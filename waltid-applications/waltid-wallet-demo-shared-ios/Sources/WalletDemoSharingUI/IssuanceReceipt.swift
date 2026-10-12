@@ -6,11 +6,14 @@ public struct IssuanceReceipt {
     public let issuer: IssuanceIssuerPreview?
     public let pendingIDs: Set<String>
     public let problem: IssuanceFailure?
+    public let detailsError: String?
 
-    public init(issuer: IssuanceIssuerPreview? = nil, pendingIDs: Set<String> = [], problem: IssuanceFailure? = nil) {
+    public init(issuer: IssuanceIssuerPreview? = nil, pendingIDs: Set<String> = [], problem: IssuanceFailure? = nil,
+                detailsError: String? = nil) {
         self.issuer = issuer
         self.pendingIDs = pendingIDs
         self.problem = problem
+        self.detailsError = detailsError
     }
 }
 

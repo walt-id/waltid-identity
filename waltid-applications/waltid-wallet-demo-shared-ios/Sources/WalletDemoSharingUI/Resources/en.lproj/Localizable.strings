@@ -77,3 +77,4 @@
 "Expanded" = "Expanded";
 "Receive" = "Receive";
 "Collapsed" = "Collapsed";
+"Some saved credential details could not be loaded. Refresh status to check your wallet before starting another request." = "Some saved credential details could not be loaded. Refresh status to check your wallet before starting another request.";

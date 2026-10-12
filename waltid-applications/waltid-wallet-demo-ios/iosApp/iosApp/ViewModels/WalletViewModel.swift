@@ -255,6 +255,18 @@ class WalletViewModel: ObservableObject {
         return lastReceivedCredentialIDs.compactMap { credentialsByID[$0] }
     }
 
+    var missingReceivedCredentialIDs: Set<String> {
+        let available = Set(credentials.map(\.id))
+        return Set(lastReceivedCredentialIDs).subtracting(available)
+    }
+
+    var receivedDetailsUnavailable: Bool { issuanceReceipt?.detailsError != nil || !missingReceivedCredentialIDs.isEmpty }
+
+    var issuanceReceiptComplete: Bool {
+        issuanceReceipt?.problem == nil && issuanceReceipt?.pendingIDs.isEmpty == true &&
+            !lastReceivedCredentialIDs.isEmpty && !receivedDetailsUnavailable
+    }
+
     var presentationUrlEntryEnabled: Bool {
         !isLoading && presentationReview == nil
     }
@@ -1120,7 +1132,14 @@ class WalletViewModel: ObservableObject {
         }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
-        let refreshedCredentials = try await walletClient.credentials()
+        var detailsError: String? = nil
+        let refreshedCredentials: [Credential]
+        do { refreshedCredentials = try await walletClient.credentials() }
+        catch is CancellationError { throw CancellationError() }
+        catch {
+            refreshedCredentials = credentials
+            detailsError = WalletStatusText.receivedCredentialsUnavailable
+        }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
         let receivedCredentialIDs = Self.resolvedReceivedCredentialIDs(
@@ -1128,9 +1147,7 @@ class WalletViewModel: ObservableObject {
             previousCredentials: previousCredentials,
             refreshedCredentials: refreshedCredentials
         )
-        let refreshedCredentialIDs = Set(refreshedCredentials.map(\.id))
-        let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
-        guard !displayableReceivedCredentialIDs.isEmpty else {
+        guard !receivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
             issuanceSession = nil
             offerPreview = nil
@@ -1153,14 +1170,14 @@ class WalletViewModel: ObservableObject {
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
-        lastReceivedCredentialIDs = displayableReceivedCredentialIDs
-        issuanceReceipt = IssuanceReceipt(issuer: issuer)
+        lastReceivedCredentialIDs = receivedCredentialIDs
+        issuanceReceipt = IssuanceReceipt(issuer: issuer, detailsError: detailsError)
         self.txCode = ""
         offerUrl = ""
-        receiveCompleted = true
+        receiveCompleted = issuanceReceiptComplete
         receiveNavigationResetKey += 1
         selectedTab = .receive
-        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: selectedTab)
+        setSuccess(WalletStatusText.receivedCredentials(receivedCredentialIDs.count), tab: selectedTab)
     }
 
     func updateTxCode(_ value: String) {
@@ -1186,7 +1203,14 @@ class WalletViewModel: ObservableObject {
                 guard isCurrent(request) else { return }
                 switch outcome {
                 case let .stored(_, credentialIDs):
-                    let refreshedCredentials = try await walletClient.credentials()
+                    var detailsError: String? = nil
+                    let refreshedCredentials: [Credential]
+                    do { refreshedCredentials = try await walletClient.credentials() }
+                    catch is CancellationError { throw CancellationError() }
+                    catch {
+                        refreshedCredentials = credentials
+                        detailsError = WalletStatusText.receivedCredentialsUnavailable
+                    }
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     credentials = refreshedCredentials
@@ -1195,8 +1219,10 @@ class WalletViewModel: ObservableObject {
                     guard isCurrent(request) else { return }
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = receivedIDs(credentialIDs)
-                    issuanceReceipt = receipt([])
-                    receiveCompleted = issuanceReceipt?.problem == nil && issuanceReceipt?.pendingIDs.isEmpty == true
+                    let originalReceipt = receipt([])
+                    issuanceReceipt = IssuanceReceipt(issuer: originalReceipt.issuer, pendingIDs: originalReceipt.pendingIDs,
+                        problem: originalReceipt.problem, detailsError: detailsError)
+                    receiveCompleted = issuanceReceiptComplete
                     if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
                         offerUrl = ""
                         receiveNavigationResetKey += 1
@@ -1269,6 +1295,7 @@ class WalletViewModel: ObservableObject {
                     issuanceReceipt = IssuanceReceipt(issuer: receipt.issuer,
                         pendingIDs: receipt.pendingIDs.intersection(pending.map(\.id)), problem: receipt.problem)
                 }
+                receiveCompleted = issuanceReceiptComplete
                 setSuccess("Receiving status updated", tab: .receive)
             } catch is CancellationError { return }
             catch {
@@ -1857,10 +1884,8 @@ class WalletViewModel: ObservableObject {
         previousCredentials: [Credential],
         refreshedCredentials: [Credential]
     ) -> [String] {
-        let refreshedIDs = Set(refreshedCredentials.map(\.id))
-        let returnedResolvedIDs = returnedCredentialIDs.filter { refreshedIDs.contains($0) }
-        if !returnedResolvedIDs.isEmpty {
-            return returnedResolvedIDs
+        if !returnedCredentialIDs.isEmpty {
+            return returnedCredentialIDs.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
         }
 
         let previousIDs = Set(previousCredentials.map(\.id))

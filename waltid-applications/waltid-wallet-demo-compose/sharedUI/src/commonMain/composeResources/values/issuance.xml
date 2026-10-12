@@ -37,4 +37,5 @@
     <string name="issuance_continue">Continue receiving</string>
     <string name="issuance_done">Done</string>
     <string name="issuance_refresh_status">Refresh status</string>
+    <string name="issuance_missing_details">Some saved credential details could not be loaded. Refresh status to check your wallet before starting another request.</string>
 </resources>

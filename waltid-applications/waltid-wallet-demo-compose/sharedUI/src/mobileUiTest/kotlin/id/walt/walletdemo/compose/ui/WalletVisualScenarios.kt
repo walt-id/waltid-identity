@@ -495,13 +495,16 @@ internal class WalletVisualScenarios(
         }
     }
 
-    fun partialBatchResult(status: WalletDemoContinuationStatus = WalletDemoContinuationStatus.AwaitingIssuer, failure: Boolean = false) = with(test) {
+    fun partialBatchResult(status: WalletDemoContinuationStatus = WalletDemoContinuationStatus.AwaitingIssuer,
+                           failure: Boolean = false, missingDetails: Boolean = false) = with(test) {
         val base = WalletVisualFixtures.partialResult
         val state = base.copy(
-            deferredCredentials = if (failure) emptyList() else base.deferredCredentials.map { it.copy(status = status) },
-            issuanceReceipt = base.issuanceReceipt?.let { if (failure) it.copy(pendingIds = emptySet(),
+            lastReceivedCredentialIds = base.lastReceivedCredentialIds + if (missingDetails) listOf("missing-credential") else emptyList(),
+            deferredCredentials = if (failure || missingDetails) emptyList() else base.deferredCredentials.map { it.copy(status = status) },
+            issuanceReceipt = base.issuanceReceipt?.let { if (missingDetails) it.copy(pendingIds = emptySet()) else if (failure) it.copy(pendingIds = emptySet(),
                 problem = WalletDemoIssuanceProblem("The issuer could not finish this request.", failedTargetCount = 1, notAttemptedTargetCount = 2)) else it },
-            operation = if (failure) WalletOperationState.Failed("The issuer could not finish this request.", WalletDemoTab.Receive) else base.operation,
+            operation = if (missingDetails) WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive)
+                else if (failure) WalletOperationState.Failed("The issuer could not finish this request.", WalletDemoTab.Receive) else base.operation,
         )
         content {
             Column(Modifier.fillMaxSize()) {
@@ -512,7 +515,11 @@ internal class WalletVisualScenarios(
                     feedback = { StatusCard(state, {}, {}) })
             }
         }
-        if (failure) {
+        if (missingDetails) {
+            onNodeWithTag("issuance-missing-details").assertIsDisplayed()
+            onNodeWithText("Saved · 2").assertIsDisplayed()
+            onNodeWithTag("issuance-refresh").assertIsDisplayed().assertIsEnabled()
+        } else if (failure) {
             onNodeWithText("Failed targets: 1").performScrollTo().assertIsDisplayed()
             onNodeWithText("Not attempted: 2").assertIsDisplayed()
         } else if (status.canResume) {
@@ -524,7 +531,7 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag("wallet.offerInput").assertDoesNotExist()
         onNodeWithTag("issuance-saved-${WalletVisualFixtures.credentialSummary.id}").assertExists()
-        val id = if (failure) "partial_failure" else when (status) {
+        val id = if (missingDetails) "missing_details" else if (failure) "partial_failure" else when (status) {
             WalletDemoContinuationStatus.AwaitingLocalSave -> "local_save_pending"
             WalletDemoContinuationStatus.RemoteOutcomeUncertain -> "remote_uncertain"
             WalletDemoContinuationStatus.StorageOutcomeUncertain -> "storage_uncertain"

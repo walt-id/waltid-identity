@@ -83,16 +83,17 @@ struct ReceiveView: View {
             WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
                 pending: pendingCredentials,
-                busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
+                busy: viewModel.isLoading, missingSavedCount: viewModel.missingReceivedCredentialIDs.count,
+                onResume: viewModel.resumeDeferredCredential)
         } actions: {
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
                 finishReceiving()
-            }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
+            }, secondary: pendingCredentials.isEmpty && !viewModel.receivedDetailsUnavailable ? nil : WalletAction("Refresh status",
                 enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
         }
         .walletSuccessDismissal(key: viewModel.receiveNavigationResetKey,
             enabled: viewModel.receiveCompleted && !viewModel.isLoading && !viewModel.statusIsError(for: .receive)
-                && viewModel.issuanceReceipt?.problem == nil && pendingCredentials.isEmpty
+                && viewModel.issuanceReceiptComplete && pendingCredentials.isEmpty
                 && !viewModel.receivedCredentials.isEmpty, onDone: finishReceiving)
     }
 

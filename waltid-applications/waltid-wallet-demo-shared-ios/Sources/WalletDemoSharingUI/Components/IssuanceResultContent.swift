@@ -7,21 +7,27 @@ public struct IssuanceResultContent: View {
     private let pending: [DeferredCredential]
     private let busy: Bool
     private let onResume: (DeferredCredential) -> Void
+    private let missingSavedCount: Int
 
     public init(receipt: IssuanceReceipt?, saved: [Credential], pending: [DeferredCredential], busy: Bool,
-                onResume: @escaping (DeferredCredential) -> Void) {
+                missingSavedCount: Int = 0, onResume: @escaping (DeferredCredential) -> Void) {
         self.receipt = receipt
         self.saved = saved
         self.pending = pending
         self.busy = busy
         self.onResume = onResume
+        self.missingSavedCount = missingSavedCount
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let issuer = receipt?.issuer { IssuanceIssuerSection(issuer: issuer) }
-            if !saved.isEmpty {
-                WalletSection(String(format: String(localized: "Saved · %d", bundle: .module), saved.count)) {
+            if missingSavedCount > 0 || receipt?.detailsError != nil {
+                Text(String(localized: "Some saved credential details could not be loaded. Refresh status to check your wallet before starting another request.", bundle: .module))
+                    .foregroundStyle(.red).accessibilityIdentifier("issuance-missing-details")
+            }
+            if !saved.isEmpty || missingSavedCount > 0 {
+                WalletSection(String(format: String(localized: "Saved · %d", bundle: .module), saved.count + missingSavedCount)) {
                     VStack(spacing: 0) {
                         ForEach(saved, id: \.id) { credential in
                             SavedCredentialRow(credential: credential)

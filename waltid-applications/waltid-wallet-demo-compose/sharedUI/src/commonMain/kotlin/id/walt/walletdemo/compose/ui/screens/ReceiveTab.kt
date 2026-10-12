@@ -5,6 +5,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.receivedCredentials
+import id.walt.walletdemo.compose.logic.issuanceReceiptComplete
+import id.walt.walletdemo.compose.logic.missingReceivedCredentialIds
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -67,21 +69,23 @@ internal fun ReceiveTab(
 
     if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
         val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
+        val missingDetails = state.missingReceivedCredentialIds().isNotEmpty() || state.issuanceReceipt?.detailsError != null
         val dismissal = rememberSuccessDismissal(state.receiveNavigationResetKey,
-            enabled = state.receiveCompleted && !state.isBusy && state.issuanceReceipt?.problem == null && pending.isEmpty()
+            enabled = state.receiveCompleted && !state.isBusy && state.issuanceReceiptComplete() && pending.isEmpty()
                 && state.operation is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded
                 && state.receivedCredentials().isNotEmpty(), onDone = onDone)
         ReviewScaffold(fillViewport = fillViewport,
             modifier = modifier.then(dismissal).testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
                 enabled = !state.isBusy, testTag = "issuance-done"),
-                secondary = pending.takeIf { it.isNotEmpty() }?.let {
+                secondary = if (pending.isNotEmpty() || missingDetails) {
                     WalletAction(stringResource(Res.string.issuance_refresh_status), onRefresh,
                         enabled = !state.isBusy, testTag = "issuance-refresh")
-                })
+                } else null)
         }) {
             feedback?.invoke()
-            IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
+            IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred,
+                missingSavedCount = state.missingReceivedCredentialIds().size)
         }
         return
     }

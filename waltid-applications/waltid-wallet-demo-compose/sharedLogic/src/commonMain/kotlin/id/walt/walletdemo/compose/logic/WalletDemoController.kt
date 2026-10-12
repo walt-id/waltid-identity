@@ -896,7 +896,13 @@ class WalletDemoController(
             }
         }
         issuanceSession = null
-        val credentials = wallet.listCredentials()
+        var detailsError: String? = null
+        val credentials = try { wallet.listCredentials() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            detailsError = WalletDisplayText.ReceivedCredentialsUnavailable
+            ready.credentials
+        }
         currentCoroutineContext().ensureActive()
         if (!isCurrent(request)) return
         val receivedCredentialIds = resolvedReceivedCredentialIds(
@@ -904,9 +910,7 @@ class WalletDemoController(
             previousCredentials = ready.credentials,
             refreshedCredentials = credentials,
         )
-        val displayableReceivedCredentialIds = receivedCredentialIds
-            .filter { receivedCredentialId -> credentials.any { it.id == receivedCredentialId } }
-        if (displayableReceivedCredentialIds.isEmpty()) {
+        if (receivedCredentialIds.isEmpty()) {
             updateIfCurrent(request, WalletOperationState.Receiving) {
                 it.copy(
                     session = ready.copy(credentials = credentials),
@@ -933,12 +937,12 @@ class WalletDemoController(
                 authorizationRequestUrl = null,
                 requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 operation = WalletOperationState.Succeeded(
-                    WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
+                    WalletDisplayText.receivedCredentials(receivedCredentialIds.size),
                     WalletDemoTab.Receive,
                 ),
-                lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                issuanceReceipt = WalletDemoIssuanceReceipt(issuer),
-                receiveCompleted = true,
+                lastReceivedCredentialIds = receivedCredentialIds,
+                issuanceReceipt = WalletDemoIssuanceReceipt(issuer, detailsError = detailsError),
+                receiveCompleted = detailsError == null && receivedCredentialIds.all { id -> credentials.any { it.id == id } },
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                 selectedTab = WalletDemoTab.Receive,
             ).withPublishedStatus()
@@ -967,16 +971,25 @@ class WalletDemoController(
                 if (!isCurrent(request)) return@launch
                 when (outcome) {
                     is WalletDemoIssuanceOutcome.Stored -> {
-                        val credentials = wallet.listCredentials()
+                        var detailsError: String? = null
+                        val credentials = try { wallet.listCredentials() }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) {
+                            detailsError = WalletDisplayText.ReceivedCredentialsUnavailable
+                            ready.credentials
+                        }
                         currentCoroutineContext().ensureActive()
                         updateIfCurrent(request, WalletOperationState.Receiving) {
                             val remainingDeferred = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId }
                             val received = outcome.credentialIds.isNotEmpty() && remainingDeferred.isEmpty()
+                                && receipt(emptyList()).problem == null
+                                && detailsError == null
+                                && (priorIds + outcome.credentialIds).all { id -> credentials.any { it.id == id } }
                             it.copy(
                                 session = ready.copy(credentials = credentials),
                                 deferredCredentials = remainingDeferred,
                                 lastReceivedCredentialIds = (priorIds + outcome.credentialIds).distinct(),
-                                issuanceReceipt = receipt(emptyList()),
+                                issuanceReceipt = receipt(emptyList()).copy(detailsError = detailsError),
                                 receiveCompleted = received,
                                 offerPreview = if (received) null else it.offerPreview,
                                 requestDrafts = if (received) {
@@ -1078,9 +1091,11 @@ class WalletDemoController(
                 val credentials = wallet.listCredentials()
                 currentCoroutineContext().ensureActive()
                 updateIfCurrent(request, WalletOperationState.Receiving) {
-                    it.copy(session = ready.copy(credentials = credentials), deferredCredentials = pending,
-                        issuanceReceipt = it.issuanceReceipt?.let { receipt -> receipt.copy(pendingIds = receipt.pendingIds.intersect(pending.map { item -> item.id }.toSet())) },
-                        operation = WalletOperationState.Succeeded("Receiving status updated", WalletDemoTab.Receive)).withPublishedStatus()
+                    val refreshed = it.copy(session = ready.copy(credentials = credentials), deferredCredentials = pending,
+                        issuanceReceipt = it.issuanceReceipt?.let { receipt -> receipt.copy(
+                            pendingIds = receipt.pendingIds.intersect(pending.map { item -> item.id }.toSet()), detailsError = null) },
+                        operation = WalletOperationState.Succeeded("Receiving status updated", WalletDemoTab.Receive))
+                    refreshed.copy(receiveCompleted = refreshed.issuanceReceiptComplete()).withPublishedStatus()
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {

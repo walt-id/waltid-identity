@@ -254,6 +254,14 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.result.partial_failure.png" alt="batch · result · partial failure, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.result.partial_failure.png" alt="batch · result · partial failure, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-result-partial_failure.native-ios26_5-phone-en-light.png" alt="batch · result · partial failure, Native iOS" width="240"> |
 
+## batch-result-missing_details
+
+**Receiving — saved details unavailable**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.result.missing_details.png" alt="Receiving — saved details unavailable, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.result.missing_details.png" alt="Receiving — saved details unavailable, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-result-missing_details.native-ios26_5-phone-en-light.png" alt="Receiving — saved details unavailable, Native iOS" width="240"> |
+
 ## onboarding-key-summary
 
 **onboarding · key · summary**

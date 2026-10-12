@@ -155,6 +155,7 @@ class WalletVisualAndroidTest {
     @Test fun remoteUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.RemoteOutcomeUncertain) }
     @Test fun storageUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.StorageOutcomeUncertain) }
     @Test fun partialFailureResult() = scenario { partialBatchResult(failure = true) }
+    @Test fun missingSavedDetails() = scenario { partialBatchResult(missingDetails = true) }
 
 
     @Test

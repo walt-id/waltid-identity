@@ -485,18 +485,22 @@ final class WalletVisualTests: XCTestCase {
     func testRemoteUncertainResult() async throws { try await batchResult(status: .remoteOutcomeUncertain, id: "remote_uncertain") }
     func testStorageUncertainResult() async throws { try await batchResult(status: .storageOutcomeUncertain, id: "storage_uncertain") }
     func testPartialFailureResult() async throws { try await batchResult(id: "partial_failure", failure: true) }
+    func testMissingSavedDetails() async throws { try await batchResult(id: "missing_details", missingDetails: true) }
 
-    private func batchResult(status: IssuanceContinuationStatus = .awaitingIssuer, id: String = "saved_and_deferred", failure: Bool = false) async throws {
+    private func batchResult(status: IssuanceContinuationStatus = .awaitingIssuer, id: String = "saved_and_deferred",
+                             failure: Bool = false, missingDetails: Bool = false) async throws {
         let fixtures = try WalletVisualFixtures()
         let model = makeModel()
         await model.readerTrustSettings.awaitPendingOperations()
         model.isReady = true
         model.selectedTab = .receive
         model.statusMessage = try fixtures.partialResultStatus()
+        if missingDetails { model.statusMessage = "Received 2 credential(s)" }
         model.credentials = [try fixtures.credential()]
         model.lastReceivedCredentialIDs = model.credentials.map(\.id)
+        if missingDetails { model.lastReceivedCredentialIDs.append("missing-credential") }
         let pending = try fixtures.deferredCredential()
-        model.deferredCredentials = failure ? [] : [DeferredCredential(id: pending.id,
+        model.deferredCredentials = failure || missingDetails ? [] : [DeferredCredential(id: pending.id,
             credentialConfigurationID: pending.credentialConfigurationID, intervalSeconds: pending.intervalSeconds,
             status: status, displayMetadataJSON: pending.displayMetadataJSON)]
         let problem: IssuanceFailure? = failure ? .init(code: .issuerResponse, message: "The issuer could not finish this request.",
@@ -505,7 +509,11 @@ final class WalletVisualTests: XCTestCase {
         model.issuanceReceipt = IssuanceReceipt(issuer: try fixtures.offer().issuer, pendingIDs: Set(model.deferredCredentials.map(\.id)), problem: problem)
         if failure { model.statusMessage = problem?.message ?? ""; model.isError = true }
         XCTAssertEqual(model.credentials.count, 1)
-        XCTAssertEqual(model.deferredCredentials.count, failure ? 0 : 1)
+        XCTAssertEqual(model.deferredCredentials.count, failure || missingDetails ? 0 : 1)
+        if missingDetails {
+            XCTAssertTrue(model.receivedDetailsUnavailable)
+            XCTAssertFalse(model.issuanceReceiptComplete)
+        }
         try capture(ReceiveView(viewModel: model), id: "batch.result.\(id)")
     }
 

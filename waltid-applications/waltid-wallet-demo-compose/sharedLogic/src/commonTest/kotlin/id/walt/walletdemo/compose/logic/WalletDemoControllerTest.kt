@@ -1578,7 +1578,7 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
         val controller = unlockedControllerWith(wallet, this)
 
-        wallet.credentials = listOf(sampleCredential)
+        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
         controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl("openid-credential-offer://example")
         controller.previewOffer()
@@ -1589,13 +1589,13 @@ class WalletDemoControllerTest {
         assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
         assertEquals(1, wallet.receiveCalls)
         assertEquals(
-            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
+            WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive),
             controller.state.value.operation,
         )
-        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
-        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
         val session = controller.state.value.session as WalletSessionState.Ready
-        assertEquals(listOf(sampleCredential), session.credentials)
+        assertEquals(wallet.credentials, session.credentials)
     }
 
     @Test
@@ -1936,6 +1936,7 @@ class WalletDemoControllerTest {
         assertEquals(listOf(deferredCredential), controller.state.value.deferredCredentials)
         assertFalse(controller.state.value.receiveCompleted)
 
+        wallet.credentials = listOf(sampleCredential.copy(id = "cred-deferred"))
         controller.resumeDeferredCredential(deferredCredential.id)
         runCurrent()
 
@@ -3216,19 +3217,100 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertFalse(controller.state.value.receiveCompleted)
-        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(listOf("missing-cred"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(setOf("missing-cred"), controller.state.value.missingReceivedCredentialIds())
+        assertNotNull(controller.state.value.issuanceReceipt)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
         assertEquals(
-            WalletOperationState.Failed(
-                "Receive failed: received credentials are not available locally",
+            WalletOperationState.Succeeded(
+                "Received 1 credential(s)",
                 WalletDemoTab.Receive,
             ),
             controller.state.value.operation,
         )
         assertEquals(
-            "Receive failed: received credentials are not available locally",
+            "Received 1 credential(s)",
             controller.state.value.statusText,
         )
+    }
+
+    @Test
+    fun incompleteSavedReceiptKeepsAllIdsAndRefreshesWithoutRepeatingIssuance() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential),
+            preAuthorizedOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1", "cred-2", "cred-2")))
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(setOf("cred-2"), controller.state.value.missingReceivedCredentialIds())
+        assertFalse(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.issuanceReceiptComplete())
+        assertNull(controller.state.value.offerPreview)
+        val issuanceCalls = wallet.receiveCalls
+        controller.refreshIssuanceStatus()
+        runCurrent()
+        assertFalse(controller.state.value.issuanceReceiptComplete())
+
+        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
+        controller.refreshIssuanceStatus()
+        runCurrent()
+        assertTrue(controller.state.value.receiveCompleted)
+        assertTrue(controller.state.value.issuanceReceiptComplete())
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.receivedCredentials().map { it.id })
+        assertEquals(issuanceCalls, wallet.receiveCalls)
+    }
+
+    @Test
+    fun failedPostIssuanceReadRetainsTheConfirmedReceiptForLocalRefresh() = runTest {
+        val delegate = FakeDemoWallet(credentials = listOf(sampleCredential), receivedCredentialIds = listOf("cred-1"))
+        var failRead = false
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun listCredentials(): List<WalletDemoCredential> {
+                check(!failRead) { "Storage read unavailable" }
+                return delegate.listCredentials()
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        failRead = true
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertNotNull(controller.state.value.issuanceReceipt?.detailsError)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.issuanceReceiptComplete())
+        assertNull(controller.state.value.offerPreview)
+        failRead = false
+        controller.refreshIssuanceStatus()
+        runCurrent()
+        assertNull(controller.state.value.issuanceReceipt?.detailsError)
+        assertTrue(controller.state.value.issuanceReceiptComplete())
+    }
+
+    @Test
+    fun resumedBatchCannotCompleteWithOnlySomeConfirmedDetails() = runTest {
+        val pending = WalletDemoDeferredCredential("pending", "ExampleCredential", null)
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential),
+            preAuthorizedOutcome = WalletDemoIssuanceOutcome.Deferred(emptyList(), listOf(pending)),
+            deferredOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1", "cred-2")))
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        controller.resumeDeferredCredential(pending.id)
+        runCurrent()
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.issuanceReceiptComplete())
+        assertEquals(setOf("cred-2"), controller.state.value.missingReceivedCredentialIds())
     }
 
     @Test
