@@ -582,7 +582,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '$sessionId' for pre-authorized issuance" }
             return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
@@ -613,7 +614,8 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             withContext(NonCancellable) { restoreSession(active, SessionState.AWAITING_ACCEPTANCE) }
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not persist accepted issuance session '$sessionId'" }
             return failAndRemove(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
         return complete(active, retryTokenRejection = requirement != null) {
@@ -629,7 +631,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(callback.sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '${callback.sessionId}' for authorization callback" }
             return failed(callback.sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(callback.sessionId)
         val authorization = active.authorization
@@ -665,7 +668,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '$sessionId' for cancellation" }
             return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
         return try {
@@ -691,7 +695,8 @@ class WalletIssuanceSessionService(
             }
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not cancel issuance session '$sessionId'" }
             failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
     }
@@ -824,7 +829,8 @@ class WalletIssuanceSessionService(
             loadDeferred(id)
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance continuation '$id'" }
             return failed(id, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(id)
         // Observing another writer must never enter cleanup that can release its claim.
@@ -838,7 +844,8 @@ class WalletIssuanceSessionService(
                     }.map { it.id }
                 } catch (error: CancellationException) {
                     throw error
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    log.error(error) { "Could not check stored credentials for issuance session '${record.sessionId}'" }
                     return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE,
                         deferredCredentials = listOf(record.public))
                 }
@@ -942,8 +949,11 @@ class WalletIssuanceSessionService(
             retainInterruptedDeferred(record)
             throw error
         } catch (error: Exception) {
-            retainInterruptedDeferred(record)
             val errorCode = (error as? IssuanceStageException)?.code ?: stage
+            if (errorCode == WalletIssuanceErrorCode.STORAGE) {
+                log.error(error) { "Could not store issued credentials for issuance session '${record.sessionId}'" }
+            }
+            retainInterruptedDeferred(record)
             val code = if (errorCode == WalletIssuanceErrorCode.NETWORK && record.claimed && record.content is DeferredContent.Remote)
                 WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN else errorCode
             failed(record.sessionId, code,
@@ -1067,6 +1077,10 @@ class WalletIssuanceSessionService(
                 cause is IllegalArgumentException || error.failure.stage == CredentialIssuanceStage.RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 error.failure.stage == CredentialIssuanceStage.STORAGE -> WalletIssuanceErrorCode.STORAGE
                 else -> WalletIssuanceErrorCode.NETWORK
+            }
+            // Credential storage failures are already logged when converted to an outcome.
+            if (code == WalletIssuanceErrorCode.STORAGE && error.storageOutcome == null) {
+                log.error(error) { "Could not store issuance progress for session '${active.public.id}'" }
             }
             throw IssuanceStageException(code, error, error.failure)
         }
@@ -1567,6 +1581,9 @@ class WalletIssuanceSessionService(
             invalidateActiveSessionBestEffort(sessionId)
             throw error
         } catch (error: Exception) {
+            if (error !is IssuanceStageException) {
+                log.error(error) { "Could not claim issuance session '$sessionId'" }
+            }
             invalidateActiveSessionBestEffort(sessionId)
             if (error is IssuanceStageException) throw error
             throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
@@ -1885,7 +1902,8 @@ class WalletIssuanceSessionService(
                 }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                log.error(error) { "Could not checkpoint received credentials for issuance session '${record.sessionId}'" }
                 return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE, deferredCredentials = listOf(public))
             }
             currentCoroutineContext().ensureActive()
