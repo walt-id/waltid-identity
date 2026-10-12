@@ -47,6 +47,10 @@ jobs:
         run: npm ci
       - name: Compare every browser catalogue state
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
         run: >-
           python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py
           --output-dir ../build/reports/browser-visual/timings browser-compare npm test
