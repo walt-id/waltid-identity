@@ -240,11 +240,12 @@ final class MockWalletUITests: XCTestCase {
         ui.tapButton(identifier: "wallet.pinClearButton", fallbackLabel: "Clear")
         XCTAssertEqual(input.value as? String, "")
         assertPinKeyboardAboveAction(app)
-        input.typeText("123")
+        // Exercise the visible keypad when comparing layout across the step transition.
+        for digit in ["1", "2", "3"] { app.keyboards.firstMatch.keys[digit].tap() }
         XCTAssertTrue(app.staticTexts["Step 1 of 2"].exists)
         XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].exists)
         let chooseY = input.frame.midY
-        input.typeText("4")
+        app.keyboards.firstMatch.keys["4"].tap()
         let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         XCTAssertFalse(input.exists)
@@ -280,7 +281,7 @@ final class MockWalletUITests: XCTestCase {
         // Interactive dismissal follows a drag that crosses into the keyboard's area.
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
             .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
-        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch.keys["1"])
+        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == false"), object: app.keyboards.firstMatch.keys["1"])
         XCTAssertEqual(XCTWaiter.wait(for: [keyboardHidden], timeout: 5), .completed)
         input.tap()
         assertPinKeyboardAboveAction(app)
