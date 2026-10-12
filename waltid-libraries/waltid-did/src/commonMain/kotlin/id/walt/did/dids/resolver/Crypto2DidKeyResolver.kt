@@ -85,11 +85,17 @@ class DidDocumentCrypto2KeyResolver(
         val declaredMethods = (document["verificationMethod"] as? JsonArray)
             ?.mapNotNull { it as? JsonObject }
             .orEmpty()
+        val embeddedMethods = VerificationRelationshipType.entries.flatMap { type ->
+            (document[type.toString()] as? JsonArray)
+                ?.mapNotNull { it as? JsonObject }
+                .orEmpty()
+        }
+        val documentMethods = (declaredMethods + embeddedMethods).distinct()
         if (relationship == null) {
-            if (declaredMethods.isEmpty()) {
+            if (documentMethods.isEmpty()) {
                 throw IllegalArgumentException("DID document has no verification methods: $did")
             }
-            return declaredMethods
+            return documentMethods
         }
 
         val relationshipMethods = document[relationship.toString()] as? JsonArray
@@ -98,7 +104,7 @@ class DidDocumentCrypto2KeyResolver(
             when (entry) {
                 is JsonObject -> entry
                 is JsonPrimitive -> entry.takeIf(JsonPrimitive::isString)
-                    ?.let { findReferencedMethod(declaredMethods, did, it.content) }
+                    ?.let { findReferencedMethod(documentMethods, did, it.content) }
                 else -> null
             }
         }
@@ -163,7 +169,11 @@ class DidDocumentCrypto2KeyResolver(
         (method["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotBlank)
 }
 
-private fun normalizeDidUrl(did: String, id: String): String = if (id.startsWith('#')) "$did$id" else id
+private fun normalizeDidUrl(did: String, id: String): String = when {
+    id.startsWith("did:") -> id
+    id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id"
+    else -> "$did/$id"
+}
 
 private fun idCandidates(id: String): Set<String> =
     setOf(id, id.substringAfter('#', missingDelimiterValue = ""))

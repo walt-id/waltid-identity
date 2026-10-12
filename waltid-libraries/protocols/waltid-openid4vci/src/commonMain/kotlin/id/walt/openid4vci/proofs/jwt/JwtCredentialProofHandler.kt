@@ -43,8 +43,17 @@ class JwtCredentialProofHandler(
     override val proofType: ProofType = ProofType.JWT
 
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-    private val didKeyResolver = Crypto2JwtKeyResolver()
+    private var didKeyResolver = Crypto2JwtKeyResolver()
     private val keyAttestationVerifier = KeyAttestationVerifier(clockSkewSeconds, now)
+
+    internal constructor(
+        didKeyResolver: Crypto2JwtKeyResolver,
+        proofMaxAgeSeconds: Long = DEFAULT_PROOF_MAX_AGE_SECONDS,
+        clockSkewSeconds: Long = DEFAULT_CLOCK_SKEW_SECONDS,
+        now: () -> Instant = { Clock.System.now() },
+    ) : this(proofMaxAgeSeconds, clockSkewSeconds, now) {
+        this.didKeyResolver = didKeyResolver
+    }
 
     init {
         require(proofMaxAgeSeconds > 0) { "Credential proof maximum age must be positive" }
@@ -219,7 +228,8 @@ class JwtCredentialProofHandler(
                     "Credential proof kid must be a DID URL when using kid-based holder key resolution: $holderKid"
                 }
                 validateDidBindingMethod(credentialConfiguration, holderKid)
-                val did = holderKid.substringBefore("#")
+                val did = DidUtils.didFromDidUrl(holderKid)
+                    ?: throw invalidCredentialProof("Credential proof kid must contain a valid DID: $holderKid")
                 val key = resolveHolderDidKey(did, holderKid)
                 validateKeyAlgorithm(key, header.requiredStringHeader(JwtHeaderParams.ALGORITHM))
                 ResolvedHolderKey(key = key, kid = holderKid, did = did)
@@ -282,18 +292,11 @@ class JwtCredentialProofHandler(
         }
     }
 
-    /**
-     * Resolves the holder key referenced by a proof `kid`.
-     *
-     * Wallets do not always use the DID verification method ID as `kid` (a JWK thumbprint fragment is
-     * common), so a DID exposing exactly one verification method is accepted without fragment matching.
-     */
+    /** Resolves exactly the holder key referenced by the proof `kid`. */
     private suspend fun resolveHolderDidKey(did: String, holderKid: String): Key =
-        runCatching { didKeyResolver.resolveFromDid(did, holderKid) }
-            .recoverCatching {
-                if (it is CancellationException) throw it
-                didKeyResolver.resolveFromDid(did)
-            }
+        runCatching {
+            didKeyResolver.resolveFromDidStrict(did, holderKid)
+        }
             .getOrElse {
                 if (it is CancellationException) throw it
                 throw invalidCredentialProof("Could not resolve credential proof DID key", it)
