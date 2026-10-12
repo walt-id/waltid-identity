@@ -66,4 +66,6 @@ runs:
       shell: bash
       env:
         SIMULATOR: ${{ steps.prepare.outputs.simulator }}
-      run: xcrun simctl delete "$SIMULATOR"
+      run: |
+        xcrun simctl shutdown "$SIMULATOR" || true
+        xcrun simctl delete "$SIMULATOR"

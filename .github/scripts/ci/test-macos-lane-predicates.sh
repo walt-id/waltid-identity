@@ -57,7 +57,7 @@ check_draft_selection() {
     [[ "$status" == 0 ]] || matches=false
     for lane in ios-simulator native compose enterprise sdk-docs visual-android visual-compose visual-native; do
       value=false
-      if [[ "$expected" == all || ("$expected" == docs && "$lane" == sdk-docs) ]]; then
+      if [[ "$expected" == all || ("$expected" == *docs && "$lane" == sdk-docs) || ("$expected" == visuals* && "$lane" == visual-*) ]]; then
         value=true
       fi
       grep -qx "run-$lane=$value" "$output" || matches=false
@@ -75,6 +75,10 @@ check_draft_selection() {
 check_draft_selection 'ci:mobile enables every lane on a draft' '["ci:mobile"]' walt-id/waltid-identity all
 check_draft_selection 'ci:macos enables every lane on a draft' '["ci:macos"]' walt-id/waltid-identity all
 check_draft_selection 'force-all wins over docs-only selection' '["ci:sdk-docs","ci:mobile"]' walt-id/waltid-identity all
+check_draft_selection 'ci:visual compares full renderers without functional suites on a draft' '["ci:visual"]' walt-id/waltid-identity visuals
+check_draft_selection 'mobile opt-in keeps functional suites alongside visuals' '["ci:visual","ci:mobile"]' walt-id/waltid-identity all
+check_draft_selection 'visual opt-in preserves the SDK docs label' '["ci:visual","ci:sdk-docs"]' walt-id/waltid-identity visuals_docs
+check_draft_selection 'a fork cannot opt into privileged visual lanes' '["ci:visual"]' contributor/fork none
 check_draft_selection 'docs-only label enables only SDK docs on a draft' '["ci:sdk-docs"]' walt-id/waltid-identity docs
 check_draft_selection 'an unlabelled draft stays skipped' '[]' walt-id/waltid-identity none
 check_draft_selection 'an unrelated label does not opt a draft in' '["bug"]' walt-id/waltid-identity none

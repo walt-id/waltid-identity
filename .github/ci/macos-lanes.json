@@ -119,7 +119,7 @@
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
-        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/wallet-visual-data.json",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileMain/*",
@@ -128,7 +128,11 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/androidMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/androidHostTest/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/*",
-        "waltid-applications/waltid-wallet-demo-compose/androidApp/*"
+        "waltid-applications/waltid-wallet-demo-compose/androidApp/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/androidMain/*"
       ]
     },
     "visual-compose": {
@@ -137,7 +141,7 @@
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
-        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/wallet-visual-data.json",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileMain/*",
@@ -146,7 +150,11 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosTest/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/*",
-        "waltid-applications/waltid-wallet-demo-compose/iosApp/*"
+        "waltid-applications/waltid-wallet-demo-compose/iosApp/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/iosMain/*"
       ]
     },
     "visual-native": {
@@ -155,7 +163,7 @@
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
-        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/wallet-visual-data.json",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
         "waltid-libraries/*/src/iosMain/*",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
         "waltid-applications/waltid-wallet-demo-ios/*",
