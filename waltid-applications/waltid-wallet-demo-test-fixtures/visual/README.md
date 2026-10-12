@@ -38,9 +38,17 @@ Committed PNGs are synthetic test assets. Reuse them in PR galleries with URLs p
 python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --base "$PR_BASE" --head "$PR_HEAD" --repository walt-id/waltid-identity --output build/reports/wallet-gallery
 ```
 
-Use the actual PR target, including the parent branch for a stack. The generator resolves its merge-base, handles additions/removals/renames, and compares decoded pixels so encoding-only updates do not crowd the previews. Catalogue and configuration changes remain visible. For forks, set `--head-repository` to the owning fork. The default collapsed gallery shows six representative scenarios and links every changed platform reference through the pinned comparison. `gallery.json` retains direct full-size before/after links and content digests.
+Use the actual PR target, including the parent branch for a stack. The generator resolves its merge-base, handles additions/removals/renames, and compares decoded pixels so encoding-only updates do not crowd the previews. Catalogue and configuration changes remain visible. For forks, set `--head-repository` to the owning fork. The collapsed description shows up to eight primary scenarios in Compose Android / Compose iOS / Native iOS columns. Default text size comes first; accessibility/layout variants and browser states have separate labelled sections. Use `galleryPreview`, `galleryVariants` and optional state `title` values to curate product-relevant examples instead of relying on filename order. `gallery.json` retains direct full-size before/after links and content digests.
 
-When the preview and complete inventory exceed the PR-body budget, the generator also emits bounded `inventory-*.md` pages in `gallery.json`'s `inventoryPages`. The trusted shared publisher reuses marked, collapsed PR comments and fills their links into the preview. Review those pages together with the gallery; an unresolved inventory-link marker is not publishable. Small inventories remain inside the PR body, and preview rows shrink only if needed to fit.
+The complete changed-reference inventory stays in the description. Its before/after links open each scenario in the versioned [visual catalogue](catalogue.md), where every available platform image is rendered with its capture configuration. This avoids duplicate image bytes and comment overflow. GitHub's description budget is enforced; oversized output fails with a useful error instead of publishing comments.
+
+Regenerate the catalogue after changing states, titles or preview choices, and commit the Markdown with the existing references:
+
+```sh
+python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --write-index
+```
+
+CI runs `--check-index`. The publisher validates the index's Git digest and each referenced scenario/image before updating the description. Existing PRs whose older comparison side predates the index retain direct links for that side.
 
 `--body path/to/body.md` replaces only the marked generated portion of a local PR body and preserves authored prose. Generation has no publishing permission. Before publishing, confirm the PR's current base/head, verify image access for the intended readers, assess selected E2E evidence, and use the shared mobile-evidence/PR-description workflow. Baselines show expected appearance; fresh comparison reports and observed app journeys have separate provenance. A superseded run must not overwrite a newer gallery.
 

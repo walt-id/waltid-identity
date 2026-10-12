@@ -24,6 +24,7 @@ class GalleryTests(unittest.TestCase):
         self.baselines = "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/test"
         self.data = {"schemaVersion": 2, "renderers": {"android": {"baselineDirectory": self.baselines, "configuration": {"theme": "light"}}}, "states": []}
         self.save()
+        (self.root / gallery.INDEX_PATH).write_text(gallery.catalogue_markdown(self.root))
         self.command("add", ".")
         self.command("commit", "-m", "empty catalogue")
         self.empty = self.head()
@@ -39,6 +40,7 @@ class GalleryTests(unittest.TestCase):
 
     def checkpoint(self):
         self.save()
+        (self.root / gallery.INDEX_PATH).write_text(gallery.catalogue_markdown(self.root))
         self.command("add", ".")
         self.command("commit", "-m", "visual change")
         return self.head()
@@ -93,7 +95,7 @@ class GalleryTests(unittest.TestCase):
         result = self.build(before)
         self.assertEqual(result["counts"], {"metadata": 1})
         body = gallery.markdown(result)
-        self.assertIn(f"[after]({result['changes'][0]['afterUrl']})", body)
+        self.assertIn(f"[after]({result['referenceIndexes']['after']['url']}#wallet-empty)", body)
         self.assertNotIn("#diff-", body)
 
     def test_rename_retains_both_reference_paths(self):
@@ -157,14 +159,14 @@ class GalleryTests(unittest.TestCase):
         self.checkpoint()
         result = self.build()
         body = gallery.markdown(result, limit=6)
-        self.assertIn("9 changed platform cells", body)
+        self.assertIn("9 platform references", body)
         self.assertEqual(body.count('<img src='), 6)
         for i in range(9):
             self.assertIn(f"| wallet.state_{i} |", body)
-            self.assertIn(result["changes"][i]["afterUrl"], body)
+            self.assertIn(f"#wallet-state_{i}", body)
         self.assertNotIn("/main/", body)
 
-    def test_inventory_keeps_direct_before_after_links_outside_the_preview(self):
+    def test_inventory_links_both_committed_catalogues_including_removed_states(self):
         path = self.add("wallet.changed")
         removed = self.add("wallet.removed")
         before = self.checkpoint()
@@ -177,33 +179,77 @@ class GalleryTests(unittest.TestCase):
         self.assertNotIn("<img", body)
         for cell in result["changes"]:
             for side in ("before", "after"):
-                if cell[side + "Url"]:
-                    self.assertIn(f"[{side}]({cell[side + 'Url']})", body)
-        self.assertIn("[diff]", body)
+                if cell[side]:
+                    self.assertIn(result["referenceIndexes"][side]["url"] + "#" + gallery.anchor(cell[side]["id"]), body)
+        self.assertNotIn("inventoryPages", result)
 
-    def test_large_gallery_preserves_the_complete_inventory_in_bounded_pages(self):
-        for i in range(9):
+    def test_large_gallery_keeps_all_references_in_the_description(self):
+        for i in range(90):
             self.add(f"wallet.state_{i}")
         self.checkpoint()
-        with mock.patch.object(gallery, "BODY_BUDGET", 5_000):
-            result = self.build()
-            body = gallery.markdown(result)
-        self.assertIn(gallery.INVENTORY_LINKS, body)
-        self.assertLessEqual(len(body.encode()), 5_000)
-        inventory = "\n".join(result["inventoryPages"])
-        for i in range(9):
-            self.assertEqual(inventory.count(f"| wallet.state_{i} |"), 1)
-        for page in result["inventoryPages"]:
-            self.assertLess(len(page.encode()), 60_000)
+        result = self.build()
+        body = gallery.markdown(result)
+        self.assertLess(len(body.encode()), 60_000)
+        self.assertNotIn("inventoryPages", result)
+        for i in range(90):
+            self.assertEqual(body.count(f"| wallet.state_{i} |"), 1)
+            self.assertIn(f"#wallet-state_{i}", body)
+
+    def test_budget_failure_never_spills_into_comments(self):
+        self.add("wallet.empty")
+        self.checkpoint()
+        with mock.patch.object(gallery, "BODY_BUDGET", 100):
+            with self.assertRaisesRegex(ValueError, "No comments"):
+                gallery.markdown(self.build())
+
+    def test_large_text_is_labelled_separately_from_primary_flows(self):
+        self.add("a.large_text")
+        self.data["states"][-1]["configuration"] = {"android": {"fontScale": 1.5, "viewport": [320, 568]}}
+        self.add("wallet.default")
+        self.checkpoint()
+        body = gallery.markdown(self.build(), limit=1)
+        normal, variants = body.split("<summary>Accessibility and layout variants</summary>")
+        self.assertIn('alt="wallet · default', normal)
+        self.assertNotIn('alt="a · large text', normal)
+        self.assertIn("1.5× text", variants)
+        self.assertIn("Compose Android | Compose iOS | Native iOS", body)
+
+    def test_explicit_product_preview_overrides_filename_order(self):
+        self.add("access.failure")
+        self.add("wallet.ready")
+        self.data["galleryPreview"] = ["wallet.ready"]
+        self.checkpoint()
+        body = gallery.markdown(self.build(), limit=1)
+        self.assertIn('alt="wallet · ready', body)
+        self.assertNotIn('alt="access · failure', body)
+
+    def test_stale_committed_index_fails_closed(self):
+        self.add("wallet.empty")
+        self.checkpoint()
+        (self.root / gallery.INDEX_PATH).write_text("outdated")
+        self.command("add", ".")
+        self.command("commit", "-m", "stale index")
+        with self.assertRaisesRegex(ValueError, "catalogue is stale"):
+            self.build()
+
+    def test_renamed_reference_keeps_the_old_index_anchor(self):
+        path = self.add("wallet.old")
+        before = self.checkpoint()
+        path.rename(path.with_name("wallet.new.png"))
+        self.data["states"][0]["id"] = "wallet.new"
+        self.checkpoint()
+        body = gallery.markdown(self.build(before), limit=0)
+        self.assertIn(f"/{before}/{gallery.INDEX_PATH}#wallet-old", body)
+        self.assertIn(f"/{self.head()}/{gallery.INDEX_PATH}#wallet-new", body)
 
     def test_preview_prioritizes_different_screen_families(self):
         for identifier in ("wallet.empty", "wallet.populated", "credential.details"):
             self.add(identifier)
         self.checkpoint()
         body = gallery.markdown(self.build(), limit=2)
-        self.assertIn("**credential.details**", body)
-        self.assertIn("**wallet.empty**", body)
-        self.assertNotIn("**wallet.populated**", body)
+        self.assertIn("**credential · details**", body)
+        self.assertIn("**wallet · empty**", body)
+        self.assertNotIn("**wallet · populated**", body)
 
     def test_refresh_is_idempotent_and_preserves_authored_prose(self):
         self.add("wallet.empty")
@@ -230,7 +276,9 @@ class GalleryTests(unittest.TestCase):
     def test_invalid_catalogue_path_is_rejected(self):
         self.data["renderers"]["android"]["baselineDirectory"] = "../../outside"
         self.data["states"].append({"id": "wallet.empty", "composeTest": "testScreen", "requirements": []})
-        self.checkpoint()
+        self.save()
+        self.command("add", ".")
+        self.command("commit", "-m", "invalid path")
         with self.assertRaisesRegex(ValueError, "inside a wallet demo"):
             self.build()
 
