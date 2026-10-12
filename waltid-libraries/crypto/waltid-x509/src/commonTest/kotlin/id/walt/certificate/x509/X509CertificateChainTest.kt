@@ -50,7 +50,7 @@ class X509CertificateChainTest {
         )
 
         assertEquals(listOf(root.certificate, intermediate.certificate, leaf.certificate), chain.certificates)
-        assertEquals(listOf(2, 1, 0), (0..<chain.size).map { chain.getEntry(it).indexInProvidedChain })
+        assertEquals(listOf(listOf(2), listOf(1), listOf(0)), (0..<chain.size).map { chain.getEntry(it).indicesInProvidedChain })
         assertTrue(chain.isProvidedLeafFirst)
     }
 
@@ -65,7 +65,7 @@ class X509CertificateChainTest {
         )
 
         assertEquals(listOf(root.certificate, intermediate.certificate, leaf.certificate), chain.certificates)
-        assertEquals(listOf(2, 0, 1), (0..<chain.size).map { chain.getEntry(it).indexInProvidedChain })
+        assertEquals(listOf(listOf(2), listOf(0), listOf(1)), (0..<chain.size).map { chain.getEntry(it).indicesInProvidedChain })
         assertFalse(chain.isProvidedLeafFirst)
     }
 
@@ -89,7 +89,20 @@ class X509CertificateChainTest {
         val chain = X509CertificateChain.of(listOf(leaf.certificate, leaf.certificate, root.certificate))
 
         assertEquals(listOf(root.certificate, leaf.certificate), chain.certificates)
-        assertEquals(listOf(2, 0), (0..<chain.size).map { chain.getEntry(it).indexInProvidedChain })
+        assertEquals(listOf(listOf(2), listOf(0, 1)), (0..<chain.size).map { chain.getEntry(it).indicesInProvidedChain })
+        assertFalse(chain.isProvidedLeafFirst)
+    }
+
+    @Test
+    fun duplicateAfterTheRootIsReportedAsNotLeafFirst() = runTest {
+        val root = root("Root")
+        val leaf = root.issue("Leaf")
+
+        // Without the repeated leaf, [leaf, root] would be leaf first.
+        val chain = X509CertificateChain.of(listOf(leaf.certificate, root.certificate, leaf.certificate))
+
+        assertEquals(listOf(root.certificate, leaf.certificate), chain.certificates)
+        assertEquals(listOf(listOf(1), listOf(0, 2)), (0..<chain.size).map { chain.getEntry(it).indicesInProvidedChain })
         assertFalse(chain.isProvidedLeafFirst)
     }
 

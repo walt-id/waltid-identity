@@ -14,12 +14,12 @@ import kotlinx.io.bytestring.ByteString
  * its issuer DN equals the other's subject DN and, when both are present, its authority key identifier
  * equals the other's subject key identifier. Signatures and trust are checked by the validators, not here.
  *
- * Each certificate also remembers where it appeared in the list it was built from, so callers can
- * relate a position back to the input (for example an `x5chain`, which is leaf first).
+ * Each certificate also remembers every position at which it appeared in the list it was built from, so
+ * callers can relate the chain back to the input (for example an `x5chain`, which is leaf first) and see
+ * certificates that were provided more than once.
  */
 class X509CertificateChain private constructor(
     private val certChainList: List<InternalCertChainEntry>,
-    private val providedWithoutDuplicates: Boolean,
 ) {
 
     val size: Int = certChainList.size
@@ -37,8 +37,7 @@ class X509CertificateChain private constructor(
      * issuer — the order required by e.g. `x5chain`/`x5c`.
      */
     val isProvidedLeafFirst: Boolean
-        get() = providedWithoutDuplicates &&
-                certChainList.indices.all { certChainList[it].indexInProvidedChain == size - 1 - it }
+        get() = certChainList.indices.all { certChainList[it].indicesInProvidedChain == listOf(size - 1 - it) }
 
     companion object {
 
@@ -55,11 +54,12 @@ class X509CertificateChain private constructor(
 
             val entries = certificateList
                 .withIndex()
-                .distinctBy { it.value.fingerprintSha256 }
-                .map { (index, certificate) ->
+                .groupBy { it.value.fingerprintSha256 }
+                .values
+                .map { occurrences ->
                     InternalCertChainEntry(
-                        entry = certificate,
-                        indexInProvidedChain = index,
+                        entry = occurrences.first().value,
+                        indicesInProvidedChain = occurrences.map { it.index },
                     )
                 }
 
@@ -104,26 +104,24 @@ class X509CertificateChain private constructor(
                 "Not all certificates could be added to chain of trust: " +
                         "${(entries - leafFirst.toSet()).map { it.subjectDn }}"
             }
-            return X509CertificateChain(
-                leafFirst.asReversed().toList(),
-                providedWithoutDuplicates = entries.size == certificateList.size,
-            )
+            return X509CertificateChain(leafFirst.asReversed().toList())
         }
     }
 
     interface CertChainEntry {
         val entry: X509Certificate
-        val indexInProvidedChain: Int?
+
+        /**
+         * Every position of this certificate in the provided certificate list (0 = first element, the leaf
+         * for a leaf-first chain), in ascending order. More than one position means the certificate was
+         * provided more than once; empty for a certificate that was not provided.
+         */
+        val indicesInProvidedChain: List<Int>
     }
 
     private class InternalCertChainEntry(
         override val entry: X509Certificate,
-
-        /**
-         * Position in the provided certificate list (0 = first element, the leaf for a leaf-first
-         * chain); `null` for a certificate that was not provided.
-         */
-        override val indexInProvidedChain: Int?,
+        override val indicesInProvidedChain: List<Int>,
     ) : CertChainEntry {
         val subjectDn: String = entry.data.subjectDn
         val issuerDn: String = entry.data.issuerDn

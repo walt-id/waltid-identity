@@ -94,6 +94,19 @@ class MdocReaderAuthenticationTrustEvaluatorTest {
     }
 
     @Test
+    fun `reader repeated after the trusted root is not trusted`() = runTest {
+        val fixture = ReaderCertificateProfileFixture.create(CryptoRuntime(defaultSoftwareKeyProviders()))
+        val evaluator = MdocReaderAuthenticationTrustEvaluator(trustStore = InMemoryTrustStore(listOf(fixture.root)))
+
+        val decision = evaluator.evaluate(
+            evidence(fixture.leaf.encodedDer, fixture.root.encodedDer, fixture.leaf.encodedDer)
+        )
+
+        assertCertificateInvalid(decision)
+        assertTrue(decision.reason.orEmpty().contains("leaf first"), "${decision.reason}")
+    }
+
+    @Test
     fun `reader chaining to an unrelated anchor is untrusted`() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val fixture = ReaderCertificateProfileFixture.create(runtime)

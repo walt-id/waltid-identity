@@ -37,7 +37,7 @@ class X509CertificateChainValidator(
                 context.setCurrent(
                     validator.id,
                     i,
-                    chainEntry.indexInProvidedChain,
+                    chainEntry.indicesInProvidedChain,
                     chainEntry.entry.data.subjectDn
                 )
                 if (validator.accepts(context, chainEntry.entry)) {

@@ -93,4 +93,33 @@ class X509CertificateChainInOrderValidatorTest {
         assertEquals(2, errors.size, "Log: $errors")
         assertTrue(errors.all { it.message.contains("leaf first") }, "Log: $errors")
     }
+
+    @Test
+    fun rejectsLeafRepeatedAfterRoot() = runTest {
+        val chain = chain()
+
+        // Duplicates are dropped when the chain is built; the remaining [leaf, intermediate, root] is in order.
+        val errors = orderErrors(listOf(chain.leaf, chain.intermediate, chain.root, chain.leaf), chain.root)
+
+        assertEquals(listOf(chain.leaf.data.subjectDn), errors.map { it.subjectDn }, "Log: $errors")
+        assertTrue(errors.single().message.contains("2 times, at positions 0, 3"), "Log: $errors")
+    }
+
+    @Test
+    fun rejectsRepeatedLeafInTwoCertificateChain() = runTest {
+        val chain = chain()
+
+        val errors = orderErrors(listOf(chain.leaf, chain.intermediate, chain.leaf), chain.root)
+
+        assertEquals(listOf(chain.leaf.data.subjectDn), errors.map { it.subjectDn }, "Log: $errors")
+    }
+
+    @Test
+    fun rejectsRepeatedRoot() = runTest {
+        val chain = chain()
+
+        val errors = orderErrors(listOf(chain.leaf, chain.intermediate, chain.root, chain.root), chain.root)
+
+        assertEquals(listOf(chain.root.data.subjectDn), errors.map { it.subjectDn }, "Log: $errors")
+    }
 }

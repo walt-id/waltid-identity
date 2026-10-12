@@ -51,12 +51,13 @@ class ValidationContext(
         get() = current.certificateIndex
 
     /**
-     * Position of the current certificate in the certificate list passed to validation (0 = first
-     * element, the leaf for a leaf-first chain); `null` if the certificate was not part of that list.
+     * Every position of the current certificate in the certificate list passed to validation (0 = first
+     * element, the leaf for a leaf-first chain), in ascending order: more than one if it was provided more
+     * than once, none if it was not part of that list.
      * [certificateIndex], in contrast, is its position in the root-first [X509CertificateChain].
      */
-    val certificateIndexInProvidedChain: Int?
-        get() = current.certificateIndexInProvidedChain
+    val certificateIndicesInProvidedChain: List<Int>
+        get() = current.certificateIndicesInProvidedChain
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
 
@@ -116,13 +117,13 @@ class ValidationContext(
     fun setCurrent(
         validatorId: String,
         certificateIndex: Int,
-        certificateIndexInProvidedChain: Int?,
+        certificateIndicesInProvidedChain: List<Int>,
         certificateSubjectDn: String
     ) {
         internalCurrent = Current(
             validatorId,
             certificateIndex,
-            certificateIndexInProvidedChain,
+            certificateIndicesInProvidedChain,
             certificateSubjectDn
         )
     }
@@ -130,7 +131,7 @@ class ValidationContext(
     private data class Current(
         val validatorId: String,
         val certificateIndex: Int,
-        val certificateIndexInProvidedChain: Int?,
+        val certificateIndicesInProvidedChain: List<Int>,
         val certificateSubjectDn: String,
     )
 }
