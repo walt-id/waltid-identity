@@ -3,12 +3,9 @@ package id.walt.verifier2.sdjwt
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.verifier2.freePort
-import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -18,16 +15,10 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SDMap
-import id.walt.sdjwt.SDPayload
-import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
@@ -47,8 +38,6 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.Url
 import io.ktor.server.application.Application
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -56,21 +45,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 /**
  * Happy-path SD-JWT VC presentation against verifier2.
  *
- * Unlike [IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest], this test mints a fresh
- * `dc+sd-jwt` at runtime so [WalletPresentFunctionality2] can attach a live key-binding JWT
- * whose `sd_hash` matches the presented token. That lets VP validation succeed and emit the
+ * The shared fixture mints a fresh `dc+sd-jwt` at runtime so [WalletPresentFunctionality2]
+ * can attach a live key-binding JWT whose `sd_hash` matches the presented token.
+ * That lets VP validation succeed and emit the
  * full success callback sequence.
  */
 class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
-
-    private val identityCredentialVct = "https://issuer.example/identity_credential"
 
     private val sdJwtVcDcqlQuery = DcqlQuery(
         credentials = listOf(
@@ -78,7 +64,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 id = "my_pid",
                 format = CredentialFormat.DC_SD_JWT,
                 meta = SdJwtVcMeta(
-                    vctValues = listOf(identityCredentialVct)
+                    vctValues = listOf(SD_JWT_VC_TEST_VCT)
                 ),
                 claims = listOf(
                     ClaimsQuery(pathStrings = listOf("given_name")),
@@ -128,32 +114,6 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
     }
 
     private val holderDid = "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
-
-    @Suppress("DEPRECATION")
-    private suspend fun issueSdJwtVcForHolder(): DigitalCredential {
-        val issuerKey = JWKKey.generate(KeyType.Ed25519)
-        val issuerDid = DidKeyRegistrar().registerByKey(issuerKey, DidKeyCreateOptions()).did
-        val issuerKeyId = issuerKey.getKeyId()
-        val now = Clock.System.now()
-        val claims = buildJsonObject {
-            put("given_name", JsonPrimitive("Jane"))
-            put("family_name", JsonPrimitive("Doe"))
-            put("age_over_18", JsonPrimitive(true))
-        }
-        val sdJwtVc = SDJwtVC.sign(
-            sdPayload = SDPayload.createSDPayload(claims, SDMap(emptyMap())),
-            jwtCryptoProvider = WaltIdJWTCryptoProvider(mapOf(issuerKeyId to issuerKey)),
-            issuerDid = issuerDid,
-            holderDid = holderDid,
-            issuerKeyId = issuerKeyId,
-            vct = identityCredentialVct,
-            nbf = now.epochSeconds,
-            exp = (now + 365.days).epochSeconds,
-            additionalJwtHeader = mapOf("kid" to issuerDid),
-            subject = holderDid,
-        )
-        return CredentialParser.parseOnly(sdJwtVc.toString(formatForPresentation = false, withKBJwt = false))
-    }
 
     private suspend fun selectCredentialsForQuery(
         query: DcqlQuery,
@@ -208,7 +168,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
             module = Application::verifierModule
         ) {
             val http = testHttpClient()
-            val walletCredential = issueSdJwtVcForHolder()
+            val walletCredential = issueSdJwtVcForHolder(holderDid)
 
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
