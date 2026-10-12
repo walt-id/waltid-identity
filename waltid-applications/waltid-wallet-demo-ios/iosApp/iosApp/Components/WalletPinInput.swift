@@ -64,19 +64,6 @@ private struct PinSecureEditor: UIViewRepresentable {
         field.tintColor = .clear
         field.delegate = context.coordinator
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
-        context.coordinator.field = field
-        let toolbar = UIToolbar()
-        let done = UIButton(type: .system)
-        done.setTitle("Done", for: .normal)
-        done.titleLabel?.font = .preferredFont(forTextStyle: .body)
-        done.titleLabel?.adjustsFontForContentSizeCategory = true
-        done.accessibilityIdentifier = "wallet.pinKeyboardAction"
-        done.addTarget(context.coordinator, action: #selector(Coordinator.dismissKeyboard), for: .touchUpInside)
-        done.frame = CGRect(x: 0, y: 0, width: 64, height: 44)
-        toolbar.items = [UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-                         UIBarButtonItem(customView: done)]
-        toolbar.sizeToFit()
-        field.inputAccessoryView = toolbar
         return field
     }
 
@@ -97,14 +84,7 @@ private struct PinSecureEditor: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: PinSecureEditor
-        weak var field: UITextField?
         init(_ parent: PinSecureEditor) { self.parent = parent }
-
-        @objc func dismissKeyboard() {
-            parent.focus = false
-            field?.resignFirstResponder()
-            parent.onSubmit()
-        }
 
         @objc func changed(_ field: UITextField) {
             parent.value = field.text ?? ""

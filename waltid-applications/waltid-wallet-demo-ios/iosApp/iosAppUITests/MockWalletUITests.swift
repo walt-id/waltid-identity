@@ -276,11 +276,11 @@ final class MockWalletUITests: XCTestCase {
         assertPinKeyboardAboveAction(app)
         input.typeText("12")
         let unlockKeyboard = XCTAttachment(screenshot: app.screenshot())
-        unlockKeyboard.name = "pin-unlock-keyboard-accessory"; unlockKeyboard.lifetime = .keepAlways; add(unlockKeyboard)
-        let done = app.buttons["wallet.pinKeyboardAction"]
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
-        done.tap()
-        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        unlockKeyboard.name = "pin-unlock-number-pad"; unlockKeyboard.lifetime = .keepAlways; add(unlockKeyboard)
+        // Interactive dismissal follows a drag that crosses into the keyboard's area.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch.keys["1"])
         XCTAssertEqual(XCTWaiter.wait(for: [keyboardHidden], timeout: 5), .completed)
         input.tap()
         assertPinKeyboardAboveAction(app)
@@ -323,8 +323,13 @@ final class MockWalletUITests: XCTestCase {
     }
 
     private func assertPinKeyboardAboveAction(_ app: XCUIApplication) {
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
-        XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.keys["1"].waitForExistence(timeout: 5), "PIN input must open the on-screen number pad, not just a keyboard accessory")
+        for digit in 0...9 {
+            XCTAssertTrue(keyboard.keys[String(digit)].isHittable, "PIN number key \(digit) must be visible and tappable")
+        }
+        XCTAssertFalse(app.buttons["wallet.pinKeyboardAction"].exists, "The four-digit PIN flow must not add a separate Done action")
+        XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, keyboard.frame.minY,
             "The keyboard must not cover the PIN action")
     }
 

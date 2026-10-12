@@ -352,11 +352,6 @@ final class WalletE2EUI {
 
     private func submitFocusedInput(_ element: XCUIElement) {
         guard element.exists && element.isEnabled else { return }
-        let numericDone = app.buttons["wallet.pinKeyboardAction"]
-        if numericDone.exists && numericDone.isEnabled && numericDone.isHittable {
-            numericDone.tap()
-            return
-        }
         let doneButton = app.toolbars.buttons["Done"]
         if doneButton.exists && doneButton.isHittable {
             doneButton.tap()
