@@ -227,6 +227,16 @@ jobs:
           test-report-require-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
           test-result-artifact-name: wallet-core-consumer-test-results
 
+      # Keep named test outcomes available for successful executions as well.
+      - name: Retain WalletCore consumer test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-core-consumer-test-reports-${{ github.run_attempt }}
+          path: waltid-identity/build/ios-test-reports/xcresult/*.xml
+          if-no-files-found: error
+          retention-days: 7
+
       # Outside the timed composite action so logs survive its deadline.
       - name: Retain failed WalletCore consumer logs
         if: failure() || cancelled()
