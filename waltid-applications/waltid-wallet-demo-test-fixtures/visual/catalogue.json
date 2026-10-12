@@ -225,7 +225,7 @@
       "composeTest": "pinConfirmation",
       "swiftTest": "testPinConfirmation",
       "requirements": [
-        "Enabled biometric option during PIN setup"
+        "PIN confirmation guidance and input"
       ],
       "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
     },
@@ -234,10 +234,7 @@
       "composeTest": "pinBiometricPrompt",
       "swiftTest": "testPinBiometricPrompt",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "Waiting for biometric setup"
       ],
       "note": "After PIN confirmation, the wallet waits for the OS biometric result with setup actions disabled. The screenshot shows the platform's actual in-app waiting view, not an imitation system dialog."
     },
@@ -246,10 +243,7 @@
       "composeTest": "pinCompact",
       "swiftTest": "testPinCompact",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "PIN layout with compact large text"
       ],
       "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Four positions and compact trailing actions remain visible.",
       "configuration": {
@@ -285,10 +279,7 @@
       "composeTest": "pinUnlock",
       "swiftTest": "testPinUnlock",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "Four-digit wallet unlock input"
       ],
       "note": "Partially entered, masked four-digit PIN with Clear. The fourth digit verifies automatically; keyboard and biometric precedence are checked in app-host tests."
     },
@@ -297,10 +288,7 @@
       "composeTest": "pinRtl",
       "swiftTest": "testPinRtl",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "PIN input and navigation in a right-to-left layout"
       ],
       "note": "Confirmation heading and trailing controls under RTL. Compose also uses reduced-motion preferences here; SwiftUI reads the OS preference separately. This still image proves the settled layout; app-host recordings cover transitions.",
       "configuration": {
@@ -398,9 +386,7 @@
     {
       "id": "batch.result.local_save_pending",
       "requirements": [
-        "R04",
-        "R06",
-        "R18"
+        "Credentials awaiting local persistence"
       ],
       "composeTest": "localSaveResult",
       "swiftTest": "testLocalSaveResult",
@@ -409,9 +395,7 @@
     {
       "id": "batch.result.remote_uncertain",
       "requirements": [
-        "R04",
-        "R06",
-        "R18"
+        "Uncertain remote issuance result"
       ],
       "composeTest": "remoteUncertainResult",
       "swiftTest": "testRemoteUncertainResult",
@@ -420,9 +404,7 @@
     {
       "id": "batch.result.storage_uncertain",
       "requirements": [
-        "R04",
-        "R06",
-        "R18"
+        "Uncertain local storage result"
       ],
       "composeTest": "storageUncertainResult",
       "swiftTest": "testStorageUncertainResult",
@@ -431,9 +413,7 @@
     {
       "id": "batch.result.partial_failure",
       "requirements": [
-        "R04",
-        "R06",
-        "R18"
+        "Partial issuance success and failure feedback"
       ],
       "composeTest": "partialFailureResult",
       "swiftTest": "testPartialFailureResult",
@@ -444,10 +424,7 @@
       "composeTest": "keySummary",
       "swiftTest": "testKeySummary",
       "requirements": [
-        "R01",
-        "R03",
-        "R11",
-        "R16"
+        "Key identity summary and available choices"
       ],
       "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
     },
@@ -456,10 +433,7 @@
       "composeTest": "keyRecovery",
       "swiftTest": "testKeyRecovery",
       "requirements": [
-        "R01",
-        "R03",
-        "R11",
-        "R16"
+        "Recovery choice and supporting guidance"
       ],
       "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
     },
@@ -468,10 +442,7 @@
       "composeTest": "keyStorage",
       "swiftTest": "testKeyStorage",
       "requirements": [
-        "R01",
-        "R03",
-        "R11",
-        "R16"
+        "Storage choice and supporting guidance"
       ],
       "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
     },
@@ -480,21 +451,14 @@
       "composeTest": "keyApproval",
       "swiftTest": "testKeyApproval",
       "requirements": [
-        "R01",
-        "R03",
-        "R11",
-        "R16"
+        "Signing approval choice and supporting guidance"
       ],
       "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
     },
     {
       "id": "sharing.provider.review",
       "requirements": [
-        "R04",
-        "R08",
-        "R09",
-        "R11",
-        "R15"
+        "Provider sharing review and actions"
       ],
       "composeTest": "providerSharingReview",
       "swiftTest": "testProviderSharingReview",
@@ -503,10 +467,7 @@
     {
       "id": "sharing.information.selected",
       "requirements": [
-        "R06",
-        "R07",
-        "R10",
-        "R11"
+        "Selected credential information"
       ],
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
@@ -516,10 +477,7 @@
     {
       "id": "sharing.information.alternative",
       "requirements": [
-        "R06",
-        "R07",
-        "R10",
-        "R11"
+        "Alternative credential information"
       ],
       "composeTest": "sharingInformationAlternative",
       "swiftTest": "testSharingInformationAlternative",
@@ -528,10 +486,7 @@
     {
       "id": "sharing.information.multiple",
       "requirements": [
-        "R06",
-        "R07",
-        "R10",
-        "R11"
+        "Multiple credentials during sharing review"
       ],
       "composeTest": "sharingInformationMultiple",
       "swiftTest": "testSharingInformationMultiple",
@@ -540,11 +495,7 @@
     {
       "id": "sharing.provider.compact_dark_large_text",
       "requirements": [
-        "R04",
-        "R08",
-        "R09",
-        "R11",
-        "R15"
+        "Provider sharing layout with compact large text"
       ],
       "composeTest": "compactProviderSharingReview",
       "swiftTest": "testCompactProviderSharingReview",
@@ -579,11 +530,7 @@
     {
       "id": "receiving.provider.review",
       "requirements": [
-        "R04",
-        "R08",
-        "R09",
-        "R11",
-        "R15"
+        "Provider receiving review and actions"
       ],
       "composeTest": "providerOfferReview",
       "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
@@ -591,11 +538,7 @@
     {
       "id": "sharing.provider.preparing",
       "requirements": [
-        "R04",
-        "R08",
-        "R09",
-        "R11",
-        "R15"
+        "Sharing preparation feedback and disabled actions"
       ],
       "swiftTest": "testProviderPreparing",
       "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
@@ -604,11 +547,7 @@
     {
       "id": "sharing.provider.failure",
       "requirements": [
-        "R04",
-        "R08",
-        "R09",
-        "R11",
-        "R15"
+        "Sharing failure feedback and available actions"
       ],
       "swiftTest": "testProviderFailure",
       "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
@@ -618,9 +557,7 @@
       "id": "sharing.provider.compact_dark_large_text.last",
       "swiftTest": "testCompactProviderSharingReviewLastRow",
       "requirements": [
-        "R09",
-        "R11",
-        "R15"
+        "Final provider review content with compact large text"
       ],
       "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container.",
       "configuration": {
@@ -637,12 +574,7 @@
     {
       "id": "receiving.provider.preparing",
       "requirements": [
-        "R07",
-        "R08",
-        "R09",
-        "R11",
-        "R15",
-        "R18"
+        "Receiving preparation feedback"
       ],
       "composeTest": "providerReceivingPreparing",
       "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
@@ -650,12 +582,7 @@
     {
       "id": "receiving.provider.authorization",
       "requirements": [
-        "R07",
-        "R08",
-        "R09",
-        "R11",
-        "R15",
-        "R18"
+        "Receiving authorization guidance"
       ],
       "composeTest": "providerReceivingAuthorization",
       "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
@@ -663,12 +590,7 @@
     {
       "id": "receiving.provider.failure",
       "requirements": [
-        "R07",
-        "R08",
-        "R09",
-        "R11",
-        "R15",
-        "R18"
+        "Receiving failure feedback and available actions"
       ],
       "composeTest": "providerReceivingFailure",
       "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
@@ -676,12 +598,7 @@
     {
       "id": "receiving.provider.partial_result",
       "requirements": [
-        "R07",
-        "R08",
-        "R09",
-        "R11",
-        "R15",
-        "R18"
+        "Partial receiving result and remaining targets"
       ],
       "composeTest": "providerReceivingPartialResult",
       "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
@@ -691,11 +608,7 @@
       "composeTest": "paymentLoading",
       "swiftTest": "testPaymentLoading",
       "requirements": [
-        "R12",
-        "R14",
-        "T02",
-        "T08",
-        "T10"
+        "Payment loading feedback and action state"
       ],
       "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
     },
@@ -704,11 +617,7 @@
       "composeTest": "paymentBlocked",
       "swiftTest": "testPaymentBlocked",
       "requirements": [
-        "R12",
-        "R14",
-        "T02",
-        "T08",
-        "T10"
+        "Blocked payment explanation and action state"
       ],
       "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
     },
@@ -717,11 +626,7 @@
       "composeTest": "paymentLocalizedCompact",
       "swiftTest": "testPaymentLocalizedCompact",
       "requirements": [
-        "R12",
-        "R14",
-        "T02",
-        "T08",
-        "T10"
+        "Localized payment layout with compact large text"
       ],
       "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text.",
       "configuration": {
@@ -752,17 +657,14 @@
       "id": "payment.mixed_credentials.unsigned_confirmation",
       "composeTest": "paymentReview",
       "requirements": [
-        "T01",
-        "T12"
+        "Explicit unsigned payment confirmation"
       ],
       "note": "Explicit unsigned confirmation after reviewing the payment. Native alert interaction is covered by MockWalletUITests; this image is a Compose dialog."
     },
     {
       "id": "external.receiving.review",
       "requirements": [
-        "R08",
-        "R09",
-        "R18"
+        "Externally opened receiving review"
       ],
       "composeTest": "externalReceiving",
       "swiftTest": "testExternalReceiving",
@@ -779,8 +681,7 @@
     {
       "id": "external.callback.unavailable",
       "requirements": [
-        "R08",
-        "R09"
+        "Unavailable external callback feedback"
       ],
       "composeTest": "externalUnavailableCallback",
       "swiftTest": "testExternalUnavailableCallback",
@@ -799,12 +700,7 @@
       "composeTest": "nearbyPermission",
       "swiftTest": "testNearbyPermission",
       "requirements": [
-        "R02",
-        "R05",
-        "R06",
-        "R10",
-        "R11",
-        "R15"
+        "Nearby permission guidance"
       ],
       "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
     },
@@ -813,12 +709,7 @@
       "composeTest": "nearbyReview",
       "swiftTest": "testNearbyReview",
       "requirements": [
-        "R02",
-        "R05",
-        "R06",
-        "R10",
-        "R11",
-        "R15"
+        "Nearby request review and consent actions"
       ],
       "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Initial viewport.",
       "configuration": {
@@ -850,12 +741,7 @@
       "composeTest": "nearbyExpired",
       "swiftTest": "testNearbyExpired",
       "requirements": [
-        "R02",
-        "R05",
-        "R06",
-        "R10",
-        "R11",
-        "R15"
+        "Expired nearby request feedback"
       ],
       "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
     },
@@ -864,12 +750,7 @@
       "composeTest": "nearbyReceipt",
       "swiftTest": "testNearbyReceipt",
       "requirements": [
-        "R02",
-        "R05",
-        "R06",
-        "R10",
-        "R11",
-        "R15"
+        "Nearby sharing receipt and date"
       ],
       "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
     },
@@ -878,10 +759,7 @@
       "composeTest": "nearbyReview",
       "swiftTest": "testNearbyReviewDisclosures",
       "requirements": [
-        "R04",
-        "R05",
-        "R07",
-        "R12"
+        "Selected disclosures and retention information"
       ],
       "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field.",
       "configuration": {
@@ -911,10 +789,7 @@
     {
       "id": "settings.dc_api.enabled",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Enabled digital credential API setting"
       ],
       "composeTest": "settingsDcApiEnabled",
       "swiftTest": "testSettingsDcApiEnabled"
@@ -922,10 +797,7 @@
     {
       "id": "settings.dc_api.disabled",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Disabled digital credential API setting"
       ],
       "composeTest": "settingsDcApiDisabled",
       "swiftTest": "testSettingsDcApiDisabled"
@@ -933,10 +805,7 @@
     {
       "id": "settings.nearby.default",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Nearby sharing settings"
       ],
       "composeTest": "settingsNearby",
       "swiftTest": "testSettingsNearby"
@@ -944,10 +813,7 @@
     {
       "id": "settings.connection.default",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Connection settings"
       ],
       "composeTest": "settingsConnection",
       "swiftTest": "testSettingsConnection"
@@ -955,10 +821,7 @@
     {
       "id": "settings.technical.unavailable",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Unavailable technical information feedback"
       ],
       "composeTest": "settingsTechnical",
       "swiftTest": "testSettingsTechnical"
@@ -966,9 +829,7 @@
     {
       "id": "account.empty",
       "requirements": [
-        "R01",
-        "R11",
-        "R15"
+        "Account form guidance and actions"
       ],
       "composeTest": "accountEmpty",
       "renderers": [
@@ -980,9 +841,7 @@
     {
       "id": "account.busy",
       "requirements": [
-        "R01",
-        "R11",
-        "R15"
+        "Busy account feedback and disabled submission"
       ],
       "composeTest": "accountBusy",
       "renderers": [
@@ -994,9 +853,7 @@
     {
       "id": "account.expired",
       "requirements": [
-        "R01",
-        "R11",
-        "R15"
+        "Expired account feedback and recovery action"
       ],
       "composeTest": "accountExpired",
       "renderers": [
@@ -1008,10 +865,7 @@
     {
       "id": "settings.reader.default",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Reader trust settings"
       ],
       "composeTest": "settingsReader",
       "swiftTest": "testSettingsReader",
@@ -1020,10 +874,7 @@
     {
       "id": "settings.reader_required.default",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Required reader trust policy"
       ],
       "composeTest": "settingsReaderRequired",
       "swiftTest": "testSettingsReaderRequired",
@@ -1032,10 +883,7 @@
     {
       "id": "settings.reader.import_review",
       "requirements": [
-        "R01",
-        "R02",
-        "R03",
-        "R15"
+        "Reader trust import review"
       ],
       "composeTest": "readerTrustImport",
       "swiftTest": "testReaderTrustImport",
@@ -1044,9 +892,7 @@
     {
       "id": "components.controls.default",
       "requirements": [
-        "R11",
-        "R13",
-        "R16"
+        "Enabled and disabled shared controls"
       ],
       "composeTest": "controls",
       "swiftTest": "testControls",
@@ -1055,9 +901,7 @@
     {
       "id": "components.controls.rtl",
       "requirements": [
-        "R11",
-        "R13",
-        "R16"
+        "Shared controls in a right-to-left layout"
       ],
       "composeTest": "controlsRtl",
       "swiftTest": "testControlsRtl",
@@ -1079,9 +923,7 @@
       "composeTest": "biometricCancelled",
       "swiftTest": "testBiometricCancelled",
       "requirements": [
-        "R01",
-        "R11",
-        "R13"
+        "Cancelled biometric setup feedback"
       ],
       "note": "F002: OS cancellation preserves explicit Retry and PIN-only choices; synthetic wallet content, no OS dialog."
     },
@@ -1090,9 +932,7 @@
       "composeTest": "biometricUnavailable",
       "swiftTest": "testBiometricUnavailable",
       "requirements": [
-        "R01",
-        "R11",
-        "R13"
+        "Unavailable biometric setup feedback"
       ],
       "note": "F002: no unavailable retry; explicit PIN-only continuation remains reachable."
     },
@@ -1101,19 +941,14 @@
       "composeTest": "singleOffer",
       "swiftTest": "testSingleOffer",
       "requirements": [
-        "R04",
-        "R06",
-        "R10",
-        "R18"
+        "Single credential offer with full artwork"
       ],
       "note": "F013-F014: one offered configuration uses full art; multi-offer and sharing thumbnails remain flat metadata colors."
     },
     {
       "id": "access.unlock.rejected",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "Rejected PIN feedback"
       ],
       "composeTest": "accessRejected",
       "swiftTest": "testAccessRejected",
@@ -1122,9 +957,7 @@
     {
       "id": "access.unlock.biometric_fallback",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "PIN fallback after biometric failure"
       ],
       "composeTest": "accessBiometricFallback",
       "swiftTest": "testAccessBiometricFallback",
@@ -1133,9 +966,7 @@
     {
       "id": "access.unlock.biometric_lockout",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "Biometric lockout feedback and PIN fallback"
       ],
       "composeTest": "accessBiometricLockout",
       "swiftTest": "testAccessBiometricLockout",
@@ -1144,9 +975,7 @@
     {
       "id": "settings.access.default",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "Wallet access settings"
       ],
       "composeTest": "accessSettings",
       "swiftTest": "testAccessSettings",
@@ -1155,9 +984,7 @@
     {
       "id": "settings.access.current_pin",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "Current PIN confirmation before changing access"
       ],
       "composeTest": "accessCurrentPin",
       "swiftTest": "testAccessCurrentPin",
@@ -1166,9 +993,7 @@
     {
       "id": "settings.access.new_pin",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "New PIN input"
       ],
       "composeTest": "accessNewPin",
       "swiftTest": "testAccessNewPin",
@@ -1177,9 +1002,7 @@
     {
       "id": "settings.access.confirmation",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "New PIN confirmation"
       ],
       "composeTest": "accessConfirmation",
       "swiftTest": "testAccessConfirmation",
@@ -1188,9 +1011,7 @@
     {
       "id": "settings.access.save_failure",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "PIN persistence failure feedback"
       ],
       "composeTest": "accessSaveFailure",
       "swiftTest": "testAccessSaveFailure",
@@ -1199,9 +1020,7 @@
     {
       "id": "settings.access.pin_changed",
       "requirements": [
-        "R10",
-        "R11",
-        "R15"
+        "Successful PIN change feedback"
       ],
       "composeTest": "accessPinChanged",
       "swiftTest": "testAccessPinChanged",
@@ -1210,9 +1029,7 @@
     {
       "id": "onboarding.key.approval_unavailable",
       "requirements": [
-        "R03",
-        "R11",
-        "R15"
+        "Unavailable signing approval feedback"
       ],
       "composeTest": "keyApprovalUnavailable",
       "swiftTest": "testKeyApprovalUnavailable",
@@ -1221,8 +1038,7 @@
     {
       "id": "access.unlock.biometric_unavailable",
       "requirements": [
-        "R11",
-        "R15"
+        "Unavailable biometrics and settings guidance"
       ],
       "composeTest": "accessBiometricUnavailable",
       "swiftTest": "testAccessBiometricUnavailable",
@@ -1232,8 +1048,7 @@
       "id": "wallet.opening.loading",
       "composeTest": "walletOpening",
       "requirements": [
-        "R01",
-        "R11"
+        "Wallet opening progress"
       ],
       "kind": "deterministic",
       "note": "Production opening content with in-memory clients; deliberately frozen progress animation. Initial-read lifecycle has separate host and model tests.",
@@ -1243,8 +1058,7 @@
       "id": "wallet.opening.failure",
       "composeTest": "walletOpeningFailure",
       "requirements": [
-        "R01",
-        "R11"
+        "Wallet opening failure and retry action"
       ],
       "kind": "deterministic",
       "note": "Production opening failure and Retry action; no wallet initialization, storage operation or retry is performed by this visual fixture.",
@@ -1254,8 +1068,7 @@
       "id": "access.storage.unavailable",
       "composeTest": "pinStorageUnavailable",
       "requirements": [
-        "R01",
-        "R11"
+        "Unavailable PIN storage and locked consequence"
       ],
       "kind": "deterministic",
       "note": "Production locked storage-error content. Compose exposes Retry; native presents the failure. Storage recovery behavior is tested separately.",
@@ -1265,8 +1078,7 @@
       "id": "settings.reset.confirmation",
       "composeTest": "resetConfirmation",
       "requirements": [
-        "R01",
-        "R11"
+        "Destructive reset warning and cancel action"
       ],
       "kind": "deterministic",
       "note": "Production Compose confirmation dialog opened through Settings; cancellation is asserted. SwiftUI uses a system alert covered by the existing recovery/reset host journey rather than a replica of OS chrome."
