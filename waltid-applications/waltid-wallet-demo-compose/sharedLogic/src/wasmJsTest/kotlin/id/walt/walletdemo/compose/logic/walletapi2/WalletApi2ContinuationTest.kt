@@ -25,7 +25,7 @@ class WalletApi2ContinuationTest {
                 install(ContentNegotiation) { json(walletApi2Json) }
             }
             try {
-                val client = WalletApi2Client("https://wallet.example", "synthetic-token", http)
+                val client = WalletApi2Client("https://wallet.example", "synthetic-token", http = http)
                 assertEquals(DeferredCredentialHandleDto("retained", status = status), client.listDeferred("wallet").single())
             } finally { http.close() }
         }

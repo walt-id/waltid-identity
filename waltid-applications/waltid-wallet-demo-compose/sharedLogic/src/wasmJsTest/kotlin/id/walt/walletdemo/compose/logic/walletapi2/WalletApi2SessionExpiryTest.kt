@@ -14,8 +14,8 @@ import kotlin.test.assertFailsWith
 
 class WalletApi2SessionExpiryTest {
     @Test fun oldSessionCallbacksCannotChangeTheNewAccount() {
-        val old = WalletApi2Session("http://localhost:7006", "old-test-token", "old-wallet", "old@example.test")
-        val current = WalletApi2Session("http://localhost:7006", "new-test-token", "new-wallet", "new@example.test")
+        val old = WalletApi2Session(WalletApiKind.OpenSource, "http://localhost:7006", "old-test-token", "old-wallet", "old@example.test")
+        val current = WalletApi2Session(WalletApiKind.OpenSource, "http://localhost:7006", "new-test-token", "new-wallet", "new@example.test")
         try {
             WalletApi2BrowserSessionStore.save(old)
             WalletApi2BrowserSessionStore.save(current)
@@ -51,7 +51,7 @@ class WalletApi2SessionExpiryTest {
             val http = HttpClient(MockEngine { respond("Session expired", HttpStatusCode.Unauthorized) }) {
                 install(ContentNegotiation) { json(walletApi2Json) }
             }
-            val client = WalletApi2Client("https://wallet.example", "synthetic-token", http) { expired++ }
+            val client = WalletApi2Client("https://wallet.example", "synthetic-token", http = http) { expired++ }
             try {
                 repeat(2) { assertFailsWith<WalletApi2Exception> { request(client) } }
                 assertEquals(1, expired, "Each HTTP path expires the session exactly once")
@@ -63,7 +63,7 @@ class WalletApi2SessionExpiryTest {
     fun forbiddenAccessDoesNotExpireAValidSession() = runTest {
         var expired = 0
         val http = HttpClient(MockEngine { respond("Forbidden", HttpStatusCode.Forbidden) })
-        val client = WalletApi2Client("https://wallet.example", "synthetic-token", http) { expired++ }
+        val client = WalletApi2Client("https://wallet.example", "synthetic-token", http = http) { expired++ }
         try {
             val error = assertFailsWith<WalletApi2Exception> { client.listWallets() }
             assertEquals(HttpStatusCode.Forbidden, error.status)

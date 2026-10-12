@@ -223,6 +223,7 @@ internal class WalletApi2Client(
     ): PresentationPreviewResponseDto =
         request {
             post(walletPath(walletId, "credentials/present/preview")) {
+                parameter("includeDetails", true)
                 jsonBody(PreviewPresentationRequestDto(requestUrl = requestUrl, keyId = keyId))
             }
         }.body()
