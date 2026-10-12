@@ -351,6 +351,20 @@
         "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/NewBatchJourneyTests.swift"
       ],
       "lanes": ["compose", "enterprise", "visual-compose"]
+    },
+    {
+      "name": "shared mobile logic compares both Compose renderers",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/kotlin/WalletModel.kt"
+      ],
+      "lanes": ["enterprise", "visual-android", "visual-compose"]
+    },
+    {
+      "name": "shared image fixtures compare every mobile renderer",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/portrait.jpg"
+      ],
+      "lanes": ["visual-android", "visual-compose", "visual-native"]
     }
   ]
 }

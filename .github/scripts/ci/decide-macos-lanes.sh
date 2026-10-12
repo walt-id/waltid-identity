@@ -47,9 +47,12 @@ label_match() {
       . as $pr_labels
       | {
           force_all: any($force_all[]; . as $force_label | ($pr_labels | index($force_label)) != null),
+          visuals: (($pr_labels | index("ci:visual")) != null),
           docs: (($pr_labels | index($docs_label)) != null)
         }
       | if .force_all then "force_all"
+        elif .visuals and .docs then "visuals_docs"
+        elif .visuals then "visuals"
         elif .docs then "docs"
         else "none"
         end
@@ -107,6 +110,17 @@ case "$EVENT_NAME" in
         write_outputs
         exit 0
         ;;
+      visuals|visuals_docs)
+        RUN_VISUAL_ANDROID="true"
+        RUN_VISUAL_COMPOSE="true"
+        RUN_VISUAL_NATIVE="true"
+        [[ "$matched_labels" != visuals_docs ]] || RUN_SDK_DOCS="true"
+        if [[ "$PR_DRAFT" == "true" ]]; then
+          REASON="ci:visual label on draft PR"
+          write_outputs
+          exit 0
+        fi
+        ;;
       docs)
         RUN_SDK_DOCS="true"
         if [[ "$PR_DRAFT" == "true" ]]; then
@@ -118,7 +132,7 @@ case "$EVENT_NAME" in
     esac
 
     if [[ "$PR_DRAFT" == "true" ]]; then
-      REASON="draft PR without ci:macos or ci:mobile label"
+      REASON="draft PR without a mobile CI opt-in label"
       write_outputs
       exit 0
     fi
@@ -155,6 +169,7 @@ case "$EVENT_NAME" in
     else
       REASON="no macOS-relevant path changes; use ci:macos, ci:mobile, or ci:sdk-docs to opt in"
     fi
+    [[ "$matched_labels" != visual* ]] || REASON="ci:visual label; $REASON"
     write_outputs
     exit 0
     ;;
