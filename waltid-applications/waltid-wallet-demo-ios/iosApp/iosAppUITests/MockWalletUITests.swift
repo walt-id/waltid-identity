@@ -278,11 +278,10 @@ final class MockWalletUITests: XCTestCase {
         input.typeText("12")
         let unlockKeyboard = XCTAttachment(screenshot: app.screenshot())
         unlockKeyboard.name = "pin-unlock-number-pad"; unlockKeyboard.lifetime = .keepAlways; add(unlockKeyboard)
-        // Interactive dismissal follows a drag that crosses into the keyboard's area.
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
-            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
-        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == false"), object: app.keyboards.firstMatch.keys["1"])
-        XCTAssertEqual(XCTWaiter.wait(for: [keyboardHidden], timeout: 5), .completed)
+        // Recover the editor and its partial PIN after a real loss of app/window focus.
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
         input.tap()
         assertPinKeyboardAboveAction(app)
         XCTAssertEqual((input.value as? String)?.count, 2, "Refocusing must retain the partial PIN")
