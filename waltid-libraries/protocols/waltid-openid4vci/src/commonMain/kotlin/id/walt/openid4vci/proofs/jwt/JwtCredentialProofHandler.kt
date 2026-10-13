@@ -12,7 +12,6 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
-import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
@@ -278,10 +277,17 @@ class JwtCredentialProofHandler(
         }
     }
 
-    /** Resolves exactly the holder key referenced by the proof `kid`. */
+    /**
+     * Resolves exactly the holder key referenced by the proof `kid`.
+     *
+     * Per OpenID4VCI spec, the proof must be signed by the key identified in the JOSE header.
+     * The key does not need to be in the authentication relationship - any signing-capable
+     * verification method is valid. KeyAgreement (encryption-only) methods are rejected by
+     * the resolver.
+     */
     private suspend fun resolveHolderDidKey(did: String, holderKid: String): Key =
         runCatching {
-            didKeyResolver.resolveFromDidStrict(did, holderKid, VerificationRelationshipType.Authentication)
+            didKeyResolver.resolveFromDidStrict(did, holderKid, relationship = null)
         }
             .getOrElse {
                 if (it is CancellationException) throw it
