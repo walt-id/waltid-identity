@@ -3,6 +3,7 @@ package id.walt.issuer2.models
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.repository.fixtures.PreBatchIssuanceSession
+import id.walt.issuer2.testsupport.decodePublicSession
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
 import id.walt.openid4vci.requests.notification.NotificationEvent
@@ -76,6 +77,16 @@ class PublicIssuanceSessionTest {
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))
             assertEquals(publicBatch, batch.toPublicJson(json))
             assertEquals(publicBatch, json.encodeToJsonElement(PublicIssuanceSession(batch)))
+            assertEquals(
+                session.issuanceResults.getValue("configuration").walletNotification,
+                decodePublicSession(session.toPublicJson(json).toString())
+                    .issuanceResults.getValue("configuration").walletNotification,
+            )
+            assertEquals(
+                batch.issuanceResults.getValue("configuration").walletNotification,
+                decodePublicSession(batch.toPublicJson(json).toString())
+                    .issuanceResults.getValue("configuration").walletNotification,
+            )
         }
     }
 
