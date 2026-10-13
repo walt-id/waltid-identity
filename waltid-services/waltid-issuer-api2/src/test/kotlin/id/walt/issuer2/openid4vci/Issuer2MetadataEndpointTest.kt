@@ -16,6 +16,8 @@ import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
 import id.walt.openid4vci.metadata.issuer.signing.ResolvedMetadataSigningKey
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
@@ -151,11 +153,14 @@ class Issuer2MetadataEndpointTest {
 
         val authorizationServerMetadataRaw = client.get("/.well-known/oauth-authorization-server/openid4vci")
         assertEquals(HttpStatusCode.OK, authorizationServerMetadataRaw.status)
+        assertEquals(ContentType.Application.Json, authorizationServerMetadataRaw.contentType()?.withoutParameters())
         val authorizationServerMetadata = authorizationServerMetadataRaw.body<AuthorizationServerMetadata>()
+        assertNull(authorizationServerMetadata.signedMetadata)
         val authorizationServerMetadataJson = client
             .get("/.well-known/oauth-authorization-server/openid4vci")
             .body<JsonObject>()
 
+        assertFalse("signed_metadata" in authorizationServerMetadataJson)
         val jwtVcIssuerMetadataRaw = client.get("/.well-known/jwt-vc-issuer/openid4vci")
         assertEquals(HttpStatusCode.OK, jwtVcIssuerMetadataRaw.status)
         val jwtVcIssuerMetadata = jwtVcIssuerMetadataRaw.body<JWTVCIssuerMetadata>()
@@ -291,6 +296,12 @@ class Issuer2MetadataEndpointTest {
         assertTrue(HttpHeaders.Accept in unsignedResponse.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
         val unsigned = unsignedResponse.body<JsonObject>()
         val tokenKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ServiceConfig>().ciTokenKey).getPublicKey()
+        val oauthJwt = client.assertSignedAuthorizationServerMetadata()
+        assertTrue(MetadataCertificateFixture.verifies(oauthJwt, fixture.leaf))
+        assertTrue(tokenKey.verifyJws(oauthJwt).isFailure)
+        assertNull(oauthJwt.decodeJws().header["jwk"])
+        assertEquals(fixture.chain.map { Base64.getEncoder().encodeToString(it.encoded) },
+            oauthJwt.decodeJws().header.getValue("x5c").jsonArray.map { it.jsonPrimitive.content })
         val acceptCases = listOf(
             "application/jwt" to "application/jwt",
             CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE to CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE,
@@ -364,6 +375,12 @@ class Issuer2MetadataEndpointTest {
         assertTrue(key.getPublicKey().verifyJws(token).isFailure)
         val jwks = client.get("$OPENID4VCI_PREFIX/jwks").body<JsonObject>()["keys"]!!.jsonArray
         assertFalse(jwks.any { it.jsonObject["kid"]?.jsonPrimitive?.content == "dedicated-metadata" })
+        val oauthJwt = client.assertSignedAuthorizationServerMetadata()
+        assertTrue(key.getPublicKey().verifyJws(oauthJwt).isSuccess)
+        assertTrue(tokenKey.verifyJws(oauthJwt).isFailure)
+        assertEquals("dedicated-metadata", oauthJwt.decodeJws().header["kid"]?.jsonPrimitive?.content)
+        assertNull(oauthJwt.decodeJws().header["x5c"])
+        assertFalse("d" in oauthJwt.decodeJws().header.getValue("jwk").jsonObject)
     }
 
     @Test
@@ -392,9 +409,81 @@ class Issuer2MetadataEndpointTest {
             val jwt = response.bodyAsText()
             assertTrue(MetadataCertificateFixture.verifies(jwt, fixture.leaf))
             assertNotNull(jwt.decodeJws().header["x5c"])
+            val oauthJwt = client.assertSignedAuthorizationServerMetadata()
+            assertTrue(MetadataCertificateFixture.verifies(oauthJwt, fixture.leaf))
+            assertEquals(jwt.decodeJws().header["x5c"], oauthJwt.decodeJws().header["x5c"])
         }
         assertEquals(1, resolutions)
         assertEquals(references, certificateResolutions)
+    }
+
+    @Test
+    fun referencedKeyWithoutCertificatesSignsOAuthMetadataOnRestrictedSurface() = testApplication {
+        val fixture = MetadataCertificateFixture()
+        val key = fixture.crypto2SigningKey()
+        var resolutions = 0
+        installIssuer2WithConfigFiles(
+            surfaces = Issuer2RouteSurface.preAuthorizedCodeOnly,
+            signedMetadata = MetadataSigningMethod.KeyReference("metadata-key"),
+            metadataSigningKeyResolver = MetadataSigningKeyReferenceResolver {
+                resolutions++
+                ResolvedMetadataSigningKey(key)
+            },
+        )
+        val client = apiClient()
+        repeat(2) {
+            val jwt = client.assertSignedAuthorizationServerMetadata()
+            assertTrue(MetadataCertificateFixture.verifies(jwt, fixture.leaf))
+            assertNotNull(jwt.decodeJws().header["jwk"])
+            assertNull(jwt.decodeJws().header["x5c"])
+        }
+        assertEquals(1, resolutions)
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/authorize").status)
+    }
+
+    @Test
+    fun runtimeSigningFailureDoesNotReturnUnsignedOAuthMetadata() = testApplication {
+        val fixture = MetadataCertificateFixture()
+        val key = fixture.crypto2SigningKey()
+        var failSigning = false
+        val remote = object : Key by key {
+            override val capabilities = key.capabilities.copy(
+                digestSigner = null,
+                signer = Signer { data, algorithm ->
+                    check(!failSigning) { "Synthetic metadata signer unavailable" }
+                    requireNotNull(key.capabilities.signer).sign(data, algorithm)
+                },
+            )
+        }
+        installIssuer2WithConfigFiles(
+            signedMetadata = MetadataSigningMethod.KeyReference("metadata-key"),
+            metadataSigningKeyResolver = MetadataSigningKeyReferenceResolver { ResolvedMetadataSigningKey(remote) },
+        )
+        val client = apiClient()
+        assertTrue(MetadataCertificateFixture.verifies(client.assertSignedAuthorizationServerMetadata(), fixture.leaf))
+        failSigning = true
+        val response = client.get(AUTHORIZATION_SERVER_METADATA_PATH)
+        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        assertFalse(response.bodyAsText().contains("signed_metadata"))
+        assertEquals(HttpStatusCode.OK, client.get(JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    @Test
+    fun missingReferencedKeyFailsApplicationInitialization() = testApplication {
+        installIssuer2WithConfigFiles(
+            signedMetadata = MetadataSigningMethod.KeyReference("missing"),
+            metadataSigningKeyResolver = MetadataSigningKeyReferenceResolver { null },
+        )
+        val error = assertFails { startApplication() }
+        assertTrue(generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("signing key is unavailable") })
+    }
+
+    @Test
+    fun expiredMetadataCertificateFailsApplicationInitialization() = testApplication {
+        val fixture = MetadataCertificateFixture(notAfter = java.time.Instant.now().minusSeconds(1))
+        installIssuer2WithConfigFiles(signedMetadata = fixture.config())
+        val error = assertFails { startApplication() }
+        assertTrue(generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("expired") })
     }
 
     @Test
@@ -705,6 +794,24 @@ class Issuer2MetadataEndpointTest {
             JWT_PROOF_SIGNING_ALGORITHMS,
             assertNotNull(sdJwtConfiguration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
         )
+    }
+
+    private suspend fun HttpClient.assertSignedAuthorizationServerMetadata(): String {
+        val response = get(AUTHORIZATION_SERVER_METADATA_PATH)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(ContentType.Application.Json, response.contentType()?.withoutParameters())
+        val metadata = response.body<JsonObject>()
+        val jwt = metadata.getValue("signed_metadata").jsonPrimitive.content
+        val decoded = jwt.decodeJws()
+        assertEquals("JWT", decoded.header["typ"]?.jsonPrimitive?.content)
+        assertEquals("ES256", decoded.header["alg"]?.jsonPrimitive?.content)
+        assertEquals(ISSUER_BASE_URL, decoded.payload["iss"]?.jsonPrimitive?.content)
+        assertEquals(metadata["issuer"], decoded.payload["iss"])
+        assertFalse("signed_metadata" in decoded.payload)
+        assertEquals(JsonObject(metadata - "signed_metadata"), JsonObject(decoded.payload - setOf("iss", "iat")))
+        val issuedAt = assertNotNull(decoded.payload["iat"]?.jsonPrimitive?.content?.toLongOrNull())
+        assertTrue(kotlin.math.abs(java.time.Instant.now().epochSecond - issuedAt) < 60)
+        return jwt
     }
 
     private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(

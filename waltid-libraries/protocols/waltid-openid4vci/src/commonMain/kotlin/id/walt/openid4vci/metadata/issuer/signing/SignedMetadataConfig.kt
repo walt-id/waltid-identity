@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlin.jvm.JvmOverloads
 
-/** One signing strategy, initialized by the embedding service. Omit this config to reuse its token key. */
+/** Shared signing strategy for credential issuer and OAuth authorization server metadata. */
 @Serializable
 data class SignedMetadataConfig(val signingMethod: MetadataSigningMethod)
 

@@ -1,13 +1,18 @@
 package id.walt.openid4vci.metadata.issuer.signing
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import kotlinx.coroutines.CancellationException
 
 fun interface MetadataJwtSigner {
     suspend fun sign(metadata: CredentialIssuerMetadata): String
 
+    /** Keeps existing credential-only implementations compatible; dedicated signers support both types. */
+    suspend fun sign(metadata: AuthorizationServerMetadata): String =
+        throw UnsupportedOperationException("This metadata signer does not support authorization server metadata")
+
     companion object {
-        /** Null retains the service's original token-key path, including its availability checks. */
+        /** Null leaves the embedding service to apply its protocol-specific behavior when signing is unconfigured. */
         suspend fun dedicatedSigner(
             config: SignedMetadataConfig?,
             resolver: MetadataSigningKeyReferenceResolver? = null,

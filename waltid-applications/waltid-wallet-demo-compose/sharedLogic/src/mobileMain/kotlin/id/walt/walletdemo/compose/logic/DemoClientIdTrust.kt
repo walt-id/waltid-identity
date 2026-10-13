@@ -233,7 +233,7 @@ object DemoClientIdTrust {
      * Additional demo trust-registry CAs for signed Request Objects.
      * Self-signed. Valid until 2029-03-19.
      */
-    val TRUST_REGISTRY_RC_PROVIDER_PEM = """
+    val WEBUILD_RP_ROOT = """
         -----BEGIN CERTIFICATE-----
         MIIDfjCCAySgAwIBAgIQRAL20BMQkFskig+t5XJgmDAKBggqhkjOPQQDAjCByzEL
         MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
@@ -254,6 +254,33 @@ object DemoClientIdTrust {
         L2lzc3Vlci8wMWEwYTAzZS00NWFkLTdjMjQtOTM5OS05M2Y0Y2E3MzEyNjkwCgYI
         KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         AiAwrUu7Q8mZxYlhUZ72F4vfj6wRMI5qxY7TFJiWS50z0w==
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+     /**
+     * WeBuild Raidiam
+     */
+    val WEBUILD_RAIDIAM_ROOT = """
+        -----BEGIN CERTIFICATE-----
+        KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
+        MIIDQzCCAiugAwIBAgIFXpo73NswDQYJKoZIhvcNAQELBQAwYzELMAkGA1UEBhMC
+        R0IxHTAbBgNVBAoMFFJhaWRpYW0gU2VydmljZXMgTHRkMTUwMwYDVQQDDCxFVURJ
+        IFNhbmRib3ggUmVnaXN0cmF0aW9uIENlcnRpZmljYXRlIFNpZ25lcjAeFw0yNjA5
+        MTgxNjAwNDBaFw0yNzEwMTgxNjAwNDBaMGMxCzAJBgNVBAYTAkdCMR0wGwYDVQQK
+        DBRSYWlkaWFtIFNlcnZpY2VzIEx0ZDE1MDMGA1UEAwwsRVVESSBTYW5kYm94IFJl
+        Z2lzdHJhdGlvbiBDZXJ0aWZpY2F0ZSBTaWduZXIwggEiMA0GCSqGSIb3DQEBAQUA
+        A4IBDwAwggEKAoIBAQDaN+7O9dDWMEtuICRcBYzKhAIp74Sa9XcOFaAYkvhiFPAo
+        kT3rpjDiDPBKfR7qK8oIPQwv3zz1Z9MwxYvLRiks9NIGvDlLxIXYCbd6JYVK9BZx
+        Rvm3fFZTdpLlT6GEmgwolyhJFVTg2WfgrAmVB9gUU9VC1v7dLLKgmApniSJlYHbQ
+        TW0y46oF9JRSKxc6KXR3qMsa063l5LGa0ouRs5j3Dec3vaJHAI6CzLiJ5ZEkZCuY
+        4KZrgda7nqmTzB2QRmobdgEMzOAMbiTxJyDM/NhOHEQWkArrL+8b84drQThLIsEp
+        VFyFGcji7sixC7av5AYZKb+FdmqoBEeDmVLgjqjJAgMBAAEwDQYJKoZIhvcNAQEL
+        BQADggEBAGYHa14y8YJYZIHQAmcYuAoUr9GXqmIFHyNXkBCcZovq4y3iGWn8t3Ru
+        2waETu/71E5RuSoH+ZiFRG9sGn3nIJXTeTojWB9iYNYz67G8sRmBzO2Af18uVLry
+        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXkY
+        0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbyst
+        FKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CGg
+        u43JYSWIGqKFtXzQ2NGETUJWclnOKM=
         -----END CERTIFICATE-----
     """.trimIndent()
 
@@ -281,7 +308,8 @@ object DemoClientIdTrust {
         PID_UT_CA_PEM,
         AUTHOLOGIC_VERIFIER_PEM,
         AUTHOLOGIC_READER_PEM,
-        TRUST_REGISTRY_RC_PROVIDER_PEM,
+        WEBUILD_RP_ROOT,
+        WEBUILD_RAIDIAM_ROOT
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(

@@ -14,6 +14,8 @@ import id.walt.crypto2.keys.decodePrivateKeyPem
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.toSignedJwt
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.metadata.oauth.toSignedJwt
 import kotlinx.coroutines.CancellationException
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
@@ -33,6 +35,11 @@ internal class CertificateMetadataSigner private constructor(
     private val certificateChain = certificates.map { Base64.Default.encode(it.encodedDer.toByteArray()) }
 
     override suspend fun sign(metadata: CredentialIssuerMetadata): String {
+        validateValidity(certificates, now)
+        return metadata.toSignedJwt(signingKey.key, signingKey.algorithm, certificateChain = certificateChain, keyId = signingKey.keyId)
+    }
+
+    override suspend fun sign(metadata: AuthorizationServerMetadata): String {
         validateValidity(certificates, now)
         return metadata.toSignedJwt(signingKey.key, signingKey.algorithm, certificateChain = certificateChain, keyId = signingKey.keyId)
     }

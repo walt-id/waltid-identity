@@ -1,5 +1,7 @@
 package id.walt.openid4vci.repository.par
 
+import id.walt.openid4vci.DefaultClient
+import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +29,7 @@ class InMemoryPARRepositoryTest {
         assertNotNull(consumed)
         assertEquals("test-123", consumed.requestId)
         assertEquals("test-client", consumed.clientId)
-        assertEquals(listOf("test-client"), consumed.requestParameters["client_id"])
+        assertEquals(listOf("test-client"), consumed.authorizationRequest.requestForm["client_id"])
     }
 
     @Test
@@ -77,7 +79,7 @@ class InMemoryPARRepositoryTest {
         val now = Clock.System.now()
         val record = DefaultPARRecord(
             requestId = "metadata-test",
-            requestParameters = testRequestParameters(),
+            authorizationRequest = testAuthorizationRequest(),
             createdAt = now,
             expiresAt = now + 90.seconds,
             clientMetadata = mapOf(
@@ -106,11 +108,17 @@ class InMemoryPARRepositoryTest {
         }
         return DefaultPARRecord(
             requestId = requestId,
-            requestParameters = testRequestParameters(),
+            authorizationRequest = testAuthorizationRequest(),
             createdAt = createdAt,
             expiresAt = expiresAt,
         )
     }
+
+    private fun testAuthorizationRequest() = DefaultAuthorizationRequest(
+        client = DefaultClient("test-client", emptyList(), setOf("authorization_code"), setOf("code")),
+        responseTypes = setOf("code"), redirectUri = null, state = null,
+        requestForm = testRequestParameters(),
+    )
 
     private fun testRequestParameters(): Map<String, List<String>> =
         mapOf(

@@ -92,6 +92,31 @@ class Issuer2OpenApiCompatibilityTest {
     }
 
     @Test
+    fun `OAuth discovery schema exposes optional signed metadata in JSON and signing failure`() = testApplication {
+        application {
+            install(OpenApi) {
+                schemas { generator = OpenApiModule.createGenerator() }
+                examples { exampleEncoder = OpenApiModule.createExampleEncoder() }
+            }
+            routing { route("api.json") { openApi() } }
+        }
+        installIssuer2WithConfigFiles()
+        val specification = Json.parseToJsonElement(apiClient().get("/api.json").bodyAsText()).jsonObject
+        val operation = specification.getValue("paths").jsonObject
+            .getValue("/.well-known/oauth-authorization-server/openid4vci").jsonObject.getValue("get").jsonObject
+        val responses = operation.getValue("responses").jsonObject
+        assertTrue("500" in responses, "OAuth discovery must document metadata signing failures")
+        val content = responses.getValue("200").jsonObject.getValue("content").jsonObject
+        assertEquals(setOf("application/json"), content.keys)
+        val schemaRef = content.getValue("application/json").jsonObject.getValue("schema").jsonObject
+        val schema = schemaRef["\$ref"]?.jsonPrimitive?.content?.substringAfterLast('/')?.let {
+            specification.getValue("components").jsonObject.getValue("schemas").jsonObject.getValue(it).jsonObject
+        } ?: schemaRef
+        assertTrue("signed_metadata" in schema.getValue("properties").jsonObject)
+        assertFalse(schema["required"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "signed_metadata" })
+    }
+
+    @Test
     fun `published credential-offer examples are the kotlinx request bodies and the API accepts them`() = testApplication {
         application {
             install(OpenApi) {
