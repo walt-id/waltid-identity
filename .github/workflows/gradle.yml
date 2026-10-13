@@ -55,7 +55,7 @@ on:
         description: "Visible GitHub check run name for the conformance job JUnit report"
         required: false
         type: string
-        default: "conformance (ubuntu-22.04)"
+        default: "wallet/verifier-conformance"
       upload-test-results:
         description: "Upload the JUnit XML results as artifacts (for the enterprise release evidence bundle)"
         required: false
@@ -248,7 +248,7 @@ jobs:
           retention-days: 90
 
   conformance:
-    name: conformance (ubuntu-22.04)
+    name: wallet/verifier-conformance
     if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
     env:
@@ -512,7 +512,7 @@ jobs:
   # Each proof mode runs the unchanged issuer matrix on an independent runner.
   # Neither depends on the wallet/verifier job, and a failed proof must not cancel its sibling.
   issuer-conformance:
-    name: issuer-conformance (${{ matrix.proof }})
+    name: issuer-conformance (proof-${{ matrix.proof }})
     if: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
     strategy:
