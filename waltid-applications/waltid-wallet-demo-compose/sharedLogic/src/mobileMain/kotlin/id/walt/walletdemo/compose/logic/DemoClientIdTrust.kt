@@ -18,6 +18,31 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
  */
 object DemoClientIdTrust {
 
+    /**
+     * Self-signed leaf from `waltid-verifier-api2/config/verifier-service.conf` (`x5c`).
+     *
+     * SAN DNS `verifier.example.com`. Pair with:
+     * - `x509_san_dns:verifier.example.com` (commented next to `clientId: "verifier2"`)
+     * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
+     *
+     * Demo material only, not a production CA. Valid 2026-08-13 until 2028-08-13.
+     * Production wallets should pin a CA and use client-auth leaves.
+     */
+    val VERIFIER2_EXAMPLE_LEAF_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
+        MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
+        aWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2
+        ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49
+        AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9
+        VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQC
+        MAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQY
+        MBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8
+        e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
+        5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
 
     /* CAs from the EUDI Reference Wallet */
 
@@ -273,6 +298,7 @@ object DemoClientIdTrust {
      * ```
      */
     val x509TrustAnchorPems: List<String> = listOf(
+        VERIFIER2_EXAMPLE_LEAF_PEM,
         PID_CZ_CA_PEM,
         PID_EE_CA_PEM,
         PID_EU_CA_PEM,

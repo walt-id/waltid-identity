@@ -10,6 +10,21 @@ import WalletSDK
 /// Keep this list aligned with the Compose demo `DemoClientIdTrust`. Replace or append entries in
 /// `x509TrustAnchorPems` with your own CAs (or pinned leaves) before shipping a production wallet.
 enum DemoClientIdTrust {
+    static let verifier2ExampleLeafPem = """
+        -----BEGIN CERTIFICATE-----
+        MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
+        MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
+        aWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2
+        ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49
+        AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9
+        VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQC
+        MAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQY
+        MBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8
+        e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
+        5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
+        -----END CERTIFICATE-----
+        """
+
     static let pidCzCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC0zCCAnmgAwIBAgIUFxoZrqz1jgmJeXu6UxkuRcCgf/AwCgYIKoZIzj0EAwMw
@@ -241,6 +256,7 @@ enum DemoClientIdTrust {
 
     /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
     static let x509TrustAnchorPems: [String] = [
+        verifier2ExampleLeafPem,
         pidCzCaPem,
         pidEeCaPem,
         pidEuCaPem,
