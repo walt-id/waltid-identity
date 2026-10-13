@@ -4,6 +4,7 @@ import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -19,6 +20,7 @@ import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 
 @Composable
 internal fun PresentTab(
@@ -63,6 +65,7 @@ internal fun PresentTab(
     }
 
     if (preview != null) {
+        val information by rememberSharingInformation(preview.credentialOptions)
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
@@ -71,7 +74,7 @@ internal fun PresentTab(
                     paymentReview = state.paymentReview,
                     isPayment = preview.transactionData.any { it.isPaymentTransaction },
                     enabled = state.presentationReviewEnabled,
-                    selectionComplete = state.presentationCredentialSelectionComplete(),
+                    selectionComplete = information != null && state.presentationCredentialSelectionComplete(),
                     onSubmit = onSubmit,
                     onCancel = onCancel,
                     onReject = onReject,
@@ -83,18 +86,14 @@ internal fun PresentTab(
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
+                information = information,
                 selectedCredentialOptions = state.selectedPresentationCredentialOptions,
                 selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,
-                selectionComplete = state.presentationCredentialSelectionComplete(),
                 enabled = state.presentationReviewEnabled,
                 readOnly = false,
                 onToggleCredential = onToggleCredential,
                 onToggleDisclosure = onToggleDisclosure,
-                onSubmit = onSubmit,
-                onReject = onReject,
-                onCancel = onCancel,
                 compact = false,
-                showActions = false,
             )
         }
         return

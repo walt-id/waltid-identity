@@ -931,7 +931,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Share credentials").assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.ScanInput).performTextReplacement("https://example.test/?client_id=demo&dcql_query=%7B%7D")
         onNodeWithTag(WalletUiTestTags.ScanContinue).performClick()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
         onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
     }
@@ -973,7 +973,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         onNodeWithText("No credentials available").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).assertIsEnabled().performClick()
@@ -1054,7 +1054,7 @@ class WalletDemoAppTestScenarios(
 
         openWalletLink("openid4vp://example")
 
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         assertPresentationActionsFollowReviewContent()
         onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
         onNodeWithTag("wallet.presentationSubmitButton").assertIsDisplayed()
@@ -1098,13 +1098,13 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onNodeWithTag("wallet.external.close").performClick()
         onNodeWithTag(WalletUiTestTags.ScanButton).assertIsDisplayed()
         assertEquals(null, wallet.rejectedRequestUrl)
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation declined" }
@@ -1130,7 +1130,7 @@ class WalletDemoAppTestScenarios(
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
         onAllNodesWithText("Not requested").assertCountEquals(0)
@@ -1152,7 +1152,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         val portraitDisclosurePath = "disclosures[0].portrait"
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollToContent(this).assertIsDisplayed()
@@ -1185,7 +1185,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollToContent(this).assertIsDisplayed()
         onAllNodesWithText(sampleDidClientId).assertCountEquals(0)
@@ -1238,7 +1238,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(identityDisclosure.id)).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(ageDisclosure.id)).assertCountEquals(0)
@@ -1266,7 +1266,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         val optional = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.disclosure_1")
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollToContent(this).performClick().assertIsOn()
@@ -1276,6 +1276,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
         runOnIdle { controller.selectTab(WalletDemoTab.Present) }
+        awaitSharingInformation(controller)
         onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollToContent(this).assertIsOn()
@@ -1302,7 +1303,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.presentButton").assertDoesNotExist()
 
         previewGate.complete(Unit)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         awaitTaggedNode(WalletUiTestTags.PresentationActions)
         onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PresentationActions).assertIsDisplayed()
@@ -1331,7 +1332,7 @@ class WalletDemoAppTestScenarios(
 
         // Warm entry uses the same owner and automatically resolves the other protocol.
         controller.handleDeepLink(requestUrl)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
         onNodeWithTag("wallet.presentationSubmitButton").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
@@ -1408,7 +1409,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.external.close").performClick()
         onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
         controller.handleDeepLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
         val review = controller.state.value.presentationReview
         controller.handleDeepLink("openid4vp://example")
         waitForIdle()
@@ -1942,7 +1943,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         openWalletLink("openid4vp://example")
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitSharingInformation(controller)
 
         onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
 
@@ -2081,6 +2082,11 @@ class WalletDemoAppTestScenarios(
             onAllNodes(hasTestTag(WalletUiTestTags.claimImage(path)) and isEnabled())
                 .fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private fun ComposeUiTest.awaitSharingInformation(controller: WalletDemoController) {
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+        awaitTaggedNode("review-information-to-share")
     }
 
     private fun ComposeUiTest.awaitTaggedNode(tag: String) {
@@ -2357,7 +2363,6 @@ internal class WalletUiTestWallet(
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
-    var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
     var rejectedRequestUrl: String? = null
@@ -2458,11 +2463,6 @@ internal class WalletUiTestWallet(
         resumedContinuations += deferredCredentialId
         deferredCredentials = deferredCredentials.filterNot { it.id == deferredCredentialId }
         return WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
-    }
-
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
-        presentedRequestUrl = requestUrl
-        return presentationResult
     }
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {

@@ -12,14 +12,12 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
 internal fun SharingInformationSection(
-    review: WalletDemoSharingReview,
-    credentials: Set<WalletDemoPresentationCredentialSelection>,
+    groups: List<SharingInformationGroup>,
     disclosures: Set<WalletDemoPresentationDisclosureSelection>,
     enabled: Boolean,
     readOnly: Boolean,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    val groups = remember(review, credentials, disclosures) { review.informationToShare(credentials, disclosures) }
     WalletSection(title = "Information to share", modifier = Modifier.testTag("review-information-to-share")) {
         if (groups.isEmpty()) Text("Select a credential to see what will be shared.",
             modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
@@ -38,10 +36,7 @@ private fun SharingInformationContent(
     readOnly: Boolean,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    val option = group.option
-    val details = remember(option) { option.toCredentialDetails() }
-    val summary = details.toCardDisplayData()
-    ReviewInformationGroup(summary.title) {
+    ReviewInformationGroup(group.summary.title) {
         if (group.fields.isEmpty()) Text("No additional information to share.", style = MaterialTheme.typography.bodySmall)
         group.fields.forEachIndexed { index, field ->
             if (index > 0) MetadataRowDivider()

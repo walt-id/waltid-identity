@@ -4,6 +4,25 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
+    func testSharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json"))
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        for row in try XCTUnwrap(fixture["sharingVisibility"] as? [[String: Any]]) {
+            let requested = row["requested"] as! Bool
+            let visible = row["visible"] as! Bool
+            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: row["format"] as! String,
+                issuer: "Issuer", subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
+                    .init(path: row["path"] as! String, name: "Field", valueJSON: #""Value""#, displayValue: "Value",
+                        selectivelyDisclosable: false, required: false, selectable: false, requested: requested)])
+            let fields = informationFields(option: option, details: CredentialDisplayNormalizer.details(for: option), disclosures: [])
+            XCTAssertEqual(!fields.isEmpty, visible, "\(row)")
+            XCTAssertEqual(fields.contains { $0.alwaysIncluded }, visible && !requested, "\(row)")
+            XCTAssertTrue(fields.allSatisfy { $0.included })
+        }
+    }
+
 
     func testIssuerLabelsAndOrderMatchComposeForStoredAndRequestedInformation() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

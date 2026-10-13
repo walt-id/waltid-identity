@@ -1,5 +1,5 @@
 import Foundation
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import XCTest
 
 final class WalletLinkKindTests: XCTestCase {
@@ -39,14 +39,60 @@ final class WalletLinkResolverTests: XCTestCase {
     }
 
     func testFollowsRedirectsWithoutGuessingFromPathOrTryingBothProtocols() async throws {
-        var fetched = [String]()
+        let recorder = LinkFetchRecorder()
         let result = try await WalletLinkResolver.resolve("https://example.test/share") { url in
-            fetched.append(url)
-            return WalletLinkDocument(status: 302, location: fetched.count == 1
+            let count = await recorder.append(url)
+            return WalletLinkDocument(status: 302, location: count == 1
                 ? "/receive" : "openid4vp://?client_id=demo&dcql_query=%7B%7D")
         }
+        let fetched = await recorder.urls
         XCTAssertEqual(fetched, ["https://example.test/share", "https://example.test/receive"])
         XCTAssertEqual(result.kind, .presentation)
+    }
+
+    func testOverallDeadlineCancelsAnInFlightRedirectFetch() async {
+        let cancelled = expectation(description: "The timed-out fetch is cancelled before returning")
+        let recorder = LinkFetchRecorder()
+        do {
+            _ = try await WalletLinkResolver.resolve("https://example.test/start", timeoutNanoseconds: 100_000_000) { url in
+                let count = await recorder.append(url)
+                if count == 1 { return WalletLinkDocument(status: 302, location: "/slow") }
+                do {
+                    try await Task.sleep(nanoseconds: 10_000_000_000)
+                    XCTFail("The resolver must cancel the slow fetch")
+                    return WalletLinkDocument(status: 503)
+                } catch {
+                    cancelled.fulfill()
+                    throw error
+                }
+            }
+            XCTFail("Expected the overall deadline")
+        } catch {
+            XCTAssertEqual((error as? WalletLinkError)?.message,
+                "This link took too long to open. Check your connection and try again.")
+        }
+        await fulfillment(of: [cancelled], timeout: 1)
+        let fetched = await recorder.urls
+        XCTAssertEqual(fetched, ["https://example.test/start", "https://example.test/slow"])
+    }
+
+    func testParentCancellationCancelsTheFetchWithoutBecomingALinkError() async {
+        let started = expectation(description: "Fetch started")
+        let cancelled = expectation(description: "Fetch cancelled")
+        let task = Task {
+            try await WalletLinkResolver.resolve("https://example.test/link") { _ in
+                started.fulfill()
+                do {
+                    try await Task.sleep(nanoseconds: 10_000_000_000)
+                    return WalletLinkDocument(status: 503)
+                } catch { cancelled.fulfill(); throw error }
+            }
+        }
+        await fulfillment(of: [started], timeout: 1)
+        task.cancel()
+        do { _ = try await task.value; XCTFail("Expected cancellation") }
+        catch { XCTAssertTrue(error is CancellationError) }
+        await fulfillment(of: [cancelled], timeout: 1)
     }
 
     func testRejectsRedirectLoopsDowngradesOversizeAndErrors() async {
@@ -59,4 +105,9 @@ final class WalletLinkResolverTests: XCTestCase {
         do { _ = try await WalletLinkResolver.resolve("https://example.test/link") { _ in throw CancellationError() }; XCTFail("Expected cancellation") }
         catch { XCTAssertTrue(error is CancellationError) }
     }
+}
+
+private actor LinkFetchRecorder {
+    private(set) var urls: [String] = []
+    func append(_ url: String) -> Int { urls.append(url); return urls.count }
 }

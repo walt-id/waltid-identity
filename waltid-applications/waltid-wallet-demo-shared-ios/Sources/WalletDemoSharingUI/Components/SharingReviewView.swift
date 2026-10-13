@@ -20,7 +20,10 @@ public struct SharingReviewView: View {
     private let compact: Bool
     private let showActions: Bool
     private let paymentReview: PaymentReviewState
-    @State private var credentialDetails: [CredentialDetails] = []
+    @State private var normalizedDetails: [CredentialDetails] = []
+    @State private var normalizedOptions: [PresentationCredentialOption]?
+    private var isNormalized: Bool { normalizedOptions == review.credentialOptions }
+    private var credentialDetails: [CredentialDetails] { isNormalized ? normalizedDetails : [] }
 
     /// Renders one sharing review.
     ///
@@ -98,7 +101,7 @@ public struct SharingReviewView: View {
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                         if index > 0 { Divider() }
                         ReviewInformationGroup(title: group.details.cardSummary.title) {
-                            ForEach(Array(group.fields.enumerated()), id: \.element.item.id) { index, field in
+                            ForEach(Array(group.fields.enumerated()), id: \.element.id) { index, field in
                                 if index > 0 { Divider() }
                                 if !field.optionalSelections.isEmpty && !isReadOnly {
                                     Toggle(isOn: Binding(get: { field.included }, set: { include in
@@ -118,7 +121,7 @@ public struct SharingReviewView: View {
 
             if !isReadOnly && showActions {
                 ReviewActions(
-                    selectionComplete: selectionComplete,
+                    selectionComplete: selectionComplete && isNormalized,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
                     onReject: onReject,
@@ -128,12 +131,14 @@ public struct SharingReviewView: View {
                 )
             }
         }
-        .preference(key: SharingReviewReadinessKey.self, value: Set(credentialDetails.map(\.id)))
+        .preference(key: SharingReviewReadinessKey.self, value: isNormalized ? review.credentialOptions : [])
         .task(id: review.credentialOptions) {
-            credentialDetails = []
+            normalizedOptions = nil
+            normalizedDetails = []
             let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
             guard !Task.isCancelled else { return }
-            credentialDetails = snapshot
+            normalizedDetails = snapshot
+            normalizedOptions = review.credentialOptions
         }
     }
 
@@ -148,8 +153,10 @@ public struct SharingReviewView: View {
     }
 }
 
-/// Emitted after the normalized credential rows enter layout; hosted previews can await real content.
-struct SharingReviewReadinessKey: PreferenceKey {
-    static let defaultValue: Set<String> = []
-    static func reduce(value: inout Set<String>, nextValue: () -> Set<String>) { value.formUnion(nextValue()) }
+/// The exact options whose normalized rows entered layout. Hosts gate confirmation on this snapshot.
+public struct SharingReviewReadinessKey: PreferenceKey {
+    public static let defaultValue: [PresentationCredentialOption] = []
+    public static func reduce(value: inout [PresentationCredentialOption], nextValue: () -> [PresentationCredentialOption]) {
+        value += nextValue()
+    }
 }

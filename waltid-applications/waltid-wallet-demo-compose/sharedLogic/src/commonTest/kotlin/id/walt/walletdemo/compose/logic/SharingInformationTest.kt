@@ -17,9 +17,9 @@ class SharingInformationTest {
         val first = option(disclosures = listOf(disclosure("given_name", "Ada")))
         val second = option("two", disclosures = listOf(disclosure("given_name", "Grace")))
         val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(first, second))
-        assertEquals(listOf("Ada"), review.informationToShare(setOf(first.selection), emptySet()).single().fields.map { it.item.rawValue?.trim('"') })
-        assertEquals(listOf("Grace"), review.informationToShare(setOf(second.selection), emptySet()).single().fields.map { it.item.rawValue?.trim('"') })
-        assertTrue(review.informationToShare(emptySet(), emptySet()).isEmpty())
+        assertEquals(listOf("Ada"), review.credentialOptions.map { it.toSharingInformation() }.informationToShare(setOf(first.selection), emptySet()).single().fields.map { it.item.rawValue?.trim('"') })
+        assertEquals(listOf("Grace"), review.credentialOptions.map { it.toSharingInformation() }.informationToShare(setOf(second.selection), emptySet()).single().fields.map { it.item.rawValue?.trim('"') })
+        assertTrue(review.credentialOptions.map { it.toSharingInformation() }.informationToShare(emptySet(), emptySet()).isEmpty())
     }
 
     @Test fun sameCredentialUnionIsShownOnceAndRequiredDisclosureCannotBeDeselectedThroughAnotherQuery() {
@@ -27,7 +27,7 @@ class SharingInformationTest {
         val optional = option(query = "optional-name", disclosures = listOf(disclosure("birth_date", "1815-12-10"),
             disclosure("$.given_name", "Ada", required = false)))
         val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(required, optional))
-        val group = review.informationToShare(setOf(required.selection, optional.selection), emptySet()).single()
+        val group = review.credentialOptions.map { it.toSharingInformation() }.informationToShare(setOf(required.selection, optional.selection), emptySet()).single()
         assertEquals(2, group.options.size)
         assertEquals(2, group.fields.size)
         val name = group.fields.first { it.item.pathComponents == listOf("given_name") }
@@ -40,11 +40,11 @@ class SharingInformationTest {
         val option = option(disclosures = listOf(disclosure("given_name", "Ada"),
             disclosure("family_name", "Lovelace", required = false, selective = false, requested = false),
             disclosure("iss", "Issuer", required = false, selective = false, requested = false)))
-        val fields = option.informationFields(emptySet())
+        val fields = option.toSharingInformation().fields
         assertEquals(2, fields.size)
         assertTrue(fields.last().alwaysIncluded)
         assertTrue(fields.last().included)
-        assertEquals(listOf("Family name"), option.additionalInformationLabels())
+        assertEquals(listOf("Family name"), option.toSharingInformation().additionalInformationLabels)
 
     }
 
@@ -55,25 +55,29 @@ class SharingInformationTest {
             option(query = "literal", disclosures = listOf(disclosure("[\"address.name\"]", "Literal"))),
         )
         val fields = WalletDemoSharingReview(WalletDemoSharingRequest(null), options)
-            .informationToShare(options.map { it.selection }.toSet(), emptySet()).single().fields
+            .credentialOptions.map { it.toSharingInformation() }.informationToShare(options.map { it.selection }.toSet(), emptySet()).single().fields
         assertEquals(3, fields.size)
+        assertEquals(3, fields.map { it.path }.distinct().size)
+        val reversed = options.reversed().map { it.toSharingInformation() }
+            .informationToShare(options.map { it.selection }.toSet(), emptySet()).single().fields
+        assertEquals(fields.associate { it.item.rawValue to it.path }, reversed.associate { it.item.rawValue to it.path })
         assertEquals(setOf("Vienna", "Ada", "Literal"), fields.map { it.item.rawValue?.trim('"') }.toSet())
     }
 
     @Test fun optionalClaimValuesStayVisibleButAreExplicitlyExcludedUntilSelected() {
         val option = option(disclosures = listOf(disclosure("birth_date", "1815-12-10", required = false)))
-        val initial = option.informationFields(emptySet()).single()
+        val initial = option.toSharingInformation().fields.single()
         assertFalse(initial.included)
         val choice = initial.optionalSelections.single()
         assertEquals(option.queryId, choice.queryId)
-        assertTrue(option.informationFields(setOf(choice)).single().included)
+        assertTrue(listOf(option.toSharingInformation()).informationToShare(setOf(option.selection), setOf(choice)).single().fields.single().included)
     }
 
     @Test fun anOptionalRequestedClearTextClaimIsNotLabelledAsAdditionalData() {
         val option = option(disclosures = listOf(disclosure("given_name", "Ada", required = false, selective = false)))
-        val field = option.informationFields(emptySet()).single()
+        val field = option.toSharingInformation().fields.single()
         assertTrue(field.included)
         assertFalse(field.alwaysIncluded)
-        assertTrue(option.additionalInformationLabels().isEmpty())
+        assertTrue(option.toSharingInformation().additionalInformationLabels.isEmpty())
     }
 }

@@ -32,7 +32,6 @@ interface DemoWallet {
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
-    suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */
     suspend fun preparePaymentConsent(

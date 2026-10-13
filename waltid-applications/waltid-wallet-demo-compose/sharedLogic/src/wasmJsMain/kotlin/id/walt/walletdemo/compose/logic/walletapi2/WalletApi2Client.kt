@@ -251,18 +251,6 @@ internal class WalletApi2Client(
             }
         }.body()
 
-    suspend fun present(
-        walletId: String,
-        requestUrl: String,
-        did: String?,
-        keyId: String? = null,
-    ): WalletPresentResultDto =
-        request {
-            post(walletPath(walletId, "credentials/present")) {
-                jsonBody(PresentCredentialRequestDto(requestUrl = requestUrl, did = did, keyId = keyId))
-            }
-        }.body()
-
     private fun walletPath(walletId: String, operation: String = "") =
         walletApiOperationPath(kind, walletId, operation)
 

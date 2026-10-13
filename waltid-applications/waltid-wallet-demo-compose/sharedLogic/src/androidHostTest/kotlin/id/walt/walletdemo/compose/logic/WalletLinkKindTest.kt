@@ -51,6 +51,27 @@ class WalletLinkResolverTest {
         assertEquals(WalletLinkKind.Presentation, result.kind)
     }
 
+    @Test fun oneDeadlineCoversRedirectsAndCancelsTheCurrentFetch() = kotlinx.coroutines.test.runTest {
+        var fetches = 0
+        var cancelled = false
+        val error = kotlin.test.assertFailsWith<WalletLinkException> {
+            resolveWalletLink("https://example.test/start") {
+                fetches++
+                if (fetches == 1) {
+                    kotlinx.coroutines.delay(6_000)
+                    WalletLinkDocument(302, location = "/slow")
+                } else {
+                    try { kotlinx.coroutines.delay(6_000); WalletLinkDocument(503) }
+                    finally { cancelled = true }
+                }
+            }
+        }
+        assertEquals("This link took too long to open. Check your connection and try again.", error.message)
+        assertEquals(10_000, testScheduler.currentTime)
+        assertEquals(2, fetches)
+        kotlin.test.assertTrue(cancelled)
+    }
+
     @Test fun rejectsRedirectLoopsDowngradesOversizeAndErrors() = kotlinx.coroutines.test.runTest {
         for (document in listOf(WalletLinkDocument(302, location = "/link"),
             WalletLinkDocument(302, location = "http://example.test/link"), WalletLinkDocument(503))) {

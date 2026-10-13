@@ -5,6 +5,25 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
+    @Test fun sharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() {
+        val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
+        fixture.getValue("sharingVisibility").jsonArray.forEach { row ->
+            val case = row.jsonObject
+            val path = case.getValue("path").jsonPrimitive.content
+            val requested = case.getValue("requested").jsonPrimitive.boolean
+            val visible = case.getValue("visible").jsonPrimitive.boolean
+            val option = WalletDemoPresentationCredentialOption(queryId = "identity", credentialId = "one",
+                format = case.getValue("format").jsonPrimitive.content, label = "Identity", issuer = "Issuer",
+                credentialDataJson = "{}", disclosures = listOf(WalletDemoPresentationDisclosure(
+                    label = "Field", path = path, valueJson = "\"Value\"", selectivelyDisclosable = false,
+                    required = false, selectable = false, requested = requested)))
+            val information = option.toSharingInformation()
+            assertEquals(visible, information.fields.isNotEmpty(), row.toString())
+            assertEquals(visible && !requested, information.additionalInformationLabels.isNotEmpty(), row.toString())
+            information.fields.forEach { assertTrue(it.included) }
+        }
+    }
+
     @Test fun issuerLabelsAndOrderAreConsistentAcrossStoredAndRequestedInformation() {
         val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
         fun strings(key: String) = fixture.getValue(key).jsonArray.map { it.jsonPrimitive.content }
