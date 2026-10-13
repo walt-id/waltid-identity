@@ -57,12 +57,18 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             ui.replaceText(in: input, value: offer.txCode)
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
             XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-            ui.assertExists(identifierPrefix: "issuance-saved-", timeout: credentialOperationTimeout)
-            ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
-            ui.returnToWallet()
+            let saved = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
+            XCTAssertTrue(saved.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
+            // Idle success returns home automatically; tapping Done races that dismissal.
+            let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+                object: app.buttons["wallet.scanButton"])
+            XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
+            XCTAssertFalse(app.buttons["issuance-done"].exists)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
+            XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)).count, index + 1)
         }
     }
 
