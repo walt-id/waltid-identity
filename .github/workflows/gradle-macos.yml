@@ -234,13 +234,13 @@ jobs:
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-visual-native }}
     runs-on: xcode-27
-    timeout-minutes: 170
+    timeout-minutes: 210
     strategy:
       fail-fast: false
       matrix:
-        # Keep each provider with its demo to reuse the build. Bridge coverage also runs
-        # for a Compose-only selection, matching the former serial consumer job.
-        consumer: ${{ fromJSON(inputs.run-native && inputs.run-compose && '["native","compose","bridge"]' || inputs.run-native && '["native","bridge"]' || '["compose","bridge"]') }}
+        # Keep each provider with its demo to reuse the build. Native visual-only
+        # selection needs one native job; bridge tests accompany functional consumers.
+        consumer: ${{ fromJSON((inputs.run-native || inputs.run-visual-native) && inputs.run-compose && '["native","compose","bridge"]' || inputs.run-native && '["native","bridge"]' || inputs.run-compose && '["compose","bridge"]' || '["native"]') }}
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -258,11 +258,11 @@ jobs:
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Configure gradle
-        if: ${{ inputs.run-native || inputs.run-compose }}
+        if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run selected WalletCore consumer tests
-        if: ${{ inputs.run-native || inputs.run-compose }}
+        if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
         # Retain full test discovery and leave time outside the action to collect failure evidence.
         timeout-minutes: 160
         uses: ./waltid-identity/.github/actions/gradle-ios
@@ -277,22 +277,25 @@ jobs:
           run-native-identity-document-provider-checks: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
           run-compose-demo-tests: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
           run-compose-identity-document-provider-checks: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
+          collect-test-reports: 'false'
+          test-result-artifact-name: wallet-core-${{ matrix.consumer }}-test-results
+
+      # Reporting survives the consumer deadline and finishes before visual comparison.
+      - name: Collect and publish WalletCore consumer test reports
+        if: ${{ always() && ((matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge') }}
+        timeout-minutes: 10
+        uses: ./waltid-identity/.github/actions/ios-test-reports
+        with:
+          waltid-directory: 'waltid-identity'
+          run-native-demo-tests: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
+          run-compose-demo-tests: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-consumer-tests (${{ matrix.consumer }})
           test-report-check-name: WalletCore ${{ matrix.consumer }} Test Report
           test-report-require-tests: 'true'
-          test-result-artifact-name: wallet-core-${{ matrix.consumer }}-test-results
-
-      - name: Compare SwiftUI visual references using the shared framework
-        if: ${{ !cancelled() && inputs.run-visual-native }}
-        uses: ./waltid-identity/.github/actions/wallet-visual
-        with:
-          renderer: swiftui
-          framework-artifact: ${{ runner.temp }}/wallet-core-artifact
-          derived-data: /tmp/xcode-derived
 
       # Keep named test outcomes available for successful executions as well.
       - name: Retain WalletCore consumer test reports
-        if: ${{ always() && (inputs.run-native || inputs.run-compose) }}
+        if: ${{ always() && ((matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge') }}
         uses: actions/upload-artifact@v7
         with:
           name: wallet-core-${{ matrix.consumer }}-test-reports-${{ github.run_attempt }}
@@ -311,14 +314,25 @@ jobs:
           retention-days: 7
 
       - name: Retain incomplete WalletCore test results
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: wallet-core-${{ matrix.consumer }}-incomplete-test-results-${{ github.run_attempt }}
           path: |
-            waltid-identity/waltid-applications/**/TestResults*
+            waltid-identity/**/*.xcresult
+            /tmp/xcode-derived/Logs/Test/**/*.xcresult
+            waltid-identity/**/build/test-results/**
             waltid-identity/build/proximity-tests/**
           retention-days: 7
+
+      - name: Compare SwiftUI visual references using the shared framework
+        if: ${{ !cancelled() && inputs.run-visual-native && matrix.consumer == 'native' }}
+        timeout-minutes: 30
+        uses: ./waltid-identity/.github/actions/wallet-visual
+        with:
+          renderer: swiftui
+          framework-artifact: ${{ runner.temp }}/wallet-core-artifact
+          derived-data: /tmp/xcode-derived
 
   enterprise-ios-mobile-tests:
     needs: wallet-core-framework

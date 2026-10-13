@@ -11,6 +11,7 @@
     ".github/scripts/mobile-ci/wallet-core-artifact.py",
     ".github/actions/checkout-repos/*",
     ".github/actions/gradle-ios/*",
+    ".github/actions/ios-test-reports/*",
     ".github/actions/gradle-setup-action/*",
     ".github/actions/ios-build-setup/*",
     ".github/actions/set-properties/*",

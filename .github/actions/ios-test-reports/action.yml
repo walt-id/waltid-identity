@@ -1,0 +1,134 @@
+name: iOS test reports
+description: Collect and publish iOS results independently of the build/test deadline
+inputs:
+  waltid-directory:
+    description: Path to the Identity checkout
+    default: '.'
+  run-native-demo-tests:
+    description: Require native unit and UI targets and app-hosted recovery contracts
+    default: 'false'
+  run-compose-demo-tests:
+    description: Require Compose unit and UI test targets
+    default: 'false'
+  test-report-job-name:
+    description: Job associated with the published JUnit report
+    default: 'gradle'
+  test-report-check-name:
+    description: Published JUnit check name
+    default: 'iOS Test Report'
+  test-report-require-tests:
+    description: Require reports containing tests
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Collect iOS test reports
+      if: always()
+      id: ios_test_report
+      shell: bash
+      run: |
+        WALTID_DIR="${{ inputs.waltid-directory }}"
+        REPORT_ROOT="$WALTID_DIR/build/ios-test-reports"
+        XCODE_REPORT_DIR="$REPORT_ROOT/xcresult"
+        GRADLE_REPORT_DIR="$REPORT_ROOT/gradle"
+
+        rm -rf "$REPORT_ROOT"
+        mkdir -p "$XCODE_REPORT_DIR" "$GRADLE_REPORT_DIR"
+
+        xcode_report_count=0
+        gradle_report_count=0
+        xcresultparser_ready=false
+
+        for xcode_search_root in "$WALTID_DIR" /tmp/xcode-derived/Logs/Test; do
+          [[ -d "$xcode_search_root" ]] || continue
+
+          while IFS= read -r -d '' bundle; do
+            if [[ "$xcresultparser_ready" != "true" ]]; then
+              if ! command -v xcresultparser >/dev/null 2>&1; then
+                # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+                # `brew install` emit a tap-trust warning. Drop it first.
+                brew untap aws/tap 2>/dev/null || true
+                brew install xcresultparser
+              fi
+              xcresultparser_ready=true
+            fi
+
+            if [[ "$bundle" == "$WALTID_DIR/"* ]]; then
+              relative_bundle="${bundle#$WALTID_DIR/}"
+            else
+              relative_bundle="$bundle"
+            fi
+            safe_name=$(printf '%s' "$relative_bundle" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+            report_file="$XCODE_REPORT_DIR/${xcode_report_count}-${safe_name}.xml"
+
+            if xcresultparser "$bundle" --output-format=junit > "$report_file"; then
+              echo "Converted iOS xcresult bundle to JUnit: $relative_bundle"
+              xcode_report_count=$((xcode_report_count + 1))
+            else
+              echo "::warning::Failed to convert iOS xcresult bundle at $bundle"
+              rm -f "$report_file"
+            fi
+          done < <(find "$xcode_search_root" -name '*.xcresult' -prune -print0 2>/dev/null || true)
+        done
+
+        if (( xcode_report_count > 0 )); then
+          echo "Converted $xcode_report_count iOS xcresult bundle(s)."
+        fi
+
+        while IFS= read -r -d '' gradle_report; do
+          relative_report="${gradle_report#$WALTID_DIR/}"
+          safe_name=$(printf '%s' "$relative_report" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+          cp "$gradle_report" "$GRADLE_REPORT_DIR/$safe_name"
+          gradle_report_count=$((gradle_report_count + 1))
+        done < <(find "$WALTID_DIR" -path '*/build/test-results/*' -name '*.xml' -type f -print0 2>/dev/null || true)
+
+        {
+          echo "## iOS Test Report Collection"
+          echo "- Xcode result bundles converted: $xcode_report_count"
+          echo "- Gradle XML reports collected: $gradle_report_count"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if (( xcode_report_count == 0 && gradle_report_count == 0 )); then
+          echo "has_report=false" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.test-report-require-tests }}" == "true" ]]; then
+            echo "::error::Required iOS test reports are missing under $WALTID_DIR"
+            exit 1
+          fi
+          echo "::warning::No iOS test reports found under $WALTID_DIR"
+          exit 0
+        fi
+
+        echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+    - name: Require native unit and UI test targets
+      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --require-suite iosAppTests.xctest iosAppUITests.xctest \
+          --require-class KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
+          --allow-skipped \
+            'WalletIdentityRecoveryIntegrationTests#testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity' \
+            'WalletIdentityRecoveryIntegrationTests#testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable' \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-ios*.xml"
+
+    - name: Require Compose unit and UI test targets
+      if: ${{ always() && inputs.run-compose-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --require-suite iosAppTests.xctest iosAppUITests.xctest \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-compose*.xml"
+
+    - name: Publish iOS test report
+      if: always() && steps.ios_test_report.outputs.has_report == 'true'
+      uses: mikepenz/action-junit-report@v6
+      with:
+        update_check: true
+        job_name: ${{ inputs.test-report-job-name }}
+        check_name: ${{ inputs.test-report-check-name }}
+        report_paths: ${{ inputs.waltid-directory }}/build/ios-test-reports/**/*.xml
+        detailed_summary: true
+        include_passed: false
+        include_skipped: false
+        require_tests: ${{ inputs.test-report-require-tests }}

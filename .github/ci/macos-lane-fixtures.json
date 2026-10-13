@@ -1,6 +1,11 @@
 {
   "fixtures": [
     {
+      "name": "iOS report action selects every lane that uses shared CI setup",
+      "files": [".github/actions/ios-test-reports/action.yml"],
+      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+    },
+    {
       "name": "commonMain-only library change selects simulator and visual renderers",
       "files": [
         "waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/Foo.kt"
