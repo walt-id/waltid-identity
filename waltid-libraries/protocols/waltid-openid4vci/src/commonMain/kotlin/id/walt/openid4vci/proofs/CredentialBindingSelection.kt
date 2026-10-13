@@ -27,8 +27,8 @@ internal suspend fun selectCredentialBindings(
             val keepIdentity = previous != null && (previous.holderDid != null || candidate.holderDid == null)
             selected[thumbprint] = VerifiedCredentialBinding(
                 holderKey = candidate.holderKey,
-                holderKid = if (keepIdentity) previous?.holderKid else candidate.holderKid,
-                holderDid = if (keepIdentity) previous?.holderDid else candidate.holderDid,
+                holderKid = if (keepIdentity) previous.holderKid else candidate.holderKid,
+                holderDid = if (keepIdentity) previous.holderDid else candidate.holderDid,
                 proofIndexes = previous?.proofIndexes.orEmpty() + index,
             )
         }
@@ -40,7 +40,8 @@ internal suspend fun selectCredentialBindings(
 private fun validateSelectedBinding(binding: VerifiedCredentialBinding, configuration: CredentialConfiguration) {
     val methods = configuration.cryptographicBindingMethodsSupported
     if (binding.holderDid == null && methods != null &&
-        methods.none { it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey }) {
+        methods.none { it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey }
+    ) {
         throw invalidCredentialProof("A selected key has no verified identifier for the supported binding methods")
     }
 }
