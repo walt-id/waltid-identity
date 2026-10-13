@@ -146,8 +146,9 @@ internal class WalletVisualScenarios(
         }
         if (state == "biometric_prompt") {
             waitUntil { controller.state.value.auth is id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup }
+            val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup
             content { id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen(
-                controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup,
+                auth,
                 busy = true, availability = DemoBiometricAvailability.Available, onRetry = {}, onContinue = {}) }
             onNodeWithTag(WalletUiTestTags.BiometricSetupRetry).assertIsNotEnabled()
             onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsNotEnabled()
