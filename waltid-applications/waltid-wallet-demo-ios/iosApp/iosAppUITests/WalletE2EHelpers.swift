@@ -322,18 +322,26 @@ final class WalletE2EUI {
     }
 
     private func makeHittable(_ element: XCUIElement) {
-        guard element.exists, !element.isHittable else {
+        guard element.exists else {
             return
         }
 
-        for _ in 0..<6 where !element.isHittable {
+        let input = [XCUIElement.ElementType.textField, .secureTextField, .textView].contains(element.elementType)
+        let footer = app.otherElements["wallet.footer"]
+        func uncoveredAndHittable() -> Bool {
+            let frame = element.frame
+            let coveredInput = input && footer.exists && footer.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+            return element.isHittable && !coveredInput
+        }
+        for _ in 0..<6 where !uncoveredAndHittable() {
             app.swipeUp()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
-        for _ in 0..<6 where !element.isHittable {
+        for _ in 0..<6 where !uncoveredAndHittable() {
             app.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
+        XCTAssertTrue(uncoveredAndHittable(), "Element remains covered after scrolling: \(element.identifier)")
     }
 
     private func dismissKeyboardIfPresent() {
