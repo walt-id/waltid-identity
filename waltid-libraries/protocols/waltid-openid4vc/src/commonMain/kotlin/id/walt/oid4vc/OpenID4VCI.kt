@@ -43,8 +43,7 @@ import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.w3c.utils.VCFormat
-import id.walt.w3c.vc.vcs.W3CV11DataModel
-import id.walt.w3c.vc.vcs.W3CV2DataModel
+import id.walt.w3c.vc.vcs.applyIssuedV2Context
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
@@ -853,26 +852,7 @@ object OpenID4VCI {
                     )
             }
             val w3cVc = when (builderType) {
-                CredentialBuilderType.W3CV2CredentialBuilder -> {
-                    val v2ContextUri = W3CV2DataModel.defaultContext.first()
-                    val v11ContextUri = W3CV11DataModel.defaultContext.first()
-                    val base = if (vc.isV2()) vc.toMutableMap() else {
-                        val existing = vcPayload["@context"]
-                            ?.let { if (it is JsonArray) it.map { e -> e.jsonPrimitive.content } else listOf(it.jsonPrimitive.content) }
-                            ?: emptyList()
-                        val merged = (listOf(v2ContextUri) + existing).distinct()
-                        vcPayload.toMutableMap().also { map ->
-                            map["@context"] = JsonArray(merged.map { JsonPrimitive(it) })
-                        }
-                    }
-                    (base["@context"] as? JsonArray)?.let { arr ->
-                        val cleaned = arr.filter { it.jsonPrimitive.contentOrNull != v11ContextUri }
-                        if (cleaned.size != arr.size) base["@context"] = JsonArray(cleaned)
-                    }
-                    base.remove("issuanceDate")?.let { v -> if ("validFrom" !in base) base["validFrom"] = v }
-                    base.remove("expirationDate")?.let { v -> if ("validUntil" !in base) base["validUntil"] = v }
-                    W3CVC(base)
-                }
+                CredentialBuilderType.W3CV2CredentialBuilder -> W3CVC(vc.toMutableMap().applyIssuedV2Context())
                 else -> builderType?.let {
                     val builder = CredentialBuilder(it)
                     builder.useCredentialSubject(vcPayload)
