@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -51,7 +52,7 @@ private fun PaymentReviewContent(payment: WalletDemoPaymentDisplay) {
 
 @Composable
 private fun PaymentField(field: WalletDemoPaymentDisplayField, prominent: Boolean, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier.testTag(WalletUiTestTags.claim(field.item.path.id)), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(field.item.label, style = MaterialTheme.typography.labelLarge)
         ClaimValue(field.item.value, field.item.path, Modifier.fillMaxWidth(),
             textStyle = if (prominent) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)

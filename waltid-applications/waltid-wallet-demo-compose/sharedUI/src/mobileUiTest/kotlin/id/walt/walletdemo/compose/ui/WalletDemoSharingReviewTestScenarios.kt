@@ -10,6 +10,9 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -274,9 +277,15 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Verified website").assertIsDisplayed()
         onAllNodesWithText("Verified website").assertCountEquals(1)
         onNodeWithText("Review payment").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("42.00").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("ACME Corp").assertIsDisplayed()
+        for ((field, label, value) in listOf(
+            Triple("amount", "Amount", "42.00"),
+            Triple("currency", "Currency", "EUR"),
+            Triple("merchant_name", "Merchant name", "ACME Corp"),
+        )) {
+            val row = hasAnyAncestor(hasTestTag(WalletUiTestTags.claim("transactionData[0].details.$field")))
+            onNode(hasText(label) and row).performScrollToContent(this).assertIsDisplayed()
+            onNode(hasText(value) and row).performScrollToContent(this).assertIsDisplayed()
+        }
         onNodeWithContentDescription("Show Verifier details").performScrollToContent(this).performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ResponseProtectionSection, useUnmergedTree = true)
             .performScrollToContent(this)
