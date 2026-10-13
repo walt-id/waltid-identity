@@ -12,6 +12,7 @@ import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import org.junit.Assume.assumeTrue
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import id.walt.mobile.test.PhysicalDeviceTest
 import kotlinx.coroutines.delay
@@ -161,9 +162,13 @@ class EnterpriseMobileWalletIntegrationTest {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             while (!BatchAuthorizationTestActivity.callback.isCompleted) {
                 // Approve browser onboarding and the external-app handoff, never a signing prompt.
-                device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
-                    "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
-                )))?.click()
+                try {
+                    device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
+                        "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
+                    )))?.click()
+                } catch (_: StaleObjectException) {
+                    // Chrome changed pages after lookup; the next iteration queries the new page.
+                }
                 delay(250)
             }
             BatchAuthorizationTestActivity.callback.await()
