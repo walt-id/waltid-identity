@@ -180,5 +180,8 @@ interface OAuth2Provider {
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 
     /** Suspending because response encryption performs key agreement, which is asynchronous on every crypto2 target. */
-    suspend fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
+    suspend fun writeCredentialResponse(
+        request: CredentialRequest,
+        response: CredentialResponse
+    ): CredentialResponseHttp
 }
