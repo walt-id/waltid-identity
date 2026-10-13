@@ -152,7 +152,7 @@ data class OpenId4VciModule(
 
                     pushedAuthorizationConfig = PushedAuthorizationConfig(
                         repository = parRepository,
-                        enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
+                        enforcePushedAuthorizationRequests = { config.enforcePushedAuthorizationRequests },
                     ),
                     clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
                     credentialRequestDecryptor = config.credentialEncryptionKey
