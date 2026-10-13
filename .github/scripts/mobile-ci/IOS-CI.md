@@ -32,7 +32,12 @@ demo, and Swift bridge tests. Each provider stays with its demo to reuse the bui
 Bridge tests run whenever either native or Compose is selected. Matrix failures
 do not cancel siblings; every selected job must succeed for the reusable workflow
 and `ci-gate` to succeed. Reports and logs have distinct names for each consumer.
-Each job leaves time outside its test step to retain failure evidence.
+Each job's selected functional phases share a 120-minute deadline. Report collection
+and native discovery checks run outside that deadline, with 10 minutes of their own.
+Only the native job runs the 30-minute SwiftUI comparison. A visual-only selection
+runs that native job without functional tests or functional-report requirements.
+The 170-minute job budget leaves 10 further minutes for setup and artifact uploads.
+These limits bound failures; successful runs finish as soon as their suites complete.
 
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
@@ -107,7 +112,9 @@ This setting does not change test selection, timeouts or failure propagation.
 Build/test steps and jobs have separate time limits, leaving time to collect
 reports after a step fails. A small phase runner retains command output and
 start/end/exit metadata; it propagates command failures and terminates the command's
-process group on cancellation. Failed or cancelled jobs upload these logs for seven days.
+process group on cancellation. Failed or cancelled consumer executions retain raw
+result bundles and phase logs for seven days, including when a bundle cannot be
+converted to JUnit. Converted consumer reports are also retained on success.
 There is no periodic resource sampling or unconditional Gradle profiling.
 Missing required test reports fail the affected lane and the aggregate CI gate.
 
