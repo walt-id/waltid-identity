@@ -92,7 +92,7 @@ class Issuer2OpenApiCompatibilityTest {
     }
 
     @Test
-    fun `OAuth discovery schema exposes optional signed metadata in JSON`() = testApplication {
+    fun `OAuth discovery schema exposes optional signed metadata in JSON and signing failure`() = testApplication {
         application {
             install(OpenApi) {
                 schemas { generator = OpenApiModule.createGenerator() }
@@ -104,7 +104,9 @@ class Issuer2OpenApiCompatibilityTest {
         val specification = Json.parseToJsonElement(apiClient().get("/api.json").bodyAsText()).jsonObject
         val operation = specification.getValue("paths").jsonObject
             .getValue("/.well-known/oauth-authorization-server/openid4vci").jsonObject.getValue("get").jsonObject
-        val content = operation.getValue("responses").jsonObject.getValue("200").jsonObject.getValue("content").jsonObject
+        val responses = operation.getValue("responses").jsonObject
+        assertTrue("500" in responses, "OAuth discovery must document metadata signing failures")
+        val content = responses.getValue("200").jsonObject.getValue("content").jsonObject
         assertEquals(setOf("application/json"), content.keys)
         val schemaRef = content.getValue("application/json").jsonObject.getValue("schema").jsonObject
         val schema = schemaRef["\$ref"]?.jsonPrimitive?.content?.substringAfterLast('/')?.let {
