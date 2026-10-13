@@ -485,6 +485,34 @@ class W3cTypeExpanderTest {
         assertTrue(DcqlMatcher.match(query("""[["$old"]]"""), listOf(redefined)).isFailure)
     }
 
+    @Test
+    fun selfDefinitionReplacesThePreviousMappingWithVocabulary() {
+        val oldDegree = "https://example.org/OldDegree"
+        val revised = "https://example.org/revised#Degree"
+        listOf(
+            """{ "@vocab": "https://example.org/revised#", "Degree": "Degree" }""",
+            """{ "@vocab": "https://example.org/revised#", "Degree": { "@id": "Degree" } }""",
+        ).forEach { definition ->
+            val loaded = selfDefinedDegree(definition)
+            val expanded = W3cTypeExpander.expandedTypes(loaded.data)
+            assertTrue(revised in expanded)
+            assertFalse(oldDegree in expanded)
+            assertTrue(verifiableCredential in expanded)
+            assertTrue(DcqlMatcher.match(query("""[["$oldDegree"]]"""), listOf(loaded)).isFailure)
+            assertTrue(DcqlMatcher.match(query("""[["$revised"]]"""), listOf(loaded)).isSuccess)
+
+            val afterGap = selfDefinedDegree(
+                definition,
+                gap = "https://example.org/review/missing",
+            )
+            val afterGapExpanded = W3cTypeExpander.expandedTypes(afterGap.data)
+            assertTrue(revised in afterGapExpanded)
+            assertFalse(oldDegree in afterGapExpanded)
+            assertTrue(DcqlMatcher.match(query("""[["$oldDegree"]]"""), listOf(afterGap)).isFailure)
+            assertTrue(DcqlMatcher.match(query("""[["$revised"]]"""), listOf(afterGap)).isSuccess)
+        }
+    }
+
     private fun query(typeValues: String) = DcqlParser.parse(
         """
         {
@@ -526,6 +554,27 @@ class W3cTypeExpanderTest {
                 {
                   "@context": [$contextJson],
                   "type": [${types.joinToString(",") { "\"$it\"" }}]
+                }
+                """.trimIndent()
+            ).jsonObject,
+        )
+    }
+
+    private fun selfDefinedDegree(definition: String, gap: String? = null): RawDcqlCredential {
+        val entries = buildList {
+            add(""""https://www.w3.org/ns/credentials/v2"""")
+            add("""{ "Degree": "https://example.org/OldDegree" }""")
+            if (gap != null) add("\"$gap\"")
+            add(definition)
+        }.joinToString(", ")
+        return RawDcqlCredential(
+            id = "degree",
+            format = "jwt_vc_json",
+            data = json.parseToJsonElement(
+                """
+                {
+                  "@context": [$entries],
+                  "type": ["VerifiableCredential", "Degree"]
                 }
                 """.trimIndent()
             ).jsonObject,

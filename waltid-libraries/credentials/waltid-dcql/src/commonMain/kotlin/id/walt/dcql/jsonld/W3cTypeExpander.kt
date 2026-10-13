@@ -178,13 +178,20 @@ object W3cTypeExpander {
             return
         }
         session.defined[term] = false
+        // JSON-LD removes the previous definition before expanding this term's value, so a
+        // self-definition uses @vocab instead of the mapping it replaces.
+        val existing = session.active.terms[term]
+        val existingUncertain = term in session.active.uncertainTerms
+        session.active.terms.remove(term)
+        session.active.uncertainTerms.remove(term)
         val defined = createTerm(session, term, value) ?: run {
             session.defined[term] = true
+            restoreTerm(session, term, existing, existingUncertain)
             return
         }
         session.defined[term] = true
-        val existing = session.active.terms[term]
         if (existing?.protected == true && (existing.iri != defined.iri || existing.prefix != defined.prefix)) {
+            restoreTerm(session, term, existing, existingUncertain)
             return
         }
         val uncertain = definedValueIsUncertain(term, value, session.active)
@@ -196,9 +203,20 @@ object W3cTypeExpander {
         }
     }
 
+    private fun restoreTerm(
+        session: TermDefinitionSession,
+        term: String,
+        existing: JsonLdTerm?,
+        existingUncertain: Boolean,
+    ) {
+        if (existing == null) return
+        session.active.terms[term] = existing
+        if (existingUncertain) session.active.uncertainTerms.add(term)
+    }
+
     /**
      * A definition whose value names the term being created expands through `@vocab`, not through
-     * the mapping this call is about to install. That vocabulary may itself be uncertain.
+     * the mapping it replaces. That vocabulary may itself be uncertain.
      */
     private fun definedValueIsUncertain(term: String, value: JsonElement, active: JsonLdActiveContext): Boolean = when (value) {
         is JsonPrimitive -> value.isString && !value.content.startsWith("@") && iriSourceIsUncertain(term, value.content, active)
