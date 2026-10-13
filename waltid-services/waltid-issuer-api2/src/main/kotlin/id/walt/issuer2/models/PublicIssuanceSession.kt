@@ -62,7 +62,21 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
         add("deferredState")
         if (deferredStatus == null) add("deferredStatus")
     })
-    if (issuanceRequests.size != 1) return encoded
+    if (issuanceRequests.size != 1) {
+        val results = encoded["issuanceResults"] as? JsonObject ?: return encoded
+        return JsonObject(encoded + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
+            val fields = (value.jsonObject - "walletNotification").toMutableMap()
+            val notification = issuanceResults[identifier]?.walletNotification
+            fun putNotificationField(name: String, value: String?) {
+                if (value != null) fields[name] = JsonPrimitive(value)
+                else if (json.configuration.encodeDefaults && json.configuration.explicitNulls) fields[name] = JsonNull
+            }
+            putNotificationField("walletNotificationId", notification?.notificationId)
+            putNotificationField("walletNotificationEvent", notification?.event?.wireValue)
+            putNotificationField("walletNotificationEventDescription", notification?.eventDescription)
+            JsonObject(fields)
+        })))
+    }
     val request = issuanceRequests.single()
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
@@ -84,8 +98,8 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     else if (json.configuration.encodeDefaults && json.configuration.explicitNulls) fields["issuedCredentialFormat"] =
         JsonNull
     val result = issuanceResults[request.credentialIdentifier]
-    result?.walletNotificationId?.let { fields["walletNotificationId"] = JsonPrimitive(it) }
-    result?.walletNotificationEvent?.let { fields["walletNotificationEvent"] = JsonPrimitive(it.wireValue) }
-    result?.walletNotificationEventDescription?.let { fields["walletNotificationEventDescription"] = JsonPrimitive(it) }
+    result?.walletNotification?.notificationId?.let { fields["walletNotificationId"] = JsonPrimitive(it) }
+    result?.walletNotification?.event?.let { fields["walletNotificationEvent"] = JsonPrimitive(it.wireValue) }
+    result?.walletNotification?.eventDescription?.let { fields["walletNotificationEventDescription"] = JsonPrimitive(it) }
     return JsonObject(fields)
 }

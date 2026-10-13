@@ -13,6 +13,8 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -25,7 +27,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -43,12 +49,39 @@ suspend fun HttpClient.getProfile(profileId: String): CredentialProfile =
 suspend fun HttpClient.getSession(sessionId: String): IssuanceSession =
     get("/issuer2/sessions/$sessionId").also {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-    }.bodyAsText().let(IssuanceSessionStorageCodec::decode)
+    }.bodyAsText().let(::decodePublicSession)
 
 suspend fun HttpClient.listSessions(): List<IssuanceSession> =
     get("/issuer2/sessions").also {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-    }.bodyAsText().let { Json.parseToJsonElement(it).jsonArray.map { element -> IssuanceSessionStorageCodec.decode(element.toString()) } }
+    }.bodyAsText().let { Json.parseToJsonElement(it).jsonArray.map { element -> decodePublicSession(element.toString()) } }
+
+/** Public session responses expose flat notification fields; stored sessions use the shared model. */
+private fun decodePublicSession(encoded: String): IssuanceSession {
+    val publicSession = Json.parseToJsonElement(encoded).jsonObject
+    val notificationFields = setOf("walletNotificationId", "walletNotificationEvent", "walletNotificationEventDescription")
+    val publicResults = publicSession["issuanceResults"]?.jsonObject
+    val sessionFields = (publicSession - notificationFields).toMutableMap()
+    if (publicResults != null) {
+        sessionFields["issuanceResults"] = JsonObject(publicResults.mapValues { (_, result) ->
+            JsonObject(result.jsonObject - notificationFields)
+        })
+    }
+    val session = IssuanceSessionStorageCodec.decode(JsonObject(sessionFields).toString())
+    return session.copy(issuanceResults = session.issuanceResults.mapValues { (identifier, result) ->
+        val report = publicResults?.get(identifier)?.jsonObject ?: publicSession
+        result.copy(walletNotification = report["walletNotificationId"]?.jsonPrimitive?.contentOrNull?.let { id ->
+            IssuedCredentialNotification(
+                credentialIdentifier = identifier,
+                notificationId = id,
+                event = report["walletNotificationEvent"]?.jsonPrimitive?.contentOrNull?.let {
+                    requireNotNull(NotificationEvent.fromWireValue(it))
+                },
+                eventDescription = report["walletNotificationEventDescription"]?.jsonPrimitive?.contentOrNull,
+            )
+        })
+    })
+}
 
 suspend fun HttpClient.createCredentialOffer(
     request: CredentialOfferCreateRequest,

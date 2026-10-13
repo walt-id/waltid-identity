@@ -60,6 +60,34 @@ class Issuer2NotificationEndpointTest {
     }
 
     @Test
+    fun notificationRequiresJsonContentTypeAndVerifiesTokenBeforeInvalidBody() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val issuance = client.issueCredential()
+        for (type in listOf(null, "text/plain", "application/jwt", "application/jsonp")) {
+            val response = client.post(issuance.notificationEndpoint) {
+                bearerAuth(issuance.accessToken)
+                if (type != null) header(HttpHeaders.ContentType, type)
+            }
+            assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+        }
+        val accepted = client.post(issuance.notificationEndpoint) {
+            bearerAuth(issuance.accessToken)
+            contentType(ContentType.Application.Json.withParameter("charset", "utf-8"))
+            setBody(notificationBody(issuance.notificationId, "credential_accepted", "stored"))
+        }
+        assertEquals(HttpStatusCode.NoContent, accepted.status, accepted.bodyAsText())
+        assertEquals("", accepted.bodyAsText())
+        val invalidToken = client.post(issuance.notificationEndpoint) {
+            bearerAuth("invalid")
+            contentType(ContentType.Application.Json)
+            setBody("{")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, invalidToken.status)
+        assertEquals("invalid_token", invalidToken.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun changedWalletEventIsPublishedToTheOfferWebhookOnce() = testApplication {
         val notificationServer = Issuer2TestNotificationServer()
         notificationServer.startServer()
@@ -402,7 +430,7 @@ class Issuer2NotificationEndpointTest {
 }
 
 private val IssuanceSession.walletNotificationEvent
-    get() = issuanceResults.values.singleOrNull()?.walletNotificationEvent
+    get() = issuanceResults.values.singleOrNull()?.walletNotification?.event
 
 private val IssuanceSession.walletNotificationEventDescription
-    get() = issuanceResults.values.singleOrNull()?.walletNotificationEventDescription
+    get() = issuanceResults.values.singleOrNull()?.walletNotification?.eventDescription
