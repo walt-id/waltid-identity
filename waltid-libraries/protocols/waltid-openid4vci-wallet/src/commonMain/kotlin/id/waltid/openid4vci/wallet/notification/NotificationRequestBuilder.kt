@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.notification
 
 import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.requests.notification.NotificationRequest
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
@@ -129,7 +130,13 @@ class NotificationRequestBuilder(
             ) {
                 accept(ContentType.Application.Json)
                 contentType(ContentType.Application.Json)
-                setBody(json.encodeToString(request))
+                setBody(json.encodeToString(
+                    DefaultNotificationRequest(
+                        notificationId = request.notificationId,
+                        event = request.event,
+                        eventDescription = request.eventDescription,
+                    )
+                ))
             }
         } catch (error: CancellationException) {
             throw error

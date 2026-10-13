@@ -27,6 +27,8 @@ import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
 import id.walt.openid4vci.validation.IssuerStateValidator
+import id.walt.openid4vci.validation.NotificationRequestValidator
+import id.walt.openid4vci.validation.DefaultNotificationRequestValidator
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
@@ -76,6 +78,8 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+
+    val notificationRequestValidator: NotificationRequestValidator = DefaultNotificationRequestValidator(),
 )
 
 data class PushedAuthorizationConfig(
