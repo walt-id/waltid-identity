@@ -1,5 +1,4 @@
 package id.walt.ktorauthnz.amendmends
 
-enum class AuthMethodFunctionAmendments {
-    Registration
-}
+@Deprecated("Moved to id.walt.ktorauthnz.amendments", ReplaceWith("id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments"))
+typealias AuthMethodFunctionAmendments = id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments

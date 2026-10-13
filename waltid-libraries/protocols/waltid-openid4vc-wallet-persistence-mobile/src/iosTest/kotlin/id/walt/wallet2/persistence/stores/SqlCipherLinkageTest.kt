@@ -3,6 +3,7 @@ package id.walt.wallet2.persistence.stores
 import app.cash.sqldelight.db.QueryResult
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -41,5 +42,42 @@ class SqlCipherLinkageTest {
 
         assertNotNull(cipherVersion)
         assertTrue(cipherVersion.isNotBlank())
+    }
+
+    @Test
+    fun encryptedDriverUsesRollbackJournal() {
+        val databaseName = "sqlcipher_journal_mode_${Uuid.random()}"
+        val factory = DriverFactory()
+        val driver = factory.createEncryptedDriver(
+            databaseName = databaseName,
+            encryptionKey = DatabaseEncryptionKey(
+                keyId = "$databaseName-key",
+                material = ByteArray(32) { index -> index.toByte() },
+            ),
+            isDeviceLocal = true,
+            walletId = databaseName,
+        )
+        try {
+            val journalMode = driver.executeQuery(
+                identifier = null,
+                sql = "PRAGMA journal_mode;",
+                mapper = { cursor ->
+                    QueryResult.Value(
+                        if (cursor.next().value) {
+                            cursor.getString(0)
+                        } else {
+                            null
+                        },
+                    )
+                },
+                parameters = 0,
+                binders = null,
+            ).value
+
+            assertEquals("delete", journalMode)
+        } finally {
+            driver.close()
+            factory.deleteDatabase(databaseName)
+        }
     }
 }

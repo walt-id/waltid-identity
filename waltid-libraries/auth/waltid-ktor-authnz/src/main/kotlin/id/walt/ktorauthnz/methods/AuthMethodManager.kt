@@ -15,13 +15,17 @@ object AuthMethodManager {
 
     init {
         registerAuthenticationMethods(
+            EmailCode,
             EmailPass,
+            Identify,
             JWT,
-            // Kerberos,
             LDAP,
             OIDC,
+            Passkey,
             RADIUS,
+            RecoveryCode,
             TOTP,
+            TotpSetup,
             UserPass,
             VerifiableCredential,
             Web3

@@ -70,6 +70,12 @@ internal object ClientIdCrypto2 {
                             }
                         )
 
+                        // Several pinned anchors share the issuer's DN and the chain's anchor cannot be
+                        // determined uniquely (reported by the signature and the basic constraints validators)
+                        errors.any {
+                            it.message.contains("multiple\\s+trusted\\s+certificates\\s+with\\s+subjectDn\\s+'.*'\\s+qualify\\s+as".toRegex(RegexOption.IGNORE_CASE))
+                        } -> ClientValidationResult.Failure(ClientIdError.X509TrustAnchorMismatch)
+
                         errors.any {
                             it.validatorId == X509CertificateSignatureValidator.ID &&
                                     it.message.contains("certificate\\s+Signature\\s+not\\s+valid".toRegex(RegexOption.IGNORE_CASE))

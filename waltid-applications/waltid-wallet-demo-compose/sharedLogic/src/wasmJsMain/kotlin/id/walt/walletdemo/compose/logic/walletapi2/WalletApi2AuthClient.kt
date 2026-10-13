@@ -12,9 +12,11 @@ import io.ktor.http.isSuccess
 
 internal class WalletApi2AuthClient(
     private val baseUrl: String,
+    private val kind: WalletApiKind = WalletApiKind.OpenSource,
     private val http: HttpClient = WalletApi2Client.defaultHttpClient(baseUrl),
 ) {
     suspend fun register(email: String, password: String) {
+        require(kind.canRegister) { "This API does not support registration" }
         val response = http.post("/auth/register") {
             contentType(ContentType.Application.Json)
             setBody(EmailPasswordRequest(email, password))
@@ -26,7 +28,7 @@ internal class WalletApi2AuthClient(
     }
 
     suspend fun login(email: String, password: String): String {
-        val response = http.post("/auth/emailpass") {
+        val response = http.post(kind.loginPath) {
             contentType(ContentType.Application.Json)
             setBody(EmailPasswordRequest(email, password))
         }
@@ -41,16 +43,18 @@ internal class WalletApi2AuthClient(
     suspend fun logout(token: String) {
         val client = WalletApi2Client.authenticatedHttpClient(baseUrl, token)
         try {
-            client.post("/auth/logout")
+            client.post(kind.logoutPath)
         } finally {
             client.close()
         }
     }
 }
 
-class WalletApi2Session(
+data class WalletApi2Session(
+    val kind: WalletApiKind,
     val baseUrl: String,
     val token: String,
     val walletId: String,
     val email: String,
+    val walletTargets: List<String> = emptyList(),
 )

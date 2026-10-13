@@ -5,6 +5,7 @@ import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Compan
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
+import kotlinx.io.bytestring.toHexString
 
 /**
  * Validation rules for the Authority Key Identifier (AKI) extension (OID 2.5.29.35, RFC 5280 section 4.2.1.1):
@@ -36,16 +37,28 @@ class X509CertificateAuthorityKeyIdValidator
         x509Certificate: X509Certificate
     ) {
         x509Certificate.data.extensionAuthorityKeyIdentifier?.also { aki ->
-            val issuerCerts = context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
+            val issuerCerts = context.findCertificate(
+                x509Certificate.data.issuerDn,
+                x509Certificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier
+            )
             if (!issuerCerts.isEmpty()) {
-                require(issuerCerts.size == 1) { "Multiple possible issuer certificates is not supported (subjectDn='${x509Certificate.data.issuerDn}')" }
-                val issuerCert = issuerCerts.first()
-                issuerCert.data.extensionSubjectKeyIdentifier?.also { issuerSki ->
-                    if (aki.keyIdentifier != issuerSki.keyIdentifier) {
-                        context.addLogEntry(
-                            ValidationResult.Severity.ERROR,
-                            "The certificate's authority key identifier doesn't match the subject key identifier of its issuer certificate (subjectDn='${x509Certificate.data.issuerDn}')"
-                        )
+                if (issuerCerts.size > 1) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "Multiple issuer certificates with subjectDn '${x509Certificate.data.issuerDn}' " +
+                                "and SKI '${x509Certificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toHexString() ?: "NULL"}' " +
+                                "(fingerprints ${issuerCerts.joinToString { it.fingerprintSha256Hex }}). " +
+                                "Refusing to select one"
+                    )
+                } else {
+                    val issuerCert = issuerCerts.first()
+                    issuerCert.data.extensionSubjectKeyIdentifier?.also { issuerSki ->
+                        if (aki.keyIdentifier != issuerSki.keyIdentifier) {
+                            context.addLogEntry(
+                                ValidationResult.Severity.ERROR,
+                                "The certificate's authority key identifier doesn't match the subject key identifier of its issuer certificate (subjectDn='${x509Certificate.data.issuerDn}')"
+                            )
+                        }
                     }
                 }
             }

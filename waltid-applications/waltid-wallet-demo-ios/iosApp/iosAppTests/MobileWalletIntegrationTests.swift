@@ -2,7 +2,9 @@ import XCTest
 import Security
 @testable import iosApp
 import TestHelpers
-import WalletSDK
+@testable import WalletSDK
+import WalletDemoKeyAttestation
+import CryptoKit
 
 /// iOS integration tests for the mobile wallet library.
 ///
@@ -13,6 +15,56 @@ import WalletSDK
 /// These are integration tests (not E2E UI tests) - they test the library directly
 /// without UI automation.
 final class MobileWalletIntegrationTests: XCTestCase {
+    func testDemoItbAttestationSignatureKeyNonceAndUnassessedClaims() async throws {
+        let resolver = DemoKeyAttestationProviders()
+        let selected = try await resolver.resolve(credentialIssuer: DemoKeyAttestationProviders.itbIssuer)
+        let provider = try XCTUnwrap(selected)
+        let proofKey = P256.Signing.PrivateKey().publicKey.x963Representation
+        func base64URL(_ data: Data) -> String {
+            data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        }
+        func decode(_ text: String) throws -> Data {
+            let base64 = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            return try XCTUnwrap(Data(base64Encoded: base64 + String(repeating: "=", count: (4 - base64.count % 4) % 4)))
+        }
+        let proofJWK = ["kty": "EC", "crv": "P-256", "x": base64URL(Data(proofKey[1..<33])), "y": base64URL(Data(proofKey[33..<65]))]
+        let proofJSON = try JSONSerialization.data(withJSONObject: proofJWK)
+        let jwt = try await provider.attest(KeyAttestationRequest(
+            credentialIssuer: DemoKeyAttestationProviders.itbIssuer,
+            proofKeyJWK: String(decoding: proofJSON, as: UTF8.self), nonce: "fresh-nonce",
+            requiredKeyStorage: nil, requiredUserAuthentication: nil
+        ))
+        let parts = jwt.split(separator: ".").map(String.init)
+        guard parts.count == 3 else { XCTFail("Attestation is not a compact JWS"); return }
+        let signer = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(provider.verificationPublicJWK.utf8)) as? [String: String])
+        let x = try decode(try XCTUnwrap(signer["x"]))
+        let y = try decode(try XCTUnwrap(signer["y"]))
+        let publicKey = try P256.Signing.PublicKey(x963Representation: Data([4]) + x + y)
+        let signature = try P256.Signing.ECDSASignature(rawRepresentation: decode(parts[2]))
+        XCTAssertTrue(publicKey.isValidSignature(signature, for: Data((parts[0] + "." + parts[1]).utf8)))
+        let header = try XCTUnwrap(JSONSerialization.jsonObject(with: decode(parts[0])) as? [String: Any])
+        XCTAssertEqual(header["alg"] as? String, "ES256")
+        XCTAssertEqual(header["typ"] as? String, "key-attestation+jwt")
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: decode(parts[1])) as? [String: Any])
+        XCTAssertEqual(payload["nonce"] as? String, "fresh-nonce")
+        XCTAssertEqual((payload["attested_keys"] as? [[String: String]])?.first, proofJWK)
+        let issuedAt = try XCTUnwrap(payload["iat"] as? Int64)
+        let expiresAt = try XCTUnwrap(payload["exp"] as? Int64)
+        XCTAssertEqual(expiresAt - issuedAt, 300)
+        XCTAssertEqual(payload["key_storage"] as? [String], ["https://example.invalid/walt-id/itb/key-storage-unassessed"])
+        XCTAssertEqual(payload["user_authentication"] as? [String], ["https://example.invalid/walt-id/itb/user-authentication-unassessed"])
+        XCTAssertEqual(payload["certification"] as? String, "https://example.invalid/walt-id/itb/no-certification")
+        let status = try XCTUnwrap(payload["key_storage_status"] as? [String: Any])
+        XCTAssertEqual(try XCTUnwrap(status["exp"] as? Int64) - issuedAt, 3600)
+        let statusBody = try XCTUnwrap(status["status"] as? [String: Any])
+        let statusList = try XCTUnwrap(statusBody["status_list"] as? [String: Any])
+        XCTAssertEqual(statusList["idx"] as? Int, 0)
+        XCTAssertEqual(statusList["uri"] as? String, "https://example.invalid/walt-id/itb/no-status-list")
+        let unsupported = try await resolver.resolve(credentialIssuer: DemoKeyAttestationProviders.itbIssuer + "/other")
+        XCTAssertNil(unsupported)
+    }
+
 
     private let testWalletId = "ios-unit-test-wallet"
     private static let eudiPidSdJwtCredentialID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
@@ -90,7 +142,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 ),
                 transactionDataProfiles: Self.demoTransactionDataProfiles,
                 defaultKeyUseAuthorizationPolicy: .none,
-                keyAttestationProvider: try await EudiTestKeyAttestationProvider.create()
+                keyAttestationProvider: DemoKeyAttestationProviders()
             )
         )
     }

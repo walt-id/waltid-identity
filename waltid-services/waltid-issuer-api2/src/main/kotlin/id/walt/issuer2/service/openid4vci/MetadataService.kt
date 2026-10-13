@@ -1,5 +1,10 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
+
+import id.walt.openid4vci.metadata.issuer.signing.MetadataJwtSigner
+
 import id.walt.openid4vci.proofs.attestation.validateKeyAttestationConfiguration
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
@@ -26,16 +31,19 @@ import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.runBlocking
 import java.net.URI
 
-class MetadataService(
+class MetadataService @JvmOverloads constructor(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
     private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
-    /** Crypto2 token signing key used for signed issuer metadata. */
+    /** Metadata signing key when no dedicated signing strategy is configured. */
     private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
+    metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+    metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -50,6 +58,10 @@ class MetadataService(
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
+    // Eager loading makes invalid dedicated configuration fail initialization, without token-key fallback.
+    private val dedicatedMetadataSigner = runBlocking {
+        MetadataJwtSigner.dedicatedSigner(serviceConfig.signedMetadata, metadataSigningKeyResolver, metadataSigningCertificateResolver)
+    }
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -102,6 +114,7 @@ class MetadataService(
         }
 
     suspend fun getSignedCredentialIssuerMetadata(): String {
+        dedicatedMetadataSigner?.let { return it.sign(getCredentialIssuerMetadata()) }
         val signingKey = requireNotNull(crypto2TokenSigningKey) {
             "Signed Credential Issuer Metadata requires a crypto2-capable token signing key"
         }
@@ -168,7 +181,8 @@ class MetadataService(
     fun issuerBaseUrl(): String = baseUrl
 
     /**
-     * Publishes the public halves of every key this issuer signs with, per RFC 8414 `jwks_uri`.
+     * Publishes token and credential signing public keys, per RFC 8414 `jwks_uri`.
+     * Dedicated metadata signers carry their public key in the JWT's `jwk` or `x5c` header instead.
      *
      * Public material only: a JWKS never needs an operational key, so this reads the published public JWK straight out
      * of the configured records instead of resolving a provider. That matters for remote-KMS keys (`tse`, `aws-rest-api`,

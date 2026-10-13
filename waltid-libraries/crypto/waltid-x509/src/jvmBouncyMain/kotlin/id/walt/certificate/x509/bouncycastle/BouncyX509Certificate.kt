@@ -3,6 +3,7 @@ package id.walt.certificate.x509.bouncycastle
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import id.walt.certificate.x509.extension.Extension
+import id.walt.crypto.utils.ShaUtils
 import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.cert.X509CertificateHolder
 import kotlin.time.toKotlinInstant
@@ -48,6 +49,8 @@ class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certif
         get() = ByteString(certificate.getSignature())
 
     override val encodedDer: ByteString = ByteString(certificate.encoded)
+
+    override val fingerprintSha256: ByteString by lazy { ByteString(ShaUtils.sha256(encodedDer.toByteArray())) }
 
     override fun hashCode(): Int = encodedDer.hashCode()
 

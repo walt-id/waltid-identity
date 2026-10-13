@@ -47,8 +47,11 @@ import kotlin.test.assertNotNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -963,6 +966,55 @@ class WalletDemoProximityControllerTest {
     }
 
     @Test
+    fun `dismiss after owner cancellation still closes the session`() = runTest {
+        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
+        val owner = SupervisorJob()
+        val controller = ownedController(session, owner)
+        controller.start()
+        advanceUntilIdle()
+        owner.cancel()
+        controller.dismiss()
+        advanceUntilIdle()
+        assertEquals(1, session.closeCalls)
+        assertEquals(1, session.closeCompletions)
+    }
+
+    @Test
+    fun `close cancelled before dispatch still closes the session`() = runTest {
+        val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
+        val owner = SupervisorJob()
+        val controller = ownedController(session, owner)
+        controller.start()
+        advanceUntilIdle()
+        controller.dismiss()
+        owner.cancel()
+        advanceUntilIdle()
+        assertEquals(1, session.closeCalls)
+        assertEquals(1, session.closeCompletions)
+    }
+
+    @Test
+    fun `owner cancellation still finishes a suspending session close`() = runTest {
+        val closeGate = CompletableDeferred<Unit>()
+        val session = FakeSession(
+            ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026),
+            closeGate = closeGate,
+        )
+        val owner = SupervisorJob()
+        val controller = ownedController(session, owner)
+        controller.start()
+        advanceUntilIdle()
+        controller.dismiss()
+        advanceUntilIdle()
+        assertEquals(1, session.closeCalls)
+        assertEquals(0, session.closeCompletions)
+        owner.cancel()
+        closeGate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, session.closeCompletions)
+    }
+
+    @Test
     fun `explicit NFC host action is available for NFC-only sessions and ignores QR and connected states`() = runTest {
         val nfc = ProximityEngagement.Nfc
         val session = FakeSession(ProximityState.EngagementReady(listOf(nfc)))
@@ -1073,6 +1125,15 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
     }
 
+    private fun TestScope.ownedController(
+        session: ProximitySession,
+        owner: Job,
+    ): WalletDemoProximityController = WalletDemoProximityController(
+        wallet = FakeBackend(session),
+        scope = CoroutineScope(owner),
+        dispatcher = StandardTestDispatcher(testScheduler),
+    )
+
     private fun TestScope.controller(
         backend: ProximityPresentationBackend,
         requestNfcPresentment: (() -> Unit)? = null,
@@ -1133,6 +1194,8 @@ private class FakeSession(
     val actions = mutableListOf<ProximityAction>()
     var closeCalls = 0
         private set
+    var closeCompletions = 0
+        private set
 
     override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         actions += action
@@ -1146,6 +1209,7 @@ private class FakeSession(
     override suspend fun close() {
         closeCalls += 1
         closeGate?.await()
+        closeCompletions += 1
     }
 }
 

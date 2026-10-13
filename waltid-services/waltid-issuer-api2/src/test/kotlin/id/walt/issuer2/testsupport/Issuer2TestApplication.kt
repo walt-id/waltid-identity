@@ -14,9 +14,11 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.ApplicationTestBuilder
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 
 fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
     credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+    json: Json = issuer2TestJson,
     configureProfilesConfig: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
@@ -29,7 +31,7 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
         configureProfilesConfig(profilesConfig)
     application {
         install(ServerContentNegotiation) {
-            json(issuer2TestJson)
+            json(json)
         }
         installIssuer2AuthenticationForTests()
         issuer2Module(

@@ -27,16 +27,25 @@ import io.ktor.server.routing.*
 import io.swagger.v3.oas.models.media.Discriminator
 import io.swagger.v3.oas.models.media.Schema
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.serializer
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 
 object OpenApiModule {
 
     private val logger = noCoLogger("OpenAPI")
+
+    /** JSON shape written into OpenAPI examples when the declared body type is not a KType. */
+    val openApiExampleJson = Json {
+        explicitNulls = false
+        encodeDefaults = false
+    }
 
     object OpenApiConfig {
         var customInfo: (InfoConfig.() -> Unit)? = null
@@ -55,40 +64,7 @@ object OpenApiModule {
             }
 
             examples {
-                val kotlinxEncoder = ExampleEncoder.kotlinx()
-                val reflectionEncoder = ExampleEncoder.internal()
-
-                fun TypeDescriptor.typeName(): String = when (this) {
-                    is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
-                    is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
-                    is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
-                    is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() }} (AnyOfType)"
-                    is ArrayTypeDescriptor -> "Array of ${this.type.typeName()} (ArrayType)"
-                    is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
-                    is RefTypeDescriptor -> "$schemaId (RefType)"
-                }
-
-                exampleEncoder = { type, example ->
-                    val isStringType = when (type) {
-                        is KTypeDescriptor -> type.type.classifier == String::class
-                        is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
-                        else -> false
-                    }
-
-                    if (example is String && isStringType) {
-                        example
-                    } else if (example is JsonElement) {
-                        // support example encoding of JsonElement so examples can be created with buildJsonObject
-                        Json.encodeToString(example).toStructuredJsonObject()
-                    } else {
-                        runCatching {
-                            kotlinxEncoder.invoke(type, example)
-                        }.recoverCatching {
-                            logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\". Example in question: $example" }
-                            reflectionEncoder.invoke(type, example)
-                        }.getOrThrow()
-                    }
-                }
+                exampleEncoder = createExampleEncoder()
             }
 
             info {
@@ -155,6 +131,54 @@ object OpenApiModule {
         }
     }
 
+    /**
+     * kotlinx [ExampleEncoder.kotlinx] only serializes [KTypeDescriptor] values. Bodies declared
+     * with `anyOf` or a serial descriptor are returned unchanged, and Swagger then writes them with
+     * Jackson. That drops `@SerialName` (for example `txCode.input_mode`) and kotlinx JSON types
+     * such as [JsonElement] and `SDMap`.
+     */
+    fun createExampleEncoder(): (TypeDescriptor?, Any?) -> Any? {
+        val kotlinxEncoder = ExampleEncoder.kotlinx()
+        val reflectionEncoder = ExampleEncoder.internal()
+        return { type, example ->
+            val isStringType = when (type) {
+                is KTypeDescriptor -> type.type.classifier == String::class
+                is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
+                else -> false
+            }
+
+            if (example == null) {
+                null
+            } else if (example is String && isStringType) {
+                example
+            } else if (example is JsonElement) {
+                Json.encodeToString(example).toStructuredJsonObject()
+            } else {
+                val encoded = runCatching { kotlinxEncoder.invoke(type, example) }.getOrElse { error ->
+                    logger.debug { "Failed kotlinx example encoding for \"${type?.typeName()}\": ${error.message}" }
+                    null
+                }
+                if (encoded != null && encoded !== example) {
+                    encoded
+                } else {
+                    runCatching { encodeSerializableExample(example) }.recoverCatching { error ->
+                        logger.debug {
+                            "Failed serializable example encoding for \"${type?.typeName()}\", trying internal encoder: ${error.message}"
+                        }
+                        reflectionEncoder.invoke(type, example)
+                    }.getOrThrow()
+                }
+            }
+        }
+    }
+
+    @OptIn(InternalSerializationApi::class)
+    private fun encodeSerializableExample(example: Any): Any? {
+        @Suppress("UNCHECKED_CAST")
+        val serializer = example::class.serializer() as KSerializer<Any>
+        return openApiExampleJson.encodeToString(serializer, example).toStructuredJsonObject()
+    }
+
     fun createGenerator(): GenericSchemaGenerator {
         val kotlinxGenerator = SchemaGenerator.kotlinx {
             explicitNullTypes = false
@@ -202,6 +226,16 @@ object OpenApiModule {
             }.getOrThrow()
         }
     }
+}
+
+private fun TypeDescriptor.typeName(): String = when (this) {
+    is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
+    is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
+    is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
+    is AnyOfTypeDescriptor -> "Any of ${types.map { it.typeName() }} (AnyOfType)"
+    is ArrayTypeDescriptor -> "Array of ${type.typeName()} (ArrayType)"
+    is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
+    is RefTypeDescriptor -> "$schemaId (RefType)"
 }
 
 private fun Instant.roundToSecond(): Instant =

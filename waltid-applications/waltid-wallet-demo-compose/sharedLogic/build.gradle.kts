@@ -124,3 +124,11 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
 tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
     enabled = false
 }
+
+if (enableMobileWallet) {
+    val fixture = layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/key-attestation")
+    extra["demoKeyAttestationFixture"] = fixture
+    apply(from = fixture.file("sources.gradle.kts"))
+    val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
+    kotlin.sourceSets.named("mobileMain") { kotlin.srcDirs(demoKeyAttestationSources) }
+}

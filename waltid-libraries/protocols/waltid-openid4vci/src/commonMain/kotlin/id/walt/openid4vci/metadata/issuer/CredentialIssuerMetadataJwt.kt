@@ -9,6 +9,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -46,6 +47,20 @@ suspend fun CredentialIssuerMetadata.toSignedJwt(
     algorithm: JwsAlgorithm,
     issuedAt: Instant = Clock.System.now(),
     keyId: String = signingKey.id.value,
+): String = toSignedJwt(signingKey, algorithm, null, issuedAt, keyId)
+
+/**
+ * Signs metadata with an optional leaf-first certificate chain of standard Base64 DER entries.
+ * A supplied chain replaces the public `jwk` header. The caller must validate the certificates and their
+ * correspondence to [signingKey]; certificate parsing and trust policy are outside this common helper.
+ * The original overload is retained for binary compatibility.
+ */
+suspend fun CredentialIssuerMetadata.toSignedJwt(
+    signingKey: Crypto2Key,
+    algorithm: JwsAlgorithm,
+    certificateChain: List<String>?,
+    issuedAt: Instant = Clock.System.now(),
+    keyId: String = signingKey.id.value,
 ): String {
     require(!algorithm.identifier.startsWith("HS", ignoreCase = true)) {
         "Credential Issuer Metadata must use an asymmetric JWS algorithm"
@@ -53,13 +68,16 @@ suspend fun CredentialIssuerMetadata.toSignedJwt(
     require(keyId.isNotBlank()) {
         "Credential Issuer Metadata signing key must have a key ID"
     }
-    val publicJwk = buildJsonObject {
+    require(certificateChain == null || certificateChain.isNotEmpty()) {
+        "Credential Issuer Metadata certificate chain must not be empty"
+    }
+    val publicJwk = if (certificateChain == null) buildJsonObject {
         signingKey.exportPublicJwkObject().forEach { (name, value) -> put(name, value) }
         put("kid", JsonPrimitive(keyId))
         put("alg", JsonPrimitive(algorithm.identifier))
         put("use", JsonPrimitive("sig"))
-    }
-    require(!Jwk.containsPrivateMaterial(publicJwk)) {
+    } else null
+    require(publicJwk == null || !Jwk.containsPrivateMaterial(publicJwk)) {
         "Credential Issuer Metadata signing key must not expose private material"
     }
 
@@ -70,7 +88,11 @@ suspend fun CredentialIssuerMetadata.toSignedJwt(
         protectedHeader = buildJsonObject {
             put(JwtHeaderParams.TYPE, JsonPrimitive(CredentialIssuerMetadataJwt.TYPE))
             put(JwtHeaderParams.KEY_ID, JsonPrimitive(keyId))
-            put(JwtHeaderParams.JSON_WEB_KEY, publicJwk)
+            if (certificateChain != null) {
+                put("x5c", JsonArray(certificateChain.map(::JsonPrimitive)))
+            } else {
+                put(JwtHeaderParams.JSON_WEB_KEY, requireNotNull(publicJwk))
+            }
         },
     )
 }

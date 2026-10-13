@@ -4,6 +4,9 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.wallet2.handlers.KeyAttestationProvider
+import id.walt.wallet2.handlers.KeyAttestationRequest
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -60,6 +63,7 @@ class Issuer2WalletFlowDriver(
         redirectUris = listOf("https://wallet.example/callback"),
     ),
     private val attestationAssembler: ClientAttestationAssembler? = null,
+    private val keyAttestationProvider: KeyAttestationProvider? = null,
 ) {
     private var walletInstanceKey: Crypto2Key? = null
 
@@ -412,13 +416,20 @@ class Issuer2WalletFlowDriver(
             null
         }
 
+        val nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull)
+        val keyAttestation = issuerMetadata.credentialConfigurationsSupported.getValue(credentialConfigurationId)
+            .proofTypesSupported?.get("jwt")?.keyAttestationsRequired?.let { requirements ->
+                requireNotNull(keyAttestationProvider) { "Test wallet needs a key-attestation provider for $credentialConfigurationId" }
+                    .attest(KeyAttestationRequest(issuerMetadata.credentialIssuer, proofKey.exportPublicJwk(), nonce, requirements))
+            }
         return JwtProofBuilder().buildProof(
             key = proofKey,
             algorithm = JwsAlgorithm.ES256,
             audience = issuerMetadata.credentialIssuer,
-            nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
+            nonce = nonce,
             binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
             clientId = clientId,
+            keyAttestation = keyAttestation,
         )
     }
 

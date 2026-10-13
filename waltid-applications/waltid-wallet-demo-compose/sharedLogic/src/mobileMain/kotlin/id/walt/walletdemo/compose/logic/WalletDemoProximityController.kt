@@ -37,6 +37,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -531,6 +532,7 @@ class WalletDemoProximityController(
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun scheduleClose(
         closing: ProximitySession?,
         starting: Job? = null,
@@ -539,7 +541,8 @@ class WalletDemoProximityController(
     ) {
         if (closing == null && starting == null && hostAction == null && revoking == null) return
         val previous = closingJob
-        closingJob = scope.launch(dispatcher) {
+        // Enter cleanup even when this close is cancelled before dispatch.
+        closingJob = scope.launch(dispatcher, start = CoroutineStart.ATOMIC) {
             withContext(NonCancellable) {
                 previous?.join()
                 starting?.join()

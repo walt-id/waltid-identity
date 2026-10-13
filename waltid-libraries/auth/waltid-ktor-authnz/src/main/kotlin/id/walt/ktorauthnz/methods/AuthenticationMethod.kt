@@ -1,10 +1,23 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AccountNotFoundException
+import id.walt.ktorauthnz.exceptions.AccountExistsException
+import id.walt.ktorauthnz.attempts.AttemptLimiter
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnSession
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptWithMethod
+import id.walt.ktorauthnz.events.AuthnzEvent
+import id.walt.ktorauthnz.events.AuthnzEvents
+import id.walt.ktorauthnz.attempts.AuthAttemptTracking
 import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
+import id.walt.ktorauthnz.exceptions.TooManyAttemptsException
+import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -14,6 +27,7 @@ import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.ktorauthnz.utils.HtmlRedirect.htmlBasedRedirect
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.application.DuplicatePluginException
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.EncodeDefault
@@ -45,10 +59,22 @@ abstract class AuthenticationMethod(open val id: String) {
 
 
     private suspend fun ApplicationCall.handleSessionAuthSuccess(session: AuthSession, authContext: AuthContext, accountId: String?) {
+        // A step continues the login of the account the session is for: it cannot switch to another account, e.g. to
+        // one whose own flow asks for more than the flow this session follows.
+        if (accountId != null && session.accountId != null && accountId != session.accountId) {
+            throw AuthenticationFailureException("This step authenticated a different account than this login is for")
+        }
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
+        AttemptLimiter.recordSuccess(this)
+        AuthnzEvents.emit(AuthnzEvent.LoginStepSucceeded(session.id, id, session.accountId, session.status.isSuccess()))
 
-        if (session.status.isSuccess()) {
+        if (session.status.isSuccess() && session.linkToAccount != null) {
+            // Linking ends here: the identity is the account's now, and no further login is issued.
+            session.token?.let { KtorAuthnzManager.tokenHandler.dropToken(it) }
+            SessionManager.invalidateSession(session)
+            session.token = null
+        } else if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
             check(session.token != null) { "Session token does not exist after successful authentication?" }
 
@@ -124,6 +150,30 @@ abstract class AuthenticationMethod(open val id: String) {
         throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")
 
 
+    /**
+     * The account an authenticated [identifier] logs in: the one it belongs to; else, for a session linking an identity
+     * to an account, that account (the identifier is added to it); else one [register] creates. Without [register], an
+     * identifier without account is refused (404). An identifier of another account cannot be linked (409).
+     */
+    protected suspend fun accountFor(
+        session: AuthSession,
+        identifier: AccountIdentifier,
+        register: (suspend (AccountIdentifier) -> Unit)?,
+    ): String {
+        val existing = identifier.resolveIfExists()
+        session.linkToAccount?.let { target ->
+            if (existing == target) return target
+            if (existing != null) throw AccountExistsException(identifier.accountIdentifierName)
+            KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(target, identifier)
+            AuthnzEvents.emit(AuthnzEvent.MethodEnrolled(target, id))
+            return target
+        }
+        if (existing != null) return existing
+        val registration = register ?: throw AccountNotFoundException(identifier.accountIdentifierName)
+        registration(identifier)
+        return identifier.resolveToAccountId()
+    }
+
     // Data functions
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountIdentifierStoredData(identifier: AccountIdentifier): V {
         val storedData =
@@ -135,24 +185,41 @@ abstract class AuthenticationMethod(open val id: String) {
 
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountStoredData(accountId: String): V {
         val storedData =
-            KtorAuthnzManager.accountStore.lookupStoredDataForAccount(accountId, this) ?: error("No stored data for method: $id")
+            KtorAuthnzManager.accountStore.lookupStoredDataForAccount(accountId, this) ?: throw AccountDataNotFoundException(id)
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
-    private suspend fun sessionForAuthContext(currentContext: AuthContext): AuthSession {
-        val session = if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
-            // Implicit session start
-            SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
-        } else {
-            // Session was started explicitly
-            KtorAuthnzManager.sessionStore.resolveSessionById(currentContext.sessionId ?: error("No session id"))
+    /**
+     * The session this call works on: a new one for the first step of an implicit flow (stored once a step succeeds),
+     * otherwise the one named in the context - refused if it failed, is complete, or used up its attempts.
+     */
+    suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession {
+        val currentContext = authContext.invoke(this)
+        attemptWithMethod(id)
+        if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
+            return SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!, tenant = currentContext.tenant)
         }
 
+        val sessionId = currentContext.sessionId ?: throw AuthSessionStateException("No authentication session id given")
+        val session = SessionManager.getSessionById(sessionId)
+        when {
+            // Another tenant's session is not continued here, and not revealed either.
+            session.tenant != null && session.tenant != currentContext.tenant -> throw AuthSessionNotFoundException(sessionId)
+            session.status == AuthSessionStatus.FAILURE ->
+                throw TooManyAttemptsException("This authentication session failed; start a new one")
+            session.status.isSuccess() || session.flows == null ->
+                throw AuthSessionStateException("This authentication session is already complete")
+        }
+        attemptOnSession(session.id)
         return session
     }
 
-    suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession =
-        sessionForAuthContext(currentContext = authContext.invoke(this))
+    /**
+     * Whether some routes of this method are called without the session in the path - e.g. the OIDC callback, which
+     * finds its session by `state`. They are then also served where a flow continues with this method, not only where
+     * one starts with it.
+     */
+    open val hasSessionlessRoutes: Boolean = false
 
     // Relations
     open val relatedAuthMethodStoredData: KClass<out AuthMethodStoredData>? = null
@@ -160,13 +227,29 @@ abstract class AuthenticationMethod(open val id: String) {
 }
 
 
+/**
+ * Registers method routes here and tracks their failed attempts. The tracking goes on this route itself - a grouping
+ * child route would show up in the OpenAPI paths - and only counts calls a method marked as an attempt, so other routes
+ * here are unaffected.
+ */
+internal fun Route.authenticationMethodRoutes(block: Route.() -> Unit) {
+    try {
+        install(AuthAttemptTracking)
+    } catch (_: DuplicatePluginException) {
+        // already tracked: methods registered here before
+    }
+    block()
+}
+
 fun Route.registerAuthenticationMethod(
     method: AuthenticationMethod,
     authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
 ) {
-    method.apply {
-        registerAuthenticationRoutes(authContext, functionAmendments)
+    authenticationMethodRoutes {
+        method.apply {
+            registerAuthenticationRoutes(authContext, functionAmendments)
+        }
     }
 }
 
@@ -175,9 +258,11 @@ fun Route.registerAuthenticationMethods(
     authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthenticationMethod, Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>>? = null
 ) {
-    methods.forEach { method ->
-        method.apply {
-            registerAuthenticationRoutes(authContext, functionAmendments?.get(method))
+    authenticationMethodRoutes {
+        methods.forEach { method ->
+            method.apply {
+                registerAuthenticationRoutes(authContext, functionAmendments?.get(method))
+            }
         }
     }
 }

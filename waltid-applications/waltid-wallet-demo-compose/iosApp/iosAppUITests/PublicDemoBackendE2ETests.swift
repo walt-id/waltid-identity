@@ -8,6 +8,65 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
+    func testButtonActionsWaitForSuccessBannerAndPreserveErrors() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        var environment = isolatedWalletEnvironment()
+        environment["TRANSACTION_DATA_PROFILES_URL"] = ""
+        ui.launch(environment: environment)
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+
+        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
+        XCTAssertFalse(app.buttons["wallet.statusDismiss"].exists,
+                       "Success-banner dismissal must finish moving the form before the next action")
+
+        // A malformed inline offer reaches the local parser without an issuer request.
+        let offer = "openid-credential-offer://?credential_offer=%7B%7D"
+        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let failure = ui.waitForStatus(prefixes: ["Receive failed"], timeout: 10)
+        XCTAssertNotNil(failure, "A single Receive activation must reach the offer parser")
+        XCTAssertTrue(app.buttons["wallet.statusExpand"].exists)
+
+        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
+        XCTAssertEqual(ui.latestStatus(prefixes: ["Receive failed"]), failure,
+                       "Button synchronization must preserve the persistent error")
+    }
+
+    func testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart() async throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        let environment = isolatedWalletEnvironment()
+        ui.launch(environment: environment)
+        for index in 0..<2 {
+            if index == 1 {
+                app.terminate()
+                ui.launch(environment: environment, initializeSigningIdentity: false)
+            }
+            XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
+            let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
+            ui.openDeepLink(offer.offerUrl)
+            XCTAssertTrue(ui.waitForTextInputValue(identifier: "wallet.offerInput",
+                fallbackLabel: "Credential offer URL", value: offer.offerUrl, timeout: 20))
+            ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+            XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+            guard let input = ui.waitForTextInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code", timeout: 20) else {
+                XCTFail("EUDI offer did not show its transaction-code input")
+                return
+            }
+            ui.replaceText(in: input, value: offer.txCode)
+            ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+            let status = ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 90)
+            XCTAssertTrue(status?.hasPrefix("Received") == true, "EUDI issuance failed: \(status ?? "nil")")
+            ui.tapButton(identifier: "wallet.tab.credentials", fallbackLabel: "Credentials tab")
+            let cards = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+            XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
+        }
+    }
+
     func testSettingsCopyControlsAreAccessible() throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("Accessibility audit requires iOS 17") }
         let app = XCUIApplication()
@@ -143,6 +202,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
+        continueAfterFailure = false
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 

@@ -77,11 +77,56 @@ final class WalletE2EUI {
     }
 
     func latestStatus(prefixes: [String]) -> String? {
-        for prefix in prefixes {
-            let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
-            let match = app.staticTexts.matching(predicate).firstMatch
-            if match.exists {
-                return match.label
+        guard let elements = walletSnapshotElements() else { return nil }
+        return latestStatus(prefixes: prefixes, elements: elements)
+    }
+
+    func waitUntilWalletReady(timeout: TimeInterval) -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            guard let elements = walletSnapshotElements() else { return nil }
+            if let failure = latestStatus(prefixes: ["Bootstrap failed"], elements: elements) {
+                return failure
+            }
+            // Both are rendered only after isReady, including the initial credential read.
+            // The success banner auto-hides and cannot represent persistent readiness.
+            if elements.contains(where: {
+                $0.identifier == "wallet.credentials.empty" || $0.identifier.hasPrefix("wallet.credentialCard.")
+            }) {
+                return "Wallet ready"
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        return nil
+    }
+
+    private func walletSnapshotElements() -> [any XCUIElementSnapshot]? {
+        let snapshot: any XCUIElementSnapshot
+        do {
+            snapshot = try app.snapshot()
+        } catch {
+            XCTFail("Could not capture wallet status: \(error)")
+            return nil
+        }
+        var pending = [snapshot]
+        var elements: [any XCUIElementSnapshot] = []
+        while let element = pending.popLast() {
+            elements.append(element)
+            pending.append(contentsOf: element.children.reversed())
+        }
+        return elements
+    }
+
+    private func latestStatus(prefixes: [String], elements: [any XCUIElementSnapshot]) -> String? {
+        // Read immutable attributes from one snapshot; the live banner can vanish between queries.
+        let taggedValues = elements.filter { $0.identifier == "wallet.status" }
+            .flatMap { [$0.label, $0.value as? String].compactMap { $0 } }
+        let labels = elements.filter { $0.elementType == .staticText }.map(\.label)
+        for candidates in [taggedValues, labels] {
+            for prefix in prefixes {
+                if let match = candidates.first(where: { $0.hasPrefix(prefix) }) {
+                    return match
+                }
             }
         }
         return nil

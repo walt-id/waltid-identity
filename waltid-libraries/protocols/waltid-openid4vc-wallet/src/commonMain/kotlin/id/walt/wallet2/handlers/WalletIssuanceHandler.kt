@@ -82,7 +82,9 @@ import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val log = KotlinLogging.logger {}
-private const val DEFAULT_CLIENT_ID = "eudiw-abca"
+
+const val Wallet2DefaultClientId = "eudiw-abca"
+private const val DEFAULT_CLIENT_ID = Wallet2DefaultClientId
 
 // ---------------------------------------------------------------------------
 // Shared offer-source contract
@@ -1734,7 +1736,11 @@ object WalletIssuanceHandler {
         nonce: String?,
         clientId: String?,
     ): Proofs {
-        val algorithms = requireNotNull(supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.attachedKeyAttestationProvider() != null)) {
+        val requirements = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired
+        val provider = if (requirements != null) requireNotNull(wallet.keyAttestationProviderFor(issuer)) {
+            "No key-attestation provider is configured for this credential issuer"
+        } else null
+        val algorithms = requireNotNull(supportedJwtProofAlgorithms(configuration.proofTypesSupported, provider != null)) {
             "Credential configuration does not support JWT proofs"
         }
         return Proofs(jwt = bindings.map { binding ->
@@ -1742,8 +1748,8 @@ object WalletIssuanceHandler {
                 binding.did,
                 algorithms,
                 clientId = clientId,
-                keyAttestationsRequired = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
-                keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
+                keyAttestationsRequired = requirements,
+                keyAttestationProvider = provider,
             ).jwt!!.single()
         })
     }
