@@ -65,6 +65,20 @@
     },
   ],
 
+  customManagers: [
+    {
+      // The Gradle manager only updates catalog versions that a [libraries] or [plugins] entry
+      // references. Versions that build scripts read directly (e.g. npm("jose", ...) in Kotlin/JS)
+      // carry a "# renovate: datasource=... depName=..." comment on the line above instead.
+      customType: 'regex',
+      description: 'Annotated versions in Gradle version catalogs.',
+      managerFilePatterns: ['/(^|/)[^/]*\\.versions\\.toml$/'],
+      matchStrings: [
+        '#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n\\s*[\\w.-]+\\s*=\\s*"(?<currentValue>[^"]+)"',
+      ],
+    },
+  ],
+
   // Security fixes skip the weekly schedule and the release-age wait, and share one PR.
   // Needs Dependabot alerts to stay enabled on the repository.
   vulnerabilityAlerts: {

@@ -24,10 +24,18 @@ let package = Package(
             name: "WalletDemoSharingUI",
             targets: ["WalletDemoSharingUI"]
         ),
+        // Only the native demo scans QR codes. A separate product keeps CodeScanner out of the
+        // Compose demo, and declaring it here rather than in the Xcode project keeps its version
+        // visible to Renovate.
+        .library(
+            name: "WalletDemoQRScanner",
+            targets: ["WalletDemoQRScanner"]
+        ),
     ],
     dependencies: [
         .package(path: "../../waltid-libraries/protocols/waltid-wallet-sdk-ios"),
         .package(url: "https://github.com/zxing-cpp/zxing-cpp.git", exact: "3.1.1"),
+        .package(url: "https://github.com/twostraws/CodeScanner.git", exact: "2.5.2"),
     ],
     targets: [
         .target(
@@ -57,6 +65,12 @@ let package = Package(
             publicHeadersPath: "include",
             linkerSettings: [
                 .linkedFramework("CoreGraphics"),
+            ]
+        ),
+        .target(
+            name: "WalletDemoQRScanner",
+            dependencies: [
+                .product(name: "CodeScanner", package: "CodeScanner"),
             ]
         ),
     ],
