@@ -18,31 +18,6 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
  */
 object DemoClientIdTrust {
 
-    /**
-     * Self-signed leaf from `waltid-verifier-api2/config/verifier-service.conf` (`x5c`).
-     *
-     * SAN DNS `verifier.example.com`. Pair with:
-     * - `x509_san_dns:verifier.example.com` (commented next to `clientId: "verifier2"`)
-     * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
-     *
-     * Demo material only, not a production CA. Valid until 2026-10-14.
-     * Production wallets should pin a CA and use client-auth leaves.
-     */
-    val VERIFIER2_EXAMPLE_LEAF_PEM = """
-        -----BEGIN CERTIFICATE-----
-        MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
-        MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
-        aWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2
-        ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49
-        AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9
-        VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQC
-        MAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQY
-        MBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8
-        e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
-        5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
-        -----END CERTIFICATE-----
-    """.trimIndent()
-
 
     /* CAs from the EUDI Reference Wallet */
 
@@ -257,12 +232,12 @@ object DemoClientIdTrust {
         -----END CERTIFICATE-----
     """.trimIndent()
 
-     /**
-     * WeBuild Raidiam
+    /**
+     * WeBuild Raidiam "EUDI Sandbox Registration Certificate Signer" root (self-signed).
+     * Source: ETSI TL https://tl-api.dev.idunion.info/api/v1/DblnEVuf/etsi/tl.xml. Valid until 2027-10-18.
      */
     val WEBUILD_RAIDIAM_ROOT = """
         -----BEGIN CERTIFICATE-----
-        KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         MIIDQzCCAiugAwIBAgIFXpo73NswDQYJKoZIhvcNAQELBQAwYzELMAkGA1UEBhMC
         R0IxHTAbBgNVBAoMFFJhaWRpYW0gU2VydmljZXMgTHRkMTUwMwYDVQQDDCxFVURJ
         IFNhbmRib3ggUmVnaXN0cmF0aW9uIENlcnRpZmljYXRlIFNpZ25lcjAeFw0yNjA5
@@ -277,10 +252,10 @@ object DemoClientIdTrust {
         VFyFGcji7sixC7av5AYZKb+FdmqoBEeDmVLgjqjJAgMBAAEwDQYJKoZIhvcNAQEL
         BQADggEBAGYHa14y8YJYZIHQAmcYuAoUr9GXqmIFHyNXkBCcZovq4y3iGWn8t3Ru
         2waETu/71E5RuSoH+ZiFRG9sGn3nIJXTeTojWB9iYNYz67G8sRmBzO2Af18uVLry
-        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXkY
-        0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbyst
-        FKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CGg
-        u43JYSWIGqKFtXzQ2NGETUJWclnOKM=
+        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXUk
+        Y0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbys
+        tFKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CG
+        gu43JYSWIGqKFtXzQ2NGETUJWclnOKM=
         -----END CERTIFICATE-----
     """.trimIndent()
 
@@ -298,7 +273,6 @@ object DemoClientIdTrust {
      * ```
      */
     val x509TrustAnchorPems: List<String> = listOf(
-        VERIFIER2_EXAMPLE_LEAF_PEM,
         PID_CZ_CA_PEM,
         PID_EE_CA_PEM,
         PID_EU_CA_PEM,
