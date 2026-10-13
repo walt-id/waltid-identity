@@ -22,5 +22,5 @@ fi
   --info
 
 python3 "$script_dir/verify_test_results.py" \
-  --manifest "$script_dir/unattended-test-suites.json" --suite android-credential-key \
+  --manifest "$script_dir/proximity-test-suites.json" --suite android-credential-key \
   --reports "$identity_dir/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml"

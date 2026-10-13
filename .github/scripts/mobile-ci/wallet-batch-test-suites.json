@@ -37,6 +37,14 @@
           "name": "testExplicitCopiesSurviveRelaunch"
         }
       ]
+    },
+    "android-batch-browser": {
+      "requiredTests": [
+        {
+          "class": "id.walt.wallet2.mobile.test.EnterpriseMobileWalletIntegrationTest",
+          "name": "browserAuthorizationRetainsBatchSelectionAcrossWalletRecreation"
+        }
+      ]
     }
   }
 }

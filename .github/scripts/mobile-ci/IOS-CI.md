@@ -53,11 +53,11 @@ with its existing issuer/verifier fixture. The fixture URL reaches XCTest throug
 Xcode's `TEST_RUNNER_` environment forwarding. Native and Compose batch reports
 are checked separately and retained on successful runs.
 
-## App URL handoffs
+## Compose URL handoffs
 
-Native and Compose tests create a temporary simulator from the workflow's named device type
+Compose tests create a temporary simulator from the workflow's named device type
 and explicit iOS version, wait for boot completion, and delete it after execution.
-Only the selected wallet handles the demos' shared URL schemes there. XCTest's
+Only the Compose wallet handles the demos' shared URL schemes there. XCTest's
 system URL opener delivers links to the running wallet. Test and cleanup failures
 propagate through the existing phase runner.
 

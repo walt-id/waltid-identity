@@ -353,7 +353,7 @@ final class MockCredentialDisplayUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
-        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait.elementValue"), timeout: 10)
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait"), timeout: 10)
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["No credential details available"].exists)
     }

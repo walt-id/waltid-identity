@@ -294,7 +294,21 @@
           "class": "KMPKeyAttestationProviderTests",
           "name": "testAdapterPropagatesProviderFailure",
           "oracle": "Provider failures reach the shared caller instead of producing an attestation."
-        }
+        },
+        {"class": "CredentialTitlesTests", "name": "testPrefersDisplayName"},
+        {"class": "CredentialTitlesTests", "name": "testW3CUsesFirstNonGenericType"},
+        {"class": "CredentialTitlesTests", "name": "testSdJwtHumanizesVct"},
+        {"class": "CredentialTitlesTests", "name": "testMdocUsesFriendlyNames"},
+        {"class": "DisplayLocalesTests", "name": "testPrefersLanguageRegionThenLanguage"},
+        {"class": "DisplayLocalesTests", "name": "testFallsBackToUntaggedThenFirst"},
+        {"class": "DisplayLocalesTests", "name": "testNormalizesUnderscoreAndCase"},
+        {"class": "PresentationValidationErrorTests", "name": "testLocalizedDescriptionIncludesProtocolAndResponseSafetyFailures"},
+        {"class": "PresentationValidationErrorTests", "name": "testAuthenticatedInvalidRequestRetainsBothFailuresThroughNativeWallet"},
+        {"class": "EnterpriseCustodyIntegrationTests", "name": "testMatchesKotlinEnterpriseFixtures"},
+        {"class": "EnterpriseCustodyIntegrationTests", "name": "testOptionalAdapterImportsOriginalIdentityAndPreservesRecoveryState"},
+        {"class": "EnterpriseCustodyIntegrationTests", "name": "testAdapterFailuresReachTheSharedCustodyResult"},
+        {"class": "EnterpriseCustodyIntegrationTests", "name": "testRecoveryDiscoveryKeepsHealthyCandidatesAndTypedProviderFailures"},
+        {"class": "EnterpriseCustodyIntegrationTests", "name": "testSwiftProviderFailureSurvivesKotlinBridgeAndPendingRetry"}
       ]
     },
     "compose-consent-android-host": {
@@ -374,6 +388,29 @@
           "name": "cancellationAtAttachOrPublishDisposesLateNativeResources",
           "oracle": "Cancellation at attach and publish cleans resources delivered by late native callbacks."
         }
+      ]
+    },
+    "shared-logic-ios": {
+      "requiredTests": [
+        {"class": "id.walt.walletdemo.compose.logic.walletapi2.WalletApi2AuthorizationCallbackTest", "name": "matchingCallbackReturnsCode"},
+        {"class": "id.walt.walletdemo.compose.logic.CredentialDisplayNormalizerTest", "name": "deferredByteArrayStillValidatesValuesAfterTheImageHeader"},
+        {"class": "id.walt.walletdemo.compose.logic.DemoSharingSettingsStoreTest", "name": "missingValueDefaultsToShowingTheDcApiPreview"},
+        {"class": "id.walt.walletdemo.compose.logic.StoredCredentialMetadataParserTest", "name": "parsesIssuerDisplayNameAndLogo"},
+        {"class": "id.walt.walletdemo.compose.logic.WalletDemoControllerSkipPinTest", "name": "skipPinStartsUnlockedAndBootstraps"},
+        {"class": "id.walt.walletdemo.compose.logic.WalletDemoControllerTest", "name": "cancelledKeyApprovalRetainsSetupAndReleasesBusyStateForRetry"},
+        {"class": "id.walt.walletdemo.compose.logic.WalletDemoKeySetupTest", "name": "recoveryOptionsAreGroupedWithoutMergingDifferentRecords"},
+        {"class": "id.walt.walletdemo.compose.logic.WalletDemoMetadataModelsTest", "name": "groupsMdocOfferClaimsByUserFacingSemantics"},
+        {"class": "id.walt.walletdemo.compose.logic.walletapi2.WalletApi2MappingsTest", "name": "preAuthorizedGrantWhenCodePresent"},
+        {"class": "id.walt.walletdemo.compose.logic.walletapi2.WalletApiProfileTest", "name": "openSourcePathsKeepWalletIdSegment"},
+        {"class": "id.walt.walletdemo.compose.logic.walletapi2.WalletDeepLinkSchemeWebTest", "name": "httpsAuthorizationCallbackWithCode"}
+      ],
+      "reportsByPlatform": {
+        "ios-simulator": "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build/test-results/iosSimulatorArm64Test/*.xml"
+      }
+    },
+    "android-credential-key": {
+      "requiredTests": [
+        {"class": "id.walt.crypto2.signum.AndroidSignumKeyBackendDeviceTest", "name": "credentialProtectedKeyReopensWithoutAnInteractionContext"}
       ]
     }
   }

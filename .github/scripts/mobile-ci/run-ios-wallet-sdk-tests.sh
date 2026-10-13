@@ -133,7 +133,4 @@ python3 "$script_dir/verify_test_results.py" \
 python3 "$script_dir/verify_test_results.py" \
   --manifest "$script_dir/wallet-batch-test-suites.json" --suite swift-batch-bridge \
   --reports "$run_dir/results.xml" | tee "$run_dir/batch-discovery.json" || test_status=1
-python3 "$script_dir/verify_test_results.py" \
-  --manifest "$script_dir/unattended-test-suites.json" --suite swift-sdk-restored \
-  --reports "$run_dir/results.xml" | tee "$run_dir/restored-discovery.json" || test_status=1
 exit "$test_status"
