@@ -118,7 +118,7 @@ struct WalletScanView: View {
 
     private var explanation: String? {
         switch kind {
-        case .fidoHybrid: return "This is a passkey sign-in code. Scan it with your device's system camera."
+        case .fidoHybrid: return "This is a digital credential or passkey request. Scan it with your device's Camera or Code Scanner."
         case .unsupported: return "This is not a supported credential offer or sharing request."
         default: return nil
         }

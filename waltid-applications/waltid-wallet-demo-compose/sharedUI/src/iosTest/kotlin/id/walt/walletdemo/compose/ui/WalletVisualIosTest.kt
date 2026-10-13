@@ -111,7 +111,7 @@ class WalletVisualIosTest {
     @Test fun homeEmpty() = scenario { walletHome(empty = true) }
     @Test fun homeCredential() = scenario { walletHome() }
     @Test fun scanEmpty() = scenario { scanner("empty") }
-    @Test fun scanUnsupported() = scenario { scanner("unsupported") }
+    @Test fun scanFido() = scenario { scanner("fido") }
     @Test fun scanWebLink() = scenario { scanner("link") }
 
     @Test

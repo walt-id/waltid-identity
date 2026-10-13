@@ -90,12 +90,13 @@
       "title": "Scan or paste a request"
     },
     {
-      "id": "wallet.scan.unsupported",
+      "id": "wallet.scan.fido",
+      "title": "Scanner — FIDO request",
       "requirements": [
-        "Unsupported camera feedback and manual input"
+        "Android system handoff action and iOS system scanner guidance"
       ],
-      "composeTest": "scanUnsupported",
-      "swiftTest": "testScanUnsupported"
+      "composeTest": "scanFido",
+      "swiftTest": "testScanFido"
     },
     {
       "id": "wallet.scan.link",
