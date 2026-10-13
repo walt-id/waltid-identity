@@ -85,6 +85,10 @@ class DidDocumentCrypto2KeyResolver(
         val declaredMethods = (document["verificationMethod"] as? JsonArray)
             ?.mapNotNull { it as? JsonObject }
             .orEmpty()
+        // Collect embedded methods from all relationships to support verification methods
+        // that are directly embedded in relationship arrays (not just referenced).
+        // Encryption-only keys (e.g., with "use": "enc") will fail to restore for
+        // KeyUsage.VERIFY and be naturally filtered out.
         val embeddedMethods = VerificationRelationshipType.entries.flatMap { type ->
             (document[type.toString()] as? JsonArray)
                 ?.mapNotNull { it as? JsonObject }
@@ -169,10 +173,17 @@ class DidDocumentCrypto2KeyResolver(
         (method["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotBlank)
 }
 
+/**
+ * Normalizes a key ID to a full DID URL.
+ *
+ * Per DID Core spec, verification methods are typically referenced by fragment.
+ * Bare strings without a prefix are treated as fragments (most common case).
+ * Explicit path (/), query (?), or fragment (#) prefixes are preserved.
+ */
 private fun normalizeDidUrl(did: String, id: String): String = when {
-    id.startsWith("did:") -> id
-    id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id"
-    else -> "$did/$id"
+    id.startsWith("did:") -> id // Already a full DID URL
+    id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id" // Explicit component
+    else -> "$did#$id" // Bare string treated as fragment (most common case)
 }
 
 private fun idCandidates(id: String): Set<String> =
