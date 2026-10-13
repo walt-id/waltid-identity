@@ -134,7 +134,7 @@ class WalletScanFidoHandoffAndroidTest {
             WalletScanScreen(onBack = { closed = true }, onOpen = { url, _ -> opened = url },
                 initialInput = "FIDO:/123", handoffFidoQr = {
                     launches++
-                    FidoQrHandoffResult.Unavailable
+                    if (launches == 1) FidoQrHandoffResult.Unavailable else FidoQrHandoffResult.Blocked
                 }, resolveLink = { ResolvedWalletLink(it, WalletLinkKind.Offer) })
         }
         onNodeWithTag(WalletUiTestTags.ScanContinue).performClick()
@@ -142,6 +142,8 @@ class WalletScanFidoHandoffAndroidTest {
             .assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsEnabled().performClick()
         waitUntil { launches == 2 }
+        onNodeWithText("Your device could not open this FIDO QR code. Try your device's camera or a fresh code.")
+            .assertIsDisplayed()
         assertFalse(closed)
         onNodeWithTag(WalletUiTestTags.ScanInput).performTextReplacement("openid-credential-offer://offer")
         onNodeWithTag(WalletUiTestTags.ScanContinue).performClick()

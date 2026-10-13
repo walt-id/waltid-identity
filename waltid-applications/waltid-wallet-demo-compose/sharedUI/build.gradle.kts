@@ -75,6 +75,7 @@ kotlin {
                     implementation(identityLibs.androidx.core)
                     implementation(identityLibs.androidx.lifecycle.runtime)
                     implementation(identityLibs.androidx.lifecycle.runtime.compose)
+                    implementation(identityLibs.google.play.services.base)
                 }
             }
 
