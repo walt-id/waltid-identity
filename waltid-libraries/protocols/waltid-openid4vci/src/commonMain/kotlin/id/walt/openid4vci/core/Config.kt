@@ -82,7 +82,8 @@ data class PushedAuthorizationConfig(
     val repository: PARRepository,
     val requestUriPrefix: String = PushedAuthorizationResponse.DEFAULT_REQUEST_URI_PREFIX,
     val lifetimeSeconds: Int = 90,
-    val enforcePushedAuthorizationRequests: Boolean = false,
+    /** Evaluated for each authorization request, including providers shared by multiple issuers. */
+    val enforcePushedAuthorizationRequests: suspend () -> Boolean = { false },
 ) {
     init {
         require(requestUriPrefix.isNotBlank()) { "PAR requestUriPrefix must not be blank" }

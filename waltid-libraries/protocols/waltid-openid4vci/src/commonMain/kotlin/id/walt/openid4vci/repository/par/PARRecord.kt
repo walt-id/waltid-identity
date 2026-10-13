@@ -1,5 +1,7 @@
 package id.walt.openid4vci.repository.par
 
+import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
@@ -10,7 +12,7 @@ import kotlin.time.Instant
  */
 interface PARRecord {
     val requestId: String
-    val requestParameters: Map<String, List<String>>
+    val authorizationRequest: AuthorizationRequest
     val clientId: String
     val createdAt: Instant
     val expiresAt: Instant
@@ -20,20 +22,19 @@ interface PARRecord {
 @Serializable
 data class DefaultPARRecord(
     override val requestId: String,
-    override val requestParameters: Map<String, List<String>>,
+    override val authorizationRequest: DefaultAuthorizationRequest,
     override val createdAt: Instant,
     override val expiresAt: Instant,
     override val clientMetadata: Map<String, String> = emptyMap(),
 ) : PARRecord {
-    override val clientId: String = requestParameters["client_id"].orEmpty()
-        .singleOrNull()
-        ?.takeIf { it.isNotBlank() }
-        ?: throw IllegalArgumentException("Pushed authorization request must contain exactly one non-blank client_id")
+    override val clientId: String
+        get() = authorizationRequest.client.id
 
     init {
+        require(clientId.isNotBlank()) { "Pushed authorization request must have a non-blank client_id" }
         require(requestId.isNotBlank()) { "requestId must not be blank" }
         require(expiresAt > createdAt) { "expiresAt must be after createdAt" }
-        require(requestParameters["request_uri"].orEmpty().none { it.isNotBlank() }) {
+        require(authorizationRequest.requestForm["request_uri"].orEmpty().none { it.isNotBlank() }) {
             "Pushed authorization request must not contain request_uri"
         }
     }

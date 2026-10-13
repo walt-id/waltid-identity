@@ -56,7 +56,7 @@ data class IssuanceSession(
     val issuanceRequests: List<IssuanceRequest>,
     val issuanceResults: Map<String, IssuanceResult> = emptyMap(),
     val credentialOffer: CredentialOffer? = null,
-    val authorizationRequest: Map<String, List<String>>? = null,
+    val authorizationRequest: id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest? = null,
     val externalAuthorizationState: String? = null,
     val authorizationClaims: JsonObject? = null,
     val expiresAt: Instant,

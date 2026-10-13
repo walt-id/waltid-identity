@@ -18,6 +18,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -236,6 +238,34 @@ class ConfiguredIssuanceSessionRepositoryTest {
         } finally {
             repository.remove(session.sessionId)
         }
+    }
+
+    @Test
+    fun legacyRawAuthorizationSessionsRequireRestartWhilePreAuthorizedSessionsRemainUsable() = runTest {
+        val namespace = "issuer2-par-compatibility-${java.util.UUID.randomUUID()}"
+        val raw = ConfiguredPersistence<String>(namespace, 5.minutes, { it }, { it })
+        val keys = ConfiguredPersistence<String>("$namespace-keys", 5.minutes, { it }, { it })
+        val repository = ConfiguredIssuanceSessionRepository(SerializedSessions(raw), keys)
+        val session = testSession()
+        val current = Json.encodeToJsonElement(session).jsonObject
+        val legacy = JsonObject(current + ("authorizationRequest" to Json.encodeToJsonElement(mapOf(
+            "client_id" to listOf("wallet"), "state" to listOf("old"),
+        )))).toString()
+        raw.set(session.sessionId, legacy, 5.minutes)
+        val preAuthorized = session.copy(sessionId = "pre-authorized", authorizationRequest = null)
+        val preAuthorizedJson = Json.encodeToString(preAuthorized)
+        raw.set(preAuthorized.sessionId, preAuthorizedJson, 5.minutes)
+        val loaded = assertNotNull(repository.get(session.sessionId))
+        assertNull(loaded.authorizationRequest)
+        assertTrue(loaded.isClosed)
+        assertEquals(IssuanceSessionStatus.UNSUCCESSFUL, loaded.status)
+        assertTrue(assertNotNull(loaded.statusReason).contains("restart"))
+        assertFalse(assertNotNull(repository.get(preAuthorized.sessionId)).isClosed)
+        assertEquals(2, repository.list().size)
+        assertEquals(legacy, raw[session.sessionId])
+        assertEquals(preAuthorizedJson, raw[preAuthorized.sessionId])
+        assertEquals(loaded, repository.take(session.sessionId))
+        repository.remove(preAuthorized.sessionId)
     }
 
     private suspend fun testSession() = IssuanceSession(

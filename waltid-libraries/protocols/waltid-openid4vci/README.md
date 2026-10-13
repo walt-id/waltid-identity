@@ -92,16 +92,16 @@ The library provides a flexible, framework-agnostic OAuth2 provider:
 ```kotlin
 interface OAuth2Provider {
     // Authorization endpoint
-    fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult
-    suspend fun createAuthorizeResponse(request: AuthorizationRequest, session: Session): AuthorizeResponseResult
+    suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+    suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
     
     // Token endpoint
-    fun createAccessRequest(parameters: Map<String, String>, session: Session? = null): AccessRequestResult
-    suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
+    suspend fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
+    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
     
     // Response formatting (framework-agnostic)
-    fun writeAuthorizeResponse(...): AuthorizeHttpResponse
-    fun writeAccessResponse(...): AccessHttpResponse
+    fun writeAuthorizationResponse(...): AuthorizationResponseHttp
+    fun writeAccessTokenResponse(...): AccessTokenResponseHttp
 }
 ```
 
@@ -113,6 +113,40 @@ The provider is configured via `OAuth2ProviderConfig`:
 - **Endpoint Handlers** - Handle grant type-specific logic
 - **Repositories** - Store authorization codes and pre-authorized codes
 - **Token Issuer** - Issue and sign access tokens
+
+### Pushed Authorization Requests
+
+- `pushedAuthorizationConfig = null`: PAR disabled; direct authorization allowed.
+- `PushedAuthorizationConfig(repository)`: PAR optional; both flows allowed.
+- `PushedAuthorizationConfig(repository, enforcePushedAuthorizationRequests = { true })`:
+  PAR required; direct authorization rejected.
+
+The enforcement lambda runs for each authorization request. The argument was previously
+a Boolean: change `true` to `{ true }`, or `false` to `{ false }`. Service configuration
+files still use Booleans. The default reference lifetime is 90 seconds and the prefix is
+`urn:ietf:params:oauth:request_uri:`. Applications configure HTTP routes and discovery metadata.
+
+`createPushedAuthorizationRequest()` authenticates and validates the parameters.
+`createPushedAuthorizationResponse()` stores the typed request and returns a `request_uri`.
+`createAuthorizationRequest()` enforces PAR policy, checks client binding, consumes the
+reference, and revalidates the stored parameters. Extra browser authorization parameters
+are ignored.
+
+On redemption, `AuthorizationRequestValidator` receives stored parameters with endpoint-only
+client credentials removed. It must reject requests disallowed by current policy. A failure
+rejects redemption; success returns the original stored request, preserving its identity
+and authentication information. Direct requests also run the validator.
+
+Save the accepted request through login using `toDefaultAuthorizationRequest()`, then pass
+it to `createAuthorizationResponse()`. Callbacks must not redeem the PAR reference again.
+
+**Storage upgrade:** repositories now store `PARRecord.authorizationRequest` instead of
+`requestParameters`. `DefaultPARRecord` and `DefaultAuthorizationRequest` are serializable.
+The library provides no storage migration. Custom migrations must preserve the original
+client binding, authentication information, and expiry. OSS rejects legacy entries on
+read. ES migrations delete legacy PAR and external-login records before normal traffic
+resumes; see the Enterprise API README for the upgrade steps. Affected clients must
+restart authorization.
 
 ### Key Attestation Limits
 

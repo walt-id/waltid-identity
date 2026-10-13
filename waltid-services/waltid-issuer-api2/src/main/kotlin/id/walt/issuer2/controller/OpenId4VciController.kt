@@ -25,6 +25,7 @@ import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.NotFoundException
 import io.ktor.server.plugins.callid.callId
 import io.ktor.server.request.ContentTransformationException
@@ -35,6 +36,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
+import io.ktor.util.AttributeKey
 import io.ktor.util.toMap
 import kotlinx.serialization.json.JsonObject
 import kotlin.coroutines.cancellation.CancellationException
@@ -89,6 +91,7 @@ private val credentialResponseCacheControl = createRouteScopedPlugin("Credential
 }
 
 private const val MISSING_CALL_ID_MESSAGE = "Missing call ID"
+private val externalLoginIntercepted = AttributeKey<Unit>("issuer2ExternalLoginIntercepted")
 
 class OpenId4VciController(
     private val metadataService: MetadataService,
@@ -197,13 +200,19 @@ class OpenId4VciController(
                     onCallRespond { call ->
                         val authorizationRequestEnvelope = call.parameters["internalAuthReq"]
                             ?: return@onCallRespond
+                        if (call.attributes.contains(externalLoginIntercepted)) return@onCallRespond
+                        call.attributes.put(externalLoginIntercepted, Unit)
                         val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
-                        protocolService.processExternalLoginInterception(
-                            externalAuthorizationRequest = call.response.headers.allValues()
-                                .toMap()["Location"]?.firstOrNull(),
-                            authorizationRequestEnvelope = authorizationRequestEnvelope,
-                            requestId = requestId,
-                        )
+                        try {
+                            protocolService.processExternalLoginInterception(
+                                externalAuthorizationRequest = call.response.headers.allValues()
+                                    .toMap()["Location"]?.firstOrNull(),
+                                authorizationRequestEnvelope = authorizationRequestEnvelope,
+                                requestId = requestId,
+                            )
+                        } catch (e: IllegalArgumentException) {
+                            throw BadRequestException("Invalid external login request", e)
+                        }
                     }
                 }
 
