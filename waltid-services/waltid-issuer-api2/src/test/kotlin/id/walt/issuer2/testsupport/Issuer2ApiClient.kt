@@ -57,7 +57,7 @@ suspend fun HttpClient.listSessions(): List<IssuanceSession> =
     }.bodyAsText().let { Json.parseToJsonElement(it).jsonArray.map { element -> decodePublicSession(element.toString()) } }
 
 /** Public session responses expose flat notification fields; stored sessions use the shared model. */
-private fun decodePublicSession(encoded: String): IssuanceSession {
+internal fun decodePublicSession(encoded: String): IssuanceSession {
     val publicSession = Json.parseToJsonElement(encoded).jsonObject
     val notificationFields = setOf("walletNotificationId", "walletNotificationEvent", "walletNotificationEventDescription")
     val publicResults = publicSession["issuanceResults"]?.jsonObject
