@@ -1,6 +1,7 @@
 package id.walt.openid4vci.requests.notification
 
 import id.walt.openid4vci.json.jsonHasDuplicateMembers
+import id.walt.openid4vci.validation.DefaultNotificationRequestValidator
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -13,6 +14,31 @@ import kotlin.test.assertTrue
 class NotificationRequestTest {
     private val json = Json { explicitNulls = false }
 
+    private fun parseBody(body: String) =
+        (DefaultNotificationRequestValidator().validate(notificationRequestParameters(body)) as? NotificationRequestValidationResult.Success)?.request
+
+    @Test
+    fun rejectsNonStringFieldsAndMalformedJsonButIgnoresUnknownFields() {
+        for (name in listOf("notification_id", "event", "event_description")) {
+            for (value in listOf("null", "1", "true", "[]", "{}")) {
+                val fields = mutableMapOf("notification_id" to "\"id\"", "event" to "\"credential_accepted\"")
+                fields[name] = value
+                val body = fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${it.value}" }
+                assertTrue(notificationRequestParameters(body).isEmpty(), body)
+            }
+        }
+        for (body in listOf("[]", "null", "{", "{notification_id:id}", "{\"event\":\"credential_accepted\",}",
+            "{\"event\":\"credential_accepted\",\"ev\\u0065nt\":\"credential_deleted\"}")) {
+            assertTrue(notificationRequestParameters(body).isEmpty(), body)
+        }
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, parseBody(
+            """{"notification_id":"id","event":"credential_accepted","future":{"nested":[1,true,null]}}"""
+        )?.event)
+        assertTrue(notificationRequestParameters(
+            """{"notification_id":"id","event":"credential_accepted","future":{"x":1,"x":2}}"""
+        ).isEmpty())
+    }
+
     @Test
     fun serializesNotificationRequestUsingProtocolFieldAndEventNames() {
         val events = mapOf(
@@ -23,12 +49,14 @@ class NotificationRequestTest {
 
         events.forEach { (event, wireName) ->
             val encoded = json.encodeToString(
-                NotificationRequest(
+                DefaultNotificationRequest(
                     notificationId = "notification-id",
                     event = event,
                     eventDescription = "Wallet result",
                 )
             )
+            val decoded = json.decodeFromString<DefaultNotificationRequest>(encoded)
+            assertEquals(DefaultNotificationRequest("notification-id", event, "Wallet result"), decoded)
             val body = json.parseToJsonElement(encoded).jsonObject
 
             assertEquals("notification-id", body["notification_id"]?.jsonPrimitive?.content)
@@ -41,30 +69,19 @@ class NotificationRequestTest {
     @Test
     fun omitsAbsentEventDescription() {
         val encoded = json.encodeToString(
-            NotificationRequest(
+            DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
             )
         )
 
-        assertFalse("event_description" in json.parseToJsonElement(encoded).jsonObject)
-    }
-
-    @Test
-    fun rejectsInvalidNotificationRequestValues() {
-        assertNull(parseNotificationRequest("""{"notification_id":" ","event":"credential_accepted"}"""))
-        assertNull(
-            parseNotificationRequest(
-                """{"notification_id":"notification-id","event":"credential_failure","event_description":"unsupported\nline break"}"""
-            )
-        )
-        assertNull(parseNotificationRequest("""{"notification_id":"notification-id","event":"unsupported_event"}"""))
-        assertNull(parseNotificationRequest("{"))
+        assertEquals(setOf("notification_id", "event"), json.parseToJsonElement(encoded).jsonObject.keys)
+        assertNull(json.decodeFromString<DefaultNotificationRequest>(encoded).eventDescription)
     }
 
     @Test
     fun ignoresUnknownParameters() {
-        val request = parseNotificationRequest(
+        val request = parseBody(
             """{"notification_id":"notification-id","event":"credential_deleted","future_parameter":"ignored"}"""
         )
 
@@ -76,7 +93,7 @@ class NotificationRequestTest {
     fun rejectsDuplicateJsonMembers() {
         assertTrue(jsonHasDuplicateMembers("""{"event":"credential_accepted","event":"credential_failure"}"""))
         assertNull(
-            parseNotificationRequest(
+            parseBody(
                 """{"notification_id":"notification-id","event":"credential_accepted","event":"credential_deleted"}"""
             )
         )

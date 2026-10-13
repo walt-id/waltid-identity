@@ -1,7 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.requests.notification.NotificationEvent
-import id.walt.openid4vci.requests.notification.NotificationRequest
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.waltid.openid4vci.wallet.notification.NotificationAccessTokenType
 import id.waltid.openid4vci.wallet.notification.NotificationDeliveryResult
@@ -107,7 +107,7 @@ internal suspend fun deliverCredentialNotification(
                     notificationEndpoint = endpoint,
                     accessToken = accessToken,
                     accessTokenType = accessTokenType,
-                    request = NotificationRequest(
+                    request = DefaultNotificationRequest(
                         notificationId = id,
                         event = event,
                         eventDescription = eventDescription,
