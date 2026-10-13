@@ -1,10 +1,12 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.mdoc.readertrust.ReaderTrustState
+import id.walt.mdoc.readertrust.ReaderTrustDecision
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialRequirement
-import id.walt.wallet2.mobile.MobileWalletReaderTrust
+import id.walt.wallet2.mobile.MobileWalletReaderAuthentication
 
 /**
  * Maps an OpenID4VP Digital Credentials API preview onto the shared sharing-review model.
@@ -32,7 +34,7 @@ fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingRev
             ),
             // The OpenID4VP DC API has no reader authentication, so the review offers no reader
             // section rather than one reporting an absent reader.
-            readerTrust = readerTrust.toDemoReaderTrust(),
+            readerTrust = readerAuthentication.toDemoReaderTrust(readerTrust),
             responseProtection = if (request.responseMode == DC_API_JWT_RESPONSE_MODE) {
                 WalletDemoSharingResponseProtection.Encrypted(WalletDemoSharingEncryptionMechanism.DcApiJwt)
             } else {
@@ -64,7 +66,7 @@ fun MobileWalletAnnexCPreview.toSharingReview(): WalletDemoSharingReview =
                 fallbackName = verifiedOrigin,
                 verifiedOrigin = verifiedOrigin,
             ),
-            readerTrust = readerTrust.toDemoReaderTrust(),
+            readerTrust = readerAuthentication.toDemoReaderTrust(readerTrust),
             // Annex C always session-encrypts the device response; there is no unencrypted variant to
             // report, so this states the mechanism rather than asking whether encryption was requested.
             responseProtection = WalletDemoSharingResponseProtection.Encrypted(
@@ -89,18 +91,27 @@ fun MobileWalletAnnexCPreview.toSharingReview(): WalletDemoSharingReview =
     )
 
 /**
- * Translates SDK reader-trust states into review states.
+ * Translates SDK reader authentication and trust into review states.
  *
- * [MobileWalletReaderTrust.NotApplicable] becomes null rather than a state, because "this protocol has
- * no reader authentication" is answered by omitting the section, not by rendering one.
+ * [MobileWalletReaderAuthentication.NOT_APPLICABLE] becomes null rather than a state, because "this
+ * protocol has no reader authentication" is answered by omitting the section, not by rendering one.
+ * Only a [ReaderTrustState.TRUSTED] decision names the reader; anything else, including a missing
+ * decision, is shown as untrusted.
  */
-private fun MobileWalletReaderTrust.toDemoReaderTrust(): WalletDemoReaderTrust? = when (this) {
-    MobileWalletReaderTrust.NotApplicable -> null
-    MobileWalletReaderTrust.NotAuthenticated -> WalletDemoReaderTrust.NotAuthenticated
-    MobileWalletReaderTrust.PendingRawRequest -> WalletDemoReaderTrust.PendingVerification
-    is MobileWalletReaderTrust.Untrusted -> WalletDemoReaderTrust.Untrusted(reason)
-    is MobileWalletReaderTrust.Trusted -> WalletDemoReaderTrust.Trusted(certificateSubject)
-}
+private fun MobileWalletReaderAuthentication.toDemoReaderTrust(trust: ReaderTrustDecision?): WalletDemoReaderTrust? =
+    when (this) {
+        MobileWalletReaderAuthentication.NOT_APPLICABLE -> null
+        MobileWalletReaderAuthentication.NOT_AUTHENTICATED -> WalletDemoReaderTrust.NotAuthenticated
+        MobileWalletReaderAuthentication.PENDING_RAW_REQUEST -> WalletDemoReaderTrust.PendingVerification
+        MobileWalletReaderAuthentication.VERIFIED -> {
+            val displayName = trust?.displayName
+            if (trust?.state == ReaderTrustState.TRUSTED && displayName != null) {
+                WalletDemoReaderTrust.Trusted(displayName)
+            } else {
+                WalletDemoReaderTrust.Untrusted(trust?.reason ?: "The reader is not trusted")
+            }
+        }
+    }
 
 private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): WalletDemoPresentationCredentialOption =
     WalletDemoPresentationCredentialOption(
