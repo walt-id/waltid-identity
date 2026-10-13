@@ -43,7 +43,8 @@ object OpenId4VciRoutesDocs {
     fun authorizationServerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get Authorization Server metadata"
-        description = "`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured."
+        description =
+            "`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured."
         response {
             HttpStatusCode.OK to {
                 description = "OAuth Authorization Server metadata"
@@ -136,7 +137,8 @@ object OpenId4VciRoutesDocs {
 
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
-        description = "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example."
+        description =
+            "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example."
         response {
             HttpStatusCode.Found to {
                 description = "Redirect containing authorization response parameters"
