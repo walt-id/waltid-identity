@@ -48,6 +48,11 @@
       allowedVersions: '/^9\\.[0-3]\\./',
     },
     {
+      description: 'SQLCipher.swift is bumped by hand: sqlcipher-swift in libs.versions.toml and the Swift manifests must change together, and the linked Compose package must be regenerated.',
+      matchPackageNames: ['/SQLCipher\\.swift/i'],
+      enabled: false,
+    },
+    {
       description: 'walt.id forks (e.g. 1.11.1-waltid-20260811, 1.1.1-WALT-SNAPSHOT) are bumped by hand; an upstream version would drop our patches.',
       matchCurrentVersion: '/-(waltid|WALT)-/',
       enabled: false,
