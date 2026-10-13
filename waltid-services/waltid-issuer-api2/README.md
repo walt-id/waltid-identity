@@ -65,8 +65,6 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 
 ### Signed issuer metadata
 
-`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured.
-
 `signedMetadata.signingMethod` follows the same strategy pattern as the attestation
 `verificationMethod` settings, with signing-specific key requirements. The strategy models
 and signing implementation are shared with enterprise issuer2 in
@@ -76,10 +74,11 @@ and signing implementation are shared with enterprise issuer2 in
 |--------|------------------|----------------------|
 | `static-jwk` | Inline private JWK JSON object | Public `jwk` |
 | `x509-chain` | Inline PKCS#8 private-key PEM and matching leaf-first PEM certificate list | `x5c` |
-| `key-reference` | Signing-capable crypto2 key returned by a deployment resolver, with optional public `certificateChainPem` | Public `jwk`, or `x5c` when configuration or the resolver supplies certificates |
+| `key-reference` | Signing-capable crypto2 key returned by a deployment resolver, with optional `x5cReferences` resolved by a certificate resolver | Public `jwk`, or `x5c` when a certificate chain is resolved |
 
-Omitting `signedMetadata` preserves the existing token-key behavior. Only the three strategies
-above are accepted; there are no file-path fields or separate algorithm settings.
+When `signedMetadata` is omitted, signed Credential Issuer metadata uses the token-signing
+key. Authorization Server metadata is returned without `signed_metadata`. Only the three
+strategies above are accepted; there are no file-path fields or separate algorithm settings.
 
 For a static key, supply one raw **private JWK JSON object**, including its public members
 (placeholder values below):
@@ -152,28 +151,30 @@ registry or an already-configured KMS provider; references are not interpreted a
 The stock standalone startup does not register a resolver automatically. Selecting
 `key-reference` without one fails initialization, as does an unresolved or unusable key.
 
-To use `x5c` with a referenced private key, add `certificateChainPem` to the same method:
+To use certificate references with a referenced private key, add `x5cReferences` to the same method:
 
 ```hocon
 signedMetadata {
   signingMethod {
     type = "key-reference"
     reference = "metadata-signing-key"
-    certificateChainPem = ["""
------BEGIN CERTIFICATE-----
-<matching leaf certificate Base64 contents>
------END CERTIFICATE-----
-"""]
+    x5cReferences = ["metadata-signing-certificate"]
   }
 }
 ```
 
-This configuration contains only the key reference and public certificates. The private
-key stays with the resolver's signing provider. Include intermediate certificates as
-subsequent list entries when needed. An explicitly configured chain takes precedence over
-certificates returned by the resolver; an invalid configured chain fails initialization
-without falling back. If the field is omitted or null, resolver-provided certificates are
-used when present, otherwise metadata retains the public-JWK header.
+When `x5cReferences` is configured, the embedding application also supplies a
+`MetadataSigningCertificateReferenceResolver` through the `metadataSigningCertificateResolver`
+argument of `Issuer2Module(...)` or `Issuer2Module.load(...)`. It returns one PEM certificate
+per reference. List the leaf first, followed by references to any needed intermediates.
+The resolvers define what the references mean; standalone OSS does not automatically resolve
+Enterprise KMS or X.509 Store IDs.
+
+The private key stays with the key resolver's signing provider. Certificates resolved from
+`x5cReferences` take precedence over certificates returned by the key resolver. Missing
+resolvers, unresolved references, empty lists, and invalid signing material fail initialization
+without falling back. If `x5cReferences` is omitted or null, certificates supplied by the key
+resolver are used when present; otherwise metadata retains the public-JWK header.
 
 Resolution happens once at initialization. No private-key export is required. Without a
 certificate chain the key must export public JWK material, and its thumbprint becomes the
@@ -204,11 +205,22 @@ Config string representations redact signing material and validation errors omit
 values. **Restart issuer2** after replacing configuration, referenced keys, or certificates.
 
 Dedicated metadata signers do not change token signing, credential signing, encryption,
-proof requirements, or the token JWKS. The complete metadata payload is preserved, with
+proof requirements, or the token JWKS. The complete Credential Issuer metadata payload is preserved, with
 `iss` and `sub` equal to `credential_issuer` (including `/openid4vci`) and a runtime `iat`.
 `Accept: application/json` returns ordinary metadata; `Accept: application/jwt` returns the
 compact JWT directly with `Content-Type: application/jwt` and `Vary: Accept`. The existing
 `application/openidvci-issuer-metadata+jwt` media type remains supported.
+
+When `signedMetadata` is configured, Authorization Server discovery returns JSON containing
+a `signed_metadata` JWT, as defined by [RFC 8414 §2.1](https://www.rfc-editor.org/rfc/rfc8414.html#section-2.1).
+The JWT contains all Authorization Server metadata members except `signed_metadata`, plus
+`iss` equal to `issuer` and a runtime `iat`. It uses the same configured signing key and
+public `jwk` or `x5c` material as Credential Issuer metadata, with `typ: JWT`.
+
+Authorization Server metadata is signed on each discovery request when signing is configured.
+Signing failures, including certificate expiry or an unavailable remote signer, return
+HTTP 500 without an unsigned fallback. Wallets requiring that discovery response cannot
+continue. Replace certificates before `notAfter` and restart OSS Issuer2 to load the replacement.
 
 Wallet trust is independent of these local signing checks. No EUDI CA or trust list is
 installed here. A wallet requiring trusted `x5c` certificates will not accept JWK-only mode.
