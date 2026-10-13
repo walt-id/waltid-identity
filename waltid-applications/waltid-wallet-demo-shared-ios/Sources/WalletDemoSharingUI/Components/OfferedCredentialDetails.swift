@@ -20,23 +20,28 @@ public struct OfferedCredentialDetails: View {
         if let description = credential.descriptionText, !description.isEmpty { Text(description) }
         Text(String(localized: "Values have not been received yet.", bundle: .module))
             .foregroundStyle(.secondary)
-        WalletSection(String(localized: "Claim definitions", bundle: .module)) {
-            VStack(alignment: .leading, spacing: 12) {
-                if definitions.isEmpty {
-                    Text(String(localized: "The issuer has not supplied claim definitions.", bundle: .module))
-                } else {
-                    ForEach(definitions, id: \.path) { claim in
-                        CredentialDataRow(claim.name ?? MdocClaimDisplaySemantics.describe(format: credential.format, path: claim.path)?.label
-                                 ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? "")) {
-                            Text(claim.mandatory == true
-                                 ? String(localized: "Always included", bundle: .module)
-                                 : String(localized: "May be included", bundle: .module))
-                                .font(.body)
-                        }
-                        if claim.path != definitions.last?.path { Divider() }
+        if definitions.isEmpty {
+            WalletSection(String(localized: "Claim definitions", bundle: .module)) {
+                Text(String(localized: "The issuer has not supplied claim definitions.", bundle: .module))
+                    .padding(16)
+            }
+        } else {
+            ForEach([true, false], id: \.self) { required in
+                let fields = definitions.filter { ($0.mandatory == true) == required }
+                if !fields.isEmpty {
+                    WalletSection(required ? String(localized: "Always included", bundle: .module)
+                                           : String(localized: "Optional", bundle: .module)) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(fields.enumerated()), id: \.element.path) { index, claim in
+                                if index > 0 { Divider() }
+                                Text(claim.name ?? MdocClaimDisplaySemantics.describe(format: credential.format, path: claim.path)?.label
+                                     ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? ""))
+                                    .font(.body)
+                            }
+                        }.padding(16)
                     }
                 }
-            }.padding(16)
+            }
         }
         Text(String(localized: "These definitions describe the offer. Review the actual values after receiving.", bundle: .module))
             .font(.footnote).foregroundStyle(.secondary)

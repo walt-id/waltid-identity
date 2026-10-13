@@ -338,7 +338,10 @@ final class WalletVisualTests: XCTestCase {
     func testOfferDefinitions() throws {
         let offer = try WalletVisualFixtures().offer()
         let credential = try XCTUnwrap(offer.credentials.first)
-        XCTAssertEqual(StoredCredentialMetadataParser.claims(from: credential.metadataJSON).map(\.name), ["Given name", "Family name"])
+        let definitions = StoredCredentialMetadataParser.claims(from: credential.metadataJSON)
+        XCTAssertEqual(definitions.map(\.name), ["Given name", "Family name", "Contact email"])
+        XCTAssertEqual(definitions.filter { $0.mandatory == true }.count, 2)
+        XCTAssertEqual(definitions.filter { $0.mandatory != true }.map(\.name), ["Contact email"])
         try capture(ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 OfferedCredentialDetails(credential: credential, issuerName: offer.issuer.name!, issuerIdentifier: offer.issuer.identifier)
@@ -550,7 +553,7 @@ final class WalletVisualTests: XCTestCase {
         if showDisclosures {
             let content = screen.environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
                 .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .accessibilityMedium)
-            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, sizeCategory: .accessibilityMedium, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
+            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, sizeCategory: .accessibilityMedium, isReady: { true }, failure: "Review not ready", scrollToBottom: true)
         } else {
             try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
                 sizeCategory: kind == "review" ? .accessibilityMedium : .large)
@@ -573,6 +576,9 @@ final class WalletVisualTests: XCTestCase {
                     ($0 as? CIQRCodeFeature)?.messageString == model.proximityPresentation.qrPayload
                 }
             }, failure: "The engagement QR must actually render and decode before capture")
+        model.proximityPresentation.showEngagement(.nfc)
+        XCTAssertEqual(model.proximityPresentation.displayedEngagement, .nfc)
+        try capture(screen.environment(\.scenePhase, .inactive), id: "nearby.ready.nfc")
     }
 
     private func batchOffer(noneSelected: Bool) async throws {

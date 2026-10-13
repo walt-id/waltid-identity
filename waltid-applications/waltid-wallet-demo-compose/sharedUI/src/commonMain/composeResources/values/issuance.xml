@@ -14,6 +14,7 @@
     <string name="issuance_no_definitions">The issuer has not supplied claim definitions.</string>
     <string name="issuance_definitions_hint">These definitions describe the offer. Review the actual values after receiving.</string>
     <string name="issuance_always_included">Always included</string>
+    <string name="issuance_optional">Optional</string>
     <string name="issuance_may_be_included">May be included</string>
     <string name="issuance_issuer">Issuer</string>
     <string name="issuance_format">Format</string>

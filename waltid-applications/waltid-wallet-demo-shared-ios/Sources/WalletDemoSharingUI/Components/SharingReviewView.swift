@@ -66,8 +66,7 @@ public struct SharingReviewView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SharingRequestSections(request: review.request, replacesGenericPayment: paymentReview.replacesGenericPayment)
-            PaymentConsentView(state: paymentReview)
+            SharingRequestSections(request: review.request, paymentReview: paymentReview)
 
             if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
                 ProgressView("Loading credentials…")
@@ -98,7 +97,7 @@ public struct SharingReviewView: View {
                     }
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                         if index > 0 { Divider() }
-                        ReviewInformationGroup(title: group.details.cardSummary.title, issuer: group.details.cardSummary.issuer) {
+                        ReviewInformationGroup(title: group.details.cardSummary.title) {
                             ForEach(Array(group.fields.enumerated()), id: \.element.item.id) { index, field in
                                 if index > 0 { Divider() }
                                 if !field.optionalSelections.isEmpty && !isReadOnly {
@@ -124,7 +123,8 @@ public struct SharingReviewView: View {
                     onSubmit: onSubmit,
                     onReject: onReject,
                     onCancel: onCancel,
-                    paymentReview: paymentReview
+                    paymentReview: paymentReview,
+                    isPayment: review.request.hasPaymentTransaction
                 )
             }
         }

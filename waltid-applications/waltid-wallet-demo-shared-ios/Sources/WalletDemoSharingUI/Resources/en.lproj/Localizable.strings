@@ -32,6 +32,9 @@
 "The issuer has not supplied claim definitions." = "The issuer has not supplied claim definitions.";
 "These definitions describe the offer. Review the actual values after receiving." = "These definitions describe the offer. Review the actual values after receiving.";
 "Always included" = "Always included";
+"Optional" = "Optional";
+"Confirm payment" = "Confirm payment";
+"Decline payment" = "Decline payment";
 "May be included" = "May be included";
 "Issuer" = "Issuer";
 "Format" = "Format";

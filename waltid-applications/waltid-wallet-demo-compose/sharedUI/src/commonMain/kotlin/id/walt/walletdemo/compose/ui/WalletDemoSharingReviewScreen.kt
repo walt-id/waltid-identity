@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.material3.IconButton
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
@@ -15,6 +15,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
+import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
@@ -56,7 +57,7 @@ fun WalletDemoSharingReviewScreen(
             fillViewport = false,
             header = {
                 WalletScreenHeader(title) {
-                    IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
+                    WalletHeaderButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
                         modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                         WalletIcon(WalletSymbol.Decline, "Close request")
                     }
@@ -65,6 +66,7 @@ fun WalletDemoSharingReviewScreen(
             actions = {
                 SharingActionsRow(
                     paymentReview = paymentReview,
+                    isPayment = review.request.transactionData.any { it.isPaymentTransaction },
                     enabled = enabled,
                     selectionComplete = selectionComplete,
                     onSubmit = submit,

@@ -1,6 +1,5 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,7 +24,7 @@ internal fun ReaderTrustImportReview(
             fillViewport = false,
             header = {
                 WalletScreenHeader(stringResource(Res.string.reader_trust_review_reader_trust_import)) {
-                    IconButton(onCancel, modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportCancel)) {
+                    WalletHeaderButton(onCancel, modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportCancel)) {
                         WalletIcon(WalletSymbol.Decline, stringResource(Res.string.reader_trust_cancel))
                     }
                 }

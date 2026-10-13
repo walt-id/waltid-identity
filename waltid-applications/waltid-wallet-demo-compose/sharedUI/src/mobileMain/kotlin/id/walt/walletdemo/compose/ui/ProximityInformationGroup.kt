@@ -23,8 +23,7 @@ internal fun ProximityInformationGroup(
     enabled: Boolean,
 ) {
     val summary = details?.toCardDisplayData()
-    ReviewInformationGroup(summary?.title ?: credential.label ?: stringResource(Res.string.proximity_generic_credential),
-        summary?.issuer ?: credential.issuer) {
+    ReviewInformationGroup(summary?.title ?: credential.label ?: stringResource(Res.string.proximity_generic_credential)) {
         if (!document.requiredElements.all { required -> credential.requestedElements.any {
             it.namespace == required.namespace && it.elementIdentifier == required.elementIdentifier
         } }) Text(stringResource(Res.string.proximity_required_data_unavailable), color = MaterialTheme.colorScheme.error)

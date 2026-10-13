@@ -134,6 +134,14 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/nearby-ready-qr.native-ios27_0-phone-en-light.png" alt="Nearby sharing, Native iOS" width="240"> |
 
+## nearby-ready-nfc
+
+**Nearby sharing — hold near reader**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/nearby.ready.nfc.png" alt="Nearby sharing — hold near reader, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/nearby.ready.nfc.png" alt="Nearby sharing — hold near reader, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/nearby-ready-nfc.native-ios27_0-phone-en-light.png" alt="Nearby sharing — hold near reader, Native iOS" width="240"> |
+
 ## onboarding-pin-setup
 
 **Onboarding — choose a PIN**

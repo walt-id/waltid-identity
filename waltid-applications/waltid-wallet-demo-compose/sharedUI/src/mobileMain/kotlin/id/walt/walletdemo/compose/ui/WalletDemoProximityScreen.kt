@@ -67,7 +67,7 @@ internal fun WalletDemoProximityScreen(
     onReviewRecentRequest: () -> Unit = {},
     onConnectionOptions: (() -> Unit)? = null,
     headerOwnsClose: Boolean = false,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
     val sessionState = state.sessionState
     val terminal = state.isTerminal

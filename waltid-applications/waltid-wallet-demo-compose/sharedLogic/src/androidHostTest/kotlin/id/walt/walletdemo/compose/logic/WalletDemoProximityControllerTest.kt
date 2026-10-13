@@ -69,7 +69,7 @@ class WalletDemoProximityControllerTest {
         val closeGate = CompletableDeferred<Unit>()
         val session = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:test"))), closeGate = closeGate)
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.requestClose()
         controller.requestClose()
@@ -91,7 +91,7 @@ class WalletDemoProximityControllerTest {
         val error = ProximityError(ProximityErrorCategory.Transport, "close_rejected", "The request is still active", ProximityRecovery.StartNewSession)
         val session = FakeSession(engagement, ProximityActionResult.Rejected(error))
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.requestClose()
         advanceUntilIdle()
@@ -108,7 +108,7 @@ class WalletDemoProximityControllerTest {
     fun `close respects terminating state and terminal acknowledgement sends no new cancel`() = runTest {
         val session = FakeSession(ProximityState.Terminating(1))
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         assertFalse(controller.state.value.canClose)
         controller.requestClose()
@@ -131,7 +131,7 @@ class WalletDemoProximityControllerTest {
         val closeGate = CompletableDeferred<Unit>()
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026), closeGate = closeGate)
         val controller = controller(FakeBackend(session, startGate = startGate))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.dismiss() // Opening Settings has already hidden the presentation route.
         var deleted = false
@@ -155,7 +155,7 @@ class WalletDemoProximityControllerTest {
         val error = ProximityError(ProximityErrorCategory.Internal, "late", "Late rejection", ProximityRecovery.StartNewSession)
         val session = FakeSession(ProximityState.ReviewRequired(oldReview), ProximityActionResult.Rejected(error), dispatchGate = gate)
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.selectCredential(0, "credential-a")
         controller.approve()
@@ -212,6 +212,8 @@ class WalletDemoProximityControllerTest {
 
         assertEquals(listOf(ProximityRemediationAction.RequestBluetoothPermission), performed)
         assertEquals(2, backend.capabilityCalls)
+        assertEquals(0, backend.startCalls)
+        chooseConnection(controller)
         assertEquals(1, backend.startCalls)
         assertEquals(session.state.value, controller.state.value.sessionState)
         controller.dismiss()
@@ -234,6 +236,8 @@ class WalletDemoProximityControllerTest {
         controller.remediate(ProximityRemediationAction.RequestBluetoothPermission,
             WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Cancelled })
         advanceUntilIdle()
+        assertEquals(0, backend.startCalls)
+        chooseConnection(controller)
         assertEquals(1, backend.startCalls)
         assertEquals(session.state.value, controller.state.value.sessionState)
         assertNull(controller.state.value.automaticPermissionAction)
@@ -252,6 +256,8 @@ class WalletDemoProximityControllerTest {
             assertEquals(0, backend.startCalls)
             controller.continueWithAvailableConnection()
             advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            if (capabilities.mayStart) chooseConnection(controller)
             assertEquals(if (capabilities.mayStart) 1 else 0, backend.startCalls)
             controller.dismiss()
             advanceUntilIdle()
@@ -284,6 +290,8 @@ class WalletDemoProximityControllerTest {
             controller.remediate(permissionAction,
                 WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Cancelled })
             advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            chooseConnection(controller)
             assertEquals(1, backend.startCalls)
             assertNull(controller.state.value.automaticPermissionAction)
             controller.dismiss()
@@ -312,6 +320,8 @@ class WalletDemoProximityControllerTest {
                 ProximityHostActionResult.Completed
             })
             advanceUntilIdle()
+            assertEquals(0, backend.startCalls)
+            chooseConnection(controller)
             assertEquals(1, backend.startCalls)
             controller.dismiss()
             advanceUntilIdle()
@@ -324,7 +334,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(session = session)
         val controller = controller(backend)
 
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         assertEquals(1, backend.startCalls)
@@ -395,7 +405,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(session = session)
         val controller = controller(backend) { selected }
 
-        controller.start()
+        startExchange(controller)
         selected = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
         advanceUntilIdle()
 
@@ -410,7 +420,7 @@ class WalletDemoProximityControllerTest {
     fun `only unambiguous credentials are selected and approval contains the explicit holder choices`() = runTest {
         val session = FakeSession(ProximityState.ReviewRequired(review()))
         val controller = controller(FakeBackend(session = session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         assertFalse(controller.state.value.canApprove)
@@ -459,7 +469,7 @@ class WalletDemoProximityControllerTest {
     fun `repeated requests require an explicit choice and reset it for fresh consent`() = runTest {
         val session = FakeSession(ProximityState.ReviewRequired(review()))
         val controller = controller(FakeBackend(session = session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         assertFalse(controller.state.value.continueAfterResponse)
@@ -491,7 +501,7 @@ class WalletDemoProximityControllerTest {
     fun `lifecycle interruption preserves prerequisite remediation but cancels an active exchange`() = runTest {
         val session = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
         val controller = controller(FakeBackend(session = session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         controller.handleLifecycleInterruption()
@@ -521,7 +531,7 @@ class WalletDemoProximityControllerTest {
                 dispatcher = StandardTestDispatcher(testScheduler),
                 systemPresentationActive = { presenting },
             )
-            controller.start()
+            startExchange(controller)
             advanceUntilIdle()
             presenting = true
             controller.handleLifecycleInterruption()
@@ -549,7 +559,7 @@ class WalletDemoProximityControllerTest {
             actionResult = ProximityActionResult.Rejected(rejection),
         )
         val controller = controller(FakeBackend(session = session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         controller.remediate(
@@ -584,7 +594,7 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
         val controller = controller(FakeBackend(session = session))
         val cancelled = CompletableDeferred<Unit>()
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
 
         controller.remediate(
@@ -618,7 +628,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(session = session, startGate = startGate)
         val controller = controller(backend)
 
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         assertEquals(1, backend.startCalls)
         controller.cancel()
@@ -652,7 +662,7 @@ class WalletDemoProximityControllerTest {
             dispatcher = StandardTestDispatcher(testScheduler),
         )
 
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
         policy = ProximityReaderPolicy.RequireTrusted
@@ -665,7 +675,7 @@ class WalletDemoProximityControllerTest {
 
         controller.dismiss()
         advanceUntilIdle()
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         val second = backend.configurations.last()
         assertIs<ProximitySessionConfiguration.ProvisionalNfcV2>(second.session)
@@ -683,14 +693,17 @@ class WalletDemoProximityControllerTest {
         val controller = controller(backend)
         controller.start()
         advanceUntilIdle()
+        assertEquals(0, backend.startCalls)
         assertNull(controller.state.value.displayedEngagement)
         assertFalse(controller.state.value.qrVisible)
         repeat(3) {
             controller.showEngagement(ProximityEngagementMethod.Qr)
+            advanceUntilIdle()
             assertTrue(controller.state.value.qrVisible)
             assertEquals(listOf(qr, ProximityEngagement.Nfc),
                 (controller.state.value.sessionState as ProximityState.EngagementReady).engagements)
             controller.showEngagement(ProximityEngagementMethod.Nfc)
+            advanceUntilIdle()
             assertFalse(controller.state.value.qrVisible)
         }
         assertEquals(1, backend.startCalls)
@@ -699,6 +712,7 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
         assertEquals(ProximityEngagementMethod.Qr, controller.state.value.displayedEngagement)
         controller.showEngagement(ProximityEngagementMethod.Nfc)
+        advanceUntilIdle()
         assertEquals(listOf(ProximityEngagementMethod.Qr), controller.state.value.engagementChoices)
         assertTrue(controller.state.value.qrVisible)
         controller.dismiss()
@@ -712,9 +726,10 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.EngagementReady(ready))
         val backend = FakeBackend(session)
         val controller = controller(backend)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.showEngagement(ProximityEngagementMethod.Qr)
+        advanceUntilIdle()
         for (state in listOf(ProximityState.Connecting(ready), ProximityState.ReviewRequired(review()))) {
             session.mutableState.value = state
             advanceUntilIdle()
@@ -750,9 +765,10 @@ class WalletDemoProximityControllerTest {
         val next = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val backend = FakeBackend(first, nextSession = next)
         val controller = controller(backend, approvalModeProvider = { mode })
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.showEngagement(ProximityEngagementMethod.Qr)
+        advanceUntilIdle()
         controller.refreshPreferences()
         assertEquals(1, backend.startCalls)
         mode = WalletDemoProximityApprovalMode.PrepareSharing
@@ -763,6 +779,7 @@ class WalletDemoProximityControllerTest {
         assertTrue(controller.state.value.qrVisible)
         assertNull(controller.state.value.sessionState)
         controller.showEngagement(ProximityEngagementMethod.Nfc)
+        advanceUntilIdle()
         controller.refreshPreferences()
         assertEquals(ProximityEngagementMethod.Qr, controller.state.value.displayedEngagement)
         assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, controller.state.value.approvalMode)
@@ -796,9 +813,10 @@ class WalletDemoProximityControllerTest {
             val next = FakeSession(ProximityState.EngagementReady(engagements(target)))
             val backend = FakeBackend(first, nextSession = next)
             val controller = controller(backend, profileProvider = { profile }, approvalModeProvider = { mode })
-            controller.start()
+            startExchange(controller)
             advanceUntilIdle()
             controller.showEngagement(ProximityEngagementMethod.Qr)
+            advanceUntilIdle()
             profile = target
             mode = WalletDemoProximityApprovalMode.PrepareSharing
             controller.refreshPreferences()
@@ -809,6 +827,7 @@ class WalletDemoProximityControllerTest {
             assertEquals(1, backend.startCalls)
             closed.complete(Unit)
             advanceUntilIdle()
+            chooseConnection(controller)
             assertEquals(target.configuration().session, backend.lastConfiguration?.session)
             assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
             assertEquals(target == WalletDemoProximityTransportProfile.Default,
@@ -833,6 +852,8 @@ class WalletDemoProximityControllerTest {
         mode = WalletDemoProximityApprovalMode.PrepareSharing
         advanceUntilIdle()
         assertEquals(2, backend.capabilityCalls)
+        assertEquals(0, backend.startCalls)
+        chooseConnection(controller)
         assertEquals(1, backend.startCalls)
         assertEquals(profile.configuration().session, backend.lastConfiguration?.session)
         assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
@@ -846,11 +867,13 @@ class WalletDemoProximityControllerTest {
         var mode = WalletDemoProximityApprovalMode.AskEachTime
         var presentations = 0
         val ready = ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc))
-        val backend = FakeBackend(FakeSession(ready), nextSession = FakeSession(ready))
+        val backend = FakeBackend(FakeSession(ready), nextSession = FakeSession(ready),
+            capabilities = { readyCapabilities.copy(session = ProximitySessionConfiguration.ProvisionalNfcV2(),
+                qrEngagement = availableUnselected, nfcEngagement = availableSelected,
+                bluetoothLowEnergy = availableUnselected, nfcV2Retrieval = availableSelected) })
         val controller = controller(backend, requestNfcPresentment = { presentations++ }, approvalModeProvider = { mode })
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
-        controller.showEngagement(ProximityEngagementMethod.Nfc)
         mode = WalletDemoProximityApprovalMode.PrepareSharing
         controller.refreshPreferences()
         advanceUntilIdle()
@@ -858,6 +881,7 @@ class WalletDemoProximityControllerTest {
         assertEquals(listOf(ProximityEngagementMethod.Nfc), controller.state.value.engagementChoices)
         assertEquals(1, presentations)
         controller.showEngagement(ProximityEngagementMethod.Nfc)
+        advanceUntilIdle()
         assertEquals(2, presentations)
         controller.dismiss()
         advanceUntilIdle()
@@ -870,7 +894,7 @@ class WalletDemoProximityControllerTest {
         val first = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:old"))), closeGate = closed)
         val backend = FakeBackend(first)
         val controller = controller(backend, approvalModeProvider = { mode })
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         mode = WalletDemoProximityApprovalMode.PrepareSharing
         controller.refreshPreferences()
@@ -889,7 +913,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:old")))),
             capabilities = { if (fail) error("unavailable") else readyCapabilities })
         val controller = controller(backend, approvalModeProvider = { mode })
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         fail = true
         mode = WalletDemoProximityApprovalMode.PrepareSharing
@@ -909,7 +933,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(session)
         val controller = WalletDemoProximityController(backend, approvalModeProvider = { mode }, profileProvider = { profile },
             scope = this, dispatcher = StandardTestDispatcher(testScheduler))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         mode = WalletDemoProximityApprovalMode.PrepareSharing
         profile = WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct
@@ -920,6 +944,7 @@ class WalletDemoProximityControllerTest {
         controller.restart()
         advanceUntilIdle()
         assertEquals(mode, controller.state.value.approvalMode)
+        chooseConnection(controller)
         assertEquals(profile.configuration().session, backend.lastConfiguration?.session)
         assertIs<ProximityApproval.PrepareBeforeSharing>(backend.lastConfiguration?.approval)
         controller.dismiss()
@@ -933,7 +958,7 @@ class WalletDemoProximityControllerTest {
             ProximityError(ProximityErrorCategory.Transport, "nfc_failed", "Connection failed", ProximityRecovery.StartNewSession)), closeGate = closed)
         val backend = FakeBackend(session)
         val controller = controller(backend)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.restart()
         advanceUntilIdle()
@@ -942,6 +967,7 @@ class WalletDemoProximityControllerTest {
         assertTrue(controller.state.value.selections.isEmpty())
         closed.complete(Unit)
         advanceUntilIdle()
+        chooseConnection(controller)
         assertEquals(2, backend.startCalls)
         assertIs<ProximitySessionConfiguration.ConventionalNfc>(backend.lastConfiguration?.session)
         controller.dismiss()
@@ -955,7 +981,7 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.Failed(denied))
         val backend = FakeBackend(session)
         val controller = controller(backend)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         val returned = CompletableDeferred<Unit>()
         controller.remediate(ProximityRemediationAction.OpenApplicationSettings, WalletDemoProximityHostActionExecutor { action ->
@@ -968,6 +994,7 @@ class WalletDemoProximityControllerTest {
         assertEquals(1, backend.startCalls)
         returned.complete(Unit)
         advanceUntilIdle()
+        chooseConnection(controller)
         assertEquals(2, backend.startCalls)
         assertTrue(session.actions.isEmpty())
         controller.dismiss()
@@ -980,7 +1007,7 @@ class WalletDemoProximityControllerTest {
             ProximityTransport.BluetoothLowEnergy)
         val session = FakeSession(ProximityState.ReviewRequired(review()), connectedRoute = route)
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         assertEquals(route, controller.state.value.connectedRoute)
         session.mutableState.value = ProximityState.Completed(1, false)
@@ -995,7 +1022,7 @@ class WalletDemoProximityControllerTest {
     fun `no-data ends the session and keeps its result available until dismissal`() = runTest {
         val session = FakeSession(ProximityState.AwaitingRequest(2))
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         session.mutableState.value = ProximityState.NoData(2)
         advanceUntilIdle()
@@ -1013,7 +1040,7 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026), closeGate = closeGate)
         val backend = FakeBackend(session)
         val controller = controller(backend)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.dismiss()
         controller.start()
@@ -1021,6 +1048,7 @@ class WalletDemoProximityControllerTest {
         assertEquals(1, backend.startCalls)
         closeGate.complete(Unit)
         advanceUntilIdle()
+        chooseConnection(controller)
         assertEquals(2, backend.startCalls)
         controller.dismiss()
         advanceUntilIdle()
@@ -1031,7 +1059,7 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val owner = SupervisorJob()
         val controller = ownedController(session, owner)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         owner.cancel()
         controller.dismiss()
@@ -1045,7 +1073,7 @@ class WalletDemoProximityControllerTest {
         val session = FakeSession(ProximityState.Preparing(ProximityProfile.Iso180135Edition2Dis2026))
         val owner = SupervisorJob()
         val controller = ownedController(session, owner)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.dismiss()
         owner.cancel()
@@ -1063,7 +1091,7 @@ class WalletDemoProximityControllerTest {
         )
         val owner = SupervisorJob()
         val controller = ownedController(session, owner)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.dismiss()
         advanceUntilIdle()
@@ -1087,6 +1115,7 @@ class WalletDemoProximityControllerTest {
         assertNull(controller.state.value.displayedEngagement)
         assertEquals(0, requests)
         controller.showEngagement(ProximityEngagementMethod.Nfc)
+        advanceUntilIdle()
         assertEquals(1, requests)
         assertEquals(ProximityEngagementMethod.Nfc, controller.state.value.displayedEngagement)
         for (next in listOf(
@@ -1097,6 +1126,7 @@ class WalletDemoProximityControllerTest {
             session.mutableState.value = next
             advanceUntilIdle()
             controller.showEngagement(ProximityEngagementMethod.Nfc)
+            advanceUntilIdle()
             assertEquals(1, requests)
         }
         assertEquals(1, backend.startCalls)
@@ -1114,7 +1144,7 @@ class WalletDemoProximityControllerTest {
         val backend = FakeBackend(first, nextSession = next)
         var presentCalls = 0
         val controller = controller(backend, requestNfcPresentment = { presentCalls++ })
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         assertTrue(controller.state.value.preparingApproval)
         assertFalse(controller.state.value.canApprove)
@@ -1150,7 +1180,7 @@ class WalletDemoProximityControllerTest {
         val next = FakeSession(ProximityState.CheckingPrerequisites(blockedCapabilities))
         val backend = FakeBackend(first, nextSession = next)
         val controller = controller(backend)
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.selectCredential(0, "credential-a")
         controller.approve()
@@ -1171,7 +1201,7 @@ class WalletDemoProximityControllerTest {
         }) }
         val session = FakeSession(ProximityState.ReviewRequired(required))
         val controller = controller(FakeBackend(session))
-        controller.start()
+        startExchange(controller)
         advanceUntilIdle()
         controller.selectCredential(0, "credential-a")
         controller.toggleElement(0, portrait)
@@ -1195,6 +1225,19 @@ class WalletDemoProximityControllerTest {
         dispatcher = StandardTestDispatcher(testScheduler),
     )
 
+    private fun TestScope.startExchange(controller: WalletDemoProximityController) {
+        controller.start()
+        advanceUntilIdle()
+        chooseConnection(controller)
+    }
+
+    private fun TestScope.chooseConnection(controller: WalletDemoProximityController) {
+        val choices = controller.state.value.pendingEngagementChoices
+        assertTrue(choices.isNotEmpty(), "A session starts only after a connection choice")
+        controller.showEngagement(choices.firstOrNull { it == ProximityEngagementMethod.Qr } ?: choices.first())
+        advanceUntilIdle()
+    }
+
     private fun TestScope.controller(
         backend: ProximityPresentationBackend,
         requestNfcPresentment: (() -> Unit)? = null,
@@ -1216,7 +1259,7 @@ private class FakeBackend(
     private val session: ProximitySession,
     private val startGate: CompletableDeferred<Unit>? = null,
     private val nextSession: ProximitySession? = null,
-    private val capabilities: () -> ProximityCapabilities = { readyCapabilities },
+    private val capabilities: (() -> ProximityCapabilities)? = null,
 ) : ProximityPresentationBackend {
     var capabilityCalls: Int = 0
         private set
@@ -1230,7 +1273,7 @@ private class FakeBackend(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities {
         capabilityCalls += 1
-        return capabilities()
+        return capabilities?.invoke() ?: readyCapabilities(configuration.session)
     }
 
     override suspend fun startProximityPresentation(
@@ -1339,6 +1382,25 @@ private val readyCapabilities = ProximityCapabilities(
     nfcV2Retrieval = availableUnselected,
     wifiAwareRetrieval = availableUnselected,
 )
+
+private fun readyCapabilities(session: ProximitySessionConfiguration): ProximityCapabilities {
+    val qr = when (session) {
+        is ProximitySessionConfiguration.Qr -> session.retrieval
+        is ProximitySessionConfiguration.ConventionalNfc -> session.qrFallback
+        is ProximitySessionConfiguration.ProvisionalNfcV2 -> session.qrFallback
+    }
+    val nfc = (session as? ProximitySessionConfiguration.ConventionalNfc)?.retrieval
+    val v2 = session as? ProximitySessionConfiguration.ProvisionalNfcV2
+    return readyCapabilities.copy(
+        session = session,
+        qrEngagement = availableSelected.copy(selected = qr != null),
+        nfcEngagement = availableSelected.copy(selected = session !is ProximitySessionConfiguration.Qr),
+        bluetoothLowEnergy = availableSelected.copy(selected = qr?.bluetoothLowEnergy != null || nfc?.bluetoothLowEnergy != null || v2?.bluetoothLowEnergy != null),
+        nfcRetrieval = availableSelected.copy(selected = qr?.nfc != null || nfc?.nfc != null),
+        nfcV2Retrieval = availableSelected.copy(selected = v2 != null),
+        wifiAwareRetrieval = availableSelected.copy(selected = qr?.wifiAware == true || nfc?.wifiAware == true || v2?.wifiAware == true),
+    )
+}
 
 private val bluetoothUnavailable = ProximityError(
     category = ProximityErrorCategory.Capability,

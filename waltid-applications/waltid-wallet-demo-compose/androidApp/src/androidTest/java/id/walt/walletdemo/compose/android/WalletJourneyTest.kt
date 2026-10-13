@@ -25,15 +25,40 @@ class WalletJourneyTest {
         WalletComposeE2EHelper.launchAndUnlock(context, device)
         WalletComposeE2EHelper.clickByTag(device, "wallet.proximityStartButton")
         assertTrue(device.wait(Until.hasObject(By.res("wallet.proximityScreen")), 10_000))
+        val sheet = By.res("wallet.screen.title")
+        val compactTop = requireNotNull(device.findObject(sheet)).visibleBounds.top
+        assertTrue("Nearby choices must start compact", compactTop > device.displayHeight / 5)
+        captureJourney(device, "nearby-compact")
         WalletComposeE2EHelper.clickByTag(device, "proximity-connection-options")
         assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsProximityDefault")), 10_000))
+        assertTrue("Connection options must expand the sheet", awaitSheetTop(device) { it < compactTop - 40 })
+        captureJourney(device, "nearby-connection-options")
         WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
         assertTrue(device.wait(Until.hasObject(By.res("wallet.proximityScreen")), 10_000))
+        assertTrue("Back must restore the content height", awaitSheetTop(device) { kotlin.math.abs(it - compactTop) <= 2 })
+        captureJourney(device, "nearby-return")
         assertFalse(device.hasObject(By.res("wallet.presentationInput")))
         WalletComposeE2EHelper.clickByTag(device, "wallet.proximityCancelButton")
         assertTrue(device.wait(Until.gone(By.res("wallet.proximityScreen")), 10_000))
         assertTrue(device.wait(Until.hasObject(By.res("wallet.scanButton")), 10_000))
         assertFalse(device.hasObject(By.res("wallet.presentationInput")))
+    }
+
+    private fun captureJourney(device: UiDevice, name: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
+            ?: context.cacheDir
+        val directory = File(output, "wallet-journey-evidence").apply { mkdirs() }
+        assertTrue(device.takeScreenshot(File(directory, "$name.png")))
+    }
+
+    private fun awaitSheetTop(device: UiDevice, matches: (Int) -> Boolean): Boolean {
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (System.nanoTime() < deadline) {
+            device.findObject(By.res("wallet.screen.title"))?.visibleBounds?.top?.let { if (matches(it)) return true }
+            Thread.sleep(100)
+        }
+        return false
     }
 
     @Test

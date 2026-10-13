@@ -7,7 +7,6 @@ import WalletDemoSharingUI
 struct WalletScanView: View {
     let onBack: () -> Void
     let onOpen: (String, WalletLinkKind) -> Void
-    private let onManualModeChange: (Bool) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @State private var input: String
     @State private var manual: Bool
@@ -20,13 +19,11 @@ struct WalletScanView: View {
     private let resolveLink: (String) async throws -> ResolvedWalletLink
 
     init(input: String = "", onBack: @escaping () -> Void, onOpen: @escaping (String, WalletLinkKind) -> Void,
-        onManualModeChange: @escaping (Bool) -> Void = { _ in },
         resolveLink: @escaping (String) async throws -> ResolvedWalletLink = { try await WalletLinkResolver.resolve($0) }
     ) {
         _input = State(initialValue: input)
         _manual = State(initialValue: !input.isEmpty)
         self.onBack = onBack
-        self.onManualModeChange = onManualModeChange
         self.onOpen = onOpen
         self.resolveLink = resolveLink
     }
@@ -73,7 +70,7 @@ struct WalletScanView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button { inputFocused = false; manual.toggle(); resolutionError = nil } label: {
-                        Image(systemName: manual ? "qrcode.viewfinder" : "keyboard").frame(minWidth: 44, minHeight: 44)
+                        WalletToolbarIcon(manual ? "qrcode.viewfinder" : "keyboard")
                     }.accessibilityLabel(manual ? "Scan QR code" : "Enter a link")
                         .disabled(resolving).accessibilityIdentifier("wallet.scanMode")
                     Button(action: close) { WalletToolbarIcon("xmark") }
@@ -86,7 +83,7 @@ struct WalletScanView: View {
         .accessibilityIdentifier("wallet.scanScreen")
         .modifier(ScannerSheetSurface())
         .onChange(of: input) { _ in resolutionError = nil }
-        .onChange(of: manual) { manual in inputFocused = manual; onManualModeChange(manual) }
+        .onChange(of: manual) { manual in inputFocused = manual }
         .onDisappear { closed = true; resolutionTask?.cancel() }
     }
 

@@ -39,7 +39,7 @@ Android provider entry points still await their explicit registration step.
 
 Home is the stable collection destination. Scan opens a scanner-first sheet with a reversible manual-input mode and a field-adjacent Paste control; links resolve automatically to the supported issuance or presentation flow. Android can also open an available system camera. Apple uses the embedded scanner because there is no supported standalone Camera-app launch contract.
 
-Reviews and details share one navigation host with directional Back/forward transitions and a reduced-motion alternative. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
+Reviews and details share one navigation host. Sheet navigation uses a short directional slide and fade-through while the host resizes to fit the destination; reduced motion removes movement. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
 
 Decisions use text-first controls: a filled primary action, quiet secondary choices, and destructive color for irreversible confirmation. Meaningful Scan, Paste, Close and navigation icons remain. Operation feedback occupies the footer; trust, disclosure requirements and field validation stay with their context. Scroll content ends above the footer and keyboard, with material/blur and accessibility fallbacks. See the [design system](../waltid-wallet-demo-test-fixtures/design-system.md).
 
@@ -87,11 +87,12 @@ longer allows the app to request is shown as an explicit **Open app settings** a
 Settings rechecks the selected configuration before session creation. Radio, power, and settings
 remediation otherwise remains an explicit user action.
 
-The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
-by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
-presentation sheet, including when NFC is the only available method.
-It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
-engagement preserves the session and payload. Once connecting starts, method controls disappear;
+The sharing screen offers **Hold near the reader** and **Show QR code** for routes the SDK capability
+snapshot reports as available. Opening this chooser creates no engagement or radio session. Selecting
+one of the methods starts the timed engagement, including when only one method is available. On iOS,
+choosing NFC opens the system presentation sheet once preparation finishes. It does not depend on the
+optional short-lived presentment assertion. Switching between already prepared methods preserves the
+session and payload. Once connecting starts, method controls disappear;
 reader consent remains the focus, and the actual route is available under **Connection details**.
 Completion shows the result and **Done**, without radio controls.
 
@@ -165,7 +166,8 @@ The ready screen prioritizes the full QR within the available space. **Prepare s
 switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
 does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
 the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
-selection. Close is an accessible X in the task header. It requests cancellation only when the SDK permits it, waits for cleanup and returns to Home without another cancelled-result acknowledgement. Connection options returns to the active nearby phase. Short screens and larger text retain
+selection. Close is an accessible X in the task header. It requests cancellation only when the SDK permits it, waits for cleanup and returns to Home without another cancelled-result acknowledgement. Wallet-owned sheets fit their current content, growing to the available height and scrolling only
+when needed. Connection options and detail pages resize the same sheet; Back and short outcomes shrink it again. Sheet navigation uses a 24 dp directional slide and fade-through over 300 ms, with a steady header and coordinated resizing. Back reverses the direction, RTL mirrors it, and reduced motion settles immediately. Short screens and larger text retain
 scrolling for secondary controls; landscape places the QR beside the controls.
 
 Review actions carry the identity of the displayed review. Each new review resets

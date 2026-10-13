@@ -537,10 +537,33 @@ final class MockWalletUITests: XCTestCase {
         ui.returnToWallet()
 
         let proximityScreen = app.descendants(matching: .any)["wallet.proximityScreen"]
-        for _ in 0..<2 {
+        func captureNearby(_ name: String) {
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = name; capture.lifetime = .keepAlways; add(capture)
+        }
+        for attempt in 0..<2 {
             ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Present to nearby reader")
             XCTAssertTrue(proximityScreen.waitForExistence(timeout: 10))
             XCTAssertFalse(app.buttons["wallet.settingsButton"].isHittable)
+            let header = app.navigationBars["Share nearby"]
+            let compactTop = header.frame.minY
+            XCTAssertGreaterThan(compactTop, app.frame.height / 5, "Nearby choices must start compact")
+            if attempt == 0 { captureNearby("Nearby compact choices") }
+            ui.tapButton(identifier: "proximity-connection-options", fallbackLabel: "Connection options")
+            let optionsHeader = app.navigationBars["Connection method"]
+            XCTAssertTrue(optionsHeader.waitForExistence(timeout: 5))
+            let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                optionsHeader.frame.minY < compactTop - 40
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
+            if attempt == 0 { captureNearby("Nearby connection options") }
+            optionsHeader.buttons.firstMatch.tap()
+            XCTAssertTrue(header.waitForExistence(timeout: 5))
+            let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                abs(header.frame.minY - compactTop) <= 2
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed)
+            if attempt == 0 { captureNearby("Nearby options return") }
             ui.tapButton(identifier: "wallet.flowBack", fallbackLabel: "Close nearby sharing")
 
             let dismissed = XCTNSPredicateExpectation(
@@ -918,6 +941,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
         XCTAssertFalse(app.buttons["wallet.receiveNewButton"].exists)
+        ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         XCTAssertTrue(app.staticTexts["Example Credential"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
@@ -949,7 +973,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.presentationRequesterDetailsToggle"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Required"].exists)
         XCTAssertFalse(app.staticTexts["ECDH-ES"].exists)
-        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Review payment"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Amount"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["129.90"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Currency"].waitForExistence(timeout: 10))

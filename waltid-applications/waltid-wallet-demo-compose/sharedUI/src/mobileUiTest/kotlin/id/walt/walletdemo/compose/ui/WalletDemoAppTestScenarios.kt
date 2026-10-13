@@ -860,8 +860,9 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Given name").assertIsDisplayed()
         onNodeWithText("18 or older").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("65 or older").performScrollToContent(this).assertIsDisplayed()
-        onAllNodesWithText("Always included").assertCountEquals(3)
-        onAllNodesWithText("May be included").assertCountEquals(2)
+        onAllNodesWithText("Always included").assertCountEquals(1)
+        onAllNodesWithText("Optional").assertCountEquals(1)
+        onAllNodesWithText("May be included").assertCountEquals(0)
         onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag("issuance-select-org.iso.23220.photoid.1").assertIsOn()
     }
@@ -1472,8 +1473,10 @@ class WalletDemoAppTestScenarios(
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).assertIsDisplayed().assertIsEnabled().performClick()
-        waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.pendingEngagementChoices.isNotEmpty() }
+        assertEquals(0, backend.starts, "Choosing a connection must not start a timed session")
         onNodeWithTag("proximity-show-Qr").performScrollToContent(this).assertIsDisplayed().performClick()
+        waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
         val prepared = onNodeWithTag("proximity-approval-prepare")
         prepared.performScrollToContent(this).assertIsOff()
         val before = prepared.getUnclippedBoundsInRoot()
@@ -1510,6 +1513,11 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct).performScrollToContent(this).performClick()
         repeat(3) { onNodeWithTag(WalletUiTestTags.SettingsBack).performClick() }
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).performClick()
+        waitUntil(timeoutMillis = 5_000) {
+            proximity.state.value.pendingEngagementChoices == listOf(ProximityEngagementMethod.Nfc)
+        }
+        onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
+        onNodeWithTag("proximity-show-Nfc").performScrollToContent(this).performClick()
         waitUntil(timeoutMillis = 5_000) {
             proximity.state.value.sessionState is ProximityState.EngagementReady &&
                 proximity.state.value.engagementChoices == listOf(ProximityEngagementMethod.Nfc)
@@ -2503,7 +2511,8 @@ internal class WalletUiTestWallet(
 private class PreferenceProximityBackend : ProximityPresentationBackend {
     val firstClose = CompletableDeferred<Unit>()
     lateinit var latestState: MutableStateFlow<ProximityState>
-    private var starts = 0
+    var starts = 0
+        private set
     var closedSessions = 0
         private set
 

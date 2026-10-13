@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.testTag
 import org.jetbrains.compose.resources.stringResource
 import id.walt.walletdemo.compose.ui.resources.*
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -60,17 +61,18 @@ internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier) {
+internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier,
+                        textStyle: TextStyle = MaterialTheme.typography.bodyLarge) {
     when (value) {
         is DisplayValue.BooleanValue -> Text(
             if (value.value) "Yes" else "No",
             modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
         )
         is DisplayValue.DecodedText -> Text(
             value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
         )
         is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
@@ -78,13 +80,13 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         DisplayValue.NullValue -> Text(
             stringResource(Res.string.claim_null_value),
             modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is DisplayValue.NumberValue -> Text(
             value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
         )
         is DisplayValue.ObjectValue -> Column(
             modifier = modifier,
@@ -104,7 +106,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         is DisplayValue.Text -> Text(
             value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge,
+            style = textStyle,
         )
     }
 }

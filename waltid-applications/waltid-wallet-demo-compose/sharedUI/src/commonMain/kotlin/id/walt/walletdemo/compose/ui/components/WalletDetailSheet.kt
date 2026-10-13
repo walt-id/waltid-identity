@@ -8,13 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
-import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
-import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletReviewHost
 import androidx.compose.material.icons.Icons
@@ -33,36 +29,35 @@ internal fun WalletDetailSheet(
     pagePath: List<String> = listOf(title),
     content: @Composable ColumnScope.(String) -> Unit,
 ) {
-    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val predictivePop = defaultPredictivePopTransitionSpec<String>()
     WalletReviewHost(dismissEnabled = true, onDismiss = onDismiss) {
+        val sheetMotion = rememberWalletSheetNavigationMotion()
         // Back navigates within the information stack; X/outside dismissal closes the adapter.
         SystemBackHandler(enabled = onBack != null) { onBack?.invoke() }
-        Column(modifier.fillMaxSize()) {
+        Column(modifier.fillMaxWidth()) {
             WalletScreenHeader(title,
                 leading = {
                     onBack?.let { back ->
-                        IconButton(onClick = back, modifier = Modifier.testTag("wallet-detail-back")) {
+                        WalletHeaderButton(onClick = back, modifier = Modifier.testTag("wallet-detail-back")) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.credential_back))
                         }
                     }
                 },
                 trailing = {
-                    IconButton(onClick = onDismiss, modifier = Modifier.testTag(closeTag)) {
+                    WalletHeaderButton(onClick = onDismiss, modifier = Modifier.testTag(closeTag)) {
                         WalletIcon(WalletSymbol.Decline, stringResource(Res.string.credential_close_details))
                     }
                 })
             val savedPages = rememberSaveableStateHolder()
-            NavDisplay(pagePath, modifier = Modifier.weight(1f), onBack = { (onBack ?: onDismiss)() },
+            NavDisplay(pagePath, modifier = Modifier.weight(1f, fill = false), onBack = { (onBack ?: onDismiss)() },
                 entryDecorators = emptyList(),
-                transitionSpec = { walletNavigationMotion(true, reduceMotion, rtl) },
-                popTransitionSpec = { walletNavigationMotion(false, reduceMotion, rtl) },
-                predictivePopTransitionSpec = if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
+                sizeTransform = walletNavigationSizeTransform(reduceMotion = true),
+                transitionSpec = { sheetMotion(true) },
+                popTransitionSpec = { sheetMotion(false) },
+                predictivePopTransitionSpec = { _ -> sheetMotion(false) },
             ) { pageKey ->
                 NavEntry(pageKey) {
                     savedPages.SaveableStateProvider(pageKey) {
-                        Column(Modifier.fillMaxSize().walletNavigationBackground().verticalScroll(rememberScrollState())
+                        Column(Modifier.fillMaxWidth().walletNavigationBackground().verticalScroll(rememberScrollState())
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)).padding(20.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)) { content(pageKey) }
                     }

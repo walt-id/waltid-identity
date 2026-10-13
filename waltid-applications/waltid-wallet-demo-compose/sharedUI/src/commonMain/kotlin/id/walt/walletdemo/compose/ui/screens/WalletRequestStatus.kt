@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +17,7 @@ internal fun WalletRequestStatus(
     onRetry: () -> Unit,
     retryEnabled: Boolean,
     modifier: Modifier = Modifier,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
     val failure = state.operation as? WalletOperationState.Failed
     ReviewScaffold(modifier, fillViewport, actions = if (failure != null && retryEnabled) {

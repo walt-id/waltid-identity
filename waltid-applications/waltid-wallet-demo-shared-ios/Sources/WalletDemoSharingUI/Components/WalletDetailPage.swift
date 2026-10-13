@@ -19,7 +19,7 @@ public struct WalletDetailPage<Content: View>: View {
     }
 
     private var page: some View {
-        ScrollView {
+        WalletSheetScrollView {
             VStack(alignment: .leading, spacing: 16) { content }.padding(20)
         }
         .background(Color(.systemGroupedBackground))

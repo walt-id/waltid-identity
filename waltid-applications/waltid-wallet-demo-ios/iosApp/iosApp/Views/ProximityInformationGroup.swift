@@ -12,8 +12,7 @@ struct ProximityInformationGroup: View {
     var enabled: Bool = true
 
     var body: some View {
-        ReviewInformationGroup(title: details?.cardSummary.title ?? credential.label ?? String(localized: "Wallet credential"),
-            issuer: details?.cardSummary.issuer ?? credential.issuer) {
+        ReviewInformationGroup(title: details?.cardSummary.title ?? credential.label ?? String(localized: "Wallet credential")) {
             if !document.requiredElements.allSatisfy({ required in
                 credential.requestedElements.contains { $0.namespace == required.namespace && $0.elementIdentifier == required.elementIdentifier }
             }) {

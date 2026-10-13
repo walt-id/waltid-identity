@@ -245,7 +245,7 @@ class WalletDemoSharingReviewTestScenarios {
         }
         onNodeWithTag("payment-consent-blocked").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("42.00").assertDoesNotExist()
-        onNodeWithText("Share").assertIsNotEnabled()
+        onNodeWithText("Confirm payment").assertIsNotEnabled()
         assertEquals(false, submitted)
     }
 
@@ -273,7 +273,7 @@ class WalletDemoSharingReviewTestScenarios {
         onAllNodesWithText("https://verifier.example").assertCountEquals(1)
         onNodeWithText("Verified website").assertIsDisplayed()
         onAllNodesWithText("Verified website").assertCountEquals(1)
-        onNodeWithText("Payment Authorization").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Review payment").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("42.00").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("ACME Corp").assertIsDisplayed()

@@ -28,10 +28,9 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 Home is the stable collection destination. Scan opens a scanner-first sheet with a reversible manual-input mode and a field-adjacent Paste control; links resolve automatically to the supported issuance or presentation flow. Android can also open an available system camera. Apple uses the embedded scanner because there is no supported standalone Camera-app launch contract.
 
-Receiving, sharing and pending issuance recovery stay in a modal sheet over Home, including externally opened links. Scanner resolution advances within the same sheet. Unlock and signing-key setup remain at the root while an incoming request waits; no full-screen promotion or Open in app action is needed. Short entry sheets fit premeasured content; long review pages expand and scroll. Close returns to Home without answering a verifier. The system-owned identity-document provider extension retains its request context and fulfillment contract.
+Receiving, sharing and pending issuance recovery stay in a modal sheet over Home, including externally opened links. Scanner resolution advances within the same sheet. Unlock and signing-key setup remain at the root while an incoming request waits; no full-screen promotion or Open in app action is needed. Sheets fit the active page's measured content, expanding and scrolling when it exceeds the available height. Close returns to Home without answering a verifier. The system-owned identity-document provider extension retains its request context and fulfillment contract.
 
-
-Reviews and details share one navigation host with directional Back/forward transitions and a reduced-motion alternative. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
+Reviews and details share one navigation host with native iOS push and swipe-back motion, including the system's reduced-motion behavior. The sheet adjusts its height after native navigation finishes so the incoming content and pinned actions resize together. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
 
 Decisions use text-first controls: a filled primary action, quiet secondary choices, and destructive color for irreversible confirmation. Meaningful Scan, Paste, Close and navigation icons remain. Operation feedback occupies the footer; trust, disclosure requirements and field validation stay with their context. Scroll content ends above the footer and keyboard, with material/blur and accessibility fallbacks. See the [design system](../waltid-wallet-demo-test-fixtures/design-system.md).
 
@@ -55,11 +54,12 @@ Home offers **Share nearby** in a focused sheet for holder-side ISO mdoc
 proximity presentation. The native SwiftUI view model consumes the Wallet SDK session directly and
 does not reconstruct protocol state, reader trust, request meaning, or disclosure rules.
 
-The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
-by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
-presentation sheet, including when NFC is the only available method.
-It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
-engagement preserves the session and payload. Once connecting starts, method controls disappear;
+The sharing screen offers **Hold near the reader** and **Show QR code** for routes the SDK capability
+snapshot reports as available. Opening this chooser creates no engagement or radio session. Selecting
+one of the methods starts the timed engagement, including when only one method is available. On iOS,
+choosing NFC opens the system presentation sheet once preparation finishes. It does not depend on the
+optional short-lived presentment assertion. Switching between already prepared methods preserves the
+session and payload. Once connecting starts, method controls disappear;
 reader consent remains the focus, and the actual route is available under **Connection details**.
 Completion shows the result and **Done**, without radio controls.
 
@@ -113,7 +113,8 @@ The ready screen prioritizes the full QR within the available space. **Prepare s
 switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
 does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
 the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
-selection. Close is an accessible X in the task header. It requests cancellation only when the SDK permits it, waits for cleanup and returns to Home without another cancelled-result acknowledgement. Connection options returns to the active nearby phase. Short screens and larger text retain
+selection. Close is an accessible X in the task header. It requests cancellation only when the SDK permits it, waits for cleanup and returns to Home without another cancelled-result acknowledgement. Wallet-owned sheets fit their current content, growing to the available height and scrolling only
+when needed. Connection options and detail pages resize the same sheet; Back and short outcomes shrink it again. Short screens and larger text retain
 scrolling for secondary controls; landscape places the QR beside the controls.
 
 QR rendering remains a private demo-package concern rather than a Wallet SDK API. The native app

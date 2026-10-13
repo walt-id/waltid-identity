@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +39,7 @@ import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
+import id.walt.walletdemo.compose.ui.components.NfcEngagementIllustration
 import id.walt.walletdemo.compose.ui.components.QrCodeCanvas
 import id.walt.walletdemo.compose.ui.components.SettingsDivider
 import id.walt.walletdemo.compose.ui.components.WalletNavigationRow
@@ -55,7 +57,7 @@ internal fun ProximityEngagementContent(
     onShowEngagement: (ProximityEngagementMethod) -> Unit,
     onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit,
     onConnectionOptions: (() -> Unit)? = null,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
     val method = state.displayedEngagement
     val choices = state.engagementChoices
@@ -126,7 +128,15 @@ internal fun ProximityEngagementContent(
         val qrCode = remember(qr?.payload) { qr?.let { runCatching { encodeProximityQrCode(it.payload) }.getOrNull() } }
         ProximityQrEngagementLayout(header = header, footer = footer) {
             if (state.refreshingEngagement) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                        Text(stringResource(Res.string.proximity_qr_preparing),
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             } else if (qrCode != null) {
                 BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     if (constraints.maxWidth >= qrCode.width + 8 && constraints.maxHeight >= qrCode.height + 8) {
@@ -147,6 +157,7 @@ internal fun ProximityEngagementContent(
         Column((if (fillViewport) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             header()
+            if (method == ProximityEngagementMethod.Nfc) NfcEngagementIllustration(active = !state.refreshingEngagement)
             if (method == null) WalletSection {
                 choices.forEachIndexed { index, choice ->
                     if (index > 0) SettingsDivider()
@@ -167,7 +178,7 @@ private fun ProximityQrEngagementLayout(
     footer: @Composable () -> Unit,
     qr: @Composable () -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
         val viewportHeight = maxHeight
         Layout(
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -186,11 +197,11 @@ private fun ProximityQrEngagementLayout(
             val bottom = children[2].measure(textConstraints)
             val qrSide = if (landscape) side else minOf(maxQr, maxOf(minQr, viewport - top.height - bottom.height - gap * 2))
             val code = children[1].measure(Constraints.fixed(qrSide, qrSide))
-            val height = maxOf(viewport, if (landscape) maxOf(qrSide, top.height + bottom.height + gap)
-                else top.height + qrSide + bottom.height + gap * 2)
+            val height = if (landscape) maxOf(qrSide, top.height + bottom.height + gap)
+                else top.height + qrSide + bottom.height + gap * 2
             layout(width, height) {
                 if (landscape) {
-                    code.placeRelative(0, (viewport - qrSide) / 2)
+                    code.placeRelative(0, (height - qrSide) / 2)
                     top.placeRelative(qrSide + gap, 0)
                     bottom.placeRelative(qrSide + gap, height - bottom.height)
                 } else {

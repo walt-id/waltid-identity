@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -39,7 +40,7 @@ import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 @OptIn(ExperimentalFoundationApi::class)
 internal fun ReviewScaffold(
     modifier: Modifier = Modifier,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
     header: (@Composable () -> Unit)? = null,
     feedback: (@Composable () -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null,

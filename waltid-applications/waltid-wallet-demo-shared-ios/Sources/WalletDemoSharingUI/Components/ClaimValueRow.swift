@@ -16,18 +16,19 @@ public struct ClaimValueRow: View {
     }
 }
 
-private struct ClaimValueView: View {
+struct ClaimValueView: View {
     let value: DisplayValue
     let path: ClaimItemPath
+    var textFont: Font = .body
 
     var body: some View {
         switch value {
         case .bool(let value):
             Text(value ? "Yes" : "No")
-                .font(.body)
+                .font(textFont)
         case .decodedText(let value), .text(let value), .number(let value):
             Text(value.isEmpty ? String(localized: "Empty text", bundle: .module) : value)
-                .font(.body)
+                .font(textFont)
         case .deferredImage(let source):
             DeferredImageValue(source: source, path: path)
         case .image(_, let data, let mimeType, let byteCount):
@@ -36,7 +37,7 @@ private struct ClaimValueView: View {
             ClaimListView(values: values, path: path)
         case .null:
             Text("No value supplied", bundle: .module)
-                .font(.body)
+                .font(textFont)
                 .foregroundStyle(.secondary)
         case .object(let entries):
             LazyVStack(alignment: .leading, spacing: 6) {

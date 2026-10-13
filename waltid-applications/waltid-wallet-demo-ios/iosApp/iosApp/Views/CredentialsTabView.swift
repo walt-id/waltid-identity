@@ -106,16 +106,13 @@ struct CredentialsTabView: View {
                                 }
                                 .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
                             } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 16, weight: .semibold))
+                                WalletToolbarIcon("ellipsis")
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                             Button(action: closeDetails) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .semibold))
+                                WalletToolbarIcon("xmark")
                             }
                             .accessibilityLabel("Close credential information")
-                            .frame(minWidth: 44, minHeight: 44)
                             .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                         } else {
                             if let onShareNearby {
@@ -127,12 +124,12 @@ struct CredentialsTabView: View {
                                     .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
                             }
                             if let onScan {
-                                Button(action: onScan) { Image(systemName: "qrcode.viewfinder") }
+                                Button(action: onScan) { WalletToolbarIcon("qrcode.viewfinder") }
                                     .accessibilityLabel("Scan or paste a link")
                                     .accessibilityIdentifier("wallet.scanButton")
                             }
                             Button(action: onOpenSettings) {
-                                Image(systemName: "gearshape")
+                                WalletToolbarIcon("gearshape")
                             }
                             .accessibilityLabel("Settings")
                 .accessibilityIdentifier(WalletAccessibilityID.settingsButton)

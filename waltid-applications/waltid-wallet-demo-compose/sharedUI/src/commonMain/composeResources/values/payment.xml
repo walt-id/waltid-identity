@@ -1,4 +1,6 @@
 <resources>
+    <string name="payment_confirm">Confirm payment</string>
+    <string name="payment_decline">Decline payment</string>
     <string name="payment_unsigned_title">Unsigned payment request</string>
     <string name="payment_unsigned_confirmation">This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?</string>
     <string name="payment_return_to_review">Back to review</string>

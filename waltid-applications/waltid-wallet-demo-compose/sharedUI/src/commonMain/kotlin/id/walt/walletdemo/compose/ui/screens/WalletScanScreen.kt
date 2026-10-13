@@ -105,19 +105,19 @@ internal fun WalletScanScreen(
         header = {
             WalletScreenHeader(if (manual) "Enter a link" else "Scan QR code") {
                 launchCamera?.let { camera ->
-                    IconButton(onClick = {
+                    WalletHeaderButton(onClick = {
                         focus.clearFocus()
                         try { camera() } catch (_: Exception) { resolutionError = "The camera app could not be opened. Use the scanner or enter a link." }
                     }, enabled = !resolving, modifier = Modifier.testTag(WalletUiTestTags.ScanCamera)) {
                         WalletIcon(WalletSymbol.Camera, "Open camera app")
                     }
                 }
-                IconButton(onClick = { focus.clearFocus(); manual = !manual; resolutionError = null },
+                WalletHeaderButton(onClick = { focus.clearFocus(); manual = !manual; resolutionError = null },
                     enabled = !resolving, modifier = Modifier.testTag("wallet.scanMode")) {
                     WalletIcon(if (manual) WalletSymbol.Scan else WalletSymbol.Manual,
                         if (manual) "Scan QR code" else "Enter a link")
                 }
-                IconButton(onClick = ::close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                WalletHeaderButton(onClick = ::close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                     WalletIcon(WalletSymbol.Decline, "Close scanner")
                 }
             }

@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
@@ -460,6 +462,9 @@ internal class WalletVisualScenarios(
         onNodeWithText("Values have not been received yet.").assertIsDisplayed()
         onNodeWithText("Given name").assertIsDisplayed()
         onNodeWithText("Family name").assertIsDisplayed()
+        onNodeWithText("Contact email").assertIsDisplayed()
+        onAllNodesWithText("Always included").assertCountEquals(1)
+        onAllNodesWithText("Optional").assertCountEquals(1)
         onNodeWithText("Ada").assertDoesNotExist()
         capture("batch.offer.definitions")
     }
@@ -566,34 +571,42 @@ internal class WalletVisualScenarios(
         capture("nearby.$kind")
         if (kind == "review") {
             onNodeWithTag(WalletUiTestTags.proximityElement(0, "org.iso.18013.5.1", "given_name")).performScrollTo().assertIsDisplayed()
-            onNodeWithText("Reader intends to retain this data").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Reader intends to retain this data").performScrollToContent(this).assertIsDisplayed()
             onNodeWithText("Alex").assertIsDisplayed()
             capture("nearby.review.disclosures")
         }
     }
 
     fun nearbyReady() = with(test) {
-        content { nearbyVisualHost {
+        val method = mutableStateOf(id.walt.wallet2.mobile.ProximityEngagementMethod.Qr)
+        content { CompositionLocalProvider(LocalWalletVisualPreferences provides WalletVisualPreferences(reduceMotion = true)) {
+            nearbyVisualHost {
             WalletDemoProximityScreen(
-                state = WalletDemoProximityUiState(active = true, sessionState = ProximityState.EngagementReady(
-                    listOf(ProximityEngagement.Qr(WalletVisualFixtures.nearbyQrPayload)))),
+                state = WalletDemoProximityUiState(active = true, preferredEngagement = method.value,
+                    sessionState = ProximityState.EngagementReady(
+                        listOf(ProximityEngagement.Qr(WalletVisualFixtures.nearbyQrPayload), ProximityEngagement.Nfc))),
                 credentialDetailsById = emptyMap(),
                 hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
                 onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
                 onCancel = {}, onDismiss = {}, onRestart = {}, onConnectionOptions = {}, headerOwnsClose = true,
             )
-        } }
+        } } }
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed()
         capture("nearby.ready.qr")
+        runOnIdle { method.value = id.walt.wallet2.mobile.ProximityEngagementMethod.Nfc }
+        onNodeWithText("Hold near the reader").assertIsDisplayed()
+        onNodeWithText("Show QR code instead").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ProximityQr).assertDoesNotExist()
+        capture("nearby.ready.nfc")
     }
 
     @Composable
     private fun nearbyVisualHost(content: @Composable () -> Unit) {
         Column(Modifier.fillMaxSize()) {
             WalletScreenHeader("Share nearby") {
-                IconButton({}, modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
+                id.walt.walletdemo.compose.ui.components.WalletHeaderButton({}, modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
                     WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
                 }
             }
@@ -626,7 +639,13 @@ internal class WalletVisualScenarios(
         }
         if (alternative) onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[1].selection.id))
             .performScrollTo().performClick()
-        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada").performScrollTo().assertIsDisplayed()
+        options.mapNotNull { it.issuer }.distinct().forEach { issuer ->
+            onAllNodesWithText(issuer).assertCountEquals(1)
+        }
+        val heading = if (alternative) "City ID" else "National ID"
+        onAllNodes(hasText(heading) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(1)
+        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada")
+            .performScrollToContent(this).assertIsDisplayed()
         if (alternative) onNodeWithText("Always included by this credential").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         capture("sharing.information." + if (multiple) "multiple" else if (alternative) "alternative" else "selected")
@@ -700,7 +719,7 @@ internal class WalletVisualScenarios(
                 onSubmit = {}, onCancel = {}, compact = false,
                 preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
         }
-        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56 EUR").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
         capture("payment.localized.compact_large_text")
@@ -723,7 +742,7 @@ internal class WalletVisualScenarios(
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()
         capture("payment.mixed_credentials.details")
-        onNodeWithTag("review-information-to-share").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Example account").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
         capture("payment.mixed_credentials.requested_data")
         onNodeWithText("Pay €11.56").performClick()

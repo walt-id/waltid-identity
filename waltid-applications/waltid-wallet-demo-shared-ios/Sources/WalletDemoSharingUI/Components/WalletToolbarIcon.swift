@@ -12,7 +12,11 @@ public struct WalletToolbarIcon: View {
 
     public var body: some View {
         Image(systemName: symbol)
-            .frame(width: 44, height: 44)
+            // The native toolbar owns the button's hit area and circular material. Giving its
+            // label another 44-point frame makes the system add padding twice.
+            .font(.system(size: 18, weight: .medium))
+            .frame(width: 22, height: 22)
+            .foregroundStyle(symbol == "xmark" ? Color.primary : Color.accentColor)
             .overlay(alignment: .bottomTrailing) {
                 if isBusy {
                     ProgressView().controlSize(.mini)
