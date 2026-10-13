@@ -1196,24 +1196,6 @@ class WalletDemoController(
         val navigationResetKey: Int,
     )
 
-    fun present() {
-        val current = _state.value
-        val ready = current.session as? WalletSessionState.Ready ?: return
-        val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
-        if (requestUrl.isBlank()) return
-
-        scope.launch(dispatcher) {
-            _state.update { it.copy(operation = WalletOperationState.Presenting) }
-            runCatching {
-                wallet.present(requestUrl, ready.did)
-            }.onSuccess { result ->
-                _state.update { it.withPresentationResult(result) }
-            }.onFailure { error ->
-                setOperationError(WalletDisplayText.PresentFailed, error, WalletDemoTab.Present)
-            }
-        }
-    }
-
     fun previewPresentation() {
         val current = _state.value
         current.session as? WalletSessionState.Ready ?: return
@@ -1305,49 +1287,38 @@ class WalletDemoController(
     )
 
     fun togglePresentationCredential(selection: WalletDemoPresentationCredentialSelection) {
-        _state.update { state ->
-            val selected = state.selectedPresentationCredentialOptions
-            val option = state.presentationPreview
-                ?.credentialOptions
-                ?.firstOrNull { it.selection == selection }
-            val nextCredentials = if (selection in selected) {
-                selected - selection
-            } else {
-                if (option?.multiple == true) {
-                    selected + selection
-                } else {
-                    selected
-                        .filterNot { it.queryId == selection.queryId }
-                        .toSet() + selection
-                }
-            }
-            val retainedDisclosures = if (option?.multiple == true) {
-                state.selectedPresentationDisclosureOptions
-                    .filterNot { it.queryId == selection.queryId && it.credentialId == selection.credentialId }
-                    .toSet()
-            } else {
-                state.selectedPresentationDisclosureOptions
-                    .filterNot { it.queryId == selection.queryId }
-                    .toSet()
-            }
-            state.copy(
-                selectedPresentationCredentialOptions = nextCredentials,
-                selectedPresentationDisclosureOptions = retainedDisclosures.forSelectedCredentials(nextCredentials),
-            )
+        updatePresentationSelection { review, current ->
+            val option = review.credentialOptions.firstOrNull { it.selection == selection }
+                ?: return@updatePresentationSelection current
+            current.toggleCredential(selection, option)
         }
-        prepareSelectedPaymentConsent()
     }
 
     fun togglePresentationDisclosure(selection: WalletDemoPresentationDisclosureSelection) {
-        _state.update { state ->
-            val selected = state.selectedPresentationDisclosureOptions
-            state.copy(
-                selectedPresentationDisclosureOptions = if (selection in selected) {
-                    selected - selection
-                } else {
-                    selected + selection
-                }.forSelectedCredentials(state.selectedPresentationCredentialOptions)
-            )
+        updatePresentationSelection { review, current ->
+            val option = review.credentialOptions.firstOrNull {
+                it.queryId == selection.queryId && it.credentialId == selection.credentialId
+            } ?: return@updatePresentationSelection current
+            if (option.selection !in current.credentials || option.disclosures.none { it.path == selection.path && it.selectable }) current
+            else current.toggleDisclosure(selection)
+        }
+    }
+
+    private fun updatePresentationSelection(
+        transform: (WalletDemoPresentationPreview, WalletDemoSharingSelection) -> WalletDemoSharingSelection,
+    ) {
+        while (true) {
+            val previous = _state.value
+            if (!previous.presentationReviewEnabled) return
+            val preview = previous.presentationPreview ?: return
+            val current = WalletDemoSharingSelection(previous.selectedPresentationCredentialOptions, previous.selectedPresentationDisclosureOptions)
+            val next = transform(preview, current)
+            if (next == current) return
+            if (_state.compareAndSet(previous, previous.copy(
+                selectedPresentationCredentialOptions = next.credentials,
+                selectedPresentationDisclosureOptions = next.disclosures,
+                paymentReview = if (preview.requiresPaymentConsent) WalletDemoPaymentReview.Loading else WalletDemoPaymentReview.NotRequired,
+            ))) break
         }
         prepareSelectedPaymentConsent()
     }

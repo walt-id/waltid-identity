@@ -2277,24 +2277,6 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentUpdatesStatusOnSuccess() = runTest {
-        val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult.Success("Presentation sent"))
-        val controller = unlockedControllerWith(wallet, this)
-
-        controller.selectTab(WalletDemoTab.Present)
-        controller.updatePresentationRequestUrl("openid4vp://example")
-        controller.present()
-        runCurrent()
-
-        assertEquals("openid4vp://example", wallet.presentedRequestUrl)
-        assertEquals(
-            WalletOperationState.Succeeded("Presentation sent", WalletDemoTab.Present),
-            controller.state.value.operation,
-        )
-        assertEquals("Presentation sent", controller.state.value.statusText)
-    }
-
-    @Test
     fun presentationPreviewSubmitRejectAndDismissUseSelectedHandle() = runTest {
         val preview = WalletDemoPresentationPreview(
             previewHandle = presentationPreviewHandle,
@@ -2331,6 +2313,10 @@ class WalletDemoControllerTest {
         controller.previewPresentation()
         runCurrent()
 
+        val reviewedState = controller.state.value
+        controller.togglePresentationCredential(WalletDemoPresentationCredentialSelection("pid", "unknown"))
+        controller.togglePresentationDisclosure(WalletDemoPresentationDisclosureSelection("pid", "cred-1", "unknown"))
+        assertEquals(reviewedState, controller.state.value)
         assertEquals(preview, controller.state.value.presentationPreview)
         assertEquals(WalletOperationState.Idle, controller.state.value.operation)
         assertEquals("Review presentation request", controller.state.value.statusText)
@@ -2911,15 +2897,16 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentIgnoresBlankRequestUrl() = runTest {
+    fun presentationReviewIgnoresBlankRequestUrl() = runTest {
         val wallet = FakeDemoWallet()
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updatePresentationRequestUrl("   ")
-        controller.present()
+        controller.previewPresentation()
         runCurrent()
 
-        assertEquals(null, wallet.presentedRequestUrl)
+        assertEquals(null, wallet.previewedRequestUrl)
+        assertEquals(null, wallet.submittedPreviewHandle)
         assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
@@ -3616,6 +3603,21 @@ class WalletDemoControllerTest {
         assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
     }
 
+    @Test
+    fun statusKindUsesOperationAndSessionStateIndependentlyOfMessageText() = runTest {
+        val controller = unlockedControllerWith(FakeDemoWallet(), this)
+        val ready = controller.state.value
+        assertEquals(WalletStatusKind.Success, ready.statusBanner()?.kind)
+        assertEquals(WalletStatusKind.Info, ready.copy(operation = WalletOperationState.OfferPreview)
+            .statusBanner(WalletDemoTab.Receive)?.kind)
+        assertEquals(WalletStatusKind.Success, ready.copy(operation = WalletOperationState.Succeeded("Erfolgreich", WalletDemoTab.Receive))
+            .statusBanner(WalletDemoTab.Receive)?.kind)
+        assertEquals(WalletStatusKind.Error, ready.copy(operation = WalletOperationState.Failed("Received invalid data", WalletDemoTab.Receive))
+            .statusBanner(WalletDemoTab.Receive)?.kind)
+        assertEquals(WalletStatusKind.Busy, ready.copy(operation = WalletOperationState.Receiving)
+            .statusBanner(WalletDemoTab.Receive)?.kind)
+    }
+
     private fun controllerWith(
         wallet: DemoWallet,
         scope: TestScope,
@@ -3865,7 +3867,6 @@ private class FakeDemoWallet(
     var receivedTxCode: String? = null
     var receiveCalls = 0
     val receivedIssuanceSelections = mutableListOf<List<WalletDemoCredentialSelection>>()
-    var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var previewPresentationCalls = 0
     var submitPresentationCalls = 0
@@ -3969,11 +3970,6 @@ private class FakeDemoWallet(
         resumedDeferredCredentialIds += deferredCredentialId
         withContext(NonCancellable) { deferredGate?.await() }
         return deferredOutcome
-    }
-
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
-        presentedRequestUrl = requestUrl
-        return presentationResult
     }
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {

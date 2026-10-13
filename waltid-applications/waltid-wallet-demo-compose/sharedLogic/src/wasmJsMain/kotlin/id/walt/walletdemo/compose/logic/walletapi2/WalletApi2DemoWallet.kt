@@ -287,13 +287,6 @@ internal class WalletApi2DemoWallet(
         client.resumeDeferred(walletId, deferredCredentialId).toOutcome()
     }
 
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult = useWallet {
-        client.present(walletId, requestUrl, did ?: this.did, keyId).toDemoOperationResult(
-            successMessage = WalletDisplayText.PresentationSent,
-            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
-        )
-    }
-
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult = useWallet {
         val preview = client.previewPresentation(walletId, requestUrl, keyId)
         val mapped = preview.toDemoPreview(requestUrl)

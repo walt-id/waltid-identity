@@ -1089,10 +1089,6 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func present(request: URL, did: String?) async throws -> PresentationResult {
-        .transmitted(.succeeded(verifierResponseJSON: "{}"))
-    }
-
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         presentationPreviewCalls += 1
         if presentationPreviewDelayNanoseconds > 0 {

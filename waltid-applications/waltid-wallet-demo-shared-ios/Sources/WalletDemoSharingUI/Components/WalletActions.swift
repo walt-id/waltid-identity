@@ -1,5 +1,19 @@
 import SwiftUI
 
+public struct WalletAction {
+    public let label: String
+    public let enabled: Bool
+    public let identifier: String?
+    public let perform: () -> Void
+
+    public init(_ label: String, enabled: Bool = true, identifier: String? = nil, perform: @escaping () -> Void) {
+        self.label = label
+        self.enabled = enabled
+        self.identifier = identifier
+        self.perform = perform
+    }
+}
+
 /// Reusable action content for full screens, sheets and platform provider containers.
 public struct WalletActions: View {
     private let primary: WalletAction?

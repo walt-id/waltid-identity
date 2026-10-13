@@ -169,11 +169,6 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func present(request: URL, did: String?) async throws -> PresentationResult {
-        try await delayOperation()
-        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
-    }
-
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await delayOperation()
         if let presentationPreviewResultOverride {

@@ -1,11 +1,11 @@
 import Foundation
 
-public struct ResolvedWalletLink {
+public struct ResolvedWalletLink: Sendable {
     public let url: String
     public let kind: WalletLinkKind
 }
 
-public struct WalletLinkDocument {
+public struct WalletLinkDocument: Sendable {
     public let status: Int
     public let body: String
     public let location: String?
@@ -22,7 +22,35 @@ public struct WalletLinkError: LocalizedError {
 /// Routing only: the existing wallet client validates every resolved offer/request before review.
 public enum WalletLinkResolver {
     public static func resolve(_ input: String,
-        fetch: (String) async throws -> WalletLinkDocument = fetchDocument
+        fetch: @escaping @Sendable (String) async throws -> WalletLinkDocument = { try await fetchDocument($0) }
+    ) async throws -> ResolvedWalletLink {
+        try await resolve(input, timeoutNanoseconds: 10_000_000_000, fetch: fetch)
+    }
+
+    // One budget covers the entire redirect chain and body download, as in the Compose resolver.
+    static func resolve(_ input: String, timeoutNanoseconds: UInt64,
+        fetch: @escaping @Sendable (String) async throws -> WalletLinkDocument
+    ) async throws -> ResolvedWalletLink {
+        try await withThrowingTaskGroup(of: ResolvedWalletLink.self) { group in
+            group.addTask { try await followRedirects(input, fetch: fetch) }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                throw WalletLinkError(message: "This link took too long to open. Check your connection and try again.")
+            }
+            defer { group.cancelAll() }
+            do {
+                let result = try await group.next()!
+                try Task.checkCancellation()
+                return result
+            } catch {
+                try Task.checkCancellation()
+                throw error
+            }
+        }
+    }
+
+    private static func followRedirects(_ input: String,
+        fetch: @Sendable (String) async throws -> WalletLinkDocument
     ) async throws -> ResolvedWalletLink {
         do {
             var value = input.trimmingCharacters(in: .whitespacesAndNewlines)

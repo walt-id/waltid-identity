@@ -268,12 +268,6 @@ internal class MobileDemoWallet(
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
         mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
 
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
-            successMessage = WalletDisplayText.PresentationSent,
-            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
-        )
-
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         when (val result = mobileWallet.previewPresentation(requestUrl)) {
             is MobileWalletPresentationPreviewResult.Ready ->

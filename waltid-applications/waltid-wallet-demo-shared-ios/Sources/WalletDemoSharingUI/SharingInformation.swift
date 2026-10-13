@@ -1,12 +1,13 @@
 import Foundation
 import WalletSDK
 
-struct SharingInformationField {
+struct SharingInformationField: Identifiable {
     let item: ClaimItem
     let included: Bool
     let alwaysIncluded: Bool
     let optionalSelections: Set<PresentationDisclosureSelection>
     let path: [ClaimPathExpression.Segment]
+    var id: [ClaimPathExpression.Segment] { path }
 }
 
 struct SharingInformationGroup: Identifiable {
@@ -57,15 +58,27 @@ func informationFields(option: PresentationCredentialOption, details: Credential
     return option.disclosures.enumerated().compactMap { index, disclosure in
         guard items.indices.contains(index) else { return nil }
         let item = items[index]
-        if !disclosure.requested &&
-            CredentialDisplayVocabulary.groupKind(for: item.pathComponents, format: option.format) == .technical { return nil }
+        let path = disclosurePathExpression(disclosure.path, format: option.format).segments
+        if !disclosure.requested && isCredentialSummaryClaim(path, format: option.format) { return nil }
         let key = PresentationDisclosureSelection(queryID: option.queryID, credentialID: option.credentialID, path: disclosure.path)
         return SharingInformationField(item: item,
             included: !disclosure.selectivelyDisclosable || disclosure.required || disclosures.contains(key),
             alwaysIncluded: !disclosure.requested,
             optionalSelections: disclosure.selectable ? [key] : [],
-            path: option.format == "mso_mdoc" && disclosure.path.contains("/") && !disclosure.path.contains("://") && !disclosure.path.hasPrefix("[")
-                ? disclosure.path.split(separator: "/", maxSplits: 1).map { .key(String($0)) }
-                : ClaimPathExpression.parse(disclosure.path).segments)
+            path: path)
+    }
+}
+
+/// Only issuer/type metadata already represented by the selector may be summarized away.
+/// Technical grouping does not make identifiers or custom nested claims safe to omit.
+func isCredentialSummaryClaim(_ path: [ClaimPathExpression.Segment], format: String) -> Bool {
+    let keys = path.compactMap { if case .key(let value) = $0 { return value }; return nil }
+    guard keys.count == path.count else { return false }
+    switch format {
+    case "dc+sd-jwt", "vc+sd-jwt": return keys == ["iss"] || keys == ["vct"]
+    case "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld":
+        return keys == ["iss"] || keys == ["vc", "issuer"] || keys == ["vc", "type"]
+    case "ldp_vc": return keys == ["issuer"] || keys == ["type"]
+    default: return false
     }
 }

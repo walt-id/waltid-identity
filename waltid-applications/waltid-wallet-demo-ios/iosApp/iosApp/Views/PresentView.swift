@@ -19,6 +19,7 @@ struct PresentView: View {
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
     @State private var showingConnectionOptions = false
     @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
+    @State private var renderedSharingOptions: [PresentationCredentialOption] = []
 
     init(viewModel: WalletViewModel, onBack: (() -> Void)? = nil, nearbySheet: Bool = false) {
         self.onBack = onBack
@@ -153,10 +154,11 @@ struct PresentView: View {
     }
 
     private func onlineReviewContent(review: SharingReviewModel) -> some View {
+        let informationReady = renderedSharingOptions == review.credentialOptions
         let reviewedSelection = viewModel.presentationSharingSelection
         let reviewedPayment = viewModel.paymentReview
         let submit = {
-            guard review == viewModel.presentationSharingReview,
+            guard informationReady, review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
                   reviewedPayment == viewModel.paymentReview else { return }
             viewModel.submitPresentation()
@@ -170,7 +172,7 @@ struct PresentView: View {
             SharingReviewView(
                 review: review,
                 selection: viewModel.presentationSharingSelection,
-                selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,
                 isReadOnly: false,
                 onToggleCredential: viewModel.togglePresentationCredential,
@@ -184,7 +186,7 @@ struct PresentView: View {
             )
         } actions: {
             ReviewActions(
-                selectionComplete: viewModel.presentationCredentialSelectionComplete,
+                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
@@ -193,7 +195,7 @@ struct PresentView: View {
                 isPayment: review.request.hasPaymentTransaction,
                 showCancelWithReject: false
             )
-        }
+        }.onPreferenceChange(SharingReviewReadinessKey.self) { renderedSharingOptions = $0 }
     }
 
     private var proximityContent: some View {

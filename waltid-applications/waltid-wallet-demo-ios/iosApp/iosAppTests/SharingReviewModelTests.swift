@@ -492,6 +492,12 @@ final class SharingReviewModelTests: XCTestCase {
         let fields = review.informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
             details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
         XCTAssertEqual(fields.count, 3)
+        XCTAssertEqual(Set(fields.map(\.id)).count, 3)
+        let reversed = SharingReviewModel(request: review.request, credentialOptions: options.reversed())
+            .informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
+                details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: fields.map { ($0.item.rawValue, $0.id) }),
+            Dictionary(uniqueKeysWithValues: reversed.map { ($0.item.rawValue, $0.id) }))
         XCTAssertEqual(Set(fields.compactMap { $0.item.rawValue }), [#""Vienna""#, #""Ada""#, #""Literal""#])
     }
 

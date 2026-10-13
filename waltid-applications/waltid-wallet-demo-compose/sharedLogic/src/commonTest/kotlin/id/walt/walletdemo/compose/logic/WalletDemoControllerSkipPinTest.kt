@@ -102,7 +102,6 @@ private class RecordingDemoWallet : DemoWallet {
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) = error("unused")
-    override suspend fun present(requestUrl: String, did: String?) = error("unused")
     override suspend fun previewPresentation(requestUrl: String) = error("unused")
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,

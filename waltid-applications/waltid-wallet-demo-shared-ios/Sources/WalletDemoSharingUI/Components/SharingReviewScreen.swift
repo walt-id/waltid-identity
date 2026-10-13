@@ -13,6 +13,7 @@ import WalletSDK
 /// submit it: in a provider extension the transport, the retained request handle and the platform
 /// result all live outside the view.
 public struct SharingReviewScreen: View {
+    @State private var renderedOptions: [PresentationCredentialOption] = []
     private let title: String
     private let review: SharingReviewModel?
     private let selection: SharingSelection
@@ -69,7 +70,7 @@ public struct SharingReviewScreen: View {
             } actions: {
                 if review != nil && failure == nil {
                     ReviewActions(
-                        selectionComplete: selectionComplete,
+                        selectionComplete: selectionComplete && renderedOptions == review?.credentialOptions,
                         isLoading: isSubmitting,
                         onSubmit: onSubmit,
                         onReject: onReject,
@@ -91,6 +92,7 @@ public struct SharingReviewScreen: View {
                 }
             }
         }
+        .onPreferenceChange(SharingReviewReadinessKey.self) { renderedOptions = $0 }
         .interactiveDismissDisabled(isSubmitting)
     }
 

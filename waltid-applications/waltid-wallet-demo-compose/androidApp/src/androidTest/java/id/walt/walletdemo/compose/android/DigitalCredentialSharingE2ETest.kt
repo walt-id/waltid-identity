@@ -270,6 +270,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 )
                 val request = fixture.startCredentialRequest(session.requestJson)
                 val confirmationStarted = System.currentTimeMillis() / 1000.0
+                val expectedFailure = "TS12 authentication evidence is unavailable:"
                 val outcome = if (showPreview) {
                     fixture.enterProviderReview(request, scenario.credentialConfigurationId)
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
@@ -287,9 +288,10 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     )
                     assertFalse("Unsigned payment submitted before explicit confirmation", request.isComplete)
                     clickByTag(fixture.device, "payment-unsigned-confirm")
+                    fixture.dismissProviderFailure(request, expectedFailure)
                     withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
                 } else {
-                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId) { device ->
+                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId, expectedFailure) { device ->
                         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { value ->
                             assertTextContainingVisibleInForegroundWindow(device, value, "Platform payment prompt is missing '$value'")
                         }
@@ -303,7 +305,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 ).lineSequence().any { line ->
                     val timestamp = line.trimStart().substringBefore(' ').toDoubleOrNull()
                     timestamp != null && timestamp >= confirmationStarted &&
-                        "TS12 authentication evidence is unavailable:" in line
+                        expectedFailure in line
                 }
                 assertTrue("Submission did not reach the native SCA key-policy rejection", rejectedByNativePolicy)
                 assertFalse("Rejected signing must not reach the verifier",

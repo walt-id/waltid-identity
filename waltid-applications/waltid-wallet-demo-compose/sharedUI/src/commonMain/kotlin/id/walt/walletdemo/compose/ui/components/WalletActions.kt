@@ -15,6 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
+internal data class WalletAction(
+    val label: String,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+    val testTag: String? = null,
+)
+
 /** Intrinsic-width decisions in reading order, wrapping when their labels need more space. */
 @Composable
 internal fun WalletActions(

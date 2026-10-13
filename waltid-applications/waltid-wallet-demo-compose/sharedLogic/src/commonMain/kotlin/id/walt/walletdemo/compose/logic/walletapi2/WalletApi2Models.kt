@@ -423,13 +423,6 @@ internal data class RejectPresentationRequestDto(
 )
 
 @Serializable
-internal data class PresentCredentialRequestDto(
-    val requestUrl: String,
-    val did: String? = null,
-    val keyId: String? = null,
-)
-
-@Serializable
 internal data class WalletPresentResultDto(
     @SerialName("get_url")
     val getUrl: String? = null,

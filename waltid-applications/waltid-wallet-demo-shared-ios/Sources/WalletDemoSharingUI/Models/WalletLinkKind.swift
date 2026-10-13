@@ -1,7 +1,7 @@
 import Foundation
 
 /// A routing hint; the wallet's protocol client remains responsible for validation.
-public enum WalletLinkKind: Equatable {
+public enum WalletLinkKind: Equatable, Sendable {
     case empty, offer, presentation, web, authorizationCallback, fidoHybrid, unsupported
 
     public static func classify(_ input: String) -> Self {

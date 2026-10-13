@@ -19,6 +19,7 @@ import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
@@ -50,7 +51,8 @@ fun WalletDemoSharingReviewScreen(
     val selection = state.selection
     val paymentReview = state.payment
     val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
-    val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
+    val information by rememberSharingInformation(review.credentialOptions)
+    val selectionComplete = information != null && review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
         ReviewScaffold(
@@ -79,17 +81,13 @@ fun WalletDemoSharingReviewScreen(
             SharingReviewSection(
                 paymentReview = paymentReview,
                 review = review,
+                information = information,
                 selectedCredentialOptions = selection.credentials,
                 selectedDisclosureOptions = selection.disclosures,
-                selectionComplete = selectionComplete,
                 enabled = enabled,
                 compact = compact,
-                showActions = false,
                 onToggleCredential = owner::toggleCredential,
                 onToggleDisclosure = owner::toggleDisclosure,
-                onSubmit = submit,
-                onCancel = onCancel,
-                onReject = onReject,
             )
         }
     }

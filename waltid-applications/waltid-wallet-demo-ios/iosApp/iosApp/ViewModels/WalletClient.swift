@@ -15,7 +15,6 @@ protocol WalletClient {
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
-    func present(request: URL, did: String?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
@@ -82,10 +81,6 @@ final class SDKWalletClient: WalletClient {
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI) }
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: sessionID) }
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(deferredCredentialID: deferredCredentialID) }
-
-    func present(request: URL, did: String?) async throws -> PresentationResult {
-        try await wallet().present(request: request, did: did)
-    }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await wallet().previewPresentation(request: request)

@@ -58,11 +58,17 @@ internal class WalletVisualScenarios(
         captureImage(id, layoutDirection)
     }
 
-    private fun content(body: @Composable () -> Unit) = test.setContent {
-        platformTheme {
-            WalletDemoTheme {
-                Surface(modifier = Modifier.fillMaxSize(), content = body)
+    private fun content(body: @Composable () -> Unit) {
+        test.setContent {
+            platformTheme {
+                WalletDemoTheme {
+                    Surface(modifier = Modifier.fillMaxSize(), content = body)
+                }
             }
+        }
+        test.waitUntil {
+            test.onAllNodesWithTag(WalletUiTestTags.PresentationReview).fetchSemanticsNodes().isEmpty() ||
+                test.onAllNodesWithTag("review-information-to-share").fetchSemanticsNodes().isNotEmpty()
         }
     }
 

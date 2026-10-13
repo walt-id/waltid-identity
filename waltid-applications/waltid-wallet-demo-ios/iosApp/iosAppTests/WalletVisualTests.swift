@@ -94,8 +94,10 @@ final class WalletVisualTests: XCTestCase {
                 BiometricRecoverySection(availability: .unavailable, kind: .faceID, showSettingsAction: false)
             }.navigationTitle("Set up your wallet").navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge: .bottom) {
-                    WalletActionBar(primary: WalletAction("Create signing key", enabled: false, perform: {}),
-                        secondary: WalletAction("Open Settings", perform: {}))
+                    WalletFooter {
+                        WalletActions(primary: WalletAction("Create signing key", enabled: false, perform: {}),
+                            secondary: WalletAction("Open Settings", perform: {}))
+                    }
                 }
         }.navigationViewStyle(.stack), id: "onboarding.key.approval_unavailable")
     }
@@ -107,8 +109,10 @@ final class WalletVisualTests: XCTestCase {
             List { SigningKeySetupContent(options: options, selected: selected, step: step, onSelect: { _ in }, onEdit: { _ in }) }
                 .navigationTitle(step == .summary ? "Set up your wallet" : step.title).navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge: .bottom) {
-                    WalletActionBar(primary: WalletAction(step == .summary ? "Create signing key" : "Done", perform: {}),
-                        secondary: step == .summary ? nil : WalletAction("Back", perform: {}))
+                    WalletFooter {
+                        WalletActions(primary: WalletAction(step == .summary ? "Create signing key" : "Done", perform: {}),
+                            secondary: step == .summary ? nil : WalletAction("Back", perform: {}))
+                    }
                 }
         }.navigationViewStyle(.stack), id: "onboarding.key.\(step)")
     }
@@ -613,7 +617,7 @@ final class WalletVisualTests: XCTestCase {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
-            .onPreferenceChange(SharingReviewReadinessKey.self) { ready = $0 }
+            .onPreferenceChange(SharingReviewReadinessKey.self) { ready = Set($0.map(\.selection.id)) }
         try await captureWhenReady(content, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory,
             isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading",
             readinessDescription: { "Expected \(expected.sorted()), rendered \(ready.sorted())" }, scrollToBottom: scrollToBottom)

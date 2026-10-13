@@ -1325,32 +1325,6 @@ class WalletViewModel: ObservableObject {
         let navigationResetKey: Int
     }
 
-    func presentCredential() {
-        resetInputFocus()
-        let trimmedRequestUrl = presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let request = URL(string: trimmedRequestUrl) else {
-            setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.invalidRequestURL), tab: .present)
-            return
-        }
-
-        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
-        Task {
-            do {
-                let result = try await walletClient.present(
-                    request: request,
-                    did: did.isEmpty ? nil : did
-                )
-                handlePresentationResult(
-                    result,
-                    successMessage: WalletStatusText.presentationSent,
-                    failureMessage: WalletStatusText.presentationFinishedWithoutVerifierConfirmation
-                )
-            } catch {
-                setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
-            }
-        }
-    }
-
     func previewPresentation() {
         resetInputFocus()
         guard !isLoading, presentationReview == nil else { return }

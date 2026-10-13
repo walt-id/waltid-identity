@@ -236,7 +236,6 @@ class WalletApi2IssuanceOwnershipTest {
                 { wallet.continuePreAuthorizedIssuance(session, null, copies()) },
                 { wallet.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state") },
                 { wallet.resumeDeferredIssuance("deferred") },
-                { wallet.present("request", null) },
                 { wallet.previewPresentation("request") },
                 { wallet.submitPresentation(handle, emptyList(), emptyList(), null) },
                 { wallet.rejectPresentation(handle) },
