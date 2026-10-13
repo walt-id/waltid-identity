@@ -1124,10 +1124,15 @@ public struct IssuanceSession: Equatable, Sendable {
 
 /// Current retained state, refreshed by listing issuance continuations.
 public enum IssuanceContinuationStatus: Equatable, Sendable {
+    /// No recognized continuation state has been supplied.
     case unresolved
+    /// The issuer is still processing the credential request.
     case awaitingIssuer
+    /// Issued credentials are waiting to be saved locally.
     case awaitingLocalSave
+    /// The issuer request outcome is uncertain; automatic retry is unsafe.
     case remoteOutcomeUncertain
+    /// The local save outcome is uncertain; automatic takeover is unsafe.
     case storageOutcomeUncertain
 }
 
@@ -1145,6 +1150,7 @@ public struct DeferredCredential: Equatable, Sendable {
     /// Issuer-recommended minimum polling interval in seconds.
     public let intervalSeconds: Int64?
 
+    /// Current retained state of the continuation.
     public let status: IssuanceContinuationStatus
 
     /// Issuer display metadata only, without credential values or protocol secrets.
@@ -1157,6 +1163,8 @@ public struct DeferredCredential: Equatable, Sendable {
     ///   - credentialConfigurationID: Credential configuration, if supplied by the original request.
     ///   - intervalSeconds: Issuer-recommended polling interval.
     ///   - credentialIdentifier: Optional issuer-granted dataset identifier.
+    ///   - status: Current retained state of the continuation.
+    ///   - displayMetadataJSON: Optional issuer display metadata, without credential values or protocol secrets.
     public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil,
                 status: IssuanceContinuationStatus = .unresolved, displayMetadataJSON: String? = nil) {
         self.id = id
@@ -1784,6 +1792,7 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     ///     disclose this claim.
     ///   - required: Whether the request requires this claim.
     ///   - selectable: Whether apps may let the user toggle this claim.
+    ///   - requested: Whether the presentation request asks for this claim, rather than additional clear-text data.
     public init(
         path: String,
         name: String?,
