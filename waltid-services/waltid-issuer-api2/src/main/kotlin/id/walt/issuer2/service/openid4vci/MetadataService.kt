@@ -143,6 +143,12 @@ class MetadataService @JvmOverloads constructor(
             authorizationResponseIssParameterSupported = true,
         ).copy(authorizationDetailsTypesSupported = setOf("openid_credential"))
 
+    suspend fun getAuthorizationServerDiscoveryMetadata(): AuthorizationServerMetadata {
+        val metadata = getAuthorizationServerMetadata()
+        val signer = dedicatedMetadataSigner ?: return metadata
+        return metadata.copy(signedMetadata = signer.sign(metadata))
+    }
+
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
         getAuthorizationServerMetadata().let { metadata ->
             JWTVCIssuerMetadata(

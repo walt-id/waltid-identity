@@ -65,6 +65,8 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 
 ### Signed issuer metadata
 
+`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured.
+
 `signedMetadata.signingMethod` follows the same strategy pattern as the attestation
 `verificationMethod` settings, with signing-specific key requirements. The strategy models
 and signing implementation are shared with enterprise issuer2 in

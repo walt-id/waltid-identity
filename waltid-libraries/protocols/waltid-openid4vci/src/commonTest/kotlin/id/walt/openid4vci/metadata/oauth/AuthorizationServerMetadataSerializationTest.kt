@@ -20,6 +20,19 @@ class AuthorizationServerMetadataSerializationTest {
     private val json = Json
 
     @Test
+    fun `signed metadata is an optional standard field and round trips`() {
+        val unsigned = AuthorizationServerMetadata.fromBaseUrl("https://as.example")
+        assertFalse("signed_metadata" in json.encodeToJsonElement(AuthorizationServerMetadata.serializer(), unsigned).jsonObject)
+        val signed = unsigned.copy(signedMetadata = "header.payload.signature")
+        val encoded = json.encodeToString(signed)
+        assertEquals(JsonPrimitive("header.payload.signature"), json.parseToJsonElement(encoded).jsonObject["signed_metadata"])
+        assertEquals(signed, json.decodeFromString<AuthorizationServerMetadata>(encoded))
+        assertFailsWith<IllegalArgumentException> {
+            unsigned.copy(customParameters = mapOf("signed_metadata" to JsonPrimitive("override")))
+        }
+    }
+
+    @Test
     fun `rejects empty collections`() {
         assertFailsWith<IllegalArgumentException> {
             AuthorizationServerMetadata(

@@ -18,11 +18,19 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.toSignedJwt
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.metadata.oauth.toSignedJwt
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import kotlinx.coroutines.CancellationException
 
 internal class JwkMetadataSigner private constructor(private val signingKey: Crypto2JwtSigningKey) : MetadataJwtSigner {
     override suspend fun sign(metadata: CredentialIssuerMetadata): String = metadata.toSignedJwt(
+        signingKey = signingKey.key,
+        algorithm = signingKey.algorithm,
+        keyId = signingKey.keyId,
+    )
+
+    override suspend fun sign(metadata: AuthorizationServerMetadata): String = metadata.toSignedJwt(
         signingKey = signingKey.key,
         algorithm = signingKey.algorithm,
         keyId = signingKey.keyId,

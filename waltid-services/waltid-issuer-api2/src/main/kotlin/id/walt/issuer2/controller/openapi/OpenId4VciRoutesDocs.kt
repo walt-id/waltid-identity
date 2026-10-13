@@ -3,6 +3,7 @@ package id.walt.issuer2.controller.openapi
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -42,10 +43,13 @@ object OpenId4VciRoutesDocs {
     fun authorizationServerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get Authorization Server metadata"
+        description = "`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured."
         response {
             HttpStatusCode.OK to {
                 description = "OAuth Authorization Server metadata"
-                body<JsonObject>()
+                body<AuthorizationServerMetadata> {
+                    mediaTypes(ContentType.Application.Json)
+                }
             }
         }
     }
