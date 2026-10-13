@@ -10,18 +10,131 @@
         },
         {
           "class": "MockWalletUITests",
-          "name": "testWalletReadinessOutlivesTheSuccessBannerAcrossRestart",
-          "oracle": "Wallet readiness survives banner dismissal on both process launches."
+          "name": "testWalletReadinessOutlivesTheSuccessBannerAcrossRestart"
         },
         {
           "class": "MockWalletUITests",
-          "name": "testCredentialsStayLoadingUntilTheInitialReadCompletes",
-          "oracle": "Readiness remains false until the initial credential read completes."
+          "name": "testCredentialsStayLoadingUntilTheInitialReadCompletes"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testReaderTrustSettingsExposePolicyAndFileImport"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testSettingsExposeAllProximityTransportProfiles"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testSettingsReturnsToOriginatingTabAndLocksWallet"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testProximityPresentationCanBeDismissedAndStartedAgain"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testStatusBannerPrecedesContentAcrossTabs"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testOnlinePresentationPrecedesInPersonPresentation"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testDeepLinksRouteToReceiveAndPresentTabs"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testTransactionCodeOfferCanBeDeclinedWithoutCode"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationDeclineSendsProtocolRejection"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testOfferShowsCredentialWithoutUnissuedClaims"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentTabAllowsPreviewAndDeclineWithoutCredentials"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialOfferDeepLinksResetReceiveDetailStackWhenUrlIsUnchanged"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationDeepLinksResetPresentDetailStackWhenUrlIsUnchanged"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationDisclosureImagesRenderAsImages"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialDetailsStayScopedToCredentialsTabNavigationStack"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testReceiveAndPresentDisableUrlControlsWhileLoading"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialImageOpensAndClosesFullScreenViewer"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testTabbedReceiveAndPresentFlowUsesMockWallet"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationShowsUnencryptedResponseState"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationWithoutVerifierDisplayKeepsClientIDInTechnicalDetails"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialDetailsStayScopedToReceiveTabNavigationStack"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialDetailsStayScopedToPresentTabNavigationStack"
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testPresentationDetailsResolveDuplicateCredentialOptionsIndependently"
+        },
+        {
+          "class": "WalletIdentitySetupUITests",
+          "name": "testBackupResetRestoreAndRestartKeepTheOriginalDid"
+        },
+        {
+          "class": "WalletIdentitySetupUITests",
+          "name": "testNativeIdentitySetupAndProtectionDetails"
         },
         {
           "class": "PublicDemoBackendE2ETests",
-          "name": "testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2",
-          "oracle": "Real issuance persists across process restart and saved identity signs a verified presentation."
+          "name": "testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart"
+        },
+        {
+          "class": "PublicDemoBackendE2ETests",
+          "name": "testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2"
+        },
+        {
+          "class": "PublicDemoBackendE2ETests",
+          "name": "testTransactionDataPreviewAgainstPublicDemoIssuer2Verifier2"
+        },
+        {
+          "class": "PublicDemoBackendE2ETests",
+          "name": "testTransactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2"
+        },
+        {
+          "class": "MockCredentialDisplayUITests",
+          "name": "testMockCredentialDetailsRenderPortraitAndCredentialInfo"
         }
       ]
     }

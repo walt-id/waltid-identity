@@ -360,6 +360,21 @@ jobs:
 
           echo "has_report=true" >> "$GITHUB_OUTPUT"
 
+      - name: Require native and Compose batch test execution
+        if: always() && steps.enterprise_ios_mobile_tests.outcome != 'skipped'
+        run: |
+          for demo in native compose; do
+            if [[ "$demo" == native ]]; then
+              report='*iosAppEnterpriseTests.xcresult.xml'
+            else
+              report='*compose-batch.xcresult.xml'
+            fi
+            python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py \
+              --manifest waltid-identity/.github/scripts/mobile-ci/wallet-batch-test-suites.json \
+              --suite "$demo-ios-batch" \
+              --reports "waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/xcresult/$report"
+          done
+
       - name: Publish Enterprise iOS mobile test report
         if: always() && steps.enterprise_ios_test_report.outputs.has_report == 'true'
         uses: mikepenz/action-junit-report@v6
@@ -374,7 +389,7 @@ jobs:
           require_tests: true
 
       - name: Upload Enterprise iOS mobile test results
-        if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
+        if: always() && steps.enterprise_ios_mobile_tests.outcome != 'skipped'
         uses: actions/upload-artifact@v7
         with:
           name: enterprise-ios-mobile-test-results

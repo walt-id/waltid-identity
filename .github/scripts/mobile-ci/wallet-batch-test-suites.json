@@ -21,6 +21,22 @@
           "name": "testEveryFailureStageRetainsStoredIdsDeferredHandlesAndUnattemptedTargets"
         }
       ]
+    },
+    "native-ios-batch": {
+      "requiredTests": [
+        {
+          "class": "BatchIssuanceE2ETests",
+          "name": "testExplicitCopiesSurviveRelaunch"
+        }
+      ]
+    },
+    "compose-ios-batch": {
+      "requiredTests": [
+        {
+          "class": "BatchIssuanceE2ETests",
+          "name": "testExplicitCopiesSurviveRelaunch"
+        }
+      ]
     }
   }
 }

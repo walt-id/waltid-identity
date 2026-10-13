@@ -98,17 +98,15 @@ metadata = {
 (output / 'inputs.json').write_text(json.dumps(metadata, indent=2) + '\n')
 PY
 
+# Keychain and persistence snippet classes run in the entitled native iosAppTests host.
+# Discover the rest of the package by default, including newly added classes.
 phase_start=$SECONDS
 test_status=0
 WALLET_SDK_BRIDGE_FIXTURES=1 xcodebuild test -collect-test-diagnostics "${XCODE_TEST_DIAGNOSTICS:-never}" \
   -workspace "$root/WalletSDK.xcworkspace" -scheme WalletSDKTests \
   -destination "$destination" \
-  -only-testing:WalletSDKTests/WalletAPITests \
-  -only-testing:WalletSDKTests/IssuanceBridgeContractTests \
-  -only-testing:WalletSDKTests/KMPKeyAttestationProviderTests \
-  -only-testing:WalletSDKTests/KMPProximityProjectionTests \
-  -only-testing:WalletSDKTests/ProximityBridgeContractTests \
-  -only-testing:WalletSDKTests/ProximityInputValidationTests \
+  -skip-testing:WalletSDKTests/KeychainRecoveryContractTests \
+  -skip-testing:WalletSDKTests/WalletPersistenceSnippetsTests \
   -resultBundlePath "$run_dir/Tests.xcresult" \
   -derivedDataPath "$root/bridge-fixture-derived" \
   -parallel-testing-enabled NO \
@@ -135,4 +133,7 @@ python3 "$script_dir/verify_test_results.py" \
 python3 "$script_dir/verify_test_results.py" \
   --manifest "$script_dir/wallet-batch-test-suites.json" --suite swift-batch-bridge \
   --reports "$run_dir/results.xml" | tee "$run_dir/batch-discovery.json" || test_status=1
+python3 "$script_dir/verify_test_results.py" \
+  --manifest "$script_dir/unattended-test-suites.json" --suite swift-sdk-restored \
+  --reports "$run_dir/results.xml" | tee "$run_dir/restored-discovery.json" || test_status=1
 exit "$test_status"

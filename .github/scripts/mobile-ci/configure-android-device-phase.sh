@@ -60,7 +60,8 @@ case "$phase" in
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 1536"
     report_paths="waltid-identity/**/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity-enterprise/waltid-enterprise-integration-tests/build/**'
-    emulator_target="default"
+    # The controlled authorization journey uses the browser included in this image.
+    emulator_target="google_apis_playstore"
     ;;
   *)
     echo "Unknown Android device test phase: $phase" >&2
