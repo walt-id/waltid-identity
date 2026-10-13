@@ -95,8 +95,16 @@ class DefaultOAuth2Provider(
 ) : OAuth2Provider {
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
-            is AuthorizationParameterResolution.Success ->
+            is AuthorizationParameterResolution.Direct ->
                 config.authorizationRequestValidator.validate(resolution.parameters)
+
+            is AuthorizationParameterResolution.Pushed -> {
+                // RFC 9126 section 4: policy may have changed since the request was pushed.
+                when (val validation = config.authorizationRequestValidator.validate(resolution.request.requestForm)) {
+                    is AuthorizationRequestResult.Failure -> validation
+                    is AuthorizationRequestResult.Success -> AuthorizationRequestResult.Success(resolution.request)
+                }
+            }
 
             is AuthorizationParameterResolution.Failure ->
                 AuthorizationRequestResult.Failure(resolution.error)
@@ -950,17 +958,18 @@ class DefaultOAuth2Provider(
     private suspend fun resolveAuthorizationParameters(
         parameters: Map<String, List<String>>,
     ): AuthorizationParameterResolution {
-        val requestUriValues = parameters["request_uri"].orEmpty().filter { it.isNotBlank() }
+        val requestUriValues = parameters["request_uri"].orEmpty()
         if (requestUriValues.size > 1) {
             return AuthorizationParameterResolution.Failure(
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for request_uri not allowed")
             )
         }
 
-        val requestUri = requestUriValues.firstOrNull()
+        val requestUri = requestUriValues.firstOrNull()?.takeIf { it.isNotBlank() }
         val pushedAuthorizationConfig = config.pushedAuthorizationConfig
+        val required = pushedAuthorizationConfig?.enforcePushedAuthorizationRequests?.invoke() == true
         if (requestUri == null) {
-            return if (pushedAuthorizationConfig?.enforcePushedAuthorizationRequests == true) {
+            return if (required) {
                 AuthorizationParameterResolution.Failure(
                     OAuthError(
                         error = OAuthErrorCodes.INVALID_REQUEST,
@@ -968,7 +977,7 @@ class DefaultOAuth2Provider(
                     )
                 )
             } else {
-                AuthorizationParameterResolution.Success(parameters)
+                AuthorizationParameterResolution.Direct(parameters)
             }
         }
 
@@ -981,7 +990,7 @@ class DefaultOAuth2Provider(
             )
         }
 
-        val clientIdValues = parameters["client_id"].orEmpty().filter { it.isNotBlank() }
+        val clientIdValues = parameters["client_id"].orEmpty()
         val clientId = when (clientIdValues.size) {
             0 -> return AuthorizationParameterResolution.Failure(
                 OAuthError(
@@ -1001,7 +1010,11 @@ class DefaultOAuth2Provider(
             requestUriPrefix = pushedAuthorizationConfig.requestUriPrefix,
         ) ?: return AuthorizationParameterResolution.Failure(
             OAuthError(
-                error = OAuthErrorCodes.INVALID_REQUEST_URI,
+                error = if (required && !requestUri.startsWith(pushedAuthorizationConfig.requestUriPrefix)) {
+                    OAuthErrorCodes.INVALID_REQUEST
+                } else {
+                    OAuthErrorCodes.INVALID_REQUEST_URI
+                },
                 description = "request_uri is invalid",
             )
         )
@@ -1023,7 +1036,7 @@ class DefaultOAuth2Provider(
             )
         }
 
-        return AuthorizationParameterResolution.Success(entry.requestParameters)
+        return AuthorizationParameterResolution.Pushed(entry.authorizationRequest)
     }
 
     private fun oauthErrorPayload(error: OAuthError): Map<String, JsonElement> =
@@ -1103,7 +1116,8 @@ class DefaultOAuth2Provider(
         )
 
     private sealed class AuthorizationParameterResolution {
-        data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
+        data class Direct(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
+        data class Pushed(val request: AuthorizationRequest) : AuthorizationParameterResolution()
         data class Failure(val error: OAuthError) : AuthorizationParameterResolution()
     }
 

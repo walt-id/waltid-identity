@@ -43,7 +43,7 @@ internal fun Map<String, List<String>>.rejectDuplicate(name: String) {
     if (values.size > 1) throw SerializationException("Multiple values for $name not allowed")
 }
 
-internal fun Map<String, List<String>>.optionalAuthorizationDetails(): List<AuthorizationDetail> {
+fun Map<String, List<String>>.optionalAuthorizationDetails(): List<AuthorizationDetail> {
     val value = optionalSingle("authorization_details") ?: return emptyList()
     return try {
         authorizationDetailsJson.decodeFromString(ListSerializer(AuthorizationDetail.serializer()), value).also {

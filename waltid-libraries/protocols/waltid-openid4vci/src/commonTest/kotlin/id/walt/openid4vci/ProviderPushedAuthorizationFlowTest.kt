@@ -1,7 +1,6 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
@@ -10,11 +9,19 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
+import id.walt.openid4vci.repository.par.PARRecord
+import id.walt.openid4vci.repository.par.PARRepository
+import id.walt.openid4vci.validation.AuthorizationRequestValidator
+import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -22,8 +29,189 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+import id.walt.openid4vci.core.PushedAuthorizationConfig
+import id.walt.openid4vci.requests.authorization.*
+import kotlinx.serialization.json.*
 
 class ProviderPushedAuthorizationFlowTest {
+
+    @Test
+    fun `direct authorization completes without PAR configuration or PAR storage access`() = runTest {
+        val unavailableRepository = object : PARRepository {
+            override suspend fun save(record: PARRecord) = error("Direct authorization must not save PAR")
+
+            override suspend fun consume(requestId: String, now: kotlin.time.Instant): PARRecord? =
+                error("Direct authorization must not consume PAR")
+        }
+        for (parConfig in listOf(null, PushedAuthorizationConfig(unavailableRepository))) {
+            val provider = buildOAuth2Provider(createTestConfig().copy(pushedAuthorizationConfig = parConfig))
+            val parameters = validPushedParameters()
+            val request = assertIs<AuthorizationRequestResult.Success>(
+                provider.createAuthorizationRequest(parameters)
+            ).request.withIssuer("https://issuer.example")
+            val authorization = assertIs<AuthorizationResponseResult.Success>(
+                provider.createAuthorizationResponse(request, DefaultSession(subject = "wallet-user"))
+            ).response
+            assertEquals("state-123", authorization.state)
+
+            val tokenRequest = assertIs<AccessTokenRequestResult.Success>(
+                provider.createAccessTokenRequest(mapOf(
+                    "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                    "client_id" to parameters.getValue("client_id"),
+                    "redirect_uri" to parameters.getValue("redirect_uri"),
+                    "code" to listOf(authorization.code),
+                ))
+            ).request.withIssuer("https://issuer.example")
+            val token = assertIs<AccessTokenResponseResult.Success>(
+                provider.createAccessTokenResponse(tokenRequest)
+            ).response
+            assertTrue(token.accessToken.isNotBlank())
+        }
+    }
+
+    @Test
+    fun `invalid PAR references cannot fall back to direct authorization in any configuration`() = runTest {
+        for (required in listOf<Boolean?>(null, false, true)) {
+            val provider = buildOAuth2Provider(createTestConfig().copy(
+                pushedAuthorizationConfig = required?.let {
+                    PushedAuthorizationConfig(InMemoryPARRepository(), enforcePushedAuthorizationRequests = { it })
+                },
+            ))
+            for (requestUri in listOf(
+                "urn:ietf:params:oauth:request_uri:missing",
+                "urn:ietf:params:oauth:request_uri:",
+                "https://wallet.example/request",
+            )) {
+                val error = assertIs<AuthorizationRequestResult.Failure>(
+                    provider.createAuthorizationRequest(
+                        validPushedParameters() + ("request_uri" to listOf(requestUri))
+                    )
+                ).error
+                assertEquals(
+                    if (required == true && requestUri.startsWith("https://")) OAuthErrorCodes.INVALID_REQUEST
+                    else OAuthErrorCodes.INVALID_REQUEST_URI,
+                    error.error,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `PAR revalidates stored parameters and preserves the complete serialized request`() = runTest {
+        val validatedParameters = mutableListOf<Map<String, List<String>>>()
+        val delegate = DefaultAuthorizationRequestValidator()
+        val storage = InMemoryPARRepository()
+        val repository = object : PARRepository {
+            override suspend fun save(record: PARRecord) {
+                val encoded = Json.encodeToString(record as DefaultPARRecord)
+                storage.save(Json.decodeFromString<DefaultPARRecord>(encoded))
+            }
+
+            override suspend fun consume(requestId: String, now: kotlin.time.Instant): PARRecord? =
+                storage.consume(requestId, now)
+        }
+        val provider = buildOAuth2Provider(createTestConfig(
+            authorizationRequestValidator = AuthorizationRequestValidator { parameters ->
+                validatedParameters += parameters
+                val parsed = assertIs<AuthorizationRequestResult.Success>(delegate.validate(parameters)).request
+                    .toDefaultAuthorizationRequest().copy(
+                        requestedAudience = setOf("requested-audience"), grantedAudience = setOf("granted-audience"),
+                        grantedScopes = setOf("credential"), handledResponseTypes = setOf("code"),
+                        issClaim = "https://issuer.example", responseMode = ResponseMode.FRAGMENT,
+                        defaultResponseMode = ResponseMode.FRAGMENT,
+                        authorizationDetails = listOf(AuthorizationDetail(
+                            type = "openid_credential", credentialConfigurationId = "credential",
+                        )),
+                    )
+                AuthorizationRequestResult.Success(object : AuthorizationRequest by parsed {})
+            },
+        ).copy(
+            pushedAuthorizationConfig = PushedAuthorizationConfig(repository, enforcePushedAuthorizationRequests = { true }),
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+                methodsByEndpoint = mapOf(ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                    setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST)),
+            ),
+        ))
+        val parameters = validPushedParameters("auth-param-client") + mapOf(
+            "code_challenge" to listOf("a".repeat(43)), "code_challenge_method" to listOf("S256"),
+            "issuer_state" to listOf("offer-state"), "client_secret" to listOf("secret-value"),
+        )
+        val pushed = assertIs<AuthorizationRequestResult.Success>(provider.createPushedAuthorizationRequest(parameters)).request
+        val response = assertIs<PushedAuthorizationResponseResult.Success>(provider.createPushedAuthorizationResponse(pushed)).response
+        val restored = assertIs<AuthorizationRequestResult.Success>(provider.createAuthorizationRequest(mapOf(
+            "client_id" to listOf("auth-param-client"), "request_uri" to listOf(response.requestUri),
+            "redirect_uri" to listOf("https://attacker.example"), "scope" to listOf("tampered"),
+            "state" to listOf("tampered"), "code_challenge" to listOf("tampered"),
+        ))).request
+
+        assertEquals(pushed.toDefaultAuthorizationRequest().copy(requestForm = parameters - "client_secret"), restored)
+        assertEquals(listOf(parameters, parameters - "client_secret"), validatedParameters)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST_URI, assertIs<AuthorizationRequestResult.Failure>(
+            provider.createAuthorizationRequest(mapOf(
+                "client_id" to listOf("auth-param-client"), "request_uri" to listOf(response.requestUri),
+            ))
+        ).error.error)
+        assertEquals(2, validatedParameters.size)
+    }
+
+    @Test
+    fun `PAR redemption rejects a request disallowed by changed authorization policy`() = runTest {
+        for (required in listOf(false, true)) {
+            var clientAllowed = true
+            val delegate = DefaultAuthorizationRequestValidator()
+            val policyError = OAuthError(OAuthErrorCodes.UNAUTHORIZED_CLIENT, "Client is no longer allowed")
+            val provider = buildOAuth2Provider(createTestConfig(
+                authorizationRequestValidator = AuthorizationRequestValidator { parameters ->
+                    if (clientAllowed) delegate.validate(parameters)
+                    else AuthorizationRequestResult.Failure(policyError)
+                },
+            ).copy(
+                pushedAuthorizationConfig = PushedAuthorizationConfig(
+                    InMemoryPARRepository(), enforcePushedAuthorizationRequests = { required },
+                ),
+            ))
+            val pushedResponse = pushAuthorizationRequest(provider, validPushedParameters())
+            val authorizationParameters = mapOf(
+                "client_id" to listOf("demo-client"), "request_uri" to listOf(pushedResponse.requestUri),
+            )
+
+            clientAllowed = false
+            assertEquals(policyError, assertIs<AuthorizationRequestResult.Failure>(
+                provider.createAuthorizationRequest(authorizationParameters)
+            ).error)
+
+            clientAllowed = true
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST_URI, assertIs<AuthorizationRequestResult.Failure>(
+                provider.createAuthorizationRequest(authorizationParameters)
+            ).error.error)
+        }
+    }
+
+    @Test
+    fun `PAR redemption rechecks issuer state with the configured validator`() = runTest {
+        var issuerStateActive = true
+        val stateError = OAuthError(OAuthErrorCodes.INVALID_REQUEST, "issuer_state is no longer active")
+        val provider = buildOAuth2Provider(createTestConfig(
+            issuerStateValidator = { issuerState, request ->
+                assertEquals("offer-state", issuerState)
+                assertEquals("demo-client", request.client.id)
+                if (issuerStateActive) null else stateError
+            },
+        ).copy(pushedAuthorizationConfig = PushedAuthorizationConfig(InMemoryPARRepository())))
+        val pushedResponse = pushAuthorizationRequest(
+            provider, validPushedParameters() + ("issuer_state" to listOf("offer-state")),
+        )
+
+        issuerStateActive = false
+        assertEquals(stateError, assertIs<AuthorizationRequestResult.Failure>(
+            provider.createAuthorizationRequest(mapOf(
+                "client_id" to listOf("demo-client"), "request_uri" to listOf(pushedResponse.requestUri),
+                "issuer_state" to listOf("tampered-state"),
+            ))
+        ).error)
+    }
 
     @Test
     fun `provider stores PAR and resolves request_uri through authorization endpoint`() = runTest {
@@ -162,7 +350,9 @@ class ProviderPushedAuthorizationFlowTest {
         repository.save(
             DefaultPARRecord(
                 requestId = "expired-request",
-                requestParameters = parameters,
+                authorizationRequest = assertIs<AuthorizationRequestResult.Success>(
+                    provider.createPushedAuthorizationRequest(parameters)
+                ).request.toDefaultAuthorizationRequest(),
                 createdAt = now - 2.seconds,
                 expiresAt = now - 1.seconds,
             )
@@ -354,6 +544,75 @@ class ProviderPushedAuthorizationFlowTest {
         assertEquals("no-cache", httpResponse.headers["Pragma"])
     }
 
+    @Test
+    fun `dynamic policy is evaluated on each authorization and failures fail closed`() = runTest {
+        var required = false
+        var broken = false
+        val policy = PushedAuthorizationConfig(
+            repository = InMemoryPARRepository(),
+            enforcePushedAuthorizationRequests = {
+                check(!broken) { "Configuration unavailable" }
+                required
+            },
+        )
+        val provider = buildOAuth2Provider(createTestConfig().copy(pushedAuthorizationConfig = policy))
+        assertIs<AuthorizationRequestResult.Success>(provider.createAuthorizationRequest(validPushedParameters()))
+        val pushedResponse = pushAuthorizationRequest(provider, validPushedParameters())
+        required = true
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, assertIs<AuthorizationRequestResult.Failure>(
+            provider.createAuthorizationRequest(validPushedParameters())
+        ).error.error)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, assertIs<AuthorizationRequestResult.Failure>(
+            provider.createAuthorizationRequest(mapOf("client_id" to listOf("demo-client"), "request_uri" to listOf("https://example/request")))
+        ).error.error)
+        assertIs<AuthorizationRequestResult.Success>(provider.createAuthorizationRequest(mapOf(
+            "client_id" to listOf("demo-client"), "request_uri" to listOf(pushedResponse.requestUri),
+        )))
+        required = false
+        assertIs<AuthorizationRequestResult.Success>(provider.createAuthorizationRequest(validPushedParameters()))
+        broken = true
+        assertFailsWith<IllegalStateException> { provider.createAuthorizationRequest(validPushedParameters()) }
+    }
+
+    @Test
+    fun `duplicate PAR references including blank values cannot bypass checks`() = runTest {
+        val provider = buildParProvider(enforcePushedAuthorizationRequests = true)
+        val uri = pushAuthorizationRequest(provider, validPushedParameters()).requestUri
+        for (parameters in listOf(
+            mapOf("client_id" to listOf("demo-client"), "request_uri" to listOf(uri, "")),
+            mapOf("client_id" to listOf("demo-client", ""), "request_uri" to listOf(uri)),
+        )) {
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST, assertIs<AuthorizationRequestResult.Failure>(
+                provider.createAuthorizationRequest(parameters)
+            ).error.error)
+        }
+        assertIs<AuthorizationRequestResult.Success>(provider.createAuthorizationRequest(
+            mapOf("client_id" to listOf("demo-client"), "request_uri" to listOf(uri))
+        ))
+    }
+
+    @Test
+    fun `concrete snapshot serializes every declared request field`() = runTest {
+        val parameters = validPushedParameters() + mapOf(
+            "code_challenge" to listOf("a".repeat(43)), "code_challenge_method" to listOf("S256"),
+            "issuer_state" to listOf("offer"),
+        )
+        val parsed = assertIs<AuthorizationRequestResult.Success>(buildParProvider().createAuthorizationRequest(parameters)).request
+        val complete = parsed.toDefaultAuthorizationRequest().copy(
+            handledResponseTypes = setOf("code"), grantedScopes = setOf("openid"),
+            requestedAudience = setOf("requested"), grantedAudience = setOf("granted"),
+            issClaim = "https://issuer.example", responseMode = ResponseMode.FRAGMENT,
+            defaultResponseMode = ResponseMode.FRAGMENT,
+            authorizationDetails = listOf(AuthorizationDetail(type = "openid_credential", credentialConfigurationId = "credential")),
+            authenticatedClient = AuthenticatedClient("demo-client", "test", true,
+                claims = buildJsonObject { put("claim", "value") }),
+        )
+        val custom = object : AuthorizationRequest by complete {}
+        val snapshot = custom.toDefaultAuthorizationRequest()
+        assertEquals(complete, snapshot)
+        assertEquals(complete, Json.decodeFromString<DefaultAuthorizationRequest>(Json.encodeToString(snapshot)))
+    }
+
     private fun buildParProvider(
         repository: InMemoryPARRepository = InMemoryPARRepository(),
         enforcePushedAuthorizationRequests: Boolean = false,
@@ -363,7 +622,7 @@ class ProviderPushedAuthorizationFlowTest {
             createTestConfig().copy(
                 pushedAuthorizationConfig = PushedAuthorizationConfig(
                     repository = repository,
-                    enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+                    enforcePushedAuthorizationRequests = { enforcePushedAuthorizationRequests },
                 ),
                 clientAuthenticationServiceConfig = clientAuthenticationServiceConfig,
             )
