@@ -46,15 +46,14 @@ class PublicDemoBackendE2ETest {
             if (index == 1) relaunchAndUnlock(context, device)
             val offer = EudiTestBackend.generateOffer()
             sendDeepLink(context, offer.offerUrl)
-            clickByTag(device, "wallet.receiveButton")
-            assertTrue("EUDI offer did not reach review: ${latestStatus(device)}",
-                waitForStatus(device, CREDENTIAL_OPERATION_TIMEOUT,
-                    { it.startsWith("Review credential offer") }, listOf("Receive failed")))
+            assertReview(device, "wallet.offerAcceptButton")
             setTextByTag(device, "wallet.txCodeInput", offer.txCode)
+            dismissKeyboard(device)
             clickByTag(device, "wallet.offerAcceptButton")
-            assertTrue("EUDI issuance failed: ${latestStatus(device)}",
-                waitForStatus(device, CREDENTIAL_OPERATION_TIMEOUT,
-                    { it.startsWith("Received") }, listOf("Receive failed")))
+            assertReview(device, "issuance-done")
+            assertTextVisibleAfterScrolling(device, listOf("Saved · 1"), "EUDI credential was not saved")
+            clickByTag(device, "issuance-done")
+            assertHome(device)
         }
     }
 
