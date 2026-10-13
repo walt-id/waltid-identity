@@ -23,7 +23,8 @@ data class TokenCredentialAuthorization(
         mapOf("authorization_details" to Json.encodeToJsonElement(authorizationDetails))
 }
 
-class InvalidTokenCredentialAuthorization(val request: AccessTokenRequest, message: String) : IllegalArgumentException(message)
+class InvalidTokenCredentialAuthorization(val request: AccessTokenRequest, message: String) :
+    IllegalArgumentException(message)
 
 /** Apply a credential grant without treating a missing grant as an unrestricted grant. */
 fun Collection<CredentialAuthorization>.withinAuthorizationDetails(
@@ -31,8 +32,8 @@ fun Collection<CredentialAuthorization>.withinAuthorizationDetails(
 ): List<CredentialAuthorization> = filter { candidate ->
     details.any { detail ->
         detail.type == OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE &&
-            detail.credentialConfigurationId == candidate.credentialConfigurationId &&
-            (detail.credentialIdentifiers == null || candidate.credentialIdentifier in detail.credentialIdentifiers)
+                detail.credentialConfigurationId == candidate.credentialConfigurationId &&
+                (detail.credentialIdentifiers == null || candidate.credentialIdentifier in detail.credentialIdentifiers)
     }
 }
 
@@ -72,13 +73,14 @@ fun resolveTokenCredentialAuthorization(
     // Inherited OAuth scopes may cover more than the saved credential grant.
     // Only an explicit selector outside that grant is an invalid request.
     if ((requestedConfigurations.isNotEmpty() || explicitScope) &&
-        selection.any { requested -> permitted.none { it.credentialConfigurationId == requested } }) {
+        selection.any { requested -> permitted.none { it.credentialConfigurationId == requested } }
+    ) {
         throw InvalidTokenCredentialAuthorization(request, "Requested credentials exceed the authorized grant")
     }
     // No mapped credential scopes is not the same as no selector: an explicit
     // scope=openid (or another non-credential scope) must not restore the grant.
     val effective = if (selection.isEmpty() && !explicitScope) permitted
-        else permitted.filter { it.credentialConfigurationId in selection }
+    else permitted.filter { it.credentialConfigurationId in selection }
     if (effective.isEmpty()) throw InvalidTokenCredentialAuthorization(request, "Token request selects no credentials")
     return TokenCredentialAuthorization(effective.toAuthorizationDetails(), includeInResponse)
 }
