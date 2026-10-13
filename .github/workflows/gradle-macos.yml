@@ -199,7 +199,7 @@ jobs:
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose }}
     runs-on: xcode-27
-    timeout-minutes: 130
+    timeout-minutes: 170
     strategy:
       fail-fast: false
       matrix:
@@ -226,8 +226,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run selected WalletCore consumer tests
-        # Leave time outside the action to collect failure evidence.
-        timeout-minutes: 120
+        # Retain full test discovery and leave time outside the action to collect failure evidence.
+        timeout-minutes: 160
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
@@ -277,7 +277,7 @@ jobs:
 
   enterprise-ios-mobile-tests:
     needs: wallet-core-framework
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: ${{ inputs.run-enterprise }}
     runs-on: xcode-27
     steps:
@@ -302,7 +302,8 @@ jobs:
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 45
+        # Native SDK/UI and Compose UI each build and finalize their own result bundle.
+        timeout-minutes: 75
         run: |
           exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$GITHUB_WORKSPACE/ios-ci-logs" enterprise \
