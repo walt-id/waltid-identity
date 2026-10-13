@@ -8,10 +8,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.MotionScheme
 import kotlin.math.PI
 
-/** Mirrors SwiftUI WalletMotion's spring; native navigation and sheet gestures remain OS-owned. */
+/** Shared timing for page travel and content resizing; native iOS navigation remains OS-owned. */
 internal object WalletMotion {
-    private const val NavigationResponse = .38f
     private const val DampingRatio = .92f
+    private val navigationEasing = CubicBezierEasing(.2f, 0f, 0f, 1f)
+    private const val SheetDuration = 300
+    private const val SheetFadeOutDuration = 105
+    private val sheetEasing = CubicBezierEasing(.4f, 0f, .2f, 1f)
     private val easeInOut = CubicBezierEasing(.42f, 0f, .58f, 1f)
     private val easeOut = CubicBezierEasing(0f, 0f, .58f, 1f)
 
@@ -24,7 +27,15 @@ internal object WalletMotion {
     }
 
     fun <T> navigation(reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
-        spatial(NavigationResponse, reduceMotion)
+        if (reduceMotion) snap() else tween(320, easing = navigationEasing)
+
+    fun <T> sheetResize(reduceMotion: Boolean): FiniteAnimationSpec<T> =
+        if (reduceMotion) snap() else tween(SheetDuration, easing = sheetEasing)
+
+    fun <T> sheetEnter(): FiniteAnimationSpec<T> =
+        tween(SheetDuration - SheetFadeOutDuration, delayMillis = SheetFadeOutDuration, easing = sheetEasing)
+
+    fun <T> sheetExit(): FiniteAnimationSpec<T> = tween(SheetFadeOutDuration, easing = sheetEasing)
 
     fun <T> disclosure(reduceMotion: Boolean = false): FiniteAnimationSpec<T> =
         if (reduceMotion) snap() else tween(180, easing = easeInOut)

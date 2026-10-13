@@ -50,6 +50,13 @@
             ],
             "label": "Family name",
             "mandatory": true
+          },
+          {
+            "path": [
+              "email"
+            ],
+            "label": "Contact email",
+            "mandatory": false
           }
         ]
       },
@@ -108,7 +115,7 @@
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay \u20ac11.56",
+    "affirmativeAction": "Pay €11.56",
     "denialAction": "Decline",
     "fields": [
       {
@@ -265,7 +272,7 @@
     "revision": "localized-signed-payment",
     "locale": "de",
     "title": null,
-    "affirmativeAction": "Zahlung verbindlich best\u00e4tigen",
+    "affirmativeAction": "Zahlung verbindlich bestätigen",
     "denialAction": null,
     "fields": [
       {
@@ -274,7 +281,7 @@
         "placement": "Prominent"
       },
       {
-        "name": "Empf\u00e4nger",
+        "name": "Empfänger",
         "value": "Example Bookshop",
         "placement": "Main"
       },
@@ -289,7 +296,7 @@
         "placement": "Omitted"
       }
     ],
-    "securityHint": "Pr\u00fcfen Sie Betrag und Empf\u00e4nger.",
+    "securityHint": "Prüfen Sie Betrag und Empfänger.",
     "requiresUnsignedRequestWarning": false
   },
   "readerTrust": {

@@ -1,12 +1,12 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,7 +64,7 @@ fun WalletDemoOfferCreateScreen(
             WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = false,
                 header = {
                     WalletScreenHeader("Receive credentials") {
-                        IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                        WalletHeaderButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
                     }
                 }) {
                 OfferCreateLoadingContent()
@@ -81,14 +81,13 @@ fun WalletDemoOfferCreateScreen(
                     )
                 }
                 WalletReviewNavigationHost(requestKey = offer.hashCode().toString(), offer = offer,
-                    enabled = enabled, onClose = onDismiss.takeIf { enabled }) {
+                    enabled = enabled, onClose = onDismiss.takeIf { enabled }, header = {
+                        WalletScreenHeader(state.title) {
+                            WalletHeaderButton(onClick = onDismiss, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                        }
+                    }) {
                     ReviewScaffold(
                         fillViewport = false,
-                        header = {
-                            WalletScreenHeader(state.title) {
-                                IconButton(onClick = onDismiss, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
-                            }
-                        },
                         feedback = state.errorMessage?.let { message -> { Text(message, color = MaterialTheme.colorScheme.error) } },
                         actions = {
                             OfferReviewActions(offer.requiresIssuerAuthentication, acceptEnabled, enabled, accept, onDecline)
@@ -116,16 +115,16 @@ fun WalletDemoOfferCreateScreen(
             is WalletDemoOfferCreateUiState.Receipt -> WalletReviewNavigationHost(
                 requestKey = "provider-receipt", savedCredentials = state.saved,
                 enabled = !state.busy, onClose = onDone.takeIf { !state.busy },
+                header = {
+                    WalletScreenHeader("Receiving result") {
+                        WalletHeaderButton(onClick = onDone, enabled = !state.busy) {
+                            WalletIcon(WalletSymbol.Decline, "Close request")
+                        }
+                    }
+                },
             ) {
                 ReviewScaffold(
                     fillViewport = false,
-                    header = {
-                        WalletScreenHeader("Receiving result") {
-                            IconButton(onClick = onDone, enabled = !state.busy) {
-                                WalletIcon(WalletSymbol.Decline, "Close request")
-                            }
-                        }
-                    },
                     feedback = state.refreshError?.let { message -> { Text(message, color = MaterialTheme.colorScheme.error) } },
                     actions = {
                         WalletActions(
@@ -141,7 +140,7 @@ fun WalletDemoOfferCreateScreen(
                 fillViewport = false,
                 header = {
                     WalletScreenHeader("Unable to receive credentials") {
-                        IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                        WalletHeaderButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
                     }
                 },
                 feedback = { Text(state.message, color = MaterialTheme.colorScheme.error) },
@@ -151,7 +150,7 @@ fun WalletDemoOfferCreateScreen(
                 fillViewport = false,
                 header = {
                     WalletScreenHeader("Receive credentials") {
-                        IconButton(onCancelAuthorization, enabled = !state.completing) {
+                        WalletHeaderButton(onCancelAuthorization, enabled = !state.completing) {
                             WalletIcon(WalletSymbol.Decline, "Close request")
                         }
                     }

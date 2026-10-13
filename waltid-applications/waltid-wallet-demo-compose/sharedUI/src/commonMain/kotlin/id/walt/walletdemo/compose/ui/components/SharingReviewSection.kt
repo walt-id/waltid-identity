@@ -46,9 +46,7 @@ internal fun SharingReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SharingRequestSections(if (paymentReview is WalletDemoPaymentReview.NotRequired) review.request else
-            review.request.copy(transactionData = review.request.transactionData.filterNot { it.transactionType == "urn:eudi:sca:payment:1" }))
-        PaymentConsentSection(paymentReview)
+        SharingRequestSections(review.request, paymentReview = paymentReview)
 
         WalletSection(title = if (compact) "Requested credentials" else "Select credentials to share") {
             if (review.credentialOptions.isEmpty()) {
@@ -75,6 +73,7 @@ internal fun SharingReviewSection(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
                 paymentReview = paymentReview,
+                isPayment = review.request.transactionData.any { it.isPaymentTransaction },
                 onSubmit = onSubmit,
                 onCancel = onCancel,
                 onReject = onReject,

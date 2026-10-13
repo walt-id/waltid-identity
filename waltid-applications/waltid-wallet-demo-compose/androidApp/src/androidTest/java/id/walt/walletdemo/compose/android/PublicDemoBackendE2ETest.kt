@@ -193,8 +193,8 @@ class PublicDemoBackendE2ETest {
 
         assertTextVisibleAfterScrolling(
             device,
-            listOf("PAYMENT AUTHORIZATION", "Payment Authorization"),
-            "Payment profile title missing",
+            listOf("Review payment"),
+            "Payment review title missing",
         )
         assertClaimValueVisibleAfterScrolling(
             device = device,

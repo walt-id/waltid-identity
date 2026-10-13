@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -32,7 +33,7 @@ internal fun ReceiveTab(
     onDone: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
     feedback: (@Composable () -> Unit)? = null,
 ) {
     val preview = state.offerPreview

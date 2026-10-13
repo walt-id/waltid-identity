@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -45,29 +45,29 @@ internal fun WalletHeader(
             titleTag = WalletUiTestTags.AppTitle,
             leading = onBack?.let { back ->
                 {
-                    IconButton(onClick = back, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                    WalletHeaderButton(onClick = back, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to wallet")
                     }
                 }
             },
         ) {
             onShareNearby?.let { nearby ->
-                IconButton(onClick = nearby, modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) {
+                WalletHeaderButton(onClick = nearby, modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) {
                     WalletIcon(WalletSymbol.Nearby, "Share nearby")
                 }
             }
             onScan?.let { scan ->
-                IconButton(onClick = scan, modifier = Modifier.testTag(WalletUiTestTags.ScanButton)) {
+                WalletHeaderButton(onClick = scan, modifier = Modifier.testTag(WalletUiTestTags.ScanButton)) {
                     WalletIcon(WalletSymbol.Scan, "Scan or paste a link")
                 }
             }
             onSettings?.let { settings ->
-                IconButton(onClick = settings, modifier = Modifier.testTag(WalletUiTestTags.SettingsButton)) {
+                WalletHeaderButton(onClick = settings, modifier = Modifier.testTag(WalletUiTestTags.SettingsButton)) {
                     Icon(Icons.Filled.Settings, "Settings")
                 }
             }
             onClose?.let { close ->
-                IconButton(onClick = close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                WalletHeaderButton(onClick = close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                     WalletIcon(WalletSymbol.Decline, "Close request")
                 }
             }
@@ -90,7 +90,7 @@ internal data class CredentialDetailsChrome(
 internal fun CredentialDetailsTopBar(chrome: CredentialDetailsChrome) {
     WalletScreenHeader(title = chrome.title, leading = chrome.onBack?.let { back ->
         {
-            IconButton(back, Modifier.testTag("wallet-detail-back")) {
+            WalletHeaderButton(back, Modifier.testTag("wallet-detail-back")) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
             }
         }

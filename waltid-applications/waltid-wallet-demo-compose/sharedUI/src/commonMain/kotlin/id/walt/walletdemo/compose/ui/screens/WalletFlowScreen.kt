@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -25,18 +26,20 @@ internal fun WalletFlowScreen(
         savedCredentials = state.receivedCredentials(),
         enabled = !state.isBusy,
         onClose = onClose.takeIf { state.canDismissExternalFlow },
-    ) {
-        Column(Modifier.fillMaxSize().testTag("wallet.external.flow")) {
+        header = {
             WalletScreenHeader(if (state.selectedTab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
                 titleTag = "wallet.external.title") {
-                IconButton(onClick = onClose, enabled = state.canDismissExternalFlow,
+                WalletHeaderButton(onClick = onClose, enabled = state.canDismissExternalFlow,
                     modifier = Modifier.testTag("wallet.external.close")) { Icon(Icons.Default.Close, "Close request") }
             }
+        },
+    ) {
+        Column(Modifier.fillMaxWidth().testTag("wallet.external.flow")) {
             if (state.externalFlow is WalletExternalFlow.UnavailableCallback) {
                 Text("The original receiving session is no longer available. Check your wallet before starting again.",
                     Modifier.padding(20.dp).testTag("wallet.external.unavailable"))
             } else WalletFlowContent(controller, state, onDone = onClose,
-                modifier = Modifier.weight(1f))
+                modifier = Modifier.weight(1f, fill = false))
         }
     }
 }

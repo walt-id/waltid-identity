@@ -21,7 +21,7 @@ public struct WalletReviewScaffold<Content: View, Actions: View>: View {
     }
 
     public var body: some View {
-        ScrollView {
+        WalletSheetScrollView {
             VStack(alignment: .leading, spacing: 14) { content }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 12)

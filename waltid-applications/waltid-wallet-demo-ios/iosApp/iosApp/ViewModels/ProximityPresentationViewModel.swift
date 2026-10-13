@@ -64,17 +64,19 @@ final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var preparedSharing: ProximityPreparedSharing?
     @Published private(set) var recentPlan: ProximitySharingPlan?
     @Published private(set) var refreshingEngagementChoices: [ProximityEngagementMethod] = []
+    /// Capability-backed choices, before creating any engagement material or session.
+    @Published private(set) var pendingEngagementChoices: [ProximityEngagementMethod] = []
 
     var refreshingEngagement: Bool { !refreshingEngagementChoices.isEmpty }
 
     var showsEngagement: Bool {
         if case .engagementReady = sessionState { return true }
-        return refreshingEngagement
+        return !pendingEngagementChoices.isEmpty || refreshingEngagement
     }
 
     /// Open on the first usable state, rather than replacing transient startup layouts mid-animation.
     var hasEntryContent: Bool {
-        if startupFailed { return true }
+        if startupFailed || !pendingEngagementChoices.isEmpty { return true }
         switch sessionState {
         case nil, .preparing: return false
         case .checkingPrerequisites(let capabilities):
@@ -84,6 +86,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var canChangeApprovalMode: Bool {
+        if !pendingEngagementChoices.isEmpty { return true }
         if case .engagementReady = sessionState { return preparedSharing == nil }
         return false
     }
@@ -98,7 +101,8 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var effectiveConfiguration: ProximityConfiguration?
     private var pendingConfiguration: ProximityConfiguration?
     private var sessionGeneration: UInt64 = 0
-    private var preparedEngagementLaunched = false
+    private var engagementLaunched = false
+    private var automaticPermissionAttempted = false
     private var deferredClosingState: ProximityState?
 
     init(
@@ -146,7 +150,8 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     private var connectionOptionsAvailable: Bool {
         guard preparedSharing == nil, hostActionInProgress == nil else { return false }
-        switch sessionState { case .checkingPrerequisites, .engagementReady: return true; default: return false }
+        if refreshingEngagement { return true }
+        switch sessionState { case nil, .checkingPrerequisites, .engagementReady: return true; default: return false }
     }
 
     var canApprove: Bool {
@@ -171,20 +176,31 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var engagementChoices: [ProximityEngagementMethod] {
-        guard case .engagementReady(let engagements) = sessionState else { return refreshingEngagementChoices }
+        guard case .engagementReady(let engagements) = sessionState else {
+            return pendingEngagementChoices.isEmpty ? refreshingEngagementChoices : pendingEngagementChoices
+        }
         let hasNFC = engagements.contains { if case .nfc = $0 { return true }; return false }
         let hasQR = engagements.contains { if case .qr = $0 { return true }; return false }
         return (hasNFC ? [.nfc] : []) + (hasQR ? [.qr] : [])
     }
 
     var displayedEngagement: ProximityEngagementMethod? {
+        guard pendingEngagementChoices.isEmpty else { return nil }
         if let preferredEngagement, engagementChoices.contains(preferredEngagement) { return preferredEngagement }
         return engagementChoices == [.qr] ? .qr : nil
     }
 
     func showEngagement(_ method: ProximityEngagementMethod) {
-        guard case .engagementReady = sessionState,
-              hostActionInProgress == nil, engagementChoices.contains(method) else { return }
+        guard !closing, hostActionInProgress == nil, engagementChoices.contains(method) else { return }
+        if !pendingEngagementChoices.isEmpty {
+            guard let pendingConfiguration else { return }
+            preferredEngagement = method
+            refreshingEngagementChoices = pendingEngagementChoices
+            pendingEngagementChoices = []
+            checkPrerequisitesAndStart(pendingConfiguration, generation: sessionGeneration)
+            return
+        }
+        guard case .engagementReady = sessionState else { return }
         preferredEngagement = method
         if method == .nfc, let session {
             let generation = sessionGeneration
@@ -227,6 +243,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         generation: UInt64,
         automaticPermissionAttempted: Bool = false
     ) {
+        self.automaticPermissionAttempted = self.automaticPermissionAttempted || automaticPermissionAttempted
         observationTask?.cancel()
         observationTask = Task { [weak self, cleanupTask] in
             guard let self else { return }
@@ -243,12 +260,22 @@ final class ProximityPresentationViewModel: ObservableObject {
                 guard active, sessionGeneration == generation else { return }
                 let usesPreparedApproval: Bool
                 if case .prepared = configuration.approval { usesPreparedApproval = true } else { usesPreparedApproval = false }
-                if !usesPreparedApproval, !automaticPermissionAttempted,
+                if !usesPreparedApproval, !self.automaticPermissionAttempted,
                    capabilities.remediationActions.contains(.requestBluetoothPermission) {
                     // Let the host explain the request before opening the OS permission prompt.
                     return
                 }
                 guard capabilities.mayStart || usesPreparedApproval else { return }
+                if !usesPreparedApproval {
+                    let choices: [ProximityEngagementMethod] = (capabilities.nfcMayStart ? [.nfc] : [])
+                        + (capabilities.qrMayStart ? [.qr] : [])
+                    if preferredEngagement.map({ choices.contains($0) }) != true {
+                        preferredEngagement = nil
+                        refreshingEngagementChoices = []
+                        pendingEngagementChoices = choices
+                        return
+                    }
+                }
                 let started = try await client.startProximityPresentation(configuration: configuration)
                 guard active, sessionGeneration == generation else {
                     await started.close()
@@ -556,6 +583,9 @@ final class ProximityPresentationViewModel: ObservableObject {
         recentPlan = nil
         pendingReviewID = nil
         refreshingEngagementChoices = []
+        pendingEngagementChoices = []
+        automaticPermissionAttempted = false
+        engagementLaunched = false
         sessionState = nil
         selections = []
         continueAfterResponse = false
@@ -591,9 +621,10 @@ final class ProximityPresentationViewModel: ObservableObject {
         guard active, !closing, preparedSharing == nil, hostActionInProgress == nil,
               let previous = effectiveConfiguration else { return }
         switch sessionState {
-        case .engagementReady: break
-        case .checkingPrerequisites(let capabilities) where !capabilities.mayStart ||
+        case nil, .engagementReady: break
+        case .checkingPrerequisites(let capabilities) where !pendingEngagementChoices.isEmpty || !capabilities.mayStart ||
             capabilities.remediationActions.contains(.requestBluetoothPermission): break
+        case .preparing where refreshingEngagement: break
         default: return
         }
         guard let configuration = readConfiguration() else { return }
@@ -603,7 +634,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         let sameTransport = previous.session == configuration.session
         guard !sameTransport || approvalMode != mode else { return }
         approvalMode = mode
-        replaceSession(configuration, preserveEngagement: sameTransport && showsEngagement)
+        replaceSession(configuration, preserveEngagement: sameTransport && showsEngagement && pendingEngagementChoices.isEmpty)
     }
 
     private func replaceSession(
@@ -630,12 +661,14 @@ final class ProximityPresentationViewModel: ObservableObject {
         pendingConfiguration = configuration
         active = true
         refreshingEngagementChoices = preserveEngagement ? previousChoices : []
+        pendingEngagementChoices = []
+        automaticPermissionAttempted = false
         sessionState = nil
         selections = []
         continueAfterResponse = false
         preferredEngagement = preserveEngagement ? previousMethod : (preparedSharing != nil ? connectedRoute?.engagement : nil)
         connectedRoute = nil
-        preparedEngagementLaunched = false
+        engagementLaunched = false
         actionErrorMessage = nil
         startupFailed = false
         hostActionInProgress = action
@@ -722,9 +755,9 @@ final class ProximityPresentationViewModel: ObservableObject {
             continueAfterResponse = false
         }
         refreshPreferences()
-        if case .engagementReady = state, preparedSharing != nil, !preparedEngagementLaunched,
+        if case .engagementReady = state, !engagementLaunched,
            let preferredEngagement, engagementChoices.contains(preferredEngagement) {
-            preparedEngagementLaunched = true
+            engagementLaunched = true
             showEngagement(preferredEngagement)
         }
     }

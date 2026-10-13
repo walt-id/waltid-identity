@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="wallet_sheet_handle">Sheet handle</string>
     <string name="proximity_action_needed">Action needed</string>
     <string name="proximity_action_failed">Action could not be completed</string>
     <string name="proximity_allow_bluetooth">Allow Bluetooth access</string>
@@ -111,6 +112,7 @@
     <string name="proximity_qr_description">Let the reader scan your screen.</string>
     <string name="proximity_tap_instructions">Keep your phone near the reader while it connects.</string>
     <string name="proximity_qr_instructions">Let the reader scan this code. Keep both devices nearby.</string>
+    <string name="proximity_qr_preparing">Preparing QR code…</string>
     <string name="proximity_show_qr_instead">Show QR code instead</string>
     <string name="proximity_tap_instead">Hold near the reader instead</string>
     <string name="proximity_qr_rotate">Rotate your phone to show the full QR code.</string>

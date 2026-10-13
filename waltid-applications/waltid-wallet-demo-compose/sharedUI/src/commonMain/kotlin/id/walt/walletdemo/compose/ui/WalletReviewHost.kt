@@ -1,16 +1,23 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +29,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.components.LocalWalletNavigationBackground
 import id.walt.walletdemo.compose.ui.components.WalletMotion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.wallet_sheet_handle
+import org.jetbrains.compose.resources.stringResource
+
+/** Sheet pages wrap their content; root and system-owned screens retain their viewport. */
+internal val LocalWalletSheet = staticCompositionLocalOf { false }
 
 /** One modal container; request state and platform result handling belong to the caller. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,23 +75,37 @@ internal fun WalletReviewHost(
         val sheetMotion = if (LocalWalletVisualPreferences.current.reduceMotion) WalletMotion.reduced else WalletMotion.sheet
         MaterialTheme(motionScheme = sheetMotion) {
             ModalBottomSheet(
-                modifier = Modifier.testTag("wallet.review.sheet"),
+                // Reserve the safe area outside the moving surface. Applying top padding to
+                // its content feeds the changing anchor back into measurement near full height.
+                modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .testTag("wallet.review.sheet"),
                 onDismissRequest = { if (canDismiss) dismiss?.invoke() },
                 sheetState = sheetState,
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                 scrimColor = Color.Black.copy(alpha = 0.48f),
                 tonalElevation = 3.dp,
                 sheetGesturesEnabled = canDismiss,
+                dragHandle = {
+                    val label = stringResource(Res.string.wallet_sheet_handle)
+                    Box(Modifier.padding(top = 8.dp, bottom = 4.dp).semantics { contentDescription = label }) {
+                        Surface(Modifier.size(40.dp, 4.dp), shape = CircleShape,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)) {}
+                    }
+                },
                 // The page/footer owns the bottom inset so its surface reaches the sheet edge.
-                contentWindowInsets = { WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal) },
+                contentWindowInsets = { WindowInsets(0) },
                 properties = ModalBottomSheetProperties(
                     shouldDismissOnBackPress = canDismiss,
                     shouldDismissOnClickOutside = canDismiss,
                 ),
             ) {
                 // The sheet owns a separate window; export semantics in that window too.
-                Box(Modifier.exportTestTagsForPlatformAutomation()) {
-                    CompositionLocalProvider(LocalWalletNavigationBackground provides MaterialTheme.colorScheme.surfaceContainer) {
+                // One resize owner for navigation, loading, and results. Nested navigators
+                // report their destination size immediately while their pages slide and fade.
+                Box(Modifier.animateContentSize(WalletMotion.sheetResize(LocalWalletVisualPreferences.current.reduceMotion))
+                    .exportTestTagsForPlatformAutomation()) {
+                    CompositionLocalProvider(LocalWalletSheet provides true,
+                        LocalWalletNavigationBackground provides MaterialTheme.colorScheme.surfaceContainer) {
                         content()
                     }
                 }

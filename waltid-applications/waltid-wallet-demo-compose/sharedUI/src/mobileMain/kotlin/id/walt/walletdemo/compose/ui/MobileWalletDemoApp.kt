@@ -2,10 +2,10 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
@@ -131,54 +131,60 @@ fun MobileWalletDemoApp(
                         }
                     },
                 ) {
-                    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
-                    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                    val sheetMotion = rememberWalletSheetNavigationMotion()
                     val pages = listOf("nearby") + if (showingConnectionOptions) listOf("options") else emptyList()
-                    val fillNearbyViewport = showingConnectionOptions || displayedProximity.review != null || displayedProximity.qrVisible || !displayedProximity.showsEngagement
                     val closingLabel = stringResource(Res.string.proximity_terminating)
                     Box {
-                        NavDisplay(pages, Modifier.fillMaxWidth()
+                        Column(Modifier.fillMaxWidth()
                             .then(if (closingNearbySheet) Modifier.clearAndSetSemantics {
                                 contentDescription = closingLabel
                                 liveRegion = LiveRegionMode.Polite
-                            } else Modifier),
-                            onBack = { if (!latestClosingNearbySheet) showingConnectionOptions = false }, entryDecorators = emptyList(),
-                            transitionSpec = { walletNavigationMotion(true, reduceMotion, rtl) },
-                            popTransitionSpec = { walletNavigationMotion(false, reduceMotion, rtl) },
-                            predictivePopTransitionSpec = { _ -> walletNavigationMotion(false, reduceMotion, rtl) },
-                        ) { page ->
-                            NavEntry(page) {
-                                val walletState = latestWalletState
-                                val proximity = latestDisplayedProximity
-                                val closing = latestClosingNearbySheet
-                                val credentialDetailsById = latestDetails
-                                if (page == "options") SettingsScreen(
-                                    state = walletState,
-                                    initialDestination = SettingsDestination.Connection,
-                                    onBack = { if (!closing) showingConnectionOptions = false },
-                                    onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
-                                    onProximityTransportProfileChange = controller::setProximityTransportProfile,
-                                    onIdentityAction = controller::performIdentityAction,
-                                    onRefreshIdentityDetails = controller::refreshIdentityDetails,
-                                    onLock = controller::lock,
-                                    onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },
-                                    onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
-                                    onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
-                                    onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
-                                    onClose = proximityController::requestClose,
-                                    closeEnabled = !closing && proximity.canClose,
-                                ) else Column(if (fillNearbyViewport) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
-                                    WalletScreenHeader("Share nearby") {
-                                        IconButton(proximityController::requestClose, enabled = !closing && proximity.canClose,
-                                            modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
-                                            if (closing) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                                            else WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
-                                        }
+                            } else Modifier)) {
+                            WalletScreenHeader(if (showingConnectionOptions) stringResource(Res.string.settings_connection) else "Share nearby",
+                                leading = if (showingConnectionOptions) ({
+                                    WalletHeaderButton({ if (!closingNearbySheet) showingConnectionOptions = false },
+                                        Modifier.testTag(WalletUiTestTags.SettingsBack), enabled = !closingNearbySheet) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                                     }
-                                    Box(Modifier.weight(1f, fill = fillNearbyViewport)) {
+                                }) else null,
+                            ) {
+                                WalletHeaderButton(proximityController::requestClose, enabled = !closingNearbySheet && displayedProximity.canClose,
+                                    modifier = Modifier.testTag(if (showingConnectionOptions) "wallet.sheet.close" else WalletUiTestTags.ProximityCancel)) {
+                                    if (closingNearbySheet) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                                    else WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
+                                }
+                            }
+                            NavDisplay(pages, Modifier.weight(1f, fill = false).fillMaxWidth(),
+                                onBack = { if (!latestClosingNearbySheet) showingConnectionOptions = false }, entryDecorators = emptyList(),
+                                sizeTransform = walletNavigationSizeTransform(reduceMotion = true),
+                                transitionSpec = { sheetMotion(true) },
+                                popTransitionSpec = { sheetMotion(false) },
+                                predictivePopTransitionSpec = { _ -> sheetMotion(false) },
+                            ) { page ->
+                                NavEntry(page) {
+                                    val walletState = latestWalletState
+                                    val proximity = latestDisplayedProximity
+                                    val closing = latestClosingNearbySheet
+                                    val credentialDetailsById = latestDetails
+                                    if (page == "options") SettingsScreen(
+                                        state = walletState,
+                                        initialDestination = SettingsDestination.Connection,
+                                        onBack = { if (!closing) showingConnectionOptions = false },
+                                        onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
+                                        onProximityTransportProfileChange = controller::setProximityTransportProfile,
+                                        onIdentityAction = controller::performIdentityAction,
+                                        onRefreshIdentityDetails = controller::refreshIdentityDetails,
+                                        onLock = controller::lock,
+                                        onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },
+                                        onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
+                                        onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
+                                        onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
+                                        onClose = proximityController::requestClose,
+                                        closeEnabled = !closing && proximity.canClose,
+                                        showHeader = false,
+                                    ) else {
                                         WalletDemoProximityScreen(
                                             headerOwnsClose = true,
-                                            fillViewport = fillNearbyViewport,
                                             state = proximity.copy(approvalMode = walletState.proximityApprovalMode),
                                             credentialDetailsById = credentialDetailsById,
                                             hostActions = hostActions.executor,

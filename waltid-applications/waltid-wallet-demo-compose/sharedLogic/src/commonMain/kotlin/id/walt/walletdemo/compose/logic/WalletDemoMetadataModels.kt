@@ -67,13 +67,16 @@ fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCre
         title = "Credential claims",
         claims = claims.map { claim ->
             WalletDemoCredentialClaimDisplay(
-                label = claim.displayName?.takeIf { it.isNotBlank() }
-                    ?: MdocClaimDisplaySemantics.describe(format = format, path = claim.path)?.label
-                    ?: CredentialDisplayVocabulary.humanizedClaimLabel(claim.path.lastOrNull().orEmpty()),
+                label = claim.displayLabel(format),
                 inclusion = if (claim.mandatory == true) "Always included" else "May be included",
             )
         },
     ))
+
+fun WalletDemoCredentialClaimMetadata.displayLabel(format: String): String =
+    displayName?.takeIf { it.isNotBlank() }
+        ?: MdocClaimDisplaySemantics.describe(format = format, path = path)?.label
+        ?: CredentialDisplayVocabulary.humanizedClaimLabel(path.lastOrNull().orEmpty())
 
 enum class WalletDemoTransactionCodeInputMode {
     Numeric,

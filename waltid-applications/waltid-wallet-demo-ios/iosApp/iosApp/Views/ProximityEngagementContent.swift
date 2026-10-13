@@ -9,11 +9,10 @@ struct ProximityEngagementContent: View {
     let credentialDetailsByID: [String: CredentialDetails]
     var onConnectionOptions: (() -> Void)? = nil
     @State private var showApprovedData = false
-    @State private var sectionHeights: [ProximityEngagementSection: CGFloat] = [:]
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollView {
+            WalletSheetScrollView {
                 if viewModel.displayedEngagement == .qr {
                     qrContent(payload: viewModel.qrPayload, viewport: geometry.size)
                 } else if viewModel.displayedEngagement == nil && viewModel.preparedSharing == nil {
@@ -24,6 +23,9 @@ struct ProximityEngagementContent: View {
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         header
+                        if viewModel.displayedEngagement == .nfc {
+                            NfcEngagementIllustration(active: !viewModel.refreshingEngagement)
+                        }
                         if viewModel.displayedEngagement == nil { choices }
                         footer.padding(.top, 12)
                     }
@@ -31,7 +33,6 @@ struct ProximityEngagementContent: View {
                 }
             }
         }
-        .onPreferenceChange(ProximityEngagementHeightKey.self) { sectionHeights = $0 }
         .onChange(of: viewModel.preparedSharing.map { ObjectIdentifier($0) }) { _ in showApprovedData = false }
         .sheet(isPresented: $showApprovedData) {
             WalletDetailSheet("Approved data", onDismiss: { showApprovedData = false }, closeIdentifier: "proximity-approved-data-close") {
@@ -43,26 +44,26 @@ struct ProximityEngagementContent: View {
         }
     }
 
-    /// Measure actual wrapped text, leaving a 200–360 point square for the QR.
-    /// The content grows into the scroll view only when readable controls need more room.
+    /// The QR has a readable natural size; long text scrolls within the sheet's available height.
     private func qrContent(payload: String?, viewport: CGSize) -> some View {
         let gap: CGFloat = 12
         let landscape = viewport.width >= 600 && viewport.width > viewport.height
-        let top = sectionHeights[.header] ?? 0
-        let bottom = sectionHeights[.footer] ?? 0
         let maximum = min(viewport.width, 360)
-        let minimum = min(maximum, 200)
         let side = landscape
-            ? min(maximum, (viewport.width - gap) / 2, max(1, viewport.height))
-            : min(maximum, max(minimum, viewport.height - top - bottom - gap * 2))
-        let height = max(viewport.height, landscape ? max(side, top + bottom + gap) : top + side + bottom + gap * 2)
+            ? min(maximum, (viewport.width - gap) / 2)
+            : maximum
         let code = Group {
             if let payload {
                 ProximityQRCode(payload: payload)
                     .equatable()
                     .accessibilityIdentifier(WalletAccessibilityID.proximityQRCode)
             } else {
-                ProgressView()
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("Preparing QR code…").font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
             }
         }.frame(width: side, height: side)
         return Group {
@@ -70,34 +71,20 @@ struct ProximityEngagementContent: View {
                 HStack(alignment: .top, spacing: gap) {
                     code
                     VStack(alignment: .leading, spacing: gap) {
-                        measuredHeader
+                        header
                         Spacer(minLength: 0)
-                        measuredFooter
-                    }
+                        footer
+                    }.frame(minHeight: side)
                 }
             } else {
-                VStack(spacing: 0) {
-                    measuredHeader
-                    Spacer(minLength: gap)
+                VStack(spacing: gap) {
+                    header
                     code
-                    Spacer(minLength: gap)
-                    measuredFooter
+                    footer
                 }
             }
         }
-        .frame(width: viewport.width, height: height)
-    }
-
-    private var measuredHeader: some View {
-        header.background(GeometryReader { geometry in
-            Color.clear.preference(key: ProximityEngagementHeightKey.self, value: [.header: geometry.size.height])
-        })
-    }
-
-    private var measuredFooter: some View {
-        footer.fixedSize(horizontal: false, vertical: true).background(GeometryReader { geometry in
-            Color.clear.preference(key: ProximityEngagementHeightKey.self, value: [.footer: geometry.size.height])
-        })
+        .frame(width: viewport.width)
     }
 
     private var header: some View {
@@ -145,7 +132,7 @@ struct ProximityEngagementContent: View {
 
 }
 
-/// Pure menu shared by the live sheet and its pre-presentation size measurement.
+/// Capability-backed connection choices before the timed session starts.
 struct ProximityEngagementMenu: View {
     let methods: [ProximityEngagementMethod]
     @Binding var approvalMode: WalletDemoProximityApprovalMode
@@ -215,15 +202,6 @@ private struct ProximitySharingOptions: View {
                 }
             }
         }
-    }
-}
-
-private enum ProximityEngagementSection { case header, footer }
-
-private struct ProximityEngagementHeightKey: PreferenceKey {
-    static let defaultValue: [ProximityEngagementSection: CGFloat] = [:]
-    static func reduce(value: inout [ProximityEngagementSection: CGFloat], nextValue: () -> [ProximityEngagementSection: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
     }
 }
 

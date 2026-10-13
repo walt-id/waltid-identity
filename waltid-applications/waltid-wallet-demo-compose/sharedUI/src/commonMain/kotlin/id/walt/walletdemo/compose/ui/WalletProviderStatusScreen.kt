@@ -1,12 +1,12 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,7 +30,7 @@ fun WalletProviderStatusScreen(
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onDismiss) {
         ReviewScaffold(fillViewport = false, header = {
             WalletScreenHeader(title) {
-                IconButton(onClose, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                WalletHeaderButton(onClose, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
             }
         }, feedback = message?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }) {
             Column(Modifier.fillMaxWidth().testTag("wallet.provider.status"), verticalArrangement = Arrangement.spacedBy(16.dp)) {

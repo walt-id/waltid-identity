@@ -1,14 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import androidx.core.graphics.Insets
@@ -28,7 +21,7 @@ import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Exercises the production in-app flow host, which bypasses the home Scaffold. */
+/** Exercises the production modal flow and its own window, outside the home Scaffold. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31], qualifiers = "en-rUS-w393dp-h852dp-mdpi")
@@ -44,29 +37,32 @@ class WalletFlowInsetsAndroidTest {
             val state = WalletVisualFixtures.partialResult.copy(selectedTab = WalletDemoTab.Present,
                 operation = WalletOperationState.Idle, presentationReview = WalletDemoPresentationPreviewResult.Ready(preview),
                 selectedPresentationCredentialOptions = preview.defaultCredentialSelection())
-            var observedNavigationInset = 0
+            val navigationInset = 48
             runOnUiThread { WindowCompat.setDecorFitsSystemWindows(requireNotNull(activity).window, false) }
             try {
                 setContent {
                     WalletDemoTheme {
-                        val density = LocalDensity.current
-                        val inset = WindowInsets.navigationBars.getBottom(density)
-                        SideEffect { observedNavigationInset = inset }
-                        Box(Modifier.fillMaxSize().testTag("flow-host")) { WalletScreen(controller, state) }
+                        WalletScreen(controller, state)
                     }
                 }
+                val submit = onNodeWithTag(WalletUiTestTags.PresentationSubmitButton)
+                val beforeInsets = submit.assertIsDisplayed().fetchSemanticsNode()
+                val bottomBeforeInsets = beforeInsets.boundsInRoot.bottom
+                // ModalBottomSheet owns a separate window; dispatch there rather than to the activity.
+                val sheetView = (requireNotNull(beforeInsets.root) as ViewRootForTest).view
                 runOnUiThread {
-                    ViewCompat.dispatchApplyWindowInsets(requireNotNull(activity).window.decorView,
-                        WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+                    ViewCompat.dispatchApplyWindowInsets(sheetView.rootView,
+                        WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, navigationInset))
                             .setVisible(WindowInsetsCompat.Type.navigationBars(), true).build())
                 }
                 waitForIdle()
-                assertEquals(48, observedNavigationInset, "The host must receive the simulated three-button navigation inset")
-                onNodeWithText("MEM-1234").performScrollTo().assertIsDisplayed()
-                val host = onNodeWithTag("flow-host").fetchSemanticsNode().boundsInRoot
-                val action = onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                assertEquals(navigationInset.toFloat(), bottomBeforeInsets - submit.fetchSemanticsNode().boundsInRoot.bottom,
+                    "The sheet must apply the simulated three-button navigation inset exactly once")
+                onNodeWithText("MEM-1234").performScrollToContent(this).assertIsDisplayed()
+                val sheet = onNodeWithTag("wallet.review.sheet").fetchSemanticsNode().boundsInRoot
+                val action = submit.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                 val lastValue = onNodeWithText("MEM-1234").fetchSemanticsNode().boundsInRoot
-                assertTrue(action.bottom <= host.bottom - 48, "Sharing actions must stay outside the navigation bar")
+                assertTrue(action.bottom <= sheet.bottom - navigationInset, "Sharing actions must stay outside the navigation bar")
                 assertTrue(lastValue.bottom <= action.top, "The last information row must scroll above the pinned actions")
             } finally { scope.cancel() }
         }

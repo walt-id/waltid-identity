@@ -74,7 +74,8 @@ public struct SharingReviewScreen: View {
                         onSubmit: onSubmit,
                         onReject: onReject,
                         onCancel: onCancel,
-                        paymentReview: paymentReview, showCancelWithReject: false
+                        paymentReview: paymentReview, isPayment: review?.request.hasPaymentTransaction == true,
+                        showCancelWithReject: false
                     )
                 } else if let failure {
                     Text(failure).font(.subheadline).foregroundStyle(.red)
@@ -84,7 +85,7 @@ public struct SharingReviewScreen: View {
             .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: onCancel) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                    Button(action: onCancel) { WalletToolbarIcon("xmark") }
                         .accessibilityLabel("Close request").disabled(isSubmitting)
                         .accessibilityIdentifier("wallet.flowBack")
                 }

@@ -41,7 +41,7 @@ private fun SharingInformationContent(
     val option = group.option
     val details = remember(option) { option.toCredentialDetails() }
     val summary = details.toCardDisplayData()
-    ReviewInformationGroup(summary.title, summary.issuer) {
+    ReviewInformationGroup(summary.title) {
         if (group.fields.isEmpty()) Text("No additional information to share.", style = MaterialTheme.typography.bodySmall)
         group.fields.forEachIndexed { index, field ->
             if (index > 0) MetadataRowDivider()

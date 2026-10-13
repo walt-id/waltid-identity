@@ -19,15 +19,16 @@ internal fun SharingActionsRow(
     onReject: (() -> Unit)?,
     presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
     paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
+    isPayment: Boolean = false,
     showCancelWithReject: Boolean = true,
 ) {
     val canSubmit = enabled && selectionComplete && paymentReview.canConfirm
     val submit = rememberPaymentSubmission(paymentReview, canSubmit, onSubmit)
-    val submitLabel = paymentReview.consent?.affirmativeAction ?: when (presentation) {
+    val submitLabel = paymentReview.consent?.affirmativeAction ?: if (isPayment) stringResource(Res.string.payment_confirm) else when (presentation) {
         ReviewActionPresentation.Sharing -> "Share"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
     }
-    val rejectLabel = paymentReview.consent?.denialAction ?: when (presentation) {
+    val rejectLabel = paymentReview.consent?.denialAction ?: if (isPayment) stringResource(Res.string.payment_decline) else when (presentation) {
         ReviewActionPresentation.Sharing -> "Reject"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_decline)
     }

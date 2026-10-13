@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,6 +13,7 @@ import id.walt.walletdemo.compose.logic.presentationCredentialSelectionComplete
 import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
+import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
@@ -29,7 +31,7 @@ internal fun PresentTab(
     onCancel: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
     feedback: (@Composable () -> Unit)? = null,
 ) {
     val preview = state.presentationPreview
@@ -67,6 +69,7 @@ internal fun PresentTab(
             actions = {
                 SharingActionsRow(
                     paymentReview = state.paymentReview,
+                    isPayment = preview.transactionData.any { it.isPaymentTransaction },
                     enabled = state.presentationReviewEnabled,
                     selectionComplete = state.presentationCredentialSelectionComplete(),
                     onSubmit = onSubmit,

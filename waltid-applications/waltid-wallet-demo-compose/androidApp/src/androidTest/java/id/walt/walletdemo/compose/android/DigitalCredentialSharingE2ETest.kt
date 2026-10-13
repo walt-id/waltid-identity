@@ -194,7 +194,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             // the issuer-scoped URL ending in the configuration id.
             candidateText = scenario.credentialConfigurationId,
             beforeShare = { device ->
-                listOf(PAYMENT_AUTHORIZATION_DISPLAY_NAME, "42.00", "EUR", "ACME Corp").forEach { expected ->
+                listOf("Review payment", "42.00", "EUR", "ACME Corp").forEach { expected ->
                     assertTextContainingVisibleAfterScrolling(
                         device = device,
                         substring = expected,
@@ -960,7 +960,6 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     })
                 })
             }))
-        private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
         /**
          * Holder binding, which for the DC API is the session-transcript check, plus issuer

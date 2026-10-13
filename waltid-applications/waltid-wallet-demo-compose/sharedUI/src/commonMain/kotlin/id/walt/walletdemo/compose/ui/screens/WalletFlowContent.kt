@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
@@ -17,7 +18,7 @@ internal fun WalletFlowContent(
     state: WalletDemoUiState,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
-    fillViewport: Boolean = true,
+    fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
     val banner = state.statusBanner().takeIf { state.isStatusVisible }
     val feedback: (@Composable () -> Unit)? = if (banner?.kind == WalletStatusKind.Busy || banner?.kind == WalletStatusKind.Error) {

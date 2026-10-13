@@ -190,6 +190,7 @@ struct PresentView: View {
                 onReject: viewModel.rejectPresentation,
                 onCancel: closeReview,
                 paymentReview: viewModel.paymentReview,
+                isPayment: review.request.hasPaymentTransaction,
                 showCancelWithReject: false
             )
         }

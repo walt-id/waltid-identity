@@ -81,7 +81,7 @@ struct ReaderTrustImportReviewView: View {
             }
             .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportReview)
         }.navigationViewStyle(.stack)
-            .walletSheetSizing(expanded: true)
+            .walletSheetSizing()
     }
 
     private func reviewDetail(_ label: String, _ value: String) -> some View {

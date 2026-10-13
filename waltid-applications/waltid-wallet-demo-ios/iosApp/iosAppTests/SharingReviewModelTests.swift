@@ -1,6 +1,6 @@
 import Foundation
 @testable import WalletDemoSharingUI
-import WalletSDK
+@testable import WalletSDK
 import XCTest
 
 /// What the shared sharing review says about a request, for each transport that can produce one.
@@ -255,6 +255,7 @@ final class SharingReviewModelTests: XCTestCase {
             "The authorized transaction is headed by the profile's label, not by its transaction_data type"
         )
         let items = review.request.transactionData.flatMap(\.items)
+        XCTAssertFalse(review.request.hasPaymentTransaction, "A payment-like label is not a supported payment type")
         XCTAssertTrue(
             items.contains { $0.value == .text("42.00 EUR") },
             "Transaction authorization must be reviewable as claims, not as a raw JSON dump"
@@ -263,6 +264,32 @@ final class SharingReviewModelTests: XCTestCase {
             items.contains { $0.value == .text("urn:test:payment") },
             "The transaction type stays visible, since the label is chosen by the wallet profile rather than by the request"
         )
+    }
+
+    func testPaymentDisplayUsesKnownTypesAndNeverSubstitutesForRequiredConsent() throws {
+        for type in ["urn:eudi:sca:payment:1", "org.waltid.transaction-data.payment-authorization"] {
+            let review = openIDPreview(transactionData: [PresentationTransactionData(
+                type: type, displayName: "Localized profile title", credentialQueryIDs: ["pid"], supportedFields: [],
+                rawJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#,
+                detailsJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#
+            )]).sharingReview()
+            XCTAssertTrue(review.request.hasPaymentTransaction)
+            let transactions = review.request.transactionData
+            let display = try XCTUnwrap(PaymentReviewState.notRequired.displays(transactions: transactions).first)
+            let values = display.fields.filter { $0.placement == .prominent }.map(\.item.value)
+            XCTAssertEqual(values.count, 3)
+            for value in ["42.00", "EUR", "Store"] { XCTAssertTrue(values.contains(.text(value))) }
+            XCTAssertFalse(display.technical.contains { $0.pathComponents.dropFirst().first == "details" })
+            if type == "urn:eudi:sca:payment:1" {
+                for state: PaymentReviewState in [.loading, .blocked("Missing issuer instructions")] {
+                    XCTAssertTrue(state.displays(transactions: transactions).isEmpty)
+                    XCTAssertFalse(state.canConfirm)
+                }
+                let consent = PaymentConsent(revision: "validated", locale: "en", title: "Review payment", securityHint: nil,
+                    affirmativeAction: "Pay", denialAction: nil, requiresUnsignedRequestWarning: true, fields: [])
+                XCTAssertEqual(PaymentReviewState.ready(consent).displays(transactions: transactions).map(\.id), ["validated"])
+            }
+        }
     }
 
     func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {

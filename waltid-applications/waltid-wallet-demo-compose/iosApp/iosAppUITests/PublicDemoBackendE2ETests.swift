@@ -104,11 +104,23 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Share nearby")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        let sheet = app.descendants(matching: .any)["wallet.screen.title"]
+        let compactTop = sheet.frame.minY
+        XCTAssertGreaterThan(compactTop, app.frame.height / 5, "Nearby choices must start compact")
+        captureHost("Nearby compact choices")
         ui.tapButton(identifier: "proximity-connection-options", fallbackLabel: "Connection options")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsProximityDefault"].waitForExistence(timeout: 10))
+        let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            sheet.frame.minY < compactTop - 40
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
         captureHost("Nearby connection options")
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            abs(sheet.frame.minY - compactTop) <= 2
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed)
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Nearby options return")
         ui.tapButton(identifier: "wallet.proximityCancelButton", fallbackLabel: "Close nearby sharing")
@@ -590,7 +602,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(previewStatus, app.debugDescription)
 
-        XCTAssertTrue(app.otherElements["Payment Authorization"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Review payment"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))

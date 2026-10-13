@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.digitalCredentialsRequirements
@@ -70,6 +71,7 @@ internal fun SettingsScreen(
     onCancelPinChange: () -> Unit = {},
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
+    showHeader: Boolean = true,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -90,192 +92,203 @@ internal fun SettingsScreen(
     val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val predictivePop = defaultPredictivePopTransitionSpec<SettingsDestination>()
+    val sheetMotion = rememberWalletSheetNavigationMotion()
 
-    Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.SettingsScreen), color = MaterialTheme.colorScheme.background) {
-        NavDisplay(backStack = path, onBack = back,
-            transitionSpec = { walletNavigationMotion(true, reduceMotion, rtl) },
-            popTransitionSpec = { walletNavigationMotion(false, reduceMotion, rtl) },
-            predictivePopTransitionSpec = if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
-        ) { destination ->
-            NavEntry(destination) {
-                Column(Modifier.fillMaxSize().walletNavigationBackground().safeDrawingPadding()) {
-                    if (destination != SettingsDestination.WalletAccess || currentState.access.pinChange == null)
-                    WalletScreenHeader(stringResource(destination.title), leading = {
-                        IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
-                        }
-                    }) {
-                        currentClose?.let { close ->
-                            IconButton(close, enabled = currentCloseEnabled, modifier = Modifier.testTag("wallet.sheet.close")) {
-                                WalletIcon(WalletSymbol.Decline, "Close request")
-                            }
-                        }
+    val fillViewport = !LocalWalletSheet.current
+    val pageSize = if (fillViewport) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
+    val header: @Composable (SettingsDestination) -> Unit = { destination ->
+        if (showHeader && (destination != SettingsDestination.WalletAccess || currentState.access.pinChange == null))
+            WalletScreenHeader(stringResource(destination.title), leading = {
+                WalletHeaderButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
+                }
+            }) {
+                currentClose?.let { close ->
+                    WalletHeaderButton(close, enabled = currentCloseEnabled, modifier = Modifier.testTag("wallet.sheet.close")) {
+                        WalletIcon(WalletSymbol.Decline, "Close request")
                     }
-                    if (destination == SettingsDestination.WalletAccess) {
-                        walletAccessContent?.invoke()
-                        return@NavEntry
-                    }
-                    Column(
-                        Modifier.weight(1f).verticalScroll(rememberScrollState()).fillMaxWidth()
-                            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                    ) {
-                        currentState.sharingSettingsError?.let { SettingsNotice(it, error = true) }
-                        when (destination) {
-                            SettingsDestination.Main -> {
-                                serverSettingsContent?.let {
-                                    WalletSection {
-                                        WalletNavigationRow(
-                                            stringResource(Res.string.settings_server),
-                                            { open(SettingsDestination.Server) },
-                                            Modifier.testTag(WalletUiTestTags.SettingsServer),
-                                            summary = stringResource(Res.string.settings_server_subtitle),
-                                            icon = { SettingsSymbol(Res.drawable.settings_connection) },
-                                        )
-                                    }
-                                }
-                                WalletSection(stringResource(Res.string.settings_wallet)) {
-                                    if (currentState.pinLockEnabled) {
-                                        if (walletAccessContent != null) {
-                                            WalletNavigationRow(stringResource(Res.string.settings_wallet_access),
-                                                { open(SettingsDestination.WalletAccess) }, Modifier.testTag(WalletUiTestTags.SettingsWalletAccess),
-                                                summary = stringResource(Res.string.settings_wallet_access_summary), icon = { Icon(Icons.Default.Lock, null) })
-                                            SettingsDivider()
+                }
+            }
+    }
+    Surface(pageSize.testTag(WalletUiTestTags.SettingsScreen), color = MaterialTheme.colorScheme.background) {
+        Column(pageSize.then(if (fillViewport) Modifier else Modifier.safeDrawingPadding())) {
+            if (!fillViewport) header(path.last())
+            NavDisplay(backStack = path, modifier = Modifier.weight(1f, fill = fillViewport), onBack = back,
+                sizeTransform = walletNavigationSizeTransform(reduceMotion || !fillViewport),
+                transitionSpec = { if (fillViewport) walletNavigationMotion(true, reduceMotion, rtl) else sheetMotion(true) },
+                popTransitionSpec = { if (fillViewport) walletNavigationMotion(false, reduceMotion, rtl) else sheetMotion(false) },
+                predictivePopTransitionSpec = if (!fillViewport) ({ _ -> sheetMotion(false) })
+                    else if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
+            ) { destination ->
+                NavEntry(destination) {
+                    Column(pageSize.walletNavigationBackground().then(if (fillViewport) Modifier.safeDrawingPadding() else Modifier)) {
+                        if (fillViewport) header(destination)
+                        if (destination == SettingsDestination.WalletAccess) {
+                            walletAccessContent?.invoke()
+                            return@NavEntry
+                        }
+                        Column(
+                            Modifier.weight(1f, fill = fillViewport).verticalScroll(rememberScrollState()).fillMaxWidth()
+                                .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
+                                .padding(horizontal = 20.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(24.dp),
+                        ) {
+                            currentState.sharingSettingsError?.let { SettingsNotice(it, error = true) }
+                            when (destination) {
+                                SettingsDestination.Main -> {
+                                    serverSettingsContent?.let {
+                                        WalletSection {
+                                            WalletNavigationRow(
+                                                stringResource(Res.string.settings_server),
+                                                { open(SettingsDestination.Server) },
+                                                Modifier.testTag(WalletUiTestTags.SettingsServer),
+                                                summary = stringResource(Res.string.settings_server_subtitle),
+                                                icon = { SettingsSymbol(Res.drawable.settings_connection) },
+                                            )
                                         }
-                                        WalletNavigationRow(stringResource(Res.string.settings_signing_key),
-                                            { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
-                                            icon = { SettingsSymbol(Res.drawable.settings_key) })
-                                        SettingsDivider()
                                     }
-                                    WalletNavigationRow(stringResource(Res.string.settings_technical),
-                                        { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
-                                        icon = { SettingsSymbol(Res.drawable.settings_code) })
-                                }
-                                if (currentState.pinLockEnabled) {
-                                    WalletSection(stringResource(Res.string.settings_sharing),
-                                        modifier = Modifier.testTag(WalletUiTestTags.SettingsCredentialSharing)) {
-                                        if (onProximityTransportProfileChange != null) {
-                                            WalletNavigationRow(stringResource(Res.string.settings_nearby),
-                                                { open(SettingsDestination.Nearby) },
-                                                Modifier.testTag(WalletUiTestTags.SettingsProximityPresentation),
-                                                summary = stringResource(currentState.proximityTransportProfile.titleResource),
-                                                icon = { SettingsSymbol(Res.drawable.settings_nearby) })
-                                            SettingsDivider()
-                                        }
-                                        WalletNavigationRow(stringResource(Res.string.settings_dc_api),
-                                            { open(SettingsDestination.DigitalCredentialsApi) }, Modifier.testTag(WalletUiTestTags.SettingsDigitalCredentialsApi),
-                                            summary = stringResource(if (currentState.showDcApiPresentationPreview) Res.string.settings_review_on else Res.string.settings_review_off),
-                                            icon = { SettingsSymbol(Res.drawable.settings_id_card) })
-                                    }
-                                }
-                                WalletSection {
-                                    if (currentState.pinLockEnabled) {
-                                        SettingsActionRow(stringResource(Res.string.settings_lock), onLock,
-                                            Modifier.testTag(WalletUiTestTags.SettingsLock), icon = { Icon(Icons.Default.Lock, null) })
-                                        SettingsDivider()
-                                    }
-                                    onSignOut?.let { signOut ->
-                                        SettingsActionRow(stringResource(Res.string.settings_sign_out), signOut,
-                                            Modifier.testTag(WalletUiTestTags.SettingsSignOut),
-                                            icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null) })
-                                        if (allowWalletReset) SettingsDivider()
-                                    }
-                                    if (allowWalletReset) {
-                                        SettingsActionRow(stringResource(Res.string.settings_reset), { confirmReset = true },
-                                            Modifier.testTag(WalletUiTestTags.SettingsReset), destructive = true,
-                                            icon = { Icon(Icons.Default.Refresh, null) })
-                                    }
-                                }
-                            }
-                            SettingsDestination.WalletAccess -> walletAccessContent?.invoke()
-                            SettingsDestination.SigningKey -> {
-                                when (val details = currentState.identityDetails) {
-                                    WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
-                                    WalletDemoIdentityDetailsState.Unsupported -> SigningProtectionSettings(currentState, currentState.session as? WalletSessionState.Ready, onRequestSigningProtectionChange)
-                                    is WalletDemoIdentityDetailsState.Failed -> WalletSection {
-                                        SettingsNotice(details.message, error = true)
-                                        SettingsActionRow(stringResource(Res.string.settings_try_again), onRefreshIdentityDetails)
-                                    }
-                                    is WalletDemoIdentityDetailsState.Available -> {
-                                        val identity = details.details
-                                        WalletSection(stringResource(Res.string.setup_summary),
-                                            footer = stringResource(Res.string.settings_change_key_notice)) {
-                                            SigningKeySummary(identity.recovery, identity.storage, identity.authorization)
-                                            SettingsDivider()
-                                            SettingsDetailRow(stringResource(Res.string.settings_key_protection), identity.protection)
-                                            SettingsDivider()
-                                            SettingsDetailRow(stringResource(Res.string.settings_key_origin), identity.origin)
-                                        }
-                                        if (identity.choices.isNotEmpty() || currentState.identityProgress != null || currentState.identityError != null)
-                                            WalletSection(stringResource(Res.string.settings_key_backup)) {
-                                            identity.choices.forEachIndexed { index, choice ->
-                                                if (index > 0) SettingsDivider()
-                                                SettingsActionRow(choice.title, {
-                                                    if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
-                                                }, detail = choice.detail, enabled = !currentState.identityBusy,
-                                                    destructive = choice.destructive,
-                                                    icon = { if (choice.destructive) Icon(Icons.Default.Delete, null) else SettingsSymbol(Res.drawable.settings_backup) })
+                                    WalletSection(stringResource(Res.string.settings_wallet)) {
+                                        if (currentState.pinLockEnabled) {
+                                            if (walletAccessContent != null) {
+                                                WalletNavigationRow(stringResource(Res.string.settings_wallet_access),
+                                                    { open(SettingsDestination.WalletAccess) }, Modifier.testTag(WalletUiTestTags.SettingsWalletAccess),
+                                                    summary = stringResource(Res.string.settings_wallet_access_summary), icon = { Icon(Icons.Default.Lock, null) })
+                                                SettingsDivider()
                                             }
-                                            currentState.identityProgress?.let { SettingsNotice(it); LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                                            currentState.identityError?.let { SettingsNotice(it, error = true) }
+                                            WalletNavigationRow(stringResource(Res.string.settings_signing_key),
+                                                { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
+                                                icon = { SettingsSymbol(Res.drawable.settings_key) })
+                                            SettingsDivider()
                                         }
-                                        if (identity.providerFailures.isNotEmpty()) ProviderAvailability(identity.providerFailures, !currentState.identityBusy, onRefreshIdentityDetails)
+                                        WalletNavigationRow(stringResource(Res.string.settings_technical),
+                                            { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
+                                            icon = { SettingsSymbol(Res.drawable.settings_code) })
                                     }
-                                }
-                            }
-                            SettingsDestination.Technical -> {
-                                SettingsCopyRow(stringResource(Res.string.settings_did), (currentState.session as? WalletSessionState.Ready)?.did,
-                                    WalletUiTestTags.SettingsDid, WalletUiTestTags.SettingsDidCopy, stringResource(Res.string.settings_copy_did), stringResource(Res.string.settings_did_copied))
-                                SettingsCopyRow(stringResource(Res.string.settings_key_id), (currentState.session as? WalletSessionState.Ready)?.keyId,
-                                    WalletUiTestTags.SettingsKeyId, WalletUiTestTags.SettingsKeyIdCopy, stringResource(Res.string.settings_copy_key_id), stringResource(Res.string.settings_key_id_copied))
-                                SettingsCopyRow(stringResource(Res.string.settings_public_key), (currentState.session as? WalletSessionState.Ready)?.publicJwk,
-                                    WalletUiTestTags.SettingsPublicJwk, WalletUiTestTags.SettingsPublicJwkCopy,
-                                    stringResource(Res.string.settings_copy_public_key), stringResource(Res.string.settings_public_key_copied),
-                                    disclosureLabels = stringResource(Res.string.settings_show_public_key) to stringResource(Res.string.settings_hide_public_key), formatJson = true)
-                            }
-                            SettingsDestination.Nearby -> {
-                                onProximityApprovalModeChange?.let { onChange ->
-                                    WalletSection(stringResource(Res.string.settings_approval)) {
-                                        ProximityApprovalModeChoice(currentState.proximityApprovalMode, onChange)
+                                    if (currentState.pinLockEnabled) {
+                                        WalletSection(stringResource(Res.string.settings_sharing),
+                                            modifier = Modifier.testTag(WalletUiTestTags.SettingsCredentialSharing)) {
+                                            if (onProximityTransportProfileChange != null) {
+                                                WalletNavigationRow(stringResource(Res.string.settings_nearby),
+                                                    { open(SettingsDestination.Nearby) },
+                                                    Modifier.testTag(WalletUiTestTags.SettingsProximityPresentation),
+                                                    summary = stringResource(currentState.proximityTransportProfile.titleResource),
+                                                    icon = { SettingsSymbol(Res.drawable.settings_nearby) })
+                                                SettingsDivider()
+                                            }
+                                            WalletNavigationRow(stringResource(Res.string.settings_dc_api),
+                                                { open(SettingsDestination.DigitalCredentialsApi) }, Modifier.testTag(WalletUiTestTags.SettingsDigitalCredentialsApi),
+                                                summary = stringResource(if (currentState.showDcApiPresentationPreview) Res.string.settings_review_on else Res.string.settings_review_off),
+                                                icon = { SettingsSymbol(Res.drawable.settings_id_card) })
+                                        }
                                     }
-                                }
-                                WalletSection {
-                                    WalletNavigationRow(stringResource(Res.string.settings_connection),
-                                        { open(SettingsDestination.Connection) }, Modifier.testTag(WalletUiTestTags.SettingsConnectionMethod), summary = stringResource(currentState.proximityTransportProfile.titleResource),
-                                        icon = { SettingsSymbol(Res.drawable.settings_connection) })
-                                    if (readerTrustSettingsContent != null) {
-                                        SettingsDivider()
-                                        WalletNavigationRow(stringResource(Res.string.settings_reader_authentication),
-                                            { open(SettingsDestination.ReaderAuthentication) },
-                                            Modifier.testTag(WalletUiTestTags.SettingsReaderAuthentication),
-                                            summary = currentReaderPolicy ?: stringResource(Res.string.settings_reader_subtitle),
-                                            icon = { SettingsSymbol(Res.drawable.settings_shield) })
-                                    }
-                                }
-                            }
-                            SettingsDestination.Connection -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                val profiles = WalletDemoProximityTransportProfile.entries
-                                for (group in listOf(profiles.take(3), profiles.drop(3))) {
-                                    WalletSection(title = if (group == profiles.take(3)) null else stringResource(Res.string.settings_provisional)) {
-                                        group.forEachIndexed { index, profile ->
-                                            if (index > 0) SettingsDivider()
-                                            SettingsChoiceRow(stringResource(profile.titleResource), stringResource(profile.descriptionResource),
-                                                profile == currentState.proximityTransportProfile, { onProximityTransportProfileChange?.invoke(profile) },
-                                                Modifier.testTag(profile.settingsTag))
+                                    WalletSection {
+                                        if (currentState.pinLockEnabled) {
+                                            SettingsActionRow(stringResource(Res.string.settings_lock), onLock,
+                                                Modifier.testTag(WalletUiTestTags.SettingsLock), icon = { Icon(Icons.Default.Lock, null) })
+                                            SettingsDivider()
+                                        }
+                                        onSignOut?.let { signOut ->
+                                            SettingsActionRow(stringResource(Res.string.settings_sign_out), signOut,
+                                                Modifier.testTag(WalletUiTestTags.SettingsSignOut),
+                                                icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null) })
+                                            if (allowWalletReset) SettingsDivider()
+                                        }
+                                        if (allowWalletReset) {
+                                            SettingsActionRow(stringResource(Res.string.settings_reset), { confirmReset = true },
+                                                Modifier.testTag(WalletUiTestTags.SettingsReset), destructive = true,
+                                                icon = { Icon(Icons.Default.Refresh, null) })
                                         }
                                     }
                                 }
-                                SettingsNotice(stringResource(Res.string.settings_connection_footer))
-                            }
-                            SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
-                            SettingsDestination.Server -> serverSettingsContent?.invoke()
-                            SettingsDestination.DigitalCredentialsApi -> {
-                                WalletSection(footer = stringResource(Res.string.settings_review_description)) {
-                                SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
-                                    onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
+                                SettingsDestination.WalletAccess -> walletAccessContent?.invoke()
+                                SettingsDestination.SigningKey -> {
+                                    when (val details = currentState.identityDetails) {
+                                        WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
+                                        WalletDemoIdentityDetailsState.Unsupported -> SigningProtectionSettings(currentState, currentState.session as? WalletSessionState.Ready, onRequestSigningProtectionChange)
+                                        is WalletDemoIdentityDetailsState.Failed -> WalletSection {
+                                            SettingsNotice(details.message, error = true)
+                                            SettingsActionRow(stringResource(Res.string.settings_try_again), onRefreshIdentityDetails)
+                                        }
+                                        is WalletDemoIdentityDetailsState.Available -> {
+                                            val identity = details.details
+                                            WalletSection(stringResource(Res.string.setup_summary),
+                                                footer = stringResource(Res.string.settings_change_key_notice)) {
+                                                SigningKeySummary(identity.recovery, identity.storage, identity.authorization)
+                                                SettingsDivider()
+                                                SettingsDetailRow(stringResource(Res.string.settings_key_protection), identity.protection)
+                                                SettingsDivider()
+                                                SettingsDetailRow(stringResource(Res.string.settings_key_origin), identity.origin)
+                                            }
+                                            if (identity.choices.isNotEmpty() || currentState.identityProgress != null || currentState.identityError != null)
+                                                WalletSection(stringResource(Res.string.settings_key_backup)) {
+                                                identity.choices.forEachIndexed { index, choice ->
+                                                    if (index > 0) SettingsDivider()
+                                                    SettingsActionRow(choice.title, {
+                                                        if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
+                                                    }, detail = choice.detail, enabled = !currentState.identityBusy,
+                                                        destructive = choice.destructive,
+                                                        icon = { if (choice.destructive) Icon(Icons.Default.Delete, null) else SettingsSymbol(Res.drawable.settings_backup) })
+                                                }
+                                                currentState.identityProgress?.let { SettingsNotice(it); LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                                                currentState.identityError?.let { SettingsNotice(it, error = true) }
+                                            }
+                                            if (identity.providerFailures.isNotEmpty()) ProviderAvailability(identity.providerFailures, !currentState.identityBusy, onRefreshIdentityDetails)
+                                        }
+                                    }
                                 }
-                                SettingsNotice(stringResource(digitalCredentialsRequirements))
+                                SettingsDestination.Technical -> {
+                                    SettingsCopyRow(stringResource(Res.string.settings_did), (currentState.session as? WalletSessionState.Ready)?.did,
+                                        WalletUiTestTags.SettingsDid, WalletUiTestTags.SettingsDidCopy, stringResource(Res.string.settings_copy_did), stringResource(Res.string.settings_did_copied))
+                                    SettingsCopyRow(stringResource(Res.string.settings_key_id), (currentState.session as? WalletSessionState.Ready)?.keyId,
+                                        WalletUiTestTags.SettingsKeyId, WalletUiTestTags.SettingsKeyIdCopy, stringResource(Res.string.settings_copy_key_id), stringResource(Res.string.settings_key_id_copied))
+                                    SettingsCopyRow(stringResource(Res.string.settings_public_key), (currentState.session as? WalletSessionState.Ready)?.publicJwk,
+                                        WalletUiTestTags.SettingsPublicJwk, WalletUiTestTags.SettingsPublicJwkCopy,
+                                        stringResource(Res.string.settings_copy_public_key), stringResource(Res.string.settings_public_key_copied),
+                                        disclosureLabels = stringResource(Res.string.settings_show_public_key) to stringResource(Res.string.settings_hide_public_key), formatJson = true)
+                                }
+                                SettingsDestination.Nearby -> {
+                                    onProximityApprovalModeChange?.let { onChange ->
+                                        WalletSection(stringResource(Res.string.settings_approval)) {
+                                            ProximityApprovalModeChoice(currentState.proximityApprovalMode, onChange)
+                                        }
+                                    }
+                                    WalletSection {
+                                        WalletNavigationRow(stringResource(Res.string.settings_connection),
+                                            { open(SettingsDestination.Connection) }, Modifier.testTag(WalletUiTestTags.SettingsConnectionMethod), summary = stringResource(currentState.proximityTransportProfile.titleResource),
+                                            icon = { SettingsSymbol(Res.drawable.settings_connection) })
+                                        if (readerTrustSettingsContent != null) {
+                                            SettingsDivider()
+                                            WalletNavigationRow(stringResource(Res.string.settings_reader_authentication),
+                                                { open(SettingsDestination.ReaderAuthentication) },
+                                                Modifier.testTag(WalletUiTestTags.SettingsReaderAuthentication),
+                                                summary = currentReaderPolicy ?: stringResource(Res.string.settings_reader_subtitle),
+                                                icon = { SettingsSymbol(Res.drawable.settings_shield) })
+                                        }
+                                    }
+                                }
+                                SettingsDestination.Connection -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                    val profiles = WalletDemoProximityTransportProfile.entries
+                                    for (group in listOf(profiles.take(3), profiles.drop(3))) {
+                                        WalletSection(title = if (group == profiles.take(3)) null else stringResource(Res.string.settings_provisional)) {
+                                            group.forEachIndexed { index, profile ->
+                                                if (index > 0) SettingsDivider()
+                                                SettingsChoiceRow(stringResource(profile.titleResource), stringResource(profile.descriptionResource),
+                                                    profile == currentState.proximityTransportProfile, { onProximityTransportProfileChange?.invoke(profile) },
+                                                    Modifier.testTag(profile.settingsTag))
+                                            }
+                                        }
+                                    }
+                                    SettingsNotice(stringResource(Res.string.settings_connection_footer))
+                                }
+                                SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
+                                SettingsDestination.Server -> serverSettingsContent?.invoke()
+                                SettingsDestination.DigitalCredentialsApi -> {
+                                    WalletSection(footer = stringResource(Res.string.settings_review_description)) {
+                                    SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
+                                        onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
+                                    }
+                                    SettingsNotice(stringResource(digitalCredentialsRequirements))
+                                }
                             }
                         }
                     }

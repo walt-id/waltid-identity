@@ -9,6 +9,7 @@ public struct ReviewActions: View {
     let onCancel: () -> Void
     let presentation: ReviewActionPresentation
     let paymentReview: PaymentReviewState
+    let isPayment: Bool
     let showCancelWithReject: Bool
     @State private var pendingUnsignedRevision: String?
 
@@ -20,6 +21,7 @@ public struct ReviewActions: View {
         onCancel: @escaping () -> Void,
         presentation: ReviewActionPresentation = .sharing,
         paymentReview: PaymentReviewState = .notRequired,
+        isPayment: Bool = false,
         showCancelWithReject: Bool = true
     ) {
         self.selectionComplete = selectionComplete
@@ -29,11 +31,14 @@ public struct ReviewActions: View {
         self.onCancel = onCancel
         self.presentation = presentation
         self.paymentReview = paymentReview
+        self.isPayment = isPayment
         self.showCancelWithReject = showCancelWithReject
     }
 
     public var body: some View {
         let canSubmit = !isLoading && selectionComplete && paymentReview.canConfirm
+        let submitTitle = paymentReview.consent?.affirmativeAction
+            ?? (isPayment ? String(localized: "Confirm payment", bundle: .module) : presentation.submitTitle)
         let cancel = WalletAction(
             (onReject == nil ? paymentReview.consent?.denialAction : nil) ?? presentation.cancelTitle
                 ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)),
@@ -41,7 +46,7 @@ public struct ReviewActions: View {
             perform: onCancel
         )
         WalletActions(
-            primary: WalletAction(paymentReview.consent?.affirmativeAction ?? presentation.submitTitle,
+            primary: WalletAction(submitTitle,
                 enabled: canSubmit,
                 identifier: presentation.submitAccessibilityIdentifier, perform: {
                     if let consent = paymentReview.consent, consent.requiresUnsignedRequestWarning {
@@ -49,7 +54,8 @@ public struct ReviewActions: View {
                     } else { onSubmit() }
                 }),
             secondary: onReject.map { reject in
-                WalletAction(paymentReview.consent?.denialAction ?? presentation.rejectTitle,
+                WalletAction(paymentReview.consent?.denialAction
+                    ?? (isPayment ? String(localized: "Decline payment", bundle: .module) : presentation.rejectTitle),
                     enabled: !isLoading, identifier: presentation.rejectAccessibilityIdentifier, perform: reject)
             } ?? cancel,
             tertiary: onReject == nil || !showCancelWithReject ? nil : cancel
@@ -58,7 +64,7 @@ public struct ReviewActions: View {
             get: { pendingUnsignedRevision != nil },
             set: { if !$0 { pendingUnsignedRevision = nil } }
         ), presenting: pendingUnsignedRevision) { revision in
-            Button(paymentReview.consent?.affirmativeAction ?? presentation.submitTitle) {
+            Button(submitTitle) {
                 guard canSubmit, revision == paymentReview.consent?.revision else { return }
                 pendingUnsignedRevision = nil
                 onSubmit()

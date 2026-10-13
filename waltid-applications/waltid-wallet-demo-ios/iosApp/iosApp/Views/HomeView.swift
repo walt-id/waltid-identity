@@ -7,11 +7,8 @@ struct HomeView: View {
     @State private var selectedCredentialDetailsID: String?
     @State private var showingSettings = false
     @State private var showingScanner = false
-    @State private var scannerManual = false
     @State private var dismissingSettings = false
     @State private var credentialCards: [CredentialCardItem] = []
-    @State private var nearbySheetHeight: CGFloat?
-    @State private var scannerSheetHeight: CGFloat?
     @State private var nearbySheet: NearbySheetPresentation = .idle
 
     init(viewModel: WalletViewModel) {
@@ -38,29 +35,6 @@ struct HomeView: View {
                 }
             } else { credentialsContent }
         }
-        .background {
-            GeometryReader { geometry in
-                // Measure only pure controls, with room for the native sheet's horizontal margins.
-                let width = max(1, min(geometry.size.width, 540) - 24)
-                ProximityEngagementMenu(methods: [.nfc, .qr], approvalMode: .constant(viewModel.proximityApprovalMode),
-                    enabled: false, onShowEngagement: { _ in }, onConnectionOptions: {})
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .frame(width: width).fixedSize(horizontal: false, vertical: true)
-                    .background(GeometryReader { menu in
-                        let available = max(1, geometry.size.height - 44)
-                        let nearby = menu.size.height + WalletEntrySheetHeights.nativeChrome
-                        let scanner = min(360, width - 40) + 48 + WalletEntrySheetHeights.nativeChrome
-                        Color.clear.preference(key: WalletEntrySheetHeightsKey.self,
-                            value: WalletEntrySheetHeights(nearby: nearby < available ? nearby : nil,
-                                scanner: scanner < available ? scanner : nil))
-                    })
-                    .hidden().accessibilityHidden(true).allowsHitTesting(false)
-            }
-        }
-        .onPreferenceChange(WalletEntrySheetHeightsKey.self) { heights in
-            nearbySheetHeight = heights.nearby
-            scannerSheetHeight = heights.scanner
-        }
         .sheet(isPresented: Binding(get: { showingTaskSheet }, set: { if !$0 { returnHome() } })) {
             Group {
                 if showingOnlineFlow {
@@ -70,20 +44,17 @@ struct HomeView: View {
                     case .credentials: EmptyView()
                     }
                 } else {
-                    WalletScanView(onBack: returnHome, onOpen: openLink,
-                        onManualModeChange: { scannerManual = $0 })
+                    WalletScanView(onBack: returnHome, onOpen: openLink)
                 }
             }
-            .walletSheetSizing(preferredHeight: showingOnlineFlow ? nil : scannerSheetHeight,
-                expanded: showingOnlineFlow || scannerManual)
+            .walletSheetSizing()
             .interactiveDismissDisabled(showingOnlineFlow && !viewModel.canDismissExternalFlow)
         }
         .sheet(isPresented: Binding(get: { nearbySheet.isPresented }, set: { if !$0 { dismissNearbySheet() } }),
             onDismiss: nearbySheetDidDismiss) {
             PresentView(viewModel: viewModel, onBack: returnHome, nearbySheet: true)
                 .interactiveDismissDisabled(!proximity.canClose)
-                .walletSheetSizing(preferredHeight: nearbySheet.preferredHeight,
-                    expanded: !proximity.showsEngagement || proximity.review != nil || proximity.displayedEngagement == .qr)
+                .walletSheetSizing()
         }
         .fullScreenCover(isPresented: $showingSettings, onDismiss: { dismissingSettings = false }) {
             NavigationView {
@@ -129,7 +100,7 @@ struct HomeView: View {
 
     private var credentialsContent: some View {
         CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
-            onOpenSettings: openSettings, onScan: { scannerManual = false; showingScanner = true }, onShareNearby: startNearbySharing,
+            onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: startNearbySharing,
             nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing)
             .accessibilityHidden(showingTaskSheet || nearbySheet.keepsHomeVisible)
     }
@@ -151,7 +122,7 @@ struct HomeView: View {
         guard case .idle = nearbySheet, !proximity.active else { return }
         viewModel.startNewPresentationFlow()
         viewModel.selectedTab = .present
-        nearbySheet = .preparing(nearbySheetHeight)
+        nearbySheet = .preparing
         proximity.start()
         synchronizeNearbySheet()
     }
@@ -160,17 +131,17 @@ struct HomeView: View {
         if proximity.active {
             switch nearbySheet {
             case .idle:
-                nearbySheet = proximity.hasEntryContent ? .presented(nearbySheetHeight) : .preparing(nearbySheetHeight)
-            case .preparing(let height) where proximity.hasEntryContent && !proximity.closing:
-                nearbySheet = .presented(height)
-            case .hidden(let height) where !proximity.closing:
+                nearbySheet = proximity.hasEntryContent ? .presented : .preparing
+            case .preparing where proximity.hasEntryContent && !proximity.closing:
+                nearbySheet = .presented
+            case .hidden where !proximity.closing:
                 // A rejected cancellation must restore the task and its actual SDK error.
-                nearbySheet = .presented(height)
+                nearbySheet = .presented
             default: break
             }
         } else {
             switch nearbySheet {
-            case .presented(let height): nearbySheet = .dismissing(height)
+            case .presented: nearbySheet = .dismissing
             case .preparing, .hidden: finishNearbyDismissal()
             default: break
             }
@@ -178,17 +149,17 @@ struct HomeView: View {
     }
 
     private func dismissNearbySheet() {
-        guard case .presented(let height) = nearbySheet else { return }
+        guard case .presented = nearbySheet else { return }
         guard !proximity.active || proximity.canClose else { return }
         // Visibility changes immediately, even while the SDK is still draining cleanup.
-        nearbySheet = .dismissing(height)
+        nearbySheet = .dismissing
         if proximity.active { proximity.requestClose() }
     }
 
     private func nearbySheetDidDismiss() {
         if case .presented = nearbySheet { dismissNearbySheet() }
-        guard case .dismissing(let height) = nearbySheet else { return }
-        nearbySheet = .hidden(height)
+        guard case .dismissing = nearbySheet else { return }
+        nearbySheet = .hidden
         synchronizeNearbySheet()
     }
 
@@ -213,42 +184,21 @@ struct HomeView: View {
 /// Native presentation and SDK cleanup complete independently; neither can reopen the other.
 private enum NearbySheetPresentation {
     case idle
-    case preparing(CGFloat?)
-    case presented(CGFloat?)
-    case dismissing(CGFloat?)
-    case hidden(CGFloat?)
+    case preparing
+    case presented
+    case dismissing
+    case hidden
 
     var isPresented: Bool { if case .presented = self { return true }; return false }
     var isPreparing: Bool { if case .preparing = self { return true }; return false }
     var keepsHomeVisible: Bool { if case .idle = self { return false }; return true }
-    var preferredHeight: CGFloat? {
-        switch self {
-        case .idle: return nil
-        case .preparing(let height), .presented(let height), .dismissing(let height), .hidden(let height): return height
-        }
-    }
+
 }
 
 private struct NearbySheetSessionState: Equatable {
     let active: Bool
     let entryReady: Bool
     let closing: Bool
-}
-
-private struct WalletEntrySheetHeights: Equatable {
-    // The measured body excludes the inline navigation toolbar and sheet drag-handle clearance.
-    static let nativeChrome: CGFloat = 96
-    var nearby: CGFloat?
-    var scanner: CGFloat?
-}
-
-private struct WalletEntrySheetHeightsKey: PreferenceKey {
-    static let defaultValue = WalletEntrySheetHeights()
-    static func reduce(value: inout WalletEntrySheetHeights, nextValue: () -> WalletEntrySheetHeights) {
-        let next = nextValue()
-        value.nearby = next.nearby ?? value.nearby
-        value.scanner = next.scanner ?? value.scanner
-    }
 }
 
 /// Keep wallet-opening status visible after the key operation succeeds.
