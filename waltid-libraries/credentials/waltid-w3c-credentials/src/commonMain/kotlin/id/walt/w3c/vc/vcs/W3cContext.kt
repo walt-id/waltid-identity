@@ -33,15 +33,17 @@ private fun JsonElement.w3cContextEntries(): List<JsonElement> = when (this) {
 /**
  * Prepares a credential map for VC Data Model 2.0 issuance.
  *
- * Inline context objects stay in place. The v2 context URL is added when absent, and the v1
- * context URL is removed. `issuanceDate` and `expirationDate` move to `validFrom` and
- * `validUntil` when those v2 names are not already set.
+ * Inline context objects stay in place. The v2 context URL is the first entry, added when
+ * absent. The v1 context URL is removed. `issuanceDate` and `expirationDate` move to
+ * `validFrom` and `validUntil` when those v2 names are not already set.
  */
 fun MutableMap<String, JsonElement>.applyIssuedV2Context(): MutableMap<String, JsonElement> {
     val entries = this["@context"]?.w3cContextEntries().orEmpty()
-    val hasV2 = entries.any { it.w3cContextUrl() == v2ContextUrl }
-    val withoutV1 = entries.filter { it.w3cContextUrl() != v1ContextUrl }
-    this["@context"] = JsonArray(if (hasV2) withoutV1 else listOf(JsonPrimitive(v2ContextUrl)) + withoutV1)
+    val retained = entries.filter { entry ->
+        val contextUrl = entry.w3cContextUrl()
+        contextUrl != v1ContextUrl && contextUrl != v2ContextUrl
+    }
+    this["@context"] = JsonArray(listOf(JsonPrimitive(v2ContextUrl)) + retained)
     remove("issuanceDate")?.let { value -> if ("validFrom" !in this) this["validFrom"] = value }
     remove("expirationDate")?.let { value -> if ("validUntil" !in this) this["validUntil"] = value }
     return this

@@ -129,4 +129,24 @@ class W3CContextParsingTest {
         assertEquals("2020-01-01T00:00:00Z", credential.getValue("validFrom").jsonPrimitive.content)
         assertNull(credential["issuanceDate"])
     }
+
+    @Test
+    fun v2UpgradeMovesExistingContextUrlAheadOfInlineObjects() {
+        val credential = Json.parseToJsonElement(
+            """
+            {
+              "@context": [
+                { "gx": "https://example.com/" },
+                "https://www.w3.org/ns/credentials/v2"
+              ],
+              "type": ["VerifiableCredential"]
+            }
+            """.trimIndent()
+        ).jsonObject.toMutableMap()
+
+        credential.applyIssuedV2Context()
+        val context = credential.getValue("@context").jsonArray
+        assertEquals("https://www.w3.org/ns/credentials/v2", context[0].jsonPrimitive.content)
+        assertEquals("https://example.com/", (context[1] as JsonObject).getValue("gx").jsonPrimitive.content)
+    }
 }
