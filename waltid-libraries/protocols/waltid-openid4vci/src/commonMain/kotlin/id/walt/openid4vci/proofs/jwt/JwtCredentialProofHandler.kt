@@ -12,6 +12,7 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
@@ -280,7 +281,7 @@ class JwtCredentialProofHandler(
     /** Resolves exactly the holder key referenced by the proof `kid`. */
     private suspend fun resolveHolderDidKey(did: String, holderKid: String): Key =
         runCatching {
-            didKeyResolver.resolveFromDidStrict(did, holderKid)
+            didKeyResolver.resolveFromDidStrict(did, holderKid, VerificationRelationshipType.Authentication)
         }
             .getOrElse {
                 if (it is CancellationException) throw it
