@@ -74,9 +74,10 @@ role-specific guide for a runnable environment and its intended command.
 ## CI summaries
 
 The reusable OSS Gradle workflow
-(`.github/workflows/gradle.yml`) always publishes these role sections to the
-GitHub Actions job summary, using the same heading and table shape as the
-OpenID4VP verifier report:
+(`.github/workflows/gradle.yml`) publishes these role sections to GitHub Actions
+job summaries, using the existing headings and table shapes. Wallet/verifier
+sections stay in the `conformance` job; the issuer section is published by
+`issuer-conformance-results` after merging the two parallel proof jobs:
 
 1. OpenID4VP Verifier
 2. OpenID4VP Wallet
@@ -96,7 +97,9 @@ When a role did not write a report, the workflow still writes the same heading,
 totals, and table, with a note that no results were produced.
 
 Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
-failures fail the conformance job. Issuer batch coverage remains required.
+failures fail their respective jobs. Issuer batch and key-attestation coverage
+remain required independently for both proof modes. The aggregate issuer artifact
+retains the name `issuer-conformance-basic-haip-batch` and its existing JSON format.
 
 Artifacts (when a role actually runs):
 
