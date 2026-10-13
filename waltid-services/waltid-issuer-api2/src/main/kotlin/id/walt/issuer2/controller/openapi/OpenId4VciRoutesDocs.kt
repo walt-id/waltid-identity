@@ -349,6 +349,9 @@ object OpenId4VciRoutesDocs {
             }
         }
         response {
+            HttpStatusCode.UnsupportedMediaType to {
+                description = "Content-Type must be application/json; media-type parameters are accepted. Missing or unsupported content types return 415."
+            }
             HttpStatusCode.NoContent to {
                 description = "Notification accepted"
             }

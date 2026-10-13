@@ -309,7 +309,14 @@ class OpenId4VciController(
                     call.respondCredentialResponse(response)
                 }.apply { install(credentialResponseCacheControl) }
 
-                post("notification", OpenId4VciRoutesDocs.notification()) {
+                post(Issuer2EndpointPaths.NOTIFICATION, OpenId4VciRoutesDocs.notification()) {
+                    val contentType = call.request.headers[HttpHeaders.ContentType]?.let {
+                        runCatching { ContentType.parse(it).withoutParameters() }.getOrNull()
+                    }
+                    if (contentType != ContentType.Application.Json) {
+                        call.respond(HttpStatusCode.UnsupportedMediaType)
+                        return@post
+                    }
                     val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
                     val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
                     val response = protocolService.processNotificationRequest(
