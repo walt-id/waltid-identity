@@ -71,9 +71,7 @@ internal class JwkMetadataSigner private constructor(private val signingKey: Cry
                 // Preserve the original signing capability and restrictions. Publish verification operations
                 // for the public JWK instead of copying private-key key_ops=[sign] from imported or managed keys.
                 val headerKey = object : Key by key {
-                    override val capabilities = key.capabilities.copy(publicKeyExporter = object : PublicKeyExporter {
-                        override suspend fun exportPublicKey(): EncodedKey = publicMaterial
-                    })
+                    override val capabilities = key.capabilities.copy(publicKeyExporter = PublicKeyExporter { publicMaterial })
                 }
                 val signingKey = Crypto2JwtSigningKey(headerKey, algorithm, keyId)
                 JwkMetadataSigner(signingKey)

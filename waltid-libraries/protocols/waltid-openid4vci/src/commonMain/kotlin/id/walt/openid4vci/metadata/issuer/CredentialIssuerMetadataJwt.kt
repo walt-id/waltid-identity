@@ -88,8 +88,8 @@ suspend fun CredentialIssuerMetadata.toSignedJwt(
     val algorithm = signingKey.keyType.jwsAlg
     require(
         algorithm.isNotBlank() &&
-            !algorithm.equals("none", ignoreCase = true) &&
-            !algorithm.startsWith("HS", ignoreCase = true)
+                !algorithm.equals("none", ignoreCase = true) &&
+                !algorithm.startsWith("HS", ignoreCase = true)
     ) {
         "Credential Issuer Metadata must use an asymmetric JWS algorithm"
     }
