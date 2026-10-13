@@ -73,56 +73,53 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Create a profile-derived OpenID4VCI credential offer URL and the backing issuance session.
 
-            Choose one of the following request formats:
+            **Request format**
 
             - Single-profile offer: send `profileId` with optional `runtimeOverrides`.
-            - Multi-credential offer: send a non-empty `credentials` array. Each entry contains a
-              `profileId` and optional `runtimeOverrides`. Select different profiles to offer different
-              credential formats, or repeat a profile with different `credentialData` overrides to offer
-              different datasets.
+            - Multi-credential offer: send a non-empty `credentials` array, with `profileId` and optional
+              `runtimeOverrides` in each entry. Omit top-level `profileId` and `runtimeOverrides`, including null values.
+            - Use different profiles for different formats, or repeat a profile with different data overrides.
+              A multi-credential response has no `profileId` or `credentials` array, even for one entry.
 
-            The batch limit is advertised as `batch_credential_issuance.batch_size` in issuer metadata.
+            See [offer examples](https://docs.walt.id/community-stack/issuer2/credential-offers/create-offer#multiple-credentials).
 
-            When using `credentials`, put overrides inside each entry and omit top-level `profileId`
-            and `runtimeOverrides` entirely, rather than setting them to null. A `profileId` request
-            returns a response containing `profileId`. A `credentials` request returns the offer response
-            without profile fields or a `credentials` array, even when only one entry was supplied.
+            **Flow and expiry**
 
-            Both request formats support pre-authorized and authorization-code issuance flows, with offers
-            returned by reference or by value. Runtime overrides can
-            be applied per credential for one offer only. Supported
-            override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
-            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
-            msoData, x5Chain, notifications, and credentialStatus.
-            runtimeOverrides.msoData is rejected unless the profile credential configuration
-            format is mso_mdoc. Blank or whitespace msoData.validFrom, validUntil, and
-            expectedUpdate values are rejected. Omitted override keys inherit the profile.
-            JSON null for expectedUpdate clears the profile value so the MSO omits it;
-            JSON null for validFrom or validUntil still inherits. ISO 18013-5 requires
-            signed <= validFrom < validUntil. expectedUpdate is optional and is not bounded
-            by that ISO rule unless an issuer enables the opt-in window policy (off by default).
-            Omitting msoData.validUntil uses the 365-day default, rounded to a 12-hour UTC
-            bucket when rounding is enabled. Explicit timestamps, data functions, and
-            fallbackValidUntil are kept as given.
-            For mDoc profiles, put namespace value functions in mapping (including <date>,
-            <date-in>, and <date-before> for ISO full-date fields such as issue_date) and MSO
-            validity functions in msoData. Top-level W3C-style mapping keys such as
-            mapping.validFrom / mapping.validUntil are rejected; use msoData instead.
-            credentialData is applied as a partial object patch over the configured profile data:
-            nested objects are merged, while primitive, array, and null values replace the configured value.
-            Each offered credential uses its configured `credentialStatus` for all copies issued from it.
-            When multiple proofs are supplied, those copies share the same status entry; revoking that
-            entry revokes every credential referencing it. Supply `runtimeOverrides.credentialStatus`
-            on a single-profile offer or inside each `credentials[]` item to override the profile default.
-            Different items can use different entries. The caller allocates and manages status entries;
-            OSS embeds them without allocating new entries per copy. Shared references make copies linkable.
-            Redeem different offered items through separate Credential Requests; multiple proofs request
-            copies of the selected item. Repeated issuance of an item also uses its configured status.
-            Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
-            for profile-based offers without runtime overrides. AUTHORIZED offers with runtimeOverrides and
-            issuerStateMode OMIT are rejected with Bad Request.
-            Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
-            Use -1 for no expiry.
+            - Both request formats support pre-authorized and authorization-code flows, by reference or by value.
+            - Authorization-code offers include `issuer_state` by default. `issuerStateMode: OMIT` is allowed
+              only for profile-based offers without runtime overrides; combining it with overrides returns Bad Request.
+            - `expiresInSeconds` defaults to `300` (five minutes). Use `-1` for no expiry.
+
+            **Runtime overrides**
+
+            Overrides apply to this offer only. Omitted fields inherit the profile. `credentialData` is a
+            partial patch: nested objects merge; primitive, array, and null values replace existing values.
+
+            See [supported override fields](https://docs.walt.id/community-stack/issuer2/credential-offers/create-offer#available-override-fields).
+
+            **mDoc mapping and validity**
+
+            - Put namespace data functions such as `<date>`, `<date-in:365d>`, and `<date-before:30d>` in `mapping`.
+              Put MSO validity functions in `msoData`; `mapping.validFrom` and `mapping.validUntil` are rejected.
+            - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
+              Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
+            - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
+              this issuer does not require it to fall within that window.
+            - Without a configured `validUntil`, the default is 365 days, rounded to a 12-hour UTC bucket
+              when rounding is enabled. Explicit `validUntil` timestamps and resolved data functions are not rounded.
+
+            See [MSO validity configuration](https://docs.walt.id/community-stack/issuer2/configurations/config-files/issuer-profiles#mso-validity-msodata).
+
+            **Multiple credentials, batches, and status**
+
+            - Redeem different offer items through separate Credential Requests. Multiple proofs request
+              copies of one selected item, subject to the advertised `batch_credential_issuance.batch_size` limit.
+            - Copies and repeated issuance of an item share its configured `credentialStatus` entry.
+              Revoking that entry revokes every credential referencing it; shared references also make copies linkable.
+            - Override status with `runtimeOverrides.credentialStatus` on the single-profile request or each
+              `credentials[]` entry. The caller allocates and manages status entries; OSS only embeds them.
+
+            See [credential status and batch issuance](https://docs.walt.id/community-stack/issuer2/credential-offers/credential-status#batch-issuance).
         """.trimIndent()
         request {
             body(anyOf(type<CredentialOfferCreateRequest>(), type<MultiCredentialOfferCreateRequest>())) {

@@ -24,6 +24,7 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -599,6 +600,7 @@ class ProviderPushedAuthorizationFlowTest {
         )
         val parsed = assertIs<AuthorizationRequestResult.Success>(buildParProvider().createAuthorizationRequest(parameters)).request
         val complete = parsed.toDefaultAuthorizationRequest().copy(
+            requestedAt = Instant.parse("2026-01-01T00:00:00Z"),
             handledResponseTypes = setOf("code"), grantedScopes = setOf("openid"),
             requestedAudience = setOf("requested"), grantedAudience = setOf("granted"),
             issClaim = "https://issuer.example", responseMode = ResponseMode.FRAGMENT,
@@ -610,7 +612,9 @@ class ProviderPushedAuthorizationFlowTest {
         val custom = object : AuthorizationRequest by complete {}
         val snapshot = custom.toDefaultAuthorizationRequest()
         assertEquals(complete, snapshot)
-        assertEquals(complete, Json.decodeFromString<DefaultAuthorizationRequest>(Json.encodeToString(snapshot)))
+        val encoded = Json.encodeToString(snapshot)
+        assertEquals(complete.requestedAt.toString(), Json.parseToJsonElement(encoded).jsonObject["requestedAt"]?.jsonPrimitive?.content)
+        assertEquals(complete, Json.decodeFromString<DefaultAuthorizationRequest>(encoded))
     }
 
     private fun buildParProvider(
