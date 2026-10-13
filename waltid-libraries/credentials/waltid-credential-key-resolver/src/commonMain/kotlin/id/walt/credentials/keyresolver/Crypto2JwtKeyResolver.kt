@@ -193,10 +193,17 @@ class Crypto2JwtKeyResolver(
             .filter(String::isNotBlank)
             .toSet()
 
+    /**
+     * Normalizes a key ID to a full DID URL.
+     *
+     * Per DID Core spec, verification methods are typically referenced by fragment.
+     * Bare strings without a prefix are treated as fragments (most common case).
+     * Explicit path (/), query (?), or fragment (#) prefixes are preserved.
+     */
     private fun normalizeDidUrl(did: String, id: String): String = when {
-        id.startsWith("did:") -> id
-        id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id"
-        else -> "$did/$id"
+        id.startsWith("did:") -> id // Already a full DID URL
+        id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id" // Explicit component
+        else -> "$did#$id" // Bare string treated as fragment (most common case)
     }
 
     private fun extractSignerIdentifier(payload: JsonObject): String? =
