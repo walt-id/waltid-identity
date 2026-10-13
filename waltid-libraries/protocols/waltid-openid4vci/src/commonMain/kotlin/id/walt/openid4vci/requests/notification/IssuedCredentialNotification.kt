@@ -1,9 +1,12 @@
 package id.walt.openid4vci.requests.notification
 
+import kotlinx.serialization.Serializable
+
 /**
  * Latest wallet report stored for one issued credential identifier.
  * [notificationId] is the OpenID4VCI identifier from the Credential Response.
  */
+@Serializable
 data class IssuedCredentialNotification(
     val credentialIdentifier: String,
     val notificationId: String,

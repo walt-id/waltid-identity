@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.notification
 
 import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.requests.notification.NotificationEvent
+import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.requests.notification.NotificationRequest
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
@@ -26,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class NotificationRequestBuilderTest {
     private fun client(
@@ -47,10 +49,11 @@ class NotificationRequestBuilderTest {
             assertEquals("notification-id", body["notification_id"]?.jsonPrimitive?.content)
             assertEquals("credential_accepted", body["event"]?.jsonPrimitive?.content)
             assertEquals("Stored", body["event_description"]?.jsonPrimitive?.content)
+            assertEquals(setOf("notification_id", "event", "event_description"), body.keys)
 
             respond(content = "", status = HttpStatusCode.NoContent)
         }
-        val notification = NotificationRequest(
+        val notification = DefaultNotificationRequest(
             notificationId = "notification-id",
             event = NotificationEvent.CREDENTIAL_ACCEPTED,
             eventDescription = "Stored",
@@ -67,6 +70,29 @@ class NotificationRequestBuilderTest {
     }
 
     @Test
+    fun sendsCustomRequestImplementationWithoutPolymorphicFields() = runTest {
+        val notification = object : NotificationRequest {
+            override val notificationId = "custom-id"
+            override val event = NotificationEvent.CREDENTIAL_DELETED
+            override val eventDescription: String? = null
+        }
+        val client = client { request ->
+            val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+            assertEquals(setOf("notification_id", "event"), body.keys)
+            assertEquals("custom-id", body["notification_id"]?.jsonPrimitive?.content)
+            assertEquals("credential_deleted", body["event"]?.jsonPrimitive?.content)
+            respond(content = "", status = HttpStatusCode.NoContent)
+        }
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = "https://issuer.example/notification",
+            accessToken = "access-token",
+            accessTokenType = NotificationAccessTokenType.BEARER,
+            request = notification,
+        )
+        assertSame(notification, assertIs<NotificationDeliveryResult.Success>(result).request)
+    }
+
+    @Test
     fun rejectsBearerRequestThatIncludesDpopProofFactory() = runTest {
         val client = client { error("Request must not be sent") }
 
@@ -74,7 +100,7 @@ class NotificationRequestBuilderTest {
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
             accessTokenType = NotificationAccessTokenType.BEARER,
-            request = NotificationRequest(
+            request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
             ),
@@ -93,7 +119,7 @@ class NotificationRequestBuilderTest {
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
             accessTokenType = NotificationAccessTokenType.DPOP,
-            request = NotificationRequest(
+            request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
             ),
@@ -117,7 +143,7 @@ class NotificationRequestBuilderTest {
             notificationEndpoint = notificationEndpoint,
             accessToken = "access-token",
             accessTokenType = NotificationAccessTokenType.DPOP,
-            request = NotificationRequest(
+            request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
             ),
@@ -159,7 +185,7 @@ class NotificationRequestBuilderTest {
             notificationEndpoint = notificationEndpoint,
             accessToken = "access-token",
             accessTokenType = NotificationAccessTokenType.DPOP,
-            request = NotificationRequest(
+            request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_FAILURE,
             ),
@@ -191,7 +217,7 @@ class NotificationRequestBuilderTest {
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
             accessTokenType = NotificationAccessTokenType.BEARER,
-            request = NotificationRequest(
+            request = DefaultNotificationRequest(
                 notificationId = "unknown",
                 event = NotificationEvent.CREDENTIAL_FAILURE,
             ),
