@@ -21,7 +21,6 @@ interface X509Certificate {
         get() = signatureValueRaw.toHexString()
 
     val fingerprintSha256: ByteString
-        get() = ByteString(ShaUtils.sha256(encodedDer.toByteArray()))
 
     val fingerprintSha256Hex: String
         get() = fingerprintSha256.toHexString()
