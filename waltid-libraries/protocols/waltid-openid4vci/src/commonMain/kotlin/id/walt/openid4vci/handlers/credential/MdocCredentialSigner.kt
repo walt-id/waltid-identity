@@ -19,8 +19,8 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
-import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
+import id.walt.openid4vci.proofs.invalidCredentialProof
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.cbor.CborElement
@@ -32,6 +32,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
+/** Generates credentials from an explicitly supplied binding. This signer rejects null bindings. */
 object MdocCredentialSigner {
 
     /**
@@ -46,7 +47,7 @@ object MdocCredentialSigner {
     @OptIn(ExperimentalSerializationApi::class)
     @Deprecated("Use the Crypto2Key overload")
     suspend fun generateMdocCredential(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerKey: Key,
         issuerCertificate: List<CoseCertificate>,
@@ -56,7 +57,6 @@ object MdocCredentialSigner {
         expectedUpdate: Instant? = null,
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
         requireExpectedUpdateWithinWindow: Boolean = false,
@@ -67,7 +67,6 @@ object MdocCredentialSigner {
             elementValueJson: JsonElement
         ) -> CborElement? = defaultSchemalessMappingFunction,
     ): String = generateMdocCredential(
-        credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
         signedAt = signedAt,
@@ -78,7 +77,7 @@ object MdocCredentialSigner {
         expectedUpdate = expectedUpdate,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         valueMappingFunction = valueMappingFunction,
@@ -86,7 +85,7 @@ object MdocCredentialSigner {
 
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun generateMdocCredential(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerKey: Crypto2Key,
         signatureAlgorithm: Int,
@@ -97,7 +96,6 @@ object MdocCredentialSigner {
         expectedUpdate: Instant? = null,
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
         requireExpectedUpdateWithinWindow: Boolean = false,
@@ -108,7 +106,6 @@ object MdocCredentialSigner {
             elementValueJson: JsonElement,
         ) -> CborElement? = defaultSchemalessMappingFunction,
     ): String = generateMdocCredential(
-        credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, signatureAlgorithm),
         signedAt = signedAt,
@@ -119,7 +116,7 @@ object MdocCredentialSigner {
         expectedUpdate = expectedUpdate,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         valueMappingFunction = valueMappingFunction,
@@ -127,7 +124,7 @@ object MdocCredentialSigner {
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun generateMdocCredential(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
         signedAt: Instant?,
@@ -138,7 +135,6 @@ object MdocCredentialSigner {
         expectedUpdate: Instant?,
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
-        verifiedProof: VerifiedCredentialProof?,
         authorizedTransactionDataTypes: List<String>?,
         requireExpectedUpdateWithinWindow: Boolean,
         valueMappingFunction: (
@@ -148,8 +144,9 @@ object MdocCredentialSigner {
             elementValueJson: JsonElement,
         ) -> CborElement?,
     ): String {
-        // A proof verified upfront already carries the holder key, so it is not resolved twice.
-        val holderKey = verifiedProof?.toCosePublicKey() ?: resolveHolderKey(credentialRequest)
+        val binding = verifiedBinding
+            ?: throw invalidCredentialProof("mDoc issuance requires a verified credential binding")
+        val holderKey = binding.toCosePublicKey()
         validateIssuerKey(issuerSigningKey)
         val namespaces = credentialData.mapValues { (namespace, namespaceData) ->
             requireNotNull(namespaceData as? JsonObject) {
@@ -232,13 +229,7 @@ object MdocCredentialSigner {
             ?.takeIf { it.isNotEmpty() }
             ?.let { types -> KeyAuthorization(dataElements = types.associateWith { TRANSACTION_DATA_HASH_ELEMENTS }) }
 
-    suspend fun resolveHolderKey(credentialRequest: CredentialRequest): CoseKey {
-        val jwtProof = credentialRequest.proofs?.jwt?.firstOrNull()
-            ?: throw IllegalArgumentException("Missing JWT proof in proofs")
-        return JwtProofUtils.resolveHolderKey(jwtProof)
-    }
-
-    private suspend fun VerifiedCredentialProof.toCosePublicKey(): CoseKey =
+    private suspend fun VerifiedCredentialBinding.toCosePublicKey(): CoseKey =
         holderKey.exportPublicJwk().toCoseKey()
 
     private fun validateIssuerKey(issuerKey: IssuerSigningKey) {

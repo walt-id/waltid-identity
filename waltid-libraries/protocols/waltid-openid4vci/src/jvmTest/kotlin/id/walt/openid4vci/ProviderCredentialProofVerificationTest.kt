@@ -9,9 +9,10 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputP
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -45,7 +46,7 @@ class ProviderCredentialProofVerificationTest {
             CredentialEndpointHandler { _, _, _, _, issuanceBatch, _, _, _, _, _, _, _, _, _, _ ->
                 handlerInvocations += 1
                 handledInputCount = issuanceBatch.inputs.size
-                handledProofCount = issuanceBatch.verifiedProofs.size
+                handledProofCount = issuanceBatch.bindings.size
                 CredentialResponseResult.Success(
                     CredentialResponse(
                         credentials = issuanceBatch.instances.mapIndexed { index, _ ->
@@ -274,7 +275,7 @@ class ProviderCredentialProofVerificationTest {
         val holderKey = JWKKey.generate(KeyType.secp256r1)
         val proofJwt = tamperSignature(createProof(holderKey))
         val proofParam = buildJsonObject {
-            put("jwt", JsonArray(listOf(JsonPrimitive(proofJwt))))
+            put(ProofType.JWT.value, JsonArray(listOf(JsonPrimitive(proofJwt))))
         }.toString()
 
         val requestResult = provider.createCredentialRequest(
@@ -323,7 +324,7 @@ class ProviderCredentialProofVerificationTest {
             "credential_configuration_id" to listOf(CREDENTIAL_CONFIGURATION_ID),
             "proofs" to listOf(
                 buildJsonObject {
-                    put("jwt", JsonArray(proofs.map { JsonPrimitive(it) }))
+                    put(ProofType.JWT.value, JsonArray(proofs.map { JsonPrimitive(it) }))
                 }.toString()
             ),
         ),
@@ -348,7 +349,7 @@ class ProviderCredentialProofVerificationTest {
         vct = CREDENTIAL_CONFIGURATION_ID,
         cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
         proofTypesSupported = mapOf(
-            "jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+            ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
         ),
     )
 

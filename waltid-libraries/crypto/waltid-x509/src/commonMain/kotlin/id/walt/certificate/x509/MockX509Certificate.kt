@@ -49,8 +49,16 @@ class MockX509Certificate(private val subjectDn: String) : X509Certificate {
     override val signatureValueRaw: ByteString
         get() = ByteString()
 
+    override val fingerprintSha256: ByteString by lazy {
+        randomSerialNumber()
+    }
+
     override val encodedDer: ByteString
         get() = ByteString()
+
+    override fun hashCode(): Int = TODO()
+
+    override fun equals(other: Any?): Boolean = TODO()
 
     companion object {
         fun randomSerialNumber(): ByteString {

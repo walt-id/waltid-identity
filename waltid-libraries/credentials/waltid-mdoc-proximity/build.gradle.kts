@@ -10,8 +10,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
+            api(project(":waltid-libraries:credentials:waltid-mdoc-reader-trust"))
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-cose"))
+            api(identityLibs.kotlinx.io.bytestring)
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.cryptography.provider.optimal)
             implementation(identityLibs.kotlinx.coroutines.core)

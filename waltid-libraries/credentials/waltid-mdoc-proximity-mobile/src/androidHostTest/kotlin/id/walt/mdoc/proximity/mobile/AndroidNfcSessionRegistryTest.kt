@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -40,7 +40,7 @@ class AndroidNfcSessionRegistryTest {
         AndroidNfcSessionRegistry.disarm(generation, ProximityCloseReason.COMPLETED)
         AndroidNfcSessionRegistry.disarm(generation, ProximityCloseReason.CANCELLED)
 
-        assertContentEquals(byteArrayOf(0x90.toByte(), 0x00), response.copy())
+        assertContentEquals(byteArrayOf(0x90.toByte(), 0x00), response.toByteArray())
         assertEquals(listOf(listOf(0x00, 0xa4.toByte())), router.commands.map(ByteArray::toList))
         assertEquals(listOf(ProximityCloseReason.COMPLETED), router.closeReasons)
         assertNull(AndroidNfcSessionRegistry.current())
@@ -187,9 +187,9 @@ class AndroidNfcSessionRegistryTest {
         val closeReasons = mutableListOf<ProximityCloseReason>()
         val deactivation = CompletableDeferred<ProximityCloseReason>()
 
-        override suspend fun process(command: ByteArray): ImmutableBytes {
+        override suspend fun process(command: ByteArray): ByteString {
             commands += command.copyOf()
-            return ImmutableBytes.of(byteArrayOf(0x90.toByte(), 0x00))
+            return ByteString(byteArrayOf(0x90.toByte(), 0x00))
         }
 
         override suspend fun deactivate(reason: ProximityCloseReason) {
@@ -201,7 +201,7 @@ class AndroidNfcSessionRegistryTest {
     private class BlockingRouter : RecordingRouter() {
         val firstEntered = CompletableDeferred<Unit>()
         val releaseFirst = CompletableDeferred<Unit>()
-        override suspend fun process(command: ByteArray): ImmutableBytes {
+        override suspend fun process(command: ByteArray): ByteString {
             if (command.contentEquals(byteArrayOf(1))) {
                 firstEntered.complete(Unit)
                 releaseFirst.await()

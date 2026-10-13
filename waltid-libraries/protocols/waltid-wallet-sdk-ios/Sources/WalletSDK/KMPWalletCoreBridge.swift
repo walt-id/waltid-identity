@@ -26,8 +26,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         self.bridge = try Self.successValue(result, as: WalletSdkBridge.self, operation: "create wallet bridge")
         if let provider = configuration.keyAttestationProvider {
-            let attached = try await bridge.attachKeyAttestationProvider(
-                provider: KMPKeyAttestationProviderAdapter(provider: provider)
+            let attached = try await bridge.attachKeyAttestationProviderResolver(
+                resolver: KMPKeyAttestationProviderResolverAdapter(resolver: provider)
             )
             _ = try Self.successAnyValue(attached, operation: "attach key attestation provider")
         }
@@ -1277,6 +1277,18 @@ private extension WalletConfiguration {
     }
 }
 
+final class KMPKeyAttestationProviderResolverAdapter: WalletBridgeKeyAttestationProviderResolver, @unchecked Sendable {
+    private let resolver: any KeyAttestationProviderResolver
+
+    init(resolver: any KeyAttestationProviderResolver) { self.resolver = resolver }
+
+    func __resolve(credentialIssuer: String) async throws -> (any WalletBridgeKeyAttestationProvider)? {
+        guard let provider = try await resolver.resolve(credentialIssuer: credentialIssuer) else { return nil }
+        try Task.checkCancellation()
+        return KMPKeyAttestationProviderAdapter(provider: provider)
+    }
+}
+
 final class KMPKeyAttestationProviderAdapter: WalletBridgeKeyAttestationProvider, @unchecked Sendable {
     private let provider: any KeyAttestationProvider
 
@@ -1730,21 +1742,24 @@ private extension MobileWalletAnnexCPreview {
                 }
             ),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
-            readerTrust: readerTrust.toSwiftReaderTrust()
+            readerTrust: readerAuthentication.toSwiftReaderTrust(decision: readerTrust)
         )
     }
 }
 
-private extension MobileWalletReaderTrust {
-    func toSwiftReaderTrust() -> ReaderTrust {
-        if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
-        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
-        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
-        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
-        if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
-        // A state this SDK build does not know about cannot be reported as identifying the reader,
-        // and the reason string says so rather than implying a rejected trust policy.
-        return .untrusted(reason: "Unrecognized reader trust state")
+private extension MobileWalletReaderAuthentication {
+    func toSwiftReaderTrust(decision: Waltid_mdoc_reader_trustReaderTrustDecision?) -> ReaderTrust {
+        switch self {
+        case .notApplicable: return .notApplicable
+        case .notAuthenticated: return .notAuthenticated
+        case .pendingRawRequest: return .pendingRawRequest
+        case .verified:
+            guard let decision else { return .untrusted(reason: "No reader trust decision was made") }
+            if decision.state == .trusted, let displayName = decision.displayName {
+                return .trusted(certificateSubject: displayName)
+            }
+            return .untrusted(reason: decision.reason ?? "The reader is not trusted")
+        }
     }
 }
 

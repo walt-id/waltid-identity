@@ -1,14 +1,15 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
+
 
 /** A transaction-scoped 128-bit BLE service UUID in Device Engagement byte order. */
-public class BleServiceUuid private constructor(private val encoded: ImmutableBytes) {
+public class BleServiceUuid private constructor(private val encoded: ByteString) {
     /** Returns the immutable 16-byte Device Engagement representation. */
-    public fun encoded(): ImmutableBytes = encoded
+    public fun encoded(): ByteString = encoded
 
     internal fun platformString(): String {
-        val bytes = encoded.copy()
+        val bytes = encoded.toByteArray()
         return buildString(36) {
             bytes.forEachIndexed { index, byte ->
                 if (index in HYPHEN_POSITIONS) append('-')
@@ -36,7 +37,7 @@ public class BleServiceUuid private constructor(private val encoded: ImmutableBy
         /** Creates a BLE service UUID from its exact 16-byte representation. */
         public fun fromBytes(encoded: ByteArray): BleServiceUuid {
             require(encoded.size == 16) { "A BLE service UUID must contain exactly 16 bytes" }
-            return BleServiceUuid(ImmutableBytes.of(encoded))
+            return BleServiceUuid(ByteString(encoded))
         }
 
         /** Parses a canonical 128-bit hexadecimal UUID string. */
@@ -94,7 +95,7 @@ public sealed interface BleBearerPolicy {
 public data class BleProximityTransportConfiguration(
     public val roles: BleMdocRoles,
     public val bearerPolicy: BleBearerPolicy = BleBearerPolicy.PreferL2cap,
-    public val eDeviceKeyBytes: ImmutableBytes,
+    public val eDeviceKeyBytes: ByteString,
 ) {
     init {
         require(eDeviceKeyBytes.size > 0) { "EDeviceKeyBytes must not be empty" }

@@ -15,7 +15,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -319,7 +319,7 @@ class Wallet2ExtendedIntegrationTest {
             format = VciCredentialFormat.SD_JWT_VC,
             vct = "eu.europa.ec.eudi.pid.1",
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
+            proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
         )
 
         // Set up the same in-process issuer as in the E2E test

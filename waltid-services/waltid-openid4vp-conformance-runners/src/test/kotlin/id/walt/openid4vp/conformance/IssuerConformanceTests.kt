@@ -2,6 +2,7 @@ package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
+import id.walt.openid4vp.conformance.testplans.parseKeyAttesterJwks
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -141,6 +142,13 @@ class IssuerConformanceTests {
 
         val clientAttesterJwks: JsonObject = loadClientAttesterJwks()
 
+        val keyAttesterJwks: JsonObject? = propertyOrEnv(
+            "openid4vci.conformance.key-attester-jwks-file",
+            "OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE",
+        )?.takeIf { it.isNotBlank() }?.let { path ->
+            parseKeyAttesterJwks(Files.readString(Path.of(path)))
+        }
+
         val authorizationServer: String? =
             propertyOrEnv(authorizationServerProperty, authorizationServerEnv)
 
@@ -167,6 +175,7 @@ class IssuerConformanceTests {
                     haipMdocCredentialConfigurationId = haipMdocCredentialConfigurationId,
                     clientAttestationIssuer = clientAttestationIssuer,
                     clientAttesterJwks = clientAttesterJwks,
+                    keyAttesterJwks = keyAttesterJwks,
                     authorizationServer = authorizationServer,
                     credentialProofTypeHint = credentialProofTypeHint,
                 ).run()

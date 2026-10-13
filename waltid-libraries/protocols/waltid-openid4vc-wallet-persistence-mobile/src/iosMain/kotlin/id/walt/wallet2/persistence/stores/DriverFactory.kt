@@ -5,6 +5,7 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import co.touchlab.sqliter.DatabaseConfiguration
 import co.touchlab.sqliter.DatabaseFileContext
+import co.touchlab.sqliter.JournalMode
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
@@ -24,6 +25,11 @@ public actual class DriverFactory {
     /**
      * Creates a SQLCipher-backed native driver for [databaseName].
      *
+     * The connection uses SQLite's rollback journal. The native driver would otherwise
+     * enable WAL, which locks the `-shm` file until every connection closes. iOS then
+     * terminates the suspended app with `0xdead10cc` so the Identity Document extension
+     * cannot deadlock on that shared App Group file.
+     *
      * @param encryptionKey Raw database key used by SQLCipher.
      * @param isDeviceLocal Reserved for platform parity; iOS database-key locality is controlled by Keychain attributes.
      * @param walletId Wallet identifier used in typed persistence errors.
@@ -40,6 +46,7 @@ public actual class DriverFactory {
                 name = "$databaseName.db",
                 onConfiguration = { configuration ->
                     configuration.copy(
+                        journalMode = JournalMode.DELETE,
                         extendedConfig = configuration.extendedConfig.copy(basePath = sharedDatabasePath(walletId)),
                         encryptionConfig = DatabaseConfiguration.Encryption(
                             key = encryptionKey.material.toSqlCipherPassphrase(),

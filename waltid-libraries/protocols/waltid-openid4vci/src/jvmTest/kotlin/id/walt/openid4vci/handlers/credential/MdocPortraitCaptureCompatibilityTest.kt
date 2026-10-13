@@ -11,9 +11,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.issuance.MdocIssuer
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
-import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.proofs.VerifiedJwtProof
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
@@ -124,10 +122,6 @@ class MdocPortraitCaptureCompatibilityTest {
         val issuer = key("portrait-issuer")
         val holder = key("portrait-holder")
         val credential = MdocCredentialSigner.generateMdocCredential(
-            credentialRequest = DefaultCredentialRequest(
-                client = DefaultClient("test", emptyList(), emptySet(), emptySet()),
-                credentialIdentifier = null, credentialConfigurationId = "mdl", proofs = null, credentialResponseEncryption = null,
-            ),
             credentialData = data, issuerKey = issuer, signatureAlgorithm = -7,
             issuerCertificate = listOf(CoseCertificate(byteArrayOf(1, 2, 3))),
             docType = docType,
@@ -137,10 +131,10 @@ class MdocPortraitCaptureCompatibilityTest {
                     "Standard portrait values must not reach a custom fallback callback")
                 MdocIssuer.defaultSchemalessMappingFunction(type, fieldNamespace, element, value)
             },
-            verifiedProof = VerifiedCredentialProof(
-                proofType = "jwt", jwt = "", algorithm = "ES256", header = buildJsonObject {}, payload = buildJsonObject {},
+            verifiedBinding = VerifiedJwtProof(
+                jwt = "", algorithm = "ES256", header = buildJsonObject {}, payload = buildJsonObject {},
                 holderKey = holder, holderKid = null, holderDid = null, nonce = null,
-            ),
+            ).binding(),
         )
         return coseCompliantCbor.decodeFromByteArray<IssuerSigned>(credential.base64UrlDecode()).also {
             assertTrue(it.issuerAuth.verify(issuer, -7))

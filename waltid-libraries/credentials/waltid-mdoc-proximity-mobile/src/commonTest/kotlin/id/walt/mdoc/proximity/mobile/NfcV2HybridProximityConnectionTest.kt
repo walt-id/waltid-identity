@@ -5,10 +5,10 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.FakeProximityLoopback
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.PreparedTransport
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityConnection
@@ -42,21 +42,21 @@ class NfcV2HybridProximityConnectionTest {
 
         val first = byteArrayOf(1, 2, 3)
         val nfcExchange = async { exchange(nfc, 0u, first) }
-        assertContentEquals(first, connection.receive()!!.copy())
+        assertContentEquals(first, connection.receive()!!.toByteArray())
         assertEquals(ProximityTransportKind.NFC, connection.kind)
 
-        alternate.reader.send(ImmutableBytes.of(first))
+        alternate.reader.send(ByteString(first))
         val next = async { connection.receive() }
         runCurrent()
         assertTrue(next.isActive)
         assertEquals(ProximityTransportKind.NFC, connection.kind, "A suppressed duplicate does not change the route")
 
         val second = byteArrayOf(4, 5, 6)
-        alternate.reader.send(ImmutableBytes.of(second))
-        assertContentEquals(second, next.await()!!.copy())
+        alternate.reader.send(ByteString(second))
+        assertContentEquals(second, next.await()!!.toByteArray())
         assertEquals(ProximityTransportKind.BLE, connection.kind)
 
-        val response = ImmutableBytes.of(byteArrayOf(7, 8))
+        val response = ByteString(byteArrayOf(7, 8))
         connection.send(response)
         assertEquals(response, nfcExchange.await())
         assertEquals(response, alternate.reader.receive())
@@ -72,10 +72,10 @@ class NfcV2HybridProximityConnectionTest {
         runCurrent()
 
         val nfcExchange = async { exchange(nfc, 0u, byteArrayOf(1)) }
-        assertContentEquals(byteArrayOf(1), connection.receive()!!.copy())
-        connection.send(ImmutableBytes.of(byteArrayOf(9)))
-        assertContentEquals(byteArrayOf(9), nfcExchange.await().copy())
-        alternate.reader.send(ImmutableBytes.of(byteArrayOf(2)))
+        assertContentEquals(byteArrayOf(1), connection.receive()!!.toByteArray())
+        connection.send(ByteString(byteArrayOf(9)))
+        assertContentEquals(byteArrayOf(9), nfcExchange.await().toByteArray())
+        alternate.reader.send(ByteString(byteArrayOf(2)))
 
         val failure = assertFailsWith<ProximityException> { connection.receive() }
         assertEquals("nfc_v2_hybrid_duplicate_mismatch", failure.error.code)
@@ -99,12 +99,12 @@ class NfcV2HybridProximityConnectionTest {
         prepared.connect(alternate.holder)
         runCurrent()
         assertEquals(ProximityTransportKind.NFC, connection.kind, "Connection alone is not message evidence")
-        val request = ImmutableBytes.of(byteArrayOf(3, 4))
+        val request = ByteString(byteArrayOf(3, 4))
         alternate.reader.send(request)
         assertEquals(request, incoming.await())
         assertEquals(ProximityTransportKind.BLE, connection.kind)
 
-        val response = ImmutableBytes.of(byteArrayOf(5, 6))
+        val response = ByteString(byteArrayOf(5, 6))
         connection.send(response)
         assertEquals(response, alternate.reader.receive())
         assertTrue(closed.isActive)
@@ -143,9 +143,9 @@ class NfcV2HybridProximityConnectionTest {
         runCurrent()
 
         val exchange = async { exchange(nfc, 0u, byteArrayOf(1)) }
-        assertContentEquals(byteArrayOf(1), connection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(1), connection.receive()!!.toByteArray())
 
-        val response = ImmutableBytes.of(byteArrayOf(2))
+        val response = ByteString(byteArrayOf(2))
         val send = async { connection.send(response) }
         runCurrent()
 
@@ -170,9 +170,9 @@ class NfcV2HybridProximityConnectionTest {
 
         val request = byteArrayOf(1, 3, 5)
         val exchange = async { exchange(nfc, 0u, request) }
-        assertContentEquals(request, connection.receive()!!.copy())
+        assertContentEquals(request, connection.receive()!!.toByteArray())
         assertEquals(ProximityTransportKind.NFC, connection.kind, "A failed alternate cannot carry the request")
-        val response = ImmutableBytes.of(byteArrayOf(2, 4, 6))
+        val response = ByteString(byteArrayOf(2, 4, 6))
         connection.send(response)
 
         assertEquals(response, exchange.await())
@@ -223,12 +223,12 @@ class NfcV2HybridProximityConnectionTest {
         runCurrent()
 
         val first = async { exchange(nfc, 0u, byteArrayOf(1)) }
-        assertContentEquals(byteArrayOf(1), connection.receive()!!.copy())
-        connection.send(ImmutableBytes.of(byteArrayOf(2)))
-        assertContentEquals(byteArrayOf(2), first.await().copy())
+        assertContentEquals(byteArrayOf(1), connection.receive()!!.toByteArray())
+        connection.send(ByteString(byteArrayOf(2)))
+        assertContentEquals(byteArrayOf(2), first.await().toByteArray())
 
         val outgoingFailure = assertFailsWith<ProximityException> {
-            connection.send(ImmutableBytes.of(byteArrayOf(3)))
+            connection.send(ByteString(byteArrayOf(3)))
         }
         assertEquals("nfc_v2_hybrid_message_limit", outgoingFailure.error.code)
 
@@ -274,9 +274,9 @@ class NfcV2HybridProximityConnectionTest {
         connection: NfcApduProximityConnection,
         identifier: ULong,
         bytes: ByteArray,
-    ): ImmutableBytes = connection.exchange(
+    ): ByteString = connection.exchange(
         identifier = identifier,
-        message = ImmutableBytes.of(bytes),
+        message = ByteString(bytes),
         cancel = {},
         complete = { _, response -> response },
     )
@@ -320,12 +320,12 @@ class NfcV2HybridProximityConnectionTest {
         override val kind: ProximityTransportKind = delegate.kind
         override suspend fun awaitClosed(): ProximityCloseReason = delegate.awaitClosed()
 
-        override suspend fun send(message: ImmutableBytes) {
+        override suspend fun send(message: ByteString) {
             release.await()
             delegate.send(message)
         }
 
-        override suspend fun receive(): ImmutableBytes? = delegate.receive()
+        override suspend fun receive(): ByteString? = delegate.receive()
 
         override suspend fun close(reason: ProximityCloseReason) = delegate.close(reason)
     }
@@ -367,9 +367,9 @@ class NfcV2HybridProximityConnectionTest {
         private val closure = CompletableDeferred<ProximityCloseReason>()
         override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
-        override suspend fun send(message: ImmutableBytes) = Unit
+        override suspend fun send(message: ByteString) = Unit
 
-        override suspend fun receive(): ImmutableBytes? = withContext(NonCancellable) {
+        override suspend fun receive(): ByteString? = withContext(NonCancellable) {
             released.await()
             null
         }

@@ -66,7 +66,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
             httpClient = client,
             buildProof = { nonce ->
                 proofNonces += nonce
-                id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-for-$nonce"))
+                id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
             },
         )
 
@@ -106,7 +106,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
                 httpClient = client,
                 buildProof = { nonce ->
                     proofNonces += nonce
-                    id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-for-$nonce"))
+                    id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
                 },
             )
             fail("Expected invalid_nonce to be propagated after the retry")
@@ -187,7 +187,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
         val result = WalletIssuanceHandler.fetchCredential(
             wallet = wallet,
             request = fetchRequest(storeInWallet = true).copy(
-                proofs = id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-1", "proof-2")),
+                proofs = id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-1", "proof-2")),
                 credentialIssuerBaseUrl = "https://issuer.example",
                 credentialConfigurationId = "identity",
                 holderBindings = bindings,

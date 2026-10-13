@@ -2,6 +2,7 @@ package id.walt.certificate.x509.signum
 
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
+import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.asn1.Asn1Element
 import at.asitplus.signum.indispensable.asn1.Asn1Integer
 import at.asitplus.signum.indispensable.asn1.Asn1Time
@@ -44,7 +45,9 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         val authorityPublicKeyInfo = convertKeyToPublicKeyInfo(issuerKey) as SignumPublicKeyInfo
         val sigAlg = X509SigningAlgorithmInfo.ofKey(issuerKey, signatureAlgorithm)
         return signCertificateInternal(authorityPublicKeyInfo, sigAlg, builder) {
-            issuerKey.capabilities.signer?.sign(it, signatureAlgorithm) ?: error("Signer not found for key")
+            val signature = issuerKey.capabilities.signer?.sign(it, signatureAlgorithm)
+                ?: error("Signer not found for key")
+            SignumSignatureAlgorithmUtil.evaluateDerSignature(sigAlg, signature)
         }
     }
 
@@ -59,7 +62,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
             sigAlgorithm,
             builder
         ) {
-            issuerKey.signRaw(it) as ByteArray
+            SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, issuerKey.signRaw(it) as ByteArray)
         }
     }
 
@@ -67,7 +70,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         authorityPublicKeyInfo: SignumPublicKeyInfo,
         sigAlgorithm: X509SigningAlgorithmInfo,
         builder: X509CertificateDataBuilder,
-        signRaw: suspend (rawData: ByteArray) -> ByteArray
+        sign: suspend (rawData: ByteArray) -> CryptoSignature
     ): X509Certificate {
         val subjectDn: List<RelativeDistinguishedName> = builder.signumSubjectDn
         var issuerDn: List<RelativeDistinguishedName> = subjectDn
@@ -115,8 +118,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         // Sign the payload using the Issuer Private Key
         // Signum abstracts encoding the payload block structure into ASN.1
         val tbsDerBytes: ByteArray = tbsCertificate.encodeToDer()
-        val rawSignatureBytes: ByteArray = signRaw(tbsDerBytes)
-        val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)
+        val signature = sign(tbsDerBytes)
 
         // 6. Combine the TBS block and Signature into a definitive X509 Certificate
         val certificate = SigX509Certificate(
@@ -176,6 +178,8 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         signatureAlgorithm: SignatureAlgorithm,
         csrBuilder: Pkcs10CertificateSigningRequestBuilder
     ): Pkcs10CertificateSigningRequest {
+        val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey, signatureAlgorithm)
+        val algorithm = sigAlgorithm.toSignatureAlgorithm()
         val publicKey = (convertKeyToPublicKeyInfo(holderKey) as SignumPublicKeyInfo).keyInfo
         val tbsCsr = buildTbsCsr(csrBuilder, publicKey)
 
@@ -188,11 +192,8 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
             ?.sign(tbsDerBytes, signatureAlgorithm)
             ?: error("Signer not found for key")
 
-        // 3. Instantiate the appropriate CryptoSignature variant manually.
-        // For EC keys (e.g., P-256), use EC.fromRawBytes. For RSA, use CryptoSignature.RSA.
-        val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey, signatureAlgorithm)
-        val algorithm = sigAlgorithm.toSignatureAlgorithm()
-        val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)
+        // 3. Decode the requested DER ECDSA format or preserve opaque RSA bytes.
+        val signature = SignumSignatureAlgorithmUtil.evaluateDerSignature(sigAlgorithm, rawSignatureBytes)
 
         // 4. Directly construct the finished PKCS#10 Certificate Request
         val encodedSignedCsr = Pkcs10CertificationRequest(
@@ -218,8 +219,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         // 2. Compute the cryptographic signature using your JS/External provider
         val rawSignatureBytes: ByteArray = holderKey.signRaw(tbsDerBytes) as ByteArray
 
-        // 3. Instantiate the appropriate CryptoSignature variant manually.
-        // For EC keys (e.g., P-256), use EC.fromRawBytes. For RSA, use CryptoSignature.RSA.
+        // 3. Decode ECDSA as DER with raw fallback, or preserve opaque RSA bytes.
         val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey)
         val algorithm = sigAlgorithm.toSignatureAlgorithm()
         val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)

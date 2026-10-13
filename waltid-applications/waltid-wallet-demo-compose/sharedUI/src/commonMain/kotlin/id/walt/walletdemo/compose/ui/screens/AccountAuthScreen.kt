@@ -35,6 +35,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 fun AccountAuthScreen(
     isBusy: Boolean,
     error: String?,
+    allowRegister: Boolean = true,
     onLogin: (email: String, password: String) -> Unit,
     onRegister: (email: String, password: String) -> Unit,
 ) {
@@ -59,7 +60,11 @@ fun AccountAuthScreen(
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "Sign in to a Wallet API 2 demo account. New here? Register first, then you will be signed in automatically.",
+            if (allowRegister) {
+                "Sign in to a Wallet API 2 demo account. New here? Register first, then you will be signed in automatically."
+            } else {
+                "Sign in with your account."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -112,14 +117,16 @@ fun AccountAuthScreen(
         ) {
             Text(if (isBusy) "Working…" else "Log in")
         }
-        OutlinedButton(
-            onClick = { onRegister(email.trim(), password) },
-            enabled = canSubmit,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(WalletUiTestTags.AccountRegisterButton),
-        ) {
-            Text("Register")
+        if (allowRegister) {
+            OutlinedButton(
+                onClick = { onRegister(email.trim(), password) },
+                enabled = canSubmit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(WalletUiTestTags.AccountRegisterButton),
+            ) {
+                Text("Register")
+            }
         }
     }
 }

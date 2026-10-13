@@ -44,6 +44,32 @@ class JwtAccessTokenVerifierTest {
     }
 
     @Test
+    fun `access token audience accepts strings and arrays`() = runBlocking {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val signer = JwtAccessTokenIssuer(resolver = { key })
+        val verifier = JwtAccessTokenVerifier { _ -> key.getPublicKey() }
+        val audience = "https://audience.example"
+        val claims = defaultAccessTokenClaims(
+            subject = "alice",
+            issuer = "https://issuer.example",
+            audience = audience,
+        )
+
+        for (audienceClaim in listOf(
+            JsonPrimitive(audience),
+            JsonArray(listOf(JsonPrimitive(audience))),
+            JsonArray(listOf(JsonPrimitive("https://other.example"), JsonPrimitive(audience))),
+        )) {
+            val token = signer.issue(claims + ("aud" to audienceClaim))
+            val payload = verifier.verify(token, expectedIssuer = "https://issuer.example", expectedAudience = audience)
+            assertEquals(audienceClaim, payload["aud"])
+            assertFailsWith<IllegalArgumentException> {
+                verifier.verify(token, expectedIssuer = "https://issuer.example", expectedAudience = "https://unrelated.example")
+            }
+        }
+    }
+
+    @Test
     fun `rejects token missing issuer claim`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
         val signer = JwtAccessTokenIssuer(resolver = { key })

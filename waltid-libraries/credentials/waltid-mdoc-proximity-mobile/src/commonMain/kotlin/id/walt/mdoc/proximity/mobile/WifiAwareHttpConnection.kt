@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityConnection
 import id.walt.mdoc.proximity.ProximityError
@@ -34,7 +34,7 @@ internal class WifiAwareHttpConnection(
         require(maximumMessageBytes > 0)
     }
 
-    override suspend fun receive(): ImmutableBytes? = receiveMutex.withLock {
+    override suspend fun receive(): ByteString? = receiveMutex.withLock {
         ensureOpen()
         try {
             if (nextRequest.receiveCatching().getOrNull() == null) return@withLock null
@@ -49,7 +49,7 @@ internal class WifiAwareHttpConnection(
             val body = buffered.copyOfRange(0, contentLength)
             buffered = buffered.copyOfRange(contentLength, buffered.size)
             check(pendingResponse.trySend(Unit).isSuccess) { "Wi-Fi Aware response route closed" }
-            ImmutableBytes.of(body)
+            ByteString(body)
         } catch (cancelled: CancellationException) {
             closeRaw(ProximityCloseReason.CANCELLED)
             throw cancelled
@@ -62,12 +62,12 @@ internal class WifiAwareHttpConnection(
         }
     }
 
-    override suspend fun send(message: ImmutableBytes): Unit = sendMutex.withLock {
+    override suspend fun send(message: ByteString): Unit = sendMutex.withLock {
         ensureOpen()
         require(message.size <= maximumMessageBytes) {
             "Wi-Fi Aware response exceeds the configured message limit"
         }
-        val body = message.copy()
+        val body = message.toByteArray()
         val header = buildString {
             append("HTTP/1.1 200 OK\r\n")
             append("Content-Length: ")

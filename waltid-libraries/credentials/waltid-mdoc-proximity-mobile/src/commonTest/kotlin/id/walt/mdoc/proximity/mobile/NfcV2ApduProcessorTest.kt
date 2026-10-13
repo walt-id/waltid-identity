@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
@@ -15,7 +16,6 @@ import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceEngagementSecurity
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
-import id.walt.mdoc.proximity.ImmutableBytes
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -108,7 +108,7 @@ class NfcV2ApduProcessorTest {
             NfcV2MaximumCommandDataLength(65_536),
             128 * 1_024,
             select = { request ->
-                assertContentEquals(exactRequest, request.exactBytes.copy())
+                assertContentEquals(exactRequest, request.exactBytes.toByteArray())
                 selection(nfcV2)
             },
             onHandover = handovers::add,
@@ -116,24 +116,24 @@ class NfcV2ApduProcessorTest {
 
         val selectResponse = response(processor.process(selectNfcV2()))
         assertEquals(NfcStatusWord.SUCCESS, selectResponse.statusWord)
-        assertContentEquals("a1001a00010000".hexToByteArray(), selectResponse.data.copy())
+        assertContentEquals("a1001a00010000".hexToByteArray(), selectResponse.data.toByteArray())
 
         val handoverResponse = response(
             processor.process(envelope(NfcDo53.encode(exactRequest), responseLength = 65_536)),
         )
-        val exactSelect = NfcDo53.decode(handoverResponse.data.copy(), 128 * 1_024)
-        assertContentEquals(exactSelect, handovers.single().handoverSelect.copy())
+        val exactSelect = NfcDo53.decode(handoverResponse.data.toByteArray(), 128 * 1_024)
+        assertContentEquals(exactSelect, handovers.single().handoverSelect.toByteArray())
         assertIs<NfcV2Handover.SameChannel>(handovers.single())
         assertEquals(NfcV2State.AWAITING_PAYLOAD, processor.state)
 
         val sessionRequest = assertIs<NfcV2ApduResult.Request>(
             processor.process(envelope(NfcDo53.encode(byteArrayOf(1, 2, 3)), responseLength = 256)),
         )
-        assertContentEquals(byteArrayOf(1, 2, 3), sessionRequest.sessionMessage.copy())
+        assertContentEquals(byteArrayOf(1, 2, 3), sessionRequest.sessionMessage.toByteArray())
         val sessionResponse = NfcResponseApdu.decode(
-            processor.completeResponse(sessionRequest.identifier, byteArrayOf(4, 5)).copy(),
+            processor.completeResponse(sessionRequest.identifier, byteArrayOf(4, 5)).toByteArray(),
         )
-        assertContentEquals(byteArrayOf(4, 5), NfcDo53.decode(sessionResponse.data.copy(), 128 * 1_024))
+        assertContentEquals(byteArrayOf(4, 5), NfcDo53.decode(sessionResponse.data.toByteArray(), 128 * 1_024))
         assertEquals(NfcV2State.AWAITING_PAYLOAD, processor.state)
     }
 
@@ -156,7 +156,7 @@ class NfcV2ApduProcessorTest {
         val request = assertIs<NfcV2ApduResult.Request>(
             processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 256)),
         )
-        assertContentEquals(byteArrayOf(1), request.sessionMessage.copy())
+        assertContentEquals(byteArrayOf(1), request.sessionMessage.toByteArray())
     }
 
     @Test
@@ -181,7 +181,7 @@ class NfcV2ApduProcessorTest {
             processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 8)),
         )
         val firstSessionResponse = NfcResponseApdu.decode(
-            processor.completeResponse(pending.identifier, ByteArray(32) { it.toByte() }).copy(),
+            processor.completeResponse(pending.identifier, ByteArray(32) { it.toByte() }).toByteArray(),
         )
         assertEquals(8, firstSessionResponse.data.size)
         assertEquals(0x61, firstSessionResponse.statusByte1.toInt())
@@ -209,7 +209,7 @@ class NfcV2ApduProcessorTest {
         assertEquals(NfcV2State.AWAITING_WALLET_RESPONSE, processor.state)
         assertEquals(
             NfcStatusWord.SUCCESS,
-            NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(2)).copy()).statusWord,
+            NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(2)).toByteArray()).statusWord,
         )
     }
 
@@ -405,11 +405,11 @@ class NfcV2ApduProcessorTest {
     ).encode()
 
     private fun envelope(data: ByteArray, responseLength: Int): ByteArray = NfcCommandApdu(
-        0u, 0xc3u, 0u, 0u, ImmutableBytes.of(data), responseLength,
+        0u, 0xc3u, 0u, 0u, ByteString(data), responseLength,
     ).encode()
 
     private fun response(result: NfcV2ApduResult): NfcResponseApdu = NfcResponseApdu.decode(
-        assertIs<NfcV2ApduResult.Response>(result).encoded.copy(),
+        assertIs<NfcV2ApduResult.Response>(result).encoded.toByteArray(),
     )
 
     private suspend fun drainResponse(
@@ -417,7 +417,7 @@ class NfcV2ApduProcessorTest {
         first: NfcResponseApdu,
         responseLength: Int = 65_536,
     ): ByteArray {
-        val chunks = mutableListOf(first.data.copy())
+        val chunks = mutableListOf(first.data.toByteArray())
         var current = first
         while (current.statusByte1 == 0x61.toUByte()) {
             current = response(
@@ -432,7 +432,7 @@ class NfcV2ApduProcessorTest {
                 ),
             )
             assertEquals(true, current.data.size <= responseLength)
-            chunks += current.data.copy()
+            chunks += current.data.toByteArray()
         }
         assertEquals(NfcStatusWord.SUCCESS, current.statusWord)
         val size = chunks.sumOf(ByteArray::size)

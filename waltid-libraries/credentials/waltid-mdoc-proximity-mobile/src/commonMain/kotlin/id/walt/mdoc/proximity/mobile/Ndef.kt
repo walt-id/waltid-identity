@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
+
 
 private val TYPED_NDEF_FORMATS = setOf(
     NdefTypeNameFormat.WELL_KNOWN,
@@ -29,9 +30,9 @@ internal enum class NdefTypeNameFormat(val code: UByte) {
 /** One logical, fully reassembled NDEF record. */
 internal data class NdefRecord(
     public val typeNameFormat: NdefTypeNameFormat,
-    public val type: ImmutableBytes = ImmutableBytes.of(byteArrayOf()),
-    public val identifier: ImmutableBytes = ImmutableBytes.of(byteArrayOf()),
-    public val payload: ImmutableBytes = ImmutableBytes.of(byteArrayOf()),
+    public val type: ByteString = ByteString(byteArrayOf()),
+    public val identifier: ByteString = ByteString(byteArrayOf()),
+    public val payload: ByteString = ByteString(byteArrayOf()),
 ) {
     init {
         require(typeNameFormat != NdefTypeNameFormat.UNCHANGED) {
@@ -89,9 +90,9 @@ internal data class NdefMessage(val records: List<NdefRecord>) {
             output.add(record.type.size)
             if (short) output.add(record.payload.size) else output.addUnsignedInt(record.payload.size)
             if (record.identifier.size > 0) output.add(record.identifier.size)
-            output.add(record.type.copy())
-            output.add(record.identifier.copy())
-            output.add(record.payload.copy())
+            output.add(record.type.toByteArray())
+            output.add(record.identifier.toByteArray())
+            output.add(record.payload.toByteArray())
         }
         return output.toByteArray()
     }
@@ -153,9 +154,9 @@ internal data class NdefMessage(val records: List<NdefRecord>) {
                     } else {
                         records += NdefRecord(
                             tnf,
-                            ImmutableBytes.of(type),
-                            ImmutableBytes.of(identifier),
-                            ImmutableBytes.of(payload),
+                            ByteString(type),
+                            ByteString(identifier),
+                            ByteString(payload),
                         )
                     }
                 } else {
@@ -167,9 +168,9 @@ internal data class NdefMessage(val records: List<NdefRecord>) {
                     if (!follows) {
                         records += NdefRecord(
                             chunk.typeNameFormat,
-                            ImmutableBytes.of(chunk.type),
-                            ImmutableBytes.of(chunk.identifier),
-                            ImmutableBytes.of(chunk.payload.toByteArray()),
+                            ByteString(chunk.type),
+                            ByteString(chunk.identifier),
+                            ByteString(chunk.payload.toByteArray()),
                         )
                         chunk = null
                     }

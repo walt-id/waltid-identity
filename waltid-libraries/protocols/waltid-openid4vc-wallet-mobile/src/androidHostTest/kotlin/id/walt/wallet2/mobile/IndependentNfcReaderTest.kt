@@ -283,7 +283,7 @@ class IndependentNfcReaderTest {
         override suspend fun transceive(command: CommandApdu): ResponseApdu {
             assertTrue(command.encode().size <= maxTransceiveLength)
             if (command.ins == Nfc.INS_ENVELOPE && command.cla == 0) delivered = CompletableDeferred()
-            return ResponseApdu.decode(router.process(command.encode()).copy()).also {
+            return ResponseApdu.decode(router.process(command.encode()).toByteArray()).also {
                 assertTrue(it.encode().size <= maxTransceiveLength)
                 exchanges += command to it
                 if (command.ins in setOf(Nfc.INS_ENVELOPE, Nfc.INS_GET_RESPONSE) && command.cla == 0 && it.status == 0x9000) {

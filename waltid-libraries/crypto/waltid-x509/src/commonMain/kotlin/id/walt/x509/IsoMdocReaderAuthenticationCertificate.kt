@@ -4,7 +4,6 @@ import at.asitplus.signum.indispensable.asn1.Asn1Element
 import at.asitplus.signum.indispensable.asn1.Asn1ExplicitlyTagged
 import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.asn1.readOid
-
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.dn.DistinguishedName
@@ -14,7 +13,6 @@ import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.ex
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
-import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.model.GeneralName
 import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
@@ -30,10 +28,11 @@ const val MdocReaderAuthentication23220EkuOid: String = "1.0.23220.4.1.6"
 /**
  * Validates an mdoc reader-authentication leaf certificate against the ISO/IEC 18013-5 profile.
  *
- * This validates the unconditional certificate fields only. For an application-identified IACA issuer,
- * also call [validateIacaIssuedMdocReaderCertificateContact]. Call [validateMdocReaderAuthenticationCertificateChain]
- * to additionally establish an RFC 5280-style path to an explicit application trust anchor.
+ * This validates the unconditional certificate fields only. Conditional IACA issuer-contact validation
+ * is outside this helper's scope. Call [validateMdocReaderAuthenticationCertificateChain] to additionally
+ * establish an RFC 5280-style path to an explicit application trust anchor.
  */
+@Deprecated("Replaced with IsoMdocReaderAuthenticationX509CertificateProfile")
 @Throws(X509ValidationException::class)
 fun validateMdocReaderAuthenticationCertificateProfile(
     certificate: CertificateDer,
@@ -63,7 +62,10 @@ fun validateMdocReaderAuthenticationCertificateProfile(
         .flatten()
         .filter { it.type.oid == COMMON_NAME_OID }
         .map { it.value }
-    requireProfile(commonNames.size == 1 && commonNames.single().isNotBlank(), "Reader certificate requires one common name")
+    requireProfile(
+        commonNames.size == 1 && commonNames.single().isNotBlank(),
+        "Reader certificate requires one common name"
+    )
 
     requireProfile(
         subjectPublicKey.algorithmOid in ISO_ALLOWED_READER_SUBJECT_PUBLIC_KEY_ALGORITHM_OIDS,
@@ -76,25 +78,28 @@ fun validateMdocReaderAuthenticationCertificateProfile(
         )
         requireProfile(
             subjectPublicKey.keyValueRaw.size > 0 &&
-                subjectPublicKey.keyValueRaw[0] == UNCOMPRESSED_EC_POINT_PREFIX,
+                    subjectPublicKey.keyValueRaw[0] == UNCOMPRESSED_EC_POINT_PREFIX,
             "Reader certificate EC public key must use uncompressed form",
         )
     } else {
-        requireProfile(subjectPublicKey.ellipticCurveOid == null, "Edwards-curve certificates must omit EC parameters")
+        requireProfile(
+            subjectPublicKey.ellipticCurveOid == null,
+            "Edwards-curve certificates must omit EC parameters"
+        )
     }
 
     val authorityKeyIdentifier = data.extensionAuthorityKeyIdentifier
     requireProfile(
         authorityKeyIdentifier != null &&
-            !authorityKeyIdentifier.critical &&
-            (authorityKeyIdentifier.keyIdentifier?.size ?: 0) > 0,
+                !authorityKeyIdentifier.critical &&
+                (authorityKeyIdentifier.keyIdentifier?.size ?: 0) > 0,
         "Reader certificate requires an authority key identifier",
     )
     val subjectKeyIdentifier = data.extensionSubjectKeyIdentifier
     requireProfile(
         subjectKeyIdentifier != null &&
-            !subjectKeyIdentifier.critical &&
-            subjectKeyIdentifier.keyIdentifier == subjectPublicKey.keyId,
+                !subjectKeyIdentifier.critical &&
+                subjectKeyIdentifier.keyIdentifier == subjectPublicKey.keyId,
         "Reader certificate requires the SHA-1 subject key identifier",
     )
 
@@ -108,7 +113,10 @@ fun validateMdocReaderAuthenticationCertificateProfile(
 
     val extendedKeyUsage = data.extensionExtendedKeyUsage
         ?: throw X509ValidationException("Reader certificate requires extended key usage")
-    requireProfile(extendedKeyUsage.critical, "Reader certificate extended key usage must be critical")
+    requireProfile(
+        extendedKeyUsage.critical,
+        "Reader certificate extended key usage must be critical"
+    )
     requireProfile(
         MdocReaderAuthenticationEkuOid in extendedKeyUsage.keyPurposeIdList,
         "Reader certificate extended key usage must contain $MdocReaderAuthenticationEkuOid",
@@ -124,12 +132,12 @@ fun validateMdocReaderAuthenticationCertificateProfile(
         crlDistributionPoints.distributionPoints.all { point ->
             val fullNames = point.distributionPointFullName
             point.reason == null &&
-                point.cRLIssuer == null &&
-                point.distributionPointNameRelativeToCrlIssuer == null &&
-                fullNames?.isNotEmpty() == true &&
-                fullNames.all { name ->
-                    name.type == GeneralName.NameType.uniformResourceIdentifier && name.value.isNotBlank()
-                }
+                    point.cRLIssuer == null &&
+                    point.distributionPointNameRelativeToCrlIssuer == null &&
+                    fullNames?.isNotEmpty() == true &&
+                    fullNames.all { name ->
+                        name.type == GeneralName.NameType.uniformResourceIdentifier && name.value.isNotBlank()
+                    }
         },
         "Reader certificate CRL distribution points must contain only full-name URIs",
     )
@@ -166,6 +174,7 @@ private fun validateReaderCertificateStructure(certificate: CertificateDer) {
  * Validates a reader-authentication certificate and builds its path only to [trustAnchors].
  * Certificates supplied by the reader are path-construction inputs and never implicit anchors.
  */
+@Deprecated("Use X509Certificate validation framework")
 @Throws(X509ValidationException::class)
 fun validateMdocReaderAuthenticationCertificateChain(
     leaf: CertificateDer,
@@ -213,20 +222,8 @@ fun validatedMdocReaderAuthenticationCertificatePath(
     )
 }
 
-/**
- * Checks Table B.6 issuer contact information for a reader whose validated direct issuer is
- * application-identified as an IACA. This content check does not identify or trust the issuer.
- */
-@Throws(X509ValidationException::class)
-fun validateIacaIssuedMdocReaderCertificateContact(certificate: CertificateDer) {
-    val contact = parseIsoCertificate(certificate, "reader certificate").data.extensionIssuerAltName
-    requireProfile(contact != null && !contact.critical && contact.alternativeNames.any {
-        it.value.isNotBlank() && (it.type == GeneralName.NameType.rfc822Name ||
-            it.type == GeneralName.NameType.uniformResourceIdentifier)
-    }, "IACA-issued reader requires non-critical issuerAlternativeName with an email or URI contact")
-}
-
 /** Returns the common name from a reader certificate that has already passed profile validation. */
+@Deprecated("Don't use it")
 @Throws(X509ValidationException::class)
 fun mdocReaderAuthenticationCommonName(certificate: CertificateDer): String {
     val parsed = parseIsoCertificate(certificate, "reader certificate")

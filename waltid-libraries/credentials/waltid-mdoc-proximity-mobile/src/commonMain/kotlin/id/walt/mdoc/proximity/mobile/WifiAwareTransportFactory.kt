@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 
 /** Side-effect-free Wi-Fi Aware runtime result. No radio resource has been prepared. */
@@ -30,7 +30,7 @@ public sealed interface WifiAwareProximityAvailability {
 /** Immutable transaction inputs for one holder Wi-Fi Aware publisher. */
 public data class WifiAwareProximityTransportConfiguration(
     /** Exact tagged EDeviceKeyBytes used for the transaction-derived service and passphrase. */
-    public val eDeviceKeyBytes: ImmutableBytes,
+    public val eDeviceKeyBytes: ByteString,
 ) {
     init {
         require(eDeviceKeyBytes.size > 0) { "EDeviceKeyBytes must not be empty" }

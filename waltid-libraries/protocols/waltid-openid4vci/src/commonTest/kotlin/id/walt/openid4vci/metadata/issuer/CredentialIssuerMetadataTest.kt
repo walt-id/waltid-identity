@@ -3,7 +3,7 @@ package id.walt.openid4vci.metadata.issuer
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.prooftypes.ProofTypeId
+import id.walt.openid4vci.proofs.ProofType
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -360,7 +360,7 @@ class CredentialIssuerMetadataTest {
             ),
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
             ),
             credentialMetadata = CredentialMetadata(
                 display = listOf(
@@ -454,7 +454,7 @@ class CredentialIssuerMetadataTest {
             ),
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
             ),
         )
         val configurationSdJwt = CredentialConfiguration(

@@ -2,7 +2,7 @@ package id.walt.openid4vci.requests.credential
 
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.requests.generateRequestId
 import kotlinx.serialization.SerialName

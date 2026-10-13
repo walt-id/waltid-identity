@@ -6,6 +6,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
@@ -65,8 +66,8 @@ enum class MdocDeviceEngagementPlacement {
 
 class MdocDeviceEngagementFactory {
     /** Encodes the complete `EDeviceKeyBytes = #6.24(bstr .cbor EDeviceKey)` value. */
-    suspend fun encodeEDeviceKeyBytes(eDeviceKey: Key): ImmutableBytes =
-        ImmutableBytes.of(
+    suspend fun encodeEDeviceKeyBytes(eDeviceKey: Key): ByteString =
+        ByteString(
             coseCompliantCbor.encodeToByteArray(
                 CborElement.serializer(),
                 CborByteString(encodePublicDeviceKey(eDeviceKey).encoded, 24u),
@@ -189,7 +190,7 @@ class MdocRequestPreview(
      * retention flags, authentication method, holder-key reference, validated application-profile results,
      * and selected device-signed response mappings.
      */
-    val submissionBindingDigest: ImmutableBytes,
+    val submissionBindingDigest: ByteString,
     applicationAuthorizations: List<MdocApplicationAuthorization> = emptyList(),
 ) {
     private val ownedDocuments: List<PreviewDocument> = documents.toList()
@@ -238,16 +239,16 @@ enum class MdocSessionContinuation { CONTINUE, TERMINATE }
 
 sealed interface MdocResponseResolution {
     /** Freshly recomputed wallet-owned binding; must still equal the preview binding before submission. */
-    val submissionBindingDigest: ImmutableBytes
+    val submissionBindingDigest: ByteString
 
     data class Send(
-        val exactResponse: ImmutableBytes,
+        val exactResponse: ByteString,
         val continuation: MdocSessionContinuation,
-        override val submissionBindingDigest: ImmutableBytes,
+        override val submissionBindingDigest: ByteString,
     ) : MdocResponseResolution
 
     data class TerminateWithoutResponse(
-        override val submissionBindingDigest: ImmutableBytes,
+        override val submissionBindingDigest: ByteString,
     ) : MdocResponseResolution
 }
 
@@ -270,7 +271,7 @@ interface MdocHolderRequestProcessor {
 }
 
 data class MdocConsentPrompt(
-    val bindingToken: ImmutableBytes,
+    val bindingToken: ByteString,
     val exchange: Int,
     val preview: MdocRequestPreview,
 ) {
@@ -281,9 +282,9 @@ data class MdocConsentPrompt(
 }
 
 sealed interface MdocConsentDecision {
-    val bindingToken: ImmutableBytes
-    data class Approve(override val bindingToken: ImmutableBytes) : MdocConsentDecision
-    data class Deny(override val bindingToken: ImmutableBytes) : MdocConsentDecision
+    val bindingToken: ByteString
+    data class Approve(override val bindingToken: ByteString) : MdocConsentDecision
+    data class Deny(override val bindingToken: ByteString) : MdocConsentDecision
 }
 
 fun interface MdocConsentHandler {
@@ -547,10 +548,10 @@ class MdocHolderProtocolEngine(
             messageSequencer.validateIncoming(establishment)
             val transcript = sessionHandover.createTranscript(
                 engagementBytes,
-                ImmutableBytes.of(establishment.eReaderKey.serialized),
+                ByteString(establishment.eReaderKey.serialized),
             )
             val transcriptBytes = MdocCryptoHelper.buildSessionTranscriptBytes(transcript)
-            val exactTranscript = ImmutableBytes.of(transcriptBytes)
+            val exactTranscript = ByteString(transcriptBytes)
             limits.requireEngagementOrHandover(exactTranscript)
             MdocCborGuard.validate(transcriptBytes, limits.maximumCborDepth, limits.maximumCborItems)
             cipher = try {
@@ -563,7 +564,7 @@ class MdocHolderProtocolEngine(
                 throw ProximityException(ProximityError.Security("invalid_reader_key", "Reader session key is invalid"), failure)
             }
 
-            var incoming = decryptOrReport(connection, cipher, ImmutableBytes.of(establishment.data))
+            var incoming = decryptOrReport(connection, cipher, ByteString(establishment.data))
             var terminateAfterResponse = false
             var exchange = 0
             while (true) {
@@ -575,8 +576,8 @@ class MdocHolderProtocolEngine(
                 limits.requireRequest(incoming)
                 val request = decodeRequestOrReport(connection, cipher, incoming, budget)
                 val context = MdocHolderRequestContext(
-                    request = ExactCbor.of(request, incoming.copy()),
-                    transcript = ExactCbor.of(transcript, exactTranscript.copy()),
+                    request = ExactCbor.of(request, incoming.toByteArray()),
+                    transcript = ExactCbor.of(transcript, exactTranscript.toByteArray()),
                     readerEphemeralKey = ExactCbor.of(
                         establishment.eReaderKey.value,
                         establishment.eReaderKey.serialized,
@@ -633,7 +634,7 @@ class MdocHolderProtocolEngine(
                     limits.requireResponse(resolution.exactResponse)
                     requireWithinReaderLimit(request, resolution.exactResponse)
                     mutableState.value = MdocHolderSessionState.SendingResponse(exchange)
-                    val encrypted = cipher.encrypt(resolution.exactResponse.copy())
+                    val encrypted = cipher.encrypt(resolution.exactResponse.toByteArray())
                     send(
                         connection,
                         SessionData(
@@ -690,7 +691,7 @@ class MdocHolderProtocolEngine(
                 val encryptedRequest = next.data ?: throw ProximityException(
                     ProximityError.Protocol("missing_session_data", "SessionData did not contain a request")
                 )
-                incoming = decryptOrReport(connection, cipher, ImmutableBytes.of(encryptedRequest))
+                incoming = decryptOrReport(connection, cipher, ByteString(encryptedRequest))
             }
         } catch (failure: ProximityException) {
             closeReason = when {
@@ -726,7 +727,7 @@ class MdocHolderProtocolEngine(
         budget: MdocSessionBudget,
         onConnected: () -> Unit,
         awaitConnection: suspend () -> WinningMdocEngagement,
-    ): Pair<WinningMdocEngagement, ImmutableBytes> {
+    ): Pair<WinningMdocEngagement, ByteString> {
         val winner = awaitConnection()
         mutableConnectedRoute.value = MdocConnectedRoute(winner.engaged.engagementMode, winner.engaged.connection.kind)
         onConnected()
@@ -760,7 +761,7 @@ class MdocHolderProtocolEngine(
         }
     }
 
-    private suspend fun receive(connection: ProximityConnection, budget: MdocSessionBudget): ImmutableBytes? =
+    private suspend fun receive(connection: ProximityConnection, budget: MdocSessionBudget): ByteString? =
         connection.receive()?.also {
             mutableConnectedRoute.value = mutableConnectedRoute.value?.copy(transport = connection.kind)
             requireWithinTransportLimit(it)
@@ -770,9 +771,9 @@ class MdocHolderProtocolEngine(
 
     private suspend inline fun <reified T> decodeOrReport(
         connection: ProximityConnection,
-        bytes: ImmutableBytes,
+        bytes: ByteString,
     ): T {
-        val encoded = bytes.copy()
+        val encoded = bytes.toByteArray()
         return try {
             MdocCborGuard.validate(encoded, limits.maximumCborDepth, limits.maximumCborItems)
             coseCompliantCbor.decodeFromByteArray<T>(encoded)
@@ -786,7 +787,7 @@ class MdocHolderProtocolEngine(
 
     private suspend fun decodeEstablishmentOrReport(
         connection: ProximityConnection,
-        bytes: ImmutableBytes,
+        bytes: ByteString,
     ): SessionEstablishment {
         // Classify errors inside a correctly wrapped reader key separately from envelope CBOR errors.
         val envelope = decodeOrReport<CborElement>(connection, bytes) as? CborMap
@@ -809,10 +810,10 @@ class MdocHolderProtocolEngine(
     private suspend fun decodeRequestOrReport(
         connection: ProximityConnection,
         cipher: MdocSessionCipher,
-        bytes: ImmutableBytes,
+        bytes: ByteString,
         budget: MdocSessionBudget,
     ): DeviceRequest = try {
-        val encoded = bytes.copy()
+        val encoded = bytes.toByteArray()
         MdocCborGuard.validate(encoded, limits.maximumCborDepth, limits.maximumCborItems, includeEmbeddedCbor = true)
         coseCompliantCbor.decodeFromByteArray<DeviceRequest>(encoded).also {
             validateRequestLimits(it)
@@ -840,19 +841,19 @@ class MdocHolderProtocolEngine(
         status: UInt,
         budget: MdocSessionBudget,
     ) {
-        val response = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(
+        val response = ByteString(coseCompliantCbor.encodeToByteArray(
             DeviceResponse.serializer(), DeviceResponse(version = "1.0", status = status),
         ))
         limits.requireResponse(response)
-        send(connection, SessionData(data = cipher.encrypt(response.copy()), status = SessionStatusCode.SESSION_TERMINATION.code), budget)
+        send(connection, SessionData(data = cipher.encrypt(response.toByteArray()), status = SessionStatusCode.SESSION_TERMINATION.code), budget)
     }
 
     private suspend fun decryptOrReport(
         connection: ProximityConnection,
         cipher: MdocSessionCipher,
-        data: ImmutableBytes,
-    ): ImmutableBytes = try {
-        ImmutableBytes.of(cipher.decrypt(data.copy()))
+        data: ByteString,
+    ): ByteString = try {
+        ByteString(cipher.decrypt(data.toByteArray()))
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Exception) {
@@ -865,7 +866,7 @@ class MdocHolderProtocolEngine(
 
     private suspend fun send(connection: ProximityConnection, message: SessionData, budget: MdocSessionBudget) {
         val sequenced = messageSequencer.sequence(message)
-        val encoded = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionData.serializer(), sequenced))
+        val encoded = ByteString(coseCompliantCbor.encodeToByteArray(SessionData.serializer(), sequenced))
         requireWithinTransportLimit(encoded)
         limits.requireSessionMessage(encoded)
         budget.account(encoded)
@@ -875,7 +876,7 @@ class MdocHolderProtocolEngine(
     private suspend fun trySendStatus(connection: ProximityConnection, status: SessionStatusCode) {
         try {
             val message = messageSequencer.sequence(SessionData(status = status.code))
-            val encoded = ImmutableBytes.of(
+            val encoded = ByteString(
                 coseCompliantCbor.encodeToByteArray(SessionData.serializer(), message)
             )
             requireWithinTransportLimit(encoded)
@@ -911,7 +912,7 @@ class MdocHolderProtocolEngine(
         )
     }
 
-    private fun requireWithinReaderLimit(request: DeviceRequest, response: ImmutableBytes) {
+    private fun requireWithinReaderLimit(request: DeviceRequest, response: ByteString) {
         val readerLimit = request.docRequests.mapNotNull { it.itemsRequest.value.requestInfo?.maximumResponseSize }
             .minOrNull()?.toLong() ?: return
         if (response.size.toLong() > readerLimit) throw ProximityException(
@@ -919,7 +920,7 @@ class MdocHolderProtocolEngine(
         )
     }
 
-    private fun requireWithinTransportLimit(message: ImmutableBytes) {
+    private fun requireWithinTransportLimit(message: ByteString) {
         if (message.size > engagementContext.maximumMessageBytes) throw ProximityException(
             ProximityError.Transport(
                 "transport_message_limit",
@@ -936,24 +937,24 @@ class MdocHolderProtocolEngine(
     }
 
     private fun consentBinding(
-        request: ImmutableBytes,
-        transcript: ImmutableBytes,
+        request: ByteString,
+        transcript: ByteString,
         exchange: Int,
         preview: MdocRequestPreview,
-    ): ImmutableBytes {
+    ): ByteString {
         val exchangeBytes = byteArrayOf(
             (exchange ushr 24).toByte(),
             (exchange ushr 16).toByte(),
             (exchange ushr 8).toByte(),
             exchange.toByte(),
         )
-        return ImmutableBytes.of(
+        return ByteString(
             SHA256().digest(
                 "walt.id/mdoc-consent/v2".encodeToByteArray() +
-                    bindingLengthPrefixed(request.copy()) +
-                    bindingLengthPrefixed(transcript.copy()) +
+                    bindingLengthPrefixed(request.toByteArray()) +
+                    bindingLengthPrefixed(transcript.toByteArray()) +
                     exchangeBytes +
-                    preview.submissionBindingDigest.copy() +
+                    preview.submissionBindingDigest.toByteArray() +
                     applicationAuthorizationBindings(preview.applicationAuthorizations)
             )
         )
@@ -962,7 +963,7 @@ class MdocHolderProtocolEngine(
     private fun applicationAuthorizationBindings(
         authorizations: List<MdocApplicationAuthorization>,
     ): ByteArray = authorizations.fold(bindingIntBytes(authorizations.size)) { bytes, authorization ->
-        bytes + authorization.consentBindingDigest().copy()
+        bytes + authorization.consentBindingDigest().toByteArray()
     }
 
     private suspend fun <T> phase(duration: Duration, error: ProximityError, block: suspend () -> T): T {
@@ -976,7 +977,7 @@ class MdocHolderProtocolEngine(
 
     private class MdocSessionBudget(private val maximumBytes: Long) {
         private var bytes = 0L
-        fun account(message: ImmutableBytes) {
+        fun account(message: ByteString) {
             bytes += message.size
             if (bytes > maximumBytes) throw ProximityException(
                 ProximityError.Protocol("session_byte_limit", "The session exceeded the cumulative byte limit")

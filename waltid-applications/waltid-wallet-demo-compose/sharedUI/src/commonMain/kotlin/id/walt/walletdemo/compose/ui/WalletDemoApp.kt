@@ -33,12 +33,18 @@ fun WalletDemoApp(
     onStartProximityPresentation: (() -> Unit)? = null,
     onSignOut: (() -> Unit)? = null,
     resetWalletDescription: String? = null,
+    allowWalletReset: Boolean = true,
+    allowCredentialDelete: Boolean = true,
+    serverSettingsContent: (@Composable () -> Unit)? = null,
 ) = WalletDemoAppHost(
     controller = controller,
     branding = branding,
     onStartProximityPresentation = onStartProximityPresentation,
     onSignOut = onSignOut,
     resetWalletDescription = resetWalletDescription,
+    allowWalletReset = allowWalletReset,
+    allowCredentialDelete = allowCredentialDelete,
+    serverSettingsContent = serverSettingsContent,
 )
 
 /** Wallet shell with an internal slot for transport-specific presentation journey content. */
@@ -54,6 +60,9 @@ internal fun WalletDemoAppHost(
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
     resetWalletDescription: String? = null,
+    allowWalletReset: Boolean = true,
+    allowCredentialDelete: Boolean = true,
+    serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -110,6 +119,9 @@ internal fun WalletDemoAppHost(
                         onResetWallet = onResetWallet,
                         onSignOut = onSignOut,
                         resetWalletDescription = resetWalletDescription,
+                        allowWalletReset = allowWalletReset,
+                        allowCredentialDelete = allowCredentialDelete,
+                        serverSettingsContent = serverSettingsContent,
                     )
                 }
             }

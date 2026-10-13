@@ -13,7 +13,8 @@ import id.walt.crypto2.keys.PublicKeyExporter
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
@@ -115,7 +116,7 @@ class WalletIssuanceCrypto2ProofTest {
     @Test
     fun `required key attestation is not silently omitted from a JWT proof`() {
         assertFailsWith<IllegalArgumentException> {
-            supportedJwtProofAlgorithms(mapOf("jwt" to ProofType(setOf("ES256"),
+            supportedJwtProofAlgorithms(mapOf(ProofType.JWT.value to ProofTypeMetadata(setOf("ES256"),
                 id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired())))
         }
     }
@@ -123,7 +124,7 @@ class WalletIssuanceCrypto2ProofTest {
     @Test
     fun `non-JWT proof metadata is rejected instead of sending JWT`() {
         assertFailsWith<IllegalArgumentException> {
-            supportedJwtProofAlgorithms(mapOf("attestation" to ProofType(setOf("ES256"))))
+            supportedJwtProofAlgorithms(mapOf(ProofType.ATTESTATION.value to ProofTypeMetadata(setOf("ES256"))))
         }
     }
 

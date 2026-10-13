@@ -196,6 +196,26 @@ val myUtil = X509CertificateUtil {
 }
 ```
 
+### Requiring a CA certificate
+
+`X509CertificateBasicConstraintsValidator` (id `basicConstraints`) decides by chain position: every
+certificate except the leaf must be a CA. To require that a certificate is a CA **regardless of its
+position** - e.g. a trust anchor or self-signed root validated as a chain of one - add
+`X509CertificateBasicConstraintsIsCaValidator` (id `basicConstraintsIsCa`):
+
+```kotlin
+val rootUtil = X509CertificateUtil {
+    addValidators(
+        X509CertificateBasicConstraintsIsCaValidator()
+    )
+}
+```
+
+It logs an `ERROR` if the basic constraints extension is missing or `cA` is not set, and a `WARNING`
+if the extension is not critical. It does not evaluate `pathLenConstraint` - that stays with
+`X509CertificateBasicConstraintsValidator`. Because validators are keyed by id, it can be registered
+alongside that validator without replacing it.
+
 **Trust store scoping.** `setTrust()` and the trust store you pass directly to a validation call
 (`validateCertificateChain(chain, trustStore)`, `validatePemCertificateChain(pem, trustStore)`)
 behave the same way: they **fully replace** the util's configured trust store for that call, they

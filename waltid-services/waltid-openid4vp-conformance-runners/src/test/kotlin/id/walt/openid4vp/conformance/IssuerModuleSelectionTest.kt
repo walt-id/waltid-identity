@@ -21,6 +21,24 @@ import kotlin.test.assertTrue
 class IssuerModuleSelectionTest {
 
     @Test
+    fun addingKeyAttestationPreservesTheExistingSelectionAndExclusions() {
+        val keyAttestation = "oid4vci-1_0-issuer-fail-invalid-key-attestation-signature"
+        val existing = IssuerModuleSelection(groups = setOf("metadata", "positive"))
+        val expanded = existing.copy(additionalModules = setOf(keyAttestation))
+        for (module in listOf(
+            "oid4vci-1_0-issuer-metadata-test", "oid4vci-1_0-issuer-metadata-test-signed",
+            "oid4vci-1_0-issuer-happy-flow", "oid4vci-1_0-issuer-happy-flow-additional-requests",
+            "oid4vci-1_0-issuer-happy-flow-multiple-clients", "oid4vci-1_0-issuer-happy-flow-skip-notification",
+            "oid4vci-1_0-issuer-batch-issuance", "oid4vci-1_0-issuer-fail-invalid-nonce",
+        )) {
+            assertEquals(existing.matches(module), expanded.matches(module), module)
+        }
+        assertTrue(!existing.matches(keyAttestation))
+        assertTrue(expanded.matches(keyAttestation))
+        assertNotNull(expanded.copy(excludedModules = setOf(keyAttestation)).exclusionReason(keyAttestation))
+    }
+
+    @Test
     fun explicitExclusionOverridesSelectedPositiveGroup() {
         val module = "oid4vci-1_0-issuer-happy-flow-additional-requests"
         val selection = IssuerModuleSelection(

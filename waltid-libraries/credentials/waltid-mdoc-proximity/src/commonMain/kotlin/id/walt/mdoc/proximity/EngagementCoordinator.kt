@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +45,7 @@ class MdocEngagementReadiness(
 /** Exact protocol material and live bearer selected by one completed engagement. */
 data class MdocEngagedConnection(
     val engagementMode: MdocEngagementMode,
-    val deviceEngagement: ImmutableBytes,
+    val deviceEngagement: ByteString,
     val sessionHandover: MdocSessionHandover,
     val connection: ProximityConnection,
     /** Private key corresponding to the exact selected DeviceEngagement. Owned by the session. */
@@ -257,7 +258,7 @@ class QrMdocEngagementSource(
                 engagementContext,
                 context.capabilities,
             )
-            val exact = ImmutableBytes.of(engagement.engagement.encodedCopy())
+            val exact = ByteString(engagement.engagement.encodedCopy())
             context.limits.requireEngagementOrHandover(exact)
             PreparedQrMdocEngagement(
                 transports = transports,
@@ -278,7 +279,7 @@ class QrMdocEngagementSource(
 private class PreparedQrMdocEngagement(
     private val eDeviceKey: Key,
     private val transports: PreparedTransports,
-    private val engagement: ImmutableBytes,
+    private val engagement: ByteString,
     qrPayload: String,
     private val transportCoordinator: TransportCoordinator,
 ) : PreparedMdocEngagement {

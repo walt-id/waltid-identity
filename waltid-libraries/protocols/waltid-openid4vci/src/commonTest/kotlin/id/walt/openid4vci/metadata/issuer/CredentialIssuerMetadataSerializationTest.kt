@@ -2,7 +2,7 @@ package id.walt.openid4vci.metadata.issuer
 
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
-import id.walt.openid4vci.prooftypes.ProofTypeId
+import id.walt.openid4vci.proofs.ProofType
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -216,8 +216,8 @@ class CredentialIssuerMetadataSerializationTest {
                 CryptographicBindingMethod.Jwk,
             ),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to
-                    ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                ProofType.JWT.value to
+                    ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
             ),
             credentialMetadata = CredentialMetadata(
                 display = listOf(
@@ -239,8 +239,8 @@ class CredentialIssuerMetadataSerializationTest {
                 CryptographicBindingMethod.CoseKey,
             ),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to
-                    ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                ProofType.JWT.value to
+                    ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
             ),
             credentialMetadata = CredentialMetadata(
                 display = listOf(
@@ -259,8 +259,8 @@ class CredentialIssuerMetadataSerializationTest {
                 CryptographicBindingMethod.Jwk,
             ),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to
-                    ProofType(
+                ProofType.JWT.value to
+                    ProofTypeMetadata(
                         proofSigningAlgValuesSupported = setOf("ES256"),
                         keyAttestationsRequired = KeyAttestationsRequired(
                             keyStorage = setOf("iso_18045_moderate"),
@@ -320,7 +320,7 @@ class CredentialIssuerMetadataSerializationTest {
                 ?.content,
         )
         assertEquals(
-            "jwt",
+            ProofType.JWT.value,
             jwtConfig?.get("proof_types_supported")
                 ?.jsonObject
                 ?.keys
@@ -398,7 +398,7 @@ class CredentialIssuerMetadataSerializationTest {
             "iso_18045_moderate",
             sdConfig?.get("proof_types_supported")
                 ?.jsonObject
-                ?.get("jwt")
+                ?.get(ProofType.JWT.value)
                 ?.jsonObject
                 ?.get("key_attestations_required")
                 ?.jsonObject

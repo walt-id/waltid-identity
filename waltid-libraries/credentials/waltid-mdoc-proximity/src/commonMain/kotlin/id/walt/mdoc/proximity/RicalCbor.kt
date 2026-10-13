@@ -5,6 +5,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.encoding.toMdocTDateString
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -64,12 +65,12 @@ object RicalSerializer : KSerializer<Rical> {
 
 private fun RicalCertificateInfo.toElement(): CborElement {
     val fields = linkedMapOf<String, CborElement>(
-        "certificate" to CborByteString(certificateDer.copy()),
-        "serialNumber" to CborByteString(serialNumber.copy(), 2u),
+        "certificate" to CborByteString(certificateDer.toByteArray()),
+        "serialNumber" to CborByteString(serialNumber.toByteArray(), 2u),
         "isTrustAnchor" to CborBoolean(isTrustAnchor),
-        "ski" to CborByteString(subjectKeyIdentifier.copy()),
+        "ski" to CborByteString(subjectKeyIdentifier.toByteArray()),
     )
-    authorityKeyIdentifier?.let { fields["aki"] = CborByteString(it.copy()) }
+    authorityKeyIdentifier?.let { fields["aki"] = CborByteString(it.toByteArray()) }
     type?.let { fields["type"] = CborString(it) }
     if (trustConstraints.isNotEmpty()) {
         // The current DIS CDDL spells this field "trustContraints". Preserve that exact wire spelling.
@@ -78,8 +79,8 @@ private fun RicalCertificateInfo.toElement(): CborElement {
     name?.let { fields["name"] = CborString(it) }
     issuingCountry?.let { fields["issuingCountry"] = CborString(it) }
     stateOrProvinceName?.let { fields["stateOrProvinceName"] = CborString(it) }
-    issuerDer?.let { fields["issuer"] = CborByteString(it.copy()) }
-    subjectDer?.let { fields["subject"] = CborByteString(it.copy()) }
+    issuerDer?.let { fields["issuer"] = CborByteString(it.toByteArray()) }
+    subjectDer?.let { fields["subject"] = CborByteString(it.toByteArray()) }
     notBefore?.let { fields["notBefore"] = it.toTDate() }
     notAfter?.let { fields["notAfter"] = it.toTDate() }
     if (extensions.isNotEmpty()) fields["extensions"] = extensions.toTextMap()
@@ -90,14 +91,14 @@ private fun RicalCertificateInfo.toElement(): CborElement {
 private fun CborElement.toCertificateInfo(): RicalCertificateInfo {
     val fields = asTextFields("RICALCertificateInfo")
     return RicalCertificateInfo(
-        certificateDer = ImmutableBytes.of(fields.requiredBytes("certificate", "RICALCertificateInfo")),
-        serialNumber = ImmutableBytes.of(
+        certificateDer = ByteString(fields.requiredBytes("certificate", "RICALCertificateInfo")),
+        serialNumber = ByteString(
             fields["serialNumber"]?.asPositiveBignum("RICALCertificateInfo serialNumber")
                 ?: throw SerializationException("RICALCertificateInfo serialNumber is required")
         ),
-        subjectKeyIdentifier = ImmutableBytes.of(fields.requiredBytes("ski", "RICALCertificateInfo")),
+        subjectKeyIdentifier = ByteString(fields.requiredBytes("ski", "RICALCertificateInfo")),
         isTrustAnchor = fields.requiredBoolean("isTrustAnchor", "RICALCertificateInfo"),
-        authorityKeyIdentifier = fields["aki"]?.asBytes("RICALCertificateInfo aki")?.let(ImmutableBytes::of),
+        authorityKeyIdentifier = fields["aki"]?.asBytes("RICALCertificateInfo aki")?.let({ ByteString(it) }),
         type = fields.optionalText("type", "RICALCertificateInfo"),
         trustConstraints = fields["trustContraints"]?.let { element ->
             val constraints = (element as? CborArray)?.map {
@@ -110,8 +111,8 @@ private fun CborElement.toCertificateInfo(): RicalCertificateInfo {
         name = fields.optionalText("name", "RICALCertificateInfo"),
         issuingCountry = fields.optionalText("issuingCountry", "RICALCertificateInfo"),
         stateOrProvinceName = fields.optionalText("stateOrProvinceName", "RICALCertificateInfo"),
-        issuerDer = fields["issuer"]?.asBytes("RICALCertificateInfo issuer")?.let(ImmutableBytes::of),
-        subjectDer = fields["subject"]?.asBytes("RICALCertificateInfo subject")?.let(ImmutableBytes::of),
+        issuerDer = fields["issuer"]?.asBytes("RICALCertificateInfo issuer")?.let({ ByteString(it) }),
+        subjectDer = fields["subject"]?.asBytes("RICALCertificateInfo subject")?.let({ ByteString(it) }),
         notBefore = fields["notBefore"]?.asTDate("RICALCertificateInfo notBefore"),
         notAfter = fields["notAfter"]?.asTDate("RICALCertificateInfo notAfter"),
         extensions = fields["extensions"]?.asTextFields("RICALCertificateInfo extensions").orEmpty(),

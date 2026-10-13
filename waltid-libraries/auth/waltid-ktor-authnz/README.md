@@ -20,345 +20,198 @@
 
 ## What This Library Contains
 
-`waltid-ktor-authnz` is a comprehensive authentication and authorization framework for Ktor applications. It provides a flexible, multi-method authentication system that supports complex authentication flows, session management, and account identification across various authentication mechanisms.
-
-## Main Purpose
-
-This library enables developers to build secure authentication systems in Ktor applications with:
-
-- **Multiple Authentication Methods**: Support for username/password, email/password, TOTP, LDAP, RADIUS, OIDC, JWT, Web3, and Verifiable Credentials
-- **Multi-Step Authentication Flows**: Chain multiple authentication methods together (e.g., username/password → TOTP)
-- **Flexible Session Management**: Session-based authentication with configurable token handling
-- **Account Management**: Unified account abstraction with multiple identifier types
-- **Password Security**: Configurable password hashing algorithms (PBKDF2, SHA, etc.)
+`waltid-ktor-authnz` is an authentication framework for Ktor: logins as flows of one or more methods (password, TOTP,
+passkeys, OIDC, verifiable credentials, ...), sessions and login tokens, account enrolment (TOTP, recovery codes,
+passkeys, passwords) and protections (attempt limits, single-use challenges, revocation). Authorization is handled by
+`waltid-permissions`.
 
 ## Key Concepts
 
-### Authentication Methods
+- **Account store** (`EditableAccountStore`, provided by the application): maps account identifiers (username, email,
+  OIDC issuer + subject, passkey credential id, ...) to accounts, and keeps each method's stored data (password
+  hashes, TOTP secrets, passkeys). `InMemoryAccountStore` is a complete one to start with.
+- **Authentication method** (`AuthenticationMethod`): one way to prove identity; each serves routes named by its id.
+  Built in: `userpass`, `email`, `email-code`, `totp`, `totp-setup`, `recovery-code`, `passkey`, `ldap`, `radius`, `jwt`, `oidc`, `vc`,
+  `web3`, and `identify`, which finds the account first and offers the ways it can log in.
+- **Auth flow** (`AuthFlow`): a tree of methods, e.g. a password, then TOTP or a recovery code:
 
-Authentication methods are pluggable components that handle specific authentication mechanisms:
+  ```json
+  {"method": "email", "expiration": "7d", "continue": [
+    {"method": "totp", "success": true},
+    {"method": "recovery-code", "success": true}
+  ]}
+  ```
 
-- **UserPass**: Username and password authentication
-- **EmailPass**: Email and password authentication
-- **TOTP**: Time-based One-Time Password (2FA)
-- **LDAP**: Lightweight Directory Access Protocol authentication
-- **RADIUS**: Remote Authentication Dial-In User Service
-- **OIDC**: OpenID Connect authentication
-- **JWT**: JSON Web Token validation
-- **Web3**: Web3 wallet signature-based authentication
-- **VerifiableCredential**: Verifiable credential-based authentication
-
-### Authentication Flows
-
-Authentication flows define sequences of authentication methods that must be completed:
-
-```json
-{
-  "method": "userpass",
-  "continue": [{
-    "method": "totp",
-    "success": true
-  }]
-}
-```
-
-This flow requires username/password authentication, followed by TOTP verification before authentication succeeds.
-
-### Sessions
-
-Authentication sessions track the progress of multi-step authentication flows:
-
-- **Session States**: `INIT`, `CONTINUE_NEXT_FLOW`, `CONTINUE_NEXT_STEP`, `SUCCESS`, `FAILURE`
-- **Session Tokens**: Generated upon successful authentication
-- **Session Storage**: Configurable storage backends (in-memory, Redis/Valkey)
-
-### Account Store
-
-The account store manages account data and authentication method-specific stored data:
-
-- **Account**: Core account entity (id, name)
-- **Stored Data**: Method-specific data (e.g., password hashes, TOTP secrets)
-- **EditableAccountStore**: Interface for account management operations
-
-## Assumptions and Dependencies
-
-### Platform Support
-- **Ktor Framework**: Requires Ktor server framework
-- **Kotlin Coroutines**: Uses coroutines for asynchronous operations
+- **Session** (`AuthSession`): the progress of one login through its flow. Responses (`AuthSessionInformation`) name
+  the `next_method` - which is also the next URL - and, once complete, the login `token`.
+- **Token handler**: opaque tokens (validated against their live session: logout, expiry and revocation end them) or
+  JWTs (stateless: valid until `exp`, unless `requireActiveSession` is set). Optional refresh tokens.
 
 ## Usage
 
-### Basic Setup
-
-1. **Configure the KtorAuthnzManager**:
+### Setup
 
 ```kotlin
-import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.accounts.ExampleAccountStore
-import id.walt.ktorauthnz.sessions.InMemorySessionStore
+install(KtorAuthnz) {
+    accountStore = MyAccountStore                    // required
+    sessionStore = ValkeySessionStore(null, "localhost", 6379, null, null)   // default: in memory
+    expiringStore = ValkeyExpiringStore(null, "localhost", 6379, null, null) // default: in memory
+    tokenHandler = JwtTokenHandler.crypto2(signingKey, algorithm = JwsAlgorithm.ES256) // default: opaque tokens
+    refreshTokens = RefreshTokenSettings(accessTokenLifetime = 15.minutes, refreshTokenLifetime = 30.days) // optional
+    passkeys = PasskeySettings(rpId = "example.com", rpName = "Example", origins = setOf("https://app.example.com"))
+    emailCodes = EmailCodeSettings { delivery -> mailer.sendCode(delivery) }  // for the email-code method
+    cookie { domain = ".example.com" }
+    onEvent { event -> auditLog.write(event) }
+}
 
-// Configure account store
-KtorAuthnzManager.accountStore = ExampleAccountStore()
-
-// Configure session store (or use Redis/Valkey for production)
-KtorAuthnzManager.sessionStore = InMemorySessionStore()
+install(Authentication) {
+    ktorAuthnz("ktor-authnz") {
+        validate { principal -> principal.takeIf { isActive(it.accountId) } } // optional: check or enrich the caller
+    }
+}
 ```
 
-2. **Register Authentication Methods**:
+Set your own `passwordHashing = PasswordHashingConfiguration(pepper = ...)`, a secret kept out of the database: the
+default pepper is public, and ktor-authnz warns at startup while it is used. Hashes only verify with the pepper they
+were made with, so keep the one you start with.
+
+The configuration is process-wide (kept in `KtorAuthnzManager`): one JVM runs one ktor-authnz configuration. Use
+Valkey stores when a service runs on more than one instance.
+
+### Login routes
 
 ```kotlin
-import id.walt.ktorauthnz.methods.*
-import id.walt.ktorauthnz.methods.AuthMethodManager
-
-// Methods are auto-registered, but you can register custom ones:
-AuthMethodManager.registerAuthenticationMethod(CustomAuthMethod())
-```
-
-3. **Define Authentication Flows**:
-
-```kotlin
-import id.walt.ktorauthnz.flows.AuthFlow
-
-val flow = AuthFlow(
-    method = "userpass",
-    continueWith = setOf(
-        AuthFlow(
-            method = "totp",
-            success = true
-        )
-    )
-)
-```
-
-4. **Register Routes in Ktor**:
-
-```kotlin
-import id.walt.ktorauthnz.*
-import id.walt.ktorauthnz.methods.*
-import io.ktor.server.routing.*
-
 routing {
-    // Register authentication methods
-    registerAuthenticationMethods(
-        methods = listOf(UserPass, TOTP),
-        authContext = { 
-            AuthContext(
-                initialFlow = flow,
-                implicitSessionGeneration = false
-            )
-        }
-    )
-    
-    // Protected routes
-    authenticate {
-        get("/protected") {
-            call.respond("Authenticated!")
-        }
+    route("auth") {
+        authFlows(flows) { tenant = { request.host() } }
     }
 }
 ```
 
-### Authentication Flow Examples
+`authFlows` serves every step of the flows:
 
-#### Single-Step Flow (Implicit Session)
+| Route | Purpose |
+|---|---|
+| `POST auth/{method}` | first step of the flow starting with that method (session opened implicitly) |
+| `POST auth/{sessionId}/{method}` | a later step, e.g. `auth/{sessionId}/totp` |
+| `POST auth/start?flow={method}` | open a session explicitly (optional, `explicitStart`) |
+
+For flows chosen per call (per tenant), pass the methods and a resolver:
+`authFlows(methods = ..., flowsFor = { flowsOfTenant(request.host()) })`.
+
+A two-step login:
 
 ```http
-POST /auth/flows/global-implicit1/userpass
-Content-Type: application/json
+POST /auth/email            {"email": "alice@example.com", "password": "..."}
+-> {"session_id": "caf4...", "status": "CONTINUE_NEXT_FLOW", "next_method": ["totp", "recovery-code"]}
 
-{"username": "alice", "password": "password123"}
+POST /auth/caf4.../totp     {"code": "768944"}
+-> {"session_id": "caf4...", "status": "SUCCESS", "token": "..."}
 ```
 
-Response:
-```json
-{
-  "session_id": "cf7951d3-54e7-4c3f-8a11-0b6d06dd7503",
-  "status": "OK",
-  "token": "70d2ac4a-3e69-4475-aa8b-9dc2a17e2a6e"
-}
-```
-
-#### Multi-Step Flow (Explicit Session)
-
-1. **Start Session**:
-```http
-POST /auth/flows/global-explicit2/start
-```
-
-Response:
-```json
-{
-  "session_id": "caf4d705-be57-4c6d-b265-8fed79e061e1",
-  "status": "CONTINUE_NEXT_FLOW",
-  "next_method": ["userpass"]
-}
-```
-
-2. **Authenticate with Username/Password**:
-```http
-POST /auth/flows/global-explicit2/caf4d705-be57-4c6d-b265-8fed79e061e1/userpass
-Content-Type: application/json
-
-{"username": "alice", "password": "password123"}
-```
-
-Response:
-```json
-{
-  "session_id": "caf4d705-be57-4c6d-b265-8fed79e061e1",
-  "status": "CONTINUE_NEXT_FLOW",
-  "next_method": ["totp"]
-}
-```
-
-3. **Complete with TOTP**:
-```http
-POST /auth/flows/global-explicit2/caf4d705-be57-4c6d-b265-8fed79e061e1/totp
-Content-Type: application/json
-
-{"code": "768944"}
-```
-
-Response:
-```json
-{
-  "session_id": "caf4d705-be57-4c6d-b265-8fed79e061e1",
-  "status": "OK",
-  "token": "26755b7d-c369-4341-aee5-ed40a68bce9e"
-}
-```
-
-### Custom Authentication Methods
-
-To add a custom authentication method:
-
-1. **Create the Authentication Method**:
+### Protected routes
 
 ```kotlin
-import id.walt.ktorauthnz.methods.AuthenticationMethod
-import id.walt.ktorauthnz.AuthContext
-import io.ktor.server.routing.*
-
-object CustomAuth : AuthenticationMethod("custom") {
-    override fun Route.registerAuthenticationRoutes(
-        authContext: ApplicationCall.() -> AuthContext,
-        functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
-    ) {
-        post("custom") {
-            val session = call.getAuthSession(authContext)
-            // Implement authentication logic
-            call.handleAuthSuccess(session, authContext(), accountId = "account-123")
-        }
+authenticate("ktor-authnz") {
+    get("/me") {
+        val principal = call.authnzPrincipal()!!   // token, accountId, sessionId
+        call.respond(principal.accountId)
     }
 }
 ```
 
-2. **Register the Method**:
+The token is read from the `ktor-authnz-auth` header, a Bearer `Authorization` header, or the session cookie.
 
-```kotlin
-AuthMethodManager.registerAuthenticationMethod(CustomAuth)
+### Registration
+
+`signUp(EmailPass)` serves `signup` (with the address verified by a code, `signup/confirm`); new OIDC identities and
+`registerUnknownAccounts(...)` register on first login; `registerAccount { password(...); totp(...) }` registers from
+code. Every new account runs the `onAccountRegistered` hook, e.g. to create a profile. See
+[registration.md](docs/registration.md).
+
+### Enrolment and account routes
+
+- `accountRoutes()`: `logout`, `sessions` (list, end one, end all); `identityLinking(flows)`: link an OIDC, LDAP,
+  wallet or Web3 identity to the account, list and remove identities; `requireRecentLogin(maxAge)` for sensitive
+  actions. See [account-routes.md](docs/account-routes.md).
+
+Place inside `authenticate { }`:
+
+- `totp-setup` in a flow, next to `totp`, sets TOTP up during login for accounts that have none yet (an account
+  that has TOTP is refused there): `{"method": "email", "continue": [{"method": "totp", "success": true},
+  {"method": "totp-setup", "success": true, "config": {"issuer": "Example"}}]}`
+- `totpEnrollment(issuer = "Example")`: `totp/enroll`, `totp/enroll/confirm` (answers recovery codes), `DELETE totp`,
+  `recovery-codes`
+- `passkeyEnrollment { accountId -> emailOf(accountId) }`: `passkey/register/options`, `passkey/register`,
+  `DELETE passkey/{credentialId}`
+- `passwordChange(EmailPass)`: `password/change` (ends every session of the account)
+
+Public:
+
+- `passwordReset(EmailPass) { email, token -> mailer.sendResetLink(email, token) }`: `password/reset/request`,
+  `password/reset/confirm`
+- `tokenRefresh()`: `token/refresh` (single-use refresh tokens; a reused one ends the session)
+
+### Protections
+
+- **Attempt limits** (`AttemptLimits`): a session fails after 5 failed steps; an identifier is locked for 15 minutes
+  after 10 failures (429). Configurable, `AttemptLimits.DISABLED` turns them off.
+- **Single use**: TOTP codes, recovery codes, passkey and Web3 challenges, reset and refresh tokens.
+- **Sessions**: a failed first step stores nothing; unfinished sessions expire after 15 minutes; sessions are bound
+  to their tenant (see [multi-tenant.md](docs/multi-tenant.md)).
+- **Events** (`AuthnzEvent`): login steps succeeded/failed, attempts exceeded, logout, sessions revoked, methods
+  enrolled/removed, password changed/reset, token refreshed.
+
+### Verifiable credential login
+
+The `vc` method verifies a presented credential with a verifier2 service and logs in the account of one of its
+claims:
+
+```json
+{"method": "vc", "success": true, "config": {
+  "verifierUrl": "https://verifier.example.com",
+  "setup": {"flow_type": "cross_device", "core_flow": {"dcql_query": {"credentials": [
+    {"id": "pid", "format": "dc+sd-jwt", "meta": {"vct_values": ["urn:eudi:pid:1"]}}]}}},
+  "identifierClaim": ["personal_administrative_number"]
+}}
 ```
 
-### Session Storage
+`POST auth/vc/start` answers the authorization request URL (QR code or same-device link); poll
+`GET auth/{sessionId}/vc/status` until the login completes. Unknown accounts are registered through the
+`Registration` function amendment, if given.
 
-#### In-Memory (Development)
+### Custom methods
 
-```kotlin
-import id.walt.ktorauthnz.sessions.InMemorySessionStore
+Extend `AuthenticationMethod`, serve routes named by its id, call `getAuthSession(authContext)` and then
+`handleAuthSuccess(session, authContext(call), accountId)`; throw an `AuthException` (e.g. `authFailure("...")`) on a
+failed check, so that it counts as a failed attempt. Register it with `AuthMethodManager.registerAuthenticationMethod`.
+See [new-auth-method.md](docs/new-auth-method.md).
 
-KtorAuthnzManager.sessionStore = InMemorySessionStore()
-```
+## Examples and Tests
 
-#### Redis/Valkey (Production)
+[`examples/multitenant`](src/test/kotlin/id/walt/ktorauthnz/examples/multitenant/MultiTenantApp.kt): an application
+whose tenants each configure their own login (password + TOTP + email code, OIDC, LDAP + TOTP, verifiable credential),
+run by `MultiTenantAppTest` against a mock IdP, a mock verifier and an in-memory LDAP server.
 
-```kotlin
-import id.walt.ktorauthnz.sessions.ValkeySessionStore
+[`examples/identifierfirst`](src/test/kotlin/id/walt/ktorauthnz/examples/identifierfirst/IdentifierFirstApp.kt): the
+user enters an address and is offered what the account set up (password + TOTP or email code, passkey or wallet, IdP
+or LDAP + TOTP, an IdP for a whole domain), run by `IdentifierFirstAppTest`. Both examples are compiled with the
+tests, so they follow the API.
 
-KtorAuthnzManager.sessionStore = ValkeySessionStore(
-    host = "localhost",
-    port = 6379
-)
-```
-
-### Password Hashing
-
-Configure password hashing algorithms:
-
-```kotlin
-import id.walt.ktorauthnz.security.PasswordHashingConfiguration
-import id.walt.ktorauthnz.security.algorithms.PBKDF2PasswordHashAlgorithm
-
-KtorAuthnzManager.passwordHashingConfig = PasswordHashingConfiguration(
-    algorithm = PBKDF2PasswordHashAlgorithm(
-        iterations = 100000,
-        keyLength = 256
-    )
-)
-```
-
-## Advanced Features
-
-### Flow Amendments
-
-Flow amendments allow customizing authentication method behavior:
-
-```kotlin
-val amendments = mapOf(
-    AuthMethodFunctionAmendments.BEFORE_AUTH to { data: Any ->
-        // Custom logic before authentication
-    },
-    AuthMethodFunctionAmendments.AFTER_AUTH to { data: Any ->
-        // Custom logic after authentication
-    }
-)
-
-registerAuthenticationMethod(
-    method = UserPass,
-    authContext = { AuthContext(...) },
-    functionAmendments = amendments
-)
-```
-
-### Account Registration
-
-Some authentication methods support automatic registration:
-
-```kotlin
-// Methods that support registration
-if (authMethod.supportsRegistration) {
-    // Register registration routes
-    authMethod.registerRegistrationRoutes(authContext)
-}
-```
-
-### External ID Mapping
-
-Map external identifiers to internal session IDs:
-
-```kotlin
-session.storeExternalIdMapping(
-    namespace = "oidc",
-    externalId = "external-user-id"
-)
-```
-
-## Examples
-
-See the test directory for complete examples:
-
-- **AuthFlowExampleApplication**: Complete authentication flow example
-- **OidcExample**: OpenID Connect integration example
-- **KtorAuthnzE2ETest**: End-to-end authentication test
+The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hook), `TotpEnrollmentTest`,
+`PasswordRoutesTest`, `PasskeyTest`, `RefreshTokensTest`, `OidcLoginTest` (mock IdP), `VerifiableCredentialLoginTest`
+(mock verifier2), `ExampleWeb` (an example app). `ValkeyStoresTest` runs against a Valkey given by `VALKEY_TEST_PORT`.
 
 ## Further Documentation
 
-Additional documentation is available in the `docs/` directory:
-
-- [1.Quickstart.md](docs/1.Quickstart.md): Quick start guide
-- [new-auth-method.md](docs/new-auth-method.md): Guide for adding new authentication methods
-- [oidc.md](docs/oidc.md): OpenID Connect configuration
-- [radius.md](docs/radius.md): RADIUS configuration
-- [account-flow-amendments.md](docs/account-flow-amendments.md): Flow amendment documentation
+- [1.Quickstart.md](docs/1.Quickstart.md): flows and requests, step by step
+- [multi-tenant.md](docs/multi-tenant.md): a login configured per tenant
+- [identifier-first.md](docs/identifier-first.md): the account decides how it logs in
+- [registration.md](docs/registration.md): sign-up, registration on first login, and from code
+- [account-routes.md](docs/account-routes.md): logout, sessions, fresh logins, linking identities
+- [new-auth-method.md](docs/new-auth-method.md): adding an authentication method
+- [oidc.md](docs/oidc.md): OpenID Connect
+- [radius.md](docs/radius.md): RADIUS
 
 ## Join the community
 

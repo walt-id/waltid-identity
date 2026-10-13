@@ -54,15 +54,27 @@ internal class ReaderCertificateProfileFixture private constructor(
         return Der.container(0x30, listOf(tbs, algorithm, Der(3, byteArrayOf(0) + signature))).encode()
     }
 
+    /**
+     * Returns a copy of [leaf] with one profile violation applied, re-signed by the root key so that the
+     * signature itself stays valid and only the named profile rule is broken.
+     *
+     * Numeric cases mirror the mDL_SM_mdocRAuth_UF_NN reader-authentication certificate unhappy flows; the
+     * "contact-*" cases add an issuer alternative name carrying contact information.
+     *
+     * Indices into the TBSCertificate children: 0 = [0] version, 1 = serialNumber, 2 = signature algorithm,
+     * 3 = issuer, 4 = validity, 5 = subject, 6 = subjectPublicKeyInfo, then the [3] extensions.
+     */
     suspend fun modified(case: String): ByteArray {
         val certificate = Der.read(leaf.encodedDer.toByteArray()).children().toMutableList()
         val tbs = certificate[0].children().toMutableList()
+        // Edits the list of extensions in the [3] EXPLICIT extensions field.
         fun extensions(change: (MutableList<Der>) -> Unit) {
             val i = tbs.indexOfFirst { it.tag == 0xa3 }
             val values = tbs[i].children().single().children().toMutableList()
             change(values)
             tbs[i] = Der.container(0xa3, listOf(Der.container(0x30, values)))
         }
+        // Edits one extension (matched by its 2.5.29.x OID last byte); the last field is its OCTET STRING value.
         fun extension(oidLastByte: Int, change: (MutableList<Der>) -> Unit) = extensions { values ->
             val i = values.indexOfFirst { it.children().first().content.contentEquals(byteArrayOf(0x55, 0x1d, oidLastByte.toByte())) }
             val fields = values[i].children().toMutableList()
@@ -70,6 +82,8 @@ internal class ReaderCertificateProfileFixture private constructor(
             values[i] = Der.container(0x30, fields)
         }
         when (case) {
+            // Appends an issuerAltName (2.5.29.18) whose single GeneralName is the contact string, as a
+            // URI (0x86), rfc822Name (0x81) or dNSName (0x82). The "-critical" variant is a URI marked critical.
             "contact-uri", "contact-email", "contact-dns", "contact-critical" -> extensions { values ->
                 val tag = when (case) { "contact-email" -> 0x81; "contact-dns" -> 0x82; else -> 0x86 }
                 val fields = mutableListOf(Der(6, byteArrayOf(0x55, 0x1d, 18)))
@@ -78,13 +92,19 @@ internal class ReaderCertificateProfileFixture private constructor(
                 values += Der.container(0x30, fields)
             }
             "01" -> tbs.removeAt(1) // Required serial number.
+            // Replaces the inner (TBS) signature AlgorithmIdentifier with ecdsa-with-SHA384 (1.2.840.10045.4.3.3).
+            // The outer signatureAlgorithm stays ecdsa-with-SHA256 and the real signature is SHA-256, so the two
+            // algorithm fields disagree (RFC 5280 requires them to be identical) and SHA-384 is off-profile.
             "02" -> tbs[2] = Der.container(0x30, listOf(Der(6, byteArrayOf(0x2a, 0x86.toByte(), 0x48, 0xce.toByte(), 0x3d, 4, 3, 3))))
+            // Moves notBefore to 2099-01-01, so the certificate is not yet valid.
             "05" -> {
                 val validity = tbs[4].children().toMutableList()
                 validity[0] = Der(0x18, "20990101000000Z".encodeToByteArray())
                 tbs[4] = Der.container(0x30, validity)
             }
+            // Replaces the subject with an empty DN (empty SEQUENCE); a reader certificate must name its subject.
             "07" -> tbs[5] = Der.container(0x30, emptyList())
+            // Corrupts the subjectPublicKeyInfo: 08 = wrong key algorithm OID, 09 = wrong curve, 10 = invalid point.
             "08", "09", "10" -> {
                 val spki = tbs[6].children().toMutableList()
                 if (case == "10") {
@@ -94,23 +114,31 @@ internal class ReaderCertificateProfileFixture private constructor(
                     spki[1] = Der(3, point)
                 } else {
                     val algorithm = spki[0].children().toMutableList()
+                    // 08: algorithm OID 1.2.840.10045.2 (the id-publicKeyType arc) instead of id-ecPublicKey (...2.1).
+                    // 09: curve parameter OID 1.3.36.3.3.2.8.1.1.6 (a Brainpool curve by OID arc) instead of P-256.
                     if (case == "08") algorithm[0] = Der(6, byteArrayOf(0x2a, 0x86.toByte(), 0x48, 0xce.toByte(), 0x3d, 2))
                     else algorithm[1] = Der(6, byteArrayOf(0x2b, 0x24, 3, 3, 2, 8, 1, 1, 6))
                     spki[0] = Der.container(0x30, algorithm)
                 }
                 tbs[6] = Der.container(0x30, spki)
             }
+            // Removes the first extension from the leaf, so a required extension is missing.
             "11" -> extensions { it.removeAt(0) }
+            // Appends an unrecognised extension (OID 2.5.29.79) marked critical, which a verifier must reject.
             "12" -> extensions { it += Der.container(0x30, listOf(
                 Der(6, byteArrayOf(0x55, 0x1d, 79)), Der(1, byteArrayOf(0xff.toByte())), Der(4, byteArrayOf(5, 0)),
             )) }
+            // Appends a copy of the first extension, so the same extension appears twice (RFC 5280 forbids this).
             "13" -> extensions { it += it.first() }
+            // Flips the last bit of the authorityKeyIdentifier (2.5.29.35) value, so it no longer matches the issuer's SKI.
             "14" -> extension(35) { fields ->
                 val bytes = fields.last().content.copyOf()
                 bytes[bytes.lastIndex] = (bytes.last().toInt() xor 1).toByte()
                 fields[fields.lastIndex] = Der(4, bytes)
             }
+            // Replaces keyUsage (2.5.29.15) with an empty BIT STRING (no bits set), dropping digitalSignature.
             "15" -> extension(15) { fields -> fields[fields.lastIndex] = Der(4, byteArrayOf(3, 2, 0, 0)) }
+            // Changes the last byte of the extKeyUsage (2.5.29.37) OID so it is not the mdoc reader-authentication EKU.
             "16" -> extension(37) { fields ->
                 val bytes = fields.last().content.copyOf()
                 bytes[bytes.lastIndex] = 7 // A different EKU; reader-authentication purpose is absent.
@@ -118,6 +146,7 @@ internal class ReaderCertificateProfileFixture private constructor(
             }
             else -> error("Unknown certificate mutation $case")
         }
+        // Re-sign the modified TBS with the root key (outer signatureAlgorithm is kept as-is) and self-check it.
         val exactTbs = Der.container(0x30, tbs).encode()
         val signature = rootKey.capabilities.signer!!.sign(exactTbs, certificateAlgorithm)
         assertTrue(rootKey.capabilities.verifier!!.verify(exactTbs, signature, certificateAlgorithm), "Re-signed certificate $case")

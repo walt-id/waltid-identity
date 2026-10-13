@@ -21,7 +21,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import kotlinx.coroutines.test.runTest
@@ -93,7 +93,7 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
                         },
                     ),
                 ),
-                verifiedProofs = listOf(verifiedProof()),
+                bindings = listOf(verifiedBinding()),
             ),
             dataMapping = buildJsonObject {
                 // Top-level validFrom/validUntil are not MSO fields; they must go through msoData.
@@ -128,16 +128,11 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
         )
     }
 
-    private suspend fun verifiedProof() = VerifiedCredentialProof(
-        proofType = "jwt",
-        jwt = "",
-        algorithm = "ES256",
-        header = buildJsonObject { },
-        payload = buildJsonObject { },
+    private suspend fun verifiedBinding() = VerifiedCredentialBinding(
         holderKey = generateP256Key("mdoc-holder"),
         holderKid = null,
         holderDid = null,
-        nonce = null,
+        proofIndexes = setOf(0),
     )
 
     private suspend fun generateP256Key(id: String) = crypto2Runtime.generateSoftwareKey(

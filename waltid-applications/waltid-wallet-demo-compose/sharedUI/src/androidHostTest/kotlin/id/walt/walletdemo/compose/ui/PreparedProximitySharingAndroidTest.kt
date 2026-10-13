@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
+import kotlinx.io.bytestring.ByteString
 import android.R as AndroidR
 import android.graphics.Bitmap
 import android.view.View
@@ -10,7 +11,6 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.wallet2.mobile.*
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
@@ -124,7 +124,7 @@ class PreparedProximitySharingAndroidTest {
 
     /** Only creates display fixtures. Signed-request SDK tests prove authorization and matching. */
     private fun fixturePlan(review: ProximityReview): ProximitySharingPlan {
-        val digest = ImmutableBytes.of(ByteArray(32))
+        val digest = ByteString(ByteArray(32))
         val scope = Class.forName("id.walt.wallet2.mobile.ProximityApprovalScope")
             .declaredConstructors.single().apply { isAccessible = true }.newInstance(
                 ProximityProfile.Iso180135Edition2Dis2026, "fixture-certificate", digest,

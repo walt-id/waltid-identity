@@ -37,30 +37,20 @@ object SignumSignatureAlgorithmUtil {
         }
 
     /**
-     * Fix strange behavior of id.walt.crypto.keys.Key.signRaw
-     * JVM implementation returns DER encoded signature, while JS implementation returns raw bytes
+     * Legacy keys return either DER or raw EC components. Preserve their existing DER preference,
+     * but select the signature algorithm before decoding: raw bytes can resemble unrelated ASN.1.
      */
     fun evaluateSignature(algorithm: X509SigningAlgorithmInfo, signatureRaw: ByteArray): CryptoSignature =
-        runCatching {
-            CryptoSignature.decodeFromDer(signatureRaw)
-        }.getOrElse {
-            //JS implementation of Key doesn't provide DER encoded signature, so we need to build it our selfe
-            when (algorithm.signingAlgorithmOid) {
-                "1.2.840.10045.4.3.2",
-                "1.2.840.10045.4.3.3",
-                "1.2.840.10045.4.3.4" -> {
-                    CryptoSignature.EC.fromRawBytes(signatureRaw)
-                }
+        when (algorithm.toSignatureAlgorithm()) {
+            is SignatureAlgorithm.ECDSA -> CryptoSignature.EC.decodeFromDerOrNull(signatureRaw)
+                ?: CryptoSignature.EC.fromRawBytes(signatureRaw)
+            is SignatureAlgorithm.RSA -> CryptoSignature.RSA(signatureRaw)
+        }
 
-                "1.2.840.113549.1.1.11",
-                "1.2.840.113549.1.1.12",
-                "1.2.840.113549.1.1.13" -> {
-                    CryptoSignature.RSA(signatureRaw)
-                }
-
-                else -> {
-                    throw IllegalArgumentException("Unsupported Hash Algorithm '${algorithm.signingAlgorithmName}' (OID: '${algorithm.signingAlgorithmOid}')")
-                }
-            }
+    /** Crypto2 X.509 callers explicitly request DER for ECDSA; RSA signatures remain opaque bytes. */
+    internal fun evaluateDerSignature(algorithm: X509SigningAlgorithmInfo, signatureRaw: ByteArray): CryptoSignature =
+        when (algorithm.toSignatureAlgorithm()) {
+            is SignatureAlgorithm.ECDSA -> CryptoSignature.EC.decodeFromDer(signatureRaw)
+            is SignatureAlgorithm.RSA -> CryptoSignature.RSA(signatureRaw)
         }
 }

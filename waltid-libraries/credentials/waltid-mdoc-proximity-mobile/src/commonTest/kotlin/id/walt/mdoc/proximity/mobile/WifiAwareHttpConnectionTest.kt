@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityException
 import kotlinx.coroutines.CompletableDeferred
@@ -21,16 +21,16 @@ class WifiAwareHttpConnectionTest {
     fun `hybrid read ahead and queued response preserve sequential HTTP ownership`() = runTest {
         val raw = FakeWifiAwareRawConnection(mutableListOf(request(byteArrayOf(1)), request(byteArrayOf(2))))
         val connection = WifiAwareHttpConnection(raw, 16)
-        val firstResponse = async { connection.send(ImmutableBytes.of(byteArrayOf(9))) }
+        val firstResponse = async { connection.send(ByteString(byteArrayOf(9))) }
         runCurrent()
         assertFalse(firstResponse.isCompleted)
-        assertContentEquals(byteArrayOf(1), connection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(1), connection.receive()!!.toByteArray())
         firstResponse.await()
-        assertContentEquals(byteArrayOf(2), connection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(2), connection.receive()!!.toByteArray())
         val readAhead = async { connection.receive() }
         runCurrent()
         assertFalse(readAhead.isCompleted)
-        connection.send(ImmutableBytes.of(byteArrayOf(8)))
+        connection.send(ByteString(byteArrayOf(8)))
         assertNull(readAhead.await())
         assertEquals(2, raw.writes.size)
         assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), raw.closeReasons)
@@ -44,8 +44,8 @@ class WifiAwareHttpConnectionTest {
         )
         val connection = WifiAwareHttpConnection(raw, maximumMessageBytes = 16)
 
-        assertContentEquals(byteArrayOf(1, 2, 3), connection.receive()!!.copy())
-        connection.send(ImmutableBytes.of(byteArrayOf(9, 8)))
+        assertContentEquals(byteArrayOf(1, 2, 3), connection.receive()!!.toByteArray())
+        connection.send(ByteString(byteArrayOf(9, 8)))
 
         assertContentEquals(
             "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Type: application/cbor\r\n\r\n".encodeToByteArray() +

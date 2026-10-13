@@ -21,7 +21,6 @@ interface X509Certificate {
         get() = signatureValueRaw.toHexString()
 
     val fingerprintSha256: ByteString
-        get() = ByteString(ShaUtils.sha256(encodedDer.toByteArray()))
 
     val fingerprintSha256Hex: String
         get() = fingerprintSha256.toHexString()
@@ -34,6 +33,16 @@ interface X509Certificate {
     suspend fun restoreSubjectPublicKey(cryptoRuntime: CryptoRuntime): Key =
         data.subjectPublicKeyInfo.restore(cryptoRuntime)
 
+    /**
+     * should compare encodedDer
+     */
+    override fun equals(other: Any?): Boolean
+
+    /**
+     * should return hashCode of encodedDer
+     */
+    override fun hashCode(): Int
+
     interface CertificateData : Pkcs10CertificateSigningRequest.RequestedCertificateData {
         val version: Int
 
@@ -45,7 +54,6 @@ interface X509Certificate {
         val issuerDnRaw: ByteString
 
         val validity: Validity
-
     }
 
     data class Validity(

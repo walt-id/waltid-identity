@@ -13,6 +13,7 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
@@ -23,6 +24,12 @@ import kotlin.time.Instant
  * Handler for credential responses per credential format.
  */
 fun interface CredentialEndpointHandler {
+    /**
+     * Check this handler's binding requirements before issuance inputs/status are allocated.
+     * Throw CredentialProofValidationException for an unsupported binding. Called for both signing APIs.
+     */
+    suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {}
+
     suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,

@@ -3,6 +3,7 @@ package id.walt.issuer2.controller.openapi
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.CredentialOfferRequestBody
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -12,7 +13,12 @@ import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.sdjwt.SDMap
+import kotlin.io.encoding.Base64
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -181,6 +187,11 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
+    val EUDI_IDENTITY_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "identityCredentialSdJwtEudi")
+    val EUDI_PHOTO_ID_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "isoPhotoIdEudi")
+    val EUDI_PID_SD_JWT_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_SD_JWT_PROFILE_ID)
+    val EUDI_PID_MDOC_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_MDOC_PROFILE_ID)
+
     val PROFILE_AUTHORIZED_OFFER_BY_VALUE = PROFILE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
@@ -190,20 +201,10 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE = MultiCredentialOfferCreateRequest(
-        credentials = listOf(
-            CredentialOfferCredential(EUDI_PID_SD_JWT_PROFILE_ID),
-            CredentialOfferCredential(EUDI_PID_MDOC_PROFILE_ID),
-        ),
-        authMethod = AuthenticationMethod.AUTHORIZED,
-        issuerStateMode = IssuerStateMode.INCLUDE,
-        valueMode = CredentialOfferValueMode.BY_REFERENCE,
-    )
-
     val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(IDENTITY_SD_JWT_PROFILE_ID),
-            CredentialOfferCredential(TAX_ID_SD_JWT_PROFILE_ID),
+            CredentialOfferCredential(CERTIFICATE_OF_RESIDENCE_SD_JWT_PROFILE_ID),
         ),
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
@@ -387,10 +388,113 @@ object Issuer2RequestExamples {
     val PRE_AUTHORIZED_CREDENTIAL_OFFER = PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE
     val AUTHORIZED_CREDENTIAL_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
 
+    // Decodable documentation fixtures only: the certificate, nonce, times and signatures must be replaced.
+    private val EXAMPLE_ATTESTED_HOLDER_JWK = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("x", "TCAER19Zvu3OHF4j4W4vfSVoHIP1ILilDls7vCeGemc")
+        put("y", "ZxjiWWbZMQGHVWKVQ4hbSIirsVfuecCE6t4jT9F2HZQ")
+    }
+
+    private val EXAMPLE_SECOND_ATTESTED_HOLDER_JWK = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("x", "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM")
+        put("y", "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E")
+    }
+
+    private val EXAMPLE_KEY_ATTESTATION = illustrativeKeyAttestation(
+        listOf(EXAMPLE_ATTESTED_HOLDER_JWK, EXAMPLE_SECOND_ATTESTED_HOLDER_JWK),
+    )
+
+    private val EXAMPLE_DID_ATTESTED_KEYS = listOf(EXAMPLE_ATTESTED_HOLDER_JWK, EXAMPLE_SECOND_ATTESTED_HOLDER_JWK).map { jwk ->
+        // Encode the public key without kid, then attach its DID verification method reference.
+        val did = "did:jwk:" + Base64.UrlSafe.encode(jwk.toString().encodeToByteArray()).trimEnd('=')
+        JsonObject(jwk + ("kid" to JsonPrimitive("$did#0")))
+    }
+
+    private val EXAMPLE_DID_KEY_ATTESTATION = illustrativeKeyAttestation(EXAMPLE_DID_ATTESTED_KEYS)
+
+    private fun illustrativeKeyAttestation(keys: List<JsonObject>) = illustrativeJwt(
+        header = buildJsonObject {
+            put("alg", "ES256")
+            put("typ", "key-attestation+jwt")
+            putJsonArray("x5c") { add("base64-DER-attester-signing-certificate") }
+        },
+        payload = buildJsonObject {
+            put("iss", "https://wallet-provider.example")
+            put("iat", 1_800_000_000)
+            put("exp", 1_800_000_300)
+            put("nonce", "c_nonce-from-issuer-nonce-endpoint")
+            put("attested_keys", JsonArray(keys))
+        },
+    )
+
+    private val EXAMPLE_JWT_WITH_KEY_ATTESTATION = illustrativeJwt(
+        header = buildJsonObject {
+            put("alg", "ES256")
+            put("typ", "openid4vci-proof+jwt")
+            put("jwk", EXAMPLE_ATTESTED_HOLDER_JWK)
+            put("key_attestation", EXAMPLE_KEY_ATTESTATION)
+        },
+        payload = buildJsonObject {
+            put("aud", EXAMPLE_CREDENTIAL_ISSUER)
+            put("iat", 1_800_000_000)
+            put("nonce", "c_nonce-from-issuer-nonce-endpoint")
+        },
+    )
+
+    val SD_JWT_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION = credentialProofExample(
+        IDENTITY_SD_JWT_CONFIGURATION_ID, ProofType.JWT, EXAMPLE_JWT_WITH_KEY_ATTESTATION,
+    )
+
+    val MDOC_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION = credentialProofExample(
+        MDOC_CREDENTIAL_CONFIGURATION_ID, ProofType.JWT, EXAMPLE_JWT_WITH_KEY_ATTESTATION,
+    )
+
+    val SD_JWT_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        IDENTITY_SD_JWT_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_KEY_ATTESTATION,
+    )
+
+    val MDOC_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        MDOC_CREDENTIAL_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_KEY_ATTESTATION,
+    )
+
+    val W3C_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION = credentialProofExample(
+        W3C_CREDENTIAL_CONFIGURATION_ID, ProofType.JWT, illustrativeJwt(
+            header = buildJsonObject {
+                put("alg", "ES256")
+                put("typ", "openid4vci-proof+jwt")
+                put("kid", EXAMPLE_DID_ATTESTED_KEYS.first().getValue("kid"))
+                put("key_attestation", EXAMPLE_DID_KEY_ATTESTATION)
+            },
+            payload = buildJsonObject {
+                put("aud", EXAMPLE_CREDENTIAL_ISSUER)
+                put("iat", 1_800_000_000)
+                put("nonce", "c_nonce-from-issuer-nonce-endpoint")
+            },
+        ),
+    )
+
+    val W3C_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        W3C_CREDENTIAL_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_DID_KEY_ATTESTATION,
+    )
+
+    private fun credentialProofExample(configurationId: String, proofType: ProofType, jwt: String) = buildJsonObject {
+        put("credential_configuration_id", configurationId)
+        putJsonObject("proofs") {
+            putJsonArray(proofType.value) { add(jwt) }
+        }
+    }
+
+    private fun illustrativeJwt(header: JsonObject, payload: JsonObject): String =
+        listOf(header.toString(), payload.toString(), "illustrative-signature-not-valid")
+            .joinToString(".") { Base64.UrlSafe.encode(it.encodeToByteArray()).trimEnd('=') }
+
     val BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID = buildJsonObject {
         put("credential_configuration_id", W3C_CREDENTIAL_CONFIGURATION_ID)
         putJsonObject("proofs") {
-            putJsonArray("jwt") {
+            putJsonArray(ProofType.JWT.value) {
                 add(EXAMPLE_PROOF_JWT_1)
                 add(EXAMPLE_PROOF_JWT_2)
             }
@@ -400,7 +504,7 @@ object Issuer2RequestExamples {
     val BATCH_CREDENTIAL_REQUEST_BY_CREDENTIAL_IDENTIFIER = buildJsonObject {
         put("credential_identifier", EXAMPLE_CREDENTIAL_IDENTIFIER)
         putJsonObject("proofs") {
-            putJsonArray("jwt") {
+            putJsonArray(ProofType.JWT.value) {
                 add(EXAMPLE_PROOF_JWT_1)
                 add(EXAMPLE_PROOF_JWT_2)
             }
@@ -417,6 +521,38 @@ object Issuer2RequestExamples {
             }
         }
     }
+
+    fun credentialOfferRequestExamples(): List<Pair<String, CredentialOfferRequestBody>> = listOf(
+        "[authorized][single][by-reference]" to PROFILE_AUTHORIZED_OFFER_BY_REFERENCE,
+        "[authorized][single][by-value]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE,
+        "[authorized][single][by-value][issuer_state omitted]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE,
+        "[authorized][single][by-reference][mDoc credentialData override]" to AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[authorized][single][eudi-sd-jwt-vc-identity]" to EUDI_IDENTITY_OFFER,
+        "[authorized][single][eudi-mdoc-photo-id]" to EUDI_PHOTO_ID_OFFER,
+        "[authorized][single][eudi-sd-jwt-vc-pid]" to EUDI_PID_SD_JWT_OFFER,
+        "[authorized][single][eudi-pid-mdoc]" to EUDI_PID_MDOC_OFFER,
+        "[authorized][multiple][by-value][same format, different datasets][SD-JWT VC]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
+        "[authorized][multiple][by-reference][runtime overrides]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
+        "[pre-authorized][single][by-reference]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE,
+        "[pre-authorized][single][shared status][W3C]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS,
+        "[pre-authorized][single][shared status][SD-JWT]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS,
+        "[pre-authorized][single][shared status][mdoc]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS,
+        "[pre-authorized][multiple][different statuses per item]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
+        "[authorized][multiple][different statuses per item]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
+        "[pre-authorized][single][by-value]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE,
+        "[pre-authorized][single][by-reference][provided tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE,
+        "[pre-authorized][single][by-reference][generated tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_GENERATED_TX_CODE,
+        "[pre-authorized][single][by-reference][expires in 2 minutes]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY,
+        "[pre-authorized][single][by-reference][no expiry]" to PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
+        "[pre-authorized][single][by-reference][credentialData override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
+        "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
+        "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][authorized transaction types override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE,
+        "[pre-authorized][multiple][by-reference]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER,
+        "[pre-authorized][multiple][by-value]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
+        "[pre-authorized][multiple][by-reference][runtime overrides]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
+    )
 
     private fun byReferenceOfferUrl(): String =
         CredentialOfferRequest(
@@ -438,7 +574,7 @@ object Issuer2RequestExamples {
                 credentialIssuer = EXAMPLE_CREDENTIAL_ISSUER,
                 credentialConfigurationIds = listOf(
                     IDENTITY_SD_JWT_CONFIGURATION_ID,
-                    TAX_ID_SD_JWT_CONFIGURATION_ID,
+                    CERTIFICATE_OF_RESIDENCE_SD_JWT_CONFIGURATION_ID,
                 ),
                 issuerState = EXAMPLE_OFFER_ID,
             )
@@ -448,7 +584,7 @@ object Issuer2RequestExamples {
     private const val MDOC_PHOTO_ID_PROFILE_ID = "isoPhotoId"
     private const val MDOC_MDL_PROFILE_ID = "isoMdl"
     private const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-    private const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+    private const val CERTIFICATE_OF_RESIDENCE_SD_JWT_PROFILE_ID = "certificateOfResidenceSdJwt"
     private const val EUDI_PID_SD_JWT_PROFILE_ID = "eudiPidSdJwt"
     private const val EUDI_PID_MDOC_PROFILE_ID = "eudiPidMdoc"
     private const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
@@ -457,7 +593,8 @@ object Issuer2RequestExamples {
     private const val EUDI_PID_SD_JWT_CONFIGURATION_ID = "urn:eudi:pid:1"
     private const val EUDI_PID_MDOC_CONFIGURATION_ID = "eu.europa.ec.eudi.pid.1"
     private const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
-    private const val TAX_ID_SD_JWT_CONFIGURATION_ID = "asit.tax-id-credential"
+    private const val CERTIFICATE_OF_RESIDENCE_SD_JWT_CONFIGURATION_ID = "urn:eu.europa.ec.eudi:cor:1"
+    private const val MDOC_CREDENTIAL_CONFIGURATION_ID = "org.iso.23220.photoid.1"
     private const val EXAMPLE_CREDENTIAL_ISSUER = "http://localhost:7002/openid4vci"
     private const val EXAMPLE_OFFER_ID = "018f8d6e-8df4-7b73-9f3d-f3df21a4374a"
     private const val EXAMPLE_EXPIRES_AT = 1_739_000_000_000

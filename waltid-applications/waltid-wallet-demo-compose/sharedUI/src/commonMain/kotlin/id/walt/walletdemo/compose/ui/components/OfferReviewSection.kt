@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.issuanceCopyLimit
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
 import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -110,8 +111,14 @@ internal fun OfferReviewSection(
                             ?: preview.issuer.credentialIssuer,
                     )
                     onCopiesChange?.let {
-                        CredentialCopySelection(credential.configurationId, credential.resolvedCardTitle(),
-                            copies[credential.configurationId] ?: 1, preview.batchSize ?: 1, reviewEnabled, it)
+                        CredentialCopySelection(
+                            credential.configurationId,
+                            credential.resolvedCardTitle(),
+                            copies[credential.configurationId] ?: 1,
+                            issuanceCopyLimit(preview, copies, credential.configurationId),
+                            reviewEnabled,
+                            it,
+                        )
                     }
                 }
             } else {
@@ -132,8 +139,14 @@ internal fun OfferReviewSection(
                         ),
                     )
                     onCopiesChange?.let {
-                        CredentialCopySelection(credential.configurationId, title,
-                            copies[credential.configurationId] ?: 1, preview.batchSize ?: 1, reviewEnabled, it)
+                        CredentialCopySelection(
+                            credential.configurationId,
+                            title,
+                            copies[credential.configurationId] ?: 1,
+                            issuanceCopyLimit(preview, copies, credential.configurationId),
+                            reviewEnabled,
+                            it,
+                        )
                     }
                 }
             }
@@ -218,11 +231,12 @@ private fun CredentialCopySelection(
     enabled: Boolean,
     onChange: (String, Int) -> Unit,
 ) {
+    val canSelect = enabled && (count > 0 || limit > 0)
     Row(
         modifier = Modifier.fillMaxWidth()
             .testTag("issuance-select-$configurationId")
             .semantics { contentDescription = "Receive $title" }
-            .toggleable(count > 0, enabled = enabled, role = Role.Switch) {
+            .toggleable(count > 0, enabled = canSelect, role = Role.Switch) {
                 onChange(configurationId, if (it) 1 else 0)
             },
         verticalAlignment = Alignment.CenterVertically,
@@ -232,7 +246,7 @@ private fun CredentialCopySelection(
         Switch(
             checked = count > 0,
             onCheckedChange = null,
-            enabled = enabled,
+            enabled = canSelect,
         )
     }
     if (count > 0 && limit > 1) {

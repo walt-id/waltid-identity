@@ -5,8 +5,8 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,11 +37,11 @@ class NfcHostApduRouterTest {
         val response = async { router.process(envelope(NfcDo53.encode(byteArrayOf(1, 2, 3)))) }
         runCurrent()
 
-        assertContentEquals(byteArrayOf(1, 2, 3), router.retrievalConnection.receive()!!.copy())
-        router.retrievalConnection.send(ImmutableBytes.of(byteArrayOf(4, 5)))
+        assertContentEquals(byteArrayOf(1, 2, 3), router.retrievalConnection.receive()!!.toByteArray())
+        router.retrievalConnection.send(ByteString(byteArrayOf(4, 5)))
 
         assertContentEquals(byteArrayOf(4, 5), NfcDo53.decode(
-            NfcResponseApdu.decode(response.await().copy()).data.copy(),
+            NfcResponseApdu.decode(response.await().toByteArray()).data.toByteArray(),
             1024,
         ))
         assertEquals(listOf(NfcHostApplication.RETRIEVAL), selected)
@@ -57,7 +57,7 @@ class NfcHostApduRouterTest {
         router.process(select(MdocNfcAid.DATA_TRANSFER))
         val response = async { runCatching { router.process(envelope(NfcDo53.encode(byteArrayOf(1)))) } }
         runCurrent()
-        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.toByteArray())
 
         val closed = async { router.retrievalConnection.awaitClosed() }
         val cancelledWait = async { router.retrievalConnection.awaitClosed() }
@@ -172,11 +172,11 @@ class NfcHostApduRouterTest {
         router.process(select(MdocNfcAid.DATA_TRANSFER))
         val cancelled = async { router.process(envelope(NfcDo53.encode(byteArrayOf(1)))) }
         runCurrent()
-        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.toByteArray())
         cancelled.cancel()
         runCurrent()
         assertFailsWith<IllegalArgumentException> {
-            router.retrievalConnection.send(ImmutableBytes.of(byteArrayOf(9)))
+            router.retrievalConnection.send(ByteString(byteArrayOf(9)))
         }
         assertStatus(
             NfcStatusWord.CONDITIONS_NOT_SATISFIED,
@@ -194,10 +194,10 @@ class NfcHostApduRouterTest {
         router.process(select(MdocNfcAid.DATA_TRANSFER))
         val response = async { runCatching { router.process(envelope(NfcDo53.encode(byteArrayOf(1)))) } }
         runCurrent()
-        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(1), router.retrievalConnection.receive()!!.toByteArray())
 
         assertFailsWith<IllegalArgumentException> {
-            router.retrievalConnection.send(ImmutableBytes.of(ByteArray(5)))
+            router.retrievalConnection.send(ByteString(ByteArray(5)))
         }
         assertTrue(response.await().isFailure)
         assertStatus(
@@ -206,7 +206,7 @@ class NfcHostApduRouterTest {
         )
     }
 
-    private fun select(aid: ImmutableBytes): ByteArray = NfcCommandApdu(
+    private fun select(aid: ByteString): ByteArray = NfcCommandApdu(
         cla = 0u,
         instruction = 0xa4u,
         parameter1 = 0x04u,
@@ -219,11 +219,11 @@ class NfcHostApduRouterTest {
         instruction = 0xc3u,
         parameter1 = 0u,
         parameter2 = 0u,
-        data = ImmutableBytes.of(payload),
+        data = ByteString(payload),
         expectedResponseDataLength = 256,
     ).encode()
 
-    private fun assertStatus(expected: UShort, response: ImmutableBytes) {
-        assertEquals(expected, NfcResponseApdu.decode(response.copy()).statusWord)
+    private fun assertStatus(expected: UShort, response: ByteString) {
+        assertEquals(expected, NfcResponseApdu.decode(response.toByteArray()).statusWord)
     }
 }

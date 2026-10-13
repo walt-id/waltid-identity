@@ -2,6 +2,17 @@
 # The workflow replaces __ISSUER_BASE_URL__ with its Cloudflare Quick Tunnel URL.
 baseUrl = "__ISSUER_BASE_URL__"
 
+# Public half of keys/attester-key.json, supplied separately from OAuth client attestation.
+keyAttestationConfig.verificationMethod {
+  type = "static-jwk"
+  jwk {
+    kty = "EC"
+    crv = "P-256"
+    x = "uca7_l8rv-ItebmtIsfg2-2p8EchZBk-C-91LMabJws"
+    y = "hXYFz2urwDJzAJ1pdWLpNrpv9ZEw_54EQsEE-1x_1cg"
+  }
+}
+
 # Requires the completed batch/legacy-offer compatibility implementation.
 batchCredentialIssuance {
   batchSize = 10

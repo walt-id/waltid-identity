@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ProximityException
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -22,7 +22,7 @@ class BleProtocolTest {
         val uuid = BleServiceUuid.fromBytes(bytes)
 
         assertEquals("00112233-4455-6677-8899-aabbccddeeff", uuid.toString())
-        assertContentEquals(bytes, BleServiceUuid.parse(uuid.toString()).encoded().copy())
+        assertContentEquals(bytes, BleServiceUuid.parse(uuid.toString()).encoded().toByteArray())
         assertFailsWith<IllegalArgumentException> { BleServiceUuid.fromBytes(ByteArray(15)) }
         assertEquals(
             "00112233-4455-6677-0099-aabbccddeeff",
@@ -33,7 +33,7 @@ class BleProtocolTest {
 
     @Test
     fun `Ident matches independent HKDF SHA-256 vector`() {
-        val actual = BleIdent.derive(ImmutableBytes.of(ByteArray(32) { it.toByte() }))
+        val actual = BleIdent.derive(ByteString(ByteArray(32) { it.toByte() }))
 
         assertContentEquals("575e082f5245fb1daacf22a211f2e604".hexToBytes(), actual)
         assertTrue(BleIdent.matches(actual, actual.copyOf()))
@@ -95,14 +95,14 @@ class BleProtocolTest {
         val codec = BleGattMessageCodec(maximumMessageBytes = 32)
         val message = ByteArray(13) { it.toByte() }
 
-        val chunks = codec.encode(ImmutableBytes.of(message), maximumPacketBytes = 6)
+        val chunks = codec.encode(ByteString(message), maximumPacketBytes = 6)
 
         assertEquals(listOf(6, 6, 4), chunks.map(ByteArray::size))
         assertEquals(listOf(1, 1, 0), chunks.map { it[0].toInt() })
         assertNull(codec.decode(chunks[0]))
         assertTrue(codec.hasIncompleteMessage())
         assertNull(codec.decode(chunks[1]))
-        assertContentEquals(message, codec.decode(chunks[2])!!.copy())
+        assertContentEquals(message, codec.decode(chunks[2])!!.toByteArray())
         assertFalse(codec.hasIncompleteMessage())
     }
 
@@ -110,11 +110,11 @@ class BleProtocolTest {
     fun `GATT codec handles empty message and resets between messages`() {
         val codec = BleGattMessageCodec(maximumMessageBytes = 4)
 
-        assertContentEquals(ByteArray(0), codec.decode(codec.encode(ImmutableBytes.of(ByteArray(0)), 2).single())!!.copy())
-        assertContentEquals(byteArrayOf(9), codec.decode(byteArrayOf(0, 9))!!.copy())
+        assertContentEquals(ByteArray(0), codec.decode(codec.encode(ByteString(ByteArray(0)), 2).single())!!.toByteArray())
+        assertContentEquals(byteArrayOf(9), codec.decode(byteArrayOf(0, 9))!!.toByteArray())
         assertFailsWith<ProximityException> { codec.decode(ByteArray(0)) }
         assertFailsWith<ProximityException> { codec.decode(byteArrayOf(2, 9)) }
-        assertFailsWith<ProximityException> { codec.encode(ImmutableBytes.of(ByteArray(5)), 2) }
+        assertFailsWith<ProximityException> { codec.encode(ByteString(ByteArray(5)), 2) }
     }
 
     @Test
@@ -123,14 +123,14 @@ class BleProtocolTest {
 
         assertNull(codec.decode(byteArrayOf(1)))
         assertTrue(codec.hasIncompleteMessage())
-        assertContentEquals(ByteArray(0), codec.decode(byteArrayOf(0))!!.copy())
+        assertContentEquals(ByteArray(0), codec.decode(byteArrayOf(0))!!.toByteArray())
         assertFalse(codec.hasIncompleteMessage())
     }
 
     @Test
     fun `L2CAP codec uses four-byte big-endian length and accepts arbitrary stream splits`() {
-        val first = BleL2capMessageCodec.encode(ImmutableBytes.of(byteArrayOf(1, 2, 3)), 16)
-        val second = BleL2capMessageCodec.encode(ImmutableBytes.of(byteArrayOf(4, 5)), 16)
+        val first = BleL2capMessageCodec.encode(ByteString(byteArrayOf(1, 2, 3)), 16)
+        val second = BleL2capMessageCodec.encode(ByteString(byteArrayOf(4, 5)), 16)
         assertContentEquals(byteArrayOf(0, 0, 0, 3, 1, 2, 3), first)
         val decoder = BleL2capMessageDecoder(16)
 
@@ -139,8 +139,8 @@ class BleProtocolTest {
         val messages = decoder.feed((first + second).copyOfRange(2, first.size + second.size))
 
         assertEquals(2, messages.size)
-        assertContentEquals(byteArrayOf(1, 2, 3), messages[0].copy())
-        assertContentEquals(byteArrayOf(4, 5), messages[1].copy())
+        assertContentEquals(byteArrayOf(1, 2, 3), messages[0].toByteArray())
+        assertContentEquals(byteArrayOf(4, 5), messages[1].toByteArray())
         assertFalse(decoder.hasIncompleteFrame())
     }
 

@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.Cose
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EcCurve
@@ -16,7 +17,6 @@ import id.walt.mdoc.proximity.MdocEngagementSource
 import id.walt.mdoc.proximity.MdocHolderProtocolEngine
 import id.walt.mdoc.proximity.MdocHolderSessionResult
 import id.walt.mdoc.proximity.MdocHolderSessionState
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocProtocolFeature
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.MdocSessionCapabilities
@@ -390,14 +390,14 @@ private class ProximitySessionImpl(
 
     private fun buildEngagementSources(
         prerequisites: ProximityCapabilities,
-        eDeviceKeyBytes: ImmutableBytes,
+        eDeviceKeyBytes: ByteString,
         qrDeviceKey: Key?,
-        qrDeviceKeyBytes: ImmutableBytes,
+        qrDeviceKeyBytes: ByteString,
         engagementFactory: MdocDeviceEngagementFactory,
     ): List<MdocEngagementSource> {
         val selected = configuration.session
         fun newProviders(
-            ble: ProximityBleConfiguration?, wifiAware: Boolean, keyBytes: ImmutableBytes, sharedBleUuid: Boolean = false,
+            ble: ProximityBleConfiguration?, wifiAware: Boolean, keyBytes: ByteString, sharedBleUuid: Boolean = false,
         ): List<ProximityTransportProvider> = buildList {
             if (ble != null && prerequisites.bluetoothLowEnergy.mayStart) add(
                 requireNotNull(bleTransportFactory).create(BleProximityTransportConfiguration(

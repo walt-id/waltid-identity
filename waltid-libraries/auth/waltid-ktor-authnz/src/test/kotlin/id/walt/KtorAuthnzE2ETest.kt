@@ -1,5 +1,6 @@
 package id.walt
 
+import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -96,6 +97,8 @@ class KtorAuthnzE2ETest {
 
     @Test
     fun testNonJwt() = runTest(timeout = 60.seconds) {
+        // Each test logs in with the current TOTP code; a fresh store lets it be used again after the other test.
+        KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
         val s = startExample(wait = false, jwt = false)
 
         implicit1Test()
@@ -106,6 +109,7 @@ class KtorAuthnzE2ETest {
 
     @Test
     fun testJwt() = runTest(timeout = 60.seconds) {
+        KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
         val s = startExample(wait = false, jwt = true)
 
         implicit1Test()

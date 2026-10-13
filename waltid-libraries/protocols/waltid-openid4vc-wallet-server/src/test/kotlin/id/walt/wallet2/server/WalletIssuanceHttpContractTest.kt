@@ -1,6 +1,6 @@
 package id.walt.wallet2.server
 
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.models.OfferIssuerMetadata
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse

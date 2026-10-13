@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -171,8 +171,8 @@ public class ProximityPreparedSharing internal constructor(
 internal data class ProximityApprovalScope(
     val profile: ProximityProfile,
     val readerCertificateSha256: String,
-    val requestDigest: ImmutableBytes,
-    val credentials: Map<String, ImmutableBytes>,
+    val requestDigest: ByteString,
+    val credentials: Map<String, ByteString>,
     val applicationAuthorizations: List<ProximityApplicationAuthorization>,
 ) {
     fun matches(other: ProximityApprovalScope, submission: ProximitySubmission): Boolean =

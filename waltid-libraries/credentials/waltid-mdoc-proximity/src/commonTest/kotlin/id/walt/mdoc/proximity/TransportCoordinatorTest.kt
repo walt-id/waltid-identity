@@ -5,6 +5,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -282,8 +283,8 @@ class TransportCoordinatorTest {
         val closeReasons = mutableListOf<ProximityCloseReason>()
         private val closure = CompletableDeferred<ProximityCloseReason>()
         override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
-        override suspend fun receive(): ImmutableBytes? = null
-        override suspend fun send(message: ImmutableBytes) = Unit
+        override suspend fun receive(): ByteString? = null
+        override suspend fun send(message: ByteString) = Unit
         override suspend fun close(reason: ProximityCloseReason) {
             closure.complete(reason)
             closeReasons += reason

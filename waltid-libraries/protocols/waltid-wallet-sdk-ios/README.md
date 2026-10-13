@@ -90,6 +90,13 @@ independently configured public JWK. Supply the provider again when recreating t
 wallet. This runtime integration does not establish issuer trust or substantiate
 hardware, certification or user-authentication claims.
 
+The same configuration property also accepts a `KeyAttestationProviderResolver`
+for issuer-specific selection. Its `resolve(credentialIssuer:)` returns a fixed
+provider or `nil` to reject an unsupported issuer. Resolution is skipped when the
+credential does not require attestation; the selected provider and verification key
+remain together throughout a proof collection. Existing fixed providers implement
+the resolver through a default method.
+
 ```swift
 import WalletSDK
 
@@ -315,10 +322,9 @@ actual direct or RICAL-validated path. Install it through the configured trust e
 standalone raw evidence returns indeterminate for this scope. The separately explicit
 `.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
 
-Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
-issuer. That exact issuer must be on the validated path and the reader must include the
-conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
-supply that role. Without this context, conditional IACA validation is outside the checked scope.
+Set `requiredIACAIssuerCertificateDER` to require an exact application-identified IACA direct
+issuer on the validated path and an `issuerAlternativeName` email or URI contact in the reader
+certificate. The application identifies the issuer's IACA role; this restriction does not add trust.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,

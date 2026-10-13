@@ -1,7 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import android.nfc.cardemulation.HostApduService
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -178,13 +178,13 @@ class AndroidMdocHostApduServiceTest {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val router = object : RecordingRouter() {
-            override suspend fun process(command: ByteArray): ImmutableBytes {
+            override suspend fun process(command: ByteArray): ByteString {
                 if (command[1] == 0xc3.toByte()) {
                     entered.complete(Unit)
                     release.await()
-                    return ImmutableBytes.of(byteArrayOf(0x53, 0x02, 0x61, 0x02))
+                    return ByteString(byteArrayOf(0x53, 0x02, 0x61, 0x02))
                 }
-                return ImmutableBytes.of(byteArrayOf(0x11, 0x22, 0x90.toByte(), 0))
+                return ByteString(byteArrayOf(0x11, 0x22, 0x90.toByte(), 0))
             }
         }
         val generation = AndroidNfcSessionRegistry.arm(router, Job())
@@ -243,8 +243,8 @@ class AndroidMdocHostApduServiceTest {
     private open class RecordingRouter : AndroidNfcSessionRegistry.Router {
         val closeReasons = CopyOnWriteArrayList<ProximityCloseReason>()
 
-        override suspend fun process(command: ByteArray): ImmutableBytes =
-            ImmutableBytes.of(byteArrayOf(0x90.toByte(), 0x00))
+        override suspend fun process(command: ByteArray): ByteString =
+            ByteString(byteArrayOf(0x90.toByte(), 0x00))
 
         override suspend fun deactivate(reason: ProximityCloseReason) {
             closeReasons += reason
@@ -255,7 +255,7 @@ class AndroidMdocHostApduServiceTest {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
 
-        override suspend fun process(command: ByteArray): ImmutableBytes {
+        override suspend fun process(command: ByteArray): ByteString {
             entered.complete(Unit)
             release.await()
             return super.process(command)
@@ -263,7 +263,7 @@ class AndroidMdocHostApduServiceTest {
     }
 
     private class CancellingRouter : RecordingRouter() {
-        override suspend fun process(command: ByteArray): ImmutableBytes =
+        override suspend fun process(command: ByteArray): ByteString =
             throw CancellationException("Current NFC command was cancelled")
     }
 
@@ -272,14 +272,14 @@ class AndroidMdocHostApduServiceTest {
         val firstEntered = CompletableDeferred<Unit>()
         val releaseFirst = CompletableDeferred<Unit>()
 
-        override suspend fun process(command: ByteArray): ImmutableBytes {
+        override suspend fun process(command: ByteArray): ByteString {
             val value = command.single().toInt()
             commands += value
             if (value == 1) {
                 firstEntered.complete(Unit)
                 releaseFirst.await()
             }
-            return ImmutableBytes.of(byteArrayOf(value.toByte(), 0x90.toByte(), 0x00))
+            return ByteString(byteArrayOf(value.toByte(), 0x90.toByte(), 0x00))
         }
 
         override suspend fun deactivate(reason: ProximityCloseReason) = Unit

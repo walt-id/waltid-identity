@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -28,23 +29,23 @@ data class MdocProximityLimits(
         require(maximumExchanges > 0)
     }
 
-    fun requireEngagementOrHandover(bytes: ImmutableBytes) = requireSize(
+    fun requireEngagementOrHandover(bytes: ByteString) = requireSize(
         bytes, maximumEngagementOrHandoverBytes, "engagement_too_large", "Engagement or handover data exceeds the configured limit"
     )
 
-    fun requireRequest(bytes: ImmutableBytes) = requireSize(
+    fun requireRequest(bytes: ByteString) = requireSize(
         bytes, maximumRequestBytes, "request_too_large", "DeviceRequest exceeds the configured limit"
     )
 
-    fun requireResponse(bytes: ImmutableBytes) = requireSize(
+    fun requireResponse(bytes: ByteString) = requireSize(
         bytes, maximumResponseBytes, "response_too_large", "DeviceResponse exceeds the configured limit"
     )
 
-    fun requireSessionMessage(bytes: ImmutableBytes) = requireSize(
+    fun requireSessionMessage(bytes: ByteString) = requireSize(
         bytes, maximumSessionMessageBytes, "message_too_large", "Proximity session message exceeds the configured limit"
     )
 
-    private fun requireSize(bytes: ImmutableBytes, maximum: Int, code: String, message: String) {
+    private fun requireSize(bytes: ByteString, maximum: Int, code: String, message: String) {
         if (bytes.size > maximum) throw ProximityException(ProximityError.Protocol(code, message))
     }
 }

@@ -421,7 +421,7 @@ class WalletBatchIssuanceTest {
                 WalletIssuanceHandler.fetchCredentials(fixture.wallet, FetchCredentialRequest(
                     credentialEndpoint = Url("$BATCH_TEST_ISSUER/credential"), accessToken = "access",
                     credentialConfigurationId = "identity", credentialIssuerBaseUrl = BATCH_TEST_ISSUER,
-                    proofs = id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("not-sent")),
+                    proofs = id.walt.openid4vci.proofs.Proofs(jwt = listOf("not-sent")),
                     holderBindings = listOf(binding), storeInWallet = true), httpClient = http)
             }
             assertFailsWith<IllegalArgumentException> {

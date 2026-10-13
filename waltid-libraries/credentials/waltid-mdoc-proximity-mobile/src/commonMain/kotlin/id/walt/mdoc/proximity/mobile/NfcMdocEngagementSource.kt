@@ -2,10 +2,10 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.crypto2.keys.Key
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocDeviceEngagementFactory
 import id.walt.mdoc.proximity.MdocDeviceEngagementPlacement
 import id.walt.mdoc.proximity.MdocEngagedConnection
@@ -265,7 +265,7 @@ public class NfcMdocEngagementSource(
                     context.capabilities,
                     MdocDeviceEngagementPlacement.QR,
                 )
-                val exact = ImmutableBytes.of(qrEngagement.engagement.encodedCopy())
+                val exact = ByteString(qrEngagement.engagement.encodedCopy())
                 context.limits.requireEngagementOrHandover(exact)
                 PreparedQrNfcPath(
                     eDeviceKey = qrKey,
@@ -288,11 +288,11 @@ public class NfcMdocEngagementSource(
                     )
                 }
             val conventionalBytes = conventionalEngagement?.let {
-                ImmutableBytes.of(it.engagement.encodedCopy()).also(context.limits::requireEngagementOrHandover)
+                ByteString(it.engagement.encodedCopy()).also(context.limits::requireEngagementOrHandover)
             }
             val deviceEngagementRecord = conventionalBytes?.let(::deviceEngagementRecord)
             val exactStaticSelect = if (nfcProfile is NfcMdocEngagementProfile.Static) {
-                ImmutableBytes.of(
+                ByteString(
                     NfcHandoverCodec.encodeSelect(
                         requireNotNull(nfcCandidates).connectionMethods.mapIndexed { index, method ->
                             carrier(method, index, requireNotNull(deviceEngagementRecord))
@@ -341,9 +341,9 @@ public class NfcMdocEngagementSource(
                             context.capabilities,
                             MdocDeviceEngagementPlacement.NFC_CONNECTION_HANDOVER,
                         )
-                        val exactDeviceEngagement = ImmutableBytes.of(engagement.engagement.encodedCopy())
+                        val exactDeviceEngagement = ByteString(engagement.engagement.encodedCopy())
                             .also(context.limits::requireEngagementOrHandover)
-                        val exactSelect = ImmutableBytes.of(
+                        val exactSelect = ByteString(
                             NfcHandoverCodec.encodeSelect(
                                 listOf(
                                     carrier(
@@ -553,7 +553,7 @@ public class NfcMdocEngagementSource(
     }
 
     private suspend fun selectNegotiatedCandidate(
-        exactRequest: ImmutableBytes,
+        exactRequest: ByteString,
         providers: List<ReaderSelectedTransportProvider>,
         nfcDirect: PreparedNfcApduTransport?,
         context: EngagementContext,
@@ -561,7 +561,7 @@ public class NfcMdocEngagementSource(
         resources: PreparedTransportRegistry,
         ndefLimits: NdefLimits,
     ): PreparedTransport {
-        val request = NfcHandoverCodec.validateRequest(exactRequest.copy(), ndefLimits)
+        val request = NfcHandoverCodec.validateRequest(exactRequest.toByteArray(), ndefLimits)
         val offers = request.carriers.mapNotNull(NfcMdocCarrierCodec::decodeReaderOffer)
         prepareReaderSelectedCandidate(offers, providers, context, sessionScope, resources)?.let { return it }
         return nfcDirect?.takeIf { direct ->
@@ -640,7 +640,7 @@ public class NfcMdocEngagementSource(
         omitBleUuid: Boolean = false,
     ): NfcHandoverCarrier = NfcMdocCarrierCodec.encode(
         method = method,
-        carrierReference = ImmutableBytes.of(
+        carrierReference = ByteString(
             (if (method is DeviceRetrievalMethod.Nfc) "nfc" else index.toString()).encodeToByteArray(),
         ),
         auxiliaryRecords = listOf(deviceEngagementRecord),
@@ -648,10 +648,10 @@ public class NfcMdocEngagementSource(
         omitBleUuid = omitBleUuid,
     )
 
-    private fun deviceEngagementRecord(exact: ImmutableBytes): NdefRecord = NdefRecord(
+    private fun deviceEngagementRecord(exact: ByteString): NdefRecord = NdefRecord(
         typeNameFormat = NdefTypeNameFormat.EXTERNAL,
-        type = ImmutableBytes.of("iso.org:18013:deviceengagement".encodeToByteArray()),
-        identifier = ImmutableBytes.of("mdoc".encodeToByteArray()),
+        type = ByteString("iso.org:18013:deviceengagement".encodeToByteArray()),
+        identifier = ByteString("mdoc".encodeToByteArray()),
         payload = exact,
     )
 
@@ -669,7 +669,7 @@ private sealed interface CompletedNfcEngagement {
     data class Conventional(
         val handover: NfcConnectionHandover,
         val selected: PreparedTransports,
-        val deviceEngagement: ImmutableBytes,
+        val deviceEngagement: ByteString,
     ) : CompletedNfcEngagement
 
     data class NfcV2SameChannel(
@@ -703,7 +703,7 @@ private sealed interface SelectedNfcV2Candidate {
 private data class PreparedQrNfcPath(
     val eDeviceKey: Key,
     val candidates: PreparedTransports,
-    val deviceEngagement: ImmutableBytes,
+    val deviceEngagement: ByteString,
     val qrPayload: String,
     val directRetrieval: PreparedNfcApduTransport?,
 )
@@ -885,7 +885,7 @@ private class PreparedNfcMdocEngagement(
                 MdocEngagedConnection(
                     eDeviceKey = eDeviceKey,
                     engagementMode = MdocEngagementMode.Nfc,
-                    deviceEngagement = ImmutableBytes.of(completed.handover.deviceEngagement.encodedCopy()),
+                    deviceEngagement = ByteString(completed.handover.deviceEngagement.encodedCopy()),
                     sessionHandover = MdocSessionHandover.ProvisionalNfcV2(
                         completed.handover.handoverSelect,
                         completed.handover.handoverRequest,
@@ -897,7 +897,7 @@ private class PreparedNfcMdocEngagement(
                 MdocEngagedConnection(
                     eDeviceKey = eDeviceKey,
                     engagementMode = MdocEngagementMode.Nfc,
-                    deviceEngagement = ImmutableBytes.of(completed.handover.deviceEngagement.encodedCopy()),
+                    deviceEngagement = ByteString(completed.handover.deviceEngagement.encodedCopy()),
                     sessionHandover = MdocSessionHandover.ProvisionalNfcV2(
                         completed.handover.handoverSelect,
                         completed.handover.handoverRequest,

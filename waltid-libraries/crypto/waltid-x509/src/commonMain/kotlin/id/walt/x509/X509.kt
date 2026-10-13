@@ -6,6 +6,7 @@ import kotlin.io.encoding.Base64
 /**
  * DER encoded X.509 certificate as platform-agnostic wrapper.
  */
+@Deprecated("Use X509Certificate", ReplaceWith("id.walt.certificate.x509.X509Certificate"))
 data class CertificateDer(
     val bytes: ByteString,
 ) {
@@ -23,6 +24,10 @@ data class CertificateDer(
         private const val PEM_HEADER = "-----BEGIN CERTIFICATE-----"
         private const val PEM_FOOTER = "-----END CERTIFICATE-----"
 
+        @Deprecated(
+            "Use X509CertificateUtil",
+            ReplaceWith("id.walt.certificate.x509.X509CertificateUtil.parseCertificatePem")
+        )
         fun fromPEMEncodedString(
             pemEncodedCertificate: String,
         ): CertificateDer {
@@ -83,7 +88,10 @@ data class CertificateDer(
  *
  * @throws X509ValidationException when validation fails.
  */
-@Deprecated("Use id.walt.certificate.x509.X509CertificateUtil instead")
+@Deprecated(
+    "Use id.walt.certificate.x509.X509CertificateUtil instead",
+    ReplaceWith("id.walt.certificate.x509.X509CertificateUtil.validateCertificateChain")
+)
 @Throws(X509ValidationException::class)
 expect fun validateCertificateChain(
     leaf: CertificateDer,

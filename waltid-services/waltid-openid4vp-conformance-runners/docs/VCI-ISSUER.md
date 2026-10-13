@@ -16,6 +16,148 @@ new `build_time`; the tag, application version, revision, and test code match.
 
 ## Test Plan
 
+### JWT and standalone attestation proofs against issuer2
+
+The pinned suite already supports `key_attestation` in the JWT proof header and
+`oid4vci-1_0-issuer-fail-invalid-key-attestation-signature`. No suite patch is needed.
+The default wrapper run preserves its existing `metadata,positive` selection and
+adds `oid4vci-1_0-issuer-fail-invalid-key-attestation-signature`. It keeps the same
+protocol variant selection and honors explicit exclusions. The wrapper now defaults
+to `OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation`, running each selected
+variant once per proof mode. Batch issuance is included by default.
+The ordinary happy-flow tests now also exercise valid key attestations when the
+issuer is configured below. Both happy-flow and invalid-signature must execute
+and pass wherever the pinned suite offers them; skips are not key attestation
+coverage. Encrypted HAIP lacks the invalid-signature module, so include Basic VCI
+or plain HAIP to satisfy the negative coverage check.
+
+For troubleshooting only, the opt-in `vci-key-attestation` preset runs one basic VCI SD-JWT pre-authorized
+variant with client attestation, DPoP, and plain credential responses. It selects
+the happy flow, batch issuance, and invalid-key-attestation-signature modules.
+All three must execute and pass; none requires a browser. Missing, skipped, excluded, or
+failed modules fail acceptance even when general result strictness is disabled.
+The batch test uses valid key attestations covering the batch proof keys. The
+invalid-signature test is separate; the pinned suite does not offer a dedicated
+test for an invalid key attestation within a batch request.
+
+Start issuer2 using these test fixtures (paths below are relative to this runner):
+
+- `src/test/resources/issuer2/issuer-service-key-attestation.conf`: uses the
+  existing CI service settings and explicitly trusts the public half of the test
+  key in `src/test/resources/keys/attester-key.json` for key attestations.
+- `src/test/resources/issuer2/credential-issuer-metadata-key-attestation.conf`:
+  provides four JWT-only configurations requiring key attestation and four
+  attestation-only configurations whose IDs and scopes end in `.attestation`.
+- `src/test/resources/issuer2/issuer2-profiles-ci.conf`: eight matching issuance profiles.
+
+These fixtures are self-contained so issuer2's stream-based HOCON loader needs no
+relative includes. The service fixture defaults to `https://localhost.emobix.co.uk:9443`;
+set `ISSUER2_CONFORMANCE_BASE_URL` in the issuer process for another public base URL.
+Use host `0.0.0.0` and port `7005` in issuer2's web configuration for the local proxy.
+For example, after building the issuer2 fat JAR, from the unified build root:
+
+```bash
+ISSUER_ATTESTATION_FIXTURES="$PWD/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2"
+cd waltid-identity/waltid-services/waltid-issuer-api2
+java -Dconfig.file.issuer-service="$ISSUER_ATTESTATION_FIXTURES/issuer-service-key-attestation.conf" \
+  -Dconfig.file.credential-issuer-metadata="$ISSUER_ATTESTATION_FIXTURES/credential-issuer-metadata-key-attestation.conf" \
+  -Dconfig.file.issuer2-profiles="$ISSUER_ATTESTATION_FIXTURES/issuer2-profiles-ci.conf" \
+  -jar build/libs/waltid-issuer-api2-all.jar
+```
+
+Then, from the runner directory:
+
+```bash
+./run-issuer-conformance-local.sh
+```
+
+The wrapper reuses the checked-in **test** attester key for both independently
+configured attestation roles. To use another key, set
+`OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE` to a private ES256/P-256 JWK or JWKS
+and update issuer2's `keyAttestationConfig` to trust its public key or certificate
+chain. The runner emits this under `client_attestation.key_attestation_jwks`;
+OAuth client attestation continues to use `client_attestation.attester_jwks`.
+Certificate-chain trust also requires the matching `x5c` chain in the signing JWK.
+
+For an existing enterprise issuer2, configure the same trust using the
+"Issuer2 - Required JWT Key Attestation" Swagger example and select its credential
+configuration ID. The selected issuer metadata must contain
+`proof_types_supported.jwt.key_attestations_required: {}`. Enabling OAuth client
+attestation alone does not require credential key attestation.
+
+The key file input is optional for direct Gradle use. Explicit module/group filters
+are respected by the wrapper. To extend a custom selection, retain its existing
+filters and set `OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES=oid4vci-1_0-issuer-fail-invalid-key-attestation-signature`
+and `OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=true`. The original selection
+must include `oid4vci-1_0-issuer-happy-flow`; use configurations requiring JWT key attestation.
+Additional modules are combined with the original selection, and explicit exclusions
+still take precedence (excluding a required acceptance test fails acceptance).
+For the focused troubleshooting run only, use
+`OPENID4VCI_CONFORMANCE_PRESET=vci-key-attestation ./run-issuer-conformance-local.sh`.
+Acceptance covers valid issuance and rejection of a corrupt attestation signature;
+it does not establish exhaustive attestation policy or hardware certification coverage.
+
+### Running both proof modes locally
+
+Start issuer2 using the service, metadata, and profile fixtures above. Restart it
+with these updated files if it is still serving only the original four configurations.
+Then, from the runner directory, run all 40 combinations (12 Basic VCI + 8 HAIP
+variants for each proof mode), with metadata, positive, and negative modules:
+
+```bash
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID OPENID4VCI_CONFORMANCE_VARIANTS
+OPENID4VCI_CONFORMANCE_PRESET=vci-basic-haip \
+OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation \
+OPENID4VCI_CONFORMANCE_MATRIX=all \
+OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY=false \
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=metadata,positive,negative \
+OPENID4VCI_CONFORMANCE_MODULES='' \
+OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES='' \
+OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES='' \
+./run-issuer-conformance-local.sh
+```
+
+This preset supplies the fixture HAIP IDs and both credential/status-list trust
+anchors, and requires batch and key-attestation coverage. The issuer trust
+material remains in `keyAttestationConfig`; both proof modes use the configured
+`OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE`.
+
+For a focused standalone-attestation smoke test, use:
+
+```bash
+OPENID4VCI_CONFORMANCE_PRESET=vci-attestation ./run-issuer-conformance-local.sh
+```
+
+Like `vci-key-attestation` (JWT only), this runs happy flow, batch, and invalid
+key-attestation signature using Basic VCI, SD-JWT VC, pre-authorized issuance,
+and plain responses. All three must pass. Existing Basic VCI and HAIP presets
+also accept `OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt` or `attestation` for one mode.
+
+The plural proof-mode setting overrides the legacy single `CREDENTIAL_PROOF_TYPE_HINT`.
+JWT mode uses the configured credential IDs; attestation mode appends `.attestation`
+to those IDs and selects the corresponding issuance profiles. Variant IDs end in
+`-proof-jwt` or `-proof-attestation`. Aggregate reports contain both runs; `jwt/`
+and `attestation/` subdirectories contain each mode's reports.
+
+Before creating any test plans, the runner validates the credential configurations
+for every selected variant and proof mode. Missing or incompatible metadata stops
+the run immediately, with configuration errors recorded as `BLOCKED` in the reports;
+valid configurations remain `GENERATED` because no tests have started.
+
+Each run clears the generated `matrix.json`, `results.json`, and `summary.md` files
+from the report root and both proof-mode subdirectories, including modes not selected
+for that run. Other files are preserved. Use a separate
+`OPENID4VCI_CONFORMANCE_REPORT_DIR` for each run if you need to retain report history.
+
+Separate configurations are intentional: at db1080a the invalid-key-attestation
+signature module prefers `attestation` over the hint if both proof types are
+advertised. The runner rejects mixed metadata for a selected proof mode, and
+requires successful suite proof-generation and key-attestation-generation log
+entries for passing happy-flow, batch, and invalid-key-attestation-signature tests.
+Each mode must independently satisfy the coverage guards. The invalid-JWT-proof
+signature test is inapplicable and skipped in attestation-only mode; the JWT run
+retains it. No conformance-suite patch is needed.
+
 | Profile | Test Plan | Variants |
 |---------|-----------|----------|
 | Base VCI issuer | `oid4vci-1_0-issuer-test-plan` | 288 generated combinations |
@@ -341,6 +483,20 @@ failures fail the conformance job.
 strict, and
 `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
 coverage. One JUnit report covers all roles; issuer result artifacts remain
+Wallet/verifier tests retain the repository's `CONFORMANCE_ALLOW_FAILURE` setting.
+`OPENID4VCI_CONFORMANCE_STRICT=true` overrides that policy only for issuer results,
+and `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
+coverage. CI also sets `OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=true`
+and supplies `OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE`. Its issuer template
+trusts that test key. `OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation` selects
+four JWT-only configurations requiring key attestation and four attestation-only
+configurations. The happy flow must execute and pass in every variant, and
+`oid4vci-1_0-issuer-fail-invalid-key-attestation-signature` must execute and pass
+where offered: 12 Basic VCI and four plain HAIP variants per proof mode.
+The four encrypted HAIP variants do not offer that negative module in db1080a;
+its absence there is not negative coverage. Skipped results never satisfy the
+check, and an encrypted-HAIP-only run cannot satisfy negative coverage.
+One JUnit report covers all roles; issuer result artifacts remain
 separate. The live test task uses `--rerun` and disables configuration caching so
 it cannot reuse old test results or stale environment settings, while dependency
 compilation can stay up to date. Cacheless runs retain `--rerun-tasks`.
@@ -362,9 +518,10 @@ never bypass that check to get a green build.
 
 The job builds Issuer2 from the same checked-out Identity revision as the
 wallet/verifier tests and records that revision in the issuer artifact. It must
-include the completed batch/legacy-offer compatibility implementation. The runner
-branch alone does not supply it. CI-only files under `src/test/resources/issuer2/`
-enable batch size 10 and define exactly four basic/HAIP SD-JWT VC/mdoc profiles.
+include the batch/legacy-offer compatibility and JWT key-attestation verification
+implementations. The runner changes alone do not supply them. CI-only files under `src/test/resources/issuer2/`
+enable batch size 10 and define eight basic/HAIP SD-JWT VC/mdoc profiles: four
+for JWT proofs and four for standalone attestation proofs.
 The keys and certificates are public test fixtures; do not use them in production.
 Certificate validity and key/root matching are checked by `IssuerCiConfigurationTest`.
 
@@ -393,8 +550,8 @@ issuer modules and non-passing variants fail the job even when
 `OPENID4VCI_CONFORMANCE_STRICT=false`.
 The Kotlin runner enforces successful selected variants and executed
 batch coverage; CI also rejects missing/empty results. The configured matrix
-selects 20 variants, with 16 applicable batch variants and four encrypted-HAIP
-variants where batch is not offered at this suite pin. Skipped batch execution
+selects 20 protocol variants twice, producing 40 proof-mode runs: 32 applicable
+batch runs and eight encrypted-HAIP runs where batch is not offered at this pin. Skipped batch execution
 does not establish coverage. Suite and metadata preflight checks use `curl`/`jq`
 directly in the workflow; there is no separate Python validation layer.
 
@@ -422,14 +579,19 @@ Focused checks (no live conformance):
 # From the unified-build root:
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
   -PskipLiveConformance=true \
-  --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest
+  --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest \
+  --tests id.walt.openid4vp.conformance.IssuerKeyAttestationTest
 ```
 
 ### Default Selection
 
 With no selection variables set, the wrapper uses
 `vci-client-attestation-dpop-simple-unsigned` and runs the
-`metadata,positive` module groups. This produces 12 valid variants:
+`metadata,positive` module groups plus the invalid-key-attestation-signature
+negative test. Batch is included, and the key-attestation pass requirement is
+enabled. The default selection does not include the other negative tests; select
+`metadata,positive,negative` for those. This produces 12 valid protocol variants
+and, by default, 24 runs across both proof modes:
 
 - 2 credential formats: `sd_jwt_vc`, `mdoc`
 - 3 grant/flow pairs: `authorization_code` with both flow variants, and
@@ -545,7 +707,11 @@ An unfiltered direct Gradle invocation selects the complete 296-variant matrix.
 |----------|-------------|---------|
 | `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL` | Full issuer URL; defaults to the local proxy | `https://localhost.emobix.co.uk:9443/openid4vci` |
 | `OPENID4VCI_CONFORMANCE_PRESET` | Matrix preset; defaults to the 12-variant client-attestation/DPoP selection | `all-basic-plan` |
-| `OPENID4VCI_CONFORMANCE_MODULE_GROUPS` | Module groups; defaults to metadata and positive modules | `metadata,positive` or `all` |
+| `OPENID4VCI_CONFORMANCE_MODULE_GROUPS` | Module groups; default is metadata and positive, with the key-attestation negative test added separately | `metadata,positive,negative` or `all` |
+| `OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES` | Modules added to the group/name selection; explicit exclusions still apply | `oid4vci-1_0-issuer-fail-invalid-key-attestation-signature` |
+| `OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES` | Explicit exclusions; empty by default locally | `oid4vci-1_0-issuer-happy-flow-additional-requests` |
+| `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS` | Require executed batch passes wherever offered; enabled in CI and the focused key-attestation preset | `true` |
+| `OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS` | Require happy-flow and invalid-signature passes wherever offered, with at least one negative pass; enabled in CI, the focused preset, and default local selection | `true` |
 | `OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | SD-JWT credential config | `identity_credential` |
 | `OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID` | mDOC credential config | `org.iso.18013.5.1.mDL` |
 | `OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | HAIP SD-JWT credential config; defaults to the base SD-JWT ID | `identity_credential_haip` |
@@ -553,6 +719,9 @@ An unfiltered direct Gradle invocation selects the complete 296-variant matrix.
 | `OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP credential x5c validation | `/path/to/credential-root-ca.pem` |
 | `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP status-list validation | `/path/to/status-list-root-ca.pem` |
 | `OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE` | Private client-attester JWK/JWKS used by the conformance suite to sign client attestation JWTs | `src/test/resources/keys/attester-key.json` |
+| `OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE` | Private ES256/P-256 key-attester JWK/JWKS; must match issuer key-attestation trust | `src/test/resources/keys/attester-key.json` |
+| `OPENID4VCI_CONFORMANCE_PROOF_MODES` | Proof modes to run; defaults to both in the wrapper and CI; attestation uses configuration IDs suffixed `.attestation` | `jwt,attestation` |
+| `OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT` | Legacy single-run hint for direct Gradle use when `PROOF_MODES` is unset; module preferences may override it | `jwt` or `attestation` |
 | `OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER` | External auth server | (optional) |
 
 ## Client Attestation Keys
@@ -606,14 +775,21 @@ offline, then update issuer2's inline chains and these public runner fixtures.
 ### Full HAIP Run Without Dedicated FAPI Modules
 
 Run this command from the runner directory to execute metadata, positive, and
-negative modules for all eight HAIP variants. It intentionally excludes the
-dedicated FAPI module group.
+negative modules for all eight HAIP variants in both proof modes against the key-attestation fixtures
+described above. It requires batch and key-attestation coverage wherever offered
+and excludes the dedicated FAPI module group.
 
 ```bash
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://localhost.emobix.co.uk:9443/openid4vci" && \
 export OPENID4VCI_CONFORMANCE_PRESET="vci-haip-client-attestation-dpop-simple-unsigned" && \
 export OPENID4VCI_CONFORMANCE_MATRIX="all" && \
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive,negative" && \
+export OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES="" && \
+export OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES="" && \
+export OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS="true" && \
+export OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS="true" && \
+export OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/attester-key.json" && \
+export OPENID4VCI_CONFORMANCE_PROOF_MODES="jwt,attestation" && \
 export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip" && \
 export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip" && \
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
@@ -781,12 +957,15 @@ lifecycle failure rather than an issuer rejection failure.
 Revision `db1080a` adds `oid4vci-1_0-issuer-batch-issuance` to the positive group
 of the base issuer plan (plain and encrypted) and the HAIP plan (plain only).
 Encrypted HAIP does not offer a batch module at this pin.
-The local wrapper excludes it by default; the capability-disabled
-configuration above is a baseline example, not a statement about every issuer's
-shipped default. Check the actual running issuer's metadata.
+The local wrapper includes batch by default. CI and the focused
+`vci-key-attestation` preset also require an executed batch pass. Other local
+runs require `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` to reject capability
+skips. The capability-disabled configuration above is an optional baseline;
+the supplied CI and key-attestation fixtures enable batch size 10.
 
 The module reads `batch_credential_issuance.batch_size`, caps the request at 20,
-sends one JWT proof per requested credential, and checks that issuer2 returns
+sends one JWT proof per requested credential in JWT mode, or a standalone
+attestation covering all requested binding keys in attestation mode, and checks that issuer2 returns
 the same credential dataset bound to distinct proof keys. It also checks
 format-specific unlinkability properties, including SD-JWT disclosures/time
 claims and status references. At this pin, missing batch metadata, no cryptographic
@@ -814,6 +993,7 @@ OPENID4VCI_CONFORMANCE_MODULE_GROUPS=metadata,positive,negative \
 OPENID4VCI_CONFORMANCE_MODULES='' \
 OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=oid4vci-1_0-issuer-batch-issuance \
 OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=false \
+OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=false \
 OPENID4VCI_CONFORMANCE_STRICT=true \
 OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536 \
 OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-baseline" \
@@ -835,11 +1015,13 @@ OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES='' \
 OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true \
 OPENID4VCI_CONFORMANCE_STRICT=true \
 OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536 \
+OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=false \
+OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES='' \
 OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-batch" \
 ./run-issuer-conformance-local.sh
 ```
 
-This preset selects 12 base variants: SD-JWT VC/mdoc, pre-authorized issuer-initiated,
+This preset selects 12 base variants per proof mode: SD-JWT VC/mdoc, pre-authorized issuer-initiated,
 authorization-code issuer-initiated, and authorization-code wallet-initiated, each
 with plain/encrypted credential responses. It is not the entire 296-variant matrix.
 For a narrow first run, set
@@ -870,12 +1052,29 @@ the test process with the current run's environment.
 
 ### Combined basic VCI and HAIP in one invocation
 
-With the issuer URL, dedicated HAIP profile IDs, trust anchors, and browser login
-configured as above, run from the runner directory:
+Start issuer2 with the key-attestation fixtures described above, then run from
+the runner directory. This executes metadata, positive, and negative issuer tests
+with the same 20 variants as CI. Locally it also runs
+`oid4vci-1_0-issuer-happy-flow-additional-requests`, which CI excludes because its
+TLS probes reach the Cloudflare tunnel edge. Both use the same shared upstream
+pre-authorized client-attestation exclusions.
 
 ```bash
 unset OPENID4VCI_CONFORMANCE_VARIANT_ID OPENID4VCI_CONFORMANCE_VARIANTS SKIP_LIVE_CONFORMANCE
 OPENID4VCI_CONFORMANCE_PRESET=custom \
+OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL=https://localhost.emobix.co.uk:9443/openid4vci \
+OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID=identity_credential \
+OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID=org.iso.18013.5.1.mDL \
+OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID=identity_credential_haip \
+OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID=org.iso.18013.5.1.mDL.haip \
+OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/attester-key.json" \
+OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/attester-key.json" \
+OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation \
+OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" \
+OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" \
+OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=true \
+OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES='' \
+OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true \
 OPENID4VCI_CONFORMANCE_MATRIX=all \
 OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY=false \
 OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES=vci,vci_haip \
@@ -898,10 +1097,13 @@ OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-combined" \
 ```
 
 This selects 20 variants (12 basic VCI and 8 HAIP), excluding dedicated FAPI modules.
-A successful run reports 16 batch passes and 4 encrypted HAIP variants where batch
-is not offered. The runner derives applicability from the selected variants, not
-hardcoded matrix counts, so narrowed runs work too. Update the applicability rule
-when upgrading the pinned suite if its HAIP encrypted plan gains batch support.
+With both proof modes, a successful run has 40 happy-flow passes, 32 batch
+passes, and 32 invalid-key-attestation-signature passes. In each mode, the four
+encrypted HAIP variants offer
+neither batch nor the invalid-signature module at this pin. The runner derives
+applicability from the selected variants, not hardcoded matrix counts, so narrowed runs work too. Update the applicability rule
+when upgrading the pinned suite if its HAIP encrypted plan gains batch or
+invalid-key-attestation-signature support.
 
 Retain the raw per-module status/result and suite log URLs from `results.json`.
 Also record the runner revision/diff, issuer commit/artifact and profile/configuration

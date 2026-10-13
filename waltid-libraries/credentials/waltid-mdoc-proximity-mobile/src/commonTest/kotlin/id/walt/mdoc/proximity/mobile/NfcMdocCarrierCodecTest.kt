@@ -2,12 +2,12 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -22,12 +22,12 @@ class NfcMdocCarrierCodecTest {
         val method = DeviceRetrievalMethod.Nfc(255u, 65_536u)
         val carrier = NfcMdocCarrierCodec.encode(
             method,
-            ImmutableBytes.of("nfc".encodeToByteArray()),
+            ByteString("nfc".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
 
-        assertContentEquals("010201ff0402010000".hexToByteArray(), carrier.carrierRecord.payload.copy())
+        assertContentEquals("010201ff0402010000".hexToByteArray(), carrier.carrierRecord.payload.toByteArray())
         val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
         assertEquals(method, NfcMdocCarrierCodec.decode(parsed.carriers.single(), NfcMdocActor.HOLDER))
     }
@@ -46,13 +46,13 @@ class NfcMdocCarrierCodecTest {
         )
         val carrier = NfcMdocCarrierCodec.encode(
             holderPeripheral,
-            ImmutableBytes.of("0".encodeToByteArray()),
+            ByteString("0".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
         assertContentEquals(
             byteArrayOf(2, 0x1c, 0, 0x11, 0x07) + uuid.reversedArray(),
-            carrier.carrierRecord.payload.copy().copyOf(21),
+            carrier.carrierRecord.payload.toByteArray().copyOf(21),
         )
         val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
 
@@ -68,7 +68,7 @@ class NfcMdocCarrierCodecTest {
         val readerCentral = DeviceRetrievalMethod.Ble(centralMode = BleCentralMode(uuid))
         val carrier = NfcMdocCarrierCodec.encode(
             readerCentral,
-            ImmutableBytes.of("0".encodeToByteArray()),
+            ByteString("0".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.READER,
         )
@@ -78,7 +78,7 @@ class NfcMdocCarrierCodecTest {
         assertFailsWith<IllegalArgumentException> {
             NfcMdocCarrierCodec.encode(
                 DeviceRetrievalMethod.NfcV2,
-                ImmutableBytes.of("v2".encodeToByteArray()),
+                ByteString("v2".encodeToByteArray()),
                 emptyList(),
                 NfcMdocActor.HOLDER,
             )
@@ -91,7 +91,7 @@ class NfcMdocCarrierCodecTest {
         val offer = DeviceRetrievalMethod.Ble(peripheralMode = BlePeripheralMode(uuid))
         val carrier = NfcMdocCarrierCodec.encode(
             offer,
-            ImmutableBytes.of("0".encodeToByteArray()),
+            ByteString("0".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.READER,
             omitBleUuid = true,
@@ -112,15 +112,15 @@ class NfcMdocCarrierCodecTest {
                 peripheralMode = BlePeripheralMode(uuid),
                 peripheralEndpoint = BlePeripheralEndpoint.Mdoc(BlePeripheralServerOptions(psm = 0x1001u)),
             ),
-            ImmutableBytes.of("0".encodeToByteArray()),
+            ByteString("0".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
             omitBleUuid = true,
         )
         val readerOriginated = carrier.copy(
             carrierRecord = carrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(
-                    carrier.carrierRecord.payload.copy().also { payload ->
+                payload = ByteString(
+                    carrier.carrierRecord.payload.toByteArray().also { payload ->
                         payload[2] = 0x01
                     },
                 ),
@@ -143,14 +143,14 @@ class NfcMdocCarrierCodecTest {
         )
         val carrier = NfcMdocCarrierCodec.encode(
             method,
-            ImmutableBytes.of("0".encodeToByteArray()),
+            ByteString("0".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
         val withUnrelatedServiceData = carrier.copy(
             carrierRecord = carrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(
-                    carrier.carrierRecord.payload.copy() + byteArrayOf(3, 0x16, 0x34, 0x12),
+                payload = ByteString(
+                    carrier.carrierRecord.payload.toByteArray() + byteArrayOf(3, 0x16, 0x34, 0x12),
                 ),
             ),
         )
@@ -161,8 +161,8 @@ class NfcMdocCarrierCodecTest {
 
         val withDuplicateMdocServiceData = carrier.copy(
             carrierRecord = carrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(
-                    carrier.carrierRecord.payload.copy() +
+                payload = ByteString(
+                    carrier.carrierRecord.payload.toByteArray() +
                         byteArrayOf(4, 0x16, 0x01, 0xff.toByte(), 0xa0.toByte()),
                 ),
             ),
@@ -211,13 +211,13 @@ class NfcMdocCarrierCodecTest {
         )
         val carrier = NfcMdocCarrierCodec.encode(
             method,
-            ImmutableBytes.of("W".encodeToByteArray()),
+            ByteString("W".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
         assertContentEquals(
             byteArrayOf(2, 1, 1, 9, 3) + "12345678".encodeToByteArray() + byteArrayOf(2, 4, 0x14, 3, 5, 81, 6),
-            carrier.carrierRecord.payload.copy(),
+            carrier.carrierRecord.payload.toByteArray(),
         )
 
         val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(carrier)))
@@ -232,14 +232,14 @@ class NfcMdocCarrierCodecTest {
         )
         val selectedCarrier = NfcMdocCarrierCodec.encode(
             selectedMethod,
-            ImmutableBytes.of("W".encodeToByteArray()),
+            ByteString("W".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
-        val payload = selectedCarrier.carrierRecord.payload.copy()
+        val payload = selectedCarrier.carrierRecord.payload.toByteArray()
         val readerCarrier = selectedCarrier.copy(
             carrierRecord = selectedCarrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
+                payload = ByteString(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
             ),
         )
         val parsed = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(readerCarrier)))
@@ -255,7 +255,7 @@ class NfcMdocCarrierCodecTest {
 
         val pkOnlyCarrier = readerCarrier.copy(
             carrierRecord = readerCarrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(readerCarrier.carrierRecord.payload.copy().also { it[2] = 2 }),
+                payload = ByteString(readerCarrier.carrierRecord.payload.toByteArray().also { it[2] = 2 }),
             ),
         )
         val pkOnly = NfcHandoverCodec.validateRequest(NfcHandoverCodec.encodeRequest(listOf(pkOnlyCarrier)))
@@ -273,14 +273,14 @@ class NfcMdocCarrierCodecTest {
     fun `Wi-Fi Aware selected carrier rejects missing shared-key passphrase`() {
         val carrier = NfcMdocCarrierCodec.encode(
             DeviceRetrievalMethod.WifiAware("12345678", supportedBands = byteArrayOf(0x04)),
-            ImmutableBytes.of("W".encodeToByteArray()),
+            ByteString("W".encodeToByteArray()),
             emptyList(),
             NfcMdocActor.HOLDER,
         )
-        val payload = carrier.carrierRecord.payload.copy()
+        val payload = carrier.carrierRecord.payload.toByteArray()
         val withoutPassphrase = carrier.copy(
             carrierRecord = carrier.carrierRecord.copy(
-                payload = ImmutableBytes.of(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
+                payload = ByteString(payload.copyOfRange(0, 3) + payload.copyOfRange(13, payload.size)),
             ),
         )
         val parsed = NfcHandoverCodec.validateSelect(NfcHandoverCodec.encodeSelect(listOf(withoutPassphrase)))

@@ -1,11 +1,14 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import kotlin.time.Duration.Companion.minutes
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import com.atlassian.onetime.core.TOTP
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.exceptions.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.storeddata.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -22,7 +25,9 @@ object TOTP : AuthenticationMethod("totp") {
     override val relatedAuthMethodStoredData = TOTPStoredData::class
 
     suspend fun auth(session: AuthSession, code: String) {
-        val storedData = lookupAccountStoredData<TOTPStoredData>(session.accountId ?: error("No account ID") /* context() */)
+        val accountId = session.accountId
+            ?: throw AuthSessionStateException("TOTP needs a previous step that identifies the account")
+        val storedData = lookupAccountStoredData<TOTPStoredData>(accountId)
 
         val userProvidedOtpCode = TOTP(code)
         val secret = TOTPSecret.fromBase32EncodedString(storedData.secret)
@@ -30,6 +35,11 @@ object TOTP : AuthenticationMethod("totp") {
         val service = DefaultTOTPService()
         authCheck(
             service.verify(userProvidedOtpCode, secret).isSuccess(), OTPAuthException()
+        )
+        // A code logs in once: codes stay valid for a few 30 s windows, so a seen one is refused meanwhile.
+        authCheck(
+            KtorAuthnzManager.expiringStore.putIfAbsent("totp-used:$accountId:$code", "used", 3.minutes),
+            OTPAuthException()
         )
     }
 
@@ -50,7 +60,7 @@ object TOTP : AuthenticationMethod("totp") {
             val otp = when {
                 contentType.match(ContentType.Application.Json) -> call.receive<TOTPCode>().code
                 contentType.match(ContentType.Application.FormUrlEncoded) ->
-                    call.receiveParameters()["code"] ?: error("Invalid or missing OTP code form post request.")
+                    requireNotNull(call.receiveParameters()["code"]) { "Invalid or missing OTP code form post request." }
 
                 else -> call.receiveText()
             }
@@ -63,19 +73,3 @@ object TOTP : AuthenticationMethod("totp") {
     }
 
 }
-
-/*fun main() {
-    val service = DefaultTOTPService()
-
-    val secret = TOTPSecret.fromBase32EncodedString("ZIQL3WHUAGCS5FQQDKP74HZCFT56TJHR")
-    val totpGenerator: TOTPGenerator = TOTPGenerator()
-    val totp = totpGenerator.generateCurrent(secret) //TOTP(value=123456)
-    println("totp: $totp")
-
-    val totpUri = service.generateTOTPUrl(
-        secret, ////NIQXUILREVGHIUKNORKHSJDHKMWS6UTY
-        EmailAddress("jsmith@acme.com"),
-        Issuer("Acme Co")
-    )
-    println("URI: $totpUri")
-}*/

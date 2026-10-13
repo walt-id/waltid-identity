@@ -5,12 +5,12 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethodCodec
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -36,10 +36,10 @@ public data class NfcV2MaximumCommandDataLength(public val value: Int) {
 
 /** Validated exact NFCv2 Handover Request received from the reader. */
 internal class NfcV2HandoverRequest(
-    exactBytes: ImmutableBytes,
+    exactBytes: ByteString,
     availableMethods: List<DeviceRetrievalMethod>,
 ) {
-    public val exactBytes: ImmutableBytes = exactBytes
+    public val exactBytes: ByteString = exactBytes
     private val ownedMethods = availableMethods.map(ReaderSelectedTransportOffer::Method)
     public val availableMethods: List<DeviceRetrievalMethod> get() = ownedMethods.map { it.value }
 
@@ -68,15 +68,15 @@ internal data class NfcV2HandoverSelection(
 
 /** Exact completed provisional NFCv2 handover with its only legal continuation. */
 internal sealed interface NfcV2Handover {
-    public val handoverSelect: ImmutableBytes
-    public val handoverRequest: ImmutableBytes
+    public val handoverSelect: ByteString
+    public val handoverRequest: ByteString
     public val deviceEngagement: ExactCbor<DeviceEngagement>
     public val selectedMethod: DeviceRetrievalMethod
 
     /** SessionEstablishment and subsequent messages continue on the selected NFCv2 APDU channel. */
     public class SameChannel internal constructor(
-        override val handoverSelect: ImmutableBytes,
-        override val handoverRequest: ImmutableBytes,
+        override val handoverSelect: ByteString,
+        override val handoverRequest: ByteString,
         override val deviceEngagement: ExactCbor<DeviceEngagement>,
         override val selectedMethod: DeviceRetrievalMethod.NfcV2,
     ) : NfcV2Handover {
@@ -89,8 +89,8 @@ internal sealed interface NfcV2Handover {
 
     /** NFCv2 engagement completed and payloads continue over NFC plus one prepared alternate bearer. */
     public class AlternateBearer internal constructor(
-        override val handoverSelect: ImmutableBytes,
-        override val handoverRequest: ImmutableBytes,
+        override val handoverSelect: ByteString,
+        override val handoverRequest: ByteString,
         override val deviceEngagement: ExactCbor<DeviceEngagement>,
         override val selectedMethod: DeviceRetrievalMethod,
     ) : NfcV2Handover {
@@ -116,8 +116,8 @@ internal enum class NfcV2State {
 }
 
 internal sealed interface NfcV2ApduResult {
-    public data class Response(public val encoded: ImmutableBytes) : NfcV2ApduResult
-    public data class Request(public val identifier: ULong, public val sessionMessage: ImmutableBytes) : NfcV2ApduResult
+    public data class Response(public val encoded: ByteString) : NfcV2ApduResult
+    public data class Request(public val identifier: ULong, public val sessionMessage: ByteString) : NfcV2ApduResult
 }
 
 /** Common provisional NFCv2 handover and same-channel APDU state machine. */
@@ -172,7 +172,7 @@ internal class NfcV2ApduProcessor(
         }
     }
 
-    public fun completeResponse(identifier: ULong, sessionMessage: ByteArray): ImmutableBytes {
+    public fun completeResponse(identifier: ULong, sessionMessage: ByteArray): ByteString {
         check(state == NfcV2State.AWAITING_WALLET_RESPONSE && pendingIdentifier == identifier) {
             "NFCv2 response does not own the current pending request"
         }
@@ -183,7 +183,7 @@ internal class NfcV2ApduProcessor(
         pendingIdentifier = null
         afterOutgoing = NfcV2State.AWAITING_PAYLOAD
         state = if (exchange.hasOutgoingData) NfcV2State.SENDING_PAYLOAD_RESPONSE else NfcV2State.AWAITING_PAYLOAD
-        return ImmutableBytes.of(first.encode())
+        return ByteString(first.encode())
     }
 
     internal fun cancelPendingResponse(identifier: ULong) {
@@ -208,14 +208,14 @@ internal class NfcV2ApduProcessor(
             return response(NfcStatusWord.INCORRECT_PARAMETERS)
         }
         if (command.expectedResponseDataLength != null) return response(NfcStatusWord.WRONG_LENGTH)
-        if (!command.data.contentEquals(MdocNfcAid.NFC_V2.copy())) return response(NfcStatusWord.FILE_NOT_FOUND)
+        if (command.data != MdocNfcAid.NFC_V2) return response(NfcStatusWord.FILE_NOT_FOUND)
         val selectPayload = coseCompliantCbor.encodeToByteArray(
             CborElement.serializer(),
             CborMap(mapOf(CborInteger(0) to CborInteger(maximumCommandDataLength.value.toULong()))),
         )
         state = NfcV2State.AWAITING_HANDOVER_REQUEST
         return NfcV2ApduResult.Response(
-            ImmutableBytes.of(NfcResponseApdu(ImmutableBytes.of(selectPayload), NfcStatusWord.SUCCESS).encode())
+            ByteString(NfcResponseApdu(ByteString(selectPayload), NfcStatusWord.SUCCESS).encode())
         )
     }
 
@@ -229,7 +229,7 @@ internal class NfcV2ApduProcessor(
         }
         return when (val incoming = exchange.accept(command)) {
             is NfcApduMessageExchange.IncomingResult.Continue ->
-                NfcV2ApduResult.Response(ImmutableBytes.of(incoming.response.encode()))
+                NfcV2ApduResult.Response(ByteString(incoming.response.encode()))
             is NfcApduMessageExchange.IncomingResult.Message -> when (state) {
                 NfcV2State.AWAITING_HANDOVER_REQUEST -> completeHandover(incoming.bytes)
                 NfcV2State.AWAITING_PAYLOAD -> {
@@ -241,7 +241,7 @@ internal class NfcV2ApduProcessor(
                     nextIdentifier++
                     pendingIdentifier = identifier
                     state = NfcV2State.AWAITING_WALLET_RESPONSE
-                    NfcV2ApduResult.Request(identifier, ImmutableBytes.of(incoming.bytes))
+                    NfcV2ApduResult.Request(identifier, ByteString(incoming.bytes))
                 }
                 else -> error("Unexpected NFCv2 ENVELOPE state")
             }
@@ -266,14 +266,14 @@ internal class NfcV2ApduProcessor(
         }
         val completedHandover = if (selection.selectedMethod is DeviceRetrievalMethod.NfcV2) {
             NfcV2Handover.SameChannel(
-                ImmutableBytes.of(exactSelect),
+                ByteString(exactSelect),
                 request.exactBytes,
                 selection.deviceEngagement,
                 selection.selectedMethod,
             )
         } else {
             NfcV2Handover.AlternateBearer(
-                ImmutableBytes.of(exactSelect),
+                ByteString(exactSelect),
                 request.exactBytes,
                 selection.deviceEngagement,
                 selection.selectedMethod,
@@ -284,7 +284,7 @@ internal class NfcV2ApduProcessor(
         state = if (exchange.hasOutgoingData) NfcV2State.SENDING_HANDOVER_RESPONSE else checkNotNull(afterOutgoing)
         if (!exchange.hasOutgoingData) afterOutgoing = null
         onHandover(completedHandover)
-        return NfcV2ApduResult.Response(ImmutableBytes.of(first.encode()))
+        return NfcV2ApduResult.Response(ByteString(first.encode()))
     }
 
     private fun getResponse(command: NfcCommandApdu): NfcV2ApduResult {
@@ -300,7 +300,7 @@ internal class NfcV2ApduProcessor(
             state = checkNotNull(afterOutgoing)
             afterOutgoing = null
         }
-        return NfcV2ApduResult.Response(ImmutableBytes.of(value.encode()))
+        return NfcV2ApduResult.Response(ByteString(value.encode()))
     }
 
     private fun parseHandoverRequest(encoded: ByteArray): NfcV2HandoverRequest {
@@ -315,7 +315,7 @@ internal class NfcV2ApduProcessor(
                 coseCompliantCbor.encodeToByteArray(CborElement.serializer(), element),
             )
         }
-        return NfcV2HandoverRequest(ImmutableBytes.of(encoded), decoded)
+        return NfcV2HandoverRequest(ByteString(encoded), decoded)
     }
 
     private fun fail(status: UShort): NfcV2ApduResult {
@@ -327,7 +327,7 @@ internal class NfcV2ApduProcessor(
     }
 
     private fun response(status: UShort): NfcV2ApduResult.Response = NfcV2ApduResult.Response(
-        ImmutableBytes.of(NfcResponseApdu(statusWord = status).encode()),
+        ByteString(NfcResponseApdu(statusWord = status).encode()),
     )
 
     private fun selectionWasOffered(

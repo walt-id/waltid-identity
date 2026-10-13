@@ -1,6 +1,6 @@
 package id.walt.wallet2.handlers
 
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

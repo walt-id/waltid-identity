@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -15,15 +15,15 @@ class NfcApduTest {
         val commands = listOf(
             NfcCommandApdu(0u, 0xa4u, 0u, 0u),
             NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 256),
-            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ImmutableBytes.of(byteArrayOf(1, 2, 3))),
+            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(byteArrayOf(1, 2, 3))),
             NfcCommandApdu(
-                0u, 0xd6u, 0u, 0u, ImmutableBytes.of(byteArrayOf(1, 2, 3)),
+                0u, 0xd6u, 0u, 0u, ByteString(byteArrayOf(1, 2, 3)),
                 expectedResponseDataLength = 17,
             ),
             NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 65_536),
-            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ImmutableBytes.of(ByteArray(256) { it.toByte() })),
+            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(ByteArray(256) { it.toByte() })),
             NfcCommandApdu(
-                0u, 0xd6u, 0u, 0u, ImmutableBytes.of(ByteArray(256) { it.toByte() }),
+                0u, 0xd6u, 0u, 0u, ByteString(ByteArray(256) { it.toByte() }),
                 expectedResponseDataLength = 65_536,
             ),
         )
@@ -57,7 +57,7 @@ class NfcApduTest {
 
     @Test
     fun `response APDU retains data and status`() {
-        val response = NfcResponseApdu(ImmutableBytes.of(byteArrayOf(1, 2, 3)), NfcStatusWord.SUCCESS)
+        val response = NfcResponseApdu(ByteString(byteArrayOf(1, 2, 3)), NfcStatusWord.SUCCESS)
         assertContentEquals(byteArrayOf(1, 2, 3, 0x90.toByte(), 0), response.encode())
         assertEquals(response, NfcResponseApdu.decode(response.encode()))
         assertFailsWith<IllegalArgumentException> { NfcResponseApdu.decode(byteArrayOf(0x90.toByte())) }

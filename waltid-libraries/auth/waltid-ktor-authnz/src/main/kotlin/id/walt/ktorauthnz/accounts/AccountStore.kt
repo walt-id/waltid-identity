@@ -16,4 +16,7 @@ interface AccountStore {
     suspend fun lookupAccountUuid(identifier: AccountIdentifier): String?
 
     suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean
+
+    /** All identifiers of the account, or null if this store cannot list them (then `GET identities` answers 501). */
+    suspend fun lookupAccountIdentifiers(accountId: String): List<AccountIdentifier>? = null
 }

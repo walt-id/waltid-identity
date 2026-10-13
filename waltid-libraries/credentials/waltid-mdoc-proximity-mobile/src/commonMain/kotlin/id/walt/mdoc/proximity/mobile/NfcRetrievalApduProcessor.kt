@@ -1,7 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.proximity.ImmutableBytes
 
 /** Observable conventional NFC retrieval lifecycle. */
 internal enum class NfcRetrievalState {
@@ -15,12 +15,12 @@ internal enum class NfcRetrievalState {
 
 /** Result of processing one reader APDU. */
 internal sealed interface NfcRetrievalApduResult {
-    public data class Response(public val encoded: ImmutableBytes) : NfcRetrievalApduResult
+    public data class Response(public val encoded: ByteString) : NfcRetrievalApduResult
 
     /** The platform must defer this APDU's response until [NfcRetrievalApduProcessor.completeResponse]. */
     public data class Request(
         public val identifier: ULong,
-        public val sessionMessage: ImmutableBytes,
+        public val sessionMessage: ByteString,
     ) : NfcRetrievalApduResult
 }
 
@@ -71,7 +71,7 @@ internal class NfcRetrievalApduProcessor(
     }
 
     /** Completes the one pending ENVELOPE response and returns its first response APDU. */
-    public fun completeResponse(identifier: ULong, sessionMessage: ByteArray): ImmutableBytes {
+    public fun completeResponse(identifier: ULong, sessionMessage: ByteArray): ByteString {
         check(state == NfcRetrievalState.AWAITING_WALLET_RESPONSE && pendingIdentifier == identifier) {
             "NFC response does not own the current pending request"
         }
@@ -79,7 +79,7 @@ internal class NfcRetrievalApduProcessor(
         val response = exchange.stageResponse(sessionMessage)
         pendingIdentifier = null
         state = if (exchange.hasOutgoingData) NfcRetrievalState.SENDING_RESPONSE else NfcRetrievalState.READY
-        return ImmutableBytes.of(response.encode())
+        return ByteString(response.encode())
     }
 
     internal fun cancelPendingResponse(identifier: ULong) {
@@ -105,7 +105,7 @@ internal class NfcRetrievalApduProcessor(
             return response(NfcStatusWord.INCORRECT_PARAMETERS)
         }
         if (command.expectedResponseDataLength != null) return response(NfcStatusWord.WRONG_LENGTH)
-        if (!command.data.contentEquals(MdocNfcAid.DATA_TRANSFER.copy())) {
+        if (command.data != MdocNfcAid.DATA_TRANSFER) {
             return response(NfcStatusWord.FILE_NOT_FOUND)
         }
         state = NfcRetrievalState.READY
@@ -123,7 +123,7 @@ internal class NfcRetrievalApduProcessor(
         return when (val incoming = exchange.accept(command)) {
             is NfcApduMessageExchange.IncomingResult.Continue -> {
                 state = NfcRetrievalState.RECEIVING_COMMAND
-                NfcRetrievalApduResult.Response(ImmutableBytes.of(incoming.response.encode()))
+                NfcRetrievalApduResult.Response(ByteString(incoming.response.encode()))
             }
             is NfcApduMessageExchange.IncomingResult.Message -> {
                 val identifier = nextIdentifier
@@ -131,7 +131,7 @@ internal class NfcRetrievalApduProcessor(
                 nextIdentifier++
                 pendingIdentifier = identifier
                 state = NfcRetrievalState.AWAITING_WALLET_RESPONSE
-                NfcRetrievalApduResult.Request(identifier, ImmutableBytes.of(incoming.bytes))
+                NfcRetrievalApduResult.Request(identifier, ByteString(incoming.bytes))
             }
         }
     }
@@ -146,7 +146,7 @@ internal class NfcRetrievalApduProcessor(
         }
         val response = exchange.getResponse(command)
         state = if (exchange.hasOutgoingData) NfcRetrievalState.SENDING_RESPONSE else NfcRetrievalState.READY
-        return NfcRetrievalApduResult.Response(ImmutableBytes.of(response.encode()))
+        return NfcRetrievalApduResult.Response(ByteString(response.encode()))
     }
 
     private fun fail(status: UShort): NfcRetrievalApduResult {
@@ -157,7 +157,7 @@ internal class NfcRetrievalApduProcessor(
     }
 
     private fun response(status: UShort): NfcRetrievalApduResult.Response = NfcRetrievalApduResult.Response(
-        ImmutableBytes.of(NfcResponseApdu(statusWord = status).encode()),
+        ByteString(NfcResponseApdu(statusWord = status).encode()),
     )
 
     private companion object {

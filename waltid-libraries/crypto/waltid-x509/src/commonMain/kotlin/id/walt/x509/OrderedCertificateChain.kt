@@ -78,6 +78,7 @@ val CertificateDer.authorityKeyIdentifier: ByteArray?
 val CertificateDer.subjectAlternativeDnsNames: List<String>
     get() = PlatformX509Certificate.parse(this).subjectAlternativeDnsNames
 
+@Deprecated("Use X509CertificateUtil", ReplaceWith("id.walt.certificate.x509.X509Certificate"))
 internal expect class PlatformX509Certificate {
     val subjectKeyIdentifier: ByteArray?
     val authorityKeyIdentifier: ByteArray?
@@ -131,6 +132,7 @@ fun CertificateDer.validateDocumentSigningCertificateUsage(instant: Instant = Cl
     }
 }
 
+@Deprecated("use X509Certificate")
 fun CertificateDer.validateCertificateAuthorityUsage(instant: Instant = Clock.System.now()) {
     val certificate = PlatformX509Certificate.parse(this)
     certificate.checkValidityAt(instant)

@@ -1,7 +1,7 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
@@ -29,7 +29,7 @@ fun interface CredentialIssuanceInputProvider {
 
 data class CredentialIssuanceInstance(
     val input: CredentialIssuanceInput,
-    val verifiedProof: VerifiedCredentialProof?,
+    val verifiedBinding: VerifiedCredentialBinding?,
 )
 
 /**
@@ -37,20 +37,20 @@ data class CredentialIssuanceInstance(
  */
 data class CredentialIssuanceBatch(
     val inputs: List<CredentialIssuanceInput>,
-    val verifiedProofs: List<VerifiedCredentialProof>,
+    val bindings: List<VerifiedCredentialBinding>,
 ) {
     init {
-        val expectedInputCount = verifiedProofs.size.coerceAtLeast(1)
+        val expectedInputCount = bindings.size.coerceAtLeast(1)
         require(inputs.size == expectedInputCount) {
             "Credential issuance batch has ${inputs.size} inputs; expected $expectedInputCount"
         }
     }
 
     val instances: List<CredentialIssuanceInstance> =
-        if (verifiedProofs.isEmpty()) {
+        if (bindings.isEmpty()) {
             listOf(CredentialIssuanceInstance(inputs.single(), null))
         } else {
-            inputs.zip(verifiedProofs) { input, proof -> CredentialIssuanceInstance(input, proof) }
+            inputs.zip(bindings) { input, proof -> CredentialIssuanceInstance(input, proof) }
         }
 }
 

@@ -1,5 +1,8 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
@@ -23,6 +26,7 @@ import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.getSession
+import id.walt.issuer2.testsupport.Issuer2TestKeyAttester
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.errors.CredentialError
@@ -69,9 +73,10 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
     @Test
     fun scaSdJwtProfileIssuesDemoClaimsBoundToTheProofKey() = testApplication {
-        installIssuer2WithConfigFiles()
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(keyAttestationConfig = attester.issuerTrust) })
         val client = apiClient()
-        val flow = Issuer2WalletFlowDriver(client)
+        val flow = Issuer2WalletFlowDriver(client, keyAttestationProvider = attester)
         val scenario = Issuer2CredentialScenarios.configured.single { it.profileId == "scaPaymentCardSdJwt" }
         val offer = client.createWalletFlowCredentialOffer(scenario = scenario, authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED, txCodeMode = Issuer2TxCodeMode.NONE)
         val resolved = flow.resolve(offer)
@@ -90,7 +95,11 @@ class Issuer2PreAuthorizedWalletFlowTest {
         val issued = response.body<JsonObject>().getValue("credentials").jsonArray.single().jsonObject.getValue("credential").jsonPrimitive.content
         val parts = issued.split('~')
         val claims = decode(parts.first().split('.')[1]).jsonObject
-        assertEquals(proofJwk, claims.getValue("cnf").jsonObject["jwk"])
+        // Key identity is independent of optional JWK metadata such as the issuer-assigned kid.
+        suspend fun thumbprint(jwk: JsonObject) = Jwk.sha256Thumbprint(
+            EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false),
+        )
+        assertEquals(thumbprint(proofJwk.jsonObject), thumbprint(claims.getValue("cnf").jsonObject.getValue("jwk").jsonObject))
         assertEquals(resolved.issuerMetadata.credentialIssuer + "/sca_payment_card_sd_jwt", claims["vct"]?.jsonPrimitive?.content)
         val disclosures = parts.drop(1).filter { it.isNotEmpty() }.map { decode(it).jsonArray }
         assertEquals(mapOf("card_scheme" to "demo", "card_last4" to "4242", "card_holder_name" to "Jane Doe"),

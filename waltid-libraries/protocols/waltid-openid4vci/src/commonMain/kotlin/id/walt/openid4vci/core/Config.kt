@@ -73,7 +73,7 @@ data class OAuth2ProviderConfig(
 
     val credentialRequestValidator: CredentialRequestValidator,
     val credentialRequestDecryptor: CredentialRequestDecryptor? = null,
-    val credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
+    val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
 )

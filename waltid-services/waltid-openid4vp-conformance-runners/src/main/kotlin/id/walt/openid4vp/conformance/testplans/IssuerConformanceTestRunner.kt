@@ -52,8 +52,14 @@ class IssuerConformanceTestRunner(
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
     private val requireBatchPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS")
         ?.toBooleanStrict() ?: false,
+    private val keyAttesterJwks: JsonObject? = null,
+    private val requireKeyAttestationPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS")
+        ?.toBooleanStrict() ?: false,
+    private val proofModes: List<String> = parseIssuerProofModes(System.getenv("OPENID4VCI_CONFORMANCE_PROOF_MODES")),
 ) {
     suspend fun run(): List<TestPlanResult> {
+        // Even failures before metadata is available must not leave an earlier run's passing reports.
+        IssuerVariantReportWriter.prepareForRun(variantSelection.reportDir)
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
         return try {
             val metadataHttp = HttpClient {
@@ -83,7 +89,8 @@ class IssuerConformanceTestRunner(
     ): List<TestPlanResult> {
         val resolvedIds = resolveCredentialConfigurationIds(metadata)
         val allVariants = IssuerVariantMatrix.all()
-        val selectedVariants = variantSelection.select(allVariants)
+        val selectedVariants = variantSelection.select(expandIssuerProofModes(allVariants, proofModes))
+        val protocolVariants = selectedVariants.map { it.copy(credentialProofType = null) }.distinct()
 
         require(selectedVariants.isNotEmpty()) {
             "No OpenID4VCI issuer variants selected. Check OPENID4VCI_CONFORMANCE_VARIANTS and filter environment variables."
@@ -91,28 +98,24 @@ class IssuerConformanceTestRunner(
         require(!requireBatchPass || !variantSelection.discoveryOnly) {
             "Batch acceptance requires executed modules; discovery mode cannot verify batch issuance."
         }
+        require(!requireKeyAttestationPass || (!variantSelection.discoveryOnly && keyAttesterJwks != null)) {
+            "Key attestation acceptance requires executed modules and OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE."
+        }
 
         println("Resolved issuer credential configuration ids:")
         println("  sd-jwt-vc -> ${resolvedIds.sdJwt ?: "<not found>"}")
         println("  mdoc      -> ${resolvedIds.mdoc ?: "<not found>"}")
         println("  haip sd-jwt-vc -> ${resolvedIds.haipSdJwt ?: "<not found>"}")
         println("  haip mdoc      -> ${resolvedIds.haipMdoc ?: "<not found>"}")
-        println("Selected OpenID4VCI issuer variants: ${selectedVariants.size}/${allVariants.size}")
+        println("Selected OpenID4VCI issuer variants: ${protocolVariants.size}/${allVariants.size}; ${selectedVariants.size} proof-mode runs")
+
+        val preflightResults = preflightIssuerConfigurations(metadata, selectedVariants) { variant ->
+            credentialConfigurationIdFor(variant, resolvedIds)
+        }
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, preflightResults, variantSelection.strictResults)
+        requireIssuerConfigurationPreflight(preflightResults)
 
         if (variantSelection.discoveryOnly) {
-            val discoveryResults = selectedVariants.map { variant ->
-                val credentialConfigurationId = credentialConfigurationIdFor(variant, resolvedIds)
-                if (credentialConfigurationId == null) {
-                    blockedResult(variant, "No issuer metadata credential configuration id found for ${variant.credentialFormat}.")
-                } else {
-                    IssuerVariantRunResult(
-                        variantId = variant.id,
-                        variant = variant.toJsonObject(),
-                        status = IssuerVariantRunStatus.GENERATED,
-                    )
-                }
-            }
-            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults, variantSelection.strictResults)
             println("Wrote issuer conformance discovery artifacts to ${variantSelection.reportDir}")
             return emptyList()
         }
@@ -124,14 +127,7 @@ class IssuerConformanceTestRunner(
         try {
             selectedVariants.forEachIndexed { index, variant ->
                 println("Running issuer matrix variant ${index + 1}/${selectedVariants.size}: ${variant.id}")
-                val credentialConfigurationId = credentialConfigurationIdFor(variant, resolvedIds)
-                if (credentialConfigurationId == null) {
-                    results += blockedResult(
-                        variant,
-                        "No issuer metadata credential configuration id found for ${variant.credentialFormat}."
-                    )
-                    return@forEachIndexed
-                }
+                val credentialConfigurationId = requireNotNull(credentialConfigurationIdFor(variant, resolvedIds))
 
                 results += runCatching {
                     val plan = Oid4vciIssuerVariantPlan(
@@ -140,8 +136,9 @@ class IssuerConformanceTestRunner(
                         variant = variant,
                         clientAttestationIssuer = clientAttestationIssuer,
                         clientAttesterJwks = clientAttesterJwks,
+                        keyAttesterJwks = keyAttesterJwks,
                         authorizationServer = authorizationServer,
-                        credentialProofTypeHint = credentialProofTypeHint,
+                        credentialProofTypeHint = variant.credentialProofType ?: credentialProofTypeHint,
                         staticTxCode = staticTxCode,
                         credentialTrustAnchorPem = credentialTrustAnchorPem,
                         statusListTrustAnchorPem = statusListTrustAnchorPem,
@@ -175,8 +172,11 @@ class IssuerConformanceTestRunner(
 
         // Ordinary runs retain capability-based skips. Batch acceptance checks raw suite outcomes.
         // Write the unmodified reports first so missing, skipped, and failed modules remain diagnosable.
-        if (requireBatchPass) {
-            requireExecutedBatchIssuance(results)
+        // Each proof mode must independently satisfy the coverage requirements.
+        results.groupBy { it.variant["credential_proof_type"]?.jsonPrimitive?.content }.forEach { (mode, modeResults) ->
+            println("Checking issuer coverage for proof mode ${mode ?: credentialProofTypeHint ?: "auto"}")
+            if (requireBatchPass) requireExecutedBatchIssuance(modeResults)
+            if (requireKeyAttestationPass) requireExecutedKeyAttestation(modeResults)
         }
 
         if (variantSelection.strictResults) {
@@ -259,15 +259,7 @@ class IssuerConformanceTestRunner(
         "sd_jwt_vc" -> if (variant.isHaip) resolvedIds.haipSdJwt else resolvedIds.sdJwt
         "mdoc" -> if (variant.isHaip) resolvedIds.haipMdoc else resolvedIds.mdoc
         else -> null
-    }
-
-    private fun blockedResult(variant: IssuerVariant, error: String): IssuerVariantRunResult =
-        IssuerVariantRunResult(
-            variantId = variant.id,
-            variant = variant.toJsonObject(),
-            status = IssuerVariantRunStatus.BLOCKED,
-            error = error,
-        )
+    }?.let { id -> if (variant.credentialProofType == "attestation") "$id.attestation" else id }
 
     private fun buildIssuerMetadataUrl(issuerUrl: String): String {
         val issuerUri = URI.create(issuerUrl)

@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -15,7 +15,7 @@ class NfcEngagementApduProcessorTest {
         val handoverSelect = handoverMessage("Hs")
         val completed = mutableListOf<NfcConnectionHandover>()
         val processor = NfcEngagementApduProcessor(
-            NfcEngagementConfiguration.Static(ImmutableBytes.of(handoverSelect)),
+            NfcEngagementConfiguration.Static(ByteString(handoverSelect)),
             onHandover = completed::add,
         )
 
@@ -24,8 +24,8 @@ class NfcEngagementApduProcessorTest {
         val response = NfcResponseApdu.decode(processor.process(readBinary(0, 65_536)))
 
         assertEquals(NfcStatusWord.SUCCESS, response.statusWord)
-        assertContentEquals(withNlen(handoverSelect), response.data.copy())
-        assertContentEquals(handoverSelect, assertIs<NfcConnectionHandover.Static>(completed.single()).handoverSelect.copy())
+        assertContentEquals(withNlen(handoverSelect), response.data.toByteArray())
+        assertContentEquals(handoverSelect, assertIs<NfcConnectionHandover.Static>(completed.single()).handoverSelect.toByteArray())
     }
 
     @Test
@@ -34,7 +34,7 @@ class NfcEngagementApduProcessorTest {
         val ndefFile = withNlen(handoverSelect)
         val completed = mutableListOf<NfcConnectionHandover>()
         val processor = NfcEngagementApduProcessor(
-            NfcEngagementConfiguration.Static(ImmutableBytes.of(handoverSelect)),
+            NfcEngagementConfiguration.Static(ByteString(handoverSelect)),
             onHandover = completed::add,
         )
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
@@ -55,8 +55,8 @@ class NfcEngagementApduProcessorTest {
         val completed = mutableListOf<NfcConnectionHandover>()
         val processor = NfcEngagementApduProcessor(
             NfcEngagementConfiguration.Negotiated { exactRequest ->
-                assertContentEquals(handoverRequest, exactRequest.copy())
-                ImmutableBytes.of(handoverSelect)
+                assertContentEquals(handoverRequest, exactRequest.toByteArray())
+                ByteString(handoverSelect)
             },
             onHandover = completed::add,
         )
@@ -67,8 +67,8 @@ class NfcEngagementApduProcessorTest {
             listOf(
                 NdefRecord(
                     NdefTypeNameFormat.WELL_KNOWN,
-                    ImmutableBytes.of("Ts".encodeToByteArray()),
-                    payload = ImmutableBytes.of(
+                    ByteString("Ts".encodeToByteArray()),
+                    payload = ByteString(
                         byteArrayOf(NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.length.toByte()) +
                             NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.encodeToByteArray(),
                     ),
@@ -79,17 +79,17 @@ class NfcEngagementApduProcessorTest {
         assertStatus(NfcStatusWord.SUCCESS, processor.process(updateBinary(0, withNlen(handoverRequest))))
 
         val result = assertIs<NfcConnectionHandover.Negotiated>(completed.single())
-        assertContentEquals(handoverRequest, result.handoverRequest.copy())
-        assertContentEquals(handoverSelect, result.handoverSelect.copy())
+        assertContentEquals(handoverRequest, result.handoverRequest.toByteArray())
+        assertContentEquals(handoverSelect, result.handoverSelect.toByteArray())
         val staged = NfcResponseApdu.decode(processor.process(readBinary(0, 65_536)))
-        assertContentEquals(withNlen(handoverSelect), staged.data.copy())
+        assertContentEquals(withNlen(handoverSelect), staged.data.toByteArray())
     }
 
     @Test
     fun `negotiated multi-command write must be sequential and exact length`() = runTest {
         val handoverRequest = handoverMessage("Hr")
         val processor = NfcEngagementApduProcessor(
-            NfcEngagementConfiguration.Negotiated { ImmutableBytes.of(handoverMessage("Hs")) },
+            NfcEngagementConfiguration.Negotiated { ByteString(handoverMessage("Hs")) },
         )
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
         processor.process(selectFile(0xe104))
@@ -108,7 +108,7 @@ class NfcEngagementApduProcessorTest {
     fun `application reselection discards an incomplete negotiated transaction`() = runTest {
         val handoverRequest = handoverMessage("Hr")
         val processor = NfcEngagementApduProcessor(
-            NfcEngagementConfiguration.Negotiated { ImmutableBytes.of(handoverMessage("Hs")) },
+            NfcEngagementConfiguration.Negotiated { ByteString(handoverMessage("Hs")) },
         )
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
         processor.process(selectFile(0xe104))
@@ -134,8 +134,8 @@ class NfcEngagementApduProcessorTest {
             listOf(
                 NdefRecord(
                     NdefTypeNameFormat.WELL_KNOWN,
-                    ImmutableBytes.of("Ts".encodeToByteArray()),
-                    payload = ImmutableBytes.of(
+                    ByteString("Ts".encodeToByteArray()),
+                    payload = ByteString(
                         byteArrayOf(NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.length.toByte()) +
                             NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.encodeToByteArray(),
                     ),
@@ -153,7 +153,7 @@ class NfcEngagementApduProcessorTest {
     @Test
     fun `deactivation rejects stale file operations until application is selected again`() = runTest {
         val processor = NfcEngagementApduProcessor(
-            NfcEngagementConfiguration.Static(ImmutableBytes.of(handoverMessage("Hs"))),
+            NfcEngagementConfiguration.Static(ByteString(handoverMessage("Hs"))),
         )
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
         processor.process(selectFile(0xe104))
@@ -178,7 +178,7 @@ class NfcEngagementApduProcessorTest {
         assertEquals(null, NfcTnepCodec.parseStatus(encodedParameters))
         assertFailsWith<IllegalArgumentException> {
             NfcTnepCodec.parseServiceParameter(
-                encodedParameters.copy(payload = ImmutableBytes.of(encodedParameters.payload.copy().dropLast(1).toByteArray()))
+                encodedParameters.copy(payload = ByteString(encodedParameters.payload.toByteArray().dropLast(1).toByteArray()))
             )
         }
     }
@@ -187,9 +187,9 @@ class NfcEngagementApduProcessorTest {
     fun `handover carrier references resolve exactly and reject ambiguity`() {
         val deviceEngagement = NdefRecord(
             NdefTypeNameFormat.EXTERNAL,
-            ImmutableBytes.of("iso.org:18013:deviceengagement".encodeToByteArray()),
-            ImmutableBytes.of("mdoc".encodeToByteArray()),
-            ImmutableBytes.of(byteArrayOf(1, 2, 3)),
+            ByteString("iso.org:18013:deviceengagement".encodeToByteArray()),
+            ByteString("mdoc".encodeToByteArray()),
+            ByteString(byteArrayOf(1, 2, 3)),
         )
         val first = carrier("0", listOf(deviceEngagement))
         val second = carrier("nfc", listOf(deviceEngagement))
@@ -198,7 +198,7 @@ class NfcEngagementApduProcessorTest {
         val parsed = NfcHandoverCodec.validateSelect(encoded)
 
         assertEquals(2, parsed.carriers.size)
-        assertContentEquals("0".encodeToByteArray(), parsed.carriers[0].alternative.carrierDataReference.copy())
+        assertContentEquals("0".encodeToByteArray(), parsed.carriers[0].alternative.carrierDataReference.toByteArray())
         assertEquals(deviceEngagement, parsed.carriers[1].auxiliaryRecords.single())
 
         val message = NdefMessage.decode(encoded)
@@ -227,8 +227,8 @@ class NfcEngagementApduProcessorTest {
         val embedded = NdefMessage(listOf(firstAlternative, secondAlternative)).encode()
         val handoverSelect = NdefRecord(
             NdefTypeNameFormat.WELL_KNOWN,
-            ImmutableBytes.of("Hs".encodeToByteArray()),
-            payload = ImmutableBytes.of(byteArrayOf(NfcHandoverCodec.VERSION_1_5.toByte()) + embedded),
+            ByteString("Hs".encodeToByteArray()),
+            payload = ByteString(byteArrayOf(NfcHandoverCodec.VERSION_1_5.toByte()) + embedded),
         )
         val ambiguous = NdefMessage(listOf(handoverSelect, firstCarrier, secondCarrier)).encode()
 
@@ -247,7 +247,7 @@ class NfcEngagementApduProcessorTest {
 
         val dis = NfcHandoverCodec.validateRequest(disD32Request)
         assertEquals(3, dis.carriers.size)
-        assertContentEquals("cr".encodeToByteArray(), dis.embeddedMessage.records.first().type.copy())
+        assertContentEquals("cr".encodeToByteArray(), dis.embeddedMessage.records.first().type.toByteArray())
         assertContentEquals(disD32Request, dis.outerMessage.encode())
 
         val withoutCollisionResolution = NfcHandoverCodec.validateRequest(handoverMessage("Hr"))
@@ -255,7 +255,7 @@ class NfcEngagementApduProcessorTest {
         assertEquals(1, withoutCollisionResolution.embeddedMessage.records.size)
         assertContentEquals(
             "ac".encodeToByteArray(),
-            withoutCollisionResolution.embeddedMessage.records.single().type.copy(),
+            withoutCollisionResolution.embeddedMessage.records.single().type.toByteArray(),
         )
     }
 
@@ -272,9 +272,9 @@ class NfcEngagementApduProcessorTest {
         NfcHandoverCarrier(
             carrierRecord = NdefRecord(
                 NdefTypeNameFormat.MIME_MEDIA,
-                ImmutableBytes.of("application/example".encodeToByteArray()),
-                ImmutableBytes.of(identifier.encodeToByteArray()),
-                ImmutableBytes.of(byteArrayOf(1)),
+                ByteString("application/example".encodeToByteArray()),
+                ByteString(identifier.encodeToByteArray()),
+                ByteString(byteArrayOf(1)),
             ),
             auxiliaryRecords = auxiliary,
         )
@@ -295,18 +295,18 @@ class NfcEngagementApduProcessorTest {
         }.toByteArray()
         return NdefRecord(
             NdefTypeNameFormat.WELL_KNOWN,
-            ImmutableBytes.of("ac".encodeToByteArray()),
-            payload = ImmutableBytes.of(payload),
+            ByteString("ac".encodeToByteArray()),
+            payload = ByteString(payload),
         )
     }
 
-    private fun selectAid(aid: ImmutableBytes): ByteArray = NfcCommandApdu(
+    private fun selectAid(aid: ByteString): ByteArray = NfcCommandApdu(
         0u, 0xa4u, 0x04u, 0u, aid,
     ).encode()
 
     private fun selectFile(identifier: Int): ByteArray = NfcCommandApdu(
         0u, 0xa4u, 0u, 0x0cu,
-        ImmutableBytes.of(byteArrayOf((identifier ushr 8).toByte(), identifier.toByte())),
+        ByteString(byteArrayOf((identifier ushr 8).toByte(), identifier.toByte())),
     ).encode()
 
     private fun readBinary(offset: Int, length: Int): ByteArray = NfcCommandApdu(
@@ -314,7 +314,7 @@ class NfcEngagementApduProcessorTest {
     ).encode()
 
     private fun updateBinary(offset: Int, data: ByteArray): ByteArray = NfcCommandApdu(
-        0u, 0xd6u, (offset ushr 8).toUByte(), offset.toUByte(), ImmutableBytes.of(data),
+        0u, 0xd6u, (offset ushr 8).toUByte(), offset.toUByte(), ByteString(data),
     ).encode()
 
     private fun withNlen(message: ByteArray): ByteArray =

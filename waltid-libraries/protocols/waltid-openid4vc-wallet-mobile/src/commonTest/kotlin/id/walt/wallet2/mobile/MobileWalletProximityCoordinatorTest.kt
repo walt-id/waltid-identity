@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
@@ -31,7 +32,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
-import id.walt.mdoc.proximity.ImmutableBytes
 import kotlin.time.TestTimeSource
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
@@ -74,7 +74,7 @@ class ProximityCoordinatorTest {
                     listOf(ProximityRequestedElement(reference.namespace, reference.elementIdentifier, false)),
                 ))),
             ), emptyList(), emptyList(), emptyList())
-            val digest = ImmutableBytes.of(ByteArray(32))
+            val digest = ByteString(ByteArray(32))
             val time = TestTimeSource()
             val plan = ProximitySharingPlan(wallet, review, ProximityApprovalScope(ProximityProfile.Iso180135Edition2Dis2026,
                 "reader", digest, mapOf("credential" to digest), emptyList()), timeSource = time)
@@ -498,8 +498,8 @@ class ProximityCoordinatorTest {
         val firstConfiguration = factory.configurations[0]
         val secondConfiguration = factory.configurations[1]
         assertFalse(
-            firstConfiguration.eDeviceKeyBytes.copy()
-                .contentEquals(secondConfiguration.eDeviceKeyBytes.copy())
+            firstConfiguration.eDeviceKeyBytes.toByteArray()
+                .contentEquals(secondConfiguration.eDeviceKeyBytes.toByteArray())
         )
         val firstRoles = assertIs<BleMdocRoles.Dual>(firstConfiguration.roles)
         val secondRoles = assertIs<BleMdocRoles.Dual>(secondConfiguration.roles)
@@ -675,14 +675,14 @@ class ProximityCoordinatorTest {
             return FakeTransportProvider(
                 method = when (val roles = configuration.roles) {
                     is BleMdocRoles.CentralClient -> DeviceRetrievalMethod.Ble(
-                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().toByteArray()),
                     )
                     is BleMdocRoles.PeripheralServer -> DeviceRetrievalMethod.Ble(
-                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().toByteArray()),
                     )
                     is BleMdocRoles.Dual -> DeviceRetrievalMethod.Ble(
-                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().copy()),
-                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().copy()),
+                        centralMode = BleCentralMode(roles.readerServiceUuid.encoded().toByteArray()),
+                        peripheralMode = BlePeripheralMode(roles.mdocServiceUuid.encoded().toByteArray()),
                     )
                 },
                 connection = loopback.holder,

@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.CoroutineScope
 
@@ -128,10 +129,10 @@ interface ProximityConnection {
     suspend fun awaitClosed(): ProximityCloseReason
 
     /** Receives one complete protocol message, or `null` after an orderly peer disconnect. */
-    suspend fun receive(): ImmutableBytes?
+    suspend fun receive(): ByteString?
 
     /** Sends one complete protocol message; ownership of [message] remains with the caller. */
-    suspend fun send(message: ImmutableBytes)
+    suspend fun send(message: ByteString)
 
     /** Idempotently closes this connection and releases its platform resources. */
     suspend fun close(reason: ProximityCloseReason)

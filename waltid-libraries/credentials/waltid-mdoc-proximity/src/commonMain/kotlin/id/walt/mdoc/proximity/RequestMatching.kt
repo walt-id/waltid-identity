@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.edition2.deviceretrieval.ElementReference
 import id.walt.mdoc.objects.edition2.deviceretrieval.ItemsRequest
@@ -9,12 +10,12 @@ import id.walt.mdoc.objects.edition2.deviceretrieval.UseCase
 class MdocCredentialCandidate(
     val id: String,
     val docType: String,
-    issuerAuthorityKeyIdentifiers: Collection<ImmutableBytes>,
+    issuerAuthorityKeyIdentifiers: Collection<ByteString>,
     availableElements: Collection<ElementReference>,
     booleanElements: Map<ElementReference, Boolean> = emptyMap(),
 ) {
-    private val ownedIssuerAuthorityKeyIdentifiers: Set<ImmutableBytes> = issuerAuthorityKeyIdentifiers.toSet()
-    val issuerAuthorityKeyIdentifiers: Set<ImmutableBytes> get() = ownedIssuerAuthorityKeyIdentifiers.toSet()
+    private val ownedIssuerAuthorityKeyIdentifiers: Set<ByteString> = issuerAuthorityKeyIdentifiers.toSet()
+    val issuerAuthorityKeyIdentifiers: Set<ByteString> get() = ownedIssuerAuthorityKeyIdentifiers.toSet()
     private val ownedAvailableElements: Set<ElementReference> = availableElements.toSet()
     val availableElements: Set<ElementReference> get() = ownedAvailableElements.toSet()
     private val ownedBooleanElements: Map<ElementReference, Boolean> = booleanElements.toMap()
@@ -163,7 +164,7 @@ class MdocRequestMatcher(
     private fun issuerAccepted(items: ItemsRequest, candidate: MdocCredentialCandidate): Boolean {
         val accepted = items.requestInfo?.issuerIdentifiers ?: return true
         return accepted.any { requested ->
-            candidate.issuerAuthorityKeyIdentifiers.any { candidateIdentifier -> candidateIdentifier.contentEquals(requested) }
+            candidate.issuerAuthorityKeyIdentifiers.any { candidateIdentifier -> candidateIdentifier == ByteString(requested) }
         }
     }
 

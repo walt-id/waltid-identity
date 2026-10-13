@@ -44,7 +44,7 @@ internal fun createTestConfig(
     refreshTokenRepository: RefreshTokenRepository = InMemoryRefreshTokenRepository(),
     issuerStateValidator: IssuerStateValidator? = null,
     credentialRequestDecryptor: CredentialRequestDecryptor? = null,
-    credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
+    credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()

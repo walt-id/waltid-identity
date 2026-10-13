@@ -1,28 +1,28 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.CancellationException
 
 /** Exact conventional NFC Connection Handover result used by the session transcript. */
 internal sealed interface NfcConnectionHandover {
-    public val handoverSelect: ImmutableBytes
+    public val handoverSelect: ByteString
 
     public data class Static(
-        override val handoverSelect: ImmutableBytes,
+        override val handoverSelect: ByteString,
     ) : NfcConnectionHandover
 
     public data class Negotiated(
-        override val handoverSelect: ImmutableBytes,
-        public val handoverRequest: ImmutableBytes,
+        override val handoverSelect: ByteString,
+        public val handoverRequest: ByteString,
     ) : NfcConnectionHandover
 }
 
 /** Conventional NFC engagement mode. The negotiated callback receives exact Hr and returns exact Hs. */
 internal sealed interface NfcEngagementConfiguration {
-    public data class Static(public val handoverSelect: ImmutableBytes) : NfcEngagementConfiguration
+    public data class Static(public val handoverSelect: ByteString) : NfcEngagementConfiguration
 
     public class Negotiated(
-        public val select: suspend (handoverRequest: ImmutableBytes) -> ImmutableBytes,
+        public val select: suspend (handoverRequest: ByteString) -> ByteString,
     ) : NfcEngagementConfiguration
 }
 
@@ -74,7 +74,7 @@ internal object NfcHandoverCodec {
         require(carrierReferences.none { it in auxiliaryReferences }) {
             "Connection Handover carrier and auxiliary references must be distinct"
         }
-        val referencedRecords = linkedMapOf<ImmutableBytes, NdefRecord>()
+        val referencedRecords = linkedMapOf<ByteString, NdefRecord>()
         carriers.forEach { carrier ->
             (carrier.auxiliaryRecords + carrier.carrierRecord).forEach { record ->
                 val previous = referencedRecords.put(record.identifier, record)
@@ -86,8 +86,8 @@ internal object NfcHandoverCodec {
         val embedded = NdefMessage(carriers.map { alternativeCarrierRecord(it) }).encode(limits)
         val handover = NdefRecord(
             typeNameFormat = NdefTypeNameFormat.WELL_KNOWN,
-            type = ImmutableBytes.of(type),
-            payload = ImmutableBytes.of(byteArrayOf(VERSION_1_5.toByte()) + embedded),
+            type = ByteString(type),
+            payload = ByteString(byteArrayOf(VERSION_1_5.toByte()) + embedded),
         )
         return NdefMessage(listOf(handover) + referencedRecords.values).encode(limits)
     }
@@ -100,16 +100,16 @@ internal object NfcHandoverCodec {
     ): NfcHandoverMessage {
         val message = NdefMessage.decode(encoded, limits)
         val first = message.records.first()
-        require(first.typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && first.type.contentEquals(expectedType)) {
+        require(first.typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && first.type == ByteString(expectedType)) {
             "$name must be the first NDEF record"
         }
-        val payload = first.payload.copy()
+        val payload = first.payload.toByteArray()
         require(payload.isNotEmpty() && payload[0].toUByte() == VERSION_1_5) {
             "$name must use Connection Handover version 1.5"
         }
         require(payload.size > 1) { "$name must contain its embedded NDEF message" }
         val embedded = NdefMessage.decode(payload.copyOfRange(1, payload.size), limits)
-        val indexedRecords = linkedMapOf<ImmutableBytes, NdefRecord>()
+        val indexedRecords = linkedMapOf<ByteString, NdefRecord>()
         message.records.drop(1).forEach { record ->
             if (record.identifier.size == 0) return@forEach
             require(indexedRecords.put(record.identifier, record) == null) {
@@ -152,13 +152,13 @@ internal object NfcHandoverCodec {
         carrier.auxiliaryRecords.forEach { output.addLengthPrefixed(it.identifier) }
         return NdefRecord(
             typeNameFormat = NdefTypeNameFormat.WELL_KNOWN,
-            type = ImmutableBytes.of(ALTERNATIVE_CARRIER_TYPE),
-            payload = ImmutableBytes.of(output.toByteArray()),
+            type = ByteString(ALTERNATIVE_CARRIER_TYPE),
+            payload = ByteString(output.toByteArray()),
         )
     }
 
     private fun parseAlternativeCarrier(record: NdefRecord): NfcAlternativeCarrier {
-        val cursor = HandoverCursor(record.payload.copy())
+        val cursor = HandoverCursor(record.payload.toByteArray())
         val powerState = NfcCarrierPowerState.fromCode(cursor.readByte())
         val carrierReference = cursor.readLengthPrefixed("carrier data reference")
         val auxiliaryCount = cursor.readByte()
@@ -168,7 +168,7 @@ internal object NfcHandoverCodec {
     }
 
     private fun NdefRecord.isAlternativeCarrier(): Boolean =
-        typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && type.contentEquals(ALTERNATIVE_CARRIER_TYPE)
+        typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && type == ByteString(ALTERNATIVE_CARRIER_TYPE)
 
     private class MutableByteBuffer {
         private val bytes = mutableListOf<Byte>()
@@ -176,10 +176,10 @@ internal object NfcHandoverCodec {
             require(value in 0..UByte.MAX_VALUE.toInt())
             bytes += value.toByte()
         }
-        fun addLengthPrefixed(value: ImmutableBytes) {
+        fun addLengthPrefixed(value: ByteString) {
             require(value.size in 1..UByte.MAX_VALUE.toInt()) { "NDEF record reference must contain 1..255 bytes" }
             add(value.size)
-            value.copy().forEach(bytes::add)
+            value.toByteArray().forEach(bytes::add)
         }
         fun toByteArray(): ByteArray = bytes.toByteArray()
     }
@@ -191,11 +191,11 @@ internal object NfcHandoverCodec {
             require(offset < bytes.size) { "Truncated Alternative Carrier record" }
             return bytes[offset++].toInt() and 0xff
         }
-        fun readLengthPrefixed(field: String): ImmutableBytes {
+        fun readLengthPrefixed(field: String): ByteString {
             val length = readByte()
             require(length > 0) { "Alternative Carrier $field is empty" }
             require(length <= bytes.size - offset) { "Truncated Alternative Carrier $field" }
-            return ImmutableBytes.of(bytes.copyOfRange(offset, offset + length)).also { offset += length }
+            return ByteString(bytes.copyOfRange(offset, offset + length)).also { offset += length }
         }
     }
 }
@@ -217,8 +217,8 @@ internal enum class NfcCarrierPowerState(val code: UByte) {
 /** Validated Alternative Carrier references from an embedded Hs/Hr NDEF message. */
 internal data class NfcAlternativeCarrier(
     public val powerState: NfcCarrierPowerState,
-    public val carrierDataReference: ImmutableBytes,
-    public val auxiliaryDataReferences: List<ImmutableBytes>,
+    public val carrierDataReference: ByteString,
+    public val auxiliaryDataReferences: List<ByteString>,
 ) {
     init {
         require(carrierDataReference.size in 1..UByte.MAX_VALUE.toInt())
@@ -303,7 +303,7 @@ internal object NfcTnepCodec {
 
     public fun parseServiceParameter(record: NdefRecord): ServiceParameters? {
         if (!record.isWellKnown(SERVICE_PARAMETER_TYPE)) return null
-        val payload = record.payload.copy()
+        val payload = record.payload.toByteArray()
         require(payload.size >= 7 && payload[0].toInt() and 0xff == VERSION_1_0) {
             "TNEP Service Parameter version or length is invalid"
         }
@@ -325,7 +325,7 @@ internal object NfcTnepCodec {
 
     public fun parseServiceSelect(record: NdefRecord): String? {
         if (!record.isWellKnown(SERVICE_SELECT_TYPE)) return null
-        val payload = record.payload.copy()
+        val payload = record.payload.toByteArray()
         require(payload.isNotEmpty()) { "TNEP Service Select payload is empty" }
         val length = payload[0].toInt() and 0xff
         require(payload.size == length + 1) { "TNEP Service Select length is invalid" }
@@ -336,19 +336,19 @@ internal object NfcTnepCodec {
 
     public fun parseStatus(record: NdefRecord): UByte? {
         if (!record.isWellKnown(STATUS_TYPE)) return null
-        val payload = record.payload.copy()
+        val payload = record.payload.toByteArray()
         require(payload.size == 1) { "TNEP Status must contain exactly one byte" }
         return payload.single().toUByte()
     }
 
     private fun wellKnown(type: ByteArray, payload: ByteArray): NdefRecord = NdefRecord(
         NdefTypeNameFormat.WELL_KNOWN,
-        ImmutableBytes.of(type),
-        payload = ImmutableBytes.of(payload),
+        ByteString(type),
+        payload = ByteString(payload),
     )
 
     private fun NdefRecord.isWellKnown(type: ByteArray): Boolean =
-        typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && this.type.contentEquals(type)
+        typeNameFormat == NdefTypeNameFormat.WELL_KNOWN && this.type == ByteString(type)
 }
 
 /** A bounded NFC Forum Type 4 Tag state machine for Static and Negotiated Handover. */
@@ -371,7 +371,7 @@ internal class NfcEngagementApduProcessor(
 
     init {
         if (configuration is NfcEngagementConfiguration.Static) {
-            NfcHandoverCodec.validateSelect(configuration.handoverSelect.copy(), limits)
+            NfcHandoverCodec.validateSelect(configuration.handoverSelect.toByteArray(), limits)
         }
     }
 
@@ -426,7 +426,7 @@ internal class NfcEngagementApduProcessor(
             SELECT_BY_NAME -> {
                 if (command.parameter2 != 0.toUByte()) return response(NfcStatusWord.INCORRECT_PARAMETERS)
                 if (command.expectedResponseDataLength != null) return response(NfcStatusWord.WRONG_LENGTH)
-                if (!command.data.contentEquals(MdocNfcAid.NDEF_APPLICATION.copy())) return response(NfcStatusWord.FILE_NOT_FOUND)
+                if (command.data != MdocNfcAid.NDEF_APPLICATION) return response(NfcStatusWord.FILE_NOT_FOUND)
                 resetApplicationTransaction()
                 applicationSelected = true
                 response(NfcStatusWord.SUCCESS)
@@ -436,7 +436,7 @@ internal class NfcEngagementApduProcessor(
                     return response(NfcStatusWord.INCORRECT_PARAMETERS)
                 }
                 if (!applicationSelected) return response(NfcStatusWord.CONDITIONS_NOT_SATISFIED)
-                val identifier = command.data.copy()
+                val identifier = command.data.toByteArray()
                 if (identifier.size != 2) return response(NfcStatusWord.WRONG_LENGTH)
                 when (unsignedShort(identifier, 0)) {
                     CAPABILITY_CONTAINER_FILE_ID -> stage(SelectedFile.CAPABILITY_CONTAINER, capabilityContainer())
@@ -464,7 +464,7 @@ internal class NfcEngagementApduProcessor(
             staticHandoverReported = true
             onHandover(NfcConnectionHandover.Static(configuration.handoverSelect))
         }
-        return NfcResponseApdu(ImmutableBytes.of(bytes), NfcStatusWord.SUCCESS).encode()
+        return NfcResponseApdu(ByteString(bytes), NfcStatusWord.SUCCESS).encode()
     }
 
     private suspend fun updateBinary(command: NfcCommandApdu): ByteArray {
@@ -473,7 +473,7 @@ internal class NfcEngagementApduProcessor(
         }
         if (command.expectedResponseDataLength != null) return response(NfcStatusWord.INCORRECT_PARAMETERS)
         val offset = command.parameter1.toInt() shl 8 or command.parameter2.toInt()
-        val data = command.data.copy()
+        val data = command.data.toByteArray()
         if (offset == 0) {
             if (data.size == 2) {
                 val length = unsignedShort(data, 0)
@@ -513,14 +513,14 @@ internal class NfcEngagementApduProcessor(
             }
             NegotiatedPhase.EXPECT_HANDOVER_REQUEST -> {
                 NfcHandoverCodec.validateRequest(encodedNdef, limits)
-                val exactRequest = ImmutableBytes.of(encodedNdef)
+                val exactRequest = ByteString(encodedNdef)
                 val negotiated = configuration as? NfcEngagementConfiguration.Negotiated
                     ?: error("Negotiated handover configuration is required")
                 val exactSelect = negotiated.select(exactRequest)
-                NfcHandoverCodec.validateSelect(exactSelect.copy(), limits)
+                NfcHandoverCodec.validateSelect(exactSelect.toByteArray(), limits)
                 negotiatedPhase = NegotiatedPhase.COMPLETE
                 onHandover(NfcConnectionHandover.Negotiated(exactSelect, exactRequest))
-                exactSelect.copy()
+                exactSelect.toByteArray()
             }
             else -> error("No NDEF write is expected in the current negotiated-handover phase")
         }
@@ -529,7 +529,7 @@ internal class NfcEngagementApduProcessor(
     }
 
     private fun initialNdefFile(): ByteArray = when (configuration) {
-        is NfcEngagementConfiguration.Static -> withNlen(configuration.handoverSelect.copy())
+        is NfcEngagementConfiguration.Static -> withNlen(configuration.handoverSelect.toByteArray())
         is NfcEngagementConfiguration.Negotiated -> {
             negotiatedPhase = NegotiatedPhase.EXPECT_SERVICE_SELECT
             val record = NfcTnepCodec.serviceParameter(
@@ -592,13 +592,13 @@ internal class NfcEngagementApduProcessor(
 
 /** ISO and NFC Forum application identifiers used by the holder. */
 internal object MdocNfcAid {
-    public val NDEF_APPLICATION: ImmutableBytes = ImmutableBytes.of(
+    public val NDEF_APPLICATION: ByteString = ByteString(
         byteArrayOf(0xd2.toByte(), 0x76, 0x00, 0x00, 0x85.toByte(), 0x01, 0x01),
     )
-    public val DATA_TRANSFER: ImmutableBytes = ImmutableBytes.of(
+    public val DATA_TRANSFER: ByteString = ByteString(
         byteArrayOf(0xa0.toByte(), 0x00, 0x00, 0x02, 0x48, 0x04, 0x00),
     )
-    public val NFC_V2: ImmutableBytes = ImmutableBytes.of(
+    public val NFC_V2: ByteString = ByteString(
         byteArrayOf(0xa0.toByte(), 0x00, 0x00, 0x02, 0x48, 0x04, 0x01),
     )
 }

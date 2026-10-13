@@ -666,15 +666,16 @@ public struct ProximityReaderTrustConfiguration: Sendable {
     /// Revocation behavior for reader chains trusted by direct Reader CA anchors.
     public let revocationPolicy: ProximityReaderRevocationPolicy
 
-    /// Application-identified IACA direct issuer; also requires the conditional reader contact extension.
-    /// This certificate supplies issuer-role context and does not add trust.
+    /// Optional application-identified IACA direct issuer required on the validated path.
+    /// When set, also requires an issuer-alternative-name email or URI contact in the reader certificate.
+    /// This restriction does not add trust; the application identifies the issuer's IACA role.
     public let requiredIACAIssuerCertificateDER: Data?
 
     /// Creates immutable application-owned reader-trust configuration.
     /// - Parameters:
     ///   - trustAnchors: Explicit Reader CA trust anchors.
     ///   - ricalProviders: Ordered RICAL provider policies.
-    ///   - requiredIACAIssuerCertificateDER: Optional exact IACA direct issuer required on the validated path.
+    ///   - requiredIACAIssuerCertificateDER: Optional exact IACA direct issuer; also requires issuer contact in the reader certificate.
     ///   - revocationPolicy: Revocation behavior for directly anchored reader chains.
     public init(
         trustAnchors: [ProximityReaderTrustAnchor] = [],
