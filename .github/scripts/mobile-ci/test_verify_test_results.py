@@ -33,32 +33,30 @@ class TestEvidenceTests(unittest.TestCase):
             self.check('<testsuite><testcase classname="PortableTests" name="passes"/></testsuite>',
                        required_classes=["KMPProximityProjectionTests"])
 
-    def test_environment_canary_is_required_even_when_other_tests_pass(self):
-        with self.assertRaisesRegex(EvidenceError, "Expected test did not pass"):
-            self.check('<testsuite><testcase classname="BrowserTests" name="ordinaryTest"/></testsuite>',
-                       required_tests=["BrowserTests#browserOptIn"])
+    def test_missing_environment_opt_in_fails_even_when_other_tests_pass(self):
+        for environment in ("secure PIN", "browser opt-in"):
+            with self.subTest(environment=environment), self.assertRaisesRegex(EvidenceError, "Unexpected skipped test"):
+                self.check('<testsuite><testcase classname="Tests" name="passes"/>'
+                           '<testcase classname="Tests" name="needsEnvironment">'
+                           f'<skipped message="Requires {environment}"/></testcase></testsuite>',
+                           required_classes=["Tests"])
 
-    def test_xctest_method_parentheses_and_nested_suites(self):
+    def test_nested_suites_require_passing_descendants(self):
         result = self.check('<testsuites><testsuite name="target"><testsuite name="nested">'
                             '<testcase classname="KMPProximityProjectionTests" name="testApprovedFields()"/>'
                             '</testsuite></testsuite></testsuites>',
                             required_suites=["target", "nested"],
-                            required_tests=["KMPProximityProjectionTests#testApprovedFields"])
-        self.assertEqual(result["requiredTestsPassed"], 1)
+                            required_classes=["KMPProximityProjectionTests"])
+        self.assertEqual(result["requiredClassesPassed"], 1)
         self.assertEqual(result["executed"], 1)
 
-    def test_known_kmp_decorations_preserve_exact_selector_identity(self):
+    def test_known_kmp_prefixes_preserve_class_identity(self):
         for prefix, suffix in (("", "()[jvm]"), ("iosSimulatorArm64Test.", "[iosSimulatorArm64]"),
                                ("jsNodeTest.", "[js, node]")):
             result = self.check(f'<testsuite><testcase classname="{prefix}KMPProximityProjectionTests" '
                                 f'name="testApprovedFields{suffix}"/></testsuite>',
-                                required_classes=["KMPProximityProjectionTests"],
-                                required_tests=["KMPProximityProjectionTests#testApprovedFields"])
-            self.assertEqual(result["requiredTestsPassed"], 1)
-        with self.assertRaises(EvidenceError):
-            self.check('<testsuite><testcase classname="KMPProximityProjectionTests" '
-                       'name="testApprovedFields[unrelated-case]"/></testsuite>',
-                       required_tests=["KMPProximityProjectionTests#testApprovedFields"])
+                                required_classes=["KMPProximityProjectionTests"])
+            self.assertEqual(result["requiredClassesPassed"], 1)
         with self.assertRaisesRegex(EvidenceError, "Physical test entered"):
             self.check('<testsuite><testcase classname="KMPProximityProjectionTests" name="testApprovedFields"/>'
                        '<testcase classname="iosSimulatorArm64Test.ProximityPhysicalDeviceTests" '

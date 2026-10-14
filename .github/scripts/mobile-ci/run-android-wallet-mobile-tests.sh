@@ -28,9 +28,9 @@ excluded_classes=(
   "-Pandroid.testInstrumentationRunnerArguments.notClass=$(IFS=,; echo "${excluded_classes[*]}")" \
   --info
 
-# This canary depends on the secure lock screen; other backend tests do not.
+# Missing secure-lock-screen setup produces a skip and fails this check.
 python3 "$script_dir/verify_test_results.py" \
-  --require-test 'id.walt.crypto2.signum.AndroidSignumKeyBackendDeviceTest#credentialProtectedKeyReopensWithoutAnInteractionContext' \
+  --require-class id.walt.crypto2.signum.AndroidSignumKeyBackendDeviceTest \
   --reports "$identity_dir/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml"
 python3 "$script_dir/verify_test_results.py" \
   --reports "$identity_dir/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml"

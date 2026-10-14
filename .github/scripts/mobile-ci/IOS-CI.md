@@ -53,8 +53,8 @@ and executes its complete Kotlin iOS test target using
 the toolchain's existing SwiftPM dependency linkage.
 
 There are no method inventories or fixed test counts to update when adding or
-renaming ordinary tests. Method-level canaries remain only for Android's secure-PIN
-key and browser opt-in, where other tests could pass without that environment.
+renaming ordinary tests. Missing Android PIN or browser opt-in makes the affected
+test skip, which fails the result check even when the rest of its suite passes.
 DC API and offline ITB profile checks also require their suites without fixing the
 number of methods. Cloud, fixture, physical-device and isolated-process selectors
 continue to route tests to the environment they need.

@@ -32,16 +32,16 @@ def test_id(value):
     return test_class(classname), test_name(name)
 
 
-def verify(reports, *, required_suites=(), required_classes=(), required_tests=(),
+def verify(reports, *, required_suites=(), required_classes=(),
            allowed_skips=(), forbidden_prefixes=()):
+    reports = sorted(set(map(Path, reports)))
     if not reports:
         raise EvidenceError("No JUnit reports found")
-    expected_tests = {test_id(value) for value in required_tests}
     allowed_skips = {test_id(value) for value in allowed_skips}
-    passed, passed_suites = set(), set()
+    passed_classes, passed_suites = set(), set()
     counts = dict(executed=0, passed=0, skipped=0, failed=0)
     problems = []
-    for report in sorted(set(map(Path, reports))):
+    for report in reports:
         try:
             root = ET.parse(report).getroot()
         except (OSError, ET.ParseError) as error:
@@ -70,7 +70,7 @@ def verify(reports, *, required_suites=(), required_classes=(), required_tests=(
             else:
                 counts["executed"] += 1
                 counts["passed"] += 1
-                passed.add(identity)
+                passed_classes.add(identity[0])
                 passed_cases.add(case)
         # A runner/setup error may exist at suite level without a test case.
         for suite in root.iter():
@@ -83,15 +83,13 @@ def verify(reports, *, required_suites=(), required_classes=(), required_tests=(
                 passed_suites.add(suite.get("name", ""))
     if counts["executed"] == 0:
         problems.append("No tests executed")
-    passed_classes = {classname for classname, _ in passed}
     problems.extend(f"Expected suite did not execute: {name}" for name in sorted(set(required_suites) - passed_suites))
     problems.extend(f"Expected class did not execute: {name}" for name in sorted(set(required_classes) - passed_classes))
-    problems.extend(f"Expected test did not pass: {identity}" for identity in sorted(expected_tests - passed))
     if problems:
         raise EvidenceError("\n".join(problems))
     return counts | {"requiredSuitesPassed": len(set(required_suites)),
                      "requiredClassesPassed": len(set(required_classes)),
-                     "requiredTestsPassed": len(expected_tests), "reports": len(set(map(Path, reports)))}
+                     "reports": len(reports)}
 
 
 def main():
@@ -99,13 +97,12 @@ def main():
     parser.add_argument("--reports", nargs="+", required=True, help="JUnit files or quoted glob patterns")
     parser.add_argument("--require-suite", nargs="+", default=[], help="Each target/suite must contain a passing case")
     parser.add_argument("--require-class", nargs="+", default=[], help="Each critical class must contain a passing case")
-    parser.add_argument("--require-test", nargs="+", default=[], help="Class#method for environment-dependent canaries")
     parser.add_argument("--allow-skipped", nargs="+", default=[], help="Class#method for intentional skips only")
     args = parser.parse_args()
     try:
         reports = [path for pattern in args.reports for path in glob.glob(pattern, recursive=True)]
         result = verify(reports, required_suites=args.require_suite, required_classes=args.require_class,
-                        required_tests=args.require_test, allowed_skips=args.allow_skipped)
+                        allowed_skips=args.allow_skipped)
     except (OSError, ValueError) as error:
         parser.exit(1, f"Test evidence rejected: {error}\n")
     print(json.dumps(result, sort_keys=True))
