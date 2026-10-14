@@ -13,6 +13,14 @@ import kotlin.test.assertTrue
 /** Scroll through the real viewport, including the area obscured by pinned review actions. */
 @OptIn(ExperimentalTestApi::class)
 internal fun SemanticsNodeInteraction.performScrollToContent(test: ComposeUiTest): SemanticsNodeInteraction {
+    test.waitUntil(timeoutMillis = 5_000) {
+        try {
+            fetchSemanticsNode()
+            true
+        } catch (_: AssertionError) {
+            false
+        }
+    }
     performScrollTo()
     repeat(3) {
         val target = fetchSemanticsNode()
