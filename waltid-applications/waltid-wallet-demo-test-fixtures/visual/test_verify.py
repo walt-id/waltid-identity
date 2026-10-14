@@ -73,6 +73,7 @@ class ComparisonRunnerTests(unittest.TestCase):
         self.assertIn("-only-testing:iosAppTests/WalletVisualTests", native)
         self.assertIn("-only-testing:iosAppTests/WalletVisualComparatorTests", native)
         self.assertIn("-only-testing:iosAppTests/WalletVisualHostingTests", native)
+        self.assertEqual(native[native.index("-parallel-testing-enabled") + 1], "NO")
         environment = json.loads(native[native.index("--json") + 1])["testRunnerEnv"]
         self.assertEqual(environment["WALLET_VISUAL_RUN_ID"], "fresh-run")
         self.assertEqual(environment["WALLET_VISUAL_RECORD"], "0")
