@@ -275,9 +275,22 @@ private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStor
     return null
 }
 
+/**
+ * Parsed JWT-secured W3C credentials are labeled `jwt_vc_json`.
+ * `jwt_vc` and `jwt_vc_json-ld` identify that same JWS encoding, so a credential matches any of them.
+ * Data Integrity (`ldp_vc`), SD-JWT VC, and mdoc stay distinct.
+ */
+internal fun issuedCredentialFormatMatches(issuedFormat: String, requestedFormat: String): Boolean {
+    if (issuedFormat == requestedFormat) return true
+    return issuedFormat in jwtSecuredW3cCredentialFormats && requestedFormat in jwtSecuredW3cCredentialFormats
+}
+
+private val jwtSecuredW3cCredentialFormats = setOf("jwt_vc_json", "jwt_vc_json-ld", "jwt_vc")
+private val w3cCredentialFormatsWithTypes = jwtSecuredW3cCredentialFormats + "ldp_vc"
+
 /** Check the requested credential kind independently of its holder-key association. */
 private fun DigitalCredential.requireRequestedConfiguration(configuration: CredentialConfiguration) {
-    require(format == configuration.format.value) {
+    require(issuedCredentialFormatMatches(format, configuration.format.value)) {
         "Issued credential format does not match the selected configuration"
     }
     configuration.vct?.takeIf { format == "dc+sd-jwt" }?.let { expected ->
@@ -290,7 +303,7 @@ private fun DigitalCredential.requireRequestedConfiguration(configuration: Crede
             "Issued credential document type does not match the selected configuration"
         }
     }
-    configuration.credentialDefinition?.type?.takeIf { format in setOf("jwt_vc_json", "jwt_vc_json-ld", "jwt_vc", "ldp_vc") }?.let { expected ->
+    configuration.credentialDefinition?.type?.takeIf { format in w3cCredentialFormatsWithTypes }?.let { expected ->
         val types = when (val value = credentialData["type"]) {
             is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
             is JsonPrimitive -> listOfNotNull(value.contentOrNull)
