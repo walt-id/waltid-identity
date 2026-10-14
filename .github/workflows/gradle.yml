@@ -510,7 +510,11 @@ jobs:
     if: ${{ always() && !cancelled() && (inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
     runs-on: ubuntu-22.04
     steps:
+      # Keep going after a missing artifact so the uploads below can still publish
+      # whatever arrived. The final check fails the job when the role jobs themselves
+      # succeeded and a required artifact did not.
       - name: Download verifier reports
+        id: verifier-reports
         continue-on-error: true
         uses: actions/download-artifact@v8
         with:
@@ -518,6 +522,7 @@ jobs:
           path: role-reports/vp-verifier
 
       - name: Download OpenID4VP wallet reports
+        id: vp-wallet-reports
         continue-on-error: true
         uses: actions/download-artifact@v8
         with:
@@ -525,6 +530,7 @@ jobs:
           path: role-reports/vp-wallet
 
       - name: Download OpenID4VCI wallet reports
+        id: vci-wallet-reports
         continue-on-error: true
         uses: actions/download-artifact@v8
         with:
@@ -532,6 +538,7 @@ jobs:
           path: role-reports/vci-wallet
 
       - name: Download verifier JUnit
+        id: verifier-junit
         if: ${{ inputs.upload-test-results }}
         continue-on-error: true
         uses: actions/download-artifact@v8
@@ -540,6 +547,7 @@ jobs:
           path: junit-conformance/verifier
 
       - name: Download OpenID4VP wallet JUnit
+        id: vp-wallet-junit
         if: ${{ inputs.upload-test-results }}
         continue-on-error: true
         uses: actions/download-artifact@v8
@@ -548,6 +556,7 @@ jobs:
           path: junit-conformance/vp-wallet
 
       - name: Download OpenID4VCI wallet JUnit
+        id: vci-wallet-junit
         if: ${{ inputs.upload-test-results }}
         continue-on-error: true
         uses: actions/download-artifact@v8
@@ -560,6 +569,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p openid-conformance-summaries
+          # Copy every report that arrived. Missing roles are rejected below when
+          # the role jobs succeeded; a failed role still leaves its siblings here.
           for role in vp-verifier vp-wallet vci-wallet; do
             src="role-reports/$role"
             [ -d "$src" ] || continue
@@ -586,6 +597,43 @@ jobs:
           overwrite: true
           if-no-files-found: warn
           path: junit-conformance
+
+      - name: Require complete reports when role jobs succeeded
+        if: ${{ always() && !cancelled() && needs.wallet-conformance.result == 'success' }}
+        env:
+          UPLOAD_TEST_RESULTS: ${{ inputs.upload-test-results }}
+          VERIFIER_REPORTS: ${{ steps.verifier-reports.outcome }}
+          VP_WALLET_REPORTS: ${{ steps.vp-wallet-reports.outcome }}
+          VCI_WALLET_REPORTS: ${{ steps.vci-wallet-reports.outcome }}
+          VERIFIER_JUNIT: ${{ steps.verifier-junit.outcome }}
+          VP_WALLET_JUNIT: ${{ steps.vp-wallet-junit.outcome }}
+          VCI_WALLET_JUNIT: ${{ steps.vci-wallet-junit.outcome }}
+        run: |
+          set -euo pipefail
+          failed=0
+          require_success() {
+            local name="$1"
+            local outcome="$2"
+            if [ "$outcome" != "success" ]; then
+              echo "::error::${name} download ${outcome}; the combined conformance artifact is incomplete."
+              failed=1
+            fi
+          }
+          require_success "OpenID4VP verifier reports" "$VERIFIER_REPORTS"
+          require_success "OpenID4VP wallet reports" "$VP_WALLET_REPORTS"
+          require_success "OpenID4VCI wallet reports" "$VCI_WALLET_REPORTS"
+          for role in vp-verifier vp-wallet vci-wallet; do
+            if [ ! -f "openid-conformance-summaries/${role}/summary.md" ]; then
+              echo "::error::Missing ${role} summary after aggregation."
+              failed=1
+            fi
+          done
+          if [ "$UPLOAD_TEST_RESULTS" = "true" ]; then
+            require_success "verifier JUnit" "$VERIFIER_JUNIT"
+            require_success "OpenID4VP wallet JUnit" "$VP_WALLET_JUNIT"
+            require_success "OpenID4VCI wallet JUnit" "$VCI_WALLET_JUNIT"
+          fi
+          exit "$failed"
 
   # Each proof mode runs the unchanged issuer matrix on an independent runner.
   # Neither depends on the verifier or wallet jobs, and a failed proof must not cancel its sibling.

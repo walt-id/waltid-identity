@@ -470,7 +470,9 @@ one for standalone attestation proofs. Both run independently of the verifier,
 OpenID4VP wallet and OpenID4VCI wallet jobs. Those three roles also run in
 parallel. Each role keeps its summary table, failure check and test filter.
 Aggregation still publishes `openid-conformance-summaries` and, when test
-results are requested, `junit-conformance`.
+results are requested, `junit-conformance`. If every role job succeeded, a
+missing report or requested JUnit artifact fails that aggregation after the
+available files are uploaded.
 The regular build enables issuer testing through conformance eligibility; the
 existing `run-issuer-conformance` and `run-haip-conformance` inputs both select it.
 Release workflows already set those inputs. Each proof job checks out the same

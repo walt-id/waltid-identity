@@ -102,7 +102,9 @@ failures fail their respective jobs. Issuer batch and key-attestation coverage
 remain required independently for both proof modes. The aggregate issuer artifact
 retains the name `issuer-conformance-basic-haip-batch` and its existing JSON format.
 Wallet and verifier aggregation retains `openid-conformance-summaries` and
-`junit-conformance`.
+`junit-conformance`. When every role job succeeded, a missing report or
+requested JUnit artifact fails aggregation after the files that did arrive
+are uploaded. A failed role job still blocks publication on its own.
 
 Artifacts (when a role actually runs):
 
