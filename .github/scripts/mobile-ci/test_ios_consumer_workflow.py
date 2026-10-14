@@ -48,7 +48,9 @@ class IosConsumerWorkflowTest(unittest.TestCase):
                 self.assertLess(execution, order.index(name))
                 self.assertLess(order.index(name), comparison)
         self.assertIn("always()", self.steps["Retain WalletCore consumer test reports"])
-        self.assertIn("if: always()", self.steps["Retain WalletCore consumer phase logs"])
+        phase_logs = self.steps["Retain WalletCore consumer phase logs"]
+        self.assertIn("if: always()", phase_logs)
+        self.assertIn("name: wallet-core-${{ matrix.consumer }}-phase-logs-${{ github.run_attempt }}", phase_logs)
         raw_results = self.steps["Retain incomplete WalletCore test results"]
         self.assertIn("if: failure() || cancelled()", raw_results)
         self.assertIn("waltid-identity/**/*.xcresult", raw_results)
