@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require the proximity test targets and critical platform adapter suites."""
+"""Require portable test targets and platform adapters; reject unexpected skips."""
 
 import argparse
 import json
@@ -10,12 +10,12 @@ from verify_test_results import EvidenceError, verify
 
 REPORT_TASKS = {"jvm": "jvmTest", "android-host": "testAndroidHostTest",
                 "ios-simulator": "iosSimulatorArm64Test", "js-node": "jsNodeTest"}
+X509_MODULE = "waltid-libraries/crypto/waltid-x509"
 
 
 def platform_suites(platform):
     # Require execution boundaries, not a second inventory of test methods.
-    suites = {"waltid-libraries/credentials/waltid-mdoc-proximity": [
-        "id.walt.mdoc.proximity.IndependentSessionVectorTest"]}
+    suites = {"waltid-libraries/credentials/waltid-mdoc-proximity": [], X509_MODULE: []}
     mobile = "waltid-libraries/credentials/waltid-mdoc-proximity-mobile"
     compose = "waltid-applications/waltid-wallet-demo-compose"
     if platform == "android-host":
@@ -30,11 +30,7 @@ def platform_suites(platform):
         suites[mobile] = [f"id.walt.mdoc.proximity.mobile.{name}" for name in (
             "IosCentralGattCallbackTest", "IosPeripheralGattCallbackTest")]
         suites[f"{compose}/sharedUI"] = ["id.walt.walletdemo.compose.ui.WalletDemoProximityIosTest"]
-        suites[f"{compose}/sharedLogic"] = [f"id.walt.walletdemo.compose.logic.{name}" for name in (
-            "CredentialDisplayNormalizerTest", "DemoSharingSettingsStoreTest", "StoredCredentialMetadataParserTest",
-            "WalletDemoControllerSkipPinTest", "WalletDemoControllerTest", "WalletDemoKeySetupTest",
-            "WalletDemoMetadataModelsTest", "walletapi2.WalletApi2AuthorizationCallbackTest",
-            "walletapi2.WalletApi2MappingsTest", "walletapi2.WalletApiProfileTest", "walletapi2.WalletDeepLinkSchemeWebTest")]
+        suites[f"{compose}/sharedLogic"] = []
     return suites
 
 
@@ -47,8 +43,15 @@ def main():
     results, errors = [], []
     for module, classes in platform_suites(args.platform).items():
         pattern = f"{module}/build/test-results/{REPORT_TASKS[args.platform]}/*.xml"
+        allowed_skips = []
+        if module == X509_MODULE:
+            # Ed25519 support remains a separate follow-up; all other cases must execute.
+            allowed_skips.append("id.walt.certificate.x509.X509CertificateSigningTest#shouldSignCertificateWithEdKey")
+            if args.platform in {"jvm", "js-node"}:
+                allowed_skips.append("id.walt.certificate.x509.SignumPublicKeyInfoUtilTest#shouldRetrieveKeyInfoOfEd25519Key")
         try:
             counts = verify(list(args.root.glob(pattern)), required_classes=classes,
+                            allowed_skips=allowed_skips,
                             forbidden_prefixes=("id.walt.proximity.physical.", "ProximityPhysicalDeviceTests"))
             results.append({"module": module, "platform": args.platform, **counts})
         except EvidenceError as error:

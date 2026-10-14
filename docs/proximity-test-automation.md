@@ -3,7 +3,7 @@
 [WAL-1349](https://linear.app/walt-new/issue/WAL-1349/qualify-proximity-presentation-for-interoperability-and-release)
 owns qualification evidence. Tests and fixes stay with the existing engine, mobile
 transport, wallet SDK and demo modules. The existing
-[result guards](../.github/scripts/mobile-ci/verify_proximity_suites.py) require
+[result guards](../.github/scripts/mobile-ci/verify_platform_test_results.py) require
 test targets and critical platform adapter suites without duplicating their methods.
 Counts are evidence for a particular run, not a coverage percentage or qualification.
 
@@ -30,7 +30,7 @@ Similar names and declared test counts alone do not establish that a test execut
 
 ## CI and local deterministic execution
 
-`verify_proximity_suites.py` checks the named suites assigned to `jvm`, `android-host`,
+`verify_platform_test_results.py` checks module results and platform adapters assigned to `jvm`, `android-host`,
 `ios-simulator` or `js-node`. The standard Gradle workflows invoke it after their
 tests. The iOS Kotlin and consumer lanes use the `gradle-ios` action from the
 selected checkout, with Xcode and the simulator destination pinned by the workflow.
@@ -41,13 +41,13 @@ Path eligibility includes the guard scripts and native simulator test sources.
 assembles the isolated test-fixture XCFramework from the selected checkout. Local runs
 without a release artifact build both frameworks. The runner checks their headers, records source and binary hashes,
 and discovers the `WalletSDKTests` target on a simulator. The discovery guard
-requires the conditional Kotlin bridge classes, including the fixture-only
-`KMPProximitySessionBridgeTests`, to execute. All failures and skips fail the lane;
+requires the fixture-only conditional Kotlin bridge class
+`KMPProximitySessionBridgeTests` to execute. All failures and skips fail the lane;
 new methods and classes need no CI configuration entry.
 Testing only the demo's `iosAppTests` cannot replace this package suite. Its
 `WALLET_SDK_BRIDGE_FIXTURES=1` framework has the same SDK sources and an additional
 test-only session producer. The ordinary release framework has no test producer.
-The native demo lane separately requires its unit and UI targets and consent view-model suite.
+The native demo lane separately requires its unit and UI targets and app-hosted Keychain/persistence classes.
 
 Focused local examples, run from Identity:
 

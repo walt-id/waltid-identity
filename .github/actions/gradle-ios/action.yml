@@ -89,11 +89,11 @@ runs:
       shell: bash
       run: ./gradlew iosSimulatorArm64Test
 
-    - name: Require proximity Kotlin simulator test discovery
+    - name: Require portable Kotlin simulator test results
       if: ${{ always() && inputs.run-ios-simulator-tests == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: python3 .github/scripts/mobile-ci/verify_proximity_suites.py --platform ios-simulator
+      run: python3 .github/scripts/mobile-ci/verify_platform_test_results.py --platform ios-simulator
 
     # A provider extension that is not embedded, or disagrees with its host about App Group, Keychain
     # group or doctypes, is invisible to iOS and fails no build - only an on-device presentation.
@@ -316,9 +316,7 @@ runs:
       run: |
         python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
           --require-suite iosAppTests.xctest iosAppUITests.xctest \
-          --require-class ProximityPresentationViewModelTests WalletViewModelReceiveTests \
-            MockWalletUITests WalletIdentitySetupUITests PublicDemoBackendE2ETests MockCredentialDisplayUITests \
-            KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
+          --require-class KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
           --allow-skipped \
             'WalletIdentityRecoveryIntegrationTests#testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity' \
             'WalletIdentityRecoveryIntegrationTests#testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable' \

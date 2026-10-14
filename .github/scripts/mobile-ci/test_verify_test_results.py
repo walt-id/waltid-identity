@@ -1,7 +1,10 @@
 import tempfile
 from pathlib import Path
+import subprocess
+import sys
 import unittest
 
+from verify_platform_test_results import REPORT_TASKS, X509_MODULE, platform_suites
 from verify_test_results import EvidenceError, verify
 
 
@@ -124,6 +127,59 @@ class TestEvidenceTests(unittest.TestCase):
             reports[1].write_text('<testsuite tests="10"/>')
             with self.assertRaisesRegex(EvidenceError, "Empty JUnit report"):
                 verify(reports)
+
+
+class PlatformEvidenceTests(unittest.TestCase):
+    def run_guard(self, platform, x509_cases, missing_module=None):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for module, classes in platform_suites(platform).items():
+                if module == missing_module:
+                    continue
+                report = root / module / "build/test-results" / REPORT_TASKS[platform] / "tests.xml"
+                report.parent.mkdir(parents=True)
+                # Ordinary test classes may be added or renamed without configuration.
+                cases = ''.join(f'<testcase classname="{name}" name="passes"/>'
+                                for name in classes or ["NewTests"])
+                if module == X509_MODULE:
+                    cases += x509_cases
+                report.write_text(f'<testsuite>{cases}</testsuite>')
+            return subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("verify_platform_test_results.py")),
+                 "--platform", platform, "--root", str(root)],
+                text=True, capture_output=True, timeout=10,
+            )
+
+    def test_x509_reports_are_required_on_every_platform(self):
+        for platform in REPORT_TASKS:
+            with self.subTest(platform=platform):
+                result = self.run_guard(platform, "", missing_module=X509_MODULE)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"{X509_MODULE}: No JUnit reports", result.stderr)
+
+    def test_x509_new_skips_fail_even_when_other_modules_pass(self):
+        for platform in REPORT_TASKS:
+            with self.subTest(platform=platform):
+                result = self.run_guard(platform, '<testcase classname="NewX509Tests" name="newCase"><skipped/></testcase>')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Unexpected skipped test", result.stderr)
+
+    def test_only_platform_specific_ed25519_exceptions_pass(self):
+        signing = '<testcase classname="id.walt.certificate.x509.X509CertificateSigningTest" name="shouldSignCertificateWithEdKey"><skipped/></testcase>'
+        key_info = '<testcase classname="id.walt.certificate.x509.SignumPublicKeyInfoUtilTest" name="shouldRetrieveKeyInfoOfEd25519Key"><skipped/></testcase>'
+        for platform in REPORT_TASKS:
+            with self.subTest(platform=platform):
+                result = self.run_guard(platform, signing)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                result = self.run_guard(platform, signing + key_info)
+                self.assertEqual(result.returncode == 0, platform in {"jvm", "js-node"}, result.stderr)
+
+    def test_shared_logic_requires_results_without_class_inventory(self):
+        result = self.run_guard("ios-simulator", "")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.run_guard("ios-simulator", "", missing_module="waltid-applications/waltid-wallet-demo-compose/sharedLogic")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("sharedLogic: No JUnit reports", result.stderr)
 
 
 if __name__ == "__main__":

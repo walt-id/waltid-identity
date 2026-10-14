@@ -129,9 +129,6 @@ fi
 xcresultparser "$run_dir/Tests.xcresult" --output-format=junit > "$run_dir/results.xml"
 python3 "$script_dir/verify_test_results.py" \
   --require-suite WalletSDKTests.xctest \
-  --require-class KMPProximitySessionBridgeTests KMPProximityProjectionTests \
-    ProximityBridgeContractTests KMPKeyAttestationProviderTests IssuanceBridgeContractTests \
-    WalletAPITests ProximityInputValidationTests CredentialTitlesTests DisplayLocalesTests \
-    PresentationValidationErrorTests EnterpriseCustodyIntegrationTests \
+  --require-class KMPProximitySessionBridgeTests \
   --reports "$run_dir/results.xml" | tee "$run_dir/discovery.json" || test_status=1
 exit "$test_status"
