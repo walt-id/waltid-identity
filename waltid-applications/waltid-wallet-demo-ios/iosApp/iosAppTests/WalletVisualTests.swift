@@ -819,19 +819,21 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
             scroll.setContentOffset(CGPoint(x: 0, y: target), animated: false)
         }
         didScroll = true
-        // Even nonanimated scrolling starts UIKit's scroll-edge backdrop opacity animation.
+        // Nonanimated scrolling can animate scroll-edge and sibling toolbar backdrops.
         // A static fixture must capture its final frame, not a runner-dependent phase.
         // Production views and the separate motion journeys retain their animations.
-        finishAnimations(scroll.layer)
+        finishAnimations(view.layer)
     }
 
     private func finishAnimations(_ layer: CALayer) {
         for key in layer.animationKeys() ?? [] {
             guard let animation = layer.animation(forKey: key)?.copy() as? CAAnimation,
+                  animation.duration > 0,
                   animation.repeatCount == 0, animation.repeatDuration == 0, !animation.autoreverses else { continue }
             // Keep the animation's final presentation value: removing it can erase native glass.
             animation.speed = 0
-            animation.timeOffset = animation.duration
+            // The exact duration boundary wraps a paused animation to its initial frame.
+            animation.timeOffset = animation.duration.nextDown
             animation.fillMode = .forwards
             animation.isRemovedOnCompletion = false
             layer.add(animation, forKey: key)
@@ -877,6 +879,58 @@ private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -
         index += 1
     }
     return true
+}
+
+@MainActor
+final class WalletVisualHostingTests: XCTestCase {
+    func testScrollSettlesTheSiblingToolbarBackdrop() throws {
+        let scroll = UIScrollView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        scroll.contentSize = CGSize(width: 100, height: 200)
+        let backdrop = UIView(frame: CGRect(x: 150, y: 150, width: 20, height: 20))
+        backdrop.backgroundColor = .black
+        let content = UIView()
+        content.backgroundColor = .white
+        content.addSubview(scroll)
+        content.addSubview(backdrop)
+        let host = WalletVisualHostingController(rootView: VisualUIKitFixture(view: content).ignoresSafeArea())
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 200, height: 200)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
+        window.layoutIfNeeded()
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 60
+        backdrop.layer.add(fade, forKey: "toolbarBackdrop")
+
+        host.scrollToBottom = true
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        let rendered = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+        }
+        XCTAssertEqual(scroll.contentOffset.y, 100)
+        let point = backdrop.convert(CGPoint(x: 10, y: 10), to: window)
+        let pixel = try XCTUnwrap(rendered.cgImage?.cropping(to: CGRect(
+            x: point.x * rendered.scale, y: point.y * rendered.scale, width: rendered.scale, height: rendered.scale)))
+        let finalFrame = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { context in
+            UIColor.black.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        XCTAssertTrue(matchesWithinRasterNoise(finalFrame, UIImage(cgImage: pixel)),
+            "A toolbar outside the scroll view must render its final backdrop after scrolling")
+    }
+}
+
+private struct VisualUIKitFixture: UIViewRepresentable {
+    let view: UIView
+    func makeUIView(context: Context) -> UIView { view }
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 @MainActor
