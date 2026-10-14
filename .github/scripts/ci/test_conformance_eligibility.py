@@ -160,14 +160,15 @@ class ConformanceEligibilityTest(unittest.TestCase):
                 self.assertIn(f"Selection reason: {reason}", summary)
 
     def test_current_failed_or_cancelled_lanes_still_fail_the_gate(self):
-        for result, expected in [("success", 0), ("skipped", 0), ("failure", 1), ("cancelled", 1)]:
-            with self.subTest(result=result):
-                gate = subprocess.run(
-                    ["bash", "-c", step_script(BUILD, "Evaluate merge gate")],
-                    env={**os.environ, "NEEDS": json.dumps({"gradle-build": {"result": result}})},
-                    capture_output=True, text=True, timeout=10,
-                )
-                self.assertEqual(gate.returncode, expected, gate.stderr)
+        for job in ("gradle-build", "ios-tests"):
+            for result, expected in [("success", 0), ("skipped", 0), ("failure", 1), ("cancelled", 1)]:
+                with self.subTest(job=job, result=result):
+                    gate = subprocess.run(
+                        ["bash", "-c", step_script(BUILD, "Evaluate merge gate")],
+                        env={**os.environ, "NEEDS": json.dumps({job: {"result": result}})},
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertEqual(gate.returncode, expected, gate.stderr)
 
     def test_cancelled_workflow_cannot_publish_a_skipped_gate(self):
         gate = BUILD.read_text().split("  ci-gate:\n", 1)[1]

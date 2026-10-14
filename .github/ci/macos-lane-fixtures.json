@@ -120,6 +120,11 @@
       "lanes": ["native"]
     },
     {
+      "name": "Xcode test launcher selects native and Compose consumers",
+      "files": [".github/scripts/mobile-ci/run-xcode-tests.sh"],
+      "lanes": ["native", "compose"]
+    },
+    {
       "name": "physical controller changes use hardware-free checks only",
       "files": [
         "scripts/proximity-physical/run.py"
