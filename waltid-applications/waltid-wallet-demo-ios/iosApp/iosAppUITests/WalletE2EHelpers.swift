@@ -296,8 +296,9 @@ final class WalletE2EUI {
 
         let identifier = element.identifier
         let scannerInput = identifier == "wallet.scanInput"
+        let verifyEnteredValue = element.elementType != .secureTextField
         element.typeText(value)
-        if element.elementType != .secureTextField {
+        if verifyEnteredValue {
             for attempt in 0..<2 {
                 let entered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
                     let actual = element.value as? String ?? ""
