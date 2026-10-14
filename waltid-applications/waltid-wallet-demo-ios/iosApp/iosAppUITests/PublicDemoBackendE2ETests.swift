@@ -123,6 +123,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         continueAfterFailure = false
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
+        recordGalleryRequest("issuance", value: offer.offerUrl)
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -134,6 +135,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.openWalletLink(offer.offerUrl)
         let offerReadyStatus = ui.waitForOfferReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(offerReadyStatus, app.debugDescription)
+        captureGallery(app, name: "native-ios-wallet-issuance-eudi-pid-mdoc-review")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         ui.allowIdentityDocumentRegistrationIfRequested()
@@ -164,6 +166,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let session = try await backend.createVerifierSession(
             scenario: scenario, signedRequest: true, clientID: DemoBackend.didVerifierClientID
         )
+        recordGalleryRequest("presentation", value: session.authorizationRequestUri)
         ui.openWalletLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(previewStatus, app.debugDescription)
@@ -171,6 +174,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Family name"].waitForExistence(timeout: 20))
+
+        captureGallery(app, name: "native-ios-wallet-presentation-eudi-pid-mdoc-review")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
 

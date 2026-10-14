@@ -401,6 +401,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         continueAfterFailure = false
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
+        recordGalleryRequest("issuance", value: offer.offerUrl)
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -417,6 +418,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.openDeepLink(offer.offerUrl)
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
+        captureGallery(app, name: "compose-ios-wallet-issuance-eudi-pid-mdoc-review")
         let offeredInformation = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-details-")).firstMatch
         XCTAssertTrue(offeredInformation.waitForExistence(timeout: 10))
         ui.tapButton(identifier: offeredInformation.identifier, fallbackLabel: "Credential information")
@@ -448,6 +450,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let session = try await backend.createVerifierSession(
             scenario: scenario, signedRequest: true, clientID: DemoBackend.didVerifierClientID
         )
+        recordGalleryRequest("presentation", value: session.authorizationRequestUri)
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(previewStatus, app.debugDescription)
@@ -456,6 +459,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Family name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].waitForExistence(timeout: 10))
+
+        captureGallery(app, name: "compose-ios-wallet-presentation-eudi-pid-mdoc-review")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
         var submitStatus = ui.waitForStatus(

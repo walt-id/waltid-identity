@@ -98,6 +98,7 @@ class PublicDemoBackendE2ETest {
     fun receiveAndPresentAgainstPublicDemoIssuer2Verifier2() = runBlocking {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
         val offer = DemoTestBackend.createOffer(scenario)
+        WalletGalleryEvidence.request("issuance", offer.offerUrl)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -107,6 +108,7 @@ class PublicDemoBackendE2ETest {
 
         sendDeepLink(context, offer.offerUrl)
         assertReview(device, "wallet.offerAcceptButton")
+        WalletGalleryEvidence.capture(device, "wallet-issuance-eudi-pid-mdoc-review")
         val offeredInformation = requireNotNull(device.findObject(By.res(Pattern.compile("issuance-details-.*"))))
         clickByTag(device, offeredInformation.resourceName)
         assertReview(device, "issuance-credential-details")
@@ -123,12 +125,14 @@ class PublicDemoBackendE2ETest {
         clickByTag(device, "issuance-done")
         assertHome(device)
         val session = DemoTestBackend.createVerifierSession(scenario)
+        WalletGalleryEvidence.request("presentation", session.authorizationRequestUri)
         sendDeepLink(context, session.authorizationRequestUri)
         assertReview(device, "wallet.presentationSubmitButton")
         assertTextVisibleAfterScrolling(device, listOf("Information to share"), "Shared information section missing")
         captureHost(device, "requested-information")
         assertTextVisibleAfterScrolling(device, listOf("Given name", "Family name"), "Requested fields missing from consent")
         assertReview(device, "wallet.presentationSubmitButton")
+        WalletGalleryEvidence.capture(device, "wallet-presentation-eudi-pid-mdoc-review")
 
         clickByTag(device, "wallet.presentationSubmitButton")
         val presentSuccess = waitForStatus(
