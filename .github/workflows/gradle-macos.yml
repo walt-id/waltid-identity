@@ -238,11 +238,11 @@ jobs:
           retention-days: 7
 
       # Outside the timed composite action so logs survive its deadline.
-      - name: Retain failed WalletCore consumer logs
-        if: failure() || cancelled()
+      - name: Retain WalletCore consumer phase logs
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: wallet-core-consumer-failure-logs
+          name: wallet-core-consumer-phase-logs-${{ github.run_attempt }}
           path: |
             ios-ci-logs/**
           retention-days: 7
