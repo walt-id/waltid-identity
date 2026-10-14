@@ -118,6 +118,31 @@ def native_attachments(export, tests):
     return results
 
 
+def native_test_cases(data, suite):
+    """Use the complete xcresult tree; CLI summaries can omit executed cases."""
+    tests = {}
+
+    def visit(nodes):
+        for node in nodes:
+            identifier = node.get("nodeIdentifier", "")
+            if node["nodeType"] == "Test Case" and identifier.startswith(suite + "/"):
+                test = identifier.removeprefix(suite + "/").removesuffix("()")
+                if not test or "/" in test or test in tests:
+                    raise ValueError(f"Invalid or duplicate native test: {identifier}")
+                status = {"Passed": "passed", "Failed": "failed", "Skipped": "skipped"}.get(node.get("result"))
+                if status is None:
+                    raise ValueError(f"Unsupported native test result: {node.get('result')}")
+                tests[test] = {"status": status, "durationMs": node.get("durationInSeconds", 0) * 1000}
+                failures = [child["name"] for child in node.get("children", [])
+                            if child["nodeType"] == "Failure Message"]
+                if failures:
+                    tests[test]["failureMessage"] = "\n".join(failures)
+            visit(node.get("children", []))
+
+    visit(data["testNodes"])
+    return tests
+
+
 def native_tests(path, run, output):
     if not fresh(path, run["started"]):
         return {}, {}, "Native result missing or older than this run"
@@ -126,10 +151,13 @@ def native_tests(path, run, output):
         if data.get("schema") != "xcodebuildmcp.output.test-result" or str(data.get("schemaVersion")) != "3":
             return {}, {}, "Unsupported native test-result schema"
         suite = CATALOGUE["renderers"]["swiftui"]["suite"]
-        tests = {t["test"].removesuffix("()"): t for t in data["data"].get("testCases", []) if t["suite"] == suite}
         bundle = Path(data["data"].get("artifacts", {}).get("xcresultPath", "")).expanduser()
         if not bundle.is_dir():
-            return tests, {}, "Native run has no accessible xcresult bundle"
+            return {}, {}, "Native run has no accessible xcresult bundle"
+        result = subprocess.run(["xcrun", "xcresulttool", "get", "test-results", "tests", "--path", str(bundle)],
+                                check=True, capture_output=True, text=True)
+        (output / "native-tests.json").write_text(result.stdout)
+        tests = native_test_cases(json.loads(result.stdout), suite)
         export = output / "native-attachments" / run["runId"]
         subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(bundle),
                         "--output-path", str(export), "--test-id", suite], check=True, capture_output=True, text=True)
