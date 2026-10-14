@@ -52,7 +52,7 @@ on:
         type: boolean
         default: false
       conformance-report-check-name:
-        description: "Visible GitHub check run name for the conformance job JUnit report"
+        description: "Retained for existing callers. Verifier and wallet roles publish their own JUnit checks."
         required: false
         type: string
         default: "wallet/verifier-conformance"
@@ -247,12 +247,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-  conformance:
-    name: wallet/verifier-conformance
+  # Verifier, OpenID4VP wallet and OpenID4VCI wallet each own a runner, tunnel and test
+  # filter. fail-fast is off so one role cannot cancel the others. Issuer proofs stay separate.
+  wallet-conformance:
+    name: ${{ matrix.role }}-conformance
     if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - role: verifier
+            port: 7003
+            report_dir: vp-verifier
+            title: OpenID4VP Verifier
+            tests: id.walt.openid4vp.conformance.ConformanceTests
+            extra_tests: id.walt.openid4vp.conformance.VerifierConformanceTests
+          - role: vp-wallet
+            port: 7006
+            report_dir: vp-wallet
+            title: OpenID4VP Wallet
+            tests: id.walt.openid4vp.conformance.VpWalletConformanceTests
+            extra_tests: ""
+          - role: vci-wallet
+            port: 7007
+            report_dir: vci-wallet
+            title: OpenID4VCI Wallet
+            tests: id.walt.openid4vp.conformance.VciWalletConformanceTests
+            extra_tests: ""
     env:
       KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
+      ROLE: ${{ matrix.role }}
+      ROLE_PORT: ${{ matrix.port }}
+      ROLE_REPORT_DIR: ${{ matrix.report_dir }}
+      ROLE_TITLE: ${{ matrix.title }}
+      ROLE_TESTS: ${{ matrix.tests }}
+      ROLE_EXTRA_TESTS: ${{ matrix.extra_tests }}
     steps:
       - name: Set up swap space
         run: |
@@ -275,63 +305,36 @@ jobs:
         id: conformance-gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
-      - name: Start tunnels and get URLs
+      - name: Start role tunnel
         id: tunnel
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
         run: |
+          set -euo pipefail
           wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
+          log="$RUNNER_TEMP/lt_role.txt"
+          ./cloudflared tunnel --url "http://localhost:${ROLE_PORT}" > "$log" 2>&1 &
+          pid=$!
+          echo "$pid" > "$RUNNER_TEMP/lt_role.pid"
+          url=""
+          for i in $(seq 1 60); do
+            url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1 || true)
+            [ -n "$url" ] && break
+            kill -0 "$pid" 2>/dev/null || { echo "::error::${ROLE} cloudflared exited before printing a URL"; cat "$log"; exit 1; }
+            sleep 1
+          done
+          if [ -z "$url" ]; then
+            echo "::error::Failed to get ${ROLE} tunnel URL after ${i}s"
+            cat "$log"
+            exit 1
+          fi
+          echo "${ROLE} tunnel: $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
-          start_tunnel() {
-            local port="$1"
-            local log="$2"
-            ./cloudflared tunnel --url "http://localhost:${port}" > "$log" 2>&1 &
-            local pid=$!
-            echo "$pid" > "$RUNNER_TEMP/${log%.txt}.pid"
-            echo "$pid"
-          }
-
-          wait_for_url() {
-            local pid="$1"
-            local log="$2"
-            local name="$3"
-            local url=""
-            local i
-            for i in $(seq 1 60); do
-              url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1)
-              [ -n "$url" ] && break
-              kill -0 "$pid" 2>/dev/null || { echo "$name cloudflared exited before printing a URL"; cat "$log"; return 1; }
-              sleep 1
-            done
-            if [ -z "$url" ]; then
-              echo "Failed to get $name tunnel URL after ${i}s"
-              cat "$log"
-              return 1
-            fi
-            echo "$url"
-          }
-
-          # Sequential start+wait: concurrent trycloudflare sessions can stall before printing a URL.
-          # 7003: OpenID4VP verifier E2E server
-          # 7006: OpenID4VP wallet adapter authorization endpoint
-          # 7007: OpenID4VCI wallet adapter credential-offer endpoint
-          VERIFIER_PID=$(start_tunnel 7003 lt_verifier.txt)
-          VERIFIER_URL=$(wait_for_url "$VERIFIER_PID" lt_verifier.txt verifier) || exit 1
-          VP_WALLET_PID=$(start_tunnel 7006 lt_vp_wallet.txt)
-          VP_WALLET_URL=$(wait_for_url "$VP_WALLET_PID" lt_vp_wallet.txt vp-wallet) || exit 1
-          VCI_WALLET_PID=$(start_tunnel 7007 lt_vci_wallet.txt)
-          VCI_WALLET_URL=$(wait_for_url "$VCI_WALLET_PID" lt_vci_wallet.txt vci-wallet) || exit 1
-
-          echo "Verifier tunnel: $VERIFIER_URL"
-          echo "VP wallet adapter tunnel: $VP_WALLET_URL"
-          echo "VCI wallet adapter tunnel: $VCI_WALLET_URL"
-          echo "url=$VERIFIER_URL" >> "$GITHUB_OUTPUT"
-          echo "vp_wallet_url=$VP_WALLET_URL" >> "$GITHUB_OUTPUT"
-          echo "vci_wallet_url=$VCI_WALLET_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Replace URLs in Kotlin test
-        if: ${{ steps.tunnel.outputs.url != '' }}
+      - name: Point verifier tests at the tunnel
+        id: verifier-url
+        if: ${{ matrix.role == 'verifier' && steps.tunnel.outputs.url != '' }}
         run: |
           FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
           sed -i \
@@ -355,149 +358,226 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Run conformance tests
+      - name: Run role conformance tests
         id: conformance-tests
-        # Issuer setup and execution are independent of wallet/verifier testing.
-        if: ${{ !cancelled() && steps.conformance-gradle.outcome == 'success' && steps.conformance-browsers.outcome == 'success' && steps.tunnel.outcome == 'success' }}
-        run: |
-          set -euo pipefail
-          unset OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
-          echo 'Running wallet/verifier conformance; issuer proofs run in their own jobs.'
-          gradle_args=(--continue --console=plain --warning-mode=summary --no-configuration-cache -PskipLiveConformance=false)
-          if [ "$CACHELESS" = "true" ]; then
-            gradle_args+=(--rerun-tasks --no-daemon)
-          fi
-          # Rerun live tests, not every compile/dependency task in the normal cached path.
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --rerun "${gradle_args[@]}"
+        if: ${{ !cancelled() && steps.conformance-gradle.outcome == 'success' && steps.conformance-browsers.outcome == 'success' && steps.tunnel.outcome == 'success' && (matrix.role != 'verifier' || steps.verifier-url.outcome == 'success') }}
         env:
           CI: "true"
           CACHELESS: ${{ inputs.cacheless }}
+          TUNNEL_URL: ${{ steps.tunnel.outputs.url }}
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          # Wallet, VCI wallet and verifier module failures fail this job.
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
-          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
-          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           SKIP_LIVE_CONFORMANCE: "false"
           PLAYWRIGHT_BROWSER: chromium
           PLAYWRIGHT_HEADLESS: "true"
+        run: |
+          set -euo pipefail
+          unset OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
+          case "$ROLE" in
+            verifier)
+              echo "Running OpenID4VP verifier conformance."
+              ;;
+            vp-wallet)
+              export CONFORMANCE_VP_WALLET_ADAPTER_URL="${TUNNEL_URL}/openid4vp/authorize"
+              echo "Running OpenID4VP wallet conformance."
+              ;;
+            vci-wallet)
+              export CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL="$TUNNEL_URL"
+              echo "Running OpenID4VCI wallet conformance."
+              ;;
+            *)
+              echo "::error::Unknown conformance role: $ROLE"
+              exit 1
+              ;;
+          esac
+          gradle_args=(--continue --console=plain --warning-mode=summary --no-configuration-cache -PskipLiveConformance=false)
+          if [ "$CACHELESS" = "true" ]; then
+            gradle_args+=(--rerun-tasks --no-daemon)
+          fi
+          test_args=(--tests "$ROLE_TESTS")
+          if [ -n "${ROLE_EXTRA_TESTS:-}" ]; then
+            test_args+=(--tests "$ROLE_EXTRA_TESTS")
+          fi
+          # Rerun live tests, not every compile/dependency task in the normal cached path.
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --rerun "${test_args[@]}" "${gradle_args[@]}"
 
-      - name: Publish test report
+      - name: Publish role test report
         uses: mikepenz/action-junit-report@v6
         if: always()
         with:
-          update_check: true
-          job_name: ${{ inputs.conformance-report-check-name }}
+          check_name: ${{ matrix.title }} conformance
           report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           detailed_summary: true
           include_passed: false
           include_skipped: false
 
-      - name: Upload test results
+      - name: Upload role test results
         if: ${{ always() && inputs.upload-test-results }}
         uses: actions/upload-artifact@v7
         with:
-          name: junit-conformance
+          name: junit-conformance-${{ matrix.role }}
+          overwrite: true
           path: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           if-no-files-found: warn
           retention-days: 90
 
-      - name: Publish OpenID conformance summary
+      - name: Publish role conformance summary
         if: always()
         run: |
           set -euo pipefail
           {
             echo "## OpenID conformance results"
             echo
-            echo "> Executed OpenID4VP verifier/wallet and OpenID4VCI wallet failures fail this job."
+            echo "> ${ROLE_TITLE} failures fail this job."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
-          append_role_summary() {
-            local role_dir="$1"
-            local title="$2"
-            local summary=""
-            local candidate
-            while IFS= read -r candidate; do
-              summary="$candidate"
-              break
-            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+          summary=""
+          candidate=""
+          while IFS= read -r candidate; do
+            summary="$candidate"
+            break
+          done < <(find . -path "*/build/reports/openid-conformance/${ROLE_REPORT_DIR}/summary.md" 2>/dev/null)
 
-            echo >> "$GITHUB_STEP_SUMMARY"
-            if [ -n "$summary" ] && [ -f "$summary" ]; then
-              cat "$summary" >> "$GITHUB_STEP_SUMMARY"
-              found=$((found + 1))
-            else
-              {
-                echo "# ${title} Conformance Summary"
-                echo
-                echo "- Total: 0"
-                echo "- Passed: 0"
-                echo "- Failed: 0"
-                echo
-                echo "<details>"
-                echo "<summary>${title} results</summary>"
-                echo
-                echo "| Test | Status | Suite | Log | Error |"
-                echo "|------|--------|-------|-----|-------|"
-                echo
-                echo "</details>"
-                echo
-                echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-            echo >> "$GITHUB_STEP_SUMMARY"
-          }
+          echo >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$summary" ] && [ -f "$summary" ]; then
+            cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "Published ${ROLE_TITLE} conformance summary."
+          else
+            {
+              echo "# ${ROLE_TITLE} Conformance Summary"
+              echo
+              echo "- Total: 0"
+              echo "- Passed: 0"
+              echo "- Failed: 0"
+              echo
+              echo "<details>"
+              echo "<summary>${ROLE_TITLE} results</summary>"
+              echo
+              echo "| Test | Status | Suite | Log | Error |"
+              echo "|------|--------|-------|-----|-------|"
+              echo
+              echo "</details>"
+              echo
+              echo "_No ${ROLE_TITLE} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "No ${ROLE_TITLE} summary file was produced."
+          fi
 
-          found=0
-          append_role_summary vp-verifier "OpenID4VP Verifier"
-          append_role_summary vp-wallet "OpenID4VP Wallet"
-          append_role_summary vci-wallet "OpenID4VCI Wallet"
-
-          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet and OpenID4VCI wallet (${found} wallet/verifier file(s) found)."
-
-      - name: Fail job on published OpenID conformance failures
+      - name: Fail job on published role conformance failures
         if: ${{ always() && !cancelled() }}
         run: |
           set -euo pipefail
+          summary=""
+          candidate=""
+          while IFS= read -r candidate; do
+            summary="$candidate"
+            break
+          done < <(find . -path "*/build/reports/openid-conformance/${ROLE_REPORT_DIR}/summary.md" 2>/dev/null)
+          if [ -z "$summary" ] || [ ! -f "$summary" ]; then
+            exit 0
+          fi
+          count="$(awk -F': ' '/^- Failed: / { print $2; exit }' "$summary")"
+          if [ -n "${count:-}" ] && [ "$count" -gt 0 ]; then
+            echo "::error::${ROLE_TITLE} conformance reported ${count} failed test(s). See the job summary."
+            exit 1
+          fi
 
-          failed=0
-          check_role() {
-            local role_dir="$1"
-            local title="$2"
-            local summary=""
-            local candidate
-            while IFS= read -r candidate; do
-              summary="$candidate"
-              break
-            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
-
-            if [ -z "$summary" ] || [ ! -f "$summary" ]; then
-              return 0
-            fi
-            local count
-            count="$(awk -F': ' '/^- Failed: / { print $2; exit }' "$summary")"
-            if [ -n "${count:-}" ] && [ "$count" -gt 0 ]; then
-              echo "::error::${title} conformance reported ${count} failed test(s). See the job summary."
-              failed=1
-            fi
-          }
-
-          check_role vp-verifier "OpenID4VP Verifier"
-          check_role vp-wallet "OpenID4VP Wallet"
-          check_role vci-wallet "OpenID4VCI Wallet"
-
-          exit "$failed"
-
-      - name: Stop wallet and verifier conformance tunnels
+      - name: Stop role tunnel
         if: always()
         run: |
-          for pid_file in "$RUNNER_TEMP/lt_verifier.pid" "$RUNNER_TEMP/lt_vp_wallet.pid" "$RUNNER_TEMP/lt_vci_wallet.pid"; do
-            [ -f "$pid_file" ] || continue
-            pid=$(cat "$pid_file")
-            if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
+          pid_file="$RUNNER_TEMP/lt_role.pid"
+          [ -f "$pid_file" ] || exit 0
+          pid=$(cat "$pid_file")
+          if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
+
+      - name: Upload role conformance reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openid-conformance-${{ matrix.report_dir }}
+          overwrite: true
+          if-no-files-found: warn
+          path: |
+            **/build/reports/openid-conformance/**
+
+  wallet-conformance-results:
+    name: wallet/verifier conformance results
+    needs: wallet-conformance
+    if: ${{ always() && !cancelled() && (inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
+    runs-on: ubuntu-22.04
+    steps:
+      # Keep going after a missing artifact so the uploads below can still publish
+      # whatever arrived. The final check fails the job when the role jobs themselves
+      # succeeded and a required artifact did not.
+      - name: Download verifier reports
+        id: verifier-reports
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: openid-conformance-vp-verifier
+          path: role-reports/vp-verifier
+
+      - name: Download OpenID4VP wallet reports
+        id: vp-wallet-reports
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: openid-conformance-vp-wallet
+          path: role-reports/vp-wallet
+
+      - name: Download OpenID4VCI wallet reports
+        id: vci-wallet-reports
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: openid-conformance-vci-wallet
+          path: role-reports/vci-wallet
+
+      - name: Download verifier JUnit
+        id: verifier-junit
+        if: ${{ inputs.upload-test-results }}
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: junit-conformance-verifier
+          path: junit-conformance/verifier
+
+      - name: Download OpenID4VP wallet JUnit
+        id: vp-wallet-junit
+        if: ${{ inputs.upload-test-results }}
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: junit-conformance-vp-wallet
+          path: junit-conformance/vp-wallet
+
+      - name: Download OpenID4VCI wallet JUnit
+        id: vci-wallet-junit
+        if: ${{ inputs.upload-test-results }}
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: junit-conformance-vci-wallet
+          path: junit-conformance/vci-wallet
+
+      - name: Assemble OpenID conformance summaries
+        if: ${{ always() && !cancelled() }}
+        run: |
+          set -euo pipefail
+          mkdir -p openid-conformance-summaries
+          # Copy every report that arrived. Missing roles are rejected below when
+          # the role jobs succeeded; a failed role still leaves its siblings here.
+          for role in vp-verifier vp-wallet vci-wallet; do
+            src="role-reports/$role"
+            [ -d "$src" ] || continue
+            summary="$(find "$src" -name summary.md -print -quit || true)"
+            [ -n "$summary" ] || continue
+            mkdir -p "openid-conformance-summaries/$role"
+            cp -R "$(dirname "$summary")/." "openid-conformance-summaries/$role/"
           done
 
       - name: Upload OpenID conformance reports
@@ -505,12 +585,58 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: openid-conformance-summaries
+          overwrite: true
           if-no-files-found: warn
-          path: |
-            **/build/reports/openid-conformance/**
+          path: openid-conformance-summaries
+
+      - name: Upload conformance test results
+        if: ${{ always() && inputs.upload-test-results }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-conformance
+          overwrite: true
+          if-no-files-found: warn
+          path: junit-conformance
+
+      - name: Require complete reports when role jobs succeeded
+        if: ${{ always() && !cancelled() && needs.wallet-conformance.result == 'success' }}
+        env:
+          UPLOAD_TEST_RESULTS: ${{ inputs.upload-test-results }}
+          VERIFIER_REPORTS: ${{ steps.verifier-reports.outcome }}
+          VP_WALLET_REPORTS: ${{ steps.vp-wallet-reports.outcome }}
+          VCI_WALLET_REPORTS: ${{ steps.vci-wallet-reports.outcome }}
+          VERIFIER_JUNIT: ${{ steps.verifier-junit.outcome }}
+          VP_WALLET_JUNIT: ${{ steps.vp-wallet-junit.outcome }}
+          VCI_WALLET_JUNIT: ${{ steps.vci-wallet-junit.outcome }}
+        run: |
+          set -euo pipefail
+          failed=0
+          require_success() {
+            local name="$1"
+            local outcome="$2"
+            if [ "$outcome" != "success" ]; then
+              echo "::error::${name} download ${outcome}; the combined conformance artifact is incomplete."
+              failed=1
+            fi
+          }
+          require_success "OpenID4VP verifier reports" "$VERIFIER_REPORTS"
+          require_success "OpenID4VP wallet reports" "$VP_WALLET_REPORTS"
+          require_success "OpenID4VCI wallet reports" "$VCI_WALLET_REPORTS"
+          for role in vp-verifier vp-wallet vci-wallet; do
+            if [ ! -f "openid-conformance-summaries/${role}/summary.md" ]; then
+              echo "::error::Missing ${role} summary after aggregation."
+              failed=1
+            fi
+          done
+          if [ "$UPLOAD_TEST_RESULTS" = "true" ]; then
+            require_success "verifier JUnit" "$VERIFIER_JUNIT"
+            require_success "OpenID4VP wallet JUnit" "$VP_WALLET_JUNIT"
+            require_success "OpenID4VCI wallet JUnit" "$VCI_WALLET_JUNIT"
+          fi
+          exit "$failed"
 
   # Each proof mode runs the unchanged issuer matrix on an independent runner.
-  # Neither depends on the wallet/verifier job, and a failed proof must not cancel its sibling.
+  # Neither depends on the verifier or wallet jobs, and a failed proof must not cancel its sibling.
   issuer-conformance:
     name: issuer-conformance (proof-${{ matrix.proof }})
     if: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
@@ -829,17 +955,18 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/attestation/results.json
 
   # Maven publish waits for the default Gradle job and, when requested, the live
-  # wallet/verifier and issuer jobs. Leaving publish on the gradle job let release candidates upload
+  # verifier, wallet and issuer jobs. Leaving publish on the gradle job let release candidates upload
   # artifacts while conformance was still running or after it had failed.
   publish:
     name: publish
-    needs: [gradle, conformance, issuer-conformance, issuer-conformance-results]
+    needs: [gradle, wallet-conformance, wallet-conformance-results, issuer-conformance, issuer-conformance-results]
     if: >-
       always() && !cancelled()
       && inputs.publish
       && inputs.version != ''
       && needs.gradle.result == 'success'
-      && (needs.conformance.result == 'success' || needs.conformance.result == 'skipped')
+      && (needs.wallet-conformance.result == 'success' || needs.wallet-conformance.result == 'skipped')
+      && (needs.wallet-conformance-results.result == 'success' || needs.wallet-conformance-results.result == 'skipped')
       && (needs.issuer-conformance.result == 'success' || needs.issuer-conformance.result == 'skipped')
       && (needs.issuer-conformance-results.result == 'success' || needs.issuer-conformance-results.result == 'skipped')
     runs-on: ubuntu-22.04

@@ -466,9 +466,13 @@ skipped when no issuer target is configured.
 
 The reusable `.github/workflows/gradle.yml` runs the combined basic VCI / HAIP /
 batch matrix in two parallel `issuer-conformance` jobs, one for JWT proofs and
-one for standalone attestation proofs. Both run independently of the existing
-wallet/verifier `conformance` job. Wallet/verifier execution, JUnit reporting,
-summary tables, failure checks and artifact names are preserved.
+one for standalone attestation proofs. Both run independently of the verifier,
+OpenID4VP wallet and OpenID4VCI wallet jobs. Those three roles also run in
+parallel. Each role keeps its summary table, failure check and test filter.
+Aggregation still publishes `openid-conformance-summaries` and, when test
+results are requested, `junit-conformance`. If every role job succeeded, a
+missing report or requested JUnit artifact fails that aggregation after the
+available files are uploaded.
 The regular build enables issuer testing through conformance eligibility; the
 existing `run-issuer-conformance` and `run-haip-conformance` inputs both select it.
 Release workflows already set those inputs. Each proof job checks out the same
@@ -499,20 +503,22 @@ where offered: 12 Basic VCI and four plain HAIP variants per proof mode.
 The four encrypted HAIP variants do not offer that negative module in db1080a;
 its absence there is not negative coverage. Skipped results never satisfy the
 check, and an encrypted-HAIP-only run cannot satisfy negative coverage.
-Issuer proof jobs publish separate JUnit checks; the existing wallet/verifier
-JUnit check is unchanged. The live test task uses `--rerun` and disables configuration caching so
+Issuer proof jobs publish separate JUnit checks. The verifier and each wallet
+role publish their own JUnit checks. The live test task uses `--rerun` and disables configuration caching so
 it cannot reuse old test results or stale environment settings, while dependency
 compilation can stay up to date. Cacheless runs retain `--rerun-tasks`.
 
-If issuer setup fails, wallet/verifier tests and the other proof job can still
-execute. No issuer target is exported unless its setup succeeds. Each issuer proof
-test retains the 90-minute timeout; wallet/verifier timeouts are unchanged. Services
+If issuer setup fails, the verifier job, both wallet jobs and the other proof job
+can still execute. No issuer target is exported unless its setup succeeds. Each issuer proof
+test retains the 90-minute timeout; wallet and verifier timeouts are unchanged. Services
 and tunnels are stopped by always-run cleanup. Maven publication waits for the
-wallet/verifier job, both issuer jobs and successful aggregation of issuer results.
+verifier job, both wallet jobs, wallet aggregation, both issuer jobs and successful aggregation of issuer results.
 
 Each issuer job invokes the existing Gradle `test` task with
-`--tests id.walt.openid4vp.conformance.IssuerConformanceTests`. Wallet/verifier
-testing keeps its existing invocation without an issuer target. CI does not use
+`--tests id.walt.openid4vp.conformance.IssuerConformanceTests`. The verifier job
+runs `ConformanceTests` and `VerifierConformanceTests`. The OpenID4VP wallet job
+runs `VpWalletConformanceTests`, and the OpenID4VCI wallet job runs
+`VciWalletConformanceTests`. None of those jobs exports an issuer target. CI does not use
 the local wrapper or a new Gradle test task. It uses
 `conformance.waltid.cloud:443` and checks `/api/server`
 for revision `db1080a`, tag `release-v5.2.3`, version `5.2.4` before starting the
@@ -564,8 +570,7 @@ reimplementing protocol acceptance policy.
 
 Each issuer JUnit check reports its aggregate matrix test, not a separate JUnit
 test for each suite module; the existing passed/skipped detail filters are unchanged.
-The existing `Publish OpenID conformance summary` keeps the wallet/verifier role
-sections. The issuer aggregation job publishes the same issuer summary format, with issuer
+Each verifier and wallet job publishes its own role summary. The issuer aggregation job publishes the same issuer summary format, with issuer
 variant statuses, clickable plan links and batch coverage counts taken from the
 runner's `matrix.json`. Missing results are reported explicitly, and issuer testing
 that was not requested leaves the issuer jobs skipped. Missing batch classifications
@@ -583,8 +588,10 @@ artifacts transfer only sanitized reports and job outcomes to the aggregation jo
 Aggregation downloads each artifact by name into its own directory, so a missing
 proof artifact still leaves the other proof's report available to merge.
 When `upload-test-results` is requested, issuer JUnit XML is uploaded separately as
-`junit-issuer-conformance-jwt` and `junit-issuer-conformance-attestation`; the existing
-`junit-conformance` wallet/verifier artifact is unchanged. The issuer and tunnel
+`junit-issuer-conformance-jwt` and `junit-issuer-conformance-attestation`. Role jobs
+upload `junit-conformance-verifier`, `junit-conformance-vp-wallet` and
+`junit-conformance-vci-wallet`; aggregation republishes them as `junit-conformance`.
+The issuer and tunnel
 are stopped on completion or failure.
 
 Focused checks (no live conformance):

@@ -201,7 +201,7 @@ jobs:
               echo "A successful \`ci-gate\` is not evidence that live conformance passed."
               echo "The maintainer must record a passing run for the integrated revision before it enters \`main\`."
             else
-              echo "Requested: \`${SELECTED:-unavailable}\`. See the conformance job for the result."
+              echo "Requested: \`${SELECTED:-unavailable}\`. See the verifier, wallet and issuer conformance jobs for the result."
             fi
             echo
             echo "Selection reason: ${REASON:-eligibility decision unavailable}"
