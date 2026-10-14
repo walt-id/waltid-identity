@@ -30,7 +30,11 @@ def platform_suites(platform):
         suites[mobile] = [f"id.walt.mdoc.proximity.mobile.{name}" for name in (
             "IosCentralGattCallbackTest", "IosPeripheralGattCallbackTest")]
         suites[f"{compose}/sharedUI"] = ["id.walt.walletdemo.compose.ui.WalletDemoProximityIosTest"]
-        suites[f"{compose}/sharedLogic"] = []
+        suites[f"{compose}/sharedLogic"] = [f"id.walt.walletdemo.compose.logic.{name}" for name in (
+            "CredentialDisplayNormalizerTest", "DemoSharingSettingsStoreTest", "StoredCredentialMetadataParserTest",
+            "WalletDemoControllerSkipPinTest", "WalletDemoControllerTest", "WalletDemoKeySetupTest",
+            "WalletDemoMetadataModelsTest", "walletapi2.WalletApi2AuthorizationCallbackTest",
+            "walletapi2.WalletApi2MappingsTest", "walletapi2.WalletApiProfileTest", "walletapi2.WalletDeepLinkSchemeWebTest")]
     return suites
 
 

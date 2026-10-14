@@ -316,7 +316,9 @@ runs:
       run: |
         python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
           --require-suite iosAppTests.xctest iosAppUITests.xctest \
-          --require-class ProximityPresentationViewModelTests \
+          --require-class ProximityPresentationViewModelTests WalletViewModelReceiveTests \
+            MockWalletUITests WalletIdentitySetupUITests PublicDemoBackendE2ETests MockCredentialDisplayUITests \
+            KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
           --allow-skipped \
             'WalletIdentityRecoveryIntegrationTests#testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity' \
             'WalletIdentityRecoveryIntegrationTests#testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable' \
