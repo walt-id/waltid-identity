@@ -42,11 +42,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
             XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
             ui.assertExists(identifierPrefix: "issuance-saved-", timeout: credentialOperationTimeout)
-            // Idle success returns home automatically; tapping Done races that dismissal.
-            let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
-                object: app.buttons["wallet.scanButton"])
-            XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
-            XCTAssertFalse(app.buttons["issuance-done"].exists)
+            waitForIdleIssuanceDismissal(app)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
@@ -144,7 +140,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         // Successful in-app issuance returns to the credential list.
         ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: credentialOperationTimeout)
 
-        ui.returnToWallet()
+        waitForIdleIssuanceDismissal(app)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
         ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
@@ -272,10 +268,18 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.swipeUp()
         ui.replaceText(in: txCodeInput, value: transactionCode)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        ui.allowIdentityDocumentRegistrationIfRequested()
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-        ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
+        ui.allowIdentityDocumentRegistrationIfRequested()
+        waitForIdleIssuanceDismissal(app)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
+    }
+
+    private func waitForIdleIssuanceDismissal(_ app: XCUIApplication) {
+        // Home exists beneath the receipt; wait until automatic dismissal makes it usable.
+        let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+            object: app.buttons["wallet.scanButton"])
+        XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
+        XCTAssertFalse(app.buttons["issuance-done"].exists)
     }
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {
