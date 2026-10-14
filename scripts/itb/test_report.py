@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
-from report import REQUIRED_COUNTS, read_results, render
+from report import REQUIRED_SUITES, read_results, render
 
 
 class ReportTest(unittest.TestCase):
@@ -12,8 +12,8 @@ class ReportTest(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name)
         self.suite = ET.Element("testsuite")
-        for classname, count in REQUIRED_COUNTS.items():
-            for number in range(count):
+        for classname in sorted(REQUIRED_SUITES):
+            for number in range(2):
                 ET.SubElement(self.suite, "testcase", classname=classname, name=f"check {number}")
 
     def write(self):
@@ -30,14 +30,23 @@ class ReportTest(unittest.TestCase):
         self.assertNotIn("private", summary)
 
     def test_rejects_missing_results(self):
-        with self.assertRaisesRegex(ValueError, "inventory differs"):
+        with self.assertRaisesRegex(ValueError, "Missing profile suites"):
             read_results(self.path)
 
-    def test_rejects_a_partial_class(self):
-        self.suite.remove(self.suite[2])
+    def test_rejects_a_missing_suite(self):
+        missing = self.suite[0].get("classname")
+        for case in list(self.suite):
+            if case.get("classname") == missing:
+                self.suite.remove(case)
         self.write()
-        with self.assertRaisesRegex(ValueError, "inventory differs"):
+        with self.assertRaisesRegex(ValueError, "Missing profile suites"):
             read_results(self.path)
+
+    def test_new_checks_and_suites_need_no_inventory_update(self):
+        ET.SubElement(self.suite, "testcase", classname=self.suite[0].get("classname"), name="new check")
+        ET.SubElement(self.suite, "testcase", classname="id.walt.itb.NewProfileTest", name="new profile check")
+        self.write()
+        self.assertEqual(len(read_results(self.path)), len(self.suite))
 
     def test_rejects_duplicate_results(self):
         self.suite.append(self.suite[0])

@@ -106,9 +106,9 @@
       "lanes": []
     },
     {
-      "name": "proximity manifest selects its Kotlin and Swift consumers",
+      "name": "result verifier selects its Kotlin and Swift consumers",
       "files": [
-        ".github/scripts/mobile-ci/proximity-test-suites.json"
+        ".github/scripts/mobile-ci/verify_test_results.py"
       ],
       "lanes": ["ios-simulator", "native"]
     },

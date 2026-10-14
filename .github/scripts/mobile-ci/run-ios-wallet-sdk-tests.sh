@@ -128,9 +128,8 @@ if ! command -v xcresultparser >/dev/null 2>&1; then
 fi
 xcresultparser "$run_dir/Tests.xcresult" --output-format=junit > "$run_dir/results.xml"
 python3 "$script_dir/verify_test_results.py" \
-  --manifest "$script_dir/proximity-test-suites.json" --suite swift-bridge \
+  --require-suite WalletSDKTests.xctest \
+  --require-class KMPProximitySessionBridgeTests KMPProximityProjectionTests \
+    ProximityBridgeContractTests KMPKeyAttestationProviderTests IssuanceBridgeContractTests \
   --reports "$run_dir/results.xml" | tee "$run_dir/discovery.json" || test_status=1
-python3 "$script_dir/verify_test_results.py" \
-  --manifest "$script_dir/wallet-batch-test-suites.json" --suite swift-batch-bridge \
-  --reports "$run_dir/results.xml" | tee "$run_dir/batch-discovery.json" || test_status=1
 exit "$test_status"

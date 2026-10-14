@@ -367,12 +367,14 @@ jobs:
           for demo in native compose; do
             if [[ "$demo" == native ]]; then
               report='*iosAppEnterpriseTests.xcresult.xml'
+              targets=(iosAppEnterpriseTests.xctest iosAppUITests.xctest)
             else
               report='*compose-batch.xcresult.xml'
+              targets=(iosAppUITests.xctest)
             fi
             python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py \
-              --manifest waltid-identity/.github/scripts/mobile-ci/wallet-batch-test-suites.json \
-              --suite "$demo-ios-batch" \
+              --require-suite "${targets[@]}" \
+              --require-class BatchIssuanceE2ETests \
               --reports "waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/xcresult/$report"
           done
 

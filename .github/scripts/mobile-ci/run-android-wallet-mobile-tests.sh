@@ -21,6 +21,7 @@ fi
   -Pandroid.testInstrumentationRunnerArguments.notClass=id.walt.wallet2.mobile.test.BlockStoreRecoveryWorkflowTest \
   --info
 
+# This canary depends on the secure lock screen; other backend tests do not.
 python3 "$script_dir/verify_test_results.py" \
-  --manifest "$script_dir/proximity-test-suites.json" --suite android-credential-key \
+  --require-test 'id.walt.crypto2.signum.AndroidSignumKeyBackendDeviceTest#credentialProtectedKeyReopensWithoutAnInteractionContext' \
   --reports "$identity_dir/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml"

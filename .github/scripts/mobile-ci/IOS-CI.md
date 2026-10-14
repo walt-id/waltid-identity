@@ -44,9 +44,19 @@ preparation succeeds and is stopped after XCTest.
 Native app and Swift package tests discover their targets by default. Explicit
 exclusions reserve physical signing prompts for attended checks, batch issuance
 for the Enterprise fixture phase, and Swift Keychain/persistence snippets for the
-entitled native app host. Named result checks reject missing or skipped restored
-suites. sharedLogic links and executes its complete Kotlin iOS test target using
+entitled native app host. Result checks require nonempty unit and UI targets
+separately, retain guards for conditional Kotlin bridge suites, and reject failures
+and unexpected skips across all reported cases. Only the two native recovery checks
+that require physical hardware or an operator may report skips. sharedLogic links
+and executes its complete Kotlin iOS test target using
 the toolchain's existing SwiftPM dependency linkage.
+
+There are no method inventories or fixed test counts to update when adding or
+renaming ordinary tests. Method-level canaries remain only for Android's secure-PIN
+key and browser opt-in, where other tests could pass without that environment.
+DC API and offline ITB profile checks also require their suites without fixing the
+number of methods. Cloud, fixture, physical-device and isolated-process selectors
+continue to route tests to the environment they need.
 
 The Enterprise phase runs SDK contracts plus native and Compose batch journeys
 with its existing issuer/verifier fixture. The fixture URL reaches XCTest through
