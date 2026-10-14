@@ -635,6 +635,8 @@ final class WalletVisualTests: XCTestCase {
         defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
         let host = WalletVisualHostingController(rootView: content)
+        host.scrollToBottom = scrollToBottom
+        host.scrollFraction = scrollFraction
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
@@ -696,14 +698,11 @@ final class WalletVisualTests: XCTestCase {
             }
             return XCTFail("\(failure). \(readinessDescription())")
         }
-        // SnapshotTesting applies its device traits and geometry during capture. Scroll after that
-        // layout, rather than using the live simulator scene's larger viewport.
-        host.scrollToBottom = scrollToBottom
-        host.scrollFraction = scrollFraction
-        try capture(host, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory)
+        // Readiness must describe the requested scrolled frame, including its scroll-edge materials.
         if scrollToBottom {
             XCTAssertTrue(host.didScroll, "The compact fixture must overflow and scroll to its requested offset")
         }
+        try capture(host, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory)
     }
 
     private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
