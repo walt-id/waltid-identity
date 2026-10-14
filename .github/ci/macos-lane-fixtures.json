@@ -15,6 +15,20 @@
       "lanes": ["ios-simulator"]
     },
     {
+      "name": "new app-hosted Keychain tests select simulator coverage",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/src/iosAppTest/kotlin/id/walt/crypto2/signum/NewOwnershipTest.kt"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
+      "name": "Keychain host runner selects simulator coverage",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/test-ios-keychain.sh"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
       "name": "library build.gradle.kts selects simulator only",
       "files": [
         "waltid-libraries/crypto/waltid-crypto/build.gradle.kts"

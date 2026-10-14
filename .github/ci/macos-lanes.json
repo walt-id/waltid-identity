@@ -29,6 +29,7 @@
         "*/src/commonTest/*",
         "*/src/iosMain/*",
         "*/src/iosTest/*",
+        "*/src/iosAppTest/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
@@ -40,6 +41,7 @@
         "scripts/ios_simulator_test.py",
         "scripts/tests/test_*recovery*",
         ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/test-ios-keychain.sh",
         "*/src/recoveryTest/*",
         "*/src/iosRecoveryTest/*"
       ]
