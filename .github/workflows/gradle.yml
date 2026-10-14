@@ -787,11 +787,21 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           resolved-refs: ${{ inputs.checkout-refs }}
 
-      - name: Download issuer proof results
+      # Named downloads keep a single surviving proof in its own directory.
+      # A pattern match of one artifact is extracted without that directory.
+      - name: Download JWT issuer proof results
+        continue-on-error: true
         uses: actions/download-artifact@v8
         with:
-          pattern: issuer-conformance-proof-*
-          path: issuer-proof-results
+          name: issuer-conformance-proof-jwt
+          path: issuer-proof-results/issuer-conformance-proof-jwt
+
+      - name: Download attestation issuer proof results
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: issuer-conformance-proof-attestation
+          path: issuer-proof-results/issuer-conformance-proof-attestation
 
       - name: Merge and verify issuer results
         if: ${{ always() && !cancelled() }}

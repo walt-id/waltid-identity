@@ -580,6 +580,8 @@ rendered configuration and test keys are not uploaded in this artifact. Its name
 JSON schema and `jwt/results.json` and `attestation/results.json` paths are preserved.
 Intermediate `issuer-conformance-proof-jwt` and `issuer-conformance-proof-attestation`
 artifacts transfer only sanitized reports and job outcomes to the aggregation job.
+Aggregation downloads each artifact by name into its own directory, so a missing
+proof artifact still leaves the other proof's report available to merge.
 When `upload-test-results` is requested, issuer JUnit XML is uploaded separately as
 `junit-issuer-conformance-jwt` and `junit-issuer-conformance-attestation`; the existing
 `junit-conformance` wallet/verifier artifact is unchanged. The issuer and tunnel
