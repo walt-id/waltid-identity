@@ -171,7 +171,7 @@ runs:
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
-          "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-xcode-tests.sh" \
+          xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ inputs.simulator-destination }}" \
@@ -219,7 +219,7 @@ runs:
         trap 'exit 143' TERM
         xcrun simctl bootstatus "$simulator" -b
 
-        "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-xcode-tests.sh" \
+        xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -configuration Debug \

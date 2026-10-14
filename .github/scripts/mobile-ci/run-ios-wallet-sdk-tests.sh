@@ -100,7 +100,7 @@ PY
 
 phase_start=$SECONDS
 test_status=0
-WALLET_SDK_BRIDGE_FIXTURES=1 "$script_dir/run-xcode-tests.sh" \
+WALLET_SDK_BRIDGE_FIXTURES=1 xcodebuild test -collect-test-diagnostics "${XCODE_TEST_DIAGNOSTICS:-never}" \
   -workspace "$root/WalletSDK.xcworkspace" -scheme WalletSDKTests \
   -destination "$destination" \
   -only-testing:WalletSDKTests/WalletAPITests \

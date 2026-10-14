@@ -50,7 +50,6 @@
       "patterns": [
         "*/Package.swift",
         ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh",
-        ".github/scripts/mobile-ci/run-xcode-tests.sh",
         ".github/scripts/mobile-ci/verify_test_results.py",
         ".github/scripts/mobile-ci/proximity-test-suites.json",
         "scripts/check-mobile-swift-parity-decision.sh",
@@ -68,7 +67,6 @@
     "compose": {
       "description": "Compose iOS demo and its WalletCore/Swift integration",
       "patterns": [
-        ".github/scripts/mobile-ci/run-xcode-tests.sh",
         "waltid-applications/waltid-wallet-demo-compose/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
