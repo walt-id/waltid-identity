@@ -25,7 +25,7 @@ object DemoClientIdTrust {
      * - `x509_san_dns:verifier.example.com` (commented next to `clientId: "verifier2"`)
      * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
      *
-     * Demo material only, not a production CA. Valid until 2026-10-14.
+     * Demo material only, not a production CA. Valid 2026-08-13 until 2028-08-13.
      * Production wallets should pin a CA and use client-auth leaves.
      */
     val VERIFIER2_EXAMPLE_LEAF_PEM = """
@@ -257,12 +257,12 @@ object DemoClientIdTrust {
         -----END CERTIFICATE-----
     """.trimIndent()
 
-     /**
-     * WeBuild Raidiam
+    /**
+     * WeBuild Raidiam "EUDI Sandbox Registration Certificate Signer" root (self-signed).
+     * Source: ETSI TL https://tl-api.dev.idunion.info/api/v1/DblnEVuf/etsi/tl.xml. Valid until 2027-10-18.
      */
     val WEBUILD_RAIDIAM_ROOT = """
         -----BEGIN CERTIFICATE-----
-        KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         MIIDQzCCAiugAwIBAgIFXpo73NswDQYJKoZIhvcNAQELBQAwYzELMAkGA1UEBhMC
         R0IxHTAbBgNVBAoMFFJhaWRpYW0gU2VydmljZXMgTHRkMTUwMwYDVQQDDCxFVURJ
         IFNhbmRib3ggUmVnaXN0cmF0aW9uIENlcnRpZmljYXRlIFNpZ25lcjAeFw0yNjA5
@@ -277,10 +277,10 @@ object DemoClientIdTrust {
         VFyFGcji7sixC7av5AYZKb+FdmqoBEeDmVLgjqjJAgMBAAEwDQYJKoZIhvcNAQEL
         BQADggEBAGYHa14y8YJYZIHQAmcYuAoUr9GXqmIFHyNXkBCcZovq4y3iGWn8t3Ru
         2waETu/71E5RuSoH+ZiFRG9sGn3nIJXTeTojWB9iYNYz67G8sRmBzO2Af18uVLry
-        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXkY
-        0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbyst
-        FKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CGg
-        u43JYSWIGqKFtXzQ2NGETUJWclnOKM=
+        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXUk
+        Y0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbys
+        tFKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CG
+        gu43JYSWIGqKFtXzQ2NGETUJWclnOKM=
         -----END CERTIFICATE-----
     """.trimIndent()
 
