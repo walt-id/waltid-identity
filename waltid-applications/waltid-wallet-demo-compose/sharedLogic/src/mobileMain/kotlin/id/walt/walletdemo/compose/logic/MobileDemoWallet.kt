@@ -184,8 +184,6 @@ internal class MobileDemoWallet(
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
         (mobileWallet.signingIdentity.state() as? SigningIdentityState.Active)?.identity.let { selected ->
             val result = requireNotNull(selected) { "Select a signing identity before opening the wallet" }
-            // Registration projects credential data; keep it outside the SDK identity lifecycle.
-            mobileWallet.refreshDigitalCredentialRegistration()
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
@@ -194,6 +192,10 @@ internal class MobileDemoWallet(
                 warning = warning,
             )
         }
+
+    override suspend fun refreshDigitalCredentialRegistration() {
+        mobileWallet.refreshDigitalCredentialRegistration()
+    }
 
     override suspend fun signingProtectionAvailability(
         signingProtection: WalletDemoSigningProtection,

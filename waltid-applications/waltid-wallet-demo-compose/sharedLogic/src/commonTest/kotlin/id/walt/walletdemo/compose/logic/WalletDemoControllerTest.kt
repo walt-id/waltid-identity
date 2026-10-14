@@ -33,6 +33,135 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun localCardsAreReadyWhileRegistrationWaitsAndForegroundRefreshesCoalesce() = runTest {
+        var calls = 0
+        var completed = false
+        val wallet = object : DemoWallet by FakeDemoWallet(credentials = listOf(sampleCredential)) {
+            override suspend fun refreshDigitalCredentialRegistration() {
+                calls++
+                kotlinx.coroutines.delay(10_000)
+                completed = true
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        assertEquals(listOf(sampleCredential), assertIs<WalletSessionState.Ready>(controller.state.value.session).credentials)
+        assertFalse(completed)
+        repeat(3) { controller.handleApplicationForegrounded() }
+        runCurrent()
+        assertEquals(1, calls)
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertTrue(completed)
+    }
+
+    @Test
+    fun registrationFailureKeepsLocalCardsAndRetriesOnWarmUnlock() = runTest {
+        var calls = 0
+        val delegate = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun refreshDigitalCredentialRegistration() {
+                calls++
+                if (calls == 1) error("Platform unavailable")
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        assertEquals(listOf(sampleCredential), assertIs<WalletSessionState.Ready>(controller.state.value.session).credentials)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        controller.lock()
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+        assertEquals(2, calls)
+        assertEquals(1, delegate.bootstrapCalls)
+    }
+
+    @Test
+    fun lockingCancelsRegistrationAndResetWaitsForItsCleanupBeforeDeletion() = runTest {
+        val cleanup = CompletableDeferred<Unit>()
+        var started = false
+        var stopped = false
+        var deleted = false
+        var calls = 0
+        val wallet = object : DemoWallet by FakeDemoWallet(credentials = listOf(sampleCredential)) {
+            override suspend fun refreshDigitalCredentialRegistration() {
+                calls++
+                started = true
+                try { awaitCancellation() }
+                finally {
+                    withContext(NonCancellable) { cleanup.await() }
+                    stopped = true
+                }
+            }
+            override suspend fun deleteWallet() {
+                assertTrue(stopped)
+                deleted = true
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        assertTrue(started)
+        controller.lock()
+        controller.resetWallet()
+        runCurrent()
+        assertFalse(deleted)
+        // A foreground/unlock while reset drains the old work must not start another refresh.
+        controller.updatePin("1234")
+        controller.submitPin()
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertEquals(1, calls)
+        cleanup.complete(Unit)
+        runCurrent()
+        assertTrue(deleted)
+        assertIs<WalletAuthState.Setup>(controller.state.value.auth)
+        assertIs<WalletSessionState.NotBootstrapped>(controller.state.value.session)
+    }
+
+    @Test
+    fun lockingDuringBootstrapDiscardsLateCardsAndUnlockStartsFresh() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val delegate = FakeDemoWallet(credentials = listOf(sampleCredential))
+        var reads = 0
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun listCredentials(): List<WalletDemoCredential> {
+                reads++
+                if (reads == 1) withContext(NonCancellable) { gate.await() }
+                return delegate.listCredentials()
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        assertIs<WalletSessionState.Bootstrapping>(controller.state.value.session)
+        controller.lock()
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+        assertIs<WalletAuthState.Login>(controller.state.value.auth)
+        assertIs<WalletSessionState.NotBootstrapped>(controller.state.value.session)
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+        assertEquals(2, delegate.bootstrapCalls)
+        assertEquals(listOf(sampleCredential), assertIs<WalletSessionState.Ready>(controller.state.value.session).credentials)
+    }
+
+    @Test
+    fun hostScopeCancellationStopsRegistration() = runTest {
+        val owner = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        var cancelled = false
+        val wallet = object : DemoWallet by FakeDemoWallet() {
+            override suspend fun refreshDigitalCredentialRegistration() {
+                try { awaitCancellation() } finally { cancelled = true }
+            }
+        }
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore(), skipPin = true,
+            scope = owner, dispatcher = StandardTestDispatcher(testScheduler))
+        runCurrent()
+        assertIs<WalletSessionState.Ready>(controller.state.value.session)
+        owner.cancel()
+        runCurrent()
+        assertTrue(cancelled)
+    }
+
+    @Test
     fun cancelledKeyApprovalRetainsSetupAndReleasesBusyStateForRetry() = runTest {
         val option = WalletDemoKeySetupOption("create", WalletDemoKeyChoice("new", "No backup", ""),
             WalletDemoKeyChoice("native", "Native", ""), WalletDemoKeyChoice("approval", "Approval", ""))

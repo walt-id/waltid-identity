@@ -244,6 +244,7 @@ public class MobileWallet internal constructor(
      */
     public val events: Flow<MobileWalletEvent> = eventStream.events
 
+    private val registrationMutex = Mutex()
     private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
@@ -643,14 +644,26 @@ public class MobileWallet internal constructor(
      * This is the retry entry point: it is safe to call at any time, and calling it again after a
      * failure re-publishes the current wallet state. It reports an adapter failure through the
      * returned result and [digitalCredentialRegistration], and only propagates an exception if
-     * reading the wallet's own credentials failed.
+     * reading the wallet's own credentials failed, or the caller was cancelled. Refreshes on this
+     * wallet serialize snapshot creation and publication; a queued retry reads the current store.
      */
     public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult = lifecycle.use {
         updateDigitalCredentialRegistration()
     }
 
-    private suspend fun updateDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
-        val records = registryRecords(registrationProjection)
+    private suspend fun updateDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult = registrationMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        val records = try {
+            registryRecords(registrationProjection)
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
+            )
+            throw failure
+        }
         val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
@@ -661,6 +674,7 @@ public class MobileWallet internal constructor(
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
         }
+        currentCoroutineContext().ensureActive()
         // Creation options advertise issuance capability and must not share the presentation
         // replace lifecycle; failures here do not roll back a successful presentation projection.
         runCatching {
@@ -668,8 +682,9 @@ public class MobileWallet internal constructor(
         }.onFailure { failure ->
             if (failure is CancellationException) throw failure
         }
+        currentCoroutineContext().ensureActive()
         lastRegistrationResult.value = presentationResult
-        return presentationResult
+        presentationResult
     }
 
     /**
@@ -683,11 +698,7 @@ public class MobileWallet internal constructor(
     private suspend fun syncDigitalCredentialRegistration() {
         runCatching { updateDigitalCredentialRegistration() }.onFailure { failure ->
             if (failure is CancellationException) throw failure
-            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
-            )
+            // The failed snapshot was reported while holding registrationMutex.
         }
         runCatching { onDigitalCredentialRegistryChanged() }.onFailure { failure ->
             if (failure is CancellationException) throw failure

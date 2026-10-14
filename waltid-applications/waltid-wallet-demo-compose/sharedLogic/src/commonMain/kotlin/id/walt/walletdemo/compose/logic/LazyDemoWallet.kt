@@ -23,6 +23,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
         wallet().bootstrap(signingProtection)
 
+    override suspend fun refreshDigitalCredentialRegistration() = wallet().refreshDigitalCredentialRegistration()
+
     override suspend fun signingProtectionAvailability(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability =

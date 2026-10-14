@@ -15,6 +15,11 @@ import androidx.credentials.registry.digitalcredentials.mdoc.MdocField
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtClaim
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
+import androidx.credentials.registry.provider.RegisterCredentialsRequest
+import androidx.credentials.registry.provider.RegisterCredentialsResponse
+import androidx.credentials.registry.provider.RegisterCredentialsException
+import androidx.credentials.registry.provider.RegisterCreationOptionsResponse
+import androidx.credentials.registry.provider.RegisterCreationOptionsException
 import androidx.credentials.registry.provider.RegisterCreationOptionsRequest
 import androidx.credentials.registry.provider.RegistryManager
 import androidx.credentials.registry.provider.digitalcredentials.DigitalCredentialEntry
@@ -40,6 +45,11 @@ import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -152,22 +162,23 @@ public class AndroidDigitalCredentialRegistry(
     override suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult {
+    ): MobileWalletCredentialRegistrationResult = replacementMutex.withLock {
+        currentCoroutineContext().ensureActive()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             registrationAvailable = false
             creationRegistrationAvailable = false
-            return MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
+            return@withLock MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
         val immediate = records.map { it.withLocalThumbnail() }
         val result = registerRecords(registryId, immediate)
         if (!result.available || records.none { it.iconPng == null && it.cardArtImageUris.isNotEmpty() }) {
-            return result
+            return@withLock result
         }
         val refreshed = withTimeoutOrNull(RegistryIconFetchTimeoutMs) {
             coroutineScope {
                 records.map { record -> async { record.withResolvedThumbnail() } }.awaitAll()
             }
-        } ?: return result
+        } ?: return@withLock result
         val changed = refreshed.indices.any { index ->
             !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
         }
@@ -178,7 +189,7 @@ public class AndroidDigitalCredentialRegistry(
                 refreshSucceeded = refreshResult.available,
             )
         }
-        return result
+        return@withLock result
     }
 
     private suspend fun registerRecords(
@@ -197,14 +208,14 @@ public class AndroidDigitalCredentialRegistry(
             )
             // Same registry bytes, different matcher. See OPENID4VP-MATCHER.md for why AndroidX's
             // embedded matcher cannot serve a transaction data request alongside a second credential.
-            registryManager.registerCredentials(
+            registerCredentials(
                 AndroidOpenId4VpRegistry(
                     id = registryId,
                     credentials = openId4Vp.credentials,
                     matcher = applicationContext.assets.open(OPENID4VP_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
-            registryManager.registerCredentials(
+            registerCredentials(
                 AndroidAnnexCRegistry(
                     id = "$registryId-annex-c",
                     credentials = encodeAnnexCCredentialDatabase(records),
@@ -214,6 +225,7 @@ public class AndroidDigitalCredentialRegistry(
             registrationAvailable = true
             MobileWalletCredentialRegistrationResult(true, entries.size)
         }.getOrElse { error ->
+            if (error is CancellationException) throw error
             registrationAvailable = false
             MobileWalletCredentialRegistrationResult(
                 available = false,
@@ -241,7 +253,7 @@ public class AndroidDigitalCredentialRegistry(
         }
         return runCatching {
             val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
-            registryManager.registerCreationOptions(
+            registerCreationOptions(
                 object : RegisterCreationOptionsRequest(
                     creationOptions = encodeOpenId4VciCreationOptions(
                         entryId = OPENID4VCI_CREATION_REGISTRY_ID,
@@ -258,12 +270,25 @@ public class AndroidDigitalCredentialRegistry(
             creationRegistrationAvailable = true
             MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = 1)
         }.getOrElse { error ->
+            if (error is CancellationException) throw error
             creationRegistrationAvailable = false
             MobileWalletCredentialRegistrationResult(
                 available = false,
                 registeredEntryCount = 0,
                 reason = error.message ?: error::class.simpleName ?: "Creation-option registration failed",
             )
+        }
+    }
+
+    private suspend fun registerCredentials(request: RegisterCredentialsRequest) {
+        publication.publish<RegisterCredentialsResponse, RegisterCredentialsException> { callback ->
+            registryManager.registerCredentialsAsync(request, null, Runnable::run, callback)
+        }
+    }
+
+    private suspend fun registerCreationOptions(request: RegisterCreationOptionsRequest) {
+        publication.publish<RegisterCreationOptionsResponse, RegisterCreationOptionsException> { callback ->
+            registryManager.registerCreationOptionsAsync(request, null, Runnable::run, callback)
         }
     }
 
@@ -529,6 +554,9 @@ public class AndroidDigitalCredentialRegistry(
     )
 
     private companion object {
+        // A process can have multiple wallet handles (main UI and Credential Manager activities).
+        val replacementMutex = Mutex()
+        val publication = AndroidRegistryPublication()
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
         // copy in the application asset merge. See ANNEX-C-MATCHER.md.
         private const val ANNEX_C_MATCHER_ASSET = "id/walt/wallet2/mobile/identitycredentialmatcher.wasm"

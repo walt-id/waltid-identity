@@ -9,6 +9,8 @@ interface DemoWallet {
     suspend fun resumeSigningIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
 
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult
+    /** Refreshes the platform index independently of local card readiness; web hosts have no index. */
+    suspend fun refreshDigitalCredentialRegistration() {}
     suspend fun signingProtectionAvailability(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability

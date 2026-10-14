@@ -105,6 +105,8 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -877,6 +879,67 @@ class MobileWalletTest {
             minimal.second.single().registryEntryId ==
                 records(MobileWalletRegistryProjection.MdocIdentity, "other-wallet").second.single().registryEntryId,
         )
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun overlappingRefreshAndDeletionPublishCurrentSnapshotsInOrder() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val published = RecordingMetadataRegistry()
+        var calls = 0
+        val registry = object : MobileWalletCredentialRegistry by published {
+            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult {
+                if (++calls == 1) gate.await()
+                return published.replace(registryId, records)
+            }
+        }
+        val store = InMemoryCredentialStore().also { it.addCredential(StoredCredential(id = "pid-1",
+            credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second)) }
+        val wallet = MobileWallet(walletId = "ordered-registration", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = store, credentialRegistry = registry)
+        val first = async { wallet.refreshDigitalCredentialRegistration() }
+        runCurrent()
+        val deletion = async { wallet.deleteCredential("pid-1") }
+        val next = async { wallet.refreshDigitalCredentialRegistration() }
+        runCurrent()
+        assertNull(store.getCredential("pid-1"))
+        assertEquals(1, calls)
+        gate.complete(Unit)
+        first.await()
+        assertTrue(deletion.await())
+        assertEquals(0, next.await().registeredEntryCount)
+        assertEquals(listOf(1, 0, 0), published.replacements.map { it.second.size })
+        assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancelledRefreshCannotPublishAResultAndReleasesLifecycleForDeletion() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val published = RecordingMetadataRegistry()
+        var calls = 0
+        var creationCalls = 0
+        val registry = object : MobileWalletCredentialRegistry by published {
+            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult {
+                if (++calls == 1) withContext(NonCancellable) { gate.await() }
+                return published.replace(registryId, records)
+            }
+            override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
+                creationCalls++
+                return MobileWalletCredentialRegistrationResult(true, 1)
+            }
+        }
+        val wallet = MobileWallet(walletId = "cancelled-registration", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = RecordingCredentialStore(), credentialRegistry = registry)
+        val first = async { wallet.refreshDigitalCredentialRegistration() }
+        runCurrent()
+        first.cancel()
+        gate.complete(Unit)
+        first.join()
+        assertNull(wallet.digitalCredentialRegistration.value)
+        assertEquals(0, creationCalls)
+        wallet.deleteWallet()
+        assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
     }
 
     @Test
