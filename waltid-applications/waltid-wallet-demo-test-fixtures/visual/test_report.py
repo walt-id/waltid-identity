@@ -165,6 +165,61 @@ class NativeReceiptTests(unittest.TestCase):
             self.export([{ "exportedFileName": "../outside.png", "suggestedHumanReadableName": "readiness-test"}])
 
 
+class NativeResultTests(unittest.TestCase):
+    def tree(self, *cases):
+        return {"testNodes": [{"nodeType": "Test Plan", "name": "iosApp", "children": [
+            {"nodeType": "Test Case", "name": test + "()", "nodeIdentifier": f"WalletVisualTests/{test}()",
+             "result": status, "durationInSeconds": 1.25} for test, status in cases]}]}
+
+    def test_complete_xcresult_recovers_a_case_omitted_by_the_cli(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle = root / "run.xcresult"
+            bundle.mkdir()
+            path = root / "native-results.json"
+            path.write_text(json.dumps({"schema": "xcodebuildmcp.output.test-result", "schemaVersion": 3,
+                "data": {"artifacts": {"xcresultPath": str(bundle)}, "testCases": []}}))
+            run = {"runId": "current", "started": 0}
+            tree = self.tree(("testAccessBiometricUnavailable", "Passed"))
+
+            def xcresult(command, **kwargs):
+                if command[2] == "get":
+                    return SimpleNamespace(stdout=json.dumps(tree))
+                export = root / "native-attachments" / run["runId"]
+                export.mkdir(parents=True)
+                (export / "receipt.json").write_text(json.dumps({"id": "access.unlock.biometric_unavailable"}))
+                (export / "manifest.json").write_text(json.dumps([
+                    {"testIdentifier": "WalletVisualTests/testAccessBiometricUnavailable()", "attachments": [
+                        {"exportedFileName": "receipt.json", "suggestedHumanReadableName": "wallet-visual-receipt-access.json"}]}]))
+                return SimpleNamespace(stdout="")
+
+            catalogue = {"renderers": {"swiftui": {"suite": "WalletVisualTests"}}}
+            with patch.object(report, "CATALOGUE", catalogue), patch.object(report.subprocess, "run", side_effect=xcresult):
+                tests, receipts, error = report.native_tests(path, run, root)
+            self.assertIsNone(error)
+            self.assertEqual(tests["testAccessBiometricUnavailable"]["status"], "passed")
+            self.assertEqual(receipts["access.unlock.biometric_unavailable"]["test"], "testAccessBiometricUnavailable")
+            self.assertEqual(json.loads((root / "native-tests.json").read_text()), tree)
+
+    def test_tree_preserves_failed_and_skipped_cases_and_filters_other_suites(self):
+        tree = self.tree(("testPass", "Passed"), ("testFail", "Failed"), ("testSkip", "Skipped"))
+        tree["testNodes"][0]["children"].append({"nodeType": "Test Case", "name": "testOther()",
+            "nodeIdentifier": "OtherSuite/testOther()", "result": "Passed"})
+        tests = report.native_test_cases(tree, "WalletVisualTests")
+        self.assertEqual({name: case["status"] for name, case in tests.items()},
+                         {"testPass": "passed", "testFail": "failed", "testSkip": "skipped"})
+        self.assertEqual(tests["testPass"]["durationMs"], 1250)
+
+    def test_duplicate_case_cannot_overwrite_a_failure_with_a_pass(self):
+        with self.assertRaisesRegex(ValueError, "duplicate native test"):
+            report.native_test_cases(self.tree(("testSame", "Failed"), ("testSame", "Passed")), "WalletVisualTests")
+
+    def test_unrecognized_and_expected_failure_results_never_pass(self):
+        for result in ("unknown", "Expected Failure", None):
+            with self.subTest(result=result), self.assertRaisesRegex(ValueError, "Unsupported native test result"):
+                report.native_test_cases(self.tree(("testScreen", result)), "WalletVisualTests")
+
+
 class SourceBindingTests(unittest.TestCase):
     """Exercise begin/finish with real Git state and pixels; mock only native result transport."""
 
