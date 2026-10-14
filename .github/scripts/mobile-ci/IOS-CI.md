@@ -52,6 +52,10 @@ or an operator may report skips. sharedLogic links
 and executes its complete Kotlin iOS test target using
 the toolchain's existing SwiftPM dependency linkage.
 
+The recovery job also runs Signum's existing entitled Keychain host on its simulator,
+requiring the ownership suite and retaining per-test JUnit results. It discovers
+all tests except the physical Secure Enclave class and rejects skipped or incomplete runs.
+
 There are no method inventories or fixed test counts to update when adding or
 renaming ordinary tests. Missing Android PIN or browser opt-in makes the affected
 test skip, which fails the result check even when the rest of its suite passes.

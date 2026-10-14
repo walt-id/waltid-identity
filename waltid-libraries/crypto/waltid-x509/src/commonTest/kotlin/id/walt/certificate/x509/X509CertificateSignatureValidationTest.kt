@@ -3,19 +3,21 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.x509.X509TestCertificates
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class X509CertificateSignatureValidationTest {
 
-    @Ignore //Test is not working on JS - for some reason signature validation fails
     @Test
     fun verifiesIssuerSignedByRoot() = runTest {
-        val validationResult = X509CertificateUtil.validateCertificateChain(
+        // WE2 is an intermediate CA, not an end-entity certificate.
+        val validationResult = X509CertificateUtil {
+            addValidators(X509CertificateBasicConstraintsValidator(leafCanBeCa = true))
+        }.validateCertificateChain(
             listOf(gtsWe2CrtPem.let {
                 X509CertificateUtil.parseCertificatePem(it)
             }),
