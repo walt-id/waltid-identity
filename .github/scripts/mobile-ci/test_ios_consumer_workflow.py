@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import re
 import unittest
@@ -20,6 +21,62 @@ class IosConsumerWorkflowTest(unittest.TestCase):
     @staticmethod
     def timeout(block):
         return int(re.search(r"timeout-minutes: (\d+)", block)[1])
+
+    @staticmethod
+    def expression(block, field, flags, consumer=None):
+        expression = re.search(rf"^\s*{field}: \$\{{\{{ (.+) \}}\}}$", block, re.M)[1]
+        expression = re.sub(r"inputs\.([\w-]+)", r'flags["\1"]', expression)
+        expression = expression.replace("matrix.consumer", "consumer")
+        expression = expression.replace("&&", "and").replace("||", "or").replace("!cancelled()", "True")
+        return eval(expression, {"__builtins__": {}}, {
+            "flags": flags, "consumer": consumer, "fromJSON": json.loads,
+            "always": lambda: True,
+        })
+
+    def test_selected_consumers_and_visuals_execute_once(self):
+        # Each tuple is native functional, Compose functional, native visual.
+        cases = {
+            (False, False, False): [],
+            (False, False, True): ["native"],
+            (False, True, False): ["compose", "bridge"],
+            (False, True, True): ["native", "compose", "bridge"],
+            (True, False, False): ["native", "bridge"],
+            (True, False, True): ["native", "bridge"],
+            (True, True, False): ["native", "compose", "bridge"],
+            (True, True, True): ["native", "compose", "bridge"],
+        }
+        for inputs, expected in cases.items():
+            with self.subTest(inputs=inputs):
+                flags = dict(zip(("run-native", "run-compose", "run-visual-native"), inputs))
+                selected = self.expression(self.job.split("    steps:", 1)[0], "if", flags)
+                self.assertEqual(bool(selected), bool(expected))
+                if not selected:
+                    continue
+                consumers = self.expression(self.job, "consumer", flags)
+                self.assertEqual(consumers, expected)
+                self.assertEqual(len(consumers), len(set(consumers)))
+                visual = [consumer for consumer in consumers if self.expression(
+                    self.steps["Compare SwiftUI visual references using the shared framework"],
+                    "if", flags, consumer,
+                )]
+                self.assertEqual(visual, ["native"] if flags["run-visual-native"] else [])
+                for consumer in consumers:
+                    functional = consumer == "bridge" or flags[f"run-{consumer}"]
+                    for step in ("Configure gradle", "Run selected WalletCore consumer tests",
+                                 "Collect and publish WalletCore consumer test reports",
+                                 "Retain WalletCore consumer test reports"):
+                        self.assertEqual(bool(self.expression(self.steps[step], "if", flags, consumer)),
+                                         functional, (inputs, consumer, step))
+
+    def test_each_functional_consumer_requires_distinct_reports(self):
+        reporting = self.steps["Collect and publish WalletCore consumer test reports"]
+        self.assertIn("test-report-require-tests: 'true'", reporting)
+        self.assertIn("test-report-check-name: WalletCore ${{ matrix.consumer }} Test Report", reporting)
+        for step in ("Retain WalletCore consumer test reports", "Retain WalletCore consumer phase logs",
+                     "Retain incomplete WalletCore test results"):
+            name = re.search(r"^          name: (.+)$", self.steps[step], re.M)[1]
+            self.assertIn("${{ matrix.consumer }}", name)
+            self.assertIn("${{ github.run_attempt }}", name)
 
     def test_test_deadline_cannot_prevent_report_collection(self):
         execution = self.steps["Run selected WalletCore consumer tests"]
