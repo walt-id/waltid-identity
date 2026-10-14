@@ -60,11 +60,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             let saved = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
             XCTAssertTrue(saved.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-            // Idle success returns home automatically; tapping Done races that dismissal.
-            let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
-                object: app.buttons["wallet.scanButton"])
-            XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
-            XCTAssertFalse(app.buttons["issuance-done"].exists)
+            waitForIdleIssuanceDismissal(app)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
@@ -434,9 +430,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
 
-        // Touching the blank receipt content keeps it open for explicit completion.
-        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
+        waitForIdleIssuanceDismissal(app)
         assertHome(app)
         let credentialCards = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
@@ -603,7 +597,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
 
-        ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
+        waitForIdleIssuanceDismissal(app)
         let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
@@ -643,6 +637,14 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
+    }
+
+    private func waitForIdleIssuanceDismissal(_ app: XCUIApplication) {
+        // Home exists beneath the receipt; wait until automatic dismissal makes it usable.
+        let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+            object: app.buttons["wallet.scanButton"])
+        XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
+        XCTAssertFalse(app.buttons["issuance-done"].exists)
     }
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {
