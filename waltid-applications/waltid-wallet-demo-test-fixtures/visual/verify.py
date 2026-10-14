@@ -108,6 +108,7 @@ def main():
                    "--scheme", "iosApp", "--configuration", "Debug", "--simulator-id", args.simulator,
                    "--derived-data-path", str(args.derived_data.resolve()), "--extra-args",
                    "-only-testing:iosAppTests/WalletVisualTests", "-only-testing:iosAppTests/WalletVisualComparatorTests",
+                   "-only-testing:iosAppTests/WalletVisualHostingTests",
                    "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
                    "--json", json.dumps({"testRunnerEnv": test_env}), "--output", "json"]
         with (args.output / "native-stderr.log").open("w") as errors:
