@@ -687,7 +687,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Secure Enclave")).count, 0)
         capture("recoverable-key-storage", app: app)
         ui.tapButton(identifier: "wallet.keySetupContinue", fallbackLabel: "Continue")
-        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Recovery"].exists)
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Recovery"].waitForExistence(timeout: 10), app.debugDescription)
         ui.tapButton(identifier: "wallet.keySetupContinue", fallbackLabel: "Continue")
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
