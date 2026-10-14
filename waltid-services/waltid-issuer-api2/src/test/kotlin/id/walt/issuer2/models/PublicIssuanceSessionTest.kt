@@ -3,7 +3,10 @@ package id.walt.issuer2.models
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.repository.fixtures.PreBatchIssuanceSession
+import id.walt.issuer2.testsupport.decodePublicSession
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
 import kotlin.test.*
@@ -46,6 +49,45 @@ class PublicIssuanceSessionTest {
         assertEquals(2, assertNotNull(view["issuanceRequests"]).jsonArray.size)
         assertFalse(view.containsKey("profileId"))
         assertEquals(JsonArray(listOf(JsonPrimitive("configuration"))), view["authorizedCredentialIdentifiers"])
+    }
+
+    @Test
+    fun `nested notifications round trip and retain flat single and batch public JSON`() {
+        val legacy = Json.encodeToJsonElement(baseline().copy(issuedCredentialFormat = "dc+sd-jwt")).jsonObject
+        val report = mapOf("walletNotificationId" to JsonPrimitive("notification"),
+            "walletNotificationEvent" to JsonPrimitive("credential_accepted"),
+            "walletNotificationEventDescription" to JsonPrimitive("stored"))
+        val original = IssuanceSessionStorageCodec.decode(legacy.toString())
+        val session = original.copy(issuanceResults = mapOf(
+            "configuration" to original.issuanceResults.getValue("configuration").copy(
+                walletNotification = IssuedCredentialNotification(
+                    "configuration", "notification", NotificationEvent.CREDENTIAL_ACCEPTED, "stored",
+                ),
+            ),
+        ))
+        assertEquals(JsonObject(legacy + report), session.toPublicJson())
+        assertEquals(session, IssuanceSessionStorageCodec.decode(Json.encodeToString(session)))
+        val batch = session.copy(issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B"))
+        for (defaults in listOf(false, true)) for (nulls in listOf(false, true)) {
+            val json = Json { encodeDefaults = defaults; explicitNulls = nulls }
+            val internal = json.encodeToJsonElement(batch).jsonObject
+            val result = internal.getValue("issuanceResults").jsonObject.getValue("configuration").jsonObject
+            val publicResult = JsonObject(result - "walletNotification" + report)
+            val publicBatch = JsonObject(internal + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
+            assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))
+            assertEquals(publicBatch, batch.toPublicJson(json))
+            assertEquals(publicBatch, json.encodeToJsonElement(PublicIssuanceSession(batch)))
+            assertEquals(
+                session.issuanceResults.getValue("configuration").walletNotification,
+                decodePublicSession(session.toPublicJson(json).toString())
+                    .issuanceResults.getValue("configuration").walletNotification,
+            )
+            assertEquals(
+                batch.issuanceResults.getValue("configuration").walletNotification,
+                decodePublicSession(batch.toPublicJson(json).toString())
+                    .issuanceResults.getValue("configuration").walletNotification,
+            )
+        }
     }
 
     private fun baseline() = PreBatchIssuanceSession(

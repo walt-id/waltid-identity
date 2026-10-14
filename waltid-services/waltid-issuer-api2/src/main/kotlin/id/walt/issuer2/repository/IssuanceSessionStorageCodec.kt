@@ -25,7 +25,7 @@ object IssuanceSessionStorageCodec {
             stored["expectedCredentialProofKeyJwk"]?.takeUnless { it is JsonNull }?.let {
                 request["expectedCredentialProofKeyJwks"] = JsonArray(listOf(it))
             }
-            normalized.keys.removeAll(requestFields + setOf("expectedCredentialProofKeyJwk", "issuedCredentialFormat", "walletNotificationId", "walletNotificationEvent", "walletNotificationEventDescription"))
+            normalized.keys.removeAll(requestFields + setOf("expectedCredentialProofKeyJwk", "issuedCredentialFormat"))
             normalized["issuanceRequests"] = JsonArray(listOf(JsonObject(request)))
             stored["issuedCredentialFormat"]?.takeUnless { it is JsonNull }?.let { format ->
                 normalized["issuanceResults"] = buildJsonObject {
@@ -33,11 +33,6 @@ object IssuanceSessionStorageCodec {
                         identifier.jsonPrimitive.content,
                         buildJsonObject {
                             put("issuedCredentialFormat", format)
-                            stored["walletNotificationId"]?.takeUnless { it is JsonNull }?.let { put("walletNotificationId", it) }
-                            stored["walletNotificationEvent"]?.takeUnless { it is JsonNull }?.let { put("walletNotificationEvent", it) }
-                            stored["walletNotificationEventDescription"]?.takeUnless { it is JsonNull }?.let {
-                                put("walletNotificationEventDescription", it)
-                            }
                         },
                     )
                 }

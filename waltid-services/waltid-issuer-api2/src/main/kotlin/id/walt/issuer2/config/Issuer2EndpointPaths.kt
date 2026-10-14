@@ -1,7 +1,5 @@
 package id.walt.issuer2.config
 
-import id.walt.openid4vci.core.OpenId4VciEndpointPaths
-
 /** Protocol paths relative to `/openid4vci`, also reserved for self-hosted VCT URLs. */
 internal object Issuer2EndpointPaths {
     const val JWKS = "jwks"
@@ -13,7 +11,7 @@ internal object Issuer2EndpointPaths {
     const val TOKEN = "token"
     const val NONCE = "nonce"
     const val CREDENTIAL = "credential"
-    const val NOTIFICATION = OpenId4VciEndpointPaths.NOTIFICATION
+    const val NOTIFICATION = "notification"
 
     // Reserve the entire protocol namespace, including groups a deployment does not expose.
     val reservedVctNames: Set<String> = setOf(

@@ -8,6 +8,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
@@ -35,7 +36,6 @@ import id.walt.openid4vci.mdoc.MsoValidityResolver
 import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.OpenId4VciEndpointPaths
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.toDefaultAuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -49,6 +49,9 @@ import id.walt.openid4vci.requests.credential.resolveCredentialAuthorization
 import id.walt.openid4vci.requests.credential.toAuthorizationDetails
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
+import id.walt.openid4vci.requests.notification.notificationRequestParameters
+import id.walt.openid4vci.responses.notification.NotificationResponseResult
 import id.walt.issuer2.service.applyWalletNotification
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
@@ -79,7 +82,7 @@ import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.resolveTokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.authorizedByVerifiedToken
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
-import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.access.parseAccessTokenAuthorization
 import id.walt.crypto2.keys.Key as Crypto2Key
@@ -116,6 +119,7 @@ private fun NotificationEvent.toIssuanceSessionEvent(): IssuanceSessionEvent = w
     NotificationEvent.CREDENTIAL_FAILURE -> IssuanceSessionEvent.WALLET_CREDENTIAL_FAILURE
     NotificationEvent.CREDENTIAL_DELETED -> IssuanceSessionEvent.WALLET_CREDENTIAL_DELETED
 }
+
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
 internal suspend fun restoreSessionIssuerCrypto2Key(
@@ -790,98 +794,43 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
     }
 
-    suspend fun processNotificationRequest(
-        authorizationHeaders: List<String>,
-        dpopProofHeaderValues: List<String>,
-        requestBody: String,
+    suspend fun processNonceRequest(
         requestId: String,
-    ): NotificationResponseHttp {
-        val authorization = parseCredentialAuthorization(authorizationHeaders)
-            ?: return oauth2Provider.writeNotificationError(
-                OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Invalid access token"),
-                AccessTokenAuthorizationScheme.BEARER,
-            )
-        when (
-            val result = oauth2Provider.createNotificationRequest(
-                body = requestBody,
-                accessTokenContext = CredentialAccessTokenContext(
-                    authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
-                    dpopProofHeaderValues = dpopProofHeaderValues,
-                    targetUri = endpointUri(OpenId4VciEndpointPaths.NOTIFICATION),
-                ),
-            )
-        ) {
-            is NotificationRequestResult.OAuthFailure ->
-                return oauth2Provider.writeNotificationError(result.error, authorization.scheme)
-
-            is NotificationRequestResult.Failure ->
-                return oauth2Provider.writeNotificationError(result.error)
-
-            is NotificationRequestResult.Success -> {
-                val sessionId = result.tokenClaims.stringClaim(JwtPayloadClaims.SUBJECT)
-                    ?: return oauth2Provider.writeNotificationError(
-                        OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
-                        authorization.scheme,
-                    )
-                sessionService.getSessionOrNull(sessionId)
-                    ?: return oauth2Provider.writeNotificationError(
-                        NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
-                    )
-                val claimed = sessionService.claimSession(sessionId)
-                    ?: return oauth2Provider.writeNotificationError(
-                        OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, "Issuance session is being processed"),
-                        authorization.scheme,
-                    )
-                try {
-                    val authorizedIdentifiers = claimed.issuanceRequests
-                        .map { it.toCredentialAuthorization() }
-                        .authorizedByVerifiedToken(
-                            result.tokenClaims,
-                            claimed.authorizedCredentialIdentifiers,
-                            metadataService.credentialConfigurationIdsForScopes(
-                                result.tokenClaims.stringClaim("scope").orEmpty()
-                                    .split(' ')
-                                    .filter(String::isNotBlank)
-                                    .toSet(),
-                            ),
-                        )
-                        .map { it.credentialIdentifier }
-                        .toSet()
-                    val update = claimed.applyWalletNotification(
-                        notificationId = result.request.notificationId,
-                        event = result.request.event,
-                        eventDescription = result.request.eventDescription,
-                        authorizedCredentialIdentifiers = authorizedIdentifiers,
-                    ) ?: run {
-                        restoreClaimedSession(claimed)
-                        return oauth2Provider.writeNotificationError(
-                            NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
-                        )
-                    }
-                    val saved = if (update.changed) {
-                        sessionService.saveSession(update.session)
-                    } else {
-                        restoreClaimedSession(claimed)
-                        claimed
-                    }
-                    if (update.changed) {
-                        notificationService.notify(
-                            requestId = requestId,
-                            session = saved,
-                            event = result.request.event.toIssuanceSessionEvent(),
-                        )
-                    }
-                    return oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
-                } catch (error: CancellationException) {
-                    restoreClaimedSession(claimed)
-                    throw error
-                } catch (error: Exception) {
-                    restoreClaimedSession(claimed)
-                    throw error
-                }
-            }
+    ): NonceResponseHttp {
+        val (response, error) = try {
+            val issuedNonce = credentialNonceService.issue(credentialNonceBinding())
+            NonceResponseHttp(
+                status = 200,
+                payload = mapOf("c_nonce" to JsonPrimitive(issuedNonce.nonce)),
+                headers = mapOf("Cache-Control" to "no-store"),
+            ) to null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn(e) { "Nonce request processing failed (requestId=$requestId)" }
+            val error = OAuthError(OAuthErrorCodes.SERVER_ERROR, "Nonce request processing failed")
+            NonceResponseHttp(
+                status = 500,
+                payload = buildMap {
+                    put("error", JsonPrimitive(error.error))
+                    error.description?.let { put("error_description", JsonPrimitive(it)) }
+                },
+                headers = mapOf("Cache-Control" to "no-store"),
+            ) to error
         }
+
+        notificationService.notify(
+            requestId = requestId,
+            session = null,
+            event = if (error == null) {
+                IssuanceSessionEvent.NONCE_REQUEST_SUCCEEDED
+            } else {
+                IssuanceSessionEvent.NONCE_REQUEST_FAILED
+            },
+            error = error?.error,
+            errorDescription = error?.description,
+        )
+        return response
     }
 
     suspend fun processCredentialRequest(
@@ -896,7 +845,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return processCredentialRequest(authorization.token, requestId) {
             oauth2Provider.createCredentialRequest(
                 parameters = parameterMap,
-                accessTokenContext = CredentialAccessTokenContext(
+                accessTokenContext = ProtectedResourceAccessTokenContext(
                     authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
@@ -917,7 +866,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return processCredentialRequest(authorization.token, requestId) {
             oauth2Provider.createCredentialRequest(
                 encryptedCredentialRequest = encryptedCredentialRequest,
-                accessTokenContext = CredentialAccessTokenContext(
+                accessTokenContext = ProtectedResourceAccessTokenContext(
                     authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
@@ -1422,7 +1371,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuanceResults = session.issuanceResults + (
                 issuanceRequest.credentialIdentifier to IssuanceResult(
                     issuedCredentialFormat = configuration.format.value,
-                    walletNotificationId = credentialResponse.notificationId,
+                    walletNotification = credentialResponse.notificationId?.let {
+                        IssuedCredentialNotification(issuanceRequest.credentialIdentifier, it)
+                    },
                 )
             )
             val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
@@ -1511,43 +1462,92 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
     }
 
-    suspend fun processNonceRequest(
+    suspend fun processNotificationRequest(
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        requestBody: String,
         requestId: String,
-    ): NonceResponseHttp {
-        val (response, error) = try {
-            val issuedNonce = credentialNonceService.issue(credentialNonceBinding())
-            NonceResponseHttp(
-                status = 200,
-                payload = mapOf("c_nonce" to JsonPrimitive(issuedNonce.nonce)),
-                headers = mapOf("Cache-Control" to "no-store"),
-            ) to null
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.warn(e) { "Nonce request processing failed (requestId=$requestId)" }
-            val error = OAuthError(OAuthErrorCodes.SERVER_ERROR, "Nonce request processing failed")
-            NonceResponseHttp(
-                status = 500,
-                payload = buildMap {
-                    put("error", JsonPrimitive(error.error))
-                    error.description?.let { put("error_description", JsonPrimitive(it)) }
-                },
-                headers = mapOf("Cache-Control" to "no-store"),
-            ) to error
-        }
+    ): NotificationResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders)
+            ?: return oauth2Provider.writeNotificationError(
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Invalid access token"),
+                AccessTokenAuthorizationScheme.BEARER,
+            )
+        when (
+            val result = oauth2Provider.createNotificationRequest(
+                parameters = notificationRequestParameters(requestBody),
+                accessTokenContext = ProtectedResourceAccessTokenContext(
+                    authorization = authorization,
+                    expectedIssuer = metadataService.issuerBaseUrl(),
+                    dpopProofHeaderValues = dpopProofHeaderValues,
+                    targetUri = endpointUri(Issuer2EndpointPaths.NOTIFICATION),
+                ),
+            )
+        ) {
+            is NotificationRequestResult.OAuthFailure ->
+                return oauth2Provider.writeNotificationError(result.error, authorization.scheme)
 
-        notificationService.notify(
-            requestId = requestId,
-            session = null,
-            event = if (error == null) {
-                IssuanceSessionEvent.NONCE_REQUEST_SUCCEEDED
-            } else {
-                IssuanceSessionEvent.NONCE_REQUEST_FAILED
-            },
-            error = error?.error,
-            errorDescription = error?.description,
-        )
-        return response
+            is NotificationRequestResult.Failure ->
+                return oauth2Provider.writeNotificationError(result.error)
+
+            is NotificationRequestResult.Success -> {
+                val sessionId = result.tokenClaims.stringClaim(JwtPayloadClaims.SUBJECT)
+                    ?: return oauth2Provider.writeNotificationError(
+                        OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
+                        authorization.scheme,
+                    )
+                sessionService.getSessionOrNull(sessionId)
+                    ?: return oauth2Provider.writeNotificationError(
+                        NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
+                    )
+                val claimed = sessionService.claimSession(sessionId)
+                    ?: return oauth2Provider.writeNotificationError(
+                        OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, "Issuance session is being processed"),
+                        authorization.scheme,
+                    )
+                var claimFinalized = false
+                try {
+                    val authorizedIdentifiers = claimed.issuanceRequests
+                        .map { it.toCredentialAuthorization() }
+                        .authorizedByVerifiedToken(
+                            result.tokenClaims,
+                            claimed.authorizedCredentialIdentifiers,
+                            metadataService.credentialConfigurationIdsForScopes(
+                                result.tokenClaims.stringClaim("scope").orEmpty()
+                                    .split(' ')
+                                    .filter(String::isNotBlank)
+                                    .toSet(),
+                            ),
+                        )
+                        .map { it.credentialIdentifier }
+                        .toSet()
+                    val response = oauth2Provider.createNotificationResponse(
+                        request = result.request,
+                        storedNotifications = claimed.issuanceResults.values.mapNotNull { it.walletNotification },
+                        authorizedCredentialIdentifiers = authorizedIdentifiers,
+                    )
+                    val change = (response as? NotificationResponseResult.Success)?.change
+                    val saved = withContext(NonCancellable) {
+                        val saved = sessionService.saveSession(
+                            change?.let { claimed.applyWalletNotification(it) } ?: claimed,
+                        )
+                        // Save releases the claim. Record that fact before cancellation can resume.
+                        claimFinalized = true
+                        saved
+                    }
+                    if (change != null) {
+                        notificationService.notify(
+                            requestId = requestId,
+                            session = saved,
+                            event = change.event.toIssuanceSessionEvent(),
+                        )
+                    }
+                    return oauth2Provider.writeNotificationResponse(response)
+                } finally {
+                    if (!claimFinalized) restoreClaimedSession(claimed)
+                }
+            }
+        }
     }
 
     private fun credentialNonceBinding(): CredentialNonceBinding {

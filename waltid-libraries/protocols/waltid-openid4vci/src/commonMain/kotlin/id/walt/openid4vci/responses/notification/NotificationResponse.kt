@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.notification
 
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
 import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.responses.NO_STORE_HEADERS
@@ -12,7 +13,12 @@ import kotlinx.serialization.json.JsonPrimitive
 data object NotificationResponse
 
 sealed class NotificationResponseResult {
-    data class Success(val response: NotificationResponse = NotificationResponse) : NotificationResponseResult()
+    data class Success(
+        val response: NotificationResponse = NotificationResponse,
+        val change: IssuedCredentialNotificationUpdate.Changed? = null,
+    ) : NotificationResponseResult()
+
+    data class Failure(val error: NotificationError) : NotificationResponseResult()
 
     fun isSuccess(): Boolean = this is Success
 }
