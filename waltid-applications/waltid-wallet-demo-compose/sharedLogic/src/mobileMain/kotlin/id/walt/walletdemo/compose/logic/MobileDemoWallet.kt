@@ -6,6 +6,8 @@ import dev.whyoleg.cryptography.algorithms.SHA256
 import id.walt.wallet2.mobile.identity.*
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
@@ -33,6 +35,7 @@ internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
     private val warning: String? = null,
     private val isIos: Boolean = false,
+    private val onRegistrationRefreshed: suspend () -> Unit = {},
 ) : ProximityDemoWallet {
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
@@ -195,6 +198,8 @@ internal class MobileDemoWallet(
 
     override suspend fun refreshDigitalCredentialRegistration() {
         mobileWallet.refreshDigitalCredentialRegistration()
+        currentCoroutineContext().ensureActive()
+        onRegistrationRefreshed()
     }
 
     override suspend fun signingProtectionAvailability(

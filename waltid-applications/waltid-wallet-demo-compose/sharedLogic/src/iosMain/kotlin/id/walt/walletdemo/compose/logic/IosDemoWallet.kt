@@ -57,6 +57,7 @@ fun createIosDemoWallet(
             ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
             warning = transactionDataProfiles.warning,
             isIos = true,
+            onRegistrationRefreshed = onDigitalCredentialRegistryChanged,
         )
     }
 }

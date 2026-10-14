@@ -942,6 +942,28 @@ class MobileWalletTest {
         assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancellationWhileReadingTheSnapshotPreventsPlatformPublication() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val registry = RecordingMetadataRegistry()
+        val store = object : WalletCredentialStore by RecordingCredentialStore() {
+            override suspend fun listCredentials(): Flow<StoredCredential> {
+                withContext(NonCancellable) { gate.await() }
+                return emptyList<StoredCredential>().asFlow()
+            }
+        }
+        val wallet = MobileWallet(walletId = "cancelled-snapshot", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = store, credentialRegistry = registry)
+        val refresh = async { wallet.refreshDigitalCredentialRegistration() }
+        runCurrent()
+        refresh.cancel()
+        gate.complete(Unit)
+        refresh.join()
+        assertTrue(registry.replacements.isEmpty())
+        assertNull(wallet.digitalCredentialRegistration.value)
+    }
+
     @Test
     fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
         val registry = RecordingMetadataRegistry()

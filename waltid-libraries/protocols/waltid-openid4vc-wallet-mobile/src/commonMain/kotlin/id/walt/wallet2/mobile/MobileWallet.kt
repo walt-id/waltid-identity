@@ -664,6 +664,7 @@ public class MobileWallet internal constructor(
             )
             throw failure
         }
+        currentCoroutineContext().ensureActive()
         val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
