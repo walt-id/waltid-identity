@@ -465,52 +465,61 @@ skipped when no issuer target is configured.
 ### Existing GitHub Actions CI
 
 The reusable `.github/workflows/gradle.yml` runs the combined basic VCI / HAIP /
-batch matrix alongside wallet/verifier tests in the existing `conformance` job's
-`Run conformance tests` step, using one live Gradle `test` invocation.
+batch matrix in two parallel `issuer-conformance` jobs, one for JWT proofs and
+one for standalone attestation proofs. Both run independently of the verifier,
+OpenID4VP wallet and OpenID4VCI wallet jobs. Those three roles also run in
+parallel. Each role keeps its summary table, failure check and test filter.
+Aggregation still publishes `openid-conformance-summaries` and, when test
+results are requested, `junit-conformance`. If every role job succeeded, a
+missing report or requested JUnit artifact fails that aggregation after the
+available files are uploaded.
 The regular build enables issuer testing through conformance eligibility; the
 existing `run-issuer-conformance` and `run-haip-conformance` inputs both select it.
-Release workflows already set those inputs. Checkout, Gradle setup and browser
-installation are shared; there is no separate issuer job.
+Release workflows already set those inputs. Each proof job checks out the same
+requested revisions, configures Gradle, installs the browser and prepares its own
+issuer and tunnel. Matrix `fail-fast` is disabled so a failed proof does not cancel
+the other proof's coverage.
 
-Issuer2 is built, configured and started before the shared test step. Its port is
-7005; verifier2 uses 7003 and the in-process VP/VCI wallets use 7015/7016 (their
-public adapters use 7006/7007). There is no wallet/issuer port collision. Startup
-rejects an occupied issuer port rather than terminating an unknown process.
+Issuer2 is prepared with `:waltid-services:waltid-issuer-api2:installDist` and
+started in a separate JVM using `build/install/waltid-issuer-api2/lib/*` and
+`id.walt.issuer2.MainKt`. This compiles the service and assembles ordinary runtime
+JARs without building a fat JAR. Its working directory and configuration overrides
+are unchanged. Each proof job uses port 7005 on its own runner; startup rejects an
+occupied port rather than terminating an unknown process.
 
 Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
-failures fail the conformance job.
+failures fail their respective jobs.
 `OPENID4VCI_CONFORMANCE_STRICT=true` remains set so issuer variant results stay
 strict, and
 `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
-coverage. One JUnit report covers all roles; issuer result artifacts remain
-Wallet/verifier tests retain the repository's `CONFORMANCE_ALLOW_FAILURE` setting.
-`OPENID4VCI_CONFORMANCE_STRICT=true` overrides that policy only for issuer results,
-and `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
 coverage. CI also sets `OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=true`
 and supplies `OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE`. Its issuer template
-trusts that test key. `OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation` selects
-four JWT-only configurations requiring key attestation and four attestation-only
-configurations. The happy flow must execute and pass in every variant, and
+trusts that test key. `OPENID4VCI_CONFORMANCE_PROOF_MODES` is set to `jwt` or
+`attestation` by the job matrix. The same four JWT-only configurations requiring
+key attestation and four attestation-only configurations remain available. The
+happy flow must execute and pass in every variant, and
 `oid4vci-1_0-issuer-fail-invalid-key-attestation-signature` must execute and pass
 where offered: 12 Basic VCI and four plain HAIP variants per proof mode.
 The four encrypted HAIP variants do not offer that negative module in db1080a;
 its absence there is not negative coverage. Skipped results never satisfy the
 check, and an encrypted-HAIP-only run cannot satisfy negative coverage.
-One JUnit report covers all roles; issuer result artifacts remain
-separate. The live test task uses `--rerun` and disables configuration caching so
+Issuer proof jobs publish separate JUnit checks. The verifier and each wallet
+role publish their own JUnit checks. The live test task uses `--rerun` and disables configuration caching so
 it cannot reuse old test results or stale environment settings, while dependency
 compilation can stay up to date. Cacheless runs retain `--rerun-tasks`.
 
-If optional issuer setup fails, wallet/verifier tests can still execute and the
-job retains the setup failure. No issuer target is exported unless its setup
-succeeds. Issuer tests have a 90-minute timeout; the shared step has no new
-90-minute limit on wallet/verifier testing. Services and tunnels are stopped by
-always-run cleanup. Maven publication waits for the shared job, including issuer
-results.
+If issuer setup fails, the verifier job, both wallet jobs and the other proof job
+can still execute. No issuer target is exported unless its setup succeeds. Each issuer proof
+test retains the 90-minute timeout; wallet and verifier timeouts are unchanged. Services
+and tunnels are stopped by always-run cleanup. Maven publication waits for the
+verifier job, both wallet jobs, wallet aggregation, both issuer jobs and successful aggregation of issuer results.
 
-CI invokes the existing Gradle `test` task without an issuer-only `--tests` filter,
-so it also discovers `IssuerConformanceTests` when the prepared issuer URL is
-exported. It does not use the local wrapper or a new Gradle task. It uses
+Each issuer job invokes the existing Gradle `test` task with
+`--tests id.walt.openid4vp.conformance.IssuerConformanceTests`. The verifier job
+runs `ConformanceTests` and `VerifierConformanceTests`. The OpenID4VP wallet job
+runs `VpWalletConformanceTests`, and the OpenID4VCI wallet job runs
+`VciWalletConformanceTests`. None of those jobs exports an issuer target. CI does not use
+the local wrapper or a new Gradle test task. It uses
 `conformance.waltid.cloud:443` and checks `/api/server`
 for revision `db1080a`, tag `release-v5.2.3`, version `5.2.4` before starting the
 issuer. A hosted-suite upgrade requires reviewing the pin and batch exceptions;
@@ -548,30 +557,42 @@ the CI-only exclusion when a compliant public TLS endpoint is available.
 Issuer strict mode and `REQUIRE_BATCH_PASS=true` stay explicit in CI. Unaccepted
 issuer modules and non-passing variants fail the job even when
 `OPENID4VCI_CONFORMANCE_STRICT=false`.
-The Kotlin runner enforces successful selected variants and executed
-batch coverage; CI also rejects missing/empty results. The configured matrix
+The Kotlin runner enforces successful selected variants and executed batch and
+key-attestation coverage. `issuer-conformance-results` also rejects missing proof
+reports, failed setup/test outcomes, incomplete or duplicate variants, different
+protocol selections, and mismatched Identity or suite revisions. The configured matrix
 selects 20 protocol variants twice, producing 40 proof-mode runs: 32 applicable
 batch runs and eight encrypted-HAIP runs where batch is not offered at this pin. Skipped batch execution
-does not establish coverage. Suite and metadata preflight checks use `curl`/`jq`
-directly in the workflow; there is no separate Python validation layer.
+does not establish coverage. Suite and metadata preflight checks still use
+`curl`/`jq` directly in the workflow. The Python report helper sanitizes and merges
+proof reports; it uses the Kotlin runner's batch classifications without
+reimplementing protocol acceptance policy.
 
-`Publish test report` includes `IssuerConformanceTests` in the same JUnit check as
-wallet/verifier tests. It reports the aggregate issuer matrix test, not a separate
-JUnit test for each suite module; the existing passed/skipped detail filters are
-unchanged. `Publish OpenID conformance summary` includes all four roles, with issuer
+Each issuer JUnit check reports its aggregate matrix test, not a separate JUnit
+test for each suite module; the existing passed/skipped detail filters are unchanged.
+Each verifier and wallet job publishes its own role summary. The issuer aggregation job publishes the same issuer summary format, with issuer
 variant statuses, clickable plan links and batch coverage counts taken from the
 runner's `matrix.json`. Missing results are reported explicitly, and issuer testing
-that was not requested is labelled as such. Missing batch classifications are
-`UNKNOWN`, never inferred as passed. After publishing, CI fails the job when any
-role's published results include failures.
+that was not requested leaves the issuer jobs skipped. Missing batch classifications
+are `UNKNOWN`, never inferred as passed. Failed aggregation still publishes available
+results and explicitly reports incomplete coverage; it cannot produce a passing job.
 
 The
 `issuer-conformance-basic-haip-batch` artifact contains suite/Identity revision
 information, batch classifications and result identifiers/statuses (including plan and test IDs for
 looking up suite logs). Error bodies, raw issuer/tunnel/test logs, JUnit output,
-rendered configuration and test keys are not uploaded in this artifact. The shared
-JUnit check includes issuer results. The issuer and tunnel are stopped on
-completion or failure.
+rendered configuration and test keys are not uploaded in this artifact. Its name,
+JSON schema and `jwt/results.json` and `attestation/results.json` paths are preserved.
+Intermediate `issuer-conformance-proof-jwt` and `issuer-conformance-proof-attestation`
+artifacts transfer only sanitized reports and job outcomes to the aggregation job.
+Aggregation downloads each artifact by name into its own directory, so a missing
+proof artifact still leaves the other proof's report available to merge.
+When `upload-test-results` is requested, issuer JUnit XML is uploaded separately as
+`junit-issuer-conformance-jwt` and `junit-issuer-conformance-attestation`. Role jobs
+upload `junit-conformance-verifier`, `junit-conformance-vp-wallet` and
+`junit-conformance-vci-wallet`; aggregation republishes them as `junit-conformance`.
+The issuer and tunnel
+are stopped on completion or failure.
 
 Focused checks (no live conformance):
 
