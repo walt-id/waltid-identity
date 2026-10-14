@@ -652,6 +652,7 @@ final class WalletVisualTests: XCTestCase {
         let started = ProcessInfo.processInfo.systemUptime
         var readiness: [[String: Any]] = []
         var lastImage: UIImage?
+        var frameGate = WalletVisualFrameGate()
         func renderAndCheckReadiness() -> Bool {
             host.view.layoutIfNeeded()
             let before = isReady()
@@ -663,9 +664,10 @@ final class WalletVisualTests: XCTestCase {
             // Drawing commits pending SwiftUI preferences. Readiness must describe this rendered
             // frame, rather than a cached preference followed by a different diagnostic frame.
             let after = isReady()
-            let ready = rendered && after && (isImageReady?(image) ?? true)
+            let contentReady = rendered && after && (isImageReady?(image) ?? true)
+            let ready = frameGate.accept(image, contentReady: contentReady)
             let observation: [String: Any] = ["beforeRender": before, "afterRender": after,
-                "rendered": rendered, "ready": ready, "description": readinessDescription(),
+                "rendered": rendered, "contentReady": contentReady, "ready": ready, "description": readinessDescription(),
                 "elapsedMs": Int((ProcessInfo.processInfo.systemUptime - started) * 1000)]
             if readiness.last?["ready"] as? Bool != ready || before != after || readiness.isEmpty {
                 readiness.append(observation)
@@ -702,7 +704,10 @@ final class WalletVisualTests: XCTestCase {
         if scrollToBottom {
             XCTAssertTrue(host.didScroll, "The compact fixture must overflow and scroll to its requested offset")
         }
-        try capture(host, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory)
+        // Compare exactly the settled frame that passed readiness. Snapshotting the controller
+        // again relays it out and can restart native scroll-edge/glass transitions.
+        try capture(XCTUnwrap(lastImage), as: .image(precision: 1), id: id,
+            colorScheme: colorScheme, sizeCategory: sizeCategory)
     }
 
     private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
@@ -722,14 +727,22 @@ final class WalletVisualTests: XCTestCase {
                          colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
                          layoutDirection: LayoutDirection = .leftToRight,
                          file: StaticString = #filePath, line: UInt = #line) throws {
+        try capture(controller, as: .image(on: config, drawHierarchyInKeyWindow: true, precision: 1),
+            id: id, colorScheme: colorScheme, sizeCategory: sizeCategory, layoutDirection: layoutDirection,
+            file: file, line: line)
+    }
+
+    private func capture<Value>(_ value: Value, as strategy: Snapshotting<Value, UIImage>, id: String,
+                                colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                layoutDirection: LayoutDirection = .leftToRight,
+                                file: StaticString = #filePath, line: UInt = #line) throws {
         let environment = ProcessInfo.processInfo.environment
         let record = environment["WALLET_VISUAL_RECORD"] == "1"
         let isCI = ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION"]
             .contains { environment[$0] != nil }
         XCTAssertFalse(record && isCI, "CI must only verify reviewed baselines", file: file, line: line)
         guard !(record && isCI) else { return }
-        var strategy = Snapshotting<UIViewController, UIImage>.image(
-            on: config, drawHierarchyInKeyWindow: true, precision: 1)
+        var strategy = strategy
         let diffing = strategy.diffing
         let baseline = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
             .appendingPathComponent("__Snapshots__/WalletVisualTests")
@@ -757,7 +770,7 @@ final class WalletVisualTests: XCTestCase {
             if matchesWithinRasterNoise(reference, decoded) { return nil }
             return diffing.diffV2(reference, decoded)
         }
-        let failure = verifySnapshot(of: controller, as: strategy,
+        let failure = verifySnapshot(of: value, as: strategy,
             named: "native-ios27_0-phone-en-light", record: record ? .all : .never,
             file: file, testName: id, line: line)
         if let actualData {
@@ -880,6 +893,16 @@ private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -
     return true
 }
 
+/// Content readiness alone does not establish that native materials have finished drawing.
+private struct WalletVisualFrameGate {
+    private var previous: UIImage?
+
+    mutating func accept(_ image: UIImage, contentReady: Bool) -> Bool {
+        defer { previous = contentReady ? image : nil }
+        return contentReady && previous.map { matchesWithinRasterNoise($0, image) } == true
+    }
+}
+
 @MainActor
 final class WalletVisualHostingTests: XCTestCase {
     func testScrollSettlesTheSiblingToolbarBackdrop() throws {
@@ -934,6 +957,23 @@ private struct VisualUIKitFixture: UIViewRepresentable {
 
 @MainActor
 final class WalletVisualComparatorTests: XCTestCase {
+    func testFrameGateRequiresConsecutiveReadyFrames() throws {
+        var gate = WalletVisualFrameGate()
+        let settled = try image([100])
+        XCTAssertFalse(gate.accept(settled, contentReady: true))
+        XCTAssertTrue(gate.accept(settled, contentReady: true))
+        XCTAssertFalse(gate.accept(settled, contentReady: false))
+        XCTAssertFalse(gate.accept(settled, contentReady: true), "Lost readiness must discard the earlier frame")
+        XCTAssertTrue(gate.accept(settled, contentReady: true))
+    }
+
+    func testFrameGateRejectsChangingMaterials() throws {
+        var gate = WalletVisualFrameGate()
+        XCTAssertFalse(gate.accept(try image([100]), contentReady: true))
+        XCTAssertFalse(gate.accept(try image([120]), contentReady: true))
+        XCTAssertTrue(gate.accept(try image([120]), contentReady: true))
+    }
+
     func testChannelNoiseHasAnExactBound() throws {
         let reference = try image([100])
         XCTAssertTrue(matchesWithinRasterNoise(reference, try image([100])))
