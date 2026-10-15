@@ -51,6 +51,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
@@ -259,11 +260,27 @@ class Issuer2CredentialProofValidationTest {
     fun `standalone W3C attestation verifies holder DIDs and permits retry after a mismatched key`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val attesterJwk = attester.getPublicKey().exportJWKObject()
-        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(
-            keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attesterJwk)),
-            clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
-        ) })
-        val flow = prepareFlow(apiClient(), Issuer2CredentialScenarios.openBadgeCredential)
+        val openBadge = Issuer2CredentialScenarios.openBadgeCredential
+        installIssuer2WithConfigFiles(
+            configureMetadataConfig = { metadata ->
+                val configuration = metadata.credentialConfigurations.getValue(openBadge.credentialConfigurationId).jsonObject
+                val proofs = configuration.getValue("proof_types_supported").jsonObject
+                metadata.copy(credentialConfigurations = metadata.credentialConfigurations + (
+                    openBadge.credentialConfigurationId to JsonObject(configuration + (
+                        "proof_types_supported" to JsonObject(proofs + (
+                            ProofType.ATTESTATION.value to buildJsonObject {
+                                put("proof_signing_alg_values_supported", JsonArray(listOf(JsonPrimitive("ES256"))))
+                            }
+                        ))
+                    ))
+                ))
+            },
+            configureServiceConfig = { it.copy(
+                keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attesterJwk)),
+                clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
+            ) },
+        )
+        val flow = prepareFlow(apiClient(), openBadge)
         val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
         val dids = holders.map { DidJwkRegistrar().registerByKey(it, DidJwkCreateOptions(KeyType.secp256r1)).did }
         val nonce = flow.nonce()
