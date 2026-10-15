@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.view.WindowInsets
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -240,23 +241,24 @@ internal object WalletComposeE2EHelper {
             fail("$tag not found.\n${visibleUiSnapshot(device)}")
             return
         }
-        var node: UiObject2 = initialNode
-        val deadline = System.currentTimeMillis() + CLICK_VISIBLE_TIMEOUT
-        while (!node.isEnabled && System.currentTimeMillis() < deadline) {
+        val deadline = SystemClock.uptimeMillis() + CLICK_VISIBLE_TIMEOUT
+        while (SystemClock.uptimeMillis() < deadline) {
+            try {
+                // The sheet can replace its accessibility nodes after the first lookup.
+                // Reacquire the visible, enabled hit target instead of retaining a stale node.
+                val node = findVisibleResource(device, tag)
+                val target = node?.let { it.clickableAncestorOrSelf() ?: it }
+                if (node?.isEnabled == true && target?.isEnabled == true && target.isVisibleOn(device)) {
+                    target.click()
+                    device.waitForIdle()
+                    return
+                }
+            } catch (_: StaleObjectException) {
+                // No current node to click; retry within the same readiness deadline.
+            }
             Thread.sleep(200)
-            node = findVisibleResource(device, tag) ?: node
         }
-        if (!node.isEnabled) {
-            fail("$tag is disabled.\n${visibleUiSnapshot(device)}")
-        }
-        device.waitForIdle()
-        val target = findVisibleResource(device, tag)
-        if (target == null) {
-            fail("$tag is not visible.\n${visibleUiSnapshot(device)}")
-            return
-        }
-        (target.clickableAncestorOrSelf() ?: target).click()
-        device.waitForIdle()
+        fail("$tag did not become visible and enabled.\n${visibleUiSnapshot(device)}")
     }
 
     fun setTextByTag(device: UiDevice, tag: String, value: String) {

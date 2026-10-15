@@ -464,12 +464,16 @@ class WalletDemoSharingReviewTestScenarios {
                 onCancel = {},
             )
         }
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(mdl.selection.id), useUnmergedTree = true)
+            .performScrollToContent(this)
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
         assertNull(submitted)
 
         runOnIdle { review.value = completeReview }
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(mdl.selection.id), useUnmergedTree = true).assertHasNoClickAction()
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id), useUnmergedTree = true).assertHasNoClickAction()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(mdl.selection.id), useUnmergedTree = true)
+            .performScrollToContent(this).assertHasNoClickAction()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id), useUnmergedTree = true)
+            .performScrollToContent(this).assertHasNoClickAction()
         onNodeWithText("Credential information").assertDoesNotExist()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(mdl.selection, photoId.selection), submitted?.credentials)
