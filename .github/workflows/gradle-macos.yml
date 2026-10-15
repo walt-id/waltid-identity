@@ -23,6 +23,11 @@ on:
         description: 'Run macOS SDK docs and ABI checks'
         type: boolean
         default: true
+      collect-test-diagnostics:
+        description: 'Verbose Xcode diagnostics for WalletCore consumer investigations'
+        type: choice
+        options: [never, on-failure]
+        default: never
   workflow_call:
     inputs:
       job_name_prefix:
@@ -55,6 +60,11 @@ on:
         type: boolean
         required: false
         default: false
+      collect-test-diagnostics:
+        description: 'Verbose consumer diagnostics: never or on-failure'
+        type: string
+        required: false
+        default: never
 
 # In-repo composites are referenced by path (./waltid-identity/.github/actions/...) so a PR editing
 # them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
@@ -185,10 +195,17 @@ jobs:
           retention-days: 7
 
   wallet-core-consumer-tests:
+    name: wallet-core-consumer-tests (${{ matrix.consumer }})
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose }}
     runs-on: xcode-27
     timeout-minutes: 130
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep each provider with its demo to reuse the build. Bridge coverage also runs
+        # for a Compose-only selection, matching the former serial consumer job.
+        consumer: ${{ fromJSON(inputs.run-native && inputs.run-compose && '["native","compose","bridge"]' || inputs.run-native && '["native","bridge"]' || '["compose","bridge"]') }}
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -209,30 +226,31 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run selected WalletCore consumer tests
-        # Keep headroom for all five phases, including cold Compose provider compilation.
+        # Leave time outside the action to collect failure evidence.
         timeout-minutes: 120
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
           run-ios-simulator-tests: 'false'
-          run-wallet-sdk-tests: 'true'
+          run-wallet-sdk-tests: ${{ matrix.consumer == 'bridge' && 'true' || 'false' }}
           wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
-          run-native-demo-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
-          run-native-identity-document-provider-checks: ${{ (inputs.run-native) && 'true' || 'false' }}
-          run-compose-demo-tests: ${{ (inputs.run-compose) && 'true' || 'false' }}
-          run-compose-identity-document-provider-checks: ${{ (inputs.run-compose) && 'true' || 'false' }}
-          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-consumer-tests
-          test-report-check-name: WalletCore Consumer Test Report
-          test-report-require-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
-          test-result-artifact-name: wallet-core-consumer-test-results
+          collect-test-diagnostics: ${{ inputs.collect-test-diagnostics }}
+          run-native-demo-tests: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
+          run-native-identity-document-provider-checks: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
+          run-compose-demo-tests: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
+          run-compose-identity-document-provider-checks: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
+          test-report-job-name: ${{ env.JOB_NAME_PREFIX }}wallet-core-consumer-tests (${{ matrix.consumer }})
+          test-report-check-name: WalletCore ${{ matrix.consumer }} Test Report
+          test-report-require-tests: 'true'
+          test-result-artifact-name: wallet-core-${{ matrix.consumer }}-test-results
 
       # Keep named test outcomes available for successful executions as well.
       - name: Retain WalletCore consumer test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: wallet-core-consumer-test-reports-${{ github.run_attempt }}
+          name: wallet-core-${{ matrix.consumer }}-test-reports-${{ github.run_attempt }}
           path: waltid-identity/build/ios-test-reports/xcresult/*.xml
           if-no-files-found: error
           retention-days: 7
@@ -242,7 +260,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: wallet-core-consumer-phase-logs-${{ github.run_attempt }}
+          name: wallet-core-${{ matrix.consumer }}-phase-logs-${{ github.run_attempt }}
           path: |
             ios-ci-logs/**
           retention-days: 7
@@ -251,7 +269,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: wallet-core-incomplete-test-results
+          name: wallet-core-${{ matrix.consumer }}-incomplete-test-results-${{ github.run_attempt }}
           path: |
             waltid-identity/waltid-applications/**/TestResults*
             waltid-identity/build/proximity-tests/**
