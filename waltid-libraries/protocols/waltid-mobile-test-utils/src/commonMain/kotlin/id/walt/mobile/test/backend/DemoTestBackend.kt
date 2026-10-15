@@ -2,7 +2,6 @@ package id.walt.mobile.test.backend
 
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
@@ -48,11 +47,14 @@ object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
-    // RFC 7638 thumbprint of the issuer2 metadata signing key published at
-    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-10-01). This is an independent trust anchor;
-    // it must not be learned from the signed metadata JWT itself.
-    private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "DOiRtPhc0Hre1XZwBVjx_YoGugtAEtWNrKCZ4zerXs4"
+    // Public issuer2 metadata signing key from HTTPS /openid4vci/jwks (verified 2026-10-15).
+    // This fixed trust anchor is independent of key material in the JWS header.
+    private val issuerMetadataSigningJwk = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("x", "Cq8HolBA1S5sXphMY-Afe2xeXggvZignanlnxsQiNTU")
+        put("y", "Ct4xSGVYXjac9dP98cvS75HBYxmJf2DlsL5_VF2WZhQ")
+    }
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     // Pre-registered client ID trusted by the signed-request integration tests.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
@@ -345,21 +347,10 @@ object DemoTestBackend {
         require(algorithm == "ES256") {
             "Unsupported public demo signed metadata algorithm: $algorithm"
         }
-        val jwk = decoded.protectedHeader[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
-            ?: error("Public demo signed metadata is missing jwk")
-        require(jwk["kty"]?.jsonPrimitive?.contentOrNull == "EC") {
-            "Public demo signed metadata jwk must use EC"
-        }
-        require(jwk["crv"]?.jsonPrimitive?.contentOrNull == "P-256") {
-            "Public demo signed metadata jwk must use P-256"
-        }
         val encodedVerificationKey = EncodedKey.Jwk(
-            data = BinaryData(jwk.toString().encodeToByteArray()),
+            data = BinaryData(issuerMetadataSigningJwk.toString().encodeToByteArray()),
             privateMaterial = false,
         )
-        require(Jwk.sha256Thumbprint(encodedVerificationKey) == ISSUER_METADATA_SIGNING_KEY_THUMBPRINT) {
-            "Public demo signed metadata key is not the pinned issuer2 signing key"
-        }
         val verificationKey = metadataCryptoRuntime.restore(
             encodedVerificationKey.toStoredSoftwareKey(KeyId("issuer2-metadata"), setOf(KeyUsage.VERIFY))
         )
