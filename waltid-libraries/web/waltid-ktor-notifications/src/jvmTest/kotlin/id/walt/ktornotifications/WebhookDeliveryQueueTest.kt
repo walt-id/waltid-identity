@@ -9,6 +9,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -16,10 +19,12 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.deleteIfExists
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -70,6 +75,54 @@ class WebhookDeliveryQueueTest {
     }
 
     @Test
+    fun `corrupt pending record is quarantined without blocking healthy deliveries`() = runTest {
+        val root = temporaryDirectory()
+        val store = FileWebhookDeliveryStore(root)
+        val transport = RecordingTransport()
+        val queue = queue(store, transport) { 1_000L }
+        val healthyDeliveryId = queue.enqueue(update(), webhook())
+        val corruptPath = root.resolve("pending/corrupt.json")
+        Files.writeString(corruptPath, "{truncated")
+
+        queue.processDue()
+
+        assertNull(store.pending(healthyDeliveryId))
+        assertEquals(1, transport.deliveries.size)
+        assertFalse(Files.exists(corruptPath))
+        assertEquals(
+            1L,
+            Files.list(root.resolve("corrupt")).use { files -> files.count() },
+        )
+    }
+
+    @Test
+    fun `crash after lease does not consume an attempt`() = runTest {
+        val root = temporaryDirectory()
+        val durableStore = FileWebhookDeliveryStore(root)
+        val crashAfterLeaseStore = CrashAfterLeaseStore(durableStore)
+        val firstTransport = RecordingTransport()
+        val firstQueue = queue(crashAfterLeaseStore, firstTransport) { 1_000L }
+        val deliveryId = firstQueue.enqueue(update(), webhook(maxAttempts = 1))
+
+        assertFailsWith<SimulatedCrashException> {
+            firstQueue.processDue()
+        }
+
+        val leased = assertNotNull(durableStore.pending(deliveryId))
+        assertEquals(0, leased.attemptCount)
+        assertTrue(firstTransport.deliveries.isEmpty())
+
+        val restartedTransport = RecordingTransport()
+        val restartedQueue = queue(durableStore, restartedTransport) {
+            assertNotNull(leased.leaseUntilEpochMilliseconds)
+        }
+        restartedQueue.processDue()
+
+        assertEquals(listOf(1), restartedTransport.attempts)
+        assertNull(durableStore.pending(deliveryId))
+    }
+
+    @Test
     fun `distinct events receive distinct delivery ids`() = runTest {
         val queue = queue(FileWebhookDeliveryStore(temporaryDirectory()), RecordingTransport()) { 1_000L }
 
@@ -89,6 +142,47 @@ class WebhookDeliveryQueueTest {
         queue.processDue()
 
         assertEquals(listOf("first", "second"), transport.deliveries.map(WebhookDelivery::event))
+    }
+
+    @Test
+    fun `slow receivers are processed with bounded concurrency`() = runTest {
+        val started = Channel<Unit>(Channel.UNLIMITED)
+        val release = CompletableDeferred<Unit>()
+        val inFlight = AtomicInteger()
+        val maximumInFlight = AtomicInteger()
+        val transport = object : WebhookTransport {
+            override suspend fun deliver(
+                delivery: WebhookDelivery,
+                attempt: Int,
+                timestampEpochSeconds: Long,
+            ): WebhookAttemptResult {
+                val active = inFlight.incrementAndGet()
+                maximumInFlight.updateAndGet { current -> maxOf(current, active) }
+                started.send(Unit)
+                try {
+                    release.await()
+                } finally {
+                    inFlight.decrementAndGet()
+                }
+                return WebhookAttemptResult(statusCode = 204)
+            }
+        }
+        val queue = queue(
+            store = FileWebhookDeliveryStore(temporaryDirectory()),
+            transport = transport,
+            clock = { 1_000L },
+            maxConcurrentDeliveries = 3,
+        )
+        repeat(6) { index -> queue.enqueue(update(event = "event-$index"), webhook()) }
+
+        val processing = async { queue.processDue() }
+        repeat(3) { started.receive() }
+
+        assertEquals(3, maximumInFlight.get())
+        assertTrue(started.tryReceive().isFailure)
+        release.complete(Unit)
+        processing.await()
+        assertEquals(0, inFlight.get())
     }
 
     @Test
@@ -135,6 +229,34 @@ class WebhookDeliveryQueueTest {
     }
 
     @Test
+    fun `retry jitter scales with the capped backoff`() = runTest {
+        val store = FileWebhookDeliveryStore(temporaryDirectory())
+        var jitterUpperBound = 0L
+        val queue = queue(
+            store = store,
+            transport = RecordingTransport(WebhookAttemptResult(statusCode = 503)),
+            clock = { 3_000L },
+            jitter = { upperExclusive ->
+                jitterUpperBound = upperExclusive
+                upperExclusive - 1
+            },
+        )
+        val deliveryId = queue.enqueue(
+            update(),
+            webhook(
+                maxAttempts = 2,
+                initialBackoffSeconds = 20,
+                maxBackoffSeconds = 60,
+            ),
+        )
+
+        queue.processDue()
+
+        assertEquals(10_001L, jitterUpperBound)
+        assertEquals(33_000L, assertNotNull(store.pending(deliveryId)).nextAttemptAtEpochMilliseconds)
+    }
+
+    @Test
     fun `transport sends integrity idempotency and attempt headers`() = runTest {
         val payload = """{"event":"completed"}"""
         val delivery = delivery(payload)
@@ -171,12 +293,15 @@ class WebhookDeliveryQueueTest {
     private fun queue(
         store: WebhookDeliveryStore,
         transport: WebhookTransport,
+        jitter: (Long) -> Long = { 0 },
+        maxConcurrentDeliveries: Int = 4,
         clock: () -> Long,
     ) = WebhookDeliveryQueue(
         store = store,
         transport = transport,
         clock = clock,
-        jitter = { 0 },
+        jitter = jitter,
+        maxConcurrentDeliveries = maxConcurrentDeliveries,
     )
 
     private fun update(event: String = "completed") = KtorSessionUpdate(
@@ -186,13 +311,17 @@ class WebhookDeliveryQueueTest {
         requestId = "request-1",
     )
 
-    private fun webhook(maxAttempts: Int = 5) =
+    private fun webhook(
+        maxAttempts: Int = 5,
+        initialBackoffSeconds: Long = 0,
+        maxBackoffSeconds: Long = initialBackoffSeconds,
+    ) =
         KtorSessionNotifications.VerificationSessionWebhookNotification(
             url = io.ktor.http.Url("https://receiver.example/webhook"),
             retryPolicy = KtorSessionNotifications.WebhookRetryPolicy(
                 maxAttempts = maxAttempts,
-                initialBackoffSeconds = 0,
-                maxBackoffSeconds = 0,
+                initialBackoffSeconds = initialBackoffSeconds,
+                maxBackoffSeconds = maxBackoffSeconds,
             ),
         )
 
@@ -233,4 +362,25 @@ class WebhookDeliveryQueueTest {
             return if (results.isEmpty()) WebhookAttemptResult(statusCode = 200) else results.removeFirst()
         }
     }
+
+    private class CrashAfterLeaseStore(
+        private val delegate: WebhookDeliveryStore,
+    ) : WebhookDeliveryStore by delegate {
+        private var crashPending = true
+
+        override suspend fun claimDue(
+            nowEpochMilliseconds: Long,
+            leaseUntilEpochMilliseconds: Long,
+            limit: Int,
+        ): List<WebhookDeliveryClaim> {
+            val claimed = delegate.claimDue(nowEpochMilliseconds, leaseUntilEpochMilliseconds, limit)
+            if (crashPending) {
+                crashPending = false
+                throw SimulatedCrashException()
+            }
+            return claimed
+        }
+    }
+
+    private class SimulatedCrashException : RuntimeException()
 }
