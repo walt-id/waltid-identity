@@ -372,11 +372,11 @@
       "lanes": ["visual-android", "visual-compose", "visual-native"]
     },
     {
-      "name": "browser source compares all browser states without Apple jobs",
+      "name": "browser source selects browser visuals and Enterprise coverage",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/kotlin/WebWallet.kt"
       ],
-      "lanes": ["visual-browser"]
+      "lanes": ["enterprise", "visual-browser"]
     }
   ]
 }
