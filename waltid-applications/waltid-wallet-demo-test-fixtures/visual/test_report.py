@@ -2,6 +2,7 @@
 import json
 import contextlib
 import io
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -311,6 +312,50 @@ class SourceBindingTests(unittest.TestCase):
         status, manifest = self.finish(run)
         self.assertEqual((status, manifest["counts"], manifest["errors"]), (0, {"passed": 1}, []))
 
+    def test_dirty_input_inventory_can_reconstruct_the_exact_fingerprint(self):
+        modified = self.root / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonMain/Wallet.kt"
+        modified.write_text("class WalletChanged")
+        backup = self.root / "gradle.properties.backup"
+        backup.write_text("enableIosBuild=false\n")
+        deleted = self.root / "build-logic/src/main/kotlin/waltid.mobile.library.gradle.kts"
+        deleted.unlink()
+        (self.root / "local.properties").write_text("sdk.dir=/synthetic/sdk")
+        run = self.begin()
+        inputs = self.output / "source-inputs.json"
+        inventory = json.loads(inputs.read_text())
+        self.assertTrue(run["dirty"])
+        self.assertEqual(run["sourceInputsDigest"], report.digest(inputs))
+        for key in ("runId", "sha", "fingerprint"):
+            self.assertEqual(inventory[key], run[key])
+        self.assertEqual(len(inventory["repositories"]), 1)
+        repository = inventory["repositories"][0]
+        self.assertEqual(repository["root"], str(self.root))
+        files = {entry["path"]: entry for entry in repository["files"]}
+        listed = subprocess.check_output(["git", "-C", str(self.root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"], text=True)
+        self.assertEqual(set(files), set(filter(None, listed.split("\0"))))
+        self.assertNotIn("local.properties", files)
+        for path in (modified, backup):
+            entry = files[path.relative_to(self.root).as_posix()]
+            self.assertEqual(entry, {"path": path.relative_to(self.root).as_posix(), "kind": "file", "sha256": report.digest(path)})
+        self.assertEqual(files[deleted.relative_to(self.root).as_posix()]["kind"], "missing")
+        rebuilt = hashlib.sha256()
+        for repository in inventory["repositories"]:
+            rebuilt.update(b"\0repository\0")
+            for entry in repository["files"]:
+                rebuilt.update(entry["path"].encode() + b"\0")
+                rebuilt.update(bytes.fromhex(entry["sha256"]))
+        self.assertEqual(rebuilt.hexdigest(), run["fingerprint"])
+        self.assertEqual(self.finish(run)[0], 0)
+
+    def test_missing_or_modified_input_inventory_cannot_certify_a_comparison(self):
+        for tamper in (lambda path: path.unlink(), lambda path: path.write_text("{}")):
+            with self.subTest(tamper=tamper):
+                run = self.begin()
+                tamper(self.output / "source-inputs.json")
+                status, manifest = self.finish(run)
+                self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
+                self.assertIn("Source input manifest is missing or changed after begin", manifest["errors"])
+
     def test_coordinated_build_inputs_are_bound_to_the_same_run(self):
         (self.workspace / ".gitignore").write_text("waltid-identity/\n")
         settings = self.workspace / "settings.gradle.kts"
@@ -318,17 +363,23 @@ class SourceBindingTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.workspace), "init", "-q"], check=True, capture_output=True)
         subprocess.run(["git", "-C", str(self.workspace), "add", "."], check=True, capture_output=True)
         run = self.begin(self.workspace)
+        repositories = json.loads((self.output / "source-inputs.json").read_text())["repositories"]
+        self.assertEqual([repository["root"] for repository in repositories], [str(self.root), str(self.workspace)])
+        coordinated = {entry["path"]: entry for entry in repositories[1]["files"]}
+        self.assertEqual(coordinated["settings.gradle.kts"]["sha256"], report.digest(settings))
         self.assertEqual(self.finish(run)[0], 0)
         settings.write_text("// changed coordinated settings")
         status, manifest = self.finish(run)
         self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
 
     def test_run_from_the_old_fingerprint_contract_is_stale(self):
-        run = self.begin()
-        run["schemaVersion"] = 2
-        del run["gradleRoot"]
-        status, manifest = self.finish(run)
-        self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
+        for version in (2, 3):
+            with self.subTest(version=version):
+                run = self.begin()
+                run["schemaVersion"] = version
+                del run["gradleRoot"]
+                status, manifest = self.finish(run)
+                self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
 
 
 if __name__ == "__main__":

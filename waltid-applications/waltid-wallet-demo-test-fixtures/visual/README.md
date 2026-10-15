@@ -24,6 +24,8 @@ The entry point builds the native framework before freezing the source fingerpri
 
 For custom orchestration, call `report.py begin` first and pass the generated `native-runner-env.json` to XcodeBuildMCP's `--json` argument. Call `report.py finish` with the native JSON result afterward. The fingerprint conservatively includes tracked files and non-ignored additions across Identity source, SDKs and build logic, plus coordinated build-root inputs when selected. Ignored build outputs and local settings are excluded. Reusing an older receipt or changing these inputs during a run invalidates the report.
 
+`source-inputs.json` retains the complete path, kind and SHA-256 inventory used by that fingerprint, without file contents. It is bound to the run marker and retained with the comparison artifact, so intentional CI configuration edits and non-ignored additions can be audited against the checked-out commits. Missing or changed inventories invalidate the report; a dirty checkout is still labelled as such.
+
 The wallet module defaults ordinary Gradle tests to verification from both Identity and coordinated build roots, with mode and baselines tracked as test inputs. The `roborazzi.test.verify` project property remains an explicit override; CI rejects disabled verification and recording or compare-only modes. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 
 ## Deliberate baseline updates

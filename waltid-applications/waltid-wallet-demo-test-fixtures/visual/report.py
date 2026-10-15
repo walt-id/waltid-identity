@@ -51,18 +51,29 @@ def image_info(path):
         raise ValueError(f"Invalid visual PNG: {error}") from error
 
 
-def fingerprint(gradle_root):
-    """Bind evidence to source, SDKs and build inputs, excluding ignored generated files."""
+def source_inputs(gradle_root):
+    """Retain the complete input inventory behind the source fingerprint, without file contents."""
     value = hashlib.sha256()
+    repositories = []
     for root in dict.fromkeys((ROOT, Path(gradle_root))):
         value.update(b"\0repository\0")
+        files = []
         paths = subprocess.check_output(
             ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"], text=True)
         for name in sorted(set(filter(None, paths.split("\0")))):
             path = root / name
+            kind = "file" if path.is_file() else "directory" if path.is_dir() else "missing"
+            content_digest = hashlib.sha256(path.read_bytes() if kind == "file" else b"<deleted>")
             value.update(name.encode() + b"\0")
-            value.update(hashlib.sha256(path.read_bytes() if path.is_file() else b"<deleted>").digest())
-    return value.hexdigest()
+            value.update(content_digest.digest())
+            files.append({"path": name, "kind": kind, "sha256": content_digest.hexdigest()})
+        repositories.append({"root": str(root), "files": files})
+    return value.hexdigest(), repositories
+
+
+def fingerprint(gradle_root):
+    """Bind evidence to source, SDKs and build inputs, excluding ignored generated files."""
+    return source_inputs(gradle_root)[0]
 
 
 def fresh(path, started):
@@ -258,7 +269,13 @@ def assess_compose(state, renderer, case, result, baseline, run, config):
 
 def finish(args, run):
     errors, cells = [], []
-    stale_source = (run.get("schemaVersion") != 3 or run["sha"] != git("rev-parse", "HEAD") or
+    try:
+        stale_inventory = run.get("sourceInputsDigest") != digest(args.output / "source-inputs.json")
+    except OSError:
+        stale_inventory = True
+    if stale_inventory:
+        errors.append("Source input manifest is missing or changed after begin")
+    stale_source = (stale_inventory or run.get("schemaVersion") != 4 or run["sha"] != git("rev-parse", "HEAD") or
                     run["fingerprint"] != fingerprint(run["gradleRoot"]))
     if stale_source:
         errors.append("Source or baselines changed after begin; results cannot describe this source state")
@@ -359,11 +376,16 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     marker = args.output / "run.json"
     if args.phase == "begin":
-        run = {"schemaVersion": 3, "runId": str(uuid.uuid4()), "started": time.time(), "sha": git("rev-parse", "HEAD"),
+        input_fingerprint, repositories = source_inputs(args.gradle_root)
+        run = {"schemaVersion": 4, "runId": str(uuid.uuid4()), "started": time.time(), "sha": git("rev-parse", "HEAD"),
                "dirty": bool(git("status", "--porcelain")), "gradleRoot": str(args.gradle_root),
-               "fingerprint": fingerprint(args.gradle_root), "renderers": args.renderers,
+               "fingerprint": input_fingerprint, "renderers": args.renderers,
                "fixtureDigest": digest(HERE.parent / "resources/files/wallet-visual-data.json"),
                "ci": {key: os.environ[key] for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_EVENT_NAME") if key in os.environ}}
+        inputs = args.output / "source-inputs.json"
+        inputs.write_text(json.dumps({"schemaVersion": 1, "runId": run["runId"], "sha": run["sha"],
+                                     "fingerprint": input_fingerprint, "repositories": repositories}, indent=2) + "\n")
+        run["sourceInputsDigest"] = digest(inputs)
         marker.write_text(json.dumps(run, indent=2) + "\n")
         (args.output / "native-runner-env.json").write_text(json.dumps({"testRunnerEnv": runner_env(run)}) + "\n")
         print(f"Started evidence run: {marker}")
