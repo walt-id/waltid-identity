@@ -1,6 +1,11 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
+import androidx.compose.runtime.DisposableEffect
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
@@ -19,6 +24,7 @@ import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import platform.UIKit.UIViewController
 
+private var iosControllerScope: CoroutineScope? = null
 private var iosController: WalletDemoController? = null
 private var iosProximityController: WalletDemoProximityController? = null
 private var pendingDeepLink: String? = null
@@ -111,6 +117,9 @@ fun walletDemoViewController(
         onDigitalCredentialRegistryChanged = { onDigitalCredentialRegistryChanged() },
     )
     val sharingSettings = createIosDemoSharingSettingsStore(appGroupIdentifier)
+    iosControllerScope?.cancel()
+    val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    iosControllerScope = controllerScope
     val controller = WalletDemoController(
         wallet = wallet,
         pinStore = createIosDemoPinStore(config.walletId),
@@ -118,6 +127,7 @@ fun walletDemoViewController(
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
         sharingSettings = sharingSettings,
+        scope = controllerScope,
     )
     val readerTrustSettingsController = DemoReaderTrustSettingsController(
         createIosDemoReaderTrustSettingsStore(appGroupIdentifier)
@@ -136,6 +146,15 @@ fun walletDemoViewController(
     pendingDeepLink?.let(controller::handleDeepLink)
     pendingDeepLink = null
     return ComposeUIViewController {
+        DisposableEffect(controller) {
+            onDispose {
+                controllerScope.cancel()
+                if (iosController === controller) {
+                    iosController = null
+                    iosControllerScope = null
+                }
+            }
+        }
         MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
     }
 }
