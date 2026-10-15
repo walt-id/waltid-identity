@@ -99,7 +99,7 @@ kotlin {
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 api(identityLibs.androidx.fragment)
-                implementation(identityLibs.ktor.client.android)
+                implementation(identityLibs.ktor.client.okhttp)
                 implementation(identityLibs.androidx.credentials.registry.mdoc)
                 implementation(identityLibs.androidx.credentials.registry.openid)
                 implementation(identityLibs.androidx.credentials.registry.sdjwtvc)

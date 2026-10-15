@@ -8,6 +8,10 @@ inputs:
   simulator-destination:
     description: 'xcodebuild simulator destination for iOS app tests'
     required: true
+  collect-test-diagnostics:
+    description: 'Verbose Xcode diagnostics: never or on-failure; ordinary results and attachments are retained'
+    required: false
+    default: 'never'
   run-ios-simulator-tests:
     description: 'Run Gradle iosSimulatorArm64Test'
     required: false
@@ -136,6 +140,8 @@ runs:
       id: wallet_sdk_tests
       continue-on-error: true
       shell: bash
+      env:
+        XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-sdk-bridge \
@@ -160,10 +166,12 @@ runs:
       continue-on-error: true
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
+      env:
+        XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
-          xcodebuild test \
+          xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ inputs.simulator-destination }}" \
@@ -184,6 +192,8 @@ runs:
       continue-on-error: true
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
       shell: bash
+      env:
+        XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" compose-demo \
@@ -209,7 +219,7 @@ runs:
         trap 'exit 143' TERM
         xcrun simctl bootstatus "$simulator" -b
 
-        xcodebuild test \
+        xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -configuration Debug \

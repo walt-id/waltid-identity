@@ -31,6 +31,7 @@ data class AndroidDemoMobileWallet(
             check(result.signingProtection == signingProtection) {
                 "Open the wallet app to apply the configured signing protection before using Digital Credentials"
             }
+            demoWallet.refreshDigitalCredentialRegistration()
         }
     }
 }

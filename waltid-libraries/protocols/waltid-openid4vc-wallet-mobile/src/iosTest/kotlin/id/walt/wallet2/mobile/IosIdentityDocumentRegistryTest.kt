@@ -1,6 +1,9 @@
 package id.walt.wallet2.mobile
 
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import platform.Foundation.NSUUID
 import platform.Foundation.NSUserDefaults
 import kotlin.test.Test
@@ -11,6 +14,21 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IosIdentityDocumentRegistryTest {
+    @Test
+    fun cancelledWalletCannotReplaceTheActiveWalletProjection() = runTest {
+        withSuite { suite ->
+            val active = IosIdentityDocumentRegistry(suite, "active-wallet")
+            active.replace("active", emptyList())
+            val stale = launch {
+                currentCoroutineContext().cancel()
+                IosIdentityDocumentRegistry(suite, "old-wallet").replace("old", emptyList())
+            }
+            stale.join()
+            assertEquals("active-wallet", assertIs<IosIdentityDocumentProjectionResult.Published>(
+                IosIdentityDocumentRegistry.readDesiredRegistrations(suite)).state.walletId)
+        }
+    }
+
     @Test
     fun capabilitiesExposeOnlyAnnexCAndRequireSharedRegistrationConfiguration() {
         val capabilities = registry(null).capabilities

@@ -26,9 +26,13 @@ The archive is retained for one day; rerun the producer if it has expired.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
-afterwards to ensure the fixture build did not replace it. The consumer step has
-time for all five phases; the job leaves additional time to retain failure evidence.
-The workflow defines both time limits.
+afterwards to ensure the fixture build did not replace it. Consumers run in three
+independent jobs: native provider plus native demo, Compose provider plus Compose
+demo, and Swift bridge tests. Each provider stays with its demo to reuse the build.
+Bridge tests run whenever either native or Compose is selected. Matrix failures
+do not cancel siblings; every selected job must succeed for the reusable workflow
+and `ci-gate` to succeed. Reports and logs have distinct names for each consumer.
+Each job leaves time outside its test step to retain failure evidence.
 
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
@@ -44,6 +48,14 @@ system URL opener delivers links to the running wallet. Test and cleanup failure
 propagate through the existing phase runner.
 
 ## Failure handling
+
+Consumer XCTest commands disable verbose system diagnostic collection by default
+with `-collect-test-diagnostics never`. This avoids long simulator diagnostic waits
+after tests complete; ordinary result bundles, assertions, reports and test
+attachments remain enabled. Select `collect-test-diagnostics: on-failure` when
+dispatching or calling the workflow to collect verbose diagnostics such as
+sysdiagnose. Direct script invocations accept `XCODE_TEST_DIAGNOSTICS=on-failure`.
+This setting does not change test selection, timeouts or failure propagation.
 
 Build/test steps and jobs have separate time limits, leaving time to collect
 reports after a step fails. A small phase runner retains command output and

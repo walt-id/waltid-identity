@@ -24,17 +24,22 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.data.HolderKeyBindingOrigin
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -72,6 +77,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -1141,6 +1147,49 @@ class WalletIssuanceSessionServiceTest {
         val consumed = assertIs<WalletIssuanceOutcome.Failed>(service.resumeDeferred(continuation))
         assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, consumed.error.code)
         assertEquals(2, deferredRequests, "A consumed continuation must not replay the credential request")
+    }
+
+    @Test
+    fun issuedMdocMustMatchTheRequestedDocumentType() = runTest {
+        val holderKey = crypto2SigningKey("mdoc-doctype")
+        val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
+        val wallet = Wallet("mdoc-doctype", keyStores = listOf(keyStore), credentialStores = listOf(InMemoryCredentialStore()))
+        val material = requireNotNull(wallet.resolveKeyMaterial(holderKey.id.value, setOf(KeyUsage.SIGN)))
+        val credential = mdocCredential(holderKey)
+        val binding = listOf(ResolvedCredentialHolderBinding(material, null))
+        val stored = wallet.prepareIssuedCredentials(
+            rawCredentials = listOf(credential),
+            bindings = binding,
+            label = null,
+            metadata = null,
+            proofRequired = false,
+            expectedConfiguration = CredentialConfiguration(format = CredentialFormat.MSO_MDOC, doctype = MDOC_DOCTYPE),
+        )
+        assertEquals(MDOC_DOCTYPE, (stored.single().credential as MdocsCredential).docType)
+
+        val wrongType = assertFailsWith<IllegalArgumentException> {
+            wallet.prepareIssuedCredentials(
+                rawCredentials = listOf(credential),
+                bindings = binding,
+                label = null,
+                metadata = null,
+                proofRequired = false,
+                expectedConfiguration = CredentialConfiguration(format = CredentialFormat.MSO_MDOC, doctype = "org.example.other"),
+            )
+        }
+        assertContains(wrongType.message ?: "", "document type")
+
+        val wrongFormat = assertFailsWith<IllegalArgumentException> {
+            wallet.prepareIssuedCredentials(
+                rawCredentials = listOf(credential),
+                bindings = binding,
+                label = null,
+                metadata = null,
+                proofRequired = false,
+                expectedConfiguration = CredentialConfiguration(format = CredentialFormat.JWT_VC_JSON_LD),
+            )
+        }
+        assertContains(wrongFormat.message ?: "", "format does not match")
     }
 
     @Test

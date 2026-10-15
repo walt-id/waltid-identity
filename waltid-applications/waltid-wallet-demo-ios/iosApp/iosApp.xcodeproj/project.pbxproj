@@ -38,7 +38,7 @@
 		A1000461AAAA000100000061 /* ProximityPresentationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000461AAAA000000000061 /* ProximityPresentationView.swift */; };
 		A1000462AAAA000100000062 /* DemoReaderTrustSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000462AAAA000000000062 /* DemoReaderTrustSettings.swift */; };
 		A1000463AAAA000100000063 /* DemoClientIdTrust.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000463AAAA000000000063 /* DemoClientIdTrust.swift */; };
-		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
+		A1000500AAAA000100000050 /* WalletDemoQRScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* WalletDemoQRScanner */; };
 		A7520000000000000000000A /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
 		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
@@ -234,7 +234,7 @@
 				A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000043 /* WalletDemoSharingUI in Frameworks */,
 				A53800000000000000000004 /* WalletDemoKeyAttestation in Frameworks */,
-				A1000500AAAA000100000050 /* CodeScanner in Frameworks */,
+				A1000500AAAA000100000050 /* WalletDemoQRScanner in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -489,7 +489,7 @@
 				A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */,
 				A75200000000000000000040 /* WalletDemoSharingUI */,
 				A53800000000000000000002 /* WalletDemoKeyAttestation */,
-				A1000501AAAA000000000051 /* CodeScanner */,
+				A1000501AAAA000000000051 /* WalletDemoQRScanner */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
@@ -609,7 +609,6 @@
 				8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */,
 				A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */,
 				A53800000000000000000001 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-test-fixtures/key-attestation" */,
-				A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */,
 			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
 			projectDirPath = "";
@@ -1315,17 +1314,6 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/twostraws/CodeScanner.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.5.2;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
         A74900000000000000000002 /* WalletSDKKeychainRecovery */ = {isa = XCSwiftPackageProductDependency; package = 8A81DD79791BBF3F1CFF90A1; productName = WalletSDKKeychainRecovery; };
 		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
@@ -1338,10 +1326,10 @@
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
 			productName = WalletSDK;
 		};
-		A1000501AAAA000000000051 /* CodeScanner */ = {
+		A1000501AAAA000000000051 /* WalletDemoQRScanner */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */;
-			productName = CodeScanner;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoQRScanner;
 		};
 		A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */ = {
 			isa = XCSwiftPackageProductDependency;

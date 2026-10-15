@@ -1,5 +1,5 @@
-import CodeScanner
 import SwiftUI
+import WalletDemoQRScanner
 import WalletDemoSharingUI
 
 struct UrlEditor: View {
@@ -88,33 +88,19 @@ struct ScannableUrlEditor: View {
             .accessibilityIdentifier(scanButtonIdentifier)
         }
         .sheet(isPresented: $scannerVisible) {
-            NavigationView {
-                CodeScannerView(
-                    codeTypes: [.qr],
-                    scanMode: .once,
-                    showViewfinder: true,
-                    requiresPhotoOutput: false
-                ) { result in
-                    switch result {
-                    case .success(let scan):
-                        text = scan.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                        scannerVisible = false
-                    case .failure:
-                        scannerVisible = false
-                        scannerError = "QR scanning is unavailable. Check camera access and try again."
-                    }
+            QRCodeScannerSheet(
+                onScan: { scanned in
+                    text = scanned.trimmingCharacters(in: .whitespacesAndNewlines)
+                    scannerVisible = false
+                },
+                onFailure: {
+                    scannerVisible = false
+                    scannerError = "QR scanning is unavailable. Check camera access and try again."
+                },
+                onClose: {
+                    scannerVisible = false
                 }
-                .navigationTitle("Scan QR code")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") {
-                            scannerVisible = false
-                        }
-                    }
-                }
-            }
-            .navigationViewStyle(.stack)
+            )
         }
         .alert(
             "QR scanner unavailable",

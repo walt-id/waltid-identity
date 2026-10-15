@@ -2,6 +2,10 @@ package id.walt.wallet2.mobile
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSProcessInfo
@@ -172,9 +176,10 @@ public class IosIdentityDocumentRegistry(
     override suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult {
+    ): MobileWalletCredentialRegistrationResult = projectionMutex.withLock {
+        currentCoroutineContext().ensureActive()
         val group = appGroupIdentifier
-            ?: return MobileWalletCredentialRegistrationResult(false, 0, "An App Group is required")
+            ?: return@withLock MobileWalletCredentialRegistrationResult(false, 0, "An App Group is required")
         // Only mdoc reaches Apple: IdentityDocumentServices registers ISO mobile documents, and an
         // SD-JWT VC has no doctype to register under.
         val projection = records
@@ -189,14 +194,14 @@ public class IosIdentityDocumentRegistry(
 
         val persisted = runCatching { writeProjection(group, projection) }
         persisted.exceptionOrNull()?.let { failure ->
-            return MobileWalletCredentialRegistrationResult(
+            return@withLock MobileWalletCredentialRegistrationResult(
                 available = false,
                 registeredEntryCount = 0,
                 reason = failure.message ?: "Identity document projection could not be persisted",
             )
         }
 
-        return MobileWalletCredentialRegistrationResult(
+        return@withLock MobileWalletCredentialRegistrationResult(
             available = capabilities.registrationAvailable,
             registeredEntryCount = projection.size,
             reason = unavailableReason,
@@ -227,6 +232,8 @@ public class IosIdentityDocumentRegistry(
         public const val PROJECTION_STATE_KEY: String = "id.walt.wallet.identity-document-projection"
         internal const val REGISTRATION_STATUS_KEY: String = "id.walt.wallet.identity-document-registration-status"
 
+        // Wallet replacement can leave two process-local handles draining at the same time.
+        private val projectionMutex = Mutex()
         private val projectionJson = Json { ignoreUnknownKeys = true }
 
         /**
