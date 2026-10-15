@@ -122,7 +122,7 @@
       "files": [
         "waltid-libraries/protocols/waltid-mobile-test-utils/src/commonMain/kotlin/id/walt/mobile/test/backend/DemoTestBackend.kt"
       ],
-      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "build-logic change selects every macOS lane",
