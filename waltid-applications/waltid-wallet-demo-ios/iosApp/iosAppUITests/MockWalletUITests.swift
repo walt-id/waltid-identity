@@ -769,6 +769,7 @@ final class MockWalletUITests: XCTestCase {
     func testDuplicateExternalOfferPreservesCredentialInformation() {
         continueAfterFailure = false
         let app = XCUIApplication()
+        app.launchArguments += ["-AppleTextDirection", "YES", "-NSForceRightToLeftWritingDirection", "YES"]
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
@@ -778,7 +779,19 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Values have not been received yet."].waitForExistence(timeout: 5))
         ui.openDeepLink(offerURL)
         XCTAssertTrue(app.staticTexts["Values have not been received yet."].waitForExistence(timeout: 5))
-        ui.tapNavigationBack()
+        let navigationBar = app.navigationBars["Credential information"]
+        let back = navigationBar.buttons.firstMatch
+        XCTAssertTrue(back.isHittable)
+        XCTAssertGreaterThan(back.frame.midX, app.frame.midX, "Native Back must follow the RTL leading edge")
+        let details = XCTAttachment(screenshot: app.screenshot())
+        details.name = "rtl-credential-information"
+        details.lifetime = .keepAlways
+        add(details)
+        // The compact sheet is inset from the screen; begin at its own leading edge.
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let swipeY = navigationBar.frame.maxY + 40
+        origin.withOffset(CGVector(dx: navigationBar.frame.maxX - 3, dy: swipeY))
+            .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: navigationBar.frame.minX + 40, dy: swipeY)))
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
         ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
