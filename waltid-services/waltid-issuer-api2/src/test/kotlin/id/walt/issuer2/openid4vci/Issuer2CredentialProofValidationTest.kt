@@ -352,7 +352,7 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
-    fun `configured JWT key attestation requirements are advertised and enforced`() = testApplication {
+    fun `shipped catalog does not require JWT key attestation`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val holder = JWKKey.generate(KeyType.secp256r1)
         val trusted = attester.getPublicKey().exportJWKObject()
