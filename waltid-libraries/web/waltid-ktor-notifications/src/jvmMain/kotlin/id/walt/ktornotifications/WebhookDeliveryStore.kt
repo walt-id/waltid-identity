@@ -16,13 +16,20 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 import kotlin.streams.toList
 
-internal interface WebhookDeliveryStore {
+private val storeLog = io.github.oshai.kotlinlogging.KotlinLogging.logger { }
+
+/** Durable outbox storage. Implementations must claim due deliveries atomically across all workers. */
+interface WebhookDeliveryStore {
     suspend fun enqueue(delivery: WebhookDelivery)
     suspend fun pending(deliveryId: String): WebhookDelivery?
-    suspend fun due(nowEpochMilliseconds: Long, limit: Int = 100): List<WebhookDelivery>
-    suspend fun update(delivery: WebhookDelivery)
-    suspend fun markDelivered(deliveryId: String)
-    suspend fun moveToDeadLetter(delivery: WebhookDelivery)
+    suspend fun claimDue(
+        nowEpochMilliseconds: Long,
+        leaseUntilEpochMilliseconds: Long,
+        limit: Int = 100,
+    ): List<WebhookDeliveryClaim>
+    suspend fun reschedule(claim: WebhookDeliveryClaim, delivery: WebhookDelivery): Boolean
+    suspend fun markDelivered(claim: WebhookDeliveryClaim): Boolean
+    suspend fun moveToDeadLetter(claim: WebhookDeliveryClaim, delivery: WebhookDelivery): Boolean
     suspend fun deadLetters(): List<WebhookDeadLetter>
     suspend fun redrive(deliveryId: String, nowEpochMilliseconds: Long): Boolean
 }
@@ -44,13 +51,16 @@ internal class FileWebhookDeliveryStore(
     private val mutex = Mutex()
     private val pendingDirectory = root.resolve("pending")
     private val deadLetterDirectory = root.resolve("dead-letter")
+    private val corruptDirectory = root.resolve("corrupt")
 
     init {
         Files.createDirectories(pendingDirectory)
         Files.createDirectories(deadLetterDirectory)
+        Files.createDirectories(corruptDirectory)
         setOwnerOnlyDirectoryPermissions(root)
         setOwnerOnlyDirectoryPermissions(pendingDirectory)
         setOwnerOnlyDirectoryPermissions(deadLetterDirectory)
+        setOwnerOnlyDirectoryPermissions(corruptDirectory)
     }
 
     override suspend fun enqueue(delivery: WebhookDelivery) = mutex.withLock {
@@ -62,51 +72,81 @@ internal class FileWebhookDeliveryStore(
     }
 
     override suspend fun pending(deliveryId: String): WebhookDelivery? = mutex.withLock {
-        read(pendingPath(deliveryId))
+        readOrQuarantine(pendingPath(deliveryId))
     }
 
-    override suspend fun due(nowEpochMilliseconds: Long, limit: Int): List<WebhookDelivery> = mutex.withLock {
-        listDeliveryFiles(pendingDirectory)
-            .mapNotNull(::read)
-            .filter { it.nextAttemptAtEpochMilliseconds <= nowEpochMilliseconds }
+    override suspend fun claimDue(
+        nowEpochMilliseconds: Long,
+        leaseUntilEpochMilliseconds: Long,
+        limit: Int,
+    ): List<WebhookDeliveryClaim> = mutex.withLock {
+        val due = listDeliveryFiles(pendingDirectory)
+            .mapNotNull(::readOrQuarantine)
+            .filter {
+                it.nextAttemptAtEpochMilliseconds <= nowEpochMilliseconds &&
+                    (it.leaseUntilEpochMilliseconds == null || it.leaseUntilEpochMilliseconds <= nowEpochMilliseconds)
+            }
             .sortedWith(compareBy(WebhookDelivery::nextAttemptAtEpochMilliseconds, WebhookDelivery::enqueueOrder))
             .take(limit)
-    }
-
-    override suspend fun update(delivery: WebhookDelivery) = mutex.withLock {
-        val path = pendingPath(delivery.deliveryId)
-        require(Files.exists(path)) { "Unknown pending webhook delivery ${delivery.deliveryId}" }
-        writeAtomically(path, delivery)
-    }
-
-    override suspend fun markDelivered(deliveryId: String) {
-        mutex.withLock {
-            Files.deleteIfExists(pendingPath(deliveryId))
+        due.map { delivery ->
+            val leaseId = UUID.randomUUID().toString()
+            val claimed = delivery.copy(
+                leaseId = leaseId,
+                leaseUntilEpochMilliseconds = leaseUntilEpochMilliseconds,
+            )
+            writeAtomically(pendingPath(delivery.deliveryId), claimed)
+            WebhookDeliveryClaim(claimed, leaseId)
         }
     }
 
-    override suspend fun moveToDeadLetter(delivery: WebhookDelivery) {
-        mutex.withLock {
-            writeAtomically(deadLetterPath(delivery.deliveryId), delivery)
-            Files.deleteIfExists(pendingPath(delivery.deliveryId))
-        }
+    override suspend fun reschedule(claim: WebhookDeliveryClaim, delivery: WebhookDelivery): Boolean = mutex.withLock {
+        val current = readOrQuarantine(pendingPath(claim.delivery.deliveryId))
+        if (current?.leaseId != claim.leaseId) return@withLock false
+        writeAtomically(
+            pendingPath(delivery.deliveryId),
+            delivery.copy(leaseId = null, leaseUntilEpochMilliseconds = null),
+        )
+        true
+    }
+
+    override suspend fun markDelivered(claim: WebhookDeliveryClaim): Boolean = mutex.withLock {
+        val path = pendingPath(claim.delivery.deliveryId)
+        val current = readOrQuarantine(path)
+        if (current?.leaseId != claim.leaseId) return@withLock false
+        Files.deleteIfExists(path)
+    }
+
+    override suspend fun moveToDeadLetter(
+        claim: WebhookDeliveryClaim,
+        delivery: WebhookDelivery,
+    ): Boolean = mutex.withLock {
+        val pendingPath = pendingPath(claim.delivery.deliveryId)
+        val current = readOrQuarantine(pendingPath)
+        if (current?.leaseId != claim.leaseId) return@withLock false
+        writeAtomically(
+            deadLetterPath(delivery.deliveryId),
+            delivery.copy(leaseId = null, leaseUntilEpochMilliseconds = null),
+        )
+        Files.deleteIfExists(pendingPath)
     }
 
     override suspend fun deadLetters(): List<WebhookDeadLetter> = mutex.withLock {
         listDeliveryFiles(deadLetterDirectory)
-            .mapNotNull(::read)
+            .mapNotNull(::readOrQuarantine)
             .sortedBy(WebhookDelivery::failedAtEpochMilliseconds)
             .map(WebhookDelivery::deadLetter)
     }
 
     override suspend fun redrive(deliveryId: String, nowEpochMilliseconds: Long): Boolean = mutex.withLock {
         val deadLetterPath = deadLetterPath(deliveryId)
-        val delivery = read(deadLetterPath) ?: return@withLock false
+        val delivery = readOrQuarantine(deadLetterPath) ?: return@withLock false
         val redriven = delivery.copy(
             attemptCount = 0,
             nextAttemptAtEpochMilliseconds = nowEpochMilliseconds,
             failedAtEpochMilliseconds = null,
             lastError = null,
+            leaseId = null,
+            leaseUntilEpochMilliseconds = null,
         )
         writeAtomically(pendingPath(deliveryId), redriven)
         Files.delete(deadLetterPath)
@@ -123,6 +163,31 @@ internal class FileWebhookDeliveryStore(
 
     private fun read(path: Path): WebhookDelivery? =
         if (Files.exists(path)) json.decodeFromString(Files.readString(path)) else null
+
+    private fun readOrQuarantine(path: Path): WebhookDelivery? =
+        runCatching { read(path) }.getOrElse { cause ->
+            val quarantined = corruptDirectory.resolve("${path.name}.${UUID.randomUUID()}.corrupt")
+            val quarantineFailure = runCatching {
+                try {
+                    Files.move(path, quarantined, StandardCopyOption.ATOMIC_MOVE)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(path, quarantined)
+                }
+                setOwnerOnlyFilePermissions(quarantined)
+            }.exceptionOrNull()
+
+            if (quarantineFailure == null) {
+                storeLog.error(cause) {
+                    "Quarantined unreadable webhook delivery record (source=$path, quarantined=$quarantined)"
+                }
+            } else {
+                storeLog.error(cause) {
+                    "Could not read or quarantine webhook delivery record (path=$path, " +
+                        "quarantineError=${quarantineFailure.message})"
+                }
+            }
+            null
+        }
 
     private fun writeAtomically(path: Path, delivery: WebhookDelivery) {
         Files.createDirectories(path.parent)
