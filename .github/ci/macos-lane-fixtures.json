@@ -118,11 +118,11 @@
       "lanes": ["native", "compose", "enterprise"]
     },
     {
-      "name": "shared Kotlin mobile test utilities select simulator compilation",
+      "name": "shared Kotlin mobile test utilities select simulator and visual coverage",
       "files": [
         "waltid-libraries/protocols/waltid-mobile-test-utils/src/commonMain/kotlin/id/walt/mobile/test/backend/DemoTestBackend.kt"
       ],
-      "lanes": ["ios-simulator"]
+      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native"]
     },
     {
       "name": "build-logic change selects every macOS lane",
