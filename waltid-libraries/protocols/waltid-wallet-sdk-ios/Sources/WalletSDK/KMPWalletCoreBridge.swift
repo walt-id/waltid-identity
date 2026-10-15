@@ -19,6 +19,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     private let nfcHost = IOSNfcHostPlatformAdapter()
 
     init(configuration: WalletConfiguration) async throws {
+        WalletCoreRuntime.initializeIfNeeded()
         let result = try await WalletSdkBridgeFactory(
             nfcHostPlatformAdapter: nfcHost
         ).create(
@@ -542,6 +543,7 @@ public final class ProximityConfiguredReaderTrustEvaluator:
     private let evaluator: WalletCore.ProximityConfiguredReaderTrustEvaluator
 
     public init(configuration: ProximityReaderTrustConfiguration) {
+        WalletCoreRuntime.initializeIfNeeded()
         evaluator = WalletCore.ProximityConfiguredReaderTrustEvaluator(
             configuration: configuration.toKMPConfiguration()
         )
@@ -581,6 +583,7 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
               issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
             throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
         }
+        WalletCoreRuntime.initializeIfNeeded()
         let kmpScope: WalletCore.ProximityCrlScope
         switch scope {
         case .readerCertificate: kmpScope = .readerCertificate

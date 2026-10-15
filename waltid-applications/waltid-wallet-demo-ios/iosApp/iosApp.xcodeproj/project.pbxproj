@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A13330000000000000000020 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
 		A53800000000000000000004 /* WalletDemoKeyAttestation in Frameworks */ = {isa = PBXBuildFile; productRef = A53800000000000000000002 /* WalletDemoKeyAttestation */; };
 		A53800000000000000000005 /* WalletDemoKeyAttestation in Frameworks */ = {isa = PBXBuildFile; productRef = A53800000000000000000003 /* WalletDemoKeyAttestation */; };
 		A13330000000000000000001 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = A13330000000000000000002 /* SnapshotTesting */; };
@@ -260,6 +261,7 @@
 			files = (
 				A13330000000000000000001 /* SnapshotTesting in Frameworks */,
 				2185E0068DD9855D00602730 /* WalletSDK in Frameworks */,
+				A13330000000000000000020 /* WalletSDKKeychainRecovery in Frameworks */,
 				A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000045 /* WalletDemoSharingUI in Frameworks */,
 				A53800000000000000000005 /* WalletDemoKeyAttestation in Frameworks */,
@@ -537,6 +539,7 @@
 			);
 			name = iosAppTests;
 			packageProductDependencies = (
+				A74900000000000000000002 /* WalletSDKKeychainRecovery */,
 				A13330000000000000000002 /* SnapshotTesting */,
 				519D794773D1421EEC9493DE /* WalletSDK */,
 				A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */,

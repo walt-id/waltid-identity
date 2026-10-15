@@ -10,10 +10,11 @@ precondition(!(physicalFixtures && bridgeFixtures), "Select only one isolated te
 let package = Package(
     name: "WalletSDK",
     platforms: [.iOS("15.4")],
+    // Optional products share the SDK runtime instead of embedding another copy in their consumers.
     products: [
         .library(name: "WalletSDK", targets: ["WalletSDK"]),
-        .library(name: "WalletSDKKeychainRecovery", targets: ["WalletSDKKeychainRecovery"]),
-        .library(name: "WalletSDKEnterpriseCustody", targets: ["WalletSDKEnterpriseCustody"]),
+        .library(name: "WalletSDKKeychainRecovery", type: .dynamic, targets: ["WalletSDKKeychainRecovery"]),
+        .library(name: "WalletSDKEnterpriseCustody", type: .dynamic, targets: ["WalletSDKEnterpriseCustody"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),

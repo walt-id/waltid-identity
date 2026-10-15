@@ -301,6 +301,7 @@ public final class IOSNfcHostPlatformAdapter:
     }
 
     public func __capability() async throws -> any Waltid_mdoc_proximity_mobileNfcHostAvailability {
+        WalletCoreRuntime.initializeIfNeeded()
         switch await bridge.capability() {
         case .available:
             return Waltid_mdoc_proximity_mobileNfcHostAvailabilityAvailable()
