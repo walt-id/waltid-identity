@@ -18,7 +18,7 @@ requests it. Predicate tests and path eligibility still run so
 `docs/mobile-sdk-api` can start `sdk-docs`.
 
 Release candidate Maven publish is a separate job that waits for the
-Gradle job and, when requested, the live conformance job.
+Gradle job and, when requested, the live verifier, wallet and issuer conformance jobs.
 
 The following labels add coverage beyond automatic path selection. `ci:macos`
 and `ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,

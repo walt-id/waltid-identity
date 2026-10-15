@@ -228,12 +228,11 @@ enum DemoClientIdTrust {
         AiAwrUu7Q8mZxYlhUZ72F4vfj6wRMI5qxY7TFJiWS50z0w==
         -----END CERTIFICATE-----
         """
-     /**
-     * WeBuild Raidiam
-     */
+
+    /// WeBuild Raidiam "EUDI Sandbox Registration Certificate Signer" root (self-signed).
+    /// Source: ETSI TL https://tl-api.dev.idunion.info/api/v1/DblnEVuf/etsi/tl.xml. Valid until 2027-10-18.
     static let webuildRaidiamRootPem = """
         -----BEGIN CERTIFICATE-----
-        KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         MIIDQzCCAiugAwIBAgIFXpo73NswDQYJKoZIhvcNAQELBQAwYzELMAkGA1UEBhMC
         R0IxHTAbBgNVBAoMFFJhaWRpYW0gU2VydmljZXMgTHRkMTUwMwYDVQQDDCxFVURJ
         IFNhbmRib3ggUmVnaXN0cmF0aW9uIENlcnRpZmljYXRlIFNpZ25lcjAeFw0yNjA5
@@ -248,12 +247,12 @@ enum DemoClientIdTrust {
         VFyFGcji7sixC7av5AYZKb+FdmqoBEeDmVLgjqjJAgMBAAEwDQYJKoZIhvcNAQEL
         BQADggEBAGYHa14y8YJYZIHQAmcYuAoUr9GXqmIFHyNXkBCcZovq4y3iGWn8t3Ru
         2waETu/71E5RuSoH+ZiFRG9sGn3nIJXTeTojWB9iYNYz67G8sRmBzO2Af18uVLry
-        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXkY
-        0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbyst
-        FKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CGg
-        u43JYSWIGqKFtXzQ2NGETUJWclnOKM=
+        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXUk
+        Y0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbys
+        tFKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CG
+        gu43JYSWIGqKFtXzQ2NGETUJWclnOKM=
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
     /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
     static let x509TrustAnchorPems: [String] = [

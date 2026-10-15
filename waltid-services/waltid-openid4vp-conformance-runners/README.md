@@ -74,21 +74,23 @@ role-specific guide for a runnable environment and its intended command.
 ## CI summaries
 
 The reusable OSS Gradle workflow
-(`.github/workflows/gradle.yml`) always publishes these role sections to the
-GitHub Actions job summary, using the same heading and table shape as the
-OpenID4VP verifier report:
+(`.github/workflows/gradle.yml`) publishes these role sections to GitHub Actions
+job summaries, using the existing headings and table shapes. The verifier,
+OpenID4VP wallet and OpenID4VCI wallet each publish their own section from a
+parallel job. The issuer section is published by `issuer-conformance-results`
+after merging the two parallel proof jobs:
 
 1. OpenID4VP Verifier
 2. OpenID4VP Wallet
 3. OpenID4VCI Wallet
 4. OpenID4VCI Issuer
 
-GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud` and
-exposes the in-process adapters through Cloudflare tunnels (OpenID4VP adapter
-on port 7006, OpenID4VCI adapter on port 7007), alongside the existing verifier
-tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
-matrix still only runs when its dedicated workflow inputs and issuer URL are
-configured.
+GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud`. Each
+role job exposes only its own listener through a Cloudflare tunnel: the verifier
+on port 7003, the OpenID4VP adapter on port 7006, and the OpenID4VCI adapter on
+port 7007. Those suites therefore run live, and one role cannot cancel the
+others. The OpenID4VCI issuer matrix still only runs when its dedicated workflow
+inputs and issuer URL are configured.
 
 When a role produced `summary.md`, that file is appended. Test names are
 compacted to the module suffix and variant values so the table stays readable.
@@ -96,7 +98,13 @@ When a role did not write a report, the workflow still writes the same heading,
 totals, and table, with a note that no results were produced.
 
 Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
-failures fail the conformance job. Issuer batch coverage remains required.
+failures fail their respective jobs. Issuer batch and key-attestation coverage
+remain required independently for both proof modes. The aggregate issuer artifact
+retains the name `issuer-conformance-basic-haip-batch` and its existing JSON format.
+Wallet and verifier aggregation retains `openid-conformance-summaries` and
+`junit-conformance`. When every role job succeeded, a missing report or
+requested JUnit artifact fails aggregation after the files that did arrive
+are uploaded. A failed role job still blocks publication on its own.
 
 Artifacts (when a role actually runs):
 

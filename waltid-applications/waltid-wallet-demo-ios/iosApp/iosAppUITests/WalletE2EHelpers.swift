@@ -267,11 +267,29 @@ final class WalletE2EUI {
         if let currentValue = element.value as? String {
             let placeholder = element.placeholderValue ?? ""
             if !currentValue.isEmpty && currentValue != placeholder {
-                element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+                element.typeKey("a", modifierFlags: .command)
+                element.typeText(XCUIKeyboardKey.delete.rawValue)
             }
         }
 
         element.typeText(value)
+        if element.elementType != .secureTextField {
+            for attempt in 0..<2 {
+                let entered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    let actual = element.value as? String ?? ""
+                    return actual == value || (value.isEmpty && actual == element.placeholderValue)
+                }, object: element)
+                if XCTWaiter.wait(for: [entered], timeout: 2) == .completed {
+                    break
+                }
+                guard attempt == 0 else {
+                    XCTFail("Input did not retain the requested text: \(element.identifier)")
+                    return
+                }
+                element.typeKey("a", modifierFlags: .command)
+                element.typeText(value)
+            }
+        }
         submitFocusedInput(element)
     }
 
