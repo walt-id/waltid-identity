@@ -19,11 +19,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Path
@@ -102,12 +107,18 @@ internal class WebhookDeliveryQueue(
         if (upperExclusive <= 1) 0 else Random.nextLong(upperExclusive)
     },
     private val pollIntervalMilliseconds: Long = 1_000,
+    private val maxConcurrentDeliveries: Int = DEFAULT_MAX_CONCURRENT_DELIVERIES,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val wakeUp = Channel<Unit>(Channel.CONFLATED)
     private val processingMutex = Mutex()
+    private val deliveryPermits = Semaphore(maxConcurrentDeliveries)
     private val enqueueSequence = AtomicLong(clock() * 1_000)
     private var worker: Job? = null
+
+    init {
+        require(maxConcurrentDeliveries > 0) { "maxConcurrentDeliveries must be greater than zero" }
+    }
 
     @Synchronized
     fun start() {
@@ -164,8 +175,21 @@ internal class WebhookDeliveryQueue(
     }
 
     suspend fun processDue(limit: Int = 100) = processingMutex.withLock {
-        store.due(clock(), limit).forEach { delivery ->
-            process(delivery)
+        val now = clock()
+        coroutineScope {
+            // Claim only work that this process can start immediately. Reserving a large backlog behind the
+            // local semaphore could let leases expire before their HTTP requests begin.
+            store.claimDue(
+                nowEpochMilliseconds = now,
+                leaseUntilEpochMilliseconds = now + DELIVERY_LEASE_MILLISECONDS,
+                limit = minOf(limit, maxConcurrentDeliveries),
+            ).map { claim ->
+                async {
+                    deliveryPermits.withPermit {
+                        process(claim)
+                    }
+                }
+            }.awaitAll()
         }
     }
 
@@ -177,60 +201,67 @@ internal class WebhookDeliveryQueue(
         return redriven
     }
 
-    private suspend fun process(delivery: WebhookDelivery) {
+    private suspend fun process(claim: WebhookDeliveryClaim) {
+        val delivery = claim.delivery
         val now = clock()
         val attempt = delivery.attemptCount + 1
-        // The lease makes a request safe across process crashes. If the receiver accepted the request before
-        // the crash, the same delivery ID is sent again after the lease and the receiver can deduplicate it.
-        val leased = delivery.copy(
-            attemptCount = attempt,
-            nextAttemptAtEpochMilliseconds = now + DELIVERY_LEASE_MILLISECONDS,
-        )
-        store.update(leased)
-
         val result = try {
-            transport.deliver(leased, attempt, now / 1_000)
+            transport.deliver(delivery, attempt, now / 1_000)
         } catch (ex: CancellationException) {
             throw ex
         } catch (ex: Exception) {
             WebhookAttemptResult(error = ex)
         }
+        val attempted = delivery.copy(attemptCount = attempt)
 
         if (result.successful) {
-            store.markDelivered(leased.deliveryId)
+            if (!store.markDelivered(claim)) {
+                log.warn { "Webhook success was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+                return
+            }
             log.info {
-                "Webhook delivered (deliveryId=${leased.deliveryId}, target=${leased.target}, " +
-                    "event=${leased.event}, attempt=$attempt, status=${result.statusCode})"
+                "Webhook delivered (deliveryId=${attempted.deliveryId}, target=${attempted.target}, " +
+                    "event=${attempted.event}, attempt=$attempt, status=${result.statusCode})"
             }
             return
         }
 
         val error = result.failureMessage()
-        val exhausted = attempt >= leased.retryPolicy.maxAttempts
+        val exhausted = attempt >= attempted.retryPolicy.maxAttempts
         if (!result.retryable || exhausted) {
-            store.moveToDeadLetter(
-                leased.copy(
+            val moved = store.moveToDeadLetter(
+                claim,
+                attempted.copy(
                     failedAtEpochMilliseconds = clock(),
                     lastError = error,
                 )
             )
+            if (!moved) {
+                log.warn { "Webhook failure was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+                return
+            }
             log.error {
-                "Webhook moved to dead-letter (deliveryId=${leased.deliveryId}, target=${leased.target}, " +
-                    "event=${leased.event}, attempt=$attempt): $error"
+                "Webhook moved to dead-letter (deliveryId=${attempted.deliveryId}, target=${attempted.target}, " +
+                    "event=${attempted.event}, attempt=$attempt): $error"
             }
             return
         }
 
-        val retryDelay = maxOf(backoffMilliseconds(leased), result.retryAfterMilliseconds ?: 0)
-        store.update(
-            leased.copy(
+        val retryDelay = maxOf(backoffMilliseconds(attempted), result.retryAfterMilliseconds ?: 0)
+        val rescheduled = store.reschedule(
+            claim,
+            attempted.copy(
                 nextAttemptAtEpochMilliseconds = clock() + retryDelay,
                 lastError = error,
             )
         )
+        if (!rescheduled) {
+            log.warn { "Webhook retry was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+            return
+        }
         log.warn {
-            "Webhook delivery failed and will be retried (deliveryId=${leased.deliveryId}, " +
-                "target=${leased.target}, event=${leased.event}, attempt=$attempt, " +
+            "Webhook delivery failed and will be retried (deliveryId=${attempted.deliveryId}, " +
+                "target=${attempted.target}, event=${attempted.event}, attempt=$attempt, " +
                 "retryInMs=$retryDelay): $error"
         }
     }
@@ -240,7 +271,7 @@ internal class WebhookDeliveryQueue(
         val base = policy.initialBackoffSeconds * 1_000.0 *
             policy.backoffMultiplier.pow((delivery.attemptCount - 1).coerceAtLeast(0))
         val capped = base.toLong().coerceAtMost(policy.maxBackoffSeconds * 1_000)
-        val jitterUpperBound = (capped / 2).coerceAtMost(1_000) + 1
+        val jitterUpperBound = capped / 2 + 1
         return capped + jitter(jitterUpperBound)
     }
 
@@ -251,6 +282,7 @@ internal class WebhookDeliveryQueue(
 
     private companion object {
         const val DELIVERY_LEASE_MILLISECONDS = 5 * 60 * 1_000L
+        const val DEFAULT_MAX_CONCURRENT_DELIVERIES = 4
     }
 }
 
@@ -269,6 +301,11 @@ object WebhookNotifier {
     fun start(serviceName: String) {
         require(serviceName.matches(Regex("[a-zA-Z0-9_-]+"))) { "Invalid webhook delivery service name" }
         start(configuredStorageRoot().resolve(serviceName))
+    }
+
+    /** Starts the worker with a service-provided distributed outbox implementation. */
+    fun start(store: WebhookDeliveryStore) {
+        queue(store).start()
     }
 
     /**
@@ -294,9 +331,12 @@ object WebhookNotifier {
     }
 
     private fun queue(storageDirectory: Path = defaultStorageDirectory()): WebhookDeliveryQueue =
+        queue(FileWebhookDeliveryStore(storageDirectory))
+
+    private fun queue(store: WebhookDeliveryStore): WebhookDeliveryQueue =
         queue ?: synchronized(lock) {
             queue ?: WebhookDeliveryQueue(
-                store = FileWebhookDeliveryStore(storageDirectory),
+                store = store,
                 transport = KtorWebhookTransport(),
             ).also { queue = it }
         }
@@ -304,11 +344,19 @@ object WebhookNotifier {
     private fun defaultStorageDirectory(): Path =
         configuredStorageRoot().resolve("embedded-${ProcessHandle.current().pid()}")
 
-    private fun configuredStorageRoot(): Path = Path.of(
-        System.getProperty(STORAGE_DIRECTORY_PROPERTY)
+    private fun configuredStorageRoot(): Path {
+        val configured = System.getProperty(STORAGE_DIRECTORY_PROPERTY)
             ?: System.getenv(STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE)
-            ?: Path.of(System.getProperty("java.io.tmpdir"), "waltid-webhook-deliveries").toString()
-    )
+        if (configured != null) return Path.of(configured)
+
+        val temporary = Path.of(System.getProperty("java.io.tmpdir"), "waltid-webhook-deliveries")
+        log.warn {
+            "Webhook delivery outbox is using temporary storage at $temporary. Pending and dead-letter " +
+                "deliveries may be lost on restart. Configure $STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE or " +
+                "$STORAGE_DIRECTORY_PROPERTY on a durable, access-restricted volume for production."
+        }
+        return temporary
+    }
 }
 
 const val WEBHOOK_ID_HEADER = "Webhook-Id"

@@ -18,7 +18,7 @@ data class WebhookDeadLetter(
 )
 
 @Serializable
-internal data class WebhookDelivery(
+data class WebhookDelivery(
     val deliveryId: String,
     val url: String,
     val payload: String,
@@ -36,6 +36,8 @@ internal data class WebhookDelivery(
     val nextAttemptAtEpochMilliseconds: Long,
     val failedAtEpochMilliseconds: Long? = null,
     val lastError: String? = null,
+    val leaseId: String? = null,
+    val leaseUntilEpochMilliseconds: Long? = null,
 ) {
     fun deadLetter(): WebhookDeadLetter = WebhookDeadLetter(
         deliveryId = deliveryId,
@@ -49,6 +51,12 @@ internal data class WebhookDelivery(
         lastError = requireNotNull(lastError),
     )
 }
+
+/** A delivery atomically reserved by one outbox worker until its lease expires. */
+data class WebhookDeliveryClaim(
+    val delivery: WebhookDelivery,
+    val leaseId: String,
+)
 
 internal data class WebhookAttemptResult(
     val statusCode: Int? = null,
