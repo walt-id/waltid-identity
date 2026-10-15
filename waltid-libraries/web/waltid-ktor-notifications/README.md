@@ -107,8 +107,9 @@ Notes:
 Webhook events use at-least-once delivery. Calling `notifySessionUpdate` first writes the exact serialized JSON
 payload to a local durable outbox and then returns; a background worker performs the HTTP request. Pending records
 are resumed when the service starts again. Exhausted and permanently rejected deliveries are retained under the
-outbox's `dead-letter` directory and can be inspected or redriven through `WebhookNotifier.deadLetters()` and
-`WebhookNotifier.redrive(deliveryId)`.
+outbox's `dead-letter` directory. The library exposes `WebhookNotifier.deadLetters()` and
+`WebhookNotifier.redrive(deliveryId)` as programmatic hooks for integration into authenticated operator tooling;
+it does not expose an HTTP management endpoint.
 
 The default retry policy is five attempts with exponential backoff from 1 to 60 seconds and jitter. Network
 failures, HTTP 408, 429, and 5xx responses are retried. The worker honors `Retry-After`. Other non-2xx responses
@@ -126,14 +127,22 @@ are dead-lettered immediately. The policy can be overridden per webhook:
 }
 ```
 
-The outbox root defaults to the operating system's temporary directory. Production deployments must set the JVM
-property `waltid.webhook.delivery.directory` or environment variable `WALTID_WEBHOOK_DELIVERY_DIRECTORY` to put
-it on a durable volume. Issuer2 and Verifier2 use separate subdirectories. The file store is intended for a single
-service process per directory; replicas must not share an outbox directory.
+The default file-backed outbox root defaults to the operating system's temporary directory and logs a warning when that fallback is
+used. Production deployments must set the JVM property `waltid.webhook.delivery.directory` or environment variable
+`WALTID_WEBHOOK_DELIVERY_DIRECTORY` to put it on a durable volume. Issuer2 and Verifier2 use separate
+subdirectories. The file store is intended for a single service process per directory; replicas must not share an
+outbox directory. Unreadable records are moved to the outbox's `corrupt` directory so they cannot block healthy
+deliveries. Delivery requests run with bounded concurrency, preventing one slow receiver from serially blocking
+the entire outbox.
+
+Services that run multiple replicas can provide a distributed implementation of `WebhookDeliveryStore` through
+`WebhookNotifier.start(store)`. Claims, completion, rescheduling, and dead-letter transitions are lease-fenced so a
+stale worker cannot overwrite a delivery reclaimed by another replica.
 
 Outbox records contain the callback URL, payload, and configured Basic/Bearer credentials so they can be delivered
-after a restart. Directory and files are owner-only on POSIX file systems. Protect the configured volume and do not
-expose or back it up as public application data.
+after a restart. Directory and files are owner-only on POSIX file systems. Restrict access to the configured volume,
+encrypt it at rest, and do not expose or back it up as public application data. Define retention and cleanup policies
+for both `dead-letter` and `corrupt` records because neither is deleted automatically.
 
 ### Receiver contract
 
