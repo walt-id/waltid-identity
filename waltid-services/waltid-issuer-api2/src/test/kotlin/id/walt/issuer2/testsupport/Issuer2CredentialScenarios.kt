@@ -110,7 +110,5 @@ object Issuer2CredentialScenarios {
         sdJwtVc("ehicSdJwt", "urn:eudi:ehic:1"),
         sdJwtVc("eudiPidSdJwt", "urn:eudi:pid:1"),
         identitySdJwt,
-        sdJwtVc("identityCredentialSdJwtEudi", "identity_credential_eudi"),
-        mdoc("isoPhotoIdEudi", "org.iso.23220.photoid.1_eudi"),
     )
 }
