@@ -13,4 +13,7 @@ class WalletMotionAndroidTest {
         scenarios.closingAndReopeningDetailsDuringMotionDoesNotReplayAStaleTransition()
     @Test fun reducedMotionSettlesTheCardStackWithoutWaitingForItsAnimationDuration() =
         scenarios.reducedMotionSettlesTheCardStackWithoutWaitingForItsAnimationDuration()
+    @Test fun disclosureAndSheetResizeTogetherIncludingReversal() =
+        scenarios.disclosureAndSheetResizeTogetherIncludingReversal()
+    @Test fun reducedMotionSettlesDisclosuresImmediately() = scenarios.reducedMotionSettlesDisclosuresImmediately()
 }

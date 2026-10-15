@@ -1238,19 +1238,28 @@ class WalletDemoControllerTest {
 
     @Test
     fun successStatusCanBeDismissedAndAutoHides() = runTest {
+        fun showSuccess(controller: WalletDemoController) {
+            controller.updateOfferUrl("openid-credential-offer://example")
+            controller.previewOffer()
+            runCurrent()
+            controller.declineOffer()
+            runCurrent()
+        }
         val controller = unlockedControllerWith(FakeDemoWallet(), this)
-        assertTrue(controller.state.value.isStatusVisible)
+        assertFalse(controller.state.value.isStatusVisible)
         assertEquals("Wallet ready", controller.state.value.statusText)
-
+        showSuccess(controller)
+        assertTrue(controller.state.value.isStatusVisible)
         controller.dismissStatus()
         assertFalse(controller.state.value.isStatusVisible)
 
         val autoHideController = unlockedControllerWith(FakeDemoWallet(), this)
+        showSuccess(autoHideController)
         assertTrue(autoHideController.state.value.isStatusVisible)
         advanceTimeBy(4_000)
         runCurrent()
         assertFalse(autoHideController.state.value.isStatusVisible)
-        assertEquals("Wallet ready", autoHideController.state.value.statusText)
+        assertEquals("Credential offer declined", autoHideController.state.value.statusText)
     }
 
     @Test
@@ -3607,7 +3616,7 @@ class WalletDemoControllerTest {
     fun statusKindUsesOperationAndSessionStateIndependentlyOfMessageText() = runTest {
         val controller = unlockedControllerWith(FakeDemoWallet(), this)
         val ready = controller.state.value
-        assertEquals(WalletStatusKind.Success, ready.statusBanner()?.kind)
+        WalletDemoTab.entries.forEach { assertNull(ready.statusBanner(it)) }
         assertEquals(WalletStatusKind.Info, ready.copy(operation = WalletOperationState.OfferPreview)
             .statusBanner(WalletDemoTab.Receive)?.kind)
         assertEquals(WalletStatusKind.Success, ready.copy(operation = WalletOperationState.Succeeded("Erfolgreich", WalletDemoTab.Receive))

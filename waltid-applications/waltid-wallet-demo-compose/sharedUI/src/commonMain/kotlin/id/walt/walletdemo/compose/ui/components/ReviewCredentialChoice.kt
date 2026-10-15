@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 
-/** The entire row selects. Navigation belongs to the selected information group's Details action. */
+/** Meaningful choices select the whole row; required single matches are read-only. */
 @Composable
 internal fun ReviewCredentialChoice(
     selected: Boolean,

@@ -38,7 +38,7 @@ struct PresentView: View {
                 } else if proximityPresentation.active {
                     proximityContent
                 } else if viewModel.pendingPresentationContinuationURL != nil || viewModel.pendingPresentationFormPostHTML != nil {
-                    WalletReviewScaffold(showsActions: false) { ProgressView("Finishing the response…") } actions: {}
+                    WalletReviewScaffold(showsActions: false) { WalletProgressRow("Finishing the response…") } actions: {}
                 } else {
                     WalletRequestStatus(viewModel: viewModel, tab: .present,
                         onRetry: viewModel.previewPresentation, onClose: closeReview)

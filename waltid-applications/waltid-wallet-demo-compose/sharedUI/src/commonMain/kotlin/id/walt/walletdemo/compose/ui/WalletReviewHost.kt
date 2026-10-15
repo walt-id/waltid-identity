@@ -23,12 +23,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.components.LocalWalletNavigationBackground
 import id.walt.walletdemo.compose.ui.components.WalletMotion
+import id.walt.walletdemo.compose.ui.components.LocalWalletExpansionAnimations
+import id.walt.walletdemo.compose.ui.components.WalletExpansionAnimations
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import id.walt.walletdemo.compose.ui.resources.Res
@@ -59,6 +62,7 @@ internal fun WalletReviewHost(
     }
 
     WalletDemoTheme {
+        val expansions = remember { WalletExpansionAnimations() }
         val sheetState = rememberBottomSheetState(
             initialValue = SheetValue.Hidden,
             enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
@@ -102,9 +106,13 @@ internal fun WalletReviewHost(
                 // The sheet owns a separate window; export semantics in that window too.
                 // One resize owner for navigation, loading, and results. Nested navigators
                 // report their destination size immediately while their pages slide and fade.
-                Box(Modifier.animateContentSize(WalletMotion.sheetResize(LocalWalletVisualPreferences.current.reduceMotion))
-                    .exportTestTagsForPlatformAutomation()) {
+                // Even a snap animateContentSize defers its measurement by a frame. Remove
+                // that modifier while a disclosure supplies the animated size itself.
+                val resize = if (expansions.running) Modifier else Modifier.animateContentSize(
+                    WalletMotion.sheetResize(LocalWalletVisualPreferences.current.reduceMotion))
+                Box(resize.exportTestTagsForPlatformAutomation()) {
                     CompositionLocalProvider(LocalWalletSheet provides true,
+                        LocalWalletExpansionAnimations provides expansions,
                         LocalWalletNavigationBackground provides MaterialTheme.colorScheme.surfaceContainer) {
                         content()
                     }

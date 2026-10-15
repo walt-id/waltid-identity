@@ -21,8 +21,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -65,29 +68,36 @@ internal fun ExpandableMetadataCard(
     summary: @Composable () -> Unit,
     details: @Composable () -> Unit,
 ) {
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f,
+        WalletMotion.disclosure(LocalWalletVisualPreferences.current.reduceMotion), label = "metadata-chevron")
     ReviewMetadataSection(title = title, modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
-                .clickable(role = Role.Button, onClick = onToggle)
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .heightIn(min = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                summary()
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
+                    .clickable(role = Role.Button, onClick = onToggle)
+                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+                    .heightIn(min = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    summary()
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    modifier = Modifier.rotate(rotation),
+                    contentDescription = if (expanded) "Hide $title details" else "Show $title details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "Hide $title details" else "Show $title details",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (expanded) {
-            MetadataRowDivider()
-            details()
+            WalletExpandableContent(expanded) {
+                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MetadataRowDivider()
+                    details()
+                }
+            }
         }
     }
 }
@@ -110,7 +120,8 @@ internal fun MetadataIdentityRow(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                .then(if (logoUri == null) Modifier.background(
+                    MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             if (logoUri != null) {

@@ -36,7 +36,7 @@ Decisions use text-first controls: a filled primary action, quiet secondary choi
 
 ## Credential issuance
 
-Compact review rows keep inclusion, copy counts and credential information separate. Information shows the issuer's advertised definitions before issuance; actual values appear after receipt. Review and stored details follow the same [credential-information contract](../waltid-wallet-demo-test-fixtures/credential-information.md).
+Receiving uses full artwork for a single credential and compact rows for multiple types. Selection and copy controls appear only when they offer a choice; existing credential-information actions remain independent of selection. Information shows advertised definitions before issuance and actual values after receipt. See the shared [credential-information contract](../waltid-wallet-demo-test-fixtures/credential-information.md).
 
 Offer review lets users select credential configurations and explicitly request copies up to the issuer's advertised limit. Every configuration defaults to one copy. Additional holder keys are created only after acceptance, and the same choices are passed to pre-authorized and browser authorization flows. The Wallet SDK retains each credential's holder-key association for presentation.
 

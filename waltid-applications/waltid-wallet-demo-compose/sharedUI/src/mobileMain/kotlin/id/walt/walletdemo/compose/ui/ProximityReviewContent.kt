@@ -72,13 +72,14 @@ internal fun ProximityReviewContent(
                 )
             }
         }
-        WalletSection(title = "Select credentials to share") {
+        WalletSection(title = if (review.documents.any { it.credentialOptions.size > 1 })
+            "Select credentials to share" else "Requested credentials") {
             review.documents.forEach { document ->
                 document.credentialOptions.forEachIndexed { index, credential ->
                     if (index > 0) MetadataRowDivider()
                     CredentialOption(document.requestIndex, credential, credentialDetailsById[credential.credentialId],
                         selections.singleOrNull { it.requestIndex == document.requestIndex }?.credentialId == credential.credentialId,
-                        onSelectCredential, enabled)
+                        onSelectCredential, enabled, document.credentialOptions.size > 1)
                 }
             }
         }
@@ -120,8 +121,9 @@ private fun CredentialOption(
     selected: Boolean,
     onSelect: (Int, String) -> Unit,
     enabled: Boolean,
+    allowsSelection: Boolean,
 ) {
-    ReviewCredentialChoice(selected, multiple = false, enabled = enabled,
+    ReviewCredentialChoice(selected, multiple = false, enabled = enabled, readOnly = !allowsSelection,
         modifier = Modifier.testTag(WalletUiTestTags.proximityCredential(requestIndex, credential.credentialId)),
         onSelect = { if (!selected) onSelect(requestIndex, credential.credentialId) }) {
         if (details != null) {

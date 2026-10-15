@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
+import id.walt.walletdemo.compose.ui.components.ExpandableMetadataCard
 import id.walt.walletdemo.compose.ui.screens.CredentialDetailsChrome
 import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import kotlin.test.assertEquals
@@ -87,6 +89,69 @@ class WalletMotionTestScenarios(
         frames(effects, 2)
         assertEquals(rest, onNodeWithTag("motion-stack").getUnclippedBoundsInRoot())
         onNodeWithTag(WalletUiTestTags.credentialCard("motion-second")).assertExists()
+    }
+
+    fun disclosureAndSheetResizeTogetherIncludingReversal() = motionTest { effects ->
+        val expanded = mutableStateOf(false)
+        setContent {
+            theme {
+                WalletReviewHost(dismissEnabled = true, onDismiss = {}) {
+                        ExpandableMetadataCard("Issuer", expanded.value, { expanded.value = !expanded.value },
+                            modifier = Modifier.testTag("motion-metadata"), summary = { Text("Example issuer") }, details = { Box(Modifier.size(200.dp)) })
+                }
+            }
+        }
+        fun height() = onNodeWithTag("wallet.review.sheet").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        fun contentHeight() = onNodeWithTag("motion-metadata").getUnclippedBoundsInRoot().let { it.bottom - it.top }
+        val compact = height()
+        val chrome = compact - contentHeight()
+        fun assertSheetFollowsContent() {
+            assertTrue(kotlin.math.abs((height() - contentHeight() - chrome).value) <= 1f,
+                "The outer sheet must follow the animated content without a second resize: sheet=${height()}, content=${contentHeight()}, chrome=$chrome")
+        }
+        mainClock.autoAdvance = false
+        runOnIdle { expanded.value = true }
+        frames(effects, 5)
+        val growing = height()
+        assertTrue(growing > compact, "The sheet must follow the disclosure while it expands")
+        assertSheetFollowsContent()
+        frames(effects, 11)
+        val full = height()
+        assertTrue(full > growing, "Expansion must move through intermediate heights")
+        frames(effects, 20)
+        assertEquals(full, height(), "The outer sheet must not trail the content animation")
+        runOnIdle { expanded.value = false }
+        frames(effects, 5)
+        val shrinking = height()
+        assertTrue(shrinking > compact && shrinking < full, "Collapse must also animate its height")
+        runOnIdle { expanded.value = true }
+        repeat(40) { frames(effects, 1); assertSheetFollowsContent() }
+        assertEquals(full, height(), "Reversal must finish at the current target")
+    }
+
+    fun reducedMotionSettlesDisclosuresImmediately() = motionTest { effects ->
+        val expanded = mutableStateOf(false)
+        setContent {
+            theme {
+                CompositionLocalProvider(LocalWalletVisualPreferences provides WalletVisualPreferences(reduceMotion = true)) {
+                    ExpandableMetadataCard("Issuer", expanded.value, { expanded.value = !expanded.value },
+                        modifier = Modifier.testTag("motion-metadata"), summary = { Text("Example issuer") },
+                        details = { Box(Modifier.size(200.dp)) })
+                }
+            }
+        }
+        fun bounds() = onNodeWithTag("motion-metadata").getUnclippedBoundsInRoot()
+        val compact = bounds()
+        mainClock.autoAdvance = false
+        runOnIdle { expanded.value = true }
+        frames(effects, 3)
+        val full = bounds()
+        assertTrue(full.bottom > compact.bottom)
+        frames(effects, 15)
+        assertEquals(full, bounds())
+        runOnIdle { expanded.value = false }
+        frames(effects, 3)
+        assertEquals(compact, bounds(), "Reduced motion must settle without the disclosure duration")
     }
 
     // v2 keeps the test block and composition on separate schedulers. Drain only current

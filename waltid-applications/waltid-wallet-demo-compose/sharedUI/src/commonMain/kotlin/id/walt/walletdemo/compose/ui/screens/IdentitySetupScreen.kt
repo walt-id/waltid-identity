@@ -221,7 +221,9 @@ private fun RecoveryIdentifier(identifier: String) {
     TextButton(onClick = { expanded = !expanded }) {
         Text(stringResource(if (expanded) Res.string.setup_hide_did else Res.string.setup_show_did))
     }
-    if (expanded) SelectionContainer { Text(identifier, style = MaterialTheme.typography.bodySmall) }
+    WalletExpandableContent(expanded) {
+        SelectionContainer { Text(identifier, style = MaterialTheme.typography.bodySmall) }
+    }
 }
 
 @Composable

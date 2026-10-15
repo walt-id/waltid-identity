@@ -32,8 +32,8 @@ class WalletDemoAppAndroidTest {
     @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
 
     @Test
-    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
-        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+    fun singleOfferCopyControlsRespectTheAdvertisedLimit() =
+        scenarios.singleOfferCopyControlsRespectTheAdvertisedLimit()
 
     @Test
     fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()

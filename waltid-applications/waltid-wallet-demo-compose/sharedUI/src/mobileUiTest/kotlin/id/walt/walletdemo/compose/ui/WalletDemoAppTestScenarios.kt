@@ -611,7 +611,7 @@ class WalletDemoAppTestScenarios(
         openWalletLink("openid-credential-offer://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithText("Example Issuer").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithTag("issuance-identity-ExampleCredential").assertExists()
+        onNodeWithTag("issuance-large-art-ExampleCredential").assertExists()
         onAllNodesWithText("vc+sd-jwt").assertCountEquals(0)
         assertIssuerDetailsCollapsedUntilRequested()
         mainClock.autoAdvance = false
@@ -746,7 +746,7 @@ class WalletDemoAppTestScenarios(
         assertEquals(null, wallet.receivedOfferUrl)
     }
 
-    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() = runComposeUiTest {
+    fun singleOfferCopyControlsRespectTheAdvertisedLimit() = runComposeUiTest {
         val gate = CompletableDeferred<Unit>()
         val wallet = WalletUiTestWallet(batchSize = 3, receiveGate = gate)
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -765,10 +765,8 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("The issuer has not supplied claim definitions.").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag("issuance-copies-ExampleCredential").performScrollToContent(this).assertTextEquals("Copies: 3")
-        onNodeWithTag("issuance-select-ExampleCredential").performScrollToContent(this).performClick()
-        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
-        onNodeWithTag("issuance-select-ExampleCredential").performClick()
-        onNodeWithTag("issuance-more-ExampleCredential").performScrollToContent(this).performClick()
+        onNodeWithTag("issuance-select-ExampleCredential").assertDoesNotExist()
+        onNodeWithTag("issuance-fewer-ExampleCredential").performScrollToContent(this).performClick()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
         waitUntil(timeoutMillis = 5_000) { wallet.receivedSelections != null }
         assertEquals(WalletDemoCredentialHolders.NewKeys(2), wallet.receivedSelections?.single()?.holders)
@@ -851,7 +849,7 @@ class WalletDemoAppTestScenarios(
         openWalletLink("openid-credential-offer://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
 
-        onNodeWithTag("issuance-identity-org.iso.23220.photoid.1").assertExists()
+        onNodeWithTag("issuance-large-art-org.iso.23220.photoid.1").assertExists()
         onAllNodesWithTag(WalletUiTestTags.OfferSupportedClaims).assertCountEquals(0)
         onAllNodesWithText("mso_mdoc").assertCountEquals(0)
         onAllNodesWithText("18 or older").assertCountEquals(0)
@@ -864,7 +862,7 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithText("Optional").assertCountEquals(1)
         onAllNodesWithText("May be included").assertCountEquals(0)
         onNodeWithTag("wallet-detail-back").performClick()
-        onNodeWithTag("issuance-select-org.iso.23220.photoid.1").assertIsOn()
+        onNodeWithTag("issuance-select-org.iso.23220.photoid.1").assertDoesNotExist()
     }
 
     fun walletHomeExposesUnifiedScanAndNearby() = runComposeUiTest {
@@ -1972,11 +1970,15 @@ class WalletDemoAppTestScenarios(
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) {
-            controller.state.value.session is WalletSessionState.Ready &&
-                controller.state.value.statusText == "Wallet ready" &&
-                controller.state.value.isStatusVisible
+            controller.state.value.session is WalletSessionState.Ready
         }
-        onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
+        onAllNodesWithTag("wallet.status").assertCountEquals(0)
+        onAllNodesWithTag("wallet.footer").assertCountEquals(0)
+        openWalletLink("openid-credential-offer://example")
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.OfferDeclineButton).performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.isStatusVisible }
+        onNodeWithTag("wallet.status").assertTextContains("Credential offer declined")
         onNodeWithTag("wallet.status.feedback").assertIsDisplayed()
         onAllNodesWithTag("wallet.status.contextual").assertCountEquals(0)
         val headerTop = onNodeWithTag("wallet.screen.header").getUnclippedBoundsInRoot().top

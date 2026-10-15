@@ -18,7 +18,7 @@ struct BiometricSetupView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             WalletFooter {
-                if viewModel.isAuthenticating { ProgressView("Authenticating…").frame(maxWidth: .infinity, alignment: .leading) }
+                if viewModel.isAuthenticating { WalletProgressRow("Authenticating…") }
                 WalletActions(primary: viewModel.isBiometricUnlockAvailable ? retry :
                     viewModel.access.biometricAvailability.offersSettings ? openSettings : continueWithPIN,
                     secondary: viewModel.isBiometricUnlockAvailable || viewModel.access.biometricAvailability.offersSettings ? continueWithPIN : nil)

@@ -48,13 +48,13 @@ struct CredentialsTabView: View {
 
                     if !viewModel.isReady {
                         if viewModel.isLoading {
-                            ProgressView("Loading credentials…")
+                            WalletProgressRow(String(localized: "Loading credentials…"))
                                 .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
                         }
                     } else if viewModel.credentials.isEmpty {
                         EmptyCredentialsView()
                     } else if cards.isEmpty {
-                        ProgressView("Loading credentials…")
+                        WalletProgressRow(String(localized: "Loading credentials…"))
                             .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
                     } else {
                         CredentialCardStackView(
@@ -74,7 +74,7 @@ struct CredentialsTabView: View {
                             CredentialDetailsView(details: expanded)
                             .transition(.opacity)
                         } else if selectedCredential != nil {
-                            ProgressView("Loading details…")
+                            WalletProgressRow(String(localized: "Loading details…"))
                         }
                     }
                 }

@@ -10,6 +10,24 @@ import XCTest
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
 
+    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
+        let identity = option(queryID: "pid", credentialID: "one")
+        let address = option(queryID: "address", credentialID: "two")
+        let request = SharingRequest(requester: nil)
+        XCTAssertFalse(SharingReviewModel(request: request, credentialOptions: [identity]).allowsCredentialSelection(identity))
+        let both = SharingReviewModel(request: request, credentialOptions: [identity, address],
+            credentialRequirements: [.init(options: [["pid", "address"]])])
+        XCTAssertFalse(both.allowsCredentialSelection(identity))
+        XCTAssertFalse(both.allowsCredentialSelection(address))
+        let either = SharingReviewModel(request: request, credentialOptions: [identity, address],
+            credentialRequirements: [.init(options: [["pid"], ["address"]])])
+        XCTAssertTrue(either.allowsCredentialSelection(identity))
+        XCTAssertTrue(either.allowsCredentialSelection(address))
+        let alternatives = SharingReviewModel(request: request,
+            credentialOptions: [identity, option(queryID: "pid", credentialID: "second-copy")])
+        XCTAssertTrue(alternatives.allowsCredentialSelection(identity))
+    }
+
     // MARK: - Requester identity
 
     func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() {

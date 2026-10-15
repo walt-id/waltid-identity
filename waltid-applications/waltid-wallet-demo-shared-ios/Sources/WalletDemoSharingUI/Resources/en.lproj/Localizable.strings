@@ -26,7 +26,6 @@
 "Copies: %d" = "Copies: %d";
 "Fewer copies of %@" = "Fewer copies of %@";
 "More copies of %@" = "More copies of %@";
-"1 copy" = "1 copy";
 "Values have not been received yet." = "Values have not been received yet.";
 "Claim definitions" = "Claim definitions";
 "The issuer has not supplied claim definitions." = "The issuer has not supplied claim definitions.";

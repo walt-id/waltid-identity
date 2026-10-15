@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -96,6 +98,7 @@ internal fun CredentialCardArt(
     art: CredentialCardArtModel,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
@@ -118,6 +121,8 @@ internal fun CredentialCardArt(
             .aspectRatio(Id1AspectRatio)
             .then(if (compact) Modifier else Modifier.shadow(16.dp, shape, clip = false))
             .clip(shape)
+            .then(if (onClick == null) Modifier else Modifier.clickable(
+                role = Role.Button, onClickLabel = "View credential details", onClick = onClick))
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
         val logoSize = if (compact) minOf(28.dp, maxHeight - 8.dp) else 36.dp

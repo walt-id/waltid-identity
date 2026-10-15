@@ -31,8 +31,8 @@ class WalletDemoAppIosTest {
     @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
 
     @Test
-    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
-        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+    fun singleOfferCopyControlsRespectTheAdvertisedLimit() =
+        scenarios.singleOfferCopyControlsRespectTheAdvertisedLimit()
 
     private val scenarios = WalletDemoAppTestScenarios { content ->
         // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.

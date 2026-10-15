@@ -40,6 +40,6 @@ public struct MetadataDisclosure<Content: View>: View {
             .accessibilityIdentifier(accessibilityIdentifier ?? "")
             if isExpanded { content }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isExpanded)
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
     }
 }
