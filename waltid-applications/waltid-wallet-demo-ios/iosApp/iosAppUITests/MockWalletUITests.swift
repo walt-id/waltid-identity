@@ -385,6 +385,11 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
         ui.assertExists(identifier: "wallet.offerAcceptButton")
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
+        let compactReview = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.navigationBars["Receive credentials"].frame.minY > app.frame.height / 5
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [compactReview], timeout: 5), .completed,
+            "Replacing the scanner with a short review must retain content-based sheet sizing")
         ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["No credentials yet"].exists)
