@@ -7,4 +7,10 @@ workspace_dir="$(cd "$identity_dir/.." && pwd -P)"
 
 cd "$workspace_dir"
 
+adb shell pm path com.android.chrome | grep -q '^package:' || {
+  echo 'Enterprise authorization tests require Chrome on the emulator' >&2
+  exit 1
+}
+adb shell cmd role add-role-holder android.app.role.BROWSER com.android.chrome
+
 ./gradlew :waltid-enterprise-integration-tests:enterpriseAndroidMobileIntegrationTest --no-configuration-cache

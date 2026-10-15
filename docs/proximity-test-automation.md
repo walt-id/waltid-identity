@@ -2,9 +2,9 @@
 
 [WAL-1349](https://linear.app/walt-new/issue/WAL-1349/qualify-proximity-presentation-for-interoperability-and-release)
 owns qualification evidence. Tests and fixes stay with the existing engine, mobile
-transport, wallet SDK and demo modules. The
-[suite manifest](../.github/scripts/mobile-ci/proximity-test-suites.json) records
-exact required selectors, source paths, execution classes and assertion oracles.
+transport, wallet SDK and demo modules. The existing
+[result guards](../.github/scripts/mobile-ci/verify_platform_test_results.py) require
+test targets and critical platform adapter suites without duplicating their methods.
 Counts are evidence for a particular run, not a coverage percentage or qualification.
 
 ## Risk inventory
@@ -14,8 +14,8 @@ Similar names and declared test counts alone do not establish that a test execut
 
 | Risk | Preserved production assertions | Added boundary / remaining limitation |
 | --- | --- | --- |
-| Missing discovery, stale framework, physical leakage | Existing Gradle/JUnit/XCTest runners | Exact passing IDs, nonzero execution, owned-suite skip rejection and forbidden physical prefixes; fixture/release header checks and separate physical sources/target |
-| Field projection and receipt | `KMPProximityProjectionTests` submission/review collection regressions | Real native `StateFlow` through the Swift bridge, exact selected fields in forwarded approval and receipt, cancellation and error projection |
+| Missing discovery, stale framework, physical leakage | Existing Gradle/JUnit/XCTest runners | Nonempty required targets/classes, unexpected-skip rejection and forbidden physical prefixes; fixture/release header checks and separate physical sources/target |
+| Field projection and receipt | `KMPProximitySessionBridgeTests` submission/review collection regressions | Real native `StateFlow` through the Swift bridge, exact selected fields in forwarded approval and receipt, cancellation and error projection |
 | Recoverable Swift host inputs | `ProximityInputValidationTests`; native invalid-configuration startup regression | Invalid configuration, trust/profile results and disclosure selections throw; stored settings cannot weaken a profile's trust policy; request indices fit the shared integer range |
 | KMP/Swift capability drift | `ProximityBridgeContractTests` against real WalletCore outputs | 24 transport flag/runtime combinations and 192 route combinations compare start decisions and ordered remediation; this does not prove every model invariant equivalent |
 | Rendered stale consent | Shared Compose review/terminal scenarios; native view-model cancellation, settings replacement and preparation tests | Android/iOS replacement review and cancellation remove stale controls; Android prepared receipt details exclude unselected fields; native combined selection preserves exact elements and proof |
@@ -30,7 +30,7 @@ Similar names and declared test counts alone do not establish that a test execut
 
 ## CI and local deterministic execution
 
-`verify_proximity_suites.py` checks the named suites assigned to `jvm`, `android-host`,
+`verify_platform_test_results.py` checks module results and platform adapters assigned to `jvm`, `android-host`,
 `ios-simulator` or `js-node`. The standard Gradle workflows invoke it after their
 tests. The iOS Kotlin and consumer lanes use the `gradle-ios` action from the
 selected checkout, with Xcode and the simulator destination pinned by the workflow.
@@ -40,13 +40,14 @@ Path eligibility includes the guard scripts and native simulator test sources.
 `run-ios-wallet-sdk-tests.sh` reuses the verified shared release framework in CI and
 assembles the isolated test-fixture XCFramework from the selected checkout. Local runs
 without a release artifact build both frameworks. The runner checks their headers, records source and binary hashes,
-and explicitly runs `KMPProximityProjectionTests`, `ProximityBridgeContractTests` and
-`ProximityInputValidationTests` in `WalletSDKTests` on a simulator. The discovery guard
-requires every named test to pass; missing or skipped tests fail the lane.
+and discovers the `WalletSDKTests` target on a simulator. The discovery guard
+requires the fixture-only conditional Kotlin bridge class
+`KMPProximitySessionBridgeTests` to execute. All failures and skips fail the lane;
+new methods and classes need no CI configuration entry.
 Testing only the demo's `iosAppTests` cannot replace this package suite. Its
 `WALLET_SDK_BRIDGE_FIXTURES=1` framework has the same SDK sources and an additional
 test-only session producer. The ordinary release framework has no test producer.
-The native demo lane separately requires its exact consent-selection regression.
+The native demo lane separately requires its unit and UI targets and app-hosted Keychain/persistence classes.
 
 Focused local examples, run from Identity:
 

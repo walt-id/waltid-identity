@@ -133,29 +133,12 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard URL(string: value) != nil else {
-            XCTFail("Invalid deep link URL: \(value)")
+        guard let url = URL(string: value) else {
+            XCTFail("Invalid deep link URL")
             return
         }
-
-        // XCUIApplication.open launches a new process. Enter the link in Safari
-        // to exercise delivery to the running wallet and its navigation state.
-        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
-        safari.activate()
-        let address = safari.textFields.firstMatch
-        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
-            safari.buttons["Continue"].tap()
-        }
-        XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
-        address.tap()
-        address.typeText(value + XCUIKeyboardKey.return.rawValue)
-        let open = safari.buttons["Open"]
-        if open.waitForExistence(timeout: 5) {
-            // Safari's external-app confirmation reports no XCTest hit point on
-            // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
-            XCTAssertFalse(open.frame.isEmpty)
-            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        // Use the same system handoff as Compose; app.open would relaunch the wallet.
+        XCUIDevice.shared.system.open(url)
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 

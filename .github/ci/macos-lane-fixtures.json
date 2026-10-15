@@ -15,6 +15,20 @@
       "lanes": ["ios-simulator"]
     },
     {
+      "name": "new app-hosted Keychain tests select simulator coverage",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/src/iosAppTest/kotlin/id/walt/crypto2/signum/NewOwnershipTest.kt"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
+      "name": "Keychain host runner selects simulator coverage",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/test-ios-keychain.sh"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
       "name": "library build.gradle.kts selects simulator only",
       "files": [
         "waltid-libraries/crypto/waltid-crypto/build.gradle.kts"
@@ -43,25 +57,25 @@
       "lanes": ["ios-simulator", "native"]
     },
     {
-      "name": "native demo change selects native only",
+      "name": "native demo change selects native and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ContentView.swift"
       ],
-      "lanes": ["native"]
+      "lanes": ["native", "enterprise"]
     },
     {
-      "name": "Compose iOS app change selects compose only",
+      "name": "Compose iOS app change selects Compose and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/iosApp/iosApp/ContentView.swift"
       ],
-      "lanes": ["compose"]
+      "lanes": ["compose", "enterprise"]
     },
     {
       "name": "Compose Kotlin iosMain also selects simulator compilation",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/kotlin/id/walt/demo/Main.kt"
       ],
-      "lanes": ["compose", "ios-simulator"]
+      "lanes": ["compose", "ios-simulator", "enterprise"]
     },
     {
       "name": "Swift package change selects WalletCore consumers, not Kotlin simulator",
@@ -71,18 +85,18 @@
       "lanes": ["native", "compose", "enterprise", "sdk-docs"]
     },
     {
-      "name": "shared iOS package manifest selects native and Compose",
+      "name": "shared iOS package manifest selects native, Compose and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-shared-ios/Package.swift"
       ],
-      "lanes": ["native", "compose"]
+      "lanes": ["native", "compose", "enterprise"]
     },
     {
-      "name": "shared iOS package sources select native and Compose",
+      "name": "shared iOS package sources select native, Compose and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoShared/Shared.swift"
       ],
-      "lanes": ["native", "compose"]
+      "lanes": ["native", "compose", "enterprise"]
     },
     {
       "name": "build-logic change selects every macOS lane",
@@ -106,11 +120,11 @@
       "lanes": []
     },
     {
-      "name": "proximity manifest selects its Kotlin and Swift consumers",
+      "name": "result verifier selects every macOS consumer",
       "files": [
-        ".github/scripts/mobile-ci/proximity-test-suites.json"
+        ".github/scripts/mobile-ci/verify_test_results.py"
       ],
-      "lanes": ["ios-simulator", "native"]
+      "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
     },
     {
       "name": "Swift bridge runner selects the native consumer lane",
@@ -191,39 +205,54 @@
       "lanes": ["ios-simulator", "sdk-docs"]
     },
     {
-      "name": "shared attestation profile selects both demo consumers",
+      "name": "shared attestation profile selects all demo consumers",
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/KeyAttestationProfiles.json"
       ],
-      "lanes": ["native", "compose"]
+      "lanes": ["native", "compose", "enterprise"]
     },
     {
-      "name": "shared Kotlin attester selects Compose iOS",
+      "name": "shared Kotlin attester selects Compose and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/kotlin/id/walt/walletdemo/attestation/DemoKeyAttestationProviders.kt"
       ],
-      "lanes": ["compose"]
+      "lanes": ["compose", "enterprise"]
     },
     {
-      "name": "shared attestation generator selects Compose iOS",
+      "name": "shared attestation generator selects Compose and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/sources.gradle.kts"
       ],
-      "lanes": ["compose"]
+      "lanes": ["compose", "enterprise"]
     },
     {
-      "name": "Swift attester selects the native demo",
+      "name": "Swift attester selects native and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/swift/DemoKeyAttestationProviders.swift"
       ],
-      "lanes": ["native"]
+      "lanes": ["native", "enterprise"]
     },
     {
-      "name": "attestation package manifest selects the native demo",
+      "name": "attestation package manifest selects native and Enterprise",
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Package.swift"
       ],
-      "lanes": ["native"]
+      "lanes": ["native", "enterprise"]
+    },
+    {
+      "name": "new native batch test selects its Enterprise execution lane",
+      "files": ["waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/NewBatchJourneyTests.swift"],
+      "lanes": ["native", "enterprise"]
+    },
+    {
+      "name": "new native Enterprise test selects its execution lane",
+      "files": ["waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppEnterpriseTests/NewContractTests.swift"],
+      "lanes": ["native", "enterprise"]
+    },
+    {
+      "name": "new Compose batch test selects its Enterprise execution lane",
+      "files": ["waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/NewBatchJourneyTests.swift"],
+      "lanes": ["compose", "enterprise"]
     }
   ]
 }

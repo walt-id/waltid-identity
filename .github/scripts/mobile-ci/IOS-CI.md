@@ -38,6 +38,53 @@ The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
 framework itself. In both paths, its fixture starts only after framework
 preparation succeeds and is stopped after XCTest.
+The task's `enterprise.ios.destination` property (or `IOS_SIMULATOR_DESTINATION`)
+must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
+`platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
+running task dependencies. An existing simulator ID or `OS=latest` cannot select
+the fresh, runtime-pinned destinations that keep the two demos isolated.
+
+## Unattended coverage
+
+Native app and Swift package tests discover their targets by default. Explicit
+exclusions reserve physical signing prompts for attended checks, batch issuance
+for the Enterprise fixture phase, and Swift Keychain/persistence snippets for the
+entitled native app host. Result checks require nonempty unit and UI targets
+separately, require nonempty sharedLogic and Swift SDK results, and retain class
+guards for conditional bridge fixtures, platform adapters and app-hosted
+Keychain/persistence sources. They reject failures and unexpected skips across
+reported cases. The native app permits only its two recovery checks that require
+physical hardware or an operator to skip. sharedLogic links
+and executes its complete Kotlin iOS test target using
+the toolchain's existing SwiftPM dependency linkage.
+
+The recovery job also runs Signum's existing entitled Keychain host on its simulator,
+requiring the ownership suite and retaining per-test JUnit results. It discovers
+all tests except the physical Secure Enclave class and rejects skipped or incomplete runs.
+The platform result guard also requires X.509 reports on JVM, JS Node, Android host
+and iOS Simulator. Only the deferred Ed25519 cases may skip, with exceptions scoped
+to the platforms that declare them.
+
+There are no method inventories or fixed test counts to update when adding or
+renaming ordinary tests. Missing Android PIN or browser opt-in makes the affected
+test skip, which fails the result check even when the rest of its suite passes.
+DC API and offline ITB profile checks also require their suites without fixing the
+number of methods. Cloud, fixture, physical-device and isolated-process selectors
+continue to route tests to the environment they need.
+
+Android wallet device tests exclude the separately orchestrated recovery lifecycle
+and the three suites that need an operator for native authorization or live ITB.
+Wallet, crypto backend and both Compose instrumentation modules reject every
+unexpected skip and require nonempty reports. Suite guards
+catch lost targets or critical classes; individual test deletion remains visible
+in source review rather than a duplicate method inventory.
+
+The Enterprise phase runs SDK contracts plus native and Compose batch journeys
+with its existing issuer/verifier fixture. The fixture URL reaches XCTest through
+Xcode's `TEST_RUNNER_` environment forwarding. Native and Compose batch reports
+are checked separately and retained on successful runs. App, shared iOS and shared
+attestation fixture changes select the Enterprise lane as well as their ordinary
+consumer lanes; new test files in these targets need no lane configuration entry.
 
 ## Compose URL handoffs
 

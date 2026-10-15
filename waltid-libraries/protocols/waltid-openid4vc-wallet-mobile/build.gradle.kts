@@ -157,6 +157,7 @@ kotlin {
                     implementation(identityLibs.kotlinx.coroutines.test)
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.uiautomator)
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.ktor.client.mock)
                     implementation(identityLibs.ktor.client.content.negotiation)

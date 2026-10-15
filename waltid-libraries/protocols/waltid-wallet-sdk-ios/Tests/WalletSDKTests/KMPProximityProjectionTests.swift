@@ -3,8 +3,8 @@ import XCTest
 @preconcurrency import WalletCore
 @testable import WalletSDK
 
-final class KMPProximityProjectionTests: XCTestCase {
-    #if WALLET_SDK_BRIDGE_FIXTURES
+#if WALLET_SDK_BRIDGE_FIXTURES
+final class KMPProximitySessionBridgeTests: XCTestCase {
     func testRealBridgeStreamsReviewAndForwardsEverySelectedField() async throws {
         let fields = ["given_name", "family_name"]
         let core = WalletCore.ProximityBridgeTestSession()
@@ -71,9 +71,10 @@ final class KMPProximityProjectionTests: XCTestCase {
         XCTAssertEqual(core.cancelCalls, 1)
         await session.close()
     }
+}
+#endif
 
-    #endif
-
+final class KMPProximityProjectionTests: XCTestCase {
     func testReaderCAImportUsesSuppliedDateForValidity() async throws {
         // Public WAL-1349 test CA, valid from 2026-09-01 to 2036-08-29.
         let certificate = try XCTUnwrap(Data(base64Encoded: Self.readerCaDerBase64))
