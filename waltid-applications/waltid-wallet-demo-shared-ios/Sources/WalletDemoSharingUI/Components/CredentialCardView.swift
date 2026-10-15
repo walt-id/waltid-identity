@@ -349,7 +349,7 @@ private func httpsURL(_ value: String?) -> URL? {
     return url
 }
 
-private extension Color {
+extension Color {
     init?(css value: String?) {
         guard let parsed = CssColorParser.parse(value) else { return nil }
         self.init(

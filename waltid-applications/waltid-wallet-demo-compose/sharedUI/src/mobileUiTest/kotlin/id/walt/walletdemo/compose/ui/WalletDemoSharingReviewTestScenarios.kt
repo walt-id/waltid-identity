@@ -14,6 +14,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -74,7 +75,8 @@ class WalletDemoSharingReviewTestScenarios {
                 onSubmit = { submitted = it }, onCancel = {})
         }
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[0].selection.id)).assertIsSelected()
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(city.selection.id)).performScrollToContent(this).performClick()
+        onNodeWithText("Credential information").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(city.selection.id)).performScrollToContent(this).assertIsNotSelected().performClick()
         onNodeWithText("Lovelace").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Always included by this credential").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Ada").performScrollToContent(this).assertIsDisplayed()
@@ -99,7 +101,7 @@ class WalletDemoSharingReviewTestScenarios {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.value)) {
                     Box(Modifier.width(width.value.dp)) {
                         OfferedCredentialRow(credential, "Example City", "https://issuer.example",
-                            copies.value, 3, true, { copies.value = it })
+                            copies.value, 3, true, true, { copies.value = it })
                     }
                 }
             }
@@ -447,28 +449,28 @@ class WalletDemoSharingReviewTestScenarios {
         var submitted: WalletDemoSharingSelection? = null
         val mdl = credentialOption(queryId = "org.iso.18013.5.1.mDL", credentialId = "credential-1")
         val photoId = credentialOption(queryId = "org.iso.23220.photoid.1", credentialId = "credential-2")
+        val completeReview = annexCReview(
+            readerTrust = WalletDemoReaderTrust.NotAuthenticated,
+            credentialOptions = listOf(mdl, photoId),
+        )
+        // The request requires both documents, but the second match is not available yet.
+        val review = mutableStateOf(completeReview.copy(credentialOptions = listOf(mdl)))
         setContent {
             WalletDemoSharingReviewScreen(
                 compact = false,
-                review = annexCReview(
-                    readerTrust = WalletDemoReaderTrust.NotAuthenticated,
-                    credentialOptions = listOf(mdl, photoId),
-                ),
+                review = review.value,
                 title = "Share mobile document?",
                 onSubmit = { submitted = it },
                 onCancel = {},
             )
         }
-
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
-            .performScrollToContent(this)
-            .performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
         assertNull(submitted)
 
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id))
-            .performScrollToContent(this)
-            .performClick()
+        runOnIdle { review.value = completeReview }
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(mdl.selection.id), useUnmergedTree = true).assertHasNoClickAction()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(photoId.selection.id), useUnmergedTree = true).assertHasNoClickAction()
+        onNodeWithText("Credential information").assertDoesNotExist()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(mdl.selection, photoId.selection), submitted?.credentials)
     }
@@ -544,7 +546,7 @@ class WalletDemoSharingReviewTestScenarios {
         setContent {
             WalletDemoSharingReviewScreen(
                 compact = false,
-                review = digitalCredentialReview(credentialOptions = listOf(option)),
+                review = digitalCredentialReview(credentialOptions = listOf(option, credentialOption(queryId = "other", credentialId = "other"))),
                 title = "Share digital credential?",
                 onSubmit = { submitted = it },
                 onCancel = {},

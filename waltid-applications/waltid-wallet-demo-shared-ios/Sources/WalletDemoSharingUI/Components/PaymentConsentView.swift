@@ -20,7 +20,8 @@ struct PaymentConsentView: View {
 
     var body: some View {
         switch state {
-        case .loading: ProgressView { Text("Loading payment instructions…", bundle: .module) }.accessibilityIdentifier("payment-consent-loading")
+        case .loading: WalletProgressRow(String(localized: "Loading payment instructions…", bundle: .module))
+            .accessibilityIdentifier("payment-consent-loading")
         case .blocked(let message): Text(message).foregroundStyle(.red).accessibilityIdentifier("payment-consent-blocked")
         default: EmptyView()
         }

@@ -114,15 +114,12 @@ final class WalletE2EUI {
             if let failed = latestStatus(prefixes: ["Bootstrap failed"]) {
                 return failed
             }
-            if latestStatus(prefixes: ["Wallet ready"]) != nil {
-                return "Wallet ready"
-            }
-            let bootstrapping = latestStatus(prefixes: ["Bootstrapping"]) != nil
-            let pinVisible = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN").exists
-            let settings = button(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-            if !bootstrapping && !pinVisible && settings.exists {
-                return "Wallet ready"
-            }
+            // Prepared wallet content, rather than transient feedback, establishes readiness.
+            let prepared = app.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier == %@ OR identifier BEGINSWITH %@",
+                "wallet.credentials.empty", "wallet.credentialCard."
+            )).firstMatch
+            if prepared.exists { return "Wallet ready" }
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         }
         return latestStatus(prefixes: ["Wallet ready", "Bootstrap failed", "Bootstrapping"])

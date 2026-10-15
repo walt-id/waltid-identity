@@ -1,14 +1,21 @@
 package id.walt.walletdemo.compose.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.AnnotatedString
@@ -28,6 +35,7 @@ internal fun OfferedCredentialRow(
     count: Int,
     limit: Int,
     enabled: Boolean,
+    allowsSelection: Boolean,
     onCountChange: ((Int) -> Unit)?,
     largeArt: Boolean = false,
 ) {
@@ -35,6 +43,10 @@ internal fun OfferedCredentialRow(
     var showDetails by rememberSaveable(credential.configurationId) { mutableStateOf(false) }
     val title = credential.resolvedCardTitle()
     val receiveLabel = stringResource(Res.string.issuance_receive_named, title)
+    val onSelectionChange = onCountChange?.takeIf { allowsSelection }
+    val showLargeArt = largeArt && onSelectionChange == null
+    val informationLabel = stringResource(Res.string.issuance_information)
+    val openInformation = { if (navigation != null) navigation.openOffered(credential.configurationId) else showDetails = true }
     val canSelect = enabled && (count > 0 || limit > 0)
     val art = credential.offerArt()
     val textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
@@ -44,46 +56,48 @@ internal fun OfferedCredentialRow(
     }
     val density = LocalDensity.current
     Column {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
-            val summaryWidth = maxWidth - 64.dp // 52 dp switch + 12 dp row gap.
+        BoxWithConstraints(Modifier.fillMaxWidth()
+            .then(if (onSelectionChange != null || showLargeArt) Modifier else Modifier
+                .testTag("issuance-details-${credential.configurationId}")
+                .clickable(role = Role.Button, onClickLabel = informationLabel, onClick = openInformation))
+            .padding(16.dp)) {
+            val summaryWidth = maxWidth - if (onSelectionChange != null) 64.dp else 0.dp
             val thumbnailWidth = credentialThumbnailWidth(summaryWidth, density.fontScale)
             val needsSeparateSelection = summaryWidth < thumbnailWidth + 12.dp + with(density) { widestWord.toDp() }
-            if (largeArt) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    CredentialCardArt(art, Modifier.fillMaxWidth().testTag("issuance-large-art-${credential.configurationId}"))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(title, Modifier.weight(1f).testTag("issuance-identity-${credential.configurationId}"),
-                            style = MaterialTheme.typography.titleMedium)
-                        if (onCountChange != null) OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onCountChange)
+            if (showLargeArt) {
+                Box(Modifier.fillMaxWidth().testTag("issuance-large-art-${credential.configurationId}")) {
+                    CredentialCardArt(art, Modifier.clearAndSetSemantics { contentDescription = title })
+                    IconButton(onClick = openInformation,
+                        // Align the 20dp icon with the card's 16dp inset: 2 + (48 - 20) / 2.
+                        modifier = Modifier.align(Alignment.BottomStart).padding(2.dp).size(48.dp)
+                            .testTag("issuance-details-${credential.configurationId}"),
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = parseCssColor(art.textColor) ?: Color.White)) {
+                        Icon(Icons.Outlined.Info, informationLabel, Modifier.size(20.dp))
                     }
                 }
-            } else if (onCountChange != null && needsSeparateSelection) {
+            } else if (onSelectionChange != null && needsSeparateSelection) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     CredentialSummaryRow(art, modifier = Modifier.fillMaxWidth()
                         .testTag("issuance-identity-${credential.configurationId}"))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(Res.string.issuance_receive), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onCountChange)
+                        OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onSelectionChange)
                     }
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     CredentialSummaryRow(art, modifier = Modifier.weight(1f)
                         .testTag("issuance-identity-${credential.configurationId}"))
-                    if (onCountChange != null) OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onCountChange)
+                    if (onSelectionChange != null) OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onSelectionChange)
+                    else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
                 }
             }
         }
-        if (count > 0) {
-            if (limit > 1 && onCountChange != null) {
-                CopySelection(credential.configurationId, title, count, limit, enabled, onCountChange)
-            } else {
-                Text(stringResource(Res.string.issuance_one_copy), Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        if (count > 0 && limit > 1 && onCountChange != null) {
+            CopySelection(credential.configurationId, title, count, limit, enabled, onCountChange)
         }
-        WalletNavigationRow(
-            title = stringResource(Res.string.issuance_information), onClick = { if (navigation != null) navigation.openOffered(credential.configurationId) else showDetails = true },
+        if (onSelectionChange != null) WalletNavigationRow(
+            title = informationLabel, onClick = openInformation,
             icon = { WalletIcon(WalletSymbol.Info, null) },
             modifier = Modifier.testTag("issuance-details-${credential.configurationId}"),
         )

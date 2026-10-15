@@ -71,7 +71,7 @@ struct ReaderTrustSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if controller.importInProgress {
-                    ProgressView("Importing trust material…")
+                    WalletProgressRow("Importing trust material…")
                         .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportProgress)
                 }
             }

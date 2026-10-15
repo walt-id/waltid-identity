@@ -43,7 +43,8 @@ internal fun SharingReviewSection(
         SharingRequestSections(review.request, paymentReview = paymentReview)
 
         if (information == null) Text("Loading credentials…", style = MaterialTheme.typography.bodyMedium)
-        WalletSection(title = if (compact) "Requested credentials" else "Select credentials to share") {
+        WalletSection(title = if (compact || review.credentialOptions.none(review::allowsCredentialSelection))
+            "Requested credentials" else "Select credentials to share") {
             if (review.credentialOptions.isEmpty()) {
                 Text("No credentials available", color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(16.dp))
@@ -54,7 +55,7 @@ internal fun SharingReviewSection(
                     information = information,
                     selectedCredentialOptions = selectedCredentialOptions,
                     enabled = enabled,
-                    readOnly = readOnly,
+                    readOnly = readOnly || !review.allowsCredentialSelection(information.option),
                     onToggleCredential = onToggleCredential,
                     hasAlternatives = review.credentialOptions.count { it.queryId == information.option.queryId } > 1,
                 )

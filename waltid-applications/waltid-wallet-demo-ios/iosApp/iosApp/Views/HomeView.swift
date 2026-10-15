@@ -214,7 +214,7 @@ private struct WalletSetupView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Your signing key is ready").font(.title2)
                 if viewModel.isLoading {
-                    ProgressView("Opening wallet…")
+                    WalletProgressRow(String(localized: "Opening wallet…"))
                 } else {
                     Text(viewModel.statusMessage).foregroundStyle(.secondary)
                     WalletActions(primary: WalletAction("Retry opening wallet", perform: viewModel.retryOpeningWallet))

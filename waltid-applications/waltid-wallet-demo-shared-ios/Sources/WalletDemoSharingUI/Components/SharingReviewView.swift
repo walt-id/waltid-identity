@@ -72,10 +72,11 @@ public struct SharingReviewView: View {
             SharingRequestSections(request: review.request, paymentReview: paymentReview)
 
             if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
-                ProgressView("Loading credentials…")
+                WalletProgressRow("Loading credentials…")
             }
 
-            WalletSection(compact ? "Requested credentials" : "Select credentials to share") {
+            WalletSection(compact || !review.credentialOptions.contains(where: review.allowsCredentialSelection)
+                ? "Requested credentials" : "Select credentials to share") {
                 VStack(spacing: 0) {
                     if review.credentialOptions.isEmpty {
                         Text("No credentials available").font(.caption).foregroundStyle(.secondary).padding(16)
@@ -84,7 +85,7 @@ public struct SharingReviewView: View {
                         if let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
                             if index > 0 { Divider() }
                             SharingCredentialRow(option: option, details: details, selection: selection,
-                                isLoading: isLoading, isReadOnly: isReadOnly,
+                                isLoading: isLoading, isReadOnly: isReadOnly || !review.allowsCredentialSelection(option),
                                 onToggleCredential: onToggleCredential,
                                 hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1)
                         }

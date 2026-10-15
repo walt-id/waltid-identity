@@ -15,11 +15,9 @@ public struct IssuanceIssuerSection: View {
                 logoURI: issuer.logoURI?.absoluteString, logoAltText: issuer.logoAltText),
                 fallbackName: issuer.identifier, supportingText: nil)
         } details: {
-            if let name = issuer.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty, name != issuer.identifier {
-                MetadataDetailList(items: [MetadataDetailItem(label: String(localized: "Credential Issuer", bundle: .module),
-                    value: issuer.identifier, linkURI: issuer.identifier)])
-                    .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
-            }
+            MetadataDetailList(items: [MetadataDetailItem(label: String(localized: "Credential Issuer", bundle: .module),
+                value: issuer.identifier, linkURI: issuer.identifier)])
+                .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
         }
     }
 }

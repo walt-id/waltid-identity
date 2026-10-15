@@ -65,20 +65,15 @@ val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
 
 fun WalletDemoUiState.statusText(tab: WalletDemoTab): String =
-    statusBanner(tab)?.message.orEmpty()
+    operation.statusTextFor(tab) ?: tabStatusText(tab) ?: session.statusText(auth).orEmpty()
 
 fun WalletDemoUiState.statusBanner(tab: WalletDemoTab = selectedTab): WalletStatusBanner? {
-    val operationMessage = operation.statusTextFor(tab)
-    val tabMessage = tabStatusText(tab)
-    val message = operationMessage
-        ?: tabMessage
-        ?: session.statusText(auth)
-        ?: return null
+    if (session is WalletSessionState.Ready && operation.statusTextFor(tab) == null && tabStatusText(tab) == null) return null
+    val message = statusText(tab).takeIf { it.isNotEmpty() } ?: return null
     val kind = when {
         isErrorFor(tab) -> WalletStatusKind.Error
         isStatusBusyFor(tab) -> WalletStatusKind.Busy
-        operationMessage != null && operation is WalletOperationState.Succeeded -> WalletStatusKind.Success
-        operationMessage == null && tabMessage == null && session is WalletSessionState.Ready -> WalletStatusKind.Success
+        operation is WalletOperationState.Succeeded && operation.belongsTo(tab) -> WalletStatusKind.Success
         else -> WalletStatusKind.Info
     }
     return WalletStatusBanner(message = message, kind = kind, occurrenceId = statusOccurrenceId)

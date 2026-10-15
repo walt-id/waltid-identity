@@ -19,6 +19,23 @@ class WalletDemoSharingReviewControllerTest {
     private val name = WalletDemoPresentationDisclosureSelection("pid", "one", "name")
     private fun consent(revision: String) = WalletDemoPaymentConsent(revision, "en", null, null, "Pay", null, false, emptyList())
 
+    @Test fun soleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
+        assertFalse(review.allowsCredentialSelection(option))
+        val other = option.copy(queryId = "address", credentialId = "two")
+        val both = review.copy(credentialOptions = listOf(option, other), credentialRequirements = listOf(
+            WalletDemoPresentationCredentialRequirement(listOf(listOf("pid", "address"))),
+        ))
+        assertFalse(both.allowsCredentialSelection(option))
+        assertFalse(both.allowsCredentialSelection(other))
+        val either = both.copy(credentialRequirements = listOf(
+            WalletDemoPresentationCredentialRequirement(listOf(listOf("pid"), listOf("address"))),
+        ))
+        assertTrue(either.allowsCredentialSelection(option))
+        assertTrue(either.allowsCredentialSelection(other))
+        val alternatives = review.copy(credentialOptions = listOf(option, option.copy(credentialId = "second-copy")))
+        assertTrue(alternatives.allowsCredentialSelection(option))
+    }
+
     @Test fun aStaleRenderedActionCannotAuthorizeANewerResolvedSelection() = runTest {
         var revision = 0
         val owner = WalletDemoSharingReviewController(review, backgroundScope) { consent("revision-${++revision}") }

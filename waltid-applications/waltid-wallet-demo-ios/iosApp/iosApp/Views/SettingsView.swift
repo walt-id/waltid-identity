@@ -127,7 +127,7 @@ struct SettingsView: View {
             }
 
             if viewModel.isChangingSigningProtection {
-                ProgressView("Changing signing protection...")
+                WalletProgressRow("Changing signing protection...")
                     .accessibilityIdentifier(WalletAccessibilityID.signingProtectionProgress)
             }
             if let error = viewModel.signingProtectionError {

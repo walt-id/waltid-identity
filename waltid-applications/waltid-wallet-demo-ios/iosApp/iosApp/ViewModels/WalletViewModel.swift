@@ -1918,7 +1918,7 @@ class WalletViewModel: ObservableObject {
 
     private func statusBanner(for tab: WalletTab) -> WalletStatusBannerModel? {
         let message = statusMessage(for: tab)
-        guard !message.isEmpty else { return nil }
+        guard !message.isEmpty, message != WalletStatusText.walletReady else { return nil }
         let kind: WalletStatusKind
         if statusIsError(for: tab) {
             kind = .error

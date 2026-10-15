@@ -9,7 +9,7 @@ struct StatusBannerView: View {
     var isExpanded: Bool = false
     var onDismiss: (() -> Void)? = nil
     var onToggleExpanded: (() -> Void)? = nil
-    @Environment(\.walletDemoBranding) private var branding
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var dragOffset: CGFloat = 0
 
@@ -26,7 +26,8 @@ struct StatusBannerView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.status)
             if isError {
                 Button(action: { onToggleExpanded?() }) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .accessibilityLabel(isExpanded ? "Collapse error" : "Expand error")
@@ -48,6 +49,7 @@ struct StatusBannerView: View {
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
         .cornerRadius(8)
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
         .offset(x: dragOffset)
         .gesture(dismissGesture)
         .onTapGesture {

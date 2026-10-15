@@ -1,7 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,8 +71,7 @@ internal fun CredentialCardStack(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(stackHeight)
-                .clipToBounds(),
+                .height(stackHeight),
         ) {
             cards.forEachIndexed { index, item ->
                 val id = item.id
@@ -91,7 +88,8 @@ internal fun CredentialCardStack(
                 ) {
                     CredentialCardArt(
                         art = remember(item) { item.toCardArt() },
-                        modifier = Modifier.fillMaxWidth().clickable(enabled = interactive) { onOpenDetails(id) },
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = if (interactive) ({ onOpenDetails(id) }) else null,
                     )
                 }
             }

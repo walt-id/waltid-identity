@@ -1,8 +1,9 @@
 import SwiftUI
 import WalletSDK
 
-/// A sharing review for the bounded container supplied by an app or operating-system provider host.
+/// A sharing review for the bounded container supplied by the operating-system provider host.
 /// Long requests scroll independently of the pinned actions, including at large text sizes.
+/// The host supplies dismissal chrome; app-owned reviews use their own navigation toolbar.
 ///
 /// It adds only what a standalone surface needs - a heading naming the request, a preparing state and
 /// a failure state - on top of ``SharingReviewView``. The
@@ -84,13 +85,6 @@ public struct SharingReviewScreen: View {
                 }
             }
             .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: onCancel) { WalletToolbarIcon("xmark") }
-                        .accessibilityLabel("Close request").disabled(isSubmitting)
-                        .accessibilityIdentifier("wallet.flowBack")
-                }
-            }
         }
         .onPreferenceChange(SharingReviewReadinessKey.self) { renderedOptions = $0 }
         .interactiveDismissDisabled(isSubmitting)

@@ -8,6 +8,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
     @Binding public var isExpanded: Bool
     public let summary: Summary
     public let details: Details
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         title: String,
@@ -36,13 +37,15 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                 HStack(alignment: .center, spacing: 8) {
                     summary
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .foregroundStyle(.secondary)
                 }
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isExpanded ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
             .accessibilityIdentifier(toggleAccessibilityIdentifier ?? "")
 
             if isExpanded {
@@ -50,6 +53,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                 details
             }
         }
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
     }
 }
 
@@ -110,8 +114,9 @@ public struct MetadataIdentityView: View {
     public var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                if logoURL == nil {
+                    RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6))
+                }
                 if let logoURL {
                     AsyncImage(url: logoURL) { phase in
                         switch phase {

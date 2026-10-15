@@ -9,25 +9,33 @@ public struct OfferedCredentialRow: View {
     private let copies: Binding<Int>
     private let limit: Int
     private let enabled: Bool
+    private let allowsSelection: Bool
     private let largeArt: Bool
     @State private var showDetails = false
     @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
     @Environment(\.sizeCategory) private var sizeCategory
 
     public init(credential: IssuanceCredentialPreview, issuerName: String, issuerIdentifier: String,
-                copies: Binding<Int>, limit: Int, enabled: Bool, largeArt: Bool = false) {
+                copies: Binding<Int>, limit: Int, enabled: Bool, allowsSelection: Bool, largeArt: Bool = false) {
         self.credential = credential
         self.issuerName = issuerName
         self.issuerIdentifier = issuerIdentifier
         self.copies = copies
         self.limit = limit
         self.enabled = enabled
-        self.largeArt = largeArt
+        self.allowsSelection = allowsSelection
+        self.largeArt = largeArt && !allowsSelection
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            identity.padding(16)
+            if largeArt || allowsSelection { identity.padding(16) }
+            else {
+                Button { showDetails = true } label: { identity.padding(16).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(String(localized: "View credential information", bundle: .module))
+                    .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
+            }
             if copies.wrappedValue > 0 {
                 if limit > 1 {
                     HStack {
@@ -40,13 +48,12 @@ public struct OfferedCredentialRow: View {
                             identifier: "issuance-copies-\(credential.configurationID)")
                     }
                     .padding(.horizontal, 16)
-                } else {
-                    Text(String(localized: "1 copy", bundle: .module))
-                        .font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 16)
                 }
             }
-            WalletNavigationRow(String(localized: "Credential information", bundle: .module)) { showDetails = true }
-                .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
+            if allowsSelection {
+                WalletNavigationRow(String(localized: "Credential information", bundle: .module)) { showDetails = true }
+                    .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
+            }
         }
         .walletReviewDestination(isPresented: $showDetails) {
             Group {
@@ -65,16 +72,25 @@ public struct OfferedCredentialRow: View {
 
     @ViewBuilder private var identity: some View {
         if largeArt {
-            VStack(alignment: .leading, spacing: 16) {
+            ZStack(alignment: .bottomLeading) {
                 CredentialCardArtView(summary: .offered(from: credential))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(CredentialCardSummary.offered(from: credential).title)
                     .accessibilityIdentifier("issuance-large-art-\(credential.configurationID)")
-                HStack(spacing: 12) {
-                    Text(CredentialCardSummary.offered(from: credential).title).font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityIdentifier("issuance-identity-\(credential.configurationID)")
-                    selection(showsLabel: false)
+                Button { showDetails = true } label: {
+                    Image(systemName: "info.circle")
+                        .resizable().frame(width: 20, height: 20)
+                        .foregroundStyle(Color(css: CredentialCardSummary.offered(from: credential).textColor) ?? .white)
+                        .frame(width: 48, height: 48).contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Credential information", bundle: .module))
+                .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
+                // Align the 20pt icon with the card's 16pt inset: 2 + (48 - 20) / 2.
+                .padding(2)
             }
+        } else if !allowsSelection {
+            HStack(spacing: 12) { summary; selection(showsLabel: false) }
         } else if #available(iOS 16, *) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) { summary; selection(showsLabel: false) }
@@ -98,8 +114,12 @@ public struct OfferedCredentialRow: View {
     }
 
     @ViewBuilder private func selection(showsLabel: Bool) -> some View {
-        if showsLabel { toggle }
-        else { toggle.labelsHidden().fixedSize() }
+        if allowsSelection {
+            if showsLabel { toggle }
+            else { toggle.labelsHidden().fixedSize() }
+        } else {
+            Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary).accessibilityHidden(true)
+        }
     }
 
     private var toggle: some View {

@@ -33,6 +33,6 @@ internal fun CredentialCard(
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         }
     } else {
-        CredentialCardArt(art = display.toCardArt(), modifier = modifier.fillMaxWidth().clickable(onClick = onClick))
+        CredentialCardArt(art = display.toCardArt(), modifier = modifier.fillMaxWidth(), onClick = onClick)
     }
 }

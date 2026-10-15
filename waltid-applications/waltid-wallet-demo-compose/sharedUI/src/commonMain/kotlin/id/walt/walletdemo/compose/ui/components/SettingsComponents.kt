@@ -10,10 +10,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
@@ -179,6 +181,8 @@ internal fun SettingsCopyRow(
         }.getOrDefault(value) else value
     }
     var expanded by rememberSaveable { mutableStateOf(disclosureLabels == null) }
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f,
+        WalletMotion.disclosure(LocalWalletVisualPreferences.current.reduceMotion), label = "settings-chevron")
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(2_000); copied = false } }
     WalletSection {
@@ -188,8 +192,8 @@ internal fun SettingsCopyRow(
             trailingContent = {
                 Row {
                     if (disclosureLabels != null) IconButton(onClick = { expanded = !expanded }) {
-                        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            if (expanded) disclosureLabels.second else disclosureLabels.first)
+                        Icon(Icons.Default.KeyboardArrowDown,
+                            if (expanded) disclosureLabels.second else disclosureLabels.first, Modifier.rotate(rotation))
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
                         value?.let { text ->
@@ -209,10 +213,12 @@ internal fun SettingsCopyRow(
                 }
             },
         )
-        if (expanded) SelectionContainer {
-            Text(displayValue?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.settings_unavailable),
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(valueTag),
-                style = MaterialTheme.typography.bodySmall)
+        WalletExpandableContent(expanded) {
+            SelectionContainer {
+                Text(displayValue?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.settings_unavailable),
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(valueTag),
+                    style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

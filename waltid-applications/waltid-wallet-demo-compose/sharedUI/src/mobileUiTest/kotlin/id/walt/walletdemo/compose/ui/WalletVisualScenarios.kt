@@ -379,14 +379,19 @@ internal class WalletVisualScenarios(
     fun singleOffer() = with(test) {
         val credential = WalletVisualFixtures.offer.offeredCredentials.first()
         val state = WalletDemoUiState(
-            offerPreview = WalletVisualFixtures.offer.copy(offeredCredentials = listOf(credential)),
+            offerPreview = WalletVisualFixtures.offer.copy(offeredCredentials = listOf(credential), batchSize = null),
             issuanceCopyCounts = mapOf(credential.configurationId to 1))
         content {
             ReceiveTab(state, state.requestDrafts, onTxCodeChange = {},
                 onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {},
                 onDeclineOffer = {}, onResumeDeferred = {}, onDone = {}, onRefresh = {})
         }
-        onNodeWithTag("issuance-select-${credential.configurationId}").assertIsDisplayed()
+        onNodeWithTag("issuance-select-${credential.configurationId}").assertDoesNotExist()
+        onNodeWithTag("issuance-copies-${credential.configurationId}").assertDoesNotExist()
+        onNodeWithTag("issuance-details-${credential.configurationId}").assertIsDisplayed().assertHasClickAction()
+            .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+            .assertContentDescriptionEquals("Credential information")
+        onNodeWithTag("issuance-identity-${credential.configurationId}", useUnmergedTree = true).assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
         capture("batch.offer.single_full_art")
     }
@@ -446,7 +451,7 @@ internal class WalletVisualScenarios(
         if (compact) {
             onNodeWithTag("issuance-select-resident-card").assertIsDisplayed()
             capture("batch.offer.compact_dark_large_text")
-            onNodeWithText("Selected: 2 · Copies: 3").performScrollTo().assertIsDisplayed()
+            onNodeWithText("2 of 2 credential types selected").performScrollTo().assertIsDisplayed()
             onNodeWithTag("issuance-more-library-card").assertIsDisplayed()
             action.assertIsDisplayed().assertIsEnabled()
             capture("batch.offer.compact_dark_large_text.last_target")

@@ -74,7 +74,7 @@ private struct SavedCredentialRow: View {
         Button { detailsOpen = true } label: {
             HStack {
                 CredentialSummaryRow(summary: .stored(from: credential))
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }.padding(16).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("issuance-saved-\(credential.id)")
         .walletReviewDestination(isPresented: $detailsOpen) {

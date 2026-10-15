@@ -1,11 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,9 +68,7 @@ internal fun MetadataDisclosure(
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
                 modifier = Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
         }
-        AnimatedVisibility(expanded,
-            enter = expandVertically(WalletMotion.disclosure(reduceMotion)) + fadeIn(WalletMotion.disclosure(reduceMotion)),
-            exit = shrinkVertically(WalletMotion.disclosure(reduceMotion)) + fadeOut(WalletMotion.disclosure(reduceMotion))) {
+        WalletExpandableContent(expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
         }
     }

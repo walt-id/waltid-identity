@@ -285,6 +285,14 @@ public extension SharingReviewModel {
         }
     }
 
+    /// A sole required match is a fact; alternatives and optional credentials remain choices.
+    func allowsCredentialSelection(_ option: PresentationCredentialOption) -> Bool {
+        if credentialOptions.filter({ $0.queryID == option.queryID }).count > 1 { return true }
+        let withoutQuery = Dictionary(grouping: credentialOptions.filter { $0.queryID != option.queryID }, by: \.queryID)
+            .values.compactMap { $0.first?.selection }
+        return hasCompleteCredentialSelection(Set(withoutQuery))
+    }
+
     /// Applies a credential toggle.
     ///
     /// Selecting a credential for a query that does not allow multiple matches replaces that query's

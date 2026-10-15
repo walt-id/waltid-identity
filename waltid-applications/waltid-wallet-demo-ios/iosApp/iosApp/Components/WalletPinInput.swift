@@ -35,6 +35,8 @@ struct WalletPinInput: View {
                             .frame(width: width, height: 44)
                         }
                     }
+                    // PIN positions follow the numeric input order even in an RTL interface.
+                    .environment(\.layoutDirection, .leftToRight)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .allowsHitTesting(false)

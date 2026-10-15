@@ -49,14 +49,16 @@ struct ProximityReviewContent: View {
                 }
             }
 
-            WalletSection("Select credentials to share") {
+            WalletSection(review.documents.contains { $0.credentialOptions.count > 1 }
+                ? "Select credentials to share" : "Requested credentials") {
                 VStack(spacing: 0) {
                     ForEach(review.documents) { document in
                         ForEach(Array(document.credentialOptions.enumerated()), id: \.element.id) { index, credential in
                             if index > 0 { Divider() }
                             ReviewCredentialChoice(
                                 selected: selections.first(where: { $0.requestIndex == document.requestIndex })?.credentialID == credential.credentialID,
-                                enabled: enabled, onSelect: { onSelectCredential(document.requestIndex, credential.credentialID) }) {
+                                enabled: enabled, readOnly: document.credentialOptions.count == 1,
+                                onSelect: { onSelectCredential(document.requestIndex, credential.credentialID) }) {
                                 if let details = credentialDetailsByID[credential.credentialID] {
                                     CredentialSummaryRow(summary: details.cardSummary)
                                 } else {

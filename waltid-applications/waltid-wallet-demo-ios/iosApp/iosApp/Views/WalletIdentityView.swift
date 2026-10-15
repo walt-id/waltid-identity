@@ -21,8 +21,8 @@ struct WalletIdentityView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if model.identity == nil {
                 WalletFooter {
-                    if model.busy { ProgressView(model.progress).frame(maxWidth: .infinity, alignment: .leading) }
-                    else if model.refreshing || !model.loaded { ProgressView("Loading signing key options…").frame(maxWidth: .infinity, alignment: .leading) }
+                    if model.busy { WalletProgressRow(model.progress) }
+                    else if model.refreshing || !model.loaded { WalletProgressRow("Loading signing key options…") }
                     else if let message = model.setupMessage { Text(message).font(.callout).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading) }
                     if let selected = model.selected {
                         WalletActions(
@@ -76,7 +76,7 @@ struct WalletIdentityView: View {
                     Section("Key backup") {
                         identityActions
                         if let message = model.message { Text(message).foregroundStyle(.red) }
-                        if model.busy { ProgressView(model.progress) }
+                        if model.busy { WalletProgressRow(model.progress) }
                     }
                 }
             } else if let selected = model.selected {
@@ -106,7 +106,7 @@ struct WalletIdentityView: View {
             }
             Section {
                 if model.identity != nil && (model.refreshing || !model.loaded) {
-                    ProgressView("Loading signing key details…")
+                    WalletProgressRow("Loading signing key details…")
                 }
                 if model.loaded && !model.refreshing && model.identity == nil && model.setupOptions.isEmpty && model.choices.isEmpty && model.message == nil {
                     Text("No signing key options are available for this device and app configuration.")

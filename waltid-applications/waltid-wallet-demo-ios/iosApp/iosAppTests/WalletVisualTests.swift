@@ -333,7 +333,7 @@ final class WalletVisualTests: XCTestCase {
         model.isReady = true
         model.statusMessage = ""
         model.offerPreview = IssuanceOfferPreview(grant: offer.grant, issuer: offer.issuer,
-            credentials: [credential], transactionCode: offer.transactionCode, batchSize: offer.batchSize)
+            credentials: [credential], transactionCode: offer.transactionCode, batchSize: nil)
         model.issuanceCopyCounts = [credential.configurationID: 1]
         XCTAssertTrue(model.acceptOfferEnabled)
         try capture(ReceiveView(viewModel: model), id: "batch.offer.single_full_art")

@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
@@ -23,6 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -42,7 +46,7 @@ import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import kotlin.math.abs
 
-private val CollapsedErrorHeight = 64.dp
+private val ErrorMinimumHeight = 64.dp
 private const val SwipeDismissThreshold = 80f
 
 @Composable
@@ -55,6 +59,11 @@ internal fun StatusCard(
     val banner = state.statusBanner() ?: return
     val dismissable = banner.kind == WalletStatusKind.Success || banner.kind == WalletStatusKind.Error
     val expanded = state.isStatusExpanded
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val expansion = updateTransition(expanded, label = "error-expansion")
+    val rotation by expansion.animateFloat(transitionSpec = { WalletMotion.disclosure(reduceMotion) },
+        label = "error-chevron") { if (it) 180f else 0f }
+    TrackWalletExpansion(expansion.isRunning || expansion.currentState != expansion.targetState)
     val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val contentColor = if (banner.kind == WalletStatusKind.Error) MaterialTheme.colorScheme.error
         else MaterialTheme.colorScheme.onSurfaceVariant
@@ -92,9 +101,10 @@ internal fun StatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize(WalletMotion.disclosure(reduceMotion), alignment = Alignment.TopStart)
                 .then(
-                    if (banner.kind == WalletStatusKind.Error && !expanded) {
-                        Modifier.heightIn(min = CollapsedErrorHeight)
+                    if (banner.kind == WalletStatusKind.Error) {
+                        Modifier.heightIn(min = ErrorMinimumHeight)
                     } else {
                         Modifier
                     },
@@ -133,7 +143,8 @@ internal fun StatusCard(
                     modifier = Modifier.testTag(WalletUiTestTags.StatusExpand),
                 ) {
                     Icon(
-                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        modifier = Modifier.rotate(rotation),
                         contentDescription = if (expanded) "Collapse error" else "Expand error",
                     )
                 }

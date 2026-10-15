@@ -28,12 +28,15 @@ struct OfferReviewView: View {
                                 issuerIdentifier: preview.issuer.identifier,
                                 copies: Binding(get: { copies[credential.configurationID] ?? 1 },
                                                 set: { onCopiesChange(credential.configurationID, $0) }),
-                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled, largeArt: preview.credentials.count == 1)
+                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled,
+                                allowsSelection: preview.credentials.count > 1, largeArt: preview.credentials.count == 1)
                             if credential.configurationID != preview.credentials.last?.configurationID { Divider() }
                         }
                     }
                 }
-                Text(selectionSummary).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 16)
+                if preview.credentials.count > 1 {
+                    Text(selectionSummary).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 16)
+                }
             }
 
             if preview.grant == .authorizationCode {
@@ -96,7 +99,7 @@ struct OfferReviewView: View {
     private var selectionSummary: String {
         let selected = preview.credentials.map { copies[$0.configurationID] ?? 1 }.filter { $0 > 0 }
         return selected.isEmpty ? String(localized: "Select at least one credential to continue.")
-            : String(format: String(localized: "Selected: %d · Copies: %d"), selected.count, selected.reduce(0, +))
+            : String(format: String(localized: "%d of %d credential types selected"), selected.count, preview.credentials.count)
     }
 
 

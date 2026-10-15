@@ -52,9 +52,9 @@ internal fun OfferReviewSection(
             val selected = preview.offeredCredentials.map { copies[it.configurationId] ?: 1 }.filter { it > 0 }
             WalletSection(
                 title = stringResource(Res.string.issuance_offered_credentials),
-                footer = if (onCopiesChange == null) null else if (selected.isEmpty())
+                footer = if (onCopiesChange == null || preview.offeredCredentials.size == 1) null else if (selected.isEmpty())
                     stringResource(Res.string.issuance_select_one)
-                else stringResource(Res.string.issuance_selection_summary, selected.size, selected.sum()),
+                else stringResource(Res.string.issuance_selection_summary, selected.size, preview.offeredCredentials.size),
                 modifier = Modifier.testTag(WalletUiTestTags.OfferCredentialsSection),
             ) {
                 preview.offeredCredentials.forEachIndexed { index, credential ->
@@ -66,6 +66,7 @@ internal fun OfferReviewSection(
                         count = copies[credential.configurationId] ?: 1,
                         limit = issuanceCopyLimit(preview, copies, credential.configurationId),
                         enabled = reviewEnabled,
+                        allowsSelection = preview.offeredCredentials.size > 1,
                         largeArt = preview.offeredCredentials.size == 1,
                         onCountChange = onCopiesChange?.let { change -> { count -> change(credential.configurationId, count) } },
                     )

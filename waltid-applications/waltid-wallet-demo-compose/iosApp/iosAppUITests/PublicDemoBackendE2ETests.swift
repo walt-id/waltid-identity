@@ -103,7 +103,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     func testNearbyConnectionOptionsReturnToTheTaskAndCloseOnce() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: isolatedWalletEnvironment())
+        let environment = isolatedWalletEnvironment()
+        configurePinOnlyProfile(app, environment: environment)
+        ui.launch(environment: environment, initializeSigningIdentity: false)
+        completePinOnlySetup(app, ui: ui)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Share nearby")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))

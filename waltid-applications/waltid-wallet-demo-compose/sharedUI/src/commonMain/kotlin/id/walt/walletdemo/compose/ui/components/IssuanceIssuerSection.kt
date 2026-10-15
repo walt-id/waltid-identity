@@ -10,12 +10,11 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 @Composable
 internal fun IssuanceIssuerSection(issuer: WalletDemoIssuerMetadata) {
     var issuerExpanded by rememberSaveable(issuer.credentialIssuer) { mutableStateOf(false) }
-    val issuerName = issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
     val issuerIdentifier = issuer.credentialIssuer.trim()
     val issuerDetails = listOf(
         MetadataDetailItem(
             label = "Credential Issuer",
-            value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
+            value = issuerIdentifier,
             linkUri = issuerIdentifier,
         ),
     ).filter { !it.value.isNullOrBlank() }
