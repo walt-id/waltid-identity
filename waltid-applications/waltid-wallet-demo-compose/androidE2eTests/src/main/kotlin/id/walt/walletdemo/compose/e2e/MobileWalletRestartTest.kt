@@ -59,7 +59,8 @@ class MobileWalletRestartTest {
         assertEquals("Wallet process must terminate", "", device.executeShellCommand("pidof $appId").trim())
         assertEquals("Test runner must survive the restart", runnerPid, Process.myPid())
         launchAndUnlock(context, device, initializeSigningIdentity = false)
-        expectStatus("Wallet ready", WALLET_READY_TIMEOUT)
+        assertTrue("Wallet must return Home after restart",
+            waitForResource(device, "wallet.scanButton", WALLET_READY_TIMEOUT) != null)
         assertNotEquals(walletPid, device.executeShellCommand("pidof $appId").trim())
         assertFalse("Restart must reuse the saved identity", device.hasObject(By.res("wallet.keySetupContinue")))
         assertEquals(savedCredentialIds, credentialIds())
@@ -81,9 +82,9 @@ class MobileWalletRestartTest {
             waitForResource(device, action, CREDENTIAL_OPERATION_TIMEOUT) != null)
     }
 
-    private fun expectStatus(prefix: String, timeoutMs: Long = CREDENTIAL_OPERATION_TIMEOUT) {
+    private fun expectStatus(prefix: String) {
         val matched = waitForStatus(
-            device, timeoutMs, { it.startsWith(prefix) },
+            device, CREDENTIAL_OPERATION_TIMEOUT, { it.startsWith(prefix) },
             listOf("Receive failed", "Preview failed", "Present failed", "Bootstrap failed"),
         )
         assertTrue("Expected $prefix, got ${latestStatus(device)}", matched)
