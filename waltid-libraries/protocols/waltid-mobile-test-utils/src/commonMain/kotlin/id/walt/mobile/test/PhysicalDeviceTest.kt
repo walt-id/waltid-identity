@@ -1,6 +1,6 @@
 package id.walt.mobile.test
 
 /** Requires real hardware. Individual suites separately declare any operator interaction. */
-@Target(AnnotationTarget.CLASS)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class PhysicalDeviceTest
