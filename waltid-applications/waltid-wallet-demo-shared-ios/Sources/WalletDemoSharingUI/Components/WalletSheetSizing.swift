@@ -49,7 +49,10 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
         guard #available(iOS 16, *), activePage === page, height.isFinite, height > 0,
               let presentation = owner.sheetPresentationController else { return }
         let rounded = ceil(height)
+        // SwiftUI can reset the same presentation controller when the task root changes.
+        // Reinstall our detent after scanner/loading/review transitions, not only for a new host.
         let needsConfiguration = sheet !== presentation
+            || presentation.detents.map(\.identifier) != [identifier]
         guard needsConfiguration || self.height != rounded else { return }
         self.height = rounded
         let changes = { [self] in
