@@ -41,7 +41,7 @@
         "scripts/ios_simulator_test.py",
         "scripts/tests/test_*recovery*",
         ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
-        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/test-ios-keychain.sh",
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/*",
         "*/src/recoveryTest/*",
         "*/src/iosRecoveryTest/*"
       ]
