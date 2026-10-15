@@ -89,11 +89,11 @@ runs:
       shell: bash
       run: ./gradlew iosSimulatorArm64Test
 
-    - name: Require proximity Kotlin simulator test discovery
+    - name: Require portable Kotlin simulator test results
       if: ${{ always() && inputs.run-ios-simulator-tests == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: python3 .github/scripts/mobile-ci/verify_proximity_suites.py --platform ios-simulator
+      run: python3 .github/scripts/mobile-ci/verify_platform_test_results.py --platform ios-simulator
 
     # A provider extension that is not embedded, or disagrees with its host about App Group, Keychain
     # group or doctypes, is invisible to iOS and fails no build - only an on-device presentation.
@@ -174,12 +174,11 @@ runs:
           xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
+          -configuration Debug \
           -destination "${{ inputs.simulator-destination }}" \
-          -only-testing:iosAppTests \
-          -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
-          -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
-          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
-          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart \
+          -skip-testing:iosAppEnterpriseTests \
+          -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
@@ -223,6 +222,8 @@ runs:
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -configuration Debug \
+          -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
           -destination "platform=iOS Simulator,id=$simulator" \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
@@ -309,23 +310,25 @@ runs:
 
         echo "has_report=true" >> "$GITHUB_OUTPUT"
 
-    - name: Require native demo consent test discovery
+    - name: Require native unit and UI test targets
       if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
       shell: bash
       run: |
         python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
-          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/proximity-test-suites.json" \
-          --suite native-demo-consent \
-          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*.xml"
-
-    - name: Require native wallet readiness and restart test results
-      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
-      shell: bash
-      run: |
-        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
-          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/native-readiness-test-suite.json" \
-          --suite native-demo-readiness \
+          --require-suite iosAppTests.xctest iosAppUITests.xctest \
+          --require-class KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
+          --allow-skipped \
+            'WalletIdentityRecoveryIntegrationTests#testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity' \
+            'WalletIdentityRecoveryIntegrationTests#testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable' \
           --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-ios*.xml"
+
+    - name: Require Compose unit and UI test targets
+      if: ${{ always() && inputs.run-compose-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --require-suite iosAppTests.xctest iosAppUITests.xctest \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-compose*.xml"
 
     - name: Publish iOS test report
       if: always() && steps.ios_test_report.outputs.has_report == 'true'

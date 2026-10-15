@@ -119,12 +119,6 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     }
 }
 
-// iOS test binaries do not get the Xcode SwiftPM linkage package used by the demo app.
-// Keep iOS source/test compilation enabled, but skip native test executable linking.
-tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
-    enabled = false
-}
-
 if (enableMobileWallet) {
     val fixture = layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/key-attestation")
     extra["demoKeyAttestationFixture"] = fixture

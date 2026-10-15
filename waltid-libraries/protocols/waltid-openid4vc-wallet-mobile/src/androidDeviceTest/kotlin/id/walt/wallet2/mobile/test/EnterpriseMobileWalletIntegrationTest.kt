@@ -11,6 +11,11 @@ import id.walt.wallet2.mobile.ScaAuthorizationTestActivity
 import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import org.junit.Assume.assumeTrue
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
+import androidx.test.uiautomator.UiDevice
+import id.walt.mobile.test.PhysicalDeviceTest
+import kotlinx.coroutines.delay
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
@@ -31,6 +36,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.UUID
+import java.util.regex.Pattern
 import kotlin.test.assertIs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -152,7 +158,21 @@ class EnterpriseMobileWalletIntegrationTest {
         reopened.signingIdentity.initialize().activeIdentity()
         BatchAuthorizationTestActivity.callback = CompletableDeferred()
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authorization.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        val callback = withTimeout(120_000) { BatchAuthorizationTestActivity.callback.await() }
+        val callback = withTimeout(120_000) {
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            while (!BatchAuthorizationTestActivity.callback.isCompleted) {
+                // Approve browser onboarding and the external-app handoff, never a signing prompt.
+                try {
+                    device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
+                        "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
+                    )))?.click()
+                } catch (_: StaleObjectException) {
+                    // Chrome changed pages after lookup; the next iteration queries the new page.
+                }
+                delay(250)
+            }
+            BatchAuthorizationTestActivity.callback.await()
+        }
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
             reopened.continueAuthorizationIssuance(session.id, callback))
         assertEquals(2, stored.credentialIds.toSet().size)
@@ -161,6 +181,7 @@ class EnterpriseMobileWalletIntegrationTest {
 
     /** Operator-gated physical-device check; cancel the second holder's signing prompt. */
     @Test
+    @PhysicalDeviceTest
     fun batchSigningCancellationStoresNoCredential() = runBlocking {
         assumeTrue("Requires an operator cancelling the signing prompt",
             InstrumentationRegistry.getArguments().getString("wallet.batch.cancel") == "true")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require named production-path tests in JUnit results, independent of runner exit status."""
+"""Reject missing suites, failures and unexpected skips in JUnit results."""
 
 import argparse
 import glob
@@ -25,70 +25,87 @@ def test_class(value):
     return value
 
 
-def verify(reports, required, forbidden_prefixes=()):
+def test_id(value):
+    classname, separator, name = value.partition("#")
+    if not separator or not classname or not name:
+        raise EvidenceError(f"Expected Class#method, got: {value}")
+    return test_class(classname), test_name(name)
+
+
+def verify(reports, *, required_suites=(), required_classes=(),
+           allowed_skips=(), forbidden_prefixes=()):
+    reports = sorted(set(map(Path, reports)))
     if not reports:
         raise EvidenceError("No JUnit reports found")
-    if not required:
-        raise EvidenceError("At least one expected test ID is required")
-    expected = {(item["class"], test_name(item["name"])) for item in required}
-    if len(expected) != len(required):
-        raise EvidenceError("Duplicate expected test ID")
-    owned_classes = {item[0] for item in expected}
-    passed = set()
+    allowed_skips = {test_id(value) for value in allowed_skips}
+    passed_classes, passed_suites = set(), set()
     counts = dict(executed=0, passed=0, skipped=0, failed=0)
     problems = []
-    for report in sorted(set(map(Path, reports))):
+    for report in reports:
         try:
             root = ET.parse(report).getroot()
         except (OSError, ET.ParseError) as error:
             raise EvidenceError(f"Unreadable JUnit report: {report}: {error}") from error
         if root.tag not in {"testsuite", "testsuites"}:
             raise EvidenceError(f"Not a JUnit report: {report}")
-        for case in root.iter("testcase"):
+        cases = list(root.iter("testcase"))
+        if not cases:
+            problems.append(f"Empty JUnit report: {report}")
+        passed_cases = set()
+        for case in cases:
             identity = (test_class(case.get("classname", "")), test_name(case.get("name", "")))
             if not all(identity):
                 raise EvidenceError(f"Unnamed test case in {report}")
             if any(identity[0].startswith(prefix) for prefix in forbidden_prefixes):
                 problems.append(f"Physical test entered a CI-safe suite: {identity}")
-            if case.find("skipped") is not None or case.get("status") in {"notrun", "disabled"}:
+            # A skip or a later retry must never hide a failure.
+            if case.find("failure") is not None or case.find("error") is not None:
+                counts["executed"] += 1
+                counts["failed"] += 1
+                problems.append(f"Failed test: {identity}")
+            elif case.find("skipped") is not None or case.get("status") in {"notrun", "disabled", "skipped"}:
                 counts["skipped"] += 1
-                if identity[0] in owned_classes:
+                if identity not in allowed_skips:
                     problems.append(f"Unexpected skipped test: {identity}")
             else:
                 counts["executed"] += 1
-                if case.find("failure") is not None or case.find("error") is not None:
-                    counts["failed"] += 1
-                    problems.append(f"Failed test: {identity}")
-                else:
-                    counts["passed"] += 1
-                    passed.add(identity)
+                counts["passed"] += 1
+                passed_classes.add(identity[0])
+                passed_cases.add(case)
         # A runner/setup error may exist at suite level without a test case.
-        for suite in root.iter("testsuite"):
+        for suite in root.iter():
+            if suite.tag not in {"testsuite", "testsuites"}:
+                continue
             if (suite.find("error") is not None or suite.find("failure") is not None
                     or any(int(suite.get(attribute, "0")) > 0 for attribute in ("errors", "failures"))):
                 problems.append(f"Suite setup/teardown failed: {suite.get('name', report.name)}")
+            if any(case in passed_cases for case in suite.iter("testcase")):
+                passed_suites.add(suite.get("name", ""))
     if counts["executed"] == 0:
         problems.append("No tests executed")
-    problems.extend(f"Expected test did not pass: {identity}" for identity in sorted(expected - passed))
+    problems.extend(f"Expected suite did not execute: {name}" for name in sorted(set(required_suites) - passed_suites))
+    problems.extend(f"Expected class did not execute: {name}" for name in sorted(set(required_classes) - passed_classes))
     if problems:
         raise EvidenceError("\n".join(problems))
-    return counts | {"requiredPassed": len(expected), "reports": len(set(map(Path, reports)))}
+    return counts | {"requiredSuitesPassed": len(set(required_suites)),
+                     "requiredClassesPassed": len(set(required_classes)),
+                     "reports": len(reports)}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", required=True, type=Path)
-    parser.add_argument("--suite", required=True)
     parser.add_argument("--reports", nargs="+", required=True, help="JUnit files or quoted glob patterns")
+    parser.add_argument("--require-suite", nargs="+", default=[], help="Each target/suite must contain a passing case")
+    parser.add_argument("--require-class", nargs="+", default=[], help="Each critical class must contain a passing case")
+    parser.add_argument("--allow-skipped", nargs="+", default=[], help="Class#method for intentional skips only")
     args = parser.parse_args()
     try:
-        manifest = json.loads(args.manifest.read_text())
-        suite = manifest["suites"][args.suite]
         reports = [path for pattern in args.reports for path in glob.glob(pattern, recursive=True)]
-        result = verify(reports, suite["requiredTests"], manifest["physicalClassPrefixes"])
-    except (EvidenceError, OSError, ValueError, KeyError) as error:
+        result = verify(reports, required_suites=args.require_suite, required_classes=args.require_class,
+                        allowed_skips=args.allow_skipped)
+    except (OSError, ValueError) as error:
         parser.exit(1, f"Test evidence rejected: {error}\n")
-    print(json.dumps({"suite": args.suite, **result}, sort_keys=True))
+    print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == "__main__":
