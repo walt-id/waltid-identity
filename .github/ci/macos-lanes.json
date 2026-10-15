@@ -54,6 +54,7 @@
         "scripts/check-mobile-swift-parity-decision.sh",
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
         "waltid-libraries/protocols/waltid-openid4vp-wallet/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
@@ -68,6 +69,7 @@
       "patterns": [
         "waltid-applications/waltid-wallet-demo-compose/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
@@ -82,6 +84,7 @@
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-compose/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
         "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",

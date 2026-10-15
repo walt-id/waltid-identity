@@ -99,6 +99,20 @@
       "lanes": ["native", "compose", "enterprise"]
     },
     {
+      "name": "shared iOS E2E backend fixtures select their demo consumers",
+      "files": [
+        "waltid-applications/mobile-e2e-fixtures/ios/TestHelpers/DemoBackend.swift"
+      ],
+      "lanes": ["native", "compose", "enterprise"]
+    },
+    {
+      "name": "shared Kotlin mobile test utilities select simulator compilation",
+      "files": [
+        "waltid-libraries/protocols/waltid-mobile-test-utils/src/commonMain/kotlin/id/walt/mobile/test/backend/DemoTestBackend.kt"
+      ],
+      "lanes": ["ios-simulator"]
+    },
+    {
       "name": "build-logic change selects every macOS lane",
       "files": [
         "build-logic/src/main/kotlin/id/walt/convention/KotlinConvention.kt"
