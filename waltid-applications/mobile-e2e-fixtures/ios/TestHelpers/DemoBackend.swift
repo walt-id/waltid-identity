@@ -106,9 +106,13 @@ public final class DemoBackend {
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
     public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
-    // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks (verified 2026-10-01).
-    // This independent pin must not be learned from the signed metadata JWT.
-    private static let issuerMetadataSigningKeyThumbprint = "DOiRtPhc0Hre1XZwBVjx_YoGugtAEtWNrKCZ4zerXs4"
+    // Public issuer2 metadata signing key from HTTPS /openid4vci/jwks (verified 2026-10-15).
+    // This fixed trust anchor is independent of key material in the JWS header.
+    private static let issuerMetadataSigningJWK = [
+        "kty": "EC", "crv": "P-256",
+        "x": "Cq8HolBA1S5sXphMY-Afe2xeXggvZignanlnxsQiNTU",
+        "y": "Ct4xSGVYXjac9dP98cvS75HBYxmJf2DlsL5_VF2WZhQ",
+    ]
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
     /// Pre-registered client ID trusted by the signed-request integration tests.
     public static let verifierClientID = "verifier2"
@@ -225,24 +229,12 @@ public final class DemoBackend {
               let header = try JSONSerialization.jsonObject(with: headerData) as? [String: Any],
               let algorithm = header["alg"] as? String,
               algorithm == "ES256",
-              let jwk = header["jwk"] as? [String: Any],
-              jwk["kty"] as? String == "EC",
-              jwk["crv"] as? String == "P-256",
-              let x = jwk["x"] as? String,
-              let y = jwk["y"] as? String,
+              let x = issuerMetadataSigningJWK["x"],
+              let y = issuerMetadataSigningJWK["y"],
               let xData = base64URLData(x),
               let yData = base64URLData(y),
               let signatureData = base64URLData(String(parts[2])) else {
             throw NSError(domain: "WalletE2E", code: 310, userInfo: [NSLocalizedDescriptionKey: "Malformed public demo signed metadata"])
-        }
-        let thumbprintJwk = "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"\(x)\",\"y\":\"\(y)\"}"
-        let thumbprint = base64URLString(Data(SHA256.hash(data: Data(thumbprintJwk.utf8))))
-        guard thumbprint == Self.issuerMetadataSigningKeyThumbprint else {
-            throw NSError(
-                domain: "WalletE2E",
-                code: 312,
-                userInfo: [NSLocalizedDescriptionKey: "Public demo signed metadata key is not the pinned issuer2 signing key"]
-            )
         }
         let publicKey = try P256.Signing.PublicKey(x963Representation: Data([0x04]) + xData + yData)
         let signature = try P256.Signing.ECDSASignature(rawRepresentation: signatureData)

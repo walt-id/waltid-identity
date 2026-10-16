@@ -29,6 +29,13 @@
       "lanes": ["ios-simulator", "sdk-docs"]
     },
     {
+      "name": "Keychain result collector selects simulator coverage",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/run_keychain_tests.py"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
       "name": "library build.gradle.kts selects simulator only",
       "files": [
         "waltid-libraries/crypto/waltid-crypto/build.gradle.kts"
@@ -97,6 +104,20 @@
         "waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoShared/Shared.swift"
       ],
       "lanes": ["native", "compose", "enterprise"]
+    },
+    {
+      "name": "shared iOS E2E backend fixtures select their demo consumers",
+      "files": [
+        "waltid-applications/mobile-e2e-fixtures/ios/TestHelpers/DemoBackend.swift"
+      ],
+      "lanes": ["native", "compose", "enterprise"]
+    },
+    {
+      "name": "shared Kotlin mobile test utilities select simulator compilation",
+      "files": [
+        "waltid-libraries/protocols/waltid-mobile-test-utils/src/commonMain/kotlin/id/walt/mobile/test/backend/DemoTestBackend.kt"
+      ],
+      "lanes": ["ios-simulator"]
     },
     {
       "name": "build-logic change selects every macOS lane",

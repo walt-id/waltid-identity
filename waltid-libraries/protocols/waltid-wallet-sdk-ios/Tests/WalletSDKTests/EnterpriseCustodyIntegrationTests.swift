@@ -74,6 +74,13 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         let cases: [(String, SigningIdentityFailure)] = [("401", .providerInteractionRequired), ("409", .providerConflict),
             ("503", .providerUnavailable), ("malformed", .providerRejected), ("oversized", .providerRejected), ("mismatch", .providerConflict)]
         for (scenario, expected) in cases {
+            let started = ProcessInfo.processInfo.systemUptime
+            func recordProgress(_ phase: String) {
+                let elapsed = String(format: "%.3f", (ProcessInfo.processInfo.systemUptime - started) * 1_000)
+                FileHandle.standardError.write(Data("CUSTODY_FIXTURE \(scenario) \(phase) elapsed_ms=\(elapsed)\n".utf8))
+            }
+            recordProgress("begin")
+            defer { recordProgress("end") }
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [CustodyProtocolFixture.self]
             let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
@@ -86,18 +93,22 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
             let wallet = try await Wallet(configuration: .init(walletID: "custody-errors-\(UUID())",
                 persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
+            recordProgress("wallet-initialized")
             do {
                 let identities = await wallet.signingIdentity
                 guard case .available(let recommended, let alternatives) = try await identities.creationOptions(),
                       let option = ([recommended] + alternatives).first(where: { $0.storage == .encryptedDatabase }),
                       case .active(let identity) = try await identities.create(option) else { throw FixtureFailure.unexpectedState("Identity unavailable") }
+                recordProgress("identity-created")
                 let options = try await identities.custodyOptions(identityID: identity.id)
                 let choice = try XCTUnwrap(options.first)
                 guard case .failed(let actual) = try await identities.copyToCustody(choice) else { throw FixtureFailure.unexpectedState("Expected failure") }
+                recordProgress("custody-completed")
                 XCTAssertEqual(actual, expected, scenario)
                 guard case .active(let active) = try await identities.state() else { throw FixtureFailure.unexpectedState("Lost local identity") }
                 XCTAssertTrue(active.custody.isEmpty)
                 try await wallet.deleteLocalData()
+                recordProgress("deleted")
             } catch { try? await wallet.deleteLocalData(); throw error }
         }
     }
