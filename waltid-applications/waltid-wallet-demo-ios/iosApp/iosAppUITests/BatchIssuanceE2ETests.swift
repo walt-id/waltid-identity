@@ -29,7 +29,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         allowIdentityDocumentRegistrationIfRequested()
-        waitForIdleIssuanceDismissal(app, timeout: 90)
+        waitForIdleResultDismissal(app, timeout: 90)
 
         let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
         let twoCards = NSPredicate { _, _ in Set(cards.allElementsBoundByIndex.map(\.identifier)).count == 2 }

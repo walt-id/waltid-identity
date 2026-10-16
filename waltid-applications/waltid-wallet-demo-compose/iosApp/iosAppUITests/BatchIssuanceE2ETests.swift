@@ -32,7 +32,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
 
         allowIdentityDocumentRegistrationIfRequested()
 
-        waitForIdleIssuanceDismissal(app, timeout: 90)
+        waitForIdleResultDismissal(app, timeout: 90)
         let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
         let twoCards = NSPredicate { _, _ in Set(cards.allElementsBoundByIndex.map(\.identifier)).count == 2 }
         let stored = XCTNSPredicateExpectation(predicate: twoCards, object: nil)
