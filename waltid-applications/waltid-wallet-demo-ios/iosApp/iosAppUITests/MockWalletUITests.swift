@@ -777,12 +777,13 @@ final class MockWalletUITests: XCTestCase {
         details.name = "rtl-credential-information"
         details.lifetime = .keepAlways
         add(details)
-        // The compact sheet is inset from the screen; begin at its own leading edge.
-        let origin = app.coordinate(withNormalizedOffset: .zero)
-        let swipeY = navigationBar.frame.maxY + 40
-        origin.withOffset(CGVector(dx: navigationBar.frame.maxX - 3, dy: swipeY))
-            .press(forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: navigationBar.frame.minX + 40, dy: swipeY)))
-        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5))
+        // Resolve the inset sheet's edge when the gesture executes, after XCTest waits for idle.
+        // A previously sampled screen coordinate can precede the sheet's final resize.
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+            .withOffset(CGVector(dx: -3, dy: 40))
+            .press(forDuration: 0.05, thenDragTo: navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 1))
+                .withOffset(CGVector(dx: 40, dy: 40)))
+        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
         ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))

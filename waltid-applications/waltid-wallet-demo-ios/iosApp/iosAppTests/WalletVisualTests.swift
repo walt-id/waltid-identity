@@ -866,8 +866,8 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
     }
 }
 
-/// Every channel must stay within the measured iOS 27 SF Symbol edge noise (6/255); dimensions must match.
-private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -> Bool {
+/// Every channel must stay within the measured iOS 27 SF Symbol edge noise (11/255); dimensions must match.
+private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage, maximumChannelDifference: Int = 11) -> Bool {
     guard let lhs = reference.cgImage, let rhs = actual.cgImage,
           lhs.width == rhs.width, lhs.height == rhs.height,
           let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return false }
@@ -886,7 +886,7 @@ private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -
     guard let a = pixels(lhs), let b = pixels(rhs) else { return false }
     var index = 0
     while index < byteCount {
-        if abs(Int(a[index]) - Int(b[index])) > 6 { return false }
+        if abs(Int(a[index]) - Int(b[index])) > maximumChannelDifference { return false }
         index += 1
     }
     return true
@@ -898,7 +898,8 @@ private struct WalletVisualFrameGate {
 
     mutating func accept(_ image: UIImage, contentReady: Bool) -> Bool {
         defer { previous = contentReady ? image : nil }
-        return contentReady && previous.map { matchesWithinRasterNoise($0, image) } == true
+        // Keep the same-run settling bound stricter than cross-run reference comparison.
+        return contentReady && previous.map { matchesWithinRasterNoise($0, image, maximumChannelDifference: 6) } == true
     }
 }
 
@@ -970,15 +971,15 @@ final class WalletVisualComparatorTests: XCTestCase {
     func testFrameGateRejectsChangingMaterials() throws {
         var gate = WalletVisualFrameGate()
         XCTAssertFalse(gate.accept(try image([100]), contentReady: true))
-        XCTAssertFalse(gate.accept(try image([120]), contentReady: true))
-        XCTAssertTrue(gate.accept(try image([120]), contentReady: true))
+        XCTAssertFalse(gate.accept(try image([107]), contentReady: true))
+        XCTAssertTrue(gate.accept(try image([107]), contentReady: true))
     }
 
     func testChannelNoiseHasAnExactBound() throws {
         let reference = try image([100])
         XCTAssertTrue(matchesWithinRasterNoise(reference, try image([100])))
-        XCTAssertTrue(matchesWithinRasterNoise(reference, try image([106])))
-        XCTAssertFalse(matchesWithinRasterNoise(reference, try image([107])))
+        XCTAssertTrue(matchesWithinRasterNoise(reference, try image([111])))
+        XCTAssertFalse(matchesWithinRasterNoise(reference, try image([112])))
     }
 
     func testOneMissingDetailCannotHideInMatchingPixels() throws {

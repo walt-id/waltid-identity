@@ -411,16 +411,21 @@ final class WalletE2EUI {
         guard pinInput.waitForExistence(timeout: 10) else { return }
         let creating = app.staticTexts["Step 1 of 2"].exists
         replaceText(in: pinInput, value: pin)
+        var submittedInput = pinInput
         if creating {
             let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
             XCTAssertTrue(confirmation.waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
             replaceText(in: confirmation, value: pin)
+            submittedInput = confirmation
         }
-        let keyboardDismissed = XCTNSPredicateExpectation(
-            predicate: NSPredicate { [app] _, _ in !app.keyboards.firstMatch.exists }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [keyboardDismissed], timeout: 10), .completed,
-            "PIN verification must dismiss its keyboard before another flow starts")
+        // Verification and its keyboard transition are separate asynchronous operations.
+        guard submittedInput.waitForNonExistence(timeout: 10) else {
+            XCTFail("PIN verification did not leave its input screen: \(app.debugDescription)")
+            return
+        }
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 10),
+            "PIN verification must dismiss its keyboard before another flow starts: \(app.debugDescription)")
     }
 }
 
