@@ -26,13 +26,6 @@ enum class LicenseePolicy {
     }
 }
 
-data class AllowedDependency(
-    val group: String,
-    val artifact: String,
-    val version: String,
-    val reason: String,
-)
-
 object LicenseePolicies {
     // Named because they repeat across the SPDX list and the URL allow-list below: BSD-3-Clause is both an
     // SPDX identifier and the name reported for several URLs, and MIT_LICENSE_NAME is the name the POMs of
@@ -64,6 +57,7 @@ object LicenseePolicies {
         "CDDL-1.0",
         "CDDL-1.1",
         "MPL-2.0",
+        // Java classpath exception used by Jakarta APIs. This is not GPL-2.0-only.
         "GPL-2.0-with-classpath-exception",
     )
 
@@ -72,13 +66,6 @@ object LicenseePolicies {
         "LGPL-2.1-or-later",
         "LGPL-3.0-only",
         "LGPL-3.0-or-later",
-    )
-
-    private val gplSpdxIds = listOf(
-        "GPL-2.0-only",
-        "GPL-2.0-or-later",
-        "GPL-3.0-only",
-        "GPL-3.0-or-later",
     )
 
     private val allowedUrls = listOf(
@@ -119,50 +106,6 @@ object LicenseePolicies {
         "http://www.oracle.com/technetwork/licenses/upl-license-2927578.html" to "UPL-1.0",
     )
 
-    /**
-     * Version-pinned allowances for artifacts whose POMs omit or mis-declare a license
-     * that is otherwise acceptable for every product policy. Prefer [allowUrl] when the
-     * POM has a real license URL. Do not use this to paper over disallowed copyleft.
-     */
-    private val allowedDependencies = listOf<AllowedDependency>(
-        AllowedDependency(
-            group = "de.mkammerer",
-            artifact = "argon2-jvm",
-            version = "2.11",
-            reason = "LGPL-3.0-only; already shipped in the identity stack",
-        ),
-        AllowedDependency(
-            group = "de.mkammerer",
-            artifact = "argon2-jvm-nolibs",
-            version = "2.11",
-            reason = "LGPL-3.0-only; already shipped in the identity stack",
-        ),
-        AllowedDependency(
-            group = "com.mysql",
-            artifact = "mysql-connector-j",
-            version = "9.7.0",
-            reason = "GPL-2.0 with Universal FOSS Exception, compatible with Apache-2.0 products",
-        ),
-        AllowedDependency(
-            group = "com.microsoft.azure",
-            artifact = "msal4j",
-            version = "1.23.1",
-            reason = "MIT License; POM omits a license URL",
-        ),
-        AllowedDependency(
-            group = "com.microsoft.azure",
-            artifact = "msal4j-persistence-extension",
-            version = "1.3.0",
-            reason = "MIT License; POM omits a license URL",
-        ),
-        AllowedDependency(
-            group = "com.soywiz",
-            artifact = "korlibs-annotations",
-            version = "6.0.0",
-            reason = "MIT License; POM omits a license URL",
-        ),
-    )
-
     fun shouldCheck(project: Project): Boolean {
         val name = project.name
         return !name.endsWith("-test") && !name.endsWith("-tests")
@@ -186,9 +129,6 @@ object LicenseePolicies {
         val ids = (permissiveSpdxIds + weakCopyleftSpdxIds).toMutableList()
         if (policy == LicenseePolicy.Binary || policy == LicenseePolicy.Saas) {
             ids += lgplSpdxIds
-        }
-        if (policy == LicenseePolicy.Saas) {
-            ids += gplSpdxIds
         }
         return ids
     }
@@ -226,13 +166,23 @@ object LicenseePolicies {
                 because(reason)
             }
         }
-        allowedDependencies.forEach { dependency ->
-            licensee.allowDependency(dependency.group, dependency.artifact, dependency.version) {
-                because(dependency.reason)
-            }
-        }
+        ignoreNameOnlyMitCoordinates(licensee)
         licensee.unusedAction(UnusedAction.IGNORE)
         licensee.violationAction(ViolationAction.FAIL)
         project.logger.info("Configured Licensee policy {} for {}", policy, project.path)
+    }
+
+    /**
+     * These POMs say "MIT License" and include no URL. Licensee 1.14 can only
+     * allow a coordinate at one exact version, so a pin fails on every Azure SDK
+     * bump. The published license is MIT; ignoring the coordinate keeps that
+     * version free to move.
+     */
+    private fun ignoreNameOnlyMitCoordinates(licensee: LicenseeExtension) {
+        listOf("msal4j", "msal4j-persistence-extension").forEach { artifact ->
+            licensee.ignoreDependencies("com.microsoft.azure", artifact) {
+                because("MIT License with no URL or SPDX identifier.")
+            }
+        }
     }
 }
