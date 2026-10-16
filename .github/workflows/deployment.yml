@@ -123,3 +123,11 @@ jobs:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
         with:
           args: apply -n ${{ matrix.services.namespace }} -f ${{ matrix.services.k8s }}/deployment_mod.yaml
+
+      - name: Wait for issuer2 rollout - ${{ matrix.services.name }}
+        if: matrix.services.name == 'issuer2' && hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != ''
+        uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
+        with:
+          args: rollout status deployment/issuer2 -n ${{ matrix.services.namespace }} --timeout=180s
