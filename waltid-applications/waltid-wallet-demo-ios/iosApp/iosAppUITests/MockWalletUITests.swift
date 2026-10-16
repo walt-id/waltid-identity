@@ -58,21 +58,15 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         receiveMockCredential(app: app, ui: ui)
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 5))
-        let receivedSheetClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
-            object: app.buttons["issuance-done"])
-        XCTAssertEqual(XCTWaiter.wait(for: [receivedSheetClosed], timeout: 10), .completed)
-        let homeAfterReceive = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
-            object: app.buttons["wallet.scanButton"])
-        XCTAssertEqual(XCTWaiter.wait(for: [homeAfterReceive], timeout: 5), .completed)
+        ui.returnToWallet()
+        XCTAssertFalse(app.buttons["issuance-done"].exists)
+        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
         ui.openWalletLink("openid4vp://mock")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
         XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: 10))
-        let sharedSheetClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
-            object: app.buttons["wallet.presentationDone"])
-        XCTAssertEqual(XCTWaiter.wait(for: [sharedSheetClosed], timeout: 10), .completed)
-        let homeAfterSharing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
-            object: app.buttons["wallet.scanButton"])
-        XCTAssertEqual(XCTWaiter.wait(for: [homeAfterSharing], timeout: 5), .completed)
+        ui.returnToWallet()
+        XCTAssertFalse(app.buttons["wallet.presentationDone"].exists)
+        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
     }
 
