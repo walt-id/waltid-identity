@@ -237,7 +237,13 @@ final class WalletE2EUI {
         dismissKeyboardIfPresent()
         let home = app.buttons["wallet.scanButton"]
         for _ in 0..<6 {
-            let identifiers = ["wallet.presentationDone", "issuance-done", "wallet-detail-close",
+            // Untouched successes can disappear between an AX lookup and a tap.
+            // Tests that retain a result complete it explicitly before returning here.
+            if app.buttons["issuance-done"].exists || app.buttons["wallet.presentationDone"].exists {
+                waitForIdleResultDismissal(app)
+                return
+            }
+            let identifiers = ["wallet-detail-close",
                 "wallet.external.close", "wallet.detailsBack", "wallet.flowBack"]
             if let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) {
                 button.tap()
