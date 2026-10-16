@@ -30,15 +30,9 @@ final class BatchIssuanceE2ETests: XCTestCase {
         attachScreenshot(app, name: "Two copies selected before acceptance")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
-        // Apple's first mdoc registration waits for this system consent, outside the app hierarchy.
-        let registrationAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
-            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
-        if registrationAlert.waitForExistence(timeout: 15) {
-            registrationAlert.buttons["Allow"].tap()
-        }
+        allowIdentityDocumentRegistrationIfRequested()
 
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 90))
-        ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
+        waitForIdleIssuanceDismissal(app, timeout: 90)
         let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
         let twoCards = NSPredicate { _, _ in Set(cards.allElementsBoundByIndex.map(\.identifier)).count == 2 }
         let stored = XCTNSPredicateExpectation(predicate: twoCards, object: nil)

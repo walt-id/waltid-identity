@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A13330000000000000000030 /* WalletSDKKeychainRecovery in Embed Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13330000000000000000022 /* WalletIssuanceUI.swift */; };
 		A13330000000000000000020 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
 		A53800000000000000000004 /* WalletDemoKeyAttestation in Frameworks */ = {isa = PBXBuildFile; productRef = A53800000000000000000002 /* WalletDemoKeyAttestation */; };
 		A53800000000000000000005 /* WalletDemoKeyAttestation in Frameworks */ = {isa = PBXBuildFile; productRef = A53800000000000000000003 /* WalletDemoKeyAttestation */; };
@@ -183,6 +184,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A13330000000000000000022 /* WalletIssuanceUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletIssuanceUI.swift; path = "../../../mobile-e2e-fixtures/ios/WalletIssuanceUI.swift"; sourceTree = "<group>"; };
 		B14400000000000000000005 /* WalletAccessSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessSettingsView.swift; sourceTree = "<group>"; };
 		B14400000000000000000003 /* WalletAccessScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessScaffold.swift; sourceTree = "<group>"; };
 		B14400000000000000000001 /* WalletAccessController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessController.swift; sourceTree = "<group>"; };
@@ -479,6 +481,7 @@
 				A14440000000000000000002 /* BatchIssuanceE2ETests.swift */,
 				E2E00014AAAA000000000014 /* MockWalletUITests.swift */,
 				E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */,
+				A13330000000000000000022 /* WalletIssuanceUI.swift */,
 			);
 			path = iosAppUITests;
 			sourceTree = "<group>";
@@ -865,6 +868,7 @@
 				A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */,
 				E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */,
 				E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */,
+				A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
