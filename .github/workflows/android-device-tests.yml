@@ -111,11 +111,29 @@ jobs:
         id: android-device-phase
         run: ./waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh "${{ matrix.phase }}"
 
+      # Older runner tools misparse minor API versions as android-0, breaking graphics setup.
+      - name: Set up Android tools for the Enterprise provider image
+        if: matrix.phase == 'enterprise-mobile'
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
+          packages: ''
+
       - name: Preinstall Android emulator SDK packages
         if: matrix.phase != 'dc-api-compose'
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${{ matrix.phase }}" == "enterprise-mobile" ]]; then
+            # The emulator action prepends latest/bin, overriding setup-android's PATH entry.
+            selected_tools="$(dirname "$(dirname "$(command -v sdkmanager)")")"
+            if [[ "$selected_tools" != "$ANDROID_HOME/cmdline-tools/latest" ]]; then
+              rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+              ln -s "$selected_tools" "$ANDROID_HOME/cmdline-tools/latest"
+            fi
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --version
+          fi
 
           retry_sdkmanager_install() {
             local attempt
@@ -180,6 +198,9 @@ jobs:
           target: ${{ steps.android-device-phase.outputs.emulator_target }}
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
+          pre-emulator-launch-script: >-
+            if [ '${{ matrix.phase }}' = enterprise-mobile ]; then grep -Fx
+            'target=android-${{ steps.android-device-phase.outputs.emulator_api_level }}' "$ANDROID_AVD_HOME/test.avd/config.ini"; fi
           script: ${{ steps.android-device-phase.outputs.script }}
 
       - name: Run Digital Credentials device test
