@@ -405,7 +405,14 @@ public class MobileWallet internal constructor(
                     } else {
                         val bindings = when (holders) {
                             is MobileWalletCredentialHolders.Existing -> holders.bindings
-                            is MobileWalletCredentialHolders.NewKeys -> createIssuanceHolderKeys(holders.count).also { generated += it }
+                            is MobileWalletCredentialHolders.NewKeys -> {
+                                val active = signingIdentityManager?.state()
+                                val identity = (active as? id.walt.wallet2.mobile.identity.SigningIdentityState.Active)?.identity
+                                check(active == null || identity != null) { "The wallet requires an active signing identity" }
+                                createIssuanceHolderKeys(holders.count,
+                                    keyUseAuthorizationPolicy = identity?.authorization,
+                                ).also { generated += it }
+                            }
                         }
                         WalletCredentialSelection(
                             selection.credentialConfigurationId, selection.credentialIdentifier,
