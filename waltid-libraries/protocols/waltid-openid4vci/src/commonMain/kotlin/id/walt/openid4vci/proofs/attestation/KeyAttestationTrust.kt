@@ -48,11 +48,14 @@ data class KeyAttestationVerificationOptions(
     /** Maximum entries per attestation, checked before key import; defaults to 20. Explicit null disables the limit. */
     val maxAttestedKeys: Int? = 20,
 ) {
-    init { require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" } }
+    init {
+        require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" }
+    }
 }
 
 /** An issuer/deployment failure, not invalid evidence from the wallet. */
-class KeyAttestationServiceException(message: String, cause: Throwable? = null) : CredentialProofServiceException(message, cause)
+class KeyAttestationServiceException(message: String, cause: Throwable? = null) :
+    CredentialProofServiceException(message, cause)
 
 internal suspend fun createKeyAttestationTrustResolver(
     method: KeyAttestationVerificationMethod,
@@ -68,6 +71,7 @@ internal suspend fun createKeyAttestationTrustResolver(
         }
         KeyAttestationTrustResolver { _, _, _ -> listOf(key) }
     }
+
     is KeyAttestationVerificationMethod.KeyReference -> {
         val delegate = keyReferenceResolver
             ?: throw KeyAttestationServiceException("Key attestation key-reference resolver is not configured")
@@ -77,6 +81,7 @@ internal suspend fun createKeyAttestationTrustResolver(
             keys
         }
     }
+
     is KeyAttestationVerificationMethod.X509Chain -> {
         val roots = try {
             InMemoryTrustStore(method.trustedRootCertificatesPem.map(X509CertificateUtil::parseCertificatePem))

@@ -26,6 +26,7 @@ internal object DisplayUriResolver {
                 }
             }
         }
+
         is JsonArray -> JsonArray(element.map { resolve(it, absolutize) })
         else -> element
     }

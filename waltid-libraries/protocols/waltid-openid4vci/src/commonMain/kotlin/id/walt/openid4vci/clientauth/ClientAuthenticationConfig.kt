@@ -34,7 +34,7 @@ data class ClientAuthenticationConfig(
         headers: Map<String, List<String>>,
     ): Boolean =
         supportsPreAuthAnonymous() &&
-            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
+                isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
 
     suspend fun toClientAuthenticationServiceConfig(
         keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
@@ -83,13 +83,11 @@ fun isAnonymousPreAuthorizedCodeTokenRequest(
     headers: Map<String, List<String>>,
 ): Boolean =
     parameters.singleNonBlankValue("grant_type") == GrantType.PreAuthorizedCode.value &&
-        parameters.hasNoClientId() &&
-        !ClientAuthenticationMethodDetector.hasClientAuthenticationInput(parameters, headers)
+            parameters.hasNoClientId() &&
+            !ClientAuthenticationMethodDetector.hasClientAuthenticationInput(parameters, headers)
 
 private fun Map<String, List<String>>.singleNonBlankValue(name: String): String? =
-    this[name].orEmpty()
-        .filter { it.isNotBlank() }
-        .singleOrNull()
+    this[name].orEmpty().singleOrNull { it.isNotBlank() }
 
 private fun Map<String, List<String>>.hasNoClientId(): Boolean =
     this["client_id"].orEmpty().none { it.isNotBlank() }

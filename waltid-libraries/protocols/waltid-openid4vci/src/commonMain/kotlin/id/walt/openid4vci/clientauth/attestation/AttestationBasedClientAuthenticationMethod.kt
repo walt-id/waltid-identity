@@ -260,7 +260,7 @@ class AttestationBasedClientAuthenticationMethod(
             ?: return "Client attestation PoP ${JwtPayloadClaims.ISSUED_AT} claim is required"
         val earliest = now.epochSeconds - popMaxAgeSeconds - clockSkewSeconds
         val latest = now.epochSeconds + clockSkewSeconds
-        if (iat < earliest || iat > latest) {
+        if (iat !in earliest..latest) {
             return "Client attestation PoP ${JwtPayloadClaims.ISSUED_AT} claim is outside the accepted age window"
         }
         return null

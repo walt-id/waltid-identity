@@ -103,7 +103,11 @@ object SdJwtVcCredentialSigner {
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
+                context = issuanceTemplateContext(
+                    issuerId = issuerId,
+                    subjectDid = holderDid,
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
+                ),
                 data = issuanceDataFunctions()
             ),
             disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
@@ -140,7 +144,11 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to JsonPrimitive(issuerKid),
             JWT_HEADER_TYPE to JsonPrimitive(sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER),
         ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.encodedDer.toByteArray().encodeToBase64()) }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
+                JsonPrimitive(
+                    cert.encodedDer.toByteArray().encodeToBase64()
+                )
+            }))
         } ?: mapOf())
 
         val finalSdPayload = SDPayload.createSDPayload(

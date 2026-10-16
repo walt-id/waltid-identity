@@ -46,8 +46,9 @@ sealed interface MetadataSigningMethod {
     ) : MetadataSigningMethod {
         init {
             require(reference.isNotBlank()) { "Metadata signing key reference must not be blank" }
-            require(x5cReferences == null ||
-                x5cReferences.isNotEmpty() && x5cReferences.all { it.isNotBlank() }) {
+            require(
+                x5cReferences == null ||
+                        x5cReferences.isNotEmpty() && x5cReferences.all { it.isNotBlank() }) {
                 "signedMetadata.x5cReferences must contain certificate references, leaf first"
             }
         }

@@ -40,7 +40,7 @@ class AuthorizationCodeAuthorizationEndpoint(
         if (!authorizationRequest.responseTypes.contains(ResponseType.CODE.value)) {
             return AuthorizationResponseResult.Failure(
                 OAuthError(
-                    error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
+                    error = OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
                     description = "Handler only supports response_type=code",
                 ),
             )

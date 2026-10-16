@@ -21,10 +21,13 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             when (grantType) {
                 GrantType.AuthorizationCode ->
                     validateAuthorizationCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+
                 GrantType.PreAuthorizedCode ->
                     validatePreAuthorizedCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
+
                 GrantType.RefreshToken ->
                     validateRefreshTokenGrant(parameters, session, parameters.optionalAuthorizationDetails())
+
                 else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,

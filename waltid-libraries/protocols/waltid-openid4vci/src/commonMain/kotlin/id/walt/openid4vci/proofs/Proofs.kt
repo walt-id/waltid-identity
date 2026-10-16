@@ -64,7 +64,8 @@ data class Proofs(
             }
             val jwt = json[ProofType.JWT.value]?.let { parseStringArray(ProofType.JWT.value, it) }
             val diVp = json[ProofType.DI_VP.value]?.let { parseObjectArray(ProofType.DI_VP.value, it) }
-            val attestation = json[ProofType.ATTESTATION.value]?.let { parseStringArray(ProofType.ATTESTATION.value, it) }
+            val attestation =
+                json[ProofType.ATTESTATION.value]?.let { parseStringArray(ProofType.ATTESTATION.value, it) }
             return Proofs(jwt = jwt, diVp = diVp, attestation = attestation).also { it.normalized() }
         }
 

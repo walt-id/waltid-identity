@@ -61,6 +61,7 @@ data class Crypto2CredentialSigningKey(
         is SigningAlgId.CoseValue -> algorithm.value
         is SigningAlgId.CoseName -> algorithm.value.toCoseAlgorithmOrNull()
             ?: throw IllegalArgumentException("Unsupported COSE signing algorithm: ${algorithm.value}")
+
         else -> throw IllegalArgumentException("Credential issuance requires a COSE signing algorithm")
     }
 
@@ -70,7 +71,7 @@ data class Crypto2CredentialSigningKey(
                 ?: setOf(defaultAlgorithm(key, configuration))
             val algorithm = supported.firstOrNull {
                 it.isCompatibleWith(key) &&
-                    (configuration.format != CredentialFormat.MSO_MDOC || key.spec == KeySpec.Ec(EcCurve.P256) && it.coseValue() == -7)
+                        (configuration.format != CredentialFormat.MSO_MDOC || key.spec == KeySpec.Ec(EcCurve.P256) && it.coseValue() == -7)
             }
                 ?: throw IllegalArgumentException(
                     "No credential signing algorithm is compatible with key specification ${key.spec}",
@@ -114,14 +115,15 @@ data class Crypto2CredentialSigningKey(
             JwsAlgorithm.ED25519 -> this == KeySpec.Edwards(EdwardsCurve.ED25519)
             JwsAlgorithm.ED448 -> this == KeySpec.Edwards(EdwardsCurve.ED448)
             JwsAlgorithm.EDDSA -> this is KeySpec.Edwards &&
-                curve in setOf(EdwardsCurve.ED25519, EdwardsCurve.ED448)
+                    curve in setOf(EdwardsCurve.ED25519, EdwardsCurve.ED448)
+
             JwsAlgorithm.RS256,
             JwsAlgorithm.RS384,
             JwsAlgorithm.RS512,
             JwsAlgorithm.PS256,
             JwsAlgorithm.PS384,
             JwsAlgorithm.PS512,
-            -> this is KeySpec.Rsa && bits >= 2048
+                -> this is KeySpec.Rsa && bits >= 2048
         }
 
         private fun KeySpec.supportsCose(algorithm: Int): Boolean = when (algorithm) {

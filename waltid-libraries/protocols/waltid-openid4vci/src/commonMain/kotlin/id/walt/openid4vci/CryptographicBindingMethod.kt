@@ -36,6 +36,7 @@ sealed class CryptographicBindingMethod(val value: String) {
                     val method = value.removePrefix("did:")
                     Did(method)
                 }
+
                 else -> throw IllegalArgumentException("Unsupported cryptographic binding method: $value")
             }
         }
