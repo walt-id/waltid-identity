@@ -154,11 +154,53 @@ class DigitalCredentialCreateModelTest {
         client.outcome = WalletDemoIssuanceOutcome.Stored(listOf("saved"))
         client.credentialsFail = true
         model.accept("5678", emptyMap()); runCurrent()
-        assertNotNull(assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state).refreshError)
+        assertEquals(1, assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state).missingSavedCount)
         client.credentialsFail = false
         model.refresh(); runCurrent()
         assertEquals(listOf("saved"), assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state).saved.map { it.id })
         assertEquals(2, client.accepts)
+        model.done(); store.clear(); runCurrent()
+    }
+
+    @Test fun partialDetailsRefreshRetainsEveryConfirmedIdWithoutRepeatingIssuance() = runTest(dispatcher) {
+        val client = Client().also {
+            it.outcome = WalletDemoIssuanceOutcome.Stored(listOf("first", "second"))
+            it.credentialsFail = true
+        }
+        val model = model(client)
+        model.start(Intent(), false); runCurrent()
+        model.accept(null, emptyMap()); runCurrent()
+        val initial = assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        assertEquals(setOf("first", "second"), initial.receivedIds)
+        assertEquals(2, initial.missingSavedCount)
+        assertTrue(initial.pending.isEmpty())
+
+        client.credentialsFail = false
+        client.saved = listOf(credential("first"), credential("unrelated"))
+        model.refresh(); runCurrent()
+        val partial = assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        assertEquals(initial.receivedIds, partial.receivedIds)
+        assertEquals(listOf("first"), partial.saved.map { it.id })
+        assertEquals(1, partial.missingSavedCount)
+
+        client.credentialsFail = true
+        model.refresh(); runCurrent()
+        val failedRefresh = assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        assertEquals(initial.receivedIds, failedRefresh.receivedIds)
+        assertEquals(partial.saved, failedRefresh.saved)
+        assertEquals(1, failedRefresh.missingSavedCount)
+        assertNotNull(failedRefresh.refreshError)
+
+        client.credentialsFail = false
+        client.saved += credential("second")
+        model.refresh(); runCurrent()
+        val complete = assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        assertEquals(initial.receivedIds, complete.receivedIds)
+        assertEquals(setOf("first", "second"), complete.saved.map { it.id }.toSet())
+        assertEquals(0, complete.missingSavedCount)
+        assertNull(complete.refreshError)
+        assertEquals(1, client.accepts)
+        assertEquals(0, client.resumes)
         model.done(); store.clear(); runCurrent()
     }
 

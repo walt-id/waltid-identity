@@ -129,11 +129,14 @@ fun WalletDemoOfferCreateScreen(
                     actions = {
                         WalletActions(
                             WalletAction("Done", onDone, enabled = !state.busy, testTag = "wallet.provider.done"),
-                            if (state.pending.isEmpty()) null else WalletAction("Refresh", onRefresh, enabled = !state.busy),
+                            if (state.pending.isNotEmpty() || state.missingSavedCount > 0 || state.refreshError != null) {
+                                WalletAction("Refresh", onRefresh, enabled = !state.busy, testTag = "issuance-refresh")
+                            } else null,
                         )
                     },
                 ) {
-                    IssuanceResultContent(state.receipt, state.saved, state.pending, state.busy, onResumeDeferred)
+                    IssuanceResultContent(state.receipt, state.saved, state.pending, state.busy, onResumeDeferred,
+                        missingSavedCount = state.missingSavedCount)
                 }
             }
             is WalletDemoOfferCreateUiState.Failure -> ReviewScaffold(

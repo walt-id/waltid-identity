@@ -683,7 +683,8 @@ internal class WalletVisualScenarios(
             "partial_result" -> WalletDemoOfferCreateUiState.Receipt(
                 receipt = requireNotNull(base.issuanceReceipt).copy(problem = WalletDemoIssuanceProblem(
                     "The issuer could not finish this request.", failedTargetCount = 1, notAttemptedTargetCount = 2)),
-                saved = (base.session as WalletSessionState.Ready).credentials, pending = base.deferredCredentials)
+                saved = (base.session as WalletSessionState.Ready).credentials, pending = base.deferredCredentials,
+                receivedIds = base.lastReceivedCredentialIds.toSet())
             else -> error("Unknown receiving state: $kind")
         }
         content {

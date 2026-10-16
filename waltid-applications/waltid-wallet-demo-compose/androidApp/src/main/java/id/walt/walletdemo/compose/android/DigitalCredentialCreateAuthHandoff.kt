@@ -103,9 +103,9 @@ internal object OrphanAuthorizationCallback {
  * Notifies [MainActivity] after CREATE_CREDENTIAL (or orphan auth) writes into the shared wallet
  * store.
  *
- * Needed because the `openid://` callback often resumes MainActivity *before* CreateActivity
- * finishes token exchange and storage; a plain `onResume` refresh can therefore miss the new
- * credential until the next process foregrounding.
+ * The provider's dedicated authorization callback returns to CreateActivity. MainActivity may
+ * already be resumed when the provider or orphan callback finishes storage, so an `onResume`
+ * refresh alone can miss the new credential until the next process foregrounding.
  */
 internal object WalletDemoCredentialStoreNotifier {
     private val listeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
