@@ -4,6 +4,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -43,4 +44,15 @@ class IssuanceSessionService(
         )
         return repository.save(updated)
     }
+}
+
+/** Applies the library's resolved change to the stored record. */
+internal fun IssuanceSession.applyWalletNotification(update: IssuedCredentialNotificationUpdate.Changed): IssuanceSession {
+    val result = requireNotNull(issuanceResults[update.credentialIdentifier])
+    return copy(issuanceResults = issuanceResults + (update.credentialIdentifier to result.copy(
+        walletNotification = requireNotNull(result.walletNotification).copy(
+            event = update.event,
+            eventDescription = update.eventDescription,
+        ),
+    )))
 }

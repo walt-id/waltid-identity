@@ -11,6 +11,8 @@ import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.openid4vci.validation.NotificationRequestValidator
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
@@ -18,7 +20,7 @@ import id.walt.openid4vci.tokens.access.AccessTokenAuthorization
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
-import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext
 import id.walt.openid4vci.tokens.jwt.JwtConfirmationClaims
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -148,14 +150,14 @@ class DPoPProviderTest {
         val failure = assertIs<CredentialRequestResult.OAuthFailure>(
             provider.createCredentialRequest(
                 parameters = emptyMap(),
-                accessTokenContext = CredentialAccessTokenContext(
+                accessTokenContext = ProtectedResourceAccessTokenContext(
                     authorization = AccessTokenAuthorization(
                         scheme = AccessTokenAuthorizationScheme.DPOP,
                         token = ACCESS_TOKEN,
                     ),
                     expectedIssuer = ISSUER,
                     dpopProofHeaderValues = listOf(proof),
-                    credentialEndpointUri = CREDENTIAL_ENDPOINT_URI,
+                    targetUri = CREDENTIAL_ENDPOINT_URI,
                 ),
             ),
         )
@@ -195,18 +197,111 @@ class DPoPProviderTest {
 
         val result = provider.createCredentialRequest(
             parameters = mapOf("credential_configuration_id" to listOf("identity_credential")),
-            accessTokenContext = CredentialAccessTokenContext(
+            accessTokenContext = ProtectedResourceAccessTokenContext(
                 authorization = AccessTokenAuthorization(
                     scheme = AccessTokenAuthorizationScheme.DPOP,
                     token = ACCESS_TOKEN,
                 ),
                 expectedIssuer = ISSUER,
                 dpopProofHeaderValues = listOf(proof),
-                credentialEndpointUri = CREDENTIAL_ENDPOINT_URI,
+                targetUri = CREDENTIAL_ENDPOINT_URI,
             ),
         )
 
         assertIs<CredentialRequestResult.Success>(result)
+    }
+
+    @Test
+    fun `notification request rejects an access token presented with another wallet key`() = runTest {
+        val walletOneKey = JWKKey.generate(KeyType.secp256r1)
+        val walletTwoKey = JWKKey.generate(KeyType.secp256r1)
+        val accessTokenVerifier = object : AccessTokenVerifier {
+            override suspend fun verify(
+                token: String,
+                expectedIssuer: String?,
+                expectedAudience: String?,
+            ): JsonObject = buildJsonObject {
+                put(JwtPayloadClaims.CONFIRMATION, buildJsonObject {
+                    put(JwtConfirmationClaims.JWK_THUMBPRINT, walletTwoKey.getPublicKey().getThumbprint())
+                })
+            }
+        }
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessTokenVerifier = accessTokenVerifier,
+                dpopProofVerifier = dpopVerifier,
+            ).copy(notificationRequestValidator = NotificationRequestValidator {
+                error("Notification parameters must not be validated when DPoP binding fails")
+            }),
+        )
+        val proof = createProof(
+            key = walletOneKey,
+            targetUri = "https://issuer.example/notification",
+            accessToken = ACCESS_TOKEN,
+        )
+
+        val failure = assertIs<NotificationRequestResult.OAuthFailure>(
+            provider.createNotificationRequest(
+                parameters = emptyMap(),
+                accessTokenContext = ProtectedResourceAccessTokenContext(
+                    authorization = AccessTokenAuthorization(
+                        scheme = AccessTokenAuthorizationScheme.DPOP,
+                        token = ACCESS_TOKEN,
+                    ),
+                    expectedIssuer = ISSUER,
+                    dpopProofHeaderValues = listOf(proof),
+                    targetUri = "https://issuer.example/notification",
+                ),
+            ),
+        )
+        val response = provider.writeNotificationError(failure.error, AccessTokenAuthorizationScheme.DPOP)
+
+        assertEquals(OAuthErrorCodes.INVALID_TOKEN, failure.error.error)
+        assertEquals(401, response.status)
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertTrue(response.headers["WWW-Authenticate"]?.startsWith(TOKEN_TYPE_DPOP) == true)
+    }
+
+    @Test
+    fun `notification request accepts an access token presented with its bound wallet key`() = runTest {
+        val walletKey = JWKKey.generate(KeyType.secp256r1)
+        val accessTokenVerifier = object : AccessTokenVerifier {
+            override suspend fun verify(
+                token: String,
+                expectedIssuer: String?,
+                expectedAudience: String?,
+            ): JsonObject = buildJsonObject {
+                put(JwtPayloadClaims.CONFIRMATION, buildJsonObject {
+                    put(JwtConfirmationClaims.JWK_THUMBPRINT, walletKey.getPublicKey().getThumbprint())
+                })
+            }
+        }
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessTokenVerifier = accessTokenVerifier,
+                dpopProofVerifier = dpopVerifier,
+            ),
+        )
+        val proof = createProof(
+            key = walletKey,
+            targetUri = "https://issuer.example/notification",
+            accessToken = ACCESS_TOKEN,
+        )
+
+        val result = provider.createNotificationRequest(
+            parameters = mapOf("notification_id" to listOf("notification"), "event" to listOf("credential_accepted")),
+            accessTokenContext = ProtectedResourceAccessTokenContext(
+                authorization = AccessTokenAuthorization(
+                    scheme = AccessTokenAuthorizationScheme.DPOP,
+                    token = ACCESS_TOKEN,
+                ),
+                expectedIssuer = ISSUER,
+                dpopProofHeaderValues = listOf(proof),
+                targetUri = "https://issuer.example/notification",
+            ),
+        )
+
+        assertIs<NotificationRequestResult.Success>(result)
     }
 
     private suspend fun assertDPoPToken(
