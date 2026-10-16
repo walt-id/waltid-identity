@@ -9,17 +9,19 @@ func allowIdentityDocumentRegistrationIfRequested(file: StaticString = #filePath
         .matching(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
     guard prompt.waitForExistence(timeout: 15) else { return }
     let allow = springboard.buttons["Allow"]
-    guard allow.waitForExistence(timeout: 5) else {
-        XCTFail("Identity verification consent has no Allow button", file: file, line: line)
+    let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+        prompt.exists && allow.exists && allow.isEnabled && allow.isHittable
+    }, object: nil)
+    guard XCTWaiter.wait(for: [ready], timeout: 5) == .completed else {
+        XCTFail("Identity verification consent has no hittable Allow button: \(springboard.debugDescription)",
+                file: file, line: line)
         return
     }
-    // Use the observed button frame to avoid XCTest's conflicting alert identity during hit testing.
-    let frame = allow.frame
-    XCTAssertFalse(frame.isEmpty, "Identity verification button has no frame", file: file, line: line)
-    guard !frame.isEmpty else { return }
-    springboard.coordinate(withNormalizedOffset: .zero)
-        .withOffset(CGVector(dx: frame.midX, dy: frame.midY)).tap()
-    XCTAssertTrue(prompt.waitForNonExistence(timeout: 10), "Identity verification consent did not close",
+    // A frame can exist before the system alert accepts input. Resolve the button's current center
+    // after it is hittable, without binding the inconsistently typed Alert/Sheet container.
+    allow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    XCTAssertTrue(prompt.waitForNonExistence(timeout: 10),
+                  "Identity verification consent did not close: \(springboard.debugDescription)",
                   file: file, line: line)
 }
 
