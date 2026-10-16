@@ -46,7 +46,6 @@ final class MockWalletUITests: XCTestCase {
         let retained = XCTAttachment(screenshot: app.screenshot())
         retained.name = "external-offer-sheet-with-transaction-code"; retained.lifetime = .keepAlways; add(retained)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 15))
         waitForIdleResultDismissal(app)
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
@@ -56,17 +55,15 @@ final class MockWalletUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
-        receiveMockCredential(app: app, ui: ui)
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 5))
-        ui.returnToWallet()
-        XCTAssertFalse(app.buttons["issuance-done"].exists)
-        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
+        ui.openWalletLink("openid-credential-offer://mock")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        // XCTest can return from a tap after the five-second success has already dismissed.
+        // Observe the stable outcome without touching or manually closing either result.
+        waitForIdleResultDismissal(app)
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         ui.openWalletLink("openid4vp://mock")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
-        XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: 10))
-        ui.returnToWallet()
-        XCTAssertFalse(app.buttons["wallet.presentationDone"].exists)
-        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
+        waitForIdleResultDismissal(app)
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
     }
 
@@ -154,13 +151,7 @@ final class MockWalletUITests: XCTestCase {
         let offer = XCTAttachment(screenshot: app.screenshot())
         offer.name = "external-receive-sheet"; offer.lifetime = .keepAlways; add(offer)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Receive")
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.navigationBars["Receiving result"].exists)
-        // An untouched success returns home after five seconds. Physical-device AX queries
-        // can consume that interval, so do not race the timer by tapping a disappearing Done.
-        let homeReady = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"),
-            object: app.buttons["wallet.scanButton"])
-        XCTAssertEqual(XCTWaiter.wait(for: [homeReady], timeout: 10), .completed)
+        waitForIdleResultDismissal(app)
         ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
@@ -644,7 +635,6 @@ final class MockWalletUITests: XCTestCase {
         ui.assertExists(identifier: "wallet.offerCredentialsSection")
         XCTAssertTrue(app.staticTexts["Example"].waitForExistence(timeout: 10))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Receive")
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 10))
         waitForIdleResultDismissal(app)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
 
