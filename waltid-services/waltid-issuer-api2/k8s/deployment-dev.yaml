@@ -48,6 +48,12 @@ spec:
           ports:
             - containerPort: 3000
               name: http-api
+          readinessProbe:
+            httpGet:
+              path: /livez
+              port: http-api
+            periodSeconds: 5
+            failureThreshold: 12
       volumes:
         - name: issuer2-web-config
           configMap:

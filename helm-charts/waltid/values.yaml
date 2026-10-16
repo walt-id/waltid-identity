@@ -31,7 +31,7 @@ issuer2:
       imagePullPolicy: Always
   configMountPath: /waltid-issuer-api2/config
   env:
-    ISSUER2_BASE_URL: "https://issuer2.portal.test.waltid.cloud"
+    ISSUER2_BASE_URL: "https://{{ .Values.ingress.host }}"
   configFiles:
     _features.conf: |-
       enabledFeatures = [
