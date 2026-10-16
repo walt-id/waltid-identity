@@ -17,12 +17,17 @@ func allowIdentityDocumentRegistrationIfRequested(file: StaticString = #filePath
                 file: file, line: line)
         return
     }
-    // A frame can exist before the system alert accepts input. Resolve the button's current center
-    // after it is hittable, without binding the inconsistently typed Alert/Sheet container.
-    allow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-    XCTAssertTrue(prompt.waitForNonExistence(timeout: 10),
-                  "Identity verification consent did not close: \(springboard.debugDescription)",
-                  file: file, line: line)
+    // SpringBoard can ignore the first tap even after reporting a hittable button. Retry only this
+    // consent's Allow action once, and require dismissal within the same ten-second wait budget.
+    for _ in 0..<2 {
+        guard prompt.exists else { return }
+        if allow.exists && allow.isEnabled && allow.isHittable {
+            allow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        if prompt.waitForNonExistence(timeout: 5) { return }
+    }
+    XCTFail("Identity verification consent did not close: \(springboard.debugDescription)",
+            file: file, line: line)
 }
 
 /// Wait for usable Home after receiving or sharing, without racing the five-second result sheet.
