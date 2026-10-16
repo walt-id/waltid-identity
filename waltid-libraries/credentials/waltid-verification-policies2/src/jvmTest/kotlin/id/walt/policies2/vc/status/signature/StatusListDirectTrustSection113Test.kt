@@ -19,9 +19,19 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.policies2.vc.policies.status.signature.StatusListEmbeddedKeyReference
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
+import id.walt.cose.Cose
 import id.walt.cose.CoseCertHash
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.toCoseSigner
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.policies2.vc.policies.status.signature.KeyResolutionFailedException
+import id.walt.policies2.vc.policies.status.signature.SignatureInvalidException
+import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -31,6 +41,7 @@ import org.junit.jupiter.api.assertThrows
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.test.assertContains
+import kotlin.test.assertTrue
 
 class StatusListDirectTrustSection113Test {
     private val provider = CryptographySoftwareKeyProvider()
@@ -198,7 +209,8 @@ class StatusListDirectTrustSection113Test {
                 authorizer = null,
             )
         }
-        assertContains(error.message!!, "status-list x5c leaf does not match")
+        assertContains(error.message!!, "delegated status signer")
+        assertContains(error.message!!, "id-kp-oauthStatusSigning")
     }
 
     @Test
@@ -213,7 +225,7 @@ class StatusListDirectTrustSection113Test {
             dn = "CN=Foreign status, O=Walt.id",
             eku = setOf(OAUTH_STATUS_SIGNING_EKU),
         )
-        assertThrows<IllegalArgumentException> {
+        val error = assertThrows<IllegalArgumentException> {
             authorizeStatusListSigner(
                 request(
                     credential = material.credentialLeaf,
@@ -224,7 +236,128 @@ class StatusListDirectTrustSection113Test {
                 authorizer = null,
             )
         }
+        assertContains(error.message!!, "delegated status signer")
     }
+
+    @Test
+    fun `verifier accepts a JWT that only references the credential certificate by x5t#S256`() = runTest {
+        val material = issuedMaterial()
+        val leaf = material.credentialLeaf
+        val thumbprint = sha256(leaf.encodedDer.toByteArray())
+        val jwt = CompactJws.sign(
+            payload = statusListPayload(),
+            key = material.issuerKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "statuslist+jwt")
+                put("x5t#S256", base64Url(thumbprint))
+            },
+        )
+
+        val verified = StatusListSignatureVerifier().verifyJwtWithSigner(jwt, credential(leaf)).getOrThrow()
+
+        assertTrue(verified.embeddedKeyReference?.x5tSha256.contentEquals(thumbprint))
+    }
+
+    @Test
+    fun `verifier rejects a JWT signed by another key even when kid matches the credential`() = runTest {
+        val material = issuedMaterial()
+        val jwt = CompactJws.sign(
+            payload = statusListPayload(),
+            key = material.statusKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "statuslist+jwt")
+                put("kid", "issuer-key")
+            },
+        )
+
+        val error = StatusListSignatureVerifier()
+            .verifyJwtWithSigner(jwt, credential(material.credentialLeaf, kid = "issuer-key"))
+            .exceptionOrNull()
+
+        assertTrue(error is SignatureInvalidException)
+    }
+
+    @Test
+    fun `verifier rejects a JWT with no key reference`() = runTest {
+        val material = issuedMaterial()
+        val jwt = CompactJws.sign(
+            payload = statusListPayload(),
+            key = material.issuerKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "statuslist+jwt")
+            },
+        )
+
+        val error = StatusListSignatureVerifier()
+            .verifyJwtWithSigner(jwt, credential(material.credentialLeaf))
+            .exceptionOrNull()
+
+        assertTrue(error is KeyResolutionFailedException)
+    }
+
+    @Test
+    fun `verifier accepts a CWT that only references the credential certificate by x5t`() = runTest {
+        val material = issuedMaterial()
+        val leaf = material.credentialLeaf
+        val thumbprint = sha256(leaf.encodedDer.toByteArray())
+        val cose = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(
+                algorithm = Cose.Algorithm.ES256,
+                x5t = CoseCertHash(CoseCertHash.SHA_256, thumbprint),
+            ),
+            payload = byteArrayOf(0x01),
+            signer = material.issuerKey.toCoseSigner(Cose.Algorithm.ES256),
+        )
+
+        val verified = StatusListSignatureVerifier()
+            .verifyCwtWithSigner(cose.toTagged(), credential(leaf))
+            .getOrThrow()
+
+        assertTrue(verified.embeddedKeyReference?.coseHash.contentEquals(thumbprint))
+    }
+
+    @Test
+    fun `verifier rejects a CWT signed by another key even when kid matches the credential`() = runTest {
+        val material = issuedMaterial()
+        val cose = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(
+                algorithm = Cose.Algorithm.ES256,
+                kid = "issuer-key".encodeToByteArray(),
+            ),
+            payload = byteArrayOf(0x01),
+            signer = material.statusKey.toCoseSigner(Cose.Algorithm.ES256),
+        )
+
+        val error = StatusListSignatureVerifier()
+            .verifyCwtWithSigner(cose.toTagged(), credential(material.credentialLeaf, kid = "issuer-key"))
+            .exceptionOrNull()
+
+        assertTrue(error is SignatureInvalidException)
+    }
+
+    private fun credential(leaf: X509Certificate, kid: String? = null) = W3C11(
+        credentialData = buildJsonObject {},
+        signature = JwtCredentialSignature(
+            signature = "test",
+            jwtHeader = buildJsonObject {
+                put("x5c", JsonArray(listOf(JsonPrimitive(leaf.base64Der()))))
+                kid?.let { put("kid", it) }
+            },
+        ),
+        signed = null,
+        issuer = null,
+    )
+
+    private fun statusListPayload(): ByteArray =
+        Json.encodeToString(buildJsonObject {
+            put("status_list", buildJsonObject { put("bits", 1) })
+        }).encodeToByteArray()
+
+    private fun base64Url(bytes: ByteArray): String =
+        Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(bytes)
 
     private suspend fun issuedMaterial(statusEku: Set<String> = emptySet()): Material {
         val caKey = generate("ca")

@@ -90,7 +90,9 @@ internal fun statusListSignerUnauthorizedMessage(
             "the status-list token is x5c-signed but carries no certificate chain"
 
         request.signer.source == JwtKeyResolutionSource.X5C ->
-            "the status-list x5c leaf does not match the referenced credential x5c leaf"
+            "the status-list x5c leaf does not match the referenced credential x5c leaf, " +
+                "and the status certificate is not a delegated status signer issued by the credential's CA " +
+                "with id-kp-oauthStatusSigning"
 
         referencedIssuer == null ->
             "the referenced credential has no issuer claim, so DID/https direct trust cannot match the status-list signer"
@@ -264,6 +266,10 @@ internal fun referencedCredentialKeyId(credential: DigitalCredential): String? {
     return null
 }
 
+/**
+ * Only SHA-1 (-14) and SHA-256 (-16) COSE `x5t` hashes are compared.
+ * SHA-384 (-43) and SHA-512 (-44) fail closed rather than being treated as a match.
+ */
 private fun coseHashMatches(algorithm: Int?, hash: ByteArray, sha1: ByteArray, sha256: ByteArray): Boolean =
     when (algorithm) {
         COSE_SHA1 -> hash.contentEquals(sha1)
