@@ -26,6 +26,15 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## Local wallet loading
+
+The Compose Android and iOS hosts publish locally stored cards after identity setup and the local
+credential read. Platform credential registration runs separately in the controller's host-owned
+scope, so optional registry artwork and platform failures do not hold up the wallet. Unlock and
+foreground refresh retry registration from the current store. Lock cancels pending loading and
+registration; wallet reset and signing-key replacement wait for their cleanup before deleting data.
+Android provider entry points still await their explicit registration step.
+
 ## Credential issuance
 
 The shared Android/iOS offer review lets users select credential types and request copies up to the issuer's advertised limit. Each type defaults to one copy. Additional holder keys are created only after acceptance; the same selections are forwarded to pre-authorized and browser authorization flows and reused for a supported transaction-code retry.

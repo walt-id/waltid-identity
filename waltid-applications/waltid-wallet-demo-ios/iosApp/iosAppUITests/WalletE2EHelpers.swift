@@ -133,29 +133,12 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard URL(string: value) != nil else {
-            XCTFail("Invalid deep link URL: \(value)")
+        guard let url = URL(string: value) else {
+            XCTFail("Invalid deep link URL")
             return
         }
-
-        // XCUIApplication.open launches a new process. Enter the link in Safari
-        // to exercise delivery to the running wallet and its navigation state.
-        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
-        safari.activate()
-        let address = safari.textFields.firstMatch
-        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
-            safari.buttons["Continue"].tap()
-        }
-        XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
-        address.tap()
-        address.typeText(value + XCUIKeyboardKey.return.rawValue)
-        let open = safari.buttons["Open"]
-        if open.waitForExistence(timeout: 5) {
-            // Safari's external-app confirmation reports no XCTest hit point on
-            // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
-            XCTAssertFalse(open.frame.isEmpty)
-            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        // Use the same system handoff as Compose; app.open would relaunch the wallet.
+        XCUIDevice.shared.system.open(url)
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
@@ -267,11 +250,29 @@ final class WalletE2EUI {
         if let currentValue = element.value as? String {
             let placeholder = element.placeholderValue ?? ""
             if !currentValue.isEmpty && currentValue != placeholder {
-                element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+                element.typeKey("a", modifierFlags: .command)
+                element.typeText(XCUIKeyboardKey.delete.rawValue)
             }
         }
 
         element.typeText(value)
+        if element.elementType != .secureTextField {
+            for attempt in 0..<2 {
+                let entered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                    let actual = element.value as? String ?? ""
+                    return actual == value || (value.isEmpty && actual == element.placeholderValue)
+                }, object: element)
+                if XCTWaiter.wait(for: [entered], timeout: 2) == .completed {
+                    break
+                }
+                guard attempt == 0 else {
+                    XCTFail("Input did not retain the requested text: \(element.identifier)")
+                    return
+                }
+                element.typeKey("a", modifierFlags: .command)
+                element.typeText(value)
+            }
+        }
         submitFocusedInput(element)
     }
 

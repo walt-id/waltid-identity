@@ -196,10 +196,9 @@ build/reports/openid-conformance/vp-verifier/summary.md
 build/reports/openid-conformance/vp-verifier/results.json
 ```
 
-The OSS Gradle workflow appends these to the GitHub Actions job summary.
-Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
-failures fail the conformance job (see the module
-[README](../README.md#ci-summaries)).
+The verifier conformance job appends this report to its GitHub Actions summary.
+A verifier failure fails that job. Wallet and issuer failures fail their own
+jobs (see the module [README](../README.md#ci-summaries)).
 
 ## Code Fixes Made (2026-07-08)
 

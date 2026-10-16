@@ -4,6 +4,8 @@ import id.walt.openid4vci.Client
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.requests.generateRequestId
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -11,6 +13,8 @@ import kotlin.time.Instant
 @Serializable
 data class DefaultAuthorizationRequest(
     override val id: String = generateRequestId(),
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val requestedAt: Instant = Clock.System.now(),
     override val client: Client,
     override val responseTypes: Set<String>,

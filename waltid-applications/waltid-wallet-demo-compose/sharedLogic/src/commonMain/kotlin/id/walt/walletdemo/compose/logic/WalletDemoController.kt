@@ -37,6 +37,11 @@ class WalletDemoController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+    private var walletResetJob: Job? = null
+    private var bootstrapJob: Job? = null
+    private var registrationJob: Job? = null
+    private var loadingCancellationJob: Job? = null
+    private val loadingGeneration = MutableStateFlow(0L)
     private var receiveJob: Job? = null
     private var issuanceSession: WalletDemoIssuanceSession? = null
     private var pendingAuthorizationCallback: String? = null
@@ -170,6 +175,7 @@ class WalletDemoController(
         foregroundSequence += 1
         refreshBiometricSigningAvailability(foregroundSequence)
         unlockWithBiometrics()
+        refreshDigitalCredentialRegistration()
         if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.IdentitySetup) {
             refreshIdentityChoices()
         }
@@ -354,6 +360,7 @@ class WalletDemoController(
                 }
                 signingProtectionStore.save(target)
                 cancelActiveWalletWork()
+                cancelLoading().join()
                 replacementStarted = true
                 wallet.deleteWallet()
                 val result = wallet.bootstrap(target)
@@ -376,6 +383,7 @@ class WalletDemoController(
                         selectedSigningProtection = target,
                     ).copy(warning = result.warning)
                 }
+                refreshDigitalCredentialRegistration()
             }.onFailure { error ->
                 if (!replacementStarted) {
                     runCatching { signingProtectionStore.save(previousSelection) }
@@ -426,12 +434,14 @@ class WalletDemoController(
 
     fun lock() {
         if (skipPin) return
+        cancelLoading()
         receiveJob?.cancel()
         paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
                 auth = WalletAuthState.Login(biometricPromptConsumed = true),
+                session = if (it.session is WalletSessionState.Bootstrapping) WalletSessionState.NotBootstrapped else it.session,
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,
@@ -504,8 +514,11 @@ class WalletDemoController(
     }
 
     fun resetWallet(beforeDelete: suspend () -> Unit = {}) {
+        if (walletResetJob?.isActive == true) return
         cancelActiveWalletWork()
-        scope.launch(dispatcher) {
+        val loadingStopped = cancelLoading()
+        walletResetJob = scope.launch(dispatcher) {
+            loadingStopped.join()
             runCatching { beforeDelete() }.exceptionOrNull()?.let { error ->
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
                 return@launch
@@ -538,6 +551,7 @@ class WalletDemoController(
                     ).withPublishedStatus()
                 }
             }
+            walletResetJob = null
             if (skipPin && _state.value.auth is WalletAuthState.Unlocked) {
                 bootstrapIfNeeded()
             }
@@ -1746,37 +1760,47 @@ class WalletDemoController(
     }
 
     private fun bootstrapIfNeeded() {
-        if (_state.value.session is WalletSessionState.Ready ||
-            _state.value.session is WalletSessionState.Bootstrapping
-        ) {
+        if (_state.value.auth != WalletAuthState.Unlocked || walletResetJob?.isActive == true) return
+        if (_state.value.session is WalletSessionState.Ready) {
+            refreshDigitalCredentialRegistration()
             return
         }
-
-        scope.launch(dispatcher) {
-            _state.update {
-                it.copy(
-                    session = WalletSessionState.Bootstrapping,
-                    operation = WalletOperationState.Idle,
-                )
-            }
+        if (_state.value.session is WalletSessionState.Bootstrapping) return
+        val generation = loadingGeneration.value
+        val loadingStopped = loadingCancellationJob
+        _state.update { it.copy(session = WalletSessionState.Bootstrapping, operation = WalletOperationState.Idle) }
+        bootstrapJob = scope.launch(dispatcher) {
+            loadingStopped?.join()
+            ensureCurrentLoading(generation)
             val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
                 if (error is CancellationException) throw error
-                _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
+                ensureCurrentLoading(generation)
+                _state.update {
+                    if (it.auth == WalletAuthState.Unlocked && loadingGeneration.value == generation)
+                        it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) else it
+                }
                 return@launch
             }
+            ensureCurrentLoading(generation)
             if (setup != null) {
-                _state.update { it.copy(session = WalletSessionState.IdentitySetup(setup)) }
+                _state.update {
+                    if (it.auth == WalletAuthState.Unlocked && loadingGeneration.value == generation)
+                        it.copy(session = WalletSessionState.IdentitySetup(setup)) else it
+                }
                 return@launch
             }
             runCatching {
                 val result = wallet.bootstrap(_state.value.selectedSigningProtection)
                 val credentials = wallet.listCredentials()
                 val deferred = wallet.listDeferredIssuance()
+                ensureCurrentLoading(generation)
                 val selection = signingProtectionMode.resolve(result.signingProtection)
                 signingProtectionStore.save(selection)
                 Triple(result, credentials, deferred)
             }.onSuccess { (result, credentials, deferred) ->
+                ensureCurrentLoading(generation)
                 _state.update {
+                    if (it.auth != WalletAuthState.Unlocked || loadingGeneration.value != generation) return@update it
                     it.copy(
                         session = WalletSessionState.Ready(
                             did = result.did,
@@ -1794,8 +1818,12 @@ class WalletDemoController(
                 }
                 showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
                 flushPendingAuthorizationCallback()
+                refreshDigitalCredentialRegistration()
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                ensureCurrentLoading(generation)
                 _state.update {
+                    if (it.auth != WalletAuthState.Unlocked || loadingGeneration.value != generation) return@update it
                     it.copy(
                         session = WalletSessionState.Failed(WalletDisplayText.failure(WalletDisplayText.BootstrapFailed, error)),
                         operation = WalletOperationState.Idle,
@@ -1803,6 +1831,49 @@ class WalletDemoController(
                 }
             }
         }
+    }
+
+    private suspend fun ensureCurrentLoading(generation: Long) {
+        currentCoroutineContext().ensureActive()
+        if (loadingGeneration.value != generation) throw CancellationException("Wallet loading was superseded")
+    }
+
+    private fun refreshDigitalCredentialRegistration() {
+        val state = _state.value
+        if (state.auth != WalletAuthState.Unlocked || state.session !is WalletSessionState.Ready ||
+            state.isChangingSigningProtection || walletResetJob?.isActive == true || registrationJob?.isActive == true) return
+        val generation = loadingGeneration.value
+        val loadingStopped = loadingCancellationJob
+        registrationJob = scope.launch(dispatcher) {
+            loadingStopped?.join()
+            ensureCurrentLoading(generation)
+            try {
+                wallet.refreshDigitalCredentialRegistration()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // Local cards remain usable. Unlock/foreground retries from the current store.
+            }
+        }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun cancelLoading(): Job {
+        loadingGeneration.update { it + 1 }
+        val bootstrap = bootstrapJob
+        val registration = registrationJob
+        val previous = loadingCancellationJob
+        bootstrapJob = null
+        registrationJob = null
+        // Socket cancellation belongs on the worker dispatcher, and deletion must await cleanup.
+        return scope.launch(dispatcher, start = CoroutineStart.ATOMIC) {
+            previous?.join()
+            try {
+                bootstrap?.cancelAndJoin()
+            } finally {
+                registration?.cancelAndJoin()
+            }
+        }.also { loadingCancellationJob = it }
     }
 
     @OptIn(DelicateCoroutinesApi::class)

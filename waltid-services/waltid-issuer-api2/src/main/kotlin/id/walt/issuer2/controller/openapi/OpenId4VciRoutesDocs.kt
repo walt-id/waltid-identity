@@ -43,14 +43,18 @@ object OpenId4VciRoutesDocs {
     fun authorizationServerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get Authorization Server metadata"
-        description =
-            "`signedMetadata` also signs OAuth authorization server metadata, returned as a JWT in the JSON `signed_metadata` field; this field is omitted when unconfigured."
+        description = "Returns OAuth Authorization Server metadata as JSON. When metadata signing is enabled, " +
+                "`signed_metadata` contains a signed JWT as defined by [RFC 8414 §2.1](https://www.rfc-editor.org/rfc/rfc8414.html#section-2.1). " +
+                "The field is omitted when signing is not configured."
         response {
             HttpStatusCode.OK to {
                 description = "OAuth Authorization Server metadata"
                 body<AuthorizationServerMetadata> {
                     mediaTypes(ContentType.Application.Json)
                 }
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "Metadata signing failed. No unsigned metadata fallback is returned."
             }
         }
     }

@@ -281,18 +281,22 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             return
         }
 
+        app.swipeUp()
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        app.swipeDown()
+        let rejectionMessage = "The issuer returned an invalid or unsuccessful response."
         let rejectedStatus = ui.waitForStatus(
-            prefixes: ["Receive failed"],
+            prefixes: [rejectionMessage],
             timeout: credentialOperationTimeout
         )
-        guard rejectedStatus?.starts(with: "Receive failed") == true else {
+        guard rejectedStatus == rejectionMessage else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
             return
         }
 
         // The reviewed offer remains active so the corrected code can be retried directly.
+        app.swipeUp()
         ui.replaceText(in: txCodeInput, value: transactionCode)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         let receivedStatus = ui.waitForStatus(
@@ -353,7 +357,7 @@ final class MockCredentialDisplayUITests: XCTestCase {
 
         XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
-        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait.elementValue"), timeout: 10)
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait"), timeout: 10)
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["No credential details available"].exists)
     }

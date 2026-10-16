@@ -657,10 +657,16 @@ class WalletViewModel: ObservableObject {
             ),
             clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
             transactionDataProfiles: transactionDataProfiles.profiles,
-            paymentCredentialIssuers: [WalletPaymentCredentialIssuer(
-                issuer: "https://issuer2.demo.walt.id/openid4vci",
-                publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"#
-            )],
+            paymentCredentialIssuers: [
+                WalletPaymentCredentialIssuer(
+                    issuer: "https://issuer2.demo.walt.id/openid4vci",
+                    publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"#
+                ),
+                WalletPaymentCredentialIssuer(
+                    issuer: "https://waltid.enterprise.test.waltid.cloud/v2/waltid.bank-tenant.issuer2/issuer-service-api/openid4vci",
+                    publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"dUpq6W-c6yLniF3k5Lj5j4rFysYXmnHTSK_aOb2JV_A","y":"urKlUBnHoHIeBP9YuCj9ZwVBewS4yNkaT1J64gQLnEw"}"#
+                ),
+            ],
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(

@@ -22,6 +22,8 @@ trap 'xcrun simctl delete "$simulator"' EXIT
 xcrun simctl boot "$simulator"
 xcrun simctl bootstatus "$simulator" -b
 
+./waltid-libraries/crypto/waltid-crypto2-signum/scripts/test-ios-keychain.sh "$simulator" "$output/signum-keychain"
+
 app="$output/host/RecoveryTests.app"
 xcrun simctl install "$simulator" "$app"
 python3 scripts/check-ios-recovery-runner.py --device "$simulator" --output "$output/runner-controls"

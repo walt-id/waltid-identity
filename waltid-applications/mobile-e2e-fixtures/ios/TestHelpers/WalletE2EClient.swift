@@ -21,7 +21,7 @@ public final class WalletE2EClient {
         config.httpCookieAcceptPolicy = .always
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
-        session = URLSession(configuration: config)
+        session = URLSession(configuration: config, delegate: LocalFixtureMetrics(), delegateQueue: nil)
     }
 
     public func jsonRequest(
@@ -149,5 +149,37 @@ public final class WalletE2EClient {
         }
 
         return false
+    }
+}
+
+// Keep fixture timing useful on CI without recording URLs, headers, bodies, or errors.
+private final class LocalFixtureMetrics: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        guard let url = task.originalRequest?.url, let host = url.host,
+              ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host), url.port == 33335,
+              ["/scenarios", "/offers"].contains(url.path) else { return }
+        let transactions: [[String: Any]] = metrics.transactionMetrics.map { transaction in
+            var values: [String: Any] = ["reused_connection": transaction.isReusedConnection]
+            let dates: [(String, Date?)] = [
+                ("dns_start_ms", transaction.domainLookupStartDate), ("dns_end_ms", transaction.domainLookupEndDate),
+                ("connect_start_ms", transaction.connectStartDate), ("connect_end_ms", transaction.connectEndDate),
+                ("request_start_ms", transaction.requestStartDate), ("request_end_ms", transaction.requestEndDate),
+                ("response_start_ms", transaction.responseStartDate), ("response_end_ms", transaction.responseEndDate),
+            ]
+            for (name, date) in dates {
+                if let date { values[name] = date.timeIntervalSince(metrics.taskInterval.start) * 1_000 }
+            }
+            if let response = transaction.response as? HTTPURLResponse { values["status"] = response.statusCode }
+            return values
+        }
+        var record: [String: Any] = [
+            "route": url.path, "duration_ms": metrics.taskInterval.duration * 1_000,
+            "transactions": transactions,
+        ]
+        if let error = task.error as NSError?, error.domain == NSURLErrorDomain {
+            record["url_error_code"] = error.code
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) else { return }
+        FileHandle.standardError.write(Data("WALLET_E2E_LOCAL_HTTP ".utf8) + data + Data("\n".utf8))
     }
 }

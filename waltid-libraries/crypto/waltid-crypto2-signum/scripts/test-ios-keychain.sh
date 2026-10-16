@@ -2,11 +2,13 @@
 # Runs native Keychain lifecycle tests in an isolated simulator application.
 set -euo pipefail
 
-simulator_id="${1:?Usage: test-ios-keychain.sh SIMULATOR_UDID}"
+simulator_id="${1:?Usage: test-ios-keychain.sh SIMULATOR_UDID [OUTPUT_DIR]}"
 module_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repo_dir="$(git -C "$module_dir" rev-parse --show-toplevel)"
 mkdir -p "$module_dir/build"
-output_dir="$(mktemp -d "$module_dir/build/keychain-tests.XXXXXX")"
+output_dir="${2:-$(mktemp -d "$module_dir/build/keychain-tests.XXXXXX")}"
+mkdir -p "$output_dir"
+output_dir="$(cd "$output_dir" && pwd -P)"
 app_dir="$output_dir/KeychainTests.app"
 bundle_id="id.walt.crypto2.keychain-tests"
 mkdir -p "$app_dir"
@@ -46,20 +48,6 @@ codesign --force --sign - "$app_dir"
 xcrun simctl bootstatus "$simulator_id" -b
 xcrun simctl install "$simulator_id" "$app_dir"
 # The app owns only temporary test keys; each test removes its own fixtures.
-python3 - "$simulator_id" "$bundle_id" "$output_dir" <<'PY'
-import pathlib, subprocess, sys
-simulator, bundle, output = sys.argv[1:]
-log = pathlib.Path(output) / 'tests.log'
-try:
-    with log.open('w') as stream:
-        result = subprocess.run(['xcrun', 'simctl', 'launch', '--terminate-running-process', '--console',
-                                 simulator, bundle], stdout=stream, stderr=subprocess.STDOUT, timeout=120)
-    text = log.read_text()
-    print(text)
-    if result.returncode or '[  PASSED  ]' not in text or '[  FAILED  ]' in text:
-        raise SystemExit('Keychain tests failed; see ' + str(log))
-except subprocess.TimeoutExpired:
-    subprocess.run(['xcrun', 'simctl', 'terminate', simulator, bundle], check=False)
-    raise SystemExit('Keychain tests timed out; see ' + str(log))
-print('Keychain test evidence: ' + str(log))
-PY
+python3 "$module_dir/scripts/run_keychain_tests.py" "$simulator_id" "$output_dir"
+python3 "$repo_dir/.github/scripts/mobile-ci/verify_test_results.py" \
+    --reports "$output_dir/results.xml" --require-class id.walt.crypto2.signum.IosKeyOwnershipTest

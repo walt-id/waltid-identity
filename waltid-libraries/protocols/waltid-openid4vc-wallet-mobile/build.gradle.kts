@@ -99,7 +99,7 @@ kotlin {
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 api(identityLibs.androidx.fragment)
-                implementation(identityLibs.ktor.client.android)
+                implementation(identityLibs.ktor.client.okhttp)
                 implementation(identityLibs.androidx.credentials.registry.mdoc)
                 implementation(identityLibs.androidx.credentials.registry.openid)
                 implementation(identityLibs.androidx.credentials.registry.sdjwtvc)
@@ -157,6 +157,7 @@ kotlin {
                     implementation(identityLibs.kotlinx.coroutines.test)
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.uiautomator)
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.ktor.client.mock)
                     implementation(identityLibs.ktor.client.content.negotiation)

@@ -103,6 +103,7 @@ webauthn4j = "0.31.10.RELEASE"
 # Android device tests. jdk18on is also what Signum and web3j pull in, and it is what crypto2 needs for secp256k1.
 bouncycastle = "1.86"
 nimbus-jose = "10.10"
+# renovate: datasource=npm depName=jose
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
@@ -159,11 +160,14 @@ maven-xml = "4.0.0-rc-7"
 mordant = "3.0.2"
 clikt-testkit = "3.1.1"
 password4j = "1.8.4"
+# renovate: datasource=npm depName=cose-js
 cose-js = "0.9.0"
 multipaz = "0.101.0"
 sqlcipher-swift = "4.19.0"
 kotlinx-browser = "0.5.0"
+# renovate: datasource=npm depName=canonicalize
 canonicalize-npm = "2.0.0"
+# renovate: datasource=npm depName=uuid
 uuid-npm = "9.0.1"
 hoplite = "2.9.0"
 playwright = "1.60.0"

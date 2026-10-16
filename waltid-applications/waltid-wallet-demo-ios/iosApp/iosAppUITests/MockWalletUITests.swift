@@ -472,7 +472,7 @@ final class MockWalletUITests: XCTestCase {
 
         ui.openDeepLink(offerUrl)
         XCTAssertTrue(app.tabBars.buttons["Receive"].isSelected)
-        XCTAssertFalse(app.descendants(matching: .any)["wallet.credentialDetailsScreen"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialDetailsScreen"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(
             ui.waitForTextInputValue(
                 identifier: "wallet.offerInput",
@@ -527,7 +527,7 @@ final class MockWalletUITests: XCTestCase {
 
         ui.openDeepLink(presentationUrl)
         XCTAssertTrue(app.tabBars.buttons["Present"].isSelected)
-        XCTAssertFalse(app.staticTexts["Requested disclosures"].exists)
+        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(
             ui.waitForTextInputValue(
                 identifier: "wallet.presentationInput",

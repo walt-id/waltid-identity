@@ -11,10 +11,15 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Instant
+import kotlin.time.TestTimeSource
+import kotlin.time.asClock
 
 class VerifyConformanceMdoc {
 
@@ -27,6 +32,8 @@ class VerifyConformanceMdoc {
         private val jwkThumbprint = null
         private const val responseUri = "https://verifier2.localhost/verification-session/9e1f6432-338b-4938-9339-2c194bc76ef4/response"
         private val verificationContext = MdocVerificationContext(nonce, clientId, responseUri)
+        // Recorded public conformance vector: verify within its signed 2025-2026 MSO window.
+        private val verificationClock = TestTimeSource().asClock(Instant.parse("2025-10-15T12:00:00Z"))
     }
 
     @Test
@@ -94,10 +101,39 @@ class VerifyConformanceMdoc {
     @Test
     fun verifyConformanceMdoc() = runTest {
         println("==== VERIFICATION: MdocVerifier ====")
-        val verificationResult = MdocVerifier.verify(vpTokenMdocBase64, verificationContext)
-        println("Verification result: $verificationResult")
+        val verificationResult = MdocVerifier.verify(vpTokenMdocBase64, verificationContext, verificationClock)
 
-        assertTrue("Verification result is not valid") { verificationResult.valid }
+        assertTrue(verificationResult.valid, verificationResult.errors.toString())
+    }
+
+    @Test
+    fun verifyConformanceMdocAtValidityBoundaries() = runTest {
+        val document = MdocParser.parseToDocument(vpTokenMdocBase64)
+        val validity = document.issuerSigned.decodeMobileSecurityObject().validityInfo
+        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext)
+
+        for (time in listOf(validity.validFrom, validity.validUntil)) {
+            val result = MdocVerifier.verify(document, sessionTranscript, TestTimeSource().asClock(time))
+            assertTrue(result.valid, "Verification at $time failed: ${result.errors}")
+        }
+    }
+
+    @Test
+    fun verifyConformanceMdocRejectsOutsideValidityWindow() = runTest {
+        val document = MdocParser.parseToDocument(vpTokenMdocBase64)
+        val validity = document.issuerSigned.decodeMobileSecurityObject().validityInfo
+
+        for (time in listOf(validity.validFrom - 1.nanoseconds, validity.validUntil + 1.nanoseconds)) {
+            val result = MdocVerifier.verify(vpTokenMdocBase64, verificationContext, TestTimeSource().asClock(time))
+            assertFalse(result.valid, "Verification at $time must fail")
+            assertEquals(false, result.msoValidityValid)
+            assertEquals(true, result.issuerSignatureValid)
+            assertEquals(true, result.deviceSignatureValid)
+            assertEquals(true, result.dataIntegrityValid)
+            assertEquals(true, result.deviceKeyAuthorized)
+            assertEquals(1, result.errors.size)
+            assertTrue(result.errors.single().startsWith("MSO Validation failed:"))
+        }
     }
 
 }

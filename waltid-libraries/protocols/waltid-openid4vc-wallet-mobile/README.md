@@ -262,7 +262,12 @@ This follows AndroidX's nullable [`MdocField.fieldValue`](https://developer.andr
 contract for fields such as photos, and also applies to SD-JWT registry claims.
 Check `digitalCredentialRegistration` or the result of
 `refreshDigitalCredentialRegistration()` to detect and retry platform indexing
-failures independently of wallet loading.
+failures independently of wallet loading. Refreshes on one wallet serialize the credential snapshot
+and its publication. Cancellation propagates without publishing a completed result. Android also
+orders platform writes across process-local adapters: a submitted write retains its place until the
+provider callback finishes, even if the caller cancels, because Play services may ignore cancellation.
+A provider that never completes a callback blocks subsequent registry writes in that process; local
+wallet reads remain independent.
 
 ## In-person proximity presentation
 
