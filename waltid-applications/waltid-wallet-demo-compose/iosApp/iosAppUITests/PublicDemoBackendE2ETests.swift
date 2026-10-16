@@ -408,12 +408,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        let registrationConsent = addUIInterruptionMonitor(withDescription: "Identity document registration") { alert in
-            guard alert.label.contains("Identity Verification") else { return false }
-            alert.buttons["Allow"].tap()
-            return true
-        }
-        defer { removeUIInterruptionMonitor(registrationConsent) }
         ui.launch(environment: isolatedWalletEnvironment())
 
         let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
@@ -432,10 +426,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.tapButton(identifier: "wallet-detail-back", fallbackLabel: "Back")
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 10))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-
-        waitForIdleIssuanceDismissal(app)
+        allowIdentityDocumentRegistrationIfRequested()
+        waitForIdleIssuanceDismissal(app, timeout: credentialOperationTimeout)
         assertHome(app)
         let credentialCards = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
@@ -645,14 +637,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
-    }
-
-    private func waitForIdleIssuanceDismissal(_ app: XCUIApplication) {
-        // Home exists beneath the receipt; wait until automatic dismissal makes it usable.
-        let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
-            object: app.buttons["wallet.scanButton"])
-        XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 20), .completed, app.debugDescription)
-        XCTAssertFalse(app.buttons["issuance-done"].exists)
     }
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {

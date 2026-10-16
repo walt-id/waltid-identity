@@ -149,13 +149,6 @@ final class WalletE2EUI {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
-    /// First-use simulator registration is an OS-owned step, separate from wallet receipt rendering.
-    func allowIdentityDocumentRegistrationIfRequested() {
-        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
-            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
-        if alert.waitForExistence(timeout: 15) { alert.buttons["Allow"].tap() }
-    }
-
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
