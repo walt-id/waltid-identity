@@ -172,9 +172,12 @@ class EnterpriseMobileWalletIntegrationTest {
             while (!BatchAuthorizationTestActivity.callback.isCompleted) {
                 // Approve browser onboarding and the external-app handoff, never a signing prompt.
                 try {
-                    device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
-                        "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
-                    )))?.click()
+                    // Chrome's sign-in dismissal label varies between bundled browser versions.
+                    val browserAction = device.findObject(By.res("com.android.chrome", "signin_fre_dismiss_button"))
+                        ?: device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
+                            "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
+                        )))
+                    browserAction?.click()
                 } catch (_: StaleObjectException) {
                     // Chrome changed pages after lookup; the next iteration queries the new page.
                 }
