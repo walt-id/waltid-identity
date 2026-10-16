@@ -254,8 +254,10 @@ enum DemoClientIdTrust {
         -----END CERTIFICATE-----
         """
 
-    /// Test wallet-gateway verifier chain for signed Request Objects.
+    /// Test wallet-gateway verifier leaf and issuing CA for signed Request Objects.
     /// SAN DNS `mc.test.walletgateway.com`. Leaf valid until 2027-01-13.
+    /// The root is omitted: its ECDSA AlgorithmIdentifier has NULL parameters, which
+    /// RFC 5758 section 3.2 forbids and the iOS parser rejects. Requests must omit it from x5c.
     static let walletGatewayTestLeafPem = """
         -----BEGIN CERTIFICATE-----
         MIIDTDCCAvOgAwIBAgIIDzMLWn1TTSkwCgYIKoZIzj0EAwIwgYAxEzARBgoJkiaJ
@@ -300,25 +302,6 @@ enum DemoClientIdTrust {
         -----END CERTIFICATE-----
         """
 
-    static let walletGatewayTestRootCaPem = """
-        -----BEGIN CERTIFICATE-----
-        MIIChjCCAgqgAwIBAgIQEX6pRviz1++6ZZwUkjINkzAMBggqhkjOPQQDAwUAMIGA
-        MRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYKbWNpbnRlcm5h
-        bDETMBEGCgmSJomT8ixkARkWA3BraTETMBEGA1UEChMKTWFzdGVyY2FyZDEjMCEG
-        A1UEAxMaTUMgSW50ZXJuYWwgVFNUIFJvb3QgQ0EgRzEwHhcNMTkxMDAzMDgxMTEx
-        WhcNMzUxMDAzMDgxMTEyWjCBgDETMBEGCgmSJomT8ixkARkWA3RzdDEaMBgGCgmS
-        JomT8ixkARkWCm1jaW50ZXJuYWwxEzARBgoJkiaJk/IsZAEZFgNwa2kxEzARBgNV
-        BAoTCk1hc3RlcmNhcmQxIzAhBgNVBAMTGk1DIEludGVybmFsIFRTVCBSb290IENB
-        IEcxMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECSFI+KqrWqkipr88/HkAgxZx5FM/
-        j5pZjdWY2ILmFY1L2zSKFzqcyW8f9l5y1qkjhOcjcwU7dBxXGj3rHXibsqfD/kXm
-        pVJhKll1+BD1+/dwlchvH+F781AnlJLvyDFZo0UwQzAOBgNVHQ8BAf8EBAMCAYYw
-        EgYDVR0TAQH/BAgwBgEB/wIBATAdBgNVHQ4EFgQUCgqK6aqV3dqr5Sg51bOkrqtd
-        I4UwDAYIKoZIzj0EAwMFAANoADBlAjEAxs3k1g0eFlw2rz7YnfoCDLSwhTffjh6w
-        gWaE5j7kZILiDqRHzd6f/SToPF5GUy5wAjBNwWZq3JYt1lOk1BUTo4MyI2YP040+
-        KFSK6WjF7XmumpeKR+QKNLQJGGS6FegFhmw=
-        -----END CERTIFICATE-----
-        """
-
     /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
     static let x509TrustAnchorPems: [String] = [
         verifier2ExampleLeafPem,
@@ -335,7 +318,6 @@ enum DemoClientIdTrust {
         webuildRaidiamRootPem,
         walletGatewayTestLeafPem,
         walletGatewayTestSubCaPem,
-        walletGatewayTestRootCaPem,
     ]
 
     static var clientIDTrustConfiguration: WalletClientIDTrustConfiguration {

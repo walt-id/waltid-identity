@@ -285,8 +285,10 @@ object DemoClientIdTrust {
     """.trimIndent()
 
     /**
-     * Test wallet-gateway verifier chain for signed Request Objects.
+     * Test wallet-gateway verifier leaf and issuing CA for signed Request Objects.
      * SAN DNS `mc.test.walletgateway.com`. Leaf valid until 2027-01-13.
+     * The root is omitted: its ECDSA AlgorithmIdentifier has NULL parameters, which
+     * RFC 5758 section 3.2 forbids and the iOS parser rejects. Requests must omit it from x5c.
      */
     val WALLET_GATEWAY_TEST_LEAF_PEM = """
         -----BEGIN CERTIFICATE-----
@@ -332,25 +334,6 @@ object DemoClientIdTrust {
         -----END CERTIFICATE-----
     """.trimIndent()
 
-    val WALLET_GATEWAY_TEST_ROOT_CA_PEM = """
-        -----BEGIN CERTIFICATE-----
-        MIIChjCCAgqgAwIBAgIQEX6pRviz1++6ZZwUkjINkzAMBggqhkjOPQQDAwUAMIGA
-        MRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYKbWNpbnRlcm5h
-        bDETMBEGCgmSJomT8ixkARkWA3BraTETMBEGA1UEChMKTWFzdGVyY2FyZDEjMCEG
-        A1UEAxMaTUMgSW50ZXJuYWwgVFNUIFJvb3QgQ0EgRzEwHhcNMTkxMDAzMDgxMTEx
-        WhcNMzUxMDAzMDgxMTEyWjCBgDETMBEGCgmSJomT8ixkARkWA3RzdDEaMBgGCgmS
-        JomT8ixkARkWCm1jaW50ZXJuYWwxEzARBgoJkiaJk/IsZAEZFgNwa2kxEzARBgNV
-        BAoTCk1hc3RlcmNhcmQxIzAhBgNVBAMTGk1DIEludGVybmFsIFRTVCBSb290IENB
-        IEcxMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECSFI+KqrWqkipr88/HkAgxZx5FM/
-        j5pZjdWY2ILmFY1L2zSKFzqcyW8f9l5y1qkjhOcjcwU7dBxXGj3rHXibsqfD/kXm
-        pVJhKll1+BD1+/dwlchvH+F781AnlJLvyDFZo0UwQzAOBgNVHQ8BAf8EBAMCAYYw
-        EgYDVR0TAQH/BAgwBgEB/wIBATAdBgNVHQ4EFgQUCgqK6aqV3dqr5Sg51bOkrqtd
-        I4UwDAYIKoZIzj0EAwMFAANoADBlAjEAxs3k1g0eFlw2rz7YnfoCDLSwhTffjh6w
-        gWaE5j7kZILiDqRHzd6f/SToPF5GUy5wAjBNwWZq3JYt1lOk1BUTo4MyI2YP040+
-        KFSK6WjF7XmumpeKR+QKNLQJGGS6FegFhmw=
-        -----END CERTIFICATE-----
-    """.trimIndent()
-
     /**
      * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
      *
@@ -379,7 +362,6 @@ object DemoClientIdTrust {
         WEBUILD_RAIDIAM_ROOT,
         WALLET_GATEWAY_TEST_LEAF_PEM,
         WALLET_GATEWAY_TEST_SUB_CA_PEM,
-        WALLET_GATEWAY_TEST_ROOT_CA_PEM,
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(
