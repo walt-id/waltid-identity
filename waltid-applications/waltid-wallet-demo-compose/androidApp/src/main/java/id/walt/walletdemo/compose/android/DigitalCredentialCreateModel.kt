@@ -32,7 +32,6 @@ internal class DigitalCredentialCreateModel(
     private var completion: Intent? = null
     // Cancellation must not discard SDK recovery handles after a remote operation has begun.
     private var preserveContinuations = false
-    private var receivedIds = emptySet<String>()
     val draft = WalletDemoOfferDraft()
     var state by mutableStateOf<WalletDemoOfferCreateUiState>(WalletDemoOfferCreateUiState.Loading)
         private set
@@ -127,7 +126,7 @@ internal class DigitalCredentialCreateModel(
         receiptOperation(previous) {
             val pending = client.continuations()
                 .filter { it.id in previous.receipt.pendingIds }
-            val saved = client.credentials().filter { it.id in receivedIds }
+            val saved = client.credentials().filter { it.id in previous.receivedIds }
             currentCoroutineContext().ensureActive()
             state = previous.copy(saved = saved, pending = pending, refreshError = null)
         }
@@ -179,13 +178,12 @@ internal class DigitalCredentialCreateModel(
                 newIds = emptyList(); newPending = emptyList(); problem = null
             }
         }
-        receivedIds = receivedIds + newIds
-        val ids = receivedIds
+        val ids = previous?.receivedIds.orEmpty() + newIds
         val pending = previous?.pending.orEmpty().filterNot { it.id == resumingId } + newPending
         val saved = try { client.credentials().filter { it.id in ids } }
         catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) {
-            refreshError = "Could not load saved credential details. Check the wallet before starting another request."
+            // The confirmed IDs keep missing details visible and recoverable in the receipt.
             previous?.saved.orEmpty()
         }
         currentCoroutineContext().ensureActive()
@@ -197,8 +195,8 @@ internal class DigitalCredentialCreateModel(
         }
         state = WalletDemoOfferCreateUiState.Receipt(
             receipt = WalletDemoIssuanceReceipt(session?.preview?.issuer, pending.map { it.id }.toSet(), previous?.receipt?.problem ?: problem),
-            saved = saved, pending = pending.distinctBy { it.id },
-            refreshError = refreshError ?: if (saved.size < ids.size) "Some saved credential details could not be loaded. Check the wallet before starting another request." else null,
+            saved = saved, pending = pending.distinctBy { it.id }, receivedIds = ids,
+            refreshError = refreshError,
         )
     }
 

@@ -16,7 +16,7 @@ sealed interface WalletDemoOfferCreateUiState {
     /**
      * Authorization-code grant: waiting while the shared external browser completes issuer/AS login.
      *
-     * @property completing True after the `openid://` callback was delivered and issuance is finishing.
+     * @property completing True after the provider authorization callback was delivered and issuance is finishing.
      */
     data class WaitingForAuthorization(
         val completing: Boolean = false,
@@ -26,9 +26,13 @@ sealed interface WalletDemoOfferCreateUiState {
         val receipt: WalletDemoIssuanceReceipt,
         val saved: List<WalletDemoCredential>,
         val pending: List<WalletDemoDeferredCredential>,
+        val receivedIds: Set<String>,
         val busy: Boolean = false,
         val refreshError: String? = null,
-    ) : WalletDemoOfferCreateUiState
+    ) : WalletDemoOfferCreateUiState {
+        val missingSavedCount: Int
+            get() = (receivedIds - saved.map { it.id }.toSet()).size
+    }
 
     data class Failure(val message: String) : WalletDemoOfferCreateUiState
 }

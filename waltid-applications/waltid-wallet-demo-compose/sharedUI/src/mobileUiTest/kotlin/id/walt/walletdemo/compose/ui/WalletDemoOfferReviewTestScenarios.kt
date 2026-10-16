@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertTextEquals
@@ -24,6 +25,7 @@ class WalletDemoOfferReviewTestScenarios {
         val result = WalletVisualFixtures.partialResult
         val state = WalletDemoOfferCreateUiState.Receipt(
             requireNotNull(result.issuanceReceipt), result.receivedCredentials(), result.deferredCredentials,
+            receivedIds = result.lastReceivedCredentialIds.toSet(),
         )
         var done = 0
         val resumed = mutableListOf<String>()
@@ -43,6 +45,47 @@ class WalletDemoOfferReviewTestScenarios {
         onNodeWithTag("issuance-pending-${state.pending.single().id}").performScrollToContent(this).assertIsDisplayed()
         assertEquals(emptyList(), resumed)
         onNodeWithTag("wallet.provider.done").performClick()
+        assertEquals(1, done)
+    }
+
+    fun missingSavedDetailsKeepTheProviderCountAndRefreshUntilComplete() = runComposeUiTest {
+        val saved = WalletVisualFixtures.partialResult.receivedCredentials().single()
+        val second = saved.copy(id = "second")
+        val state = mutableStateOf(WalletDemoOfferCreateUiState.Receipt(
+            receipt = WalletDemoIssuanceReceipt(), saved = emptyList(), pending = emptyList(),
+            receivedIds = setOf(saved.id, second.id),
+        ))
+        var refreshes = 0
+        var accepts = 0
+        var resumes = 0
+        var done = 0
+        setContent {
+            WalletDemoOfferCreateScreen(state.value, onAccept = { _, _ -> accepts++ }, onDecline = {},
+                onDismiss = {}, onCancelAuthorization = {}, onDone = { done++ },
+                onResumeDeferred = { resumes++ }, onRefresh = {
+                    refreshes++
+                    state.value = state.value.copy(busy = true)
+                })
+        }
+        onNodeWithText("Saved · 2").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("issuance-missing-details").assertIsDisplayed()
+        onNodeWithTag("issuance-refresh").assertIsEnabled().performClick()
+        onNodeWithTag("issuance-refresh").assertIsNotEnabled()
+        onNodeWithTag("wallet.provider.done").assertIsNotEnabled()
+        runOnIdle { state.value = state.value.copy(saved = listOf(saved), busy = false) }
+        onNodeWithText("Saved · 2").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("issuance-saved-${saved.id}").assertIsDisplayed()
+        onNodeWithTag("issuance-missing-details").assertIsDisplayed()
+        onNodeWithTag("issuance-refresh").assertIsEnabled().performClick()
+        runOnIdle { state.value = state.value.copy(saved = listOf(saved, second), busy = false) }
+        onNodeWithText("Saved · 2").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("issuance-saved-${second.id}").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("issuance-missing-details").assertDoesNotExist()
+        onNodeWithTag("issuance-refresh").assertDoesNotExist()
+        onNodeWithTag("wallet.provider.done").assertIsEnabled().performClick()
+        assertEquals(2, refreshes)
+        assertEquals(0, accepts)
+        assertEquals(0, resumes)
         assertEquals(1, done)
     }
 
