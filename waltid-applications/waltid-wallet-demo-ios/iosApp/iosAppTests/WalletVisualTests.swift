@@ -822,6 +822,9 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
         // Core Animation spinners run outside SwiftUI transactions. Freeze their layer clocks at
         // one frame only in the snapshot host; production loading indicators keep animating.
         freezeSpinners(view)
+        // Initial mounting and nonanimated scrolling can animate native toolbar materials.
+        // Static fixtures must capture their final frame; production motion is unchanged.
+        defer { finishAnimations(view.layer) }
         guard scrollToBottom, let scroll = findScrollView(view) else { return }
         let bottom = scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom
         guard bottom > -scroll.adjustedContentInset.top else { return }
@@ -831,10 +834,6 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
             scroll.setContentOffset(CGPoint(x: 0, y: target), animated: false)
         }
         didScroll = true
-        // Nonanimated scrolling can animate scroll-edge and sibling toolbar backdrops.
-        // A static fixture must capture its final frame, not a runner-dependent phase.
-        // Production views and the separate motion journeys retain their animations.
-        finishAnimations(view.layer)
     }
 
     private func finishAnimations(_ layer: CALayer) {
@@ -905,7 +904,7 @@ private struct WalletVisualFrameGate {
 
 @MainActor
 final class WalletVisualHostingTests: XCTestCase {
-    func testScrollSettlesTheSiblingToolbarBackdrop() throws {
+    func testMountAndScrollSettleTheSiblingToolbarBackdrop() throws {
         let scroll = UIScrollView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
         scroll.contentSize = CGSize(width: 100, height: 200)
         let backdrop = UIView(frame: CGRect(x: 150, y: 150, width: 20, height: 20))
@@ -928,24 +927,25 @@ final class WalletVisualHostingTests: XCTestCase {
         fade.fromValue = 0
         fade.toValue = 1
         fade.duration = 60
-        backdrop.layer.add(fade, forKey: "toolbarBackdrop")
-
-        host.scrollToBottom = true
-        host.view.setNeedsLayout()
-        host.view.layoutIfNeeded()
-        let rendered = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
-            XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
-        }
-        XCTAssertEqual(scroll.contentOffset.y, 100)
-        let point = backdrop.convert(CGPoint(x: 10, y: 10), to: window)
-        let pixel = try XCTUnwrap(rendered.cgImage?.cropping(to: CGRect(
-            x: point.x * rendered.scale, y: point.y * rendered.scale, width: rendered.scale, height: rendered.scale)))
         let finalFrame = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { context in
             UIColor.black.setFill()
             context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
         }
-        XCTAssertTrue(matchesWithinRasterNoise(finalFrame, UIImage(cgImage: pixel)),
-            "A toolbar outside the scroll view must render its final backdrop after scrolling")
+        for scrollToBottom in [false, true] {
+            backdrop.layer.add(fade, forKey: "toolbarBackdrop")
+            host.scrollToBottom = scrollToBottom
+            host.view.setNeedsLayout()
+            host.view.layoutIfNeeded()
+            let rendered = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+            }
+            XCTAssertEqual(scroll.contentOffset.y, scrollToBottom ? 100 : -scroll.adjustedContentInset.top)
+            let point = backdrop.convert(CGPoint(x: 10, y: 10), to: window)
+            let pixel = try XCTUnwrap(rendered.cgImage?.cropping(to: CGRect(
+                x: point.x * rendered.scale, y: point.y * rendered.scale, width: rendered.scale, height: rendered.scale)))
+            XCTAssertTrue(matchesWithinRasterNoise(finalFrame, UIImage(cgImage: pixel)),
+                "A toolbar outside the scroll view must settle on mount and after scrolling")
+        }
     }
 }
 

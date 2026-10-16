@@ -23,13 +23,14 @@ func allowIdentityDocumentRegistrationIfRequested(file: StaticString = #filePath
                   file: file, line: line)
 }
 
-/// Wait for stable, usable Home rather than racing the five-second success receipt.
+/// Wait for usable Home after receiving or sharing, without racing the five-second result sheet.
 @MainActor
-func waitForIdleIssuanceDismissal(_ app: XCUIApplication, timeout: TimeInterval = 20,
-                                 file: StaticString = #filePath, line: UInt = #line) {
+func waitForIdleResultDismissal(_ app: XCUIApplication, timeout: TimeInterval = 20,
+                                file: StaticString = #filePath, line: UInt = #line) {
     let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
                                         object: app.buttons["wallet.scanButton"])
     XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: timeout), .completed, app.debugDescription,
                    file: file, line: line)
     XCTAssertFalse(app.buttons["issuance-done"].exists, file: file, line: line)
+    XCTAssertFalse(app.buttons["wallet.presentationDone"].exists, file: file, line: line)
 }

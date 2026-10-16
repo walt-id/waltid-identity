@@ -60,7 +60,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             let saved = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
             XCTAssertTrue(saved.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-            waitForIdleIssuanceDismissal(app)
+            waitForIdleResultDismissal(app)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
@@ -427,7 +427,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 10))
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         allowIdentityDocumentRegistrationIfRequested()
-        waitForIdleIssuanceDismissal(app, timeout: credentialOperationTimeout)
+        waitForIdleResultDismissal(app, timeout: credentialOperationTimeout)
         assertHome(app)
         let credentialCards = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
@@ -597,7 +597,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
 
-        waitForIdleIssuanceDismissal(app)
+        waitForIdleResultDismissal(app)
         let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
