@@ -149,15 +149,16 @@ final class WalletE2EUI {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
-    func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
+    private func waitForTextInputValue(in input: XCUIElement, value: String, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            let input = textInput(identifier: identifier, fallbackLabel: fallbackLabel)
-            if input.exists, input.value as? String == value {
+        // A short predicate waiter can interrupt the accessibility query itself before it returns.
+        repeat {
+            if input.exists, let actual = input.value as? String,
+                actual == value || (value.isEmpty && actual == input.placeholderValue) {
                 return true
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        }
+        } while Date() < deadline
         return false
     }
 
@@ -299,11 +300,7 @@ final class WalletE2EUI {
         element.typeText(value)
         if verifyEnteredValue {
             for attempt in 0..<2 {
-                let entered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                    let actual = element.value as? String ?? ""
-                    return actual == value || (value.isEmpty && actual == element.placeholderValue)
-                }, object: element)
-                if XCTWaiter.wait(for: [entered], timeout: 2) == .completed {
+                if waitForTextInputValue(in: element, value: value, timeout: 2) {
                     break
                 }
                 guard attempt == 0 else {
