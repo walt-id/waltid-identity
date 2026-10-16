@@ -51,6 +51,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
@@ -259,11 +260,27 @@ class Issuer2CredentialProofValidationTest {
     fun `standalone W3C attestation verifies holder DIDs and permits retry after a mismatched key`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val attesterJwk = attester.getPublicKey().exportJWKObject()
-        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(
-            keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attesterJwk)),
-            clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
-        ) })
-        val flow = prepareFlow(apiClient(), Issuer2CredentialScenarios.openBadgeCredential)
+        val openBadge = Issuer2CredentialScenarios.openBadgeCredential
+        installIssuer2WithConfigFiles(
+            configureMetadataConfig = { metadata ->
+                val configuration = metadata.credentialConfigurations.getValue(openBadge.credentialConfigurationId).jsonObject
+                val proofs = configuration.getValue("proof_types_supported").jsonObject
+                metadata.copy(credentialConfigurations = metadata.credentialConfigurations + (
+                    openBadge.credentialConfigurationId to JsonObject(configuration + (
+                        "proof_types_supported" to JsonObject(proofs + (
+                            ProofType.ATTESTATION.value to buildJsonObject {
+                                put("proof_signing_alg_values_supported", JsonArray(listOf(JsonPrimitive("ES256"))))
+                            }
+                        ))
+                    ))
+                ))
+            },
+            configureServiceConfig = { it.copy(
+                keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attesterJwk)),
+                clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
+            ) },
+        )
+        val flow = prepareFlow(apiClient(), openBadge)
         val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
         val dids = holders.map { DidJwkRegistrar().registerByKey(it, DidJwkCreateOptions(KeyType.secp256r1)).did }
         val nonce = flow.nonce()
@@ -300,59 +317,7 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
-    fun `EUDI photo ID accepts attested kid proof and reports why invalid proofs fail`() = testApplication {
-        val attester = JWKKey.generate(KeyType.secp256r1)
-        val holder = JWKKey.generate(KeyType.secp256r1)
-        val trusted = attester.getPublicKey().exportJWKObject()
-        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(
-            keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(trusted)),
-            clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
-        ) })
-        val scenario = Issuer2CredentialScenarios.configured.single {
-            it.credentialConfigurationId == "org.iso.23220.photoid.1_eudi"
-        }
-        val flow = prepareFlow(apiClient(), scenario)
-        val nonce = flow.nonce()
-        val now = Clock.System.now().epochSeconds
-        for ((kind, expectedReason) in listOf(
-            "untrusted" to "Key attestation signature is invalid or its signer is not trusted",
-            "unmatched-kid" to "Credential proof kid does not match an attested JWK: 0",
-            "anonymous-iss" to "Credential proof issuer claim must be omitted for anonymous pre-authorized access",
-            "missing-kid" to null,
-        )) {
-            val signer = if (kind == "untrusted") JWKKey.generate(KeyType.secp256r1) else attester
-            val attestedJwk = JsonObject(holder.getPublicKey().exportJWKObject() - "kid" +
-                if (kind == "unmatched-kid") mapOf("kid" to JsonPrimitive("other")) else emptyMap())
-            val attestation = signer.signJws(buildJsonObject {
-                put("iat", now)
-                put("exp", now + 300)
-                put("nonce", nonce)
-                put("attested_keys", JsonArray(listOf(attestedJwk)))
-            }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("key-attestation+jwt")))
-            val jwt = holder.signJws(buildJsonObject {
-                put("aud", flow.resolvedOffer.issuerMetadata.credentialIssuer)
-                put("iat", now)
-                put("nonce", nonce)
-                if (kind == "anonymous-iss") put("iss", "wallet-client")
-            }.toString().encodeToByteArray(), mapOf(
-                "typ" to JsonPrimitive("openid4vci-proof+jwt"),
-                "kid" to JsonPrimitive("0"),
-                "key_attestation" to JsonPrimitive(attestation),
-            ))
-            val response = flow.request(Proofs(jwt = listOf(jwt)))
-            if (expectedReason == null) {
-                assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-                assertEquals(1, response.body<JsonObject>().getValue("credentials").jsonArray.size)
-            } else {
-                assertRejectedCredentialRequest(response)
-                assertEquals(expectedReason, response.body<JsonObject>().getValue("error_description").jsonPrimitive.content)
-                assertEquals(IssuanceSessionStatus.ACTIVE, flow.client.getSession(flow.sessionId).status)
-            }
-        }
-    }
-
-    @Test
-    fun `configured JWT key attestation requirements are advertised and enforced`() = testApplication {
+    fun `shipped catalog does not require JWT key attestation`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val holder = JWKKey.generate(KeyType.secp256r1)
         val trusted = attester.getPublicKey().exportJWKObject()

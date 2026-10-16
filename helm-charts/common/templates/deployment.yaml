@@ -40,7 +40,7 @@ spec:
         env:
         {{- range $name, $value := . }}
         - name: {{ $name }}
-          value: {{ $value | quote }}
+          value: {{ tpl $value $ | quote }}
         {{- end }}
         {{- end }}
         {{- with .Values.envFromSecrets }}
