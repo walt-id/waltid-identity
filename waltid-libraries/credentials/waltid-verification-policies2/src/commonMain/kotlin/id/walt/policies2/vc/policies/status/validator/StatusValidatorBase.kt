@@ -41,9 +41,14 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         
         signatureVerifier?.let { verifier ->
             requireNotNull(referencedCredential) { "Referenced credential is required for status-list signer authorization" }
-            val verified = verifySignature(verifier, statusListContent)
+            val verified = verifySignature(verifier, statusListContent, referencedCredential)
             authorizeStatusListSigner(
-                StatusListSignerAuthorizationRequest(referencedCredential, entry.uri, verified.signer),
+                StatusListSignerAuthorizationRequest(
+                    referencedCredential = referencedCredential,
+                    statusListUri = entry.uri,
+                    signer = verified.signer,
+                    embeddedKeyReference = verified.embeddedKeyReference,
+                ),
                 signerAuthorizer,
             )
             if (entry is IETFEntry && verified.payload is JsonObject) {
@@ -66,13 +71,14 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
     private suspend fun verifySignature(
         verifier: StatusListSignatureVerifier,
         content: StatusListContent,
+        referencedCredential: DigitalCredential,
     ): VerifiedStatusList<*> {
         logger.debug { "Verifying status list signature" }
         
         val verified = when (content) {
             is StatusListContent.Text -> {
                 if (isJwt(content.content)) {
-                    verifier.verifyJwtWithSigner(content.content).getOrElse {
+                    verifier.verifyJwtWithSigner(content.content, referencedCredential).getOrElse {
                         throw StatusVerificationError("Status list JWT signature verification failed: ${it.message}")
                     }
                 } else {
@@ -80,7 +86,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
                 }
             }
             is StatusListContent.Binary -> {
-                verifier.verifyCwtWithSigner(content.content).getOrElse {
+                verifier.verifyCwtWithSigner(content.content, referencedCredential).getOrElse {
                     throw StatusVerificationError("Status list CWT signature verification failed: ${it.message}")
                 }
             }

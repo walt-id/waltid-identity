@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.policies.status.signature
 
+import id.walt.cose.CoseCertHash
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.Cose
@@ -28,12 +29,25 @@ import kotlin.io.encoding.Base64
 data class VerifiedStatusList<T>(
     val payload: T,
     val signer: ResolvedJwtVerificationKey,
+    val embeddedKeyReference: StatusListEmbeddedKeyReference? = null,
 )
 
 data class StatusListSignerAuthorizationRequest(
     val referencedCredential: DigitalCredential,
     val statusListUri: String,
     val signer: ResolvedJwtVerificationKey,
+    val embeddedKeyReference: StatusListEmbeddedKeyReference? = null,
+)
+
+/**
+ * JOSE `x5t` / `x5t#S256` or COSE `x5t` from the status-list token.
+ * These name the credential certificate; they are not a key by themselves.
+ */
+class StatusListEmbeddedKeyReference(
+    val x5tSha1: ByteArray? = null,
+    val x5tSha256: ByteArray? = null,
+    val coseHashAlgorithm: Int? = null,
+    val coseHash: ByteArray? = null,
 )
 
 fun interface StatusListSignerAuthorizer {
@@ -61,7 +75,10 @@ class StatusListSignatureVerifier(
     suspend fun verifyJwt(jwt: String): Result<JsonObject> =
         verifyJwtWithSigner(jwt).map(VerifiedStatusList<JsonObject>::payload)
 
-    suspend fun verifyJwtWithSigner(jwt: String): Result<VerifiedStatusList<JsonObject>> = resultOfSuspend {
+    suspend fun verifyJwtWithSigner(
+        jwt: String,
+        referencedCredential: DigitalCredential? = null,
+    ): Result<VerifiedStatusList<JsonObject>> = resultOfSuspend {
         logger.debug { "Verifying JWT status list signature" }
 
         val decoded = try {
@@ -75,7 +92,16 @@ class StatusListSignatureVerifier(
         } catch (cause: Throwable) {
             throw SignatureInvalidException("Invalid JWT payload: ${cause.message}")
         }
+        val reference = joseEmbeddedKeyReference(decoded.protectedHeader)
         val resolved = resolveKeyFromJwtHeader(decoded.protectedHeader, payload)
+            ?: resolveReferencedCredentialKey(
+                credential = referencedCredential,
+                reference = reference,
+                keyId = decoded.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull,
+            )
+            ?: throw KeyResolutionFailedException(
+                "No resolvable key information in JWT header (expected trusted issuer, x5c, or explicitly enabled jwk)"
+            )
         logger.debug { "Resolved crypto2 key for JWT verification: ${resolved.key.spec}" }
         try {
             CompactJws.verify(jwt, resolved.key, allowedJwtAlgorithms)
@@ -84,7 +110,7 @@ class StatusListSignatureVerifier(
         } catch (cause: Throwable) {
             throw SignatureInvalidException("JWT signature verification failed: ${cause.message}")
         }
-        VerifiedStatusList(payload, resolved)
+        VerifiedStatusList(payload, resolved, reference)
     }
     
     /**
@@ -96,7 +122,10 @@ class StatusListSignatureVerifier(
     suspend fun verifyCwt(cwtBytes: ByteArray): Result<ByteArray> =
         verifyCwtWithSigner(cwtBytes).map(VerifiedStatusList<ByteArray>::payload)
 
-    suspend fun verifyCwtWithSigner(cwtBytes: ByteArray): Result<VerifiedStatusList<ByteArray>> = resultOfSuspend {
+    suspend fun verifyCwtWithSigner(
+        cwtBytes: ByteArray,
+        referencedCredential: DigitalCredential? = null,
+    ): Result<VerifiedStatusList<ByteArray>> = resultOfSuspend {
         logger.debug { "Verifying CWT status list signature" }
         
         val coseSign1 = try {
@@ -105,7 +134,14 @@ class StatusListSignatureVerifier(
             throw SignatureInvalidException("Invalid CWT structure: ${cause.message}")
         }
         
-        val resolved = resolveKeyFromCoseHeaders(coseSign1)
+        val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(coseSign1.protected)
+        val reference = coseEmbeddedKeyReference(protectedHeaders.x5t ?: coseSign1.unprotected.x5t)
+        val headerKid = (protectedHeaders.kid ?: coseSign1.unprotected.kid)?.decodeToString()
+        val resolved = resolveKeyFromCoseHeaders(coseSign1, protectedHeaders)
+            ?: resolveReferencedCredentialKey(referencedCredential, reference, headerKid)
+            ?: throw KeyResolutionFailedException(
+                "No resolvable key information in CWT protected headers (expected x5chain or kid with DID)"
+            )
         logger.debug { "Resolved crypto2 key for CWT verification: ${resolved.key.spec}" }
         val isValid = try {
             coseSign1.verify(resolved.key, allowedCoseAlgorithms)
@@ -122,6 +158,7 @@ class StatusListSignatureVerifier(
         VerifiedStatusList(
             coseSign1.payload ?: throw SignatureInvalidException("CWT has no payload"),
             resolved,
+            reference,
         )
     }
     
@@ -146,17 +183,14 @@ class StatusListSignatureVerifier(
     private suspend fun resolveKeyFromJwtHeader(
         header: JsonObject,
         payload: JsonObject,
-    ): ResolvedJwtVerificationKey {
+    ): ResolvedJwtVerificationKey? {
         val keyId = header["kid"]?.jsonPrimitive?.contentOrNull
         val payloadForResolution = if (
             payload["iss"] == null && payload["issuer"] == null && keyId != null && DidUtils.isDidUrl(keyId)
         ) {
             JsonObject(payload + ("iss" to JsonPrimitive(keyId.substringBefore('#'))))
         } else payload
-        return keyResolver.resolveFromJwt(header, payloadForResolution) // see Crypto2JwtKeyResolver
-        ?: throw KeyResolutionFailedException(
-            "No resolvable key information in JWT header (expected trusted issuer, x5c, or explicitly enabled jwk)"
-        )
+        return keyResolver.resolveFromJwt(header, payloadForResolution)
     }
     
     /**
@@ -168,9 +202,10 @@ class StatusListSignatureVerifier(
      * 
      * Note: ISO 18013-5 Second Edition mandates x5chain in protected headers.
      */
-    private suspend fun resolveKeyFromCoseHeaders(coseSign1: CoseSign1): ResolvedJwtVerificationKey {
-        // Decode protected headers
-        val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(coseSign1.protected)
+    private suspend fun resolveKeyFromCoseHeaders(
+        coseSign1: CoseSign1,
+        protectedHeaders: CoseHeaders,
+    ): ResolvedJwtVerificationKey? {
         
         // Try x5chain in PROTECTED headers (ISO 18013-5 Second Edition compliant)
         protectedHeaders.x5chain?.let { x5chain ->
@@ -195,7 +230,7 @@ class StatusListSignatureVerifier(
             }
         }
         
-        throw KeyResolutionFailedException("No resolvable key information in CWT protected headers (expected x5chain or kid with DID)")
+        return null
     }
     
     /**
@@ -213,6 +248,20 @@ class StatusListSignatureVerifier(
             jwtPayload = buildJsonObject { },
         ) ?: throw KeyResolutionFailedException("Failed to import key from x5c certificate")
     }
+
+    private fun joseEmbeddedKeyReference(header: JsonObject): StatusListEmbeddedKeyReference? =
+        embeddedKeyReference(
+            x5tSha1 = header.thumbprint("x5t"),
+            x5tSha256 = header.thumbprint("x5t#S256"),
+        )
+
+    private fun coseEmbeddedKeyReference(x5t: CoseCertHash?): StatusListEmbeddedKeyReference? =
+        x5t?.let {
+            embeddedKeyReference(coseHashAlgorithm = it.hashAlgorithm, coseHash = it.hashValue)
+        }
+
+    private fun JsonObject.thumbprint(name: String): ByteArray? =
+        (this[name] as? JsonPrimitive)?.contentOrNull?.let(::decodeCertificateThumbprint)
     
     private fun String.hexToByteArray(): ByteArray {
         check(length % 2 == 0) { "Hex string must have even length" }
