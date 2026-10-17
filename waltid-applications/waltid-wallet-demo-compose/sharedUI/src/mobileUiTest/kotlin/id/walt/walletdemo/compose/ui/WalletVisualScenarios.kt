@@ -361,8 +361,8 @@ internal class WalletVisualScenarios(
         capture(if (empty) "wallet.home.empty" else "wallet.home.credential")
     }
 
-    fun scanner(state: String) = with(test) {
-        val input = when (state) { "link" -> "https://example.test/request"; "unsupported" -> "FIDO:/0123456789"; else -> "" }
+    fun scanner(state: String, fidoHandoffSupported: Boolean = false) = with(test) {
+        val input = when (state) { "link" -> "https://example.test/request"; "fido" -> "FIDO:/0123456789"; else -> "" }
         content { WalletScanScreen(onBack = {}, onOpen = { _, _ -> }, initialInput = input) }
         if (state == "link") {
             onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsEnabled()
@@ -372,7 +372,8 @@ internal class WalletVisualScenarios(
             onAllNodesWithTag(WalletUiTestTags.ScanInput).assertCountEquals(0)
             onAllNodesWithTag(WalletUiTestTags.ScanContinue).assertCountEquals(0)
             onNodeWithTag("wallet.scanMode").assertIsDisplayed().assertIsEnabled()
-        } else onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsNotEnabled()
+        } else if (fidoHandoffSupported) onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsEnabled()
+        else onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsNotEnabled()
         capture("wallet.scan.$state")
     }
 

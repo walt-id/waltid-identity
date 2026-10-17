@@ -910,7 +910,7 @@ class WalletDemoAppTestScenarios(
         assertEquals(null, controller.state.value.offerPreview)
     }
 
-    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() = runComposeUiTest {
+    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests(fidoHandoffSupported: Boolean = false) = runComposeUiTest {
         val controller = WalletDemoController(WalletUiTestWallet(presentationPreview = samplePresentationPreview), InMemoryDemoPinStore())
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -918,8 +918,11 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.ScanButton).performClick()
         onNodeWithTag("wallet.scanMode").performClick()
         onNodeWithTag(WalletUiTestTags.ScanInput).performTextInput("FIDO:/123456")
-        onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsNotEnabled()
-        onNodeWithText("This is a passkey sign-in code. Scan it with your device's system camera.")
+        if (fidoHandoffSupported) onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsEnabled()
+        else onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsNotEnabled()
+        onNodeWithText(if (fidoHandoffSupported)
+            "Continue in your device's system dialog to share a credential or use a passkey."
+        else "This is a digital credential or passkey request. Scan it with your device's Camera or Code Scanner.")
             .performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ScanInput).performTextReplacement("javascript:alert(1)")
         onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsNotEnabled()

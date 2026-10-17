@@ -30,13 +30,13 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.empty.png" alt="Scan or paste a request, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.empty.png" alt="Scan or paste a request, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-empty.native-ios27_0-phone-en-light.png" alt="Scan or paste a request, Native iOS" width="240"> |
 
-## wallet-scan-unsupported
+## wallet-scan-fido
 
-**wallet · scan · unsupported**
+**Scanner — FIDO request**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.unsupported.png" alt="wallet · scan · unsupported, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.unsupported.png" alt="wallet · scan · unsupported, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-unsupported.native-ios27_0-phone-en-light.png" alt="wallet · scan · unsupported, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.fido.png" alt="Scanner — FIDO request, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.fido.png" alt="Scanner — FIDO request, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-fido.native-ios27_0-phone-en-light.png" alt="Scanner — FIDO request, Native iOS" width="240"> |
 
 ## wallet-scan-link
 

@@ -232,8 +232,8 @@ final class WalletVisualTests: XCTestCase {
         try capture(WalletScanView(onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.empty")
     }
 
-    func testScanUnsupported() throws {
-        try capture(WalletScanView(input: "FIDO:/0123456789", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.unsupported")
+    func testScanFido() throws {
+        try capture(WalletScanView(input: "FIDO:/0123456789", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.fido")
     }
 
     func testScanWebLink() throws {

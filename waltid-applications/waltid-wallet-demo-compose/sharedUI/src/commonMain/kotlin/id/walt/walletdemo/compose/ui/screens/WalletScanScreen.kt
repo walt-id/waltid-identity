@@ -17,9 +17,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.FidoQrHandoffResult
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.readPlainText
+import id.walt.walletdemo.compose.ui.rememberFidoQrHandoff
 import id.walt.walletdemo.compose.ui.rememberSystemCameraLauncher
 import id.walt.walletdemo.compose.ui.rememberScannerHostActive
 import id.walt.walletdemo.compose.ui.components.*
@@ -38,6 +40,10 @@ internal fun WalletScanScreen(
     initialInput: String = "",
     resolveLink: suspend (String) -> ResolvedWalletLink = { resolveWalletLink(it) },
     clipboard: Clipboard = LocalClipboard.current,
+    handoffFidoQr: ((String) -> FidoQrHandoffResult)? = rememberFidoQrHandoff(),
+    scanner: @Composable (Modifier, (String) -> Unit) -> Unit = { modifier, onCode ->
+        PlatformQrScanner(modifier, onCode)
+    },
 ) {
     var input by rememberSaveable { mutableStateOf(initialInput) }
     var manual by rememberSaveable { mutableStateOf(initialInput.isNotEmpty()) }
@@ -46,12 +52,16 @@ internal fun WalletScanScreen(
     var resolving by remember { mutableStateOf(false) }
     var resolutionError by remember { mutableStateOf<String?>(null) }
     var pasting by remember { mutableStateOf(false) }
+    var pendingFidoCode by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val inputFocus = remember { FocusRequester() }
     val hostActive = rememberScannerHostActive()
     val launchCamera = rememberSystemCameraLauncher()
     val kind = WalletLinkKind.classify(input)
+    val canOpen = kind in setOf(WalletLinkKind.Offer, WalletLinkKind.Presentation,
+        WalletLinkKind.AuthorizationCallback, WalletLinkKind.Web) ||
+        (kind == WalletLinkKind.FidoHybrid && handoffFidoQr != null)
     fun close() {
         if (closed) return
         closed = true
@@ -64,6 +74,12 @@ internal fun WalletScanScreen(
         resolving = true
         resolutionError = null
         focus.clearFocus()
+        if (WalletLinkKind.classify(value) == WalletLinkKind.FidoHybrid) {
+            manual = true
+            if (handoffFidoQr == null) { resolving = false; return }
+            pendingFidoCode = value.trim()
+            return
+        }
         scope.launch {
             try {
                 val resolved = resolveLink(value)
@@ -95,8 +111,23 @@ internal fun WalletScanScreen(
             } finally { pasting = false }
         }
     }
-    LaunchedEffect(manual, hostActive) {
-        if (manual && hostActive) { withFrameNanos { }; inputFocus.requestFocus() }
+    LaunchedEffect(pendingFidoCode) {
+        val code = pendingFidoCode ?: return@LaunchedEffect
+        // Manual mode removes capture from composition before the system handler opens.
+        withFrameNanos { }
+        if (closed) return@LaunchedEffect
+        val result = handoffFidoQr?.invoke(code) ?: FidoQrHandoffResult.Unavailable
+        pendingFidoCode = null
+        resolving = false
+        when (result) {
+            FidoQrHandoffResult.Opened -> close()
+            FidoQrHandoffResult.InvalidCode -> resolutionError = "This FIDO QR code is invalid. Ask for a fresh QR code."
+            FidoQrHandoffResult.Unavailable -> resolutionError = "No system handler is available for this FIDO QR code. Try your device's camera or another device."
+            FidoQrHandoffResult.Blocked -> resolutionError = "Your device could not open this FIDO QR code. Try your device's camera or a fresh code."
+        }
+    }
+    LaunchedEffect(manual, hostActive, resolving) {
+        if (manual && hostActive && !resolving) { withFrameNanos { }; inputFocus.requestFocus() }
         else focus.clearFocus()
     }
     SystemBackHandler(onBack = ::close, enabled = true)
@@ -126,8 +157,7 @@ internal fun WalletScanScreen(
             WalletActions(primary = WalletAction(
                 label = if (resolving) "Opening link…" else if (resolutionError != null) "Try again"
                     else if (kind == WalletLinkKind.AuthorizationCallback) "Continue sign-in" else "Continue",
-                onClick = { open(input) }, enabled = !resolving && !dispatched && kind in setOf(WalletLinkKind.Offer,
-                    WalletLinkKind.Presentation, WalletLinkKind.AuthorizationCallback, WalletLinkKind.Web),
+                onClick = { open(input) }, enabled = !resolving && !dispatched && canOpen,
                 testTag = WalletUiTestTags.ScanContinue))
         }) else null,
     ) {
@@ -143,7 +173,11 @@ internal fun WalletScanScreen(
                     }
                 })
             when (kind) {
-                WalletLinkKind.FidoHybrid -> Text("This is a passkey sign-in code. Scan it with your device's system camera.", style = MaterialTheme.typography.bodyMedium)
+                WalletLinkKind.FidoHybrid -> Text(
+                    if (handoffFidoQr != null) "Continue in your device's system dialog to share a credential or use a passkey."
+                    else "This is a digital credential or passkey request. Scan it with your device's Camera or Code Scanner.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 WalletLinkKind.Unsupported -> Text("This is not a supported credential offer or sharing request.", style = MaterialTheme.typography.bodyMedium)
                 else -> Unit
             }
@@ -161,11 +195,12 @@ internal fun WalletScanScreen(
                         }
                     }
                 } else if (hostActive) {
-                    PlatformQrScanner(Modifier.fillMaxSize()) { value ->
-                        if (closed || resolving || dispatched || value.isBlank()) return@PlatformQrScanner
+                    scanner(Modifier.fillMaxSize()) { value ->
+                        if (closed || resolving || dispatched || value.isBlank()) return@scanner
                         input = value.trim()
                         when (WalletLinkKind.classify(input)) {
                             WalletLinkKind.Offer, WalletLinkKind.Presentation, WalletLinkKind.Web, WalletLinkKind.AuthorizationCallback -> open(input)
+                            WalletLinkKind.FidoHybrid -> if (handoffFidoQr != null) open(input) else manual = true
                             else -> manual = true
                         }
                     }

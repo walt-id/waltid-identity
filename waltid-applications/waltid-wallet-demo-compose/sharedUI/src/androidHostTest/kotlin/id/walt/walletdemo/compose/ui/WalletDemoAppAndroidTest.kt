@@ -100,7 +100,8 @@ class WalletDemoAppAndroidTest {
     fun scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview() = scenarios.scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview()
 
     @Test
-    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() = scenarios.scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests()
+    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() =
+        scenarios.scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests(fidoHandoffSupported = true)
 
     @Test
     fun walletHomeExposesUnifiedScanAndNearby() =
