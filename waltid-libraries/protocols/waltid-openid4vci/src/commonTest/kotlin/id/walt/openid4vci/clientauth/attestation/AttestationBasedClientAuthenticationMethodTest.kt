@@ -127,6 +127,102 @@ class AttestationBasedClientAuthenticationMethodTest {
         )
     }
 
+    @Test
+    fun `wrapped verifier keeps rejected algorithms and the pop age window`() = runTest {
+        val attesterKey = JWKKey.generate(KeyType.Ed25519)
+        val clientInstanceKey = JWKKey.generate(KeyType.Ed25519)
+        val now = Clock.System.now().epochSeconds
+        val method = AttestationBasedClientAuthenticationMethod(
+            trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
+            acceptedAttestationSigningAlgorithms = setOf("none"),
+            popMaxAgeSeconds = 1,
+            clockSkewSeconds = 0,
+        ).withAttestationVerifier { inner ->
+            object : id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier {
+                override suspend fun verifyAttestationJwt(
+                    jwt: String,
+                    header: kotlinx.serialization.json.JsonObject,
+                    payload: kotlinx.serialization.json.JsonObject,
+                ) = inner.verifyAttestationJwt(jwt, header, payload)
+            }
+        }
+        val attestationJwt = attesterKey.signJws(
+            buildJsonObject {
+                put("sub", "wallet-client")
+                put("iat", now)
+                put("exp", now + 300)
+                put("cnf", buildJsonObject {
+                    put("jwk", clientInstanceKey.getPublicKey().exportJWKObject())
+                })
+            }.toString().encodeToByteArray(),
+            headers = mapOf("typ" to JsonPrimitive(ClientAttestationJwtTypes.CLIENT_ATTESTATION)),
+        )
+        val popJwt = clientInstanceKey.signJws(
+            buildJsonObject {
+                put("aud", issuer)
+                put("iat", now - 120)
+                put("jti", "proof-$now")
+            }.toString().encodeToByteArray(),
+            headers = mapOf("typ" to JsonPrimitive(ClientAttestationJwtTypes.CLIENT_ATTESTATION_POP)),
+        )
+        val result = method.authenticate(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = emptyMap(),
+            headers = mapOf(
+                ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(attestationJwt),
+                ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(popJwt),
+            ),
+            context = ClientAuthenticationContext(authorizationServerIssuer = issuer),
+        )
+        val failure = assertIs<ClientAuthenticationResult.Failure>(result)
+        assertEquals("Client attestation alg is not supported", failure.error.description)
+    }
+
+    @Test
+    fun `wrapped verifier keeps the pop age window`() = runTest {
+        val attesterKey = JWKKey.generate(KeyType.Ed25519)
+        val clientInstanceKey = JWKKey.generate(KeyType.Ed25519)
+        val now = Clock.System.now().epochSeconds
+        val method = AttestationBasedClientAuthenticationMethod(
+            trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
+            popMaxAgeSeconds = 1,
+            clockSkewSeconds = 0,
+        ).withAttestationVerifier { it }
+        val attestationJwt = attesterKey.signJws(
+            buildJsonObject {
+                put("sub", "wallet-client")
+                put("iat", now)
+                put("exp", now + 300)
+                put("cnf", buildJsonObject {
+                    put("jwk", clientInstanceKey.getPublicKey().exportJWKObject())
+                })
+            }.toString().encodeToByteArray(),
+            headers = mapOf("typ" to JsonPrimitive(ClientAttestationJwtTypes.CLIENT_ATTESTATION)),
+        )
+        val popJwt = clientInstanceKey.signJws(
+            buildJsonObject {
+                put("aud", issuer)
+                put("iat", now - 120)
+                put("jti", "proof-$now")
+            }.toString().encodeToByteArray(),
+            headers = mapOf("typ" to JsonPrimitive(ClientAttestationJwtTypes.CLIENT_ATTESTATION_POP)),
+        )
+        val result = method.authenticate(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = emptyMap(),
+            headers = mapOf(
+                ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(attestationJwt),
+                ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(popJwt),
+            ),
+            context = ClientAuthenticationContext(authorizationServerIssuer = issuer),
+        )
+        val failure = assertIs<ClientAuthenticationResult.Failure>(result)
+        assertEquals(
+            "Client attestation PoP iat claim is outside the accepted age window",
+            failure.error.description,
+        )
+    }
+
     private companion object {
         const val issuer = "https://issuer.example/openid4vci"
     }
