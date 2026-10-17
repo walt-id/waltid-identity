@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalWasmDsl::class)
+@file:OptIn(ExperimentalWasmDsl::class, com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.gradle.api.tasks.testing.Test
@@ -8,6 +8,8 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 plugins {
     id("waltid.mobile.library")
     alias(identityLibs.plugins.compose.multiplatform)
+    alias(identityLibs.plugins.roborazzi)
+    id("waltid.wallet.visual")
     kotlin("plugin.compose")
 }
 
@@ -39,12 +41,14 @@ kotlin {
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
+            implementation(identityLibs.compose.ui.tooling.preview)
             implementation(identityLibs.compose.material3)
             implementation(identityLibs.compose.material.icons.core)
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
-            implementation(identityLibs.coil.network.ktor3)
             implementation(identityLibs.coil.svg)
+            implementation(identityLibs.haze.core)
+            implementation(identityLibs.haze.blur)
             implementation(identityLibs.compose.resources)
             implementation(identityLibs.kotlinx.serialization.json)
         }
@@ -62,6 +66,8 @@ kotlin {
             if (enableAndroidBuild) {
                 androidMain.get().dependsOn(mobileMain)
                 androidMain.dependencies {
+                    // Ktor's Android engine races response cleanup when a composable cancels an image load.
+                    implementation(identityLibs.coil.network.okhttp)
                     // The system back gesture is registered against the host Activity's own
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
@@ -69,6 +75,7 @@ kotlin {
                     implementation(identityLibs.androidx.core)
                     implementation(identityLibs.androidx.lifecycle.runtime)
                     implementation(identityLibs.androidx.lifecycle.runtime.compose)
+                    implementation(identityLibs.google.play.services.base)
                 }
             }
 
@@ -76,6 +83,7 @@ kotlin {
                 iosMain.get().apply {
                     dependsOn(mobileMain)
                     dependencies {
+                        implementation(identityLibs.coil.network.ktor3)
                         implementation(identityLibs.zxing.cpp.kotlin.native)
                     }
                 }
@@ -84,6 +92,7 @@ kotlin {
 
         if (enableWalletDemoComposeWeb) {
             getByName("wasmJsMain").dependencies {
+                implementation(identityLibs.coil.network.ktor3)
                 implementation(identityLibs.kotlinx.browser)
                 implementation(identityLibs.kotlinx.coroutines.core)
             }
@@ -106,6 +115,9 @@ kotlin {
             if (enableIosBuild) {
                 val iosTest = getByName("iosTest") {
                     dependsOn(mobileUiTest)
+                    dependencies {
+                        implementation(identityLibs.roborazzi.compose.ios)
+                    }
                 }
             }
 
@@ -116,11 +128,24 @@ kotlin {
                     dependencies {
                         implementation(identityLibs.junit)
                         implementation(identityLibs.robolectric)
+                        implementation(identityLibs.roborazzi.core)
+                        implementation(identityLibs.roborazzi.compose)
                     }
+                }
+                getByName("androidDeviceTest").dependencies {
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
+                    implementation(identityLibs.androidx.test.uiautomator)
                 }
             }
         }
     }
+}
+
+roborazzi {
+    outputDir.set(layout.projectDirectory.dir("src/visualTest/snapshots"))
+    compare.outputDir.set(layout.buildDirectory.dir("outputs/visual-diffs"))
+    separateOutputDirs.set(true)
 }
 
 compose {

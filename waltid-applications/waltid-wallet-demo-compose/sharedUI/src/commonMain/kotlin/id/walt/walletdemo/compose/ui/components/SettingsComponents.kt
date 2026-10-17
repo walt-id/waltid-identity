@@ -10,10 +10,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
@@ -33,28 +36,6 @@ import org.jetbrains.compose.resources.stringResource
 private val readableJson = Json { prettyPrint = true }
 
 @Composable
-internal fun SettingsSection(
-    title: String? = null,
-    footer: String? = null,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        title?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp).semantics { heading() },
-                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column(Modifier.fillMaxWidth(), content = content)
-        }
-        footer?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 internal fun SettingsDivider() = HorizontalDivider(
     Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant,
 )
@@ -62,24 +43,6 @@ internal fun SettingsDivider() = HorizontalDivider(
 @Composable
 internal fun SettingsSymbol(resource: DrawableResource) {
     Icon(painterResource(resource), contentDescription = null, modifier = Modifier.size(24.dp))
-}
-
-@Composable
-internal fun SettingsNavigationRow(
-    title: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    summary: String? = null,
-    icon: (@Composable () -> Unit)? = null,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = summary?.let { { Text(it) } },
-        leadingContent = icon,
-        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(onClick = onClick),
-    )
 }
 
 @Composable
@@ -137,19 +100,23 @@ internal fun SettingsChoiceRow(
     extra: (@Composable () -> Unit)? = null,
 ) {
     val selection = if (selectable) Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect) else Modifier
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = if (detail != null || extra != null) ({
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                detail?.let { Text(it) }
+    Surface(
+        color = if (selected && selectable) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .25f)
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).then(selection),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
+                detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 extra?.invoke()
             }
-        }) else null,
-        trailingContent = if (selectable) ({ RadioButton(selected, onClick = null, enabled = enabled) }) else null,
-        colors = ListItemDefaults.colors(containerColor = if (selected && selectable)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f) else MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).then(selection),
-    )
+            if (selectable) RadioButton(selected, onClick = null, enabled = enabled)
+        }
+    }
 }
 
 @Composable
@@ -214,17 +181,19 @@ internal fun SettingsCopyRow(
         }.getOrDefault(value) else value
     }
     var expanded by rememberSaveable { mutableStateOf(disclosureLabels == null) }
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f,
+        WalletMotion.disclosure(LocalWalletVisualPreferences.current.reduceMotion), label = "settings-chevron")
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(2_000); copied = false } }
-    SettingsSection {
+    WalletSection {
         ListItem(
             headlineContent = { Text(title) },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
             trailingContent = {
                 Row {
                     if (disclosureLabels != null) IconButton(onClick = { expanded = !expanded }) {
-                        Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            if (expanded) disclosureLabels.second else disclosureLabels.first)
+                        Icon(Icons.Default.KeyboardArrowDown,
+                            if (expanded) disclosureLabels.second else disclosureLabels.first, Modifier.rotate(rotation))
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
                         value?.let { text ->
@@ -244,10 +213,12 @@ internal fun SettingsCopyRow(
                 }
             },
         )
-        if (expanded) SelectionContainer {
-            Text(displayValue?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.settings_unavailable),
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(valueTag),
-                style = MaterialTheme.typography.bodySmall)
+        WalletExpandableContent(expanded) {
+            SelectionContainer {
+                Text(displayValue?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.settings_unavailable),
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(valueTag),
+                    style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

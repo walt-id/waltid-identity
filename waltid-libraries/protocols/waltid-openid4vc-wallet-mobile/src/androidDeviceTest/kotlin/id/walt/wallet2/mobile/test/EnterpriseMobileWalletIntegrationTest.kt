@@ -2,6 +2,8 @@ package id.walt.wallet2.mobile.test
 
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.mobile.identity.SigningIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityAuthorization
+import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -100,7 +102,14 @@ class EnterpriseMobileWalletIntegrationTest {
         val scenario = enterpriseScenario(fixture, "enterprise-mdl")
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
         val walletId = "android-enterprise-batch-${UUID.randomUUID()}"
-        val wallet = createWallet(walletId, null)
+        // The selected identity can differ from the build's default. Copies must retain its policy.
+        val wallet = MobileWalletFactory(context).create(MobileWalletConfig(
+            walletId = walletId,
+            signingIdentity = SigningIdentityConfiguration(
+                authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None),
+            ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
+        ))
         wallet.signingIdentity.initialize().activeIdentity()
         val session = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(offer.offerUrl)))
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(
@@ -163,9 +172,12 @@ class EnterpriseMobileWalletIntegrationTest {
             while (!BatchAuthorizationTestActivity.callback.isCompleted) {
                 // Approve browser onboarding and the external-app handoff, never a signing prompt.
                 try {
-                    device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
-                        "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
-                    )))?.click()
+                    // Chrome's sign-in dismissal label varies between bundled browser versions.
+                    val browserAction = device.findObject(By.res("com.android.chrome", "signin_fre_dismiss_button"))
+                        ?: device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
+                            "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
+                        )))
+                    browserAction?.click()
                 } catch (_: StaleObjectException) {
                     // Chrome changed pages after lookup; the next iteration queries the new page.
                 }

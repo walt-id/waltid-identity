@@ -97,7 +97,7 @@ internal object WalletDemoSharingReviewFixtures {
         label = label,
         issuer = "Test Issuer",
         format = "mso_mdoc",
-        credentialDataJson = "{}",
+        credentialDataJson = """{"org.iso.18013.5.1":{"given_name":"Ada","portrait":"Photo","private_note":"Private"}}""",
         disclosures = disclosures,
     )
 

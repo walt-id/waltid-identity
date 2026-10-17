@@ -57,10 +57,7 @@ public enum WalletAccessibilityID {
     public static let detailsBack = identifier("detailsBack")
     public static let detailsMenu = identifier("detailsMenu")
     public static let credentialsTabContent = identifier("credentialsTabContent")
-    public static let offerInput = identifier("offerInput")
-    public static let offerScanButton = identifier("offerScanButton")
     public static let txCodeInput = identifier("txCodeInput")
-    public static let receiveButton = identifier("receiveButton")
     public static let receiveNewButton = identifier("receiveNewButton")
     public static let receiveTabContent = identifier("receiveTabContent")
     public static let offerAcceptButton = identifier("offerAcceptButton")
@@ -72,9 +69,6 @@ public enum WalletAccessibilityID {
     public static let offerSupportedClaims = identifier("offerSupportedClaims")
     public static let offerAuthorizationSection = identifier("offerAuthorizationSection")
     public static let offerTransactionCodeSection = identifier("offerTransactionCodeSection")
-    public static let presentationInput = identifier("presentationInput")
-    public static let presentationScanButton = identifier("presentationScanButton")
-    public static let presentButton = identifier("presentButton")
     public static let presentationNewButton = identifier("presentationNewButton")
     public static let presentTabContent = identifier("presentTabContent")
     public static let presentationSubmitButton = identifier("presentationSubmitButton")
@@ -86,8 +80,6 @@ public enum WalletAccessibilityID {
     public static let presentationCancelButton = identifier("presentationCancelButton")
     public static let presentationVerifier = identifier("presentationVerifier")
     public static let presentationVerifierSection = identifier("presentationVerifierSection")
-    public static let presentationClaimsDialog = identifier("presentationClaimsDialog")
-    public static let presentationClaimsClose = identifier("presentationClaimsClose")
     public static let presentationRequesterDetailsToggle = identifier("presentationRequesterDetailsToggle")
     public static let presentationRequesterDetails = identifier("presentationRequesterDetails")
     public static let presentationReaderTrustSection = identifier("presentationReaderTrustSection")
@@ -149,10 +141,6 @@ public enum WalletAccessibilityID {
 
     public static func presentationCredentialToggle(_ id: String) -> String {
         identifier("presentationCredentialToggle", id)
-    }
-
-    public static func presentationClaimsToggle(_ id: String) -> String {
-        identifier("presentationClaimsToggle", id)
     }
 
     public static func presentationDisclosureToggle(_ id: String) -> String {

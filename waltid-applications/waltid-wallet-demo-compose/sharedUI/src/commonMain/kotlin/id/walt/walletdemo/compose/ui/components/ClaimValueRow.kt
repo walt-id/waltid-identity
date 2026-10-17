@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,7 +37,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import org.jetbrains.compose.resources.stringResource
+import id.walt.walletdemo.compose.ui.resources.*
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -49,70 +55,44 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.claim(item.path.id)),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    CredentialDataRow(item.label, modifier.testTag(WalletUiTestTags.claim(item.path.id))) {
         ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier) {
+internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier,
+                        textStyle: TextStyle = MaterialTheme.typography.bodyLarge) {
     when (value) {
         is DisplayValue.BooleanValue -> Text(
             if (value.value) "Yes" else "No",
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
         )
         is DisplayValue.DecodedText -> Text(
-            value.value,
+            value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
         )
         is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
-        is DisplayValue.ListValue -> Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            value.values.take(MaxListPreviewItems).forEachIndexed { index, child ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
-                    ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
-                }
-            }
-            if (value.values.size > MaxListPreviewItems) {
-                Text(
-                    "Showing first $MaxListPreviewItems of ${value.values.size} items",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        is DisplayValue.ListValue -> ClaimListValue(value, path, modifier)
         DisplayValue.NullValue -> Text(
-            "Not provided",
+            stringResource(Res.string.claim_null_value),
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is DisplayValue.NumberValue -> Text(
-            value.value,
+            value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
         )
         is DisplayValue.ObjectValue -> Column(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (value.entries.isEmpty()) Text(stringResource(Res.string.claim_empty_object))
             value.entries.forEach { entry ->
                 ClaimValueRow(entry)
             }
@@ -124,9 +104,9 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is DisplayValue.Text -> Text(
-            value.value,
+            value.value.ifEmpty { stringResource(Res.string.claim_empty_text) },
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
         )
     }
 }
@@ -144,7 +124,7 @@ private fun DeferredImageValue(source: DisplayValue.DeferredImage, path: ClaimIt
     }) {
         val value = resolved
         if (value == null) {
-            Box(Modifier.size(112.dp))
+            ClaimImagePlaceholder(loading = true)
         } else {
             ClaimValue(value, path)
         }
@@ -159,8 +139,42 @@ private fun DeferredImageValue(source: DisplayValue.DeferredImage, path: ClaimIt
 private const val MaxListPreviewItems = 25
 
 @Composable
+private fun ClaimListValue(value: DisplayValue.ListValue, path: ClaimItemPath, modifier: Modifier) {
+    var visibleCount by remember(value, path) { mutableStateOf(MaxListPreviewItems) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (value.values.isEmpty()) Text(stringResource(Res.string.claim_empty_list))
+        value.values.take(visibleCount).forEachIndexed { index, child ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("${index + 1}.", style = MaterialTheme.typography.bodyLarge)
+                ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
+            }
+        }
+        if (value.values.size > visibleCount) {
+            Text(stringResource(Res.string.claim_list_preview, visibleCount, value.values.size),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { visibleCount = (visibleCount + MaxListPreviewItems).coerceAtMost(value.values.size) }) {
+                Text(stringResource(Res.string.claim_list_more, (value.values.size - visibleCount).coerceAtMost(MaxListPreviewItems)))
+            }
+        }
+    }
+}
+
+private enum class ClaimImageState { Loading, Ready, Failed }
+
+@Composable
+private fun ClaimImagePlaceholder(loading: Boolean) {
+    Column(Modifier.size(112.dp).padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        if (loading) CircularProgressIndicator(Modifier.size(24.dp)) else WalletIcon(WalletSymbol.Info, contentDescription = null)
+        Text(stringResource(if (loading) Res.string.claim_image_loading else Res.string.claim_image_failed),
+            style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier: Modifier = Modifier) {
     var viewerOpen by rememberSaveable(path.id) { mutableStateOf(false) }
+    var imageState by remember(value) { mutableStateOf(ClaimImageState.Loading) }
 
     Column(
         modifier = modifier
@@ -175,6 +189,7 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                 .testTag(WalletUiTestTags.claimImage(path.id))
                 .clickable(
+                    enabled = imageState == ClaimImageState.Ready,
                     onClickLabel = "View credential image full screen",
                     onClick = { viewerOpen = true },
                 ),
@@ -185,18 +200,13 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
                 contentDescription = "Credential image",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
+                onLoading = { imageState = ClaimImageState.Loading },
+                onSuccess = { imageState = ClaimImageState.Ready },
+                onError = { imageState = ClaimImageState.Failed },
             )
+            if (imageState != ClaimImageState.Ready) ClaimImagePlaceholder(imageState == ClaimImageState.Loading)
         }
-        Text(
-            value.mimeType,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            "${value.byteCount} bytes",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+
     }
 
     if (viewerOpen) {
@@ -222,6 +232,7 @@ private fun CredentialImageViewer(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.72f))
+                .safeDrawingPadding()
                 .testTag(WalletUiTestTags.claimImageViewer(path.id)),
         ) {
             AsyncImage(
@@ -232,6 +243,9 @@ private fun CredentialImageViewer(
                     .padding(horizontal = 24.dp, vertical = 64.dp),
                 contentScale = ContentScale.Fit,
             )
+            Text("${value.mimeType} · ${value.byteCount} bytes",
+                modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+                color = Color.White, style = MaterialTheme.typography.bodySmall)
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier

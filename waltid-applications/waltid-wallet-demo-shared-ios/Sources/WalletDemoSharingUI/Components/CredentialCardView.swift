@@ -16,8 +16,13 @@ public struct CredentialCardView: View {
     }
 
     public var body: some View {
-        CredentialCardArtView(summary: details.cardSummary, compact: compact)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+        Group {
+            if compact {
+                CredentialSummaryRow(summary: details.cardSummary)
+            } else {
+                CredentialCardArtView(summary: details.cardSummary)
+            }
+        }.accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
     }
 }
 
@@ -25,6 +30,7 @@ public struct CredentialCardArtView: View {
     public let summary: CredentialCardSummary
     public var compact: Bool = false
     @State private var loadedMetadataArt: UIImage?
+    @State private var loadedMetadataArtURI: String?
     @State private var metadataArtFailed = false
 
     public init(summary: CredentialCardSummary, compact: Bool = false) {
@@ -34,45 +40,56 @@ public struct CredentialCardArtView: View {
 
     public var body: some View {
         let corner: CGFloat = compact ? 10 : 14
-        let padding: CGFloat = compact ? 10 : 16
-        let nameSize: CGFloat = compact ? 13 : 18
+        let padding: CGFloat = compact ? 4 : 16
         let background = Color(css: summary.backgroundColor) ?? defaultWaltCardBlue
         let label = Color(css: summary.textColor) ?? .white
-        let logoSize: CGFloat = compact ? 22 : 36
+        let artURI = credentialCardMetadataArtURI(
+            backgroundColor: summary.backgroundColor,
+            backgroundImageURI: summary.backgroundImageURI,
+            compact: compact
+        )
 
         GeometryReader { proxy in
+            let logoSize: CGFloat = compact ? min(28, max(0, proxy.size.height - 8)) : 36
             ZStack(alignment: .topLeading) {
                 background
-                if let loadedMetadataArt {
+                if artURI != nil, loadedMetadataArtURI == artURI, let loadedMetadataArt {
                     Image(uiImage: loadedMetadataArt)
                         .resizable()
                         .scaledToFill()
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipped()
-                } else if showsConstructedCardArtOverlay(
-                    backgroundImageURI: summary.backgroundImageURI,
-                    hasLoadedMetadataArt: false,
+                }
+                if showsConstructedCardArtOverlay(
+                    backgroundImageURI: artURI,
+                    hasLoadedMetadataArt: loadedMetadataArtURI == artURI && loadedMetadataArt != nil,
                     metadataArtFailed: metadataArtFailed
                 ) {
-                    Text(summary.title)
-                        .font(.system(size: nameSize, weight: .semibold))
+                    if !compact { Text(summary.title)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(label)
                         .lineLimit(2)
                         .padding(padding)
+                    }
                     credentialLogo()
                         .frame(width: logoSize, height: logoSize)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .center : .bottomTrailing)
                         .padding(padding)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .shadow(color: .black.opacity(compact ? 0.22 : 0.34), radius: compact ? 10 : 16, y: 6)
+            .shadow(color: .black.opacity(compact ? 0 : 0.34), radius: compact ? 0 : 16, y: compact ? 0 : 6)
         }
         .aspectRatio(id1AspectRatio, contentMode: .fit)
-        .task(id: summary.backgroundImageURI) {
+        .task(id: artURI) {
+            loadedMetadataArt = nil
+            loadedMetadataArtURI = nil
             metadataArtFailed = false
-            loadedMetadataArt = await loadMetadataArt(from: summary.backgroundImageURI)
-            metadataArtFailed = loadedMetadataArt == nil && httpsURL(summary.backgroundImageURI) != nil
+            let image = await loadMetadataArt(from: artURI)
+            guard !Task.isCancelled else { return }
+            loadedMetadataArt = image
+            loadedMetadataArtURI = artURI
+            metadataArtFailed = image == nil && artURI != nil
         }
     }
 
@@ -94,7 +111,7 @@ public struct CredentialCardArtView: View {
                 }
             }
         case .bundledWalt:
-            DefaultWaltLogo()
+            if !compact { DefaultWaltLogo() }
         }
     }
 
@@ -123,16 +140,23 @@ public struct CredentialCardButton: View {
     }
 
     public var body: some View {
-        CredentialCardView(details: details, compact: compact)
+        Button(action: action) {
+            HStack(spacing: 8) {
+                CredentialCardView(details: details, compact: compact)
+                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary) }
+            }
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .onTapGesture(perform: action)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
-            .accessibilityAddTraits(.isButton)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+        .accessibilityHint("View credential details")
     }
 }
 
 public struct CredentialCardStackView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     public let cards: [CredentialCardItem]
     public let onOpenDetails: (String) -> Void
     public var expandedID: String? = nil
@@ -177,6 +201,7 @@ public struct CredentialCardStackView: View {
                 .opacity(isSelected || !othersHidden ? 1 : 0)
                 .zIndex(isSelected ? Double(cards.count) : Double(index))
                 .allowsHitTesting(isSelected || !othersHidden)
+                .accessibilityHidden(!isSelected && othersHidden)
             }
         }
         .frame(maxWidth: .infinity)
@@ -187,8 +212,8 @@ public struct CredentialCardStackView: View {
             }
         )
         .onPreferenceChange(CredentialCardStackWidthKey.self) { stackWidth = $0 }
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
-        .animation(.easeInOut(duration: 0.22), value: othersHidden)
+        .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedAtTop)
+        .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: othersHidden)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {
@@ -253,6 +278,16 @@ public func credentialCardLogoSource(_ value: String?) -> CredentialCardLogoSour
     httpsURL(value).map(CredentialCardLogoSource.metadata) ?? .bundledWalt
 }
 
+public func credentialCardMetadataArtURI(
+    backgroundColor: String?,
+    backgroundImageURI: String?,
+    compact: Bool
+) -> String? {
+    guard !compact || Color(css: backgroundColor) == nil,
+          httpsURL(backgroundImageURI) != nil else { return nil }
+    return backgroundImageURI
+}
+
 public func showsConstructedCardArtOverlay(
     backgroundImageURI: String?,
     hasLoadedMetadataArt: Bool,
@@ -314,7 +349,7 @@ private func httpsURL(_ value: String?) -> URL? {
     return url
 }
 
-private extension Color {
+extension Color {
     init?(css value: String?) {
         guard let parsed = CssColorParser.parse(value) else { return nil }
         self.init(

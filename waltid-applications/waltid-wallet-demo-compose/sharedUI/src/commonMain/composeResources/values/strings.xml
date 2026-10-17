@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="wallet_sheet_handle">Sheet handle</string>
     <string name="proximity_action_needed">Action needed</string>
     <string name="proximity_action_failed">Action could not be completed</string>
     <string name="proximity_allow_bluetooth">Allow Bluetooth access</string>
@@ -111,6 +112,7 @@
     <string name="proximity_qr_description">Let the reader scan your screen.</string>
     <string name="proximity_tap_instructions">Keep your phone near the reader while it connects.</string>
     <string name="proximity_qr_instructions">Let the reader scan this code. Keep both devices nearby.</string>
+    <string name="proximity_qr_preparing">Preparing QR code…</string>
     <string name="proximity_show_qr_instead">Show QR code instead</string>
     <string name="proximity_tap_instead">Hold near the reader instead</string>
     <string name="proximity_qr_rotate">Rotate your phone to show the full QR code.</string>
@@ -167,4 +169,35 @@
     <string name="reader_trust_effect_allow">Untrusted readers may still reach holder consent</string>
     <string name="reader_trust_effect_require">Only readers trusted by the configured material may reach holder consent</string>
     <string name="proximity_verifier">Verifier</string>
+    <string name="account_sign_in_welcome">Sign in with your account.</string>
+    <string name="account_welcome">Sign in with your email and password, or create an account.</string>
+    <string name="account_email">Email</string>
+    <string name="account_password">Password</string>
+    <string name="account_working">Working…</string>
+    <string name="account_sign_in">Sign in</string>
+    <string name="account_create">Create account</string>
+    <string name="settings_wallet_access">Wallet access</string>
+    <string name="settings_wallet_access_summary">PIN and biometric unlock</string>
+    <string name="settings_change_pin">Change PIN</string>
+    <string name="settings_biometric_unlock">Biometric unlock</string>
+    <string name="settings_face_id_unlock">Unlock with Face ID</string>
+    <string name="settings_touch_id_unlock">Unlock with Touch ID</string>
+    <string name="settings_biometric_unavailable">Biometric unlock is unavailable on this device.</string>
+    <string name="pin_current">Enter your current PIN</string>
+    <string name="pin_create_new">Choose a new PIN</string>
+    <string name="pin_clear">Clear</string>
+    <string name="pin_cancel">Cancel</string>
+    <string name="pin_retry_biometrics">Try biometrics</string>
+    <string name="pin_retry_face_id">Try Face ID</string>
+    <string name="pin_retry_touch_id">Try Touch ID</string>
+    <string name="biometric_open_settings">Open Settings</string>
+    <string name="biometric_not_enrolled">Set up biometrics in device settings, then try again.</string>
+    <string name="biometric_no_device_passcode">Set up a device passcode in Settings to use biometrics.</string>
+    <string name="biometric_device_locked_out">Biometrics are locked. Unlock your device with its passcode, then try again.</string>
+    <string name="biometric_unsupported">This device does not support biometric authentication.</string>
+    <string name="biometric_face_id_unavailable">Face ID is unavailable. Check this app’s Face ID access in Settings.</string>
+    <string name="biometric_recovery_unavailable">Biometrics are unavailable. Check device settings or try again later.</string>
+    <string name="biometric_signing_separate">Continuing with your PIN changes wallet unlock only. Signing approval is configured separately.</string>
+    <string name="setup_approval_unavailable">The selected signing approval is unavailable for this configuration. Check device settings or explicitly choose another signing approval.</string>
+    <string name="setup_key_retained">Your existing signing key has not been changed. Restore its availability and try again.</string>
 </resources>

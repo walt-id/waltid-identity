@@ -3,6 +3,8 @@ package id.walt.wallet2.handlers
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -12,7 +14,8 @@ import kotlinx.serialization.json.put
  * Builds sidecar wallet metadata for a stored credential.
  *
  * Writes OpenID4VCI issuer display under `issuerDisplay` and credential configuration display
- * under `credentialDisplay`. Both are locale arrays so the demo UI can pick a preferred entry.
+ * under `credentialDisplay`. Both are locale arrays so consumers can pick a preferred entry. `credentialClaims` retains
+ * the issuer's ordered claim definitions and all localized labels; it contains no issued values.
  */
 internal fun storedCredentialDisplayMetadata(
     issuerMetadata: CredentialIssuerMetadata,
@@ -22,18 +25,21 @@ internal fun storedCredentialDisplayMetadata(
     val issuerDisplayArray = issuerMetadata.display?.takeIf { it.isNotEmpty() }?.let { displays ->
         JsonArray(displays.map { it.toStoredDisplayObject() })
     }
-    val credentialDisplayArray = credentialConfigurationId
-        ?.let { issuerMetadata.credentialConfigurationsSupported[it] }
-        ?.credentialMetadata
-        ?.display
+    val credentialMetadata = credentialConfigurationId
+        ?.let { issuerMetadata.credentialConfigurationsSupported[it] }?.credentialMetadata
+    val credentialDisplayArray = credentialMetadata?.display
         ?.takeIf { it.isNotEmpty() }
         ?.let { displays -> JsonArray(displays.map { it.toStoredDisplayObject() }) }
 
-    if (issuerDisplayArray == null && credentialDisplayArray == null) return requestMetadata
+    val credentialClaims = credentialMetadata?.claims?.takeIf { it.isNotEmpty() }
+        ?.let { Json.encodeToJsonElement(it) }
+
+    if (issuerDisplayArray == null && credentialDisplayArray == null && credentialClaims == null) return requestMetadata
 
     val merged = (requestMetadata?.toMutableMap() ?: mutableMapOf())
     issuerDisplayArray?.let { merged["issuerDisplay"] = it }
     credentialDisplayArray?.let { merged["credentialDisplay"] = it }
+    credentialClaims?.let { merged["credentialClaims"] = it }
     return JsonObject(merged)
 }
 

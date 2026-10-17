@@ -4,14 +4,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,17 +22,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletStatusKind
-import id.walt.walletdemo.compose.logic.isError
 import id.walt.walletdemo.compose.logic.isStatusBusy
 import id.walt.walletdemo.compose.logic.isStatusExpanded
 import id.walt.walletdemo.compose.logic.isStatusVisible
@@ -39,7 +46,7 @@ import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import kotlin.math.abs
 
-private val CollapsedErrorHeight = 64.dp
+private val ErrorMinimumHeight = 64.dp
 private const val SwipeDismissThreshold = 80f
 
 @Composable
@@ -52,23 +59,24 @@ internal fun StatusCard(
     val banner = state.statusBanner() ?: return
     val dismissable = banner.kind == WalletStatusKind.Success || banner.kind == WalletStatusKind.Error
     val expanded = state.isStatusExpanded
-    val containerColor = when {
-        state.isError -> MaterialTheme.colorScheme.errorContainer
-        state.isStatusBusy -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.primaryContainer
-    }
-    val contentColor = when {
-        state.isError -> MaterialTheme.colorScheme.onErrorContainer
-        state.isStatusBusy -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onPrimaryContainer
-    }
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val expansion = updateTransition(expanded, label = "error-expansion")
+    val rotation by expansion.animateFloat(transitionSpec = { WalletMotion.disclosure(reduceMotion) },
+        label = "error-chevron") { if (it) 180f else 0f }
+    TrackWalletExpansion(expansion.isRunning || expansion.currentState != expansion.targetState)
+    val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val contentColor = if (banner.kind == WalletStatusKind.Error) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant
 
     var dragDistance by remember(banner.key) { mutableStateOf(0f) }
 
-    Card(
-        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+    Surface(
+        color = containerColor, contentColor = contentColor,
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("wallet.status.feedback")
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .then(
                 if (dismissable) {
                     Modifier.pointerInput(banner.key) {
@@ -93,29 +101,33 @@ internal fun StatusCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .animateContentSize(WalletMotion.disclosure(reduceMotion), alignment = Alignment.TopStart)
                 .then(
-                    if (banner.kind == WalletStatusKind.Error && !expanded) {
-                        Modifier.height(CollapsedErrorHeight)
+                    if (banner.kind == WalletStatusKind.Error) {
+                        Modifier.heightIn(min = ErrorMinimumHeight)
                     } else {
                         Modifier
                     },
                 )
                 .then(
                     if (banner.kind == WalletStatusKind.Error) {
-                        Modifier.clickable(onClick = onToggleExpanded)
+                        Modifier.clickable(onClick = onToggleExpanded).testTag(WalletUiTestTags.Status)
                     } else {
                         Modifier
                     },
                 )
-                .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                .heightIn(min = 48.dp).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (state.isStatusBusy) {
+                CircularProgressIndicator(Modifier.padding(end = 8.dp).size(20.dp), strokeWidth = 2.dp)
+            }
             Text(
                 text = banner.message,
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 4.dp)
-                    .testTag(WalletUiTestTags.Status)
+                    .then(if (banner.kind == WalletStatusKind.Error) Modifier else Modifier.testTag(WalletUiTestTags.Status))
                     .semantics { contentDescription = banner.message },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = if (banner.kind == WalletStatusKind.Error && !expanded) 2 else Int.MAX_VALUE,
@@ -131,7 +143,8 @@ internal fun StatusCard(
                     modifier = Modifier.testTag(WalletUiTestTags.StatusExpand),
                 ) {
                     Icon(
-                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        modifier = Modifier.rotate(rotation),
                         contentDescription = if (expanded) "Collapse error" else "Expand error",
                     )
                 }

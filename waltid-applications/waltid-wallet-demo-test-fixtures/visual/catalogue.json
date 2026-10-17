@@ -1,0 +1,1122 @@
+{
+  "schemaVersion": 2,
+  "renderers": {
+    "android": {
+      "environment": "Robolectric 4.17 / API 35 / en-US / mdpi / 393x852 / light / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/androidHostTest/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/TEST-id.walt.walletdemo.compose.ui.WalletVisualAndroidTest.xml",
+      "suite": "id.walt.walletdemo.compose.ui.WalletVisualAndroidTest",
+      "configuration": {
+        "viewport": [
+          393,
+          852
+        ],
+        "scale": 1,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "fontScale": 1,
+        "layoutDirection": "ltr"
+      }
+    },
+    "compose-ios": {
+      "environment": "Compose 1.12.1 / iOS 27.0 / headless Skia / density 1 / 393x852 / light / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/iosSimulatorArm64/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/TEST-iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest.xml",
+      "suite": "iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest",
+      "configuration": {
+        "viewport": [
+          393,
+          852
+        ],
+        "scale": 1,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "fontScale": 1,
+        "layoutDirection": "ltr"
+      }
+    },
+    "swiftui": {
+      "environment": "Xcode 27 / iOS 27.0 / hosted SwiftUI / iPhone 17 simulator / iPhone 13 layout / scale 3 / en-US / light / Large / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests",
+      "suite": "WalletVisualTests",
+      "suffix": ".native-ios27_0-phone-en-light",
+      "configuration": {
+        "viewport": [
+          390,
+          844
+        ],
+        "scale": 3,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "textSize": "large",
+        "runtime": "27.0",
+        "layoutDirection": "ltr"
+      }
+    }
+  },
+  "states": [
+    {
+      "id": "wallet.home.empty",
+      "requirements": [
+        "Empty wallet guidance and acquisition actions"
+      ],
+      "composeTest": "homeEmpty",
+      "swiftTest": "testHomeEmpty",
+      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests."
+    },
+    {
+      "id": "wallet.home.credential",
+      "requirements": [
+        "Saved credential and wallet actions"
+      ],
+      "composeTest": "homeCredential",
+      "swiftTest": "testHomeCredential",
+      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
+      "title": "Wallet — saved credential"
+    },
+    {
+      "id": "wallet.scan.empty",
+      "requirements": [
+        "Scanner guidance and manual request input"
+      ],
+      "composeTest": "scanEmpty",
+      "swiftTest": "testScanEmpty",
+      "note": "F011: scanner-first wallet chrome; sensor preview and permission UI require actual-host evidence.",
+      "title": "Scan or paste a request"
+    },
+    {
+      "id": "wallet.scan.fido",
+      "title": "Scanner — FIDO request",
+      "requirements": [
+        "Android system handoff action and iOS system scanner guidance"
+      ],
+      "composeTest": "scanFido",
+      "swiftTest": "testScanFido"
+    },
+    {
+      "id": "wallet.scan.link",
+      "requirements": [
+        "Entered request and continue action"
+      ],
+      "composeTest": "scanWebLink",
+      "swiftTest": "testScanWebLink"
+    },
+    {
+      "id": "settings.root.default",
+      "requirements": [
+        "Grouped settings and available actions"
+      ],
+      "composeTest": "settingsRoot",
+      "swiftTest": "testSettingsRoot",
+      "title": "Settings"
+    },
+    {
+      "id": "credential.details.identity",
+      "requirements": [
+        "Credential identity and nested claims"
+      ],
+      "composeTest": "credentialDetails",
+      "swiftTest": "testCredentialDetails",
+      "note": "Identity and nested values share this viewport; both are asserted before capture.",
+      "title": "Credential information"
+    },
+    {
+      "id": "credential.media.loaded",
+      "requirements": [
+        "Decoded portrait and signature images"
+      ],
+      "swiftTest": "testCredentialImages",
+      "note": "Portrait and signature share this viewport; both wait for image readiness and remain visible.",
+      "composeTest": "credentialImages",
+      "title": "Credential images"
+    },
+    {
+      "id": "batch.offer.two_targets_three_copies",
+      "requirements": [
+        "Multiple targets, selected copies and receive action"
+      ],
+      "composeTest": "batchOffer",
+      "swiftTest": "testBatchOffer",
+      "title": "Receiving — selected credentials"
+    },
+    {
+      "id": "batch.offer.none_selected",
+      "requirements": [
+        "Disabled receive action with no selection"
+      ],
+      "composeTest": "batchOfferWithNothingSelected",
+      "swiftTest": "testBatchOfferWithNothingSelected"
+    },
+    {
+      "id": "batch.result.saved_and_deferred",
+      "requirements": [
+        "Saved credentials and deferred copies"
+      ],
+      "composeTest": "partialBatchResult",
+      "swiftTest": "testPartialBatchResult",
+      "title": "Receiving — saved and deferred"
+    },
+    {
+      "id": "payment.mixed_credentials.main",
+      "requirements": [
+        "Payment summary and separate credential groups"
+      ],
+      "composeTest": "paymentReview",
+      "title": "Payment review",
+      "swiftTest": "testMixedPaymentReview",
+      "note": "Complete review with ordinary and payment credentials and pinned SDK-labelled actions. Compose uses expanded review rows; native captures the compact provider review."
+    },
+    {
+      "id": "payment.mixed_credentials.details",
+      "requirements": [
+        "Payment parties and transaction details"
+      ],
+      "composeTest": "paymentReview"
+    },
+    {
+      "id": "payment.mixed_credentials.requested_data",
+      "requirements": [
+        "Nested requested data"
+      ],
+      "composeTest": "paymentReview"
+    },
+    {
+      "id": "payment.consent.main",
+      "requirements": [
+        "Payment consent and primary action"
+      ],
+      "swiftTest": "testPaymentConsent",
+      "note": "Native consent component; mixed-credential review also has its own bounded host capture."
+    },
+    {
+      "id": "nearby.ready.qr",
+      "requirements": [
+        "QR sharing instructions and cancel action"
+      ],
+      "composeTest": "nearbyReady",
+      "swiftTest": "testNearbyReady",
+      "title": "Nearby sharing"
+    },
+    {
+      "id": "nearby.ready.nfc",
+      "requirements": [
+        "Hold near reader instructions, decorative NFC illustration and switch to QR action"
+      ],
+      "composeTest": "nearbyReady",
+      "swiftTest": "testNearbyReady",
+      "title": "Nearby sharing — hold near reader",
+      "note": "Synthetic engagement with the decorative animation paused (Compose reduced motion; native inactive scene); no radio session or system NFC prompt."
+    },
+    {
+      "id": "onboarding.pin.setup",
+      "composeTest": "pinSetup",
+      "swiftTest": "testPinSetup",
+      "requirements": [
+        "PIN setup guidance and input"
+      ],
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
+      "title": "Onboarding — choose a PIN"
+    },
+    {
+      "id": "onboarding.pin.mismatch",
+      "composeTest": "pinMismatch",
+      "swiftTest": "testPinMismatch",
+      "requirements": [
+        "PIN mismatch feedback and correction"
+      ],
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
+    },
+    {
+      "id": "onboarding.pin.confirmation",
+      "composeTest": "pinConfirmation",
+      "swiftTest": "testPinConfirmation",
+      "requirements": [
+        "PIN confirmation guidance and input"
+      ],
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
+    },
+    {
+      "id": "onboarding.pin.biometric_prompt",
+      "composeTest": "pinBiometricPrompt",
+      "swiftTest": "testPinBiometricPrompt",
+      "requirements": [
+        "Waiting for biometric setup"
+      ],
+      "note": "After PIN confirmation, the wallet waits for the OS biometric result with setup actions disabled. The screenshot shows the platform's actual in-app waiting view, not an imitation system dialog."
+    },
+    {
+      "id": "onboarding.pin.compact_dark_large_text",
+      "composeTest": "pinCompact",
+      "swiftTest": "testPinCompact",
+      "requirements": [
+        "PIN layout with compact large text"
+      ],
+      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Four positions and compact trailing actions remain visible.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      },
+      "title": "PIN — compact, dark, large text"
+    },
+    {
+      "id": "onboarding.pin.unlock",
+      "composeTest": "pinUnlock",
+      "swiftTest": "testPinUnlock",
+      "requirements": [
+        "Four-digit wallet unlock input"
+      ],
+      "note": "Partially entered, masked four-digit PIN with Clear. The fourth digit verifies automatically; keyboard and biometric precedence are checked in app-host tests."
+    },
+    {
+      "id": "onboarding.pin.rtl",
+      "composeTest": "pinRtl",
+      "swiftTest": "testPinRtl",
+      "requirements": [
+        "PIN input and navigation in a right-to-left layout"
+      ],
+      "note": "Confirmation heading and trailing controls under RTL. Compose also uses reduced-motion preferences here; SwiftUI reads the OS preference separately. This still image proves the settled layout; app-host recordings cover transitions.",
+      "configuration": {
+        "android": {
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
+    },
+    {
+      "id": "credential.details.localized_metadata",
+      "composeTest": "localizedCredentialDetails",
+      "swiftTest": "testLocalizedCredentialDetails",
+      "requirements": [
+        "Localized identity and namespaced claims"
+      ],
+      "note": "Shared German locale fallback, issuer ordering and independent namespaced claims."
+    },
+    {
+      "id": "batch.offer.definitions",
+      "requirements": [
+        "Required and optional definitions grouped once under their section headings, without issued values"
+      ],
+      "composeTest": "offerDefinitions",
+      "swiftTest": "testOfferDefinitions",
+      "note": "Issuer claim definitions before issuance; no values have arrived."
+    },
+    {
+      "id": "batch.offer.compact_dark_large_text",
+      "requirements": [
+        "Offer wrapping and pinned actions with compact large text"
+      ],
+      "composeTest": "compactBatchOffer",
+      "swiftTest": "testCompactBatchOffer",
+      "note": "320x568 dark viewport. Compose font scale 1.5; SwiftUI accessibilityMedium. Initial review and trailing actions.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      },
+      "title": "Receiving — compact, dark, large text"
+    },
+    {
+      "id": "batch.offer.compact_dark_large_text.last_target",
+      "requirements": [
+        "Scroll access to the final target with compact large text"
+      ],
+      "composeTest": "compactBatchOffer",
+      "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        }
+      }
+    },
+    {
+      "id": "batch.result.local_save_pending",
+      "requirements": [
+        "Credentials awaiting local persistence"
+      ],
+      "composeTest": "localSaveResult",
+      "swiftTest": "testLocalSaveResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.remote_uncertain",
+      "requirements": [
+        "Uncertain remote issuance result"
+      ],
+      "composeTest": "remoteUncertainResult",
+      "swiftTest": "testRemoteUncertainResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.storage_uncertain",
+      "requirements": [
+        "Uncertain local storage result"
+      ],
+      "composeTest": "storageUncertainResult",
+      "swiftTest": "testStorageUncertainResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.partial_failure",
+      "requirements": [
+        "Partial issuance success and failure feedback"
+      ],
+      "composeTest": "partialFailureResult",
+      "swiftTest": "testPartialFailureResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.missing_details",
+      "requirements": [
+        "Complete saved count, unavailable-details warning and local refresh"
+      ],
+      "composeTest": "missingSavedDetails",
+      "swiftTest": "testMissingSavedDetails",
+      "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
+      "title": "Receiving — saved details unavailable"
+    },
+    {
+      "id": "onboarding.key.summary",
+      "composeTest": "keySummary",
+      "swiftTest": "testKeySummary",
+      "requirements": [
+        "Key identity summary and available choices"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.recovery",
+      "composeTest": "keyRecovery",
+      "swiftTest": "testKeyRecovery",
+      "requirements": [
+        "Recovery choice and supporting guidance"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.storage",
+      "composeTest": "keyStorage",
+      "swiftTest": "testKeyStorage",
+      "requirements": [
+        "Storage choice and supporting guidance"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.approval",
+      "composeTest": "keyApproval",
+      "swiftTest": "testKeyApproval",
+      "requirements": [
+        "Signing approval choice and supporting guidance"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "sharing.provider.review",
+      "requirements": [
+        "Provider sharing review and actions"
+      ],
+      "composeTest": "providerSharingReview",
+      "swiftTest": "testProviderSharingReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.information.selected",
+      "requirements": [
+        "Selected credential information"
+      ],
+      "composeTest": "sharingInformationSelected",
+      "swiftTest": "testSharingInformationSelected",
+      "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
+      "title": "Sharing — selected information"
+    },
+    {
+      "id": "sharing.information.alternative",
+      "requirements": [
+        "Alternative credential information"
+      ],
+      "composeTest": "sharingInformationAlternative",
+      "swiftTest": "testSharingInformationAlternative",
+      "note": "F036: selecting an alternative changes the shared-information group and exposes unavoidable additional personal data."
+    },
+    {
+      "id": "sharing.information.multiple",
+      "requirements": [
+        "Multiple credentials during sharing review"
+      ],
+      "composeTest": "sharingInformationMultiple",
+      "swiftTest": "testSharingInformationMultiple",
+      "note": "F036: information groups for two selected credentials remain scrollable above pinned actions."
+    },
+    {
+      "id": "sharing.provider.compact_dark_large_text",
+      "requirements": [
+        "Provider sharing layout with compact large text"
+      ],
+      "composeTest": "compactProviderSharingReview",
+      "swiftTest": "testCompactProviderSharingReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome. 320x568, dark, Compose font scale 1.5 / SwiftUI accessibilityMedium.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "receiving.provider.review",
+      "requirements": [
+        "Provider receiving review and actions"
+      ],
+      "composeTest": "providerOfferReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.provider.preparing",
+      "requirements": [
+        "Sharing preparation feedback and disabled actions"
+      ],
+      "swiftTest": "testProviderPreparing",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
+      "composeTest": "providerPreparing"
+    },
+    {
+      "id": "sharing.provider.failure",
+      "requirements": [
+        "Sharing failure feedback and available actions"
+      ],
+      "swiftTest": "testProviderFailure",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
+      "composeTest": "providerFailure"
+    },
+    {
+      "id": "sharing.provider.compact_dark_large_text.last",
+      "swiftTest": "testCompactProviderSharingReviewLastRow",
+      "requirements": [
+        "Final provider review content with compact large text"
+      ],
+      "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "receiving.provider.preparing",
+      "requirements": [
+        "Receiving preparation feedback"
+      ],
+      "composeTest": "providerReceivingPreparing",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.authorization",
+      "requirements": [
+        "Receiving authorization guidance"
+      ],
+      "composeTest": "providerReceivingAuthorization",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.failure",
+      "requirements": [
+        "Receiving failure feedback and available actions"
+      ],
+      "composeTest": "providerReceivingFailure",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.partial_result",
+      "requirements": [
+        "Partial receiving result and remaining targets"
+      ],
+      "composeTest": "providerReceivingPartialResult",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "payment.loading",
+      "composeTest": "paymentLoading",
+      "swiftTest": "testPaymentLoading",
+      "requirements": [
+        "Payment loading feedback and action state"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+    },
+    {
+      "id": "payment.blocked",
+      "composeTest": "paymentBlocked",
+      "swiftTest": "testPaymentBlocked",
+      "requirements": [
+        "Blocked payment explanation and action state"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+    },
+    {
+      "id": "payment.localized.compact_large_text",
+      "composeTest": "paymentLocalizedCompact",
+      "swiftTest": "testPaymentLocalizedCompact",
+      "requirements": [
+        "Localized payment layout with compact large text"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "payment.mixed_credentials.unsigned_confirmation",
+      "composeTest": "paymentReview",
+      "requirements": [
+        "Explicit unsigned payment confirmation"
+      ],
+      "note": "Explicit unsigned confirmation after reviewing the payment. Native alert interaction is covered by MockWalletUITests; this image is a Compose dialog."
+    },
+    {
+      "id": "external.receiving.review",
+      "requirements": [
+        "Externally opened receiving review"
+      ],
+      "composeTest": "externalReceiving",
+      "swiftTest": "testExternalReceiving",
+      "note": "Compose actual modal window; native bounded receive content with external chrome. Real cold/warm windows, unlock, recreation and return paths have separate UI/instrumentation tests.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ]
+        }
+      }
+    },
+    {
+      "id": "external.callback.unavailable",
+      "requirements": [
+        "Unavailable external callback feedback"
+      ],
+      "composeTest": "externalUnavailableCallback",
+      "swiftTest": "testExternalUnavailableCallback",
+      "note": "Unknown callback explains the unavailable original session and provides Close; no automatic replay or fabricated receipt.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ]
+        }
+      }
+    },
+    {
+      "id": "nearby.permission",
+      "composeTest": "nearbyPermission",
+      "swiftTest": "testNearbyPermission",
+      "requirements": [
+        "Nearby permission guidance"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.review",
+      "composeTest": "nearbyReview",
+      "swiftTest": "testNearbyReview",
+      "requirements": [
+        "Nearby request review and consent actions"
+      ],
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Initial viewport.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "nearby.expired",
+      "composeTest": "nearbyExpired",
+      "swiftTest": "testNearbyExpired",
+      "requirements": [
+        "Expired nearby request feedback"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.receipt",
+      "composeTest": "nearbyReceipt",
+      "swiftTest": "testNearbyReceipt",
+      "requirements": [
+        "Nearby sharing receipt and date"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.review.disclosures",
+      "composeTest": "nearbyReview",
+      "swiftTest": "testNearbyReviewDisclosures",
+      "requirements": [
+        "Selected disclosures and retention information"
+      ],
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "settings.dc_api.enabled",
+      "requirements": [
+        "Enabled digital credential API setting"
+      ],
+      "composeTest": "settingsDcApiEnabled",
+      "swiftTest": "testSettingsDcApiEnabled"
+    },
+    {
+      "id": "settings.dc_api.disabled",
+      "requirements": [
+        "Disabled digital credential API setting"
+      ],
+      "composeTest": "settingsDcApiDisabled",
+      "swiftTest": "testSettingsDcApiDisabled"
+    },
+    {
+      "id": "settings.nearby.default",
+      "requirements": [
+        "Nearby sharing settings"
+      ],
+      "composeTest": "settingsNearby",
+      "swiftTest": "testSettingsNearby"
+    },
+    {
+      "id": "settings.connection.default",
+      "requirements": [
+        "Connection settings"
+      ],
+      "composeTest": "settingsConnection",
+      "swiftTest": "testSettingsConnection"
+    },
+    {
+      "id": "settings.technical.unavailable",
+      "requirements": [
+        "Unavailable technical information feedback"
+      ],
+      "composeTest": "settingsTechnical",
+      "swiftTest": "testSettingsTechnical"
+    },
+    {
+      "id": "account.empty",
+      "requirements": [
+        "Account form guidance and actions"
+      ],
+      "composeTest": "accountEmpty",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "account.busy",
+      "requirements": [
+        "Busy account feedback and disabled submission"
+      ],
+      "composeTest": "accountBusy",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "account.expired",
+      "requirements": [
+        "Expired account feedback and recovery action"
+      ],
+      "composeTest": "accountExpired",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "settings.reader.default",
+      "requirements": [
+        "Reader trust settings"
+      ],
+      "composeTest": "settingsReader",
+      "swiftTest": "testSettingsReader",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "settings.reader_required.default",
+      "requirements": [
+        "Required reader trust policy"
+      ],
+      "composeTest": "settingsReaderRequired",
+      "swiftTest": "testSettingsReaderRequired",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "settings.reader.import_review",
+      "requirements": [
+        "Reader trust import review"
+      ],
+      "composeTest": "readerTrustImport",
+      "swiftTest": "testReaderTrustImport",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "components.controls.default",
+      "requirements": [
+        "Enabled and disabled shared controls"
+      ],
+      "composeTest": "controls",
+      "swiftTest": "testControls",
+      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels."
+    },
+    {
+      "id": "components.controls.rtl",
+      "requirements": [
+        "Shared controls in a right-to-left layout"
+      ],
+      "composeTest": "controlsRtl",
+      "swiftTest": "testControlsRtl",
+      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels.",
+      "configuration": {
+        "android": {
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
+    },
+    {
+      "id": "onboarding.biometric.cancelled",
+      "composeTest": "biometricCancelled",
+      "swiftTest": "testBiometricCancelled",
+      "requirements": [
+        "Cancelled biometric setup feedback"
+      ],
+      "note": "F002: OS cancellation preserves explicit Retry and PIN-only choices; synthetic wallet content, no OS dialog."
+    },
+    {
+      "id": "onboarding.biometric.unavailable",
+      "composeTest": "biometricUnavailable",
+      "swiftTest": "testBiometricUnavailable",
+      "requirements": [
+        "Unavailable biometric setup feedback"
+      ],
+      "note": "F002: no unavailable retry; explicit PIN-only continuation remains reachable."
+    },
+    {
+      "id": "batch.offer.single_full_art",
+      "composeTest": "singleOffer",
+      "swiftTest": "testSingleOffer",
+      "requirements": [
+        "Single credential offer with full artwork"
+      ],
+      "note": "F013-F014: one offered configuration uses full art; multi-offer and sharing thumbnails remain flat metadata colors."
+    },
+    {
+      "id": "access.unlock.rejected",
+      "requirements": [
+        "Rejected PIN feedback"
+      ],
+      "composeTest": "accessRejected",
+      "swiftTest": "testAccessRejected",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "access.unlock.biometric_fallback",
+      "requirements": [
+        "PIN fallback after biometric failure"
+      ],
+      "composeTest": "accessBiometricFallback",
+      "swiftTest": "testAccessBiometricFallback",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "access.unlock.biometric_lockout",
+      "requirements": [
+        "Biometric lockout feedback and PIN fallback"
+      ],
+      "composeTest": "accessBiometricLockout",
+      "swiftTest": "testAccessBiometricLockout",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.default",
+      "requirements": [
+        "Wallet access settings"
+      ],
+      "composeTest": "accessSettings",
+      "swiftTest": "testAccessSettings",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.current_pin",
+      "requirements": [
+        "Current PIN confirmation before changing access"
+      ],
+      "composeTest": "accessCurrentPin",
+      "swiftTest": "testAccessCurrentPin",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.new_pin",
+      "requirements": [
+        "New PIN input"
+      ],
+      "composeTest": "accessNewPin",
+      "swiftTest": "testAccessNewPin",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.confirmation",
+      "requirements": [
+        "New PIN confirmation"
+      ],
+      "composeTest": "accessConfirmation",
+      "swiftTest": "testAccessConfirmation",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.save_failure",
+      "requirements": [
+        "PIN persistence failure feedback"
+      ],
+      "composeTest": "accessSaveFailure",
+      "swiftTest": "testAccessSaveFailure",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.pin_changed",
+      "requirements": [
+        "Successful PIN change feedback"
+      ],
+      "composeTest": "accessPinChanged",
+      "swiftTest": "testAccessPinChanged",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "onboarding.key.approval_unavailable",
+      "requirements": [
+        "Unavailable signing approval feedback"
+      ],
+      "composeTest": "keyApprovalUnavailable",
+      "swiftTest": "testKeyApprovalUnavailable",
+      "note": "Unavailable biometric signing retains the intended approval and blocks creation. Native capture uses the shared production configuration content and recovery section; guarded submission is covered separately."
+    },
+    {
+      "id": "access.unlock.biometric_unavailable",
+      "requirements": [
+        "Unavailable biometrics and settings guidance"
+      ],
+      "composeTest": "accessBiometricUnavailable",
+      "swiftTest": "testAccessBiometricUnavailable",
+      "note": "Configured Face ID is unavailable: PIN fallback and a supported Open Settings action. Synthetic wallet UI; no OS permission dialog is imitated."
+    },
+    {
+      "id": "wallet.opening.loading",
+      "composeTest": "walletOpening",
+      "requirements": [
+        "Wallet opening progress"
+      ],
+      "kind": "deterministic",
+      "note": "Production opening content with in-memory clients; deliberately frozen progress animation. Initial-read lifecycle has separate host and model tests.",
+      "swiftTest": "testWalletOpening"
+    },
+    {
+      "id": "wallet.opening.failure",
+      "composeTest": "walletOpeningFailure",
+      "requirements": [
+        "Wallet opening failure and retry action"
+      ],
+      "kind": "deterministic",
+      "note": "Production opening failure and Retry action; no wallet initialization, storage operation or retry is performed by this visual fixture.",
+      "swiftTest": "testWalletOpeningFailure"
+    },
+    {
+      "id": "access.storage.unavailable",
+      "composeTest": "pinStorageUnavailable",
+      "requirements": [
+        "Unavailable PIN storage and locked consequence"
+      ],
+      "kind": "deterministic",
+      "note": "Production locked storage-error content. Compose exposes Retry; native presents the failure. Storage recovery behavior is tested separately.",
+      "swiftTest": "testPinStorageUnavailable"
+    },
+    {
+      "id": "settings.reset.confirmation",
+      "composeTest": "resetConfirmation",
+      "requirements": [
+        "Destructive reset warning and cancel action"
+      ],
+      "kind": "deterministic",
+      "note": "Production Compose confirmation dialog opened through Settings; cancellation is asserted. SwiftUI uses a system alert covered by the existing recovery/reset host journey rather than a replica of OS chrome."
+    }
+  ],
+  "galleryPreview": [
+    "wallet.home.credential",
+    "onboarding.pin.setup",
+    "wallet.scan.empty",
+    "batch.offer.two_targets_three_copies",
+    "sharing.information.selected",
+    "credential.details.identity",
+    "nearby.ready.qr",
+    "settings.root.default"
+  ],
+  "galleryVariants": [
+    "onboarding.pin.compact_dark_large_text",
+    "batch.offer.compact_dark_large_text"
+  ]
+}

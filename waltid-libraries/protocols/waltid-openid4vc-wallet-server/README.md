@@ -248,6 +248,12 @@ examples. Issuance does not implicitly generate keys or increase batch size.
 
 ### Presentation (OpenID4VP 1.0)
 
+The consent-preview endpoint preserves its released disclosure JSON by default.
+Use `POST /wallet/{walletId}/credentials/present/preview?includeDetails=true` to
+distinguish unavoidable additional cleartext claims with `requested=false`.
+The opt-in changes display information only; credential selection, trust checks,
+and presentation generation remain unchanged.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/wallet/{walletId}/credentials/present` | Full DCQL presentation flow |

@@ -78,6 +78,8 @@ optional second output-directory argument). The existing iOS recovery CI job run
 simulator, excluding the physical Secure Enclave suite. It exercises owned-key reopening, exact
 private-key recovery, policy mismatch and native-entry replacement. Simulator results
 do not establish Secure Enclave, biometric, passcode, or cloud-backup behavior.
+Incomplete launches fail with JUnit errors and a `launch.json` receipt containing the launch status,
+unfinished tests and available crash termination metadata. Raw crash memory and environment are not collected.
 
 Android's `AndroidInteractiveAuthorizationTest` is opt-in. Pass the instrumentation argument
 `wallet.authorization=biometric`, `credential`, or `cancel`, and use the named action for both generated

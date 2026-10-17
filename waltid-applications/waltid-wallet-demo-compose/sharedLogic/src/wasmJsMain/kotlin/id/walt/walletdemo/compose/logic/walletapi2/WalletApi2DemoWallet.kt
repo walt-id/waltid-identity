@@ -34,8 +34,9 @@ fun createWalletApi2DemoWallet(
     redirectUri: String,
     kind: WalletApiKind = WalletApiKind.OpenSource,
     onWalletIdChanged: (String) -> Unit = {},
+    onSessionExpired: () -> Unit = {},
 ): DemoWallet = WalletApi2DemoWallet(
-    client = WalletApi2Client(baseUrl = baseUrl, token = token, kind = kind),
+    client = WalletApi2Client(baseUrl = baseUrl, token = token, kind = kind, onSessionExpired = onSessionExpired),
     kind = kind,
     walletId = walletId,
     redirectUri = redirectUri,
@@ -284,13 +285,6 @@ internal class WalletApi2DemoWallet(
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome = useWallet {
         client.resumeDeferred(walletId, deferredCredentialId).toOutcome()
-    }
-
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult = useWallet {
-        client.present(walletId, requestUrl, did ?: this.did, keyId).toDemoOperationResult(
-            successMessage = WalletDisplayText.PresentationSent,
-            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
-        )
     }
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult = useWallet {

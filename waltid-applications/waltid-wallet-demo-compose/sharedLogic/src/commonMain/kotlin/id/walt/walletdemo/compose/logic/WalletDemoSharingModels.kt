@@ -207,6 +207,14 @@ fun WalletDemoSharingReview.hasCompleteCredentialSelection(
     selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
 ): Boolean = hasCompleteCredentialSelection(credentialOptions, credentialRequirements, selectedCredentialOptions)
 
+/** A sole required match is a fact; alternatives and optional credentials remain choices. */
+fun WalletDemoSharingReview.allowsCredentialSelection(option: WalletDemoPresentationCredentialOption): Boolean {
+    if (credentialOptions.count { it.queryId == option.queryId } > 1) return true
+    val withoutQuery = credentialOptions.filter { it.queryId != option.queryId }
+        .distinctBy { it.queryId }.map { it.selection }.toSet()
+    return hasCompleteCredentialSelection(withoutQuery)
+}
+
 /**
  * Maps a normal OpenID4VP preview onto the shared review model.
  *
