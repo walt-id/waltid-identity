@@ -90,6 +90,20 @@
       "lanes": ["compose", "enterprise", "ios-simulator", "visual-compose"]
     },
     {
+      "name": "Compose shared mobile trust selects simulator coverage",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/kotlin/id/walt/walletdemo/compose/logic/DemoClientIdTrust.kt"
+      ],
+      "lanes": ["compose", "ios-simulator", "enterprise"]
+    },
+    {
+      "name": "Compose shared mobile tests select simulator coverage",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileTest/kotlin/id/walt/walletdemo/compose/logic/DemoClientIdTrustTest.kt"
+      ],
+      "lanes": ["compose", "ios-simulator", "enterprise"]
+    },
+    {
       "name": "Swift package change selects WalletCore consumers, not Kotlin simulator",
       "files": [
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Wallet.swift"

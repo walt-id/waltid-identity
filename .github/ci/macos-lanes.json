@@ -33,6 +33,8 @@
         "*/src/iosMain/*",
         "*/src/iosTest/*",
         "*/src/iosAppTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileTest/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
