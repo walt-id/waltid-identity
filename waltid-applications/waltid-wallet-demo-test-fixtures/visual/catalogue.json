@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "renderers": {
+    "android": {
+      "environment": "Robolectric 4.17 / API 35 / en-US / mdpi / 393x852 / light / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/androidHostTest/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/TEST-id.walt.walletdemo.compose.ui.WalletVisualAndroidTest.xml",
+      "suite": "id.walt.walletdemo.compose.ui.WalletVisualAndroidTest",
+      "configuration": {
+        "viewport": [
+          393,
+          852
+        ],
+        "scale": 1,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "fontScale": 1
+      }
+    },
+    "compose-ios": {
+      "environment": "Compose 1.12.1 / iOS 27.0 / headless Skia / density 1 / 393x852 / light / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/iosSimulatorArm64/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/TEST-iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest.xml",
+      "suite": "iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest",
+      "configuration": {
+        "viewport": [
+          393,
+          852
+        ],
+        "scale": 1,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "fontScale": 1
+      }
+    },
+    "swiftui": {
+      "environment": "Xcode 27 / iOS 27.0 / hosted SwiftUI / iPhone 13 layout / scale 3 / en-US / light / Large / UTC",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests",
+      "suite": "WalletVisualTests",
+      "suffix": ".native-ios27_0-phone-en-light",
+      "configuration": {
+        "viewport": [
+          390,
+          844
+        ],
+        "scale": 3,
+        "theme": "light",
+        "locale": "en-US",
+        "timezone": "UTC",
+        "textSize": "large",
+        "runtime": "27.0"
+      }
+    }
+  },
+  "states": [
+    {
+      "id": "settings.root.default",
+      "requirements": [
+        "Grouped settings and available actions"
+      ],
+      "composeTest": "settingsRoot",
+      "swiftTest": "testSettingsRoot",
+      "title": "Settings"
+    },
+    {
+      "id": "credential.details.identity",
+      "requirements": [
+        "Credential identity and nested claims"
+      ],
+      "composeTest": "credentialDetails",
+      "swiftTest": "testCredentialDetails",
+      "note": "Identity and nested values share this viewport; both are asserted before capture.",
+      "title": "Credential information"
+    },
+    {
+      "id": "credential.media.loaded",
+      "requirements": [
+        "Decoded portrait and signature images"
+      ],
+      "swiftTest": "testCredentialImages",
+      "note": "Portrait and signature share this viewport; both wait for image readiness and remain visible.",
+      "composeTest": "credentialImages",
+      "title": "Credential images"
+    },
+    {
+      "id": "batch.offer.two_targets_three_copies",
+      "requirements": [
+        "Multiple targets, selected copies and receive action"
+      ],
+      "composeTest": "batchOffer",
+      "swiftTest": "testBatchOffer",
+      "title": "Receiving \u2014 selected credentials"
+    },
+    {
+      "id": "batch.offer.two_targets_three_copies.second_target",
+      "requirements": [
+        "Scroll access to the second target"
+      ],
+      "composeTest": "batchOffer"
+    },
+    {
+      "id": "batch.offer.none_selected",
+      "requirements": [
+        "Disabled receive action with no selection"
+      ],
+      "composeTest": "batchOfferWithNothingSelected",
+      "swiftTest": "testBatchOfferWithNothingSelected"
+    },
+    {
+      "id": "batch.result.saved_and_deferred",
+      "requirements": [
+        "Saved credentials and deferred copies"
+      ],
+      "composeTest": "partialBatchResult",
+      "swiftTest": "testPartialBatchResult",
+      "title": "Receiving \u2014 saved and deferred"
+    },
+    {
+      "id": "payment.mixed_credentials.main",
+      "requirements": [
+        "Payment summary and separate credential groups"
+      ],
+      "composeTest": "paymentReview",
+      "title": "Payment review"
+    },
+    {
+      "id": "payment.mixed_credentials.details",
+      "requirements": [
+        "Payment parties and transaction details"
+      ],
+      "composeTest": "paymentReview"
+    },
+    {
+      "id": "payment.mixed_credentials.requested_data",
+      "requirements": [
+        "Nested requested data"
+      ],
+      "composeTest": "paymentReview"
+    },
+    {
+      "id": "payment.consent.main",
+      "requirements": [
+        "Payment consent and primary action"
+      ],
+      "swiftTest": "testPaymentConsent",
+      "note": "Native consent component; mixed-credential host coverage is still required."
+    },
+    {
+      "id": "nearby.ready.qr",
+      "requirements": [
+        "QR sharing instructions and cancel action"
+      ],
+      "composeTest": "nearbyReady",
+      "swiftTest": "testNearbyReady",
+      "title": "Nearby sharing"
+    }
+  ],
+  "galleryPreview": [
+    "settings.root.default",
+    "credential.details.identity",
+    "batch.offer.two_targets_three_copies",
+    "batch.result.saved_and_deferred",
+    "payment.mixed_credentials.main",
+    "nearby.ready.qr",
+    "credential.media.loaded"
+  ]
+}

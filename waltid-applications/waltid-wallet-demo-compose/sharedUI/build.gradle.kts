@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalWasmDsl::class)
+@file:OptIn(ExperimentalWasmDsl::class, com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.gradle.api.tasks.testing.Test
@@ -8,6 +8,8 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 plugins {
     id("waltid.mobile.library")
     alias(identityLibs.plugins.compose.multiplatform)
+    alias(identityLibs.plugins.roborazzi)
+    id("waltid.wallet.visual")
     kotlin("plugin.compose")
 }
 
@@ -106,6 +108,9 @@ kotlin {
             if (enableIosBuild) {
                 val iosTest = getByName("iosTest") {
                     dependsOn(mobileUiTest)
+                    dependencies {
+                        implementation(identityLibs.roborazzi.compose.ios)
+                    }
                 }
             }
 
@@ -116,11 +121,19 @@ kotlin {
                     dependencies {
                         implementation(identityLibs.junit)
                         implementation(identityLibs.robolectric)
+                        implementation(identityLibs.roborazzi.core)
+                        implementation(identityLibs.roborazzi.compose)
                     }
                 }
             }
         }
     }
+}
+
+roborazzi {
+    outputDir.set(layout.projectDirectory.dir("src/visualTest/snapshots"))
+    compare.outputDir.set(layout.buildDirectory.dir("outputs/visual-diffs"))
+    separateOutputDirs.set(true)
 }
 
 compose {

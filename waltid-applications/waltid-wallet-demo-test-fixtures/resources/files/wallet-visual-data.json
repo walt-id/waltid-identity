@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "issuer": { "identifier": "https://issuer.example", "name": "Example City" },
+  "credential": {
+    "id": "visual-resident-card",
+    "title": "Resident card",
+    "format": "dc+sd-jwt",
+    "addedAt": "2026-01-15T12:00:00Z",
+    "data": {
+      "given_name": "Ada",
+      "family_name": "Lovelace",
+      "resident_address": { "street_address": "12 Example Street", "locality": "Vienna" },
+      "children": ["Alice", "Bob"],
+      "optional_note": null,
+      "is_employee": false,
+      "balance": 0
+    },
+    "portraitFile": "synthetic-portrait.jpg",
+    "signatureFile": "synthetic-signature.png"
+  },
+  "offer": {
+    "batchSize": 3,
+    "credentials": [
+      {
+        "configurationId": "resident-card",
+        "format": "dc+sd-jwt",
+        "title": "Resident card",
+        "backgroundColor": "#164A61",
+        "copies": 2,
+        "claims": [
+          { "path": ["given_name"], "label": "Given name", "mandatory": true },
+          { "path": ["family_name"], "label": "Family name", "mandatory": true }
+        ]
+      },
+      {
+        "configurationId": "library-card",
+        "format": "dc+sd-jwt",
+        "title": "Library membership",
+        "backgroundColor": "#664373",
+        "copies": 1,
+        "claims": [{ "path": ["member_id"], "label": "Member number", "mandatory": true }]
+      }
+    ]
+  },
+  "nearby": { "qrPayload": "mdoc:visual-fixture-not-a-live-engagement" },
+  "batchOutcome": {
+    "status": "Saved credentials: 1. Pending targets: 1.",
+    "pendingId": "visual-deferred-library",
+    "pendingConfigurationId": "library-card"
+  },
+  "payment": {
+    "revision": "visual-consent-revision-1",
+    "locale": "en",
+    "title": "Confirm payment",
+    "affirmativeAction": "Pay €11.56",
+    "denialAction": "Decline",
+    "fields": [
+      { "name": "Amount", "value": "11.56 EUR", "placement": "Prominent" },
+      { "name": "Payee", "value": "Example Bookshop", "placement": "Main" },
+      { "name": "Transaction identifier", "value": "example-transaction-001", "placement": "Details" },
+      { "name": "Technical reference", "value": "bound-but-hidden", "placement": "Omitted" }
+    ]
+  }
+}

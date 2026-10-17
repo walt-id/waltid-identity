@@ -6,7 +6,7 @@ import textwrap
 import unittest
 
 
-ACTION = Path(__file__).resolve().parents[2] / "actions/gradle-ios/action.yml"
+ACTION = Path(__file__).resolve().parents[2] / "actions/ios-test-reports/action.yml"
 
 
 class IosReportsTest(unittest.TestCase):
@@ -24,10 +24,18 @@ class IosReportsTest(unittest.TestCase):
             tools.mkdir()
             # Exercise the real collection script without Xcode or Homebrew.
             converter = tools / "xcresultparser"
-            converter.write_text("#!/bin/sh\nexit 1\n")
+            converter.write_text(
+                "#!/bin/sh\n"
+                "case \"$1\" in *Incomplete.xcresult) exit 1;; esac\n"
+                "printf '%s\\n' '<testsuite tests=\"1\"><testcase name=\"passes\"/></testsuite>'\n"
+            )
             converter.chmod(0o755)
             if report_kind == "unconvertible":
-                (checkout / "Tests.xcresult").mkdir()
+                (checkout / "Incomplete.xcresult").mkdir()
+            elif report_kind in ("xcresult", "partial"):
+                (checkout / "Complete.xcresult").mkdir()
+                if report_kind == "partial":
+                    (checkout / "Incomplete.xcresult").mkdir()
             elif report_kind == "junit":
                 report = checkout / "module/build/test-results/iosSimulatorArm64Test/tests.xml"
                 report.parent.mkdir(parents=True)
@@ -64,8 +72,17 @@ class IosReportsTest(unittest.TestCase):
         self.assertEqual(count, 0)
 
     def test_available_required_reports_are_collected(self):
-        result, outputs, count = self.collect("junit")
+        for kind in ("junit", "xcresult"):
+            with self.subTest(kind=kind):
+                result, outputs, count = self.collect(kind)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(outputs["has_report"], "true")
+                self.assertEqual(count, 1)
+
+    def test_completed_report_survives_an_incomplete_sibling_bundle(self):
+        result, outputs, count = self.collect("partial")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Failed to convert", result.stdout)
         self.assertEqual(outputs["has_report"], "true")
         self.assertEqual(count, 1)
 

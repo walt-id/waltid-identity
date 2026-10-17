@@ -1500,3 +1500,25 @@ private actor FakePreparedSharingBridge: ProximityPreparedSharingBridge {
     private(set) var revoked = false
     func revoke() { revoked = true }
 }
+
+/// Reuses the behavior suite's fake session; visual tests never start Bluetooth or NFC.
+@MainActor
+func makeWalletVisualProximityModel(qrPayload: String) async throws -> WalletViewModel {
+    let session = FakeProximitySession()
+    let client = FakeProximityWalletClient(session: session)
+    let wallet = WalletViewModel(
+        walletID: "visual-nearby", signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
+        walletClient: MockWalletClient(), proximityWalletClient: client,
+        readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
+        identityDocumentRegistrationUpdate: {}, pinStore: InMemoryDemoPinStore()
+    )
+    await wallet.readerTrustSettings.awaitPendingOperations()
+    wallet.isReady = true
+    wallet.statusMessage = ""
+    wallet.selectedTab = .present
+    wallet.proximityPresentation.start()
+    try await waitUntil { client.startCount == 1 }
+    await session.emit(.engagementReady([.qr(payload: qrPayload)]))
+    try await waitUntil { wallet.proximityPresentation.qrPayload == qrPayload }
+    return wallet
+}

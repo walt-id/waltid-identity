@@ -65,6 +65,7 @@ class MobileWalletIssuanceOwnershipTest {
         }
         assertEquals(2, fixture.created)
         assertEquals(2, fixture.tokenCalls)
+        assertEquals(List<KeyUseAuthorizationPolicy>(2) { KeyUseAuthorizationPolicy.BiometricCurrentSet }, fixture.generatedPolicies)
         assertEquals(3, fixture.keys.listKeys().toList().size)
         assertEquals(2, fixture.dids.listDids().toList().size)
         assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(1))))
@@ -126,6 +127,7 @@ class MobileWalletIssuanceOwnershipTest {
         lateinit var reopen: () -> MobileWallet
         var created = 0
         var tokenCalls = 0
+        val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
     }
 
     private suspend fun fixture(records: WalletIssuanceSessionStore? = null, afterGenerate: suspend (Int) -> Unit = {}): Fixture {
@@ -153,7 +155,10 @@ class MobileWalletIssuanceOwnershipTest {
         fixture.reopen = { MobileWallet(
             walletId = "ownership", keyStore = fixture.keys, didStore = fixture.dids,
             credentialStore = InMemoryCredentialStore(), issuanceHttpClient = client, issuanceSessionStore = records,
-            generateAndPersistHolderKey = { _, _ -> key("generated-${++fixture.created}").also { afterGenerate(fixture.created) } },
+            generateAndPersistHolderKey = { _, policy ->
+                fixture.generatedPolicies += policy
+                key("generated-${++fixture.created}").also { afterGenerate(fixture.created) }
+            },
         ) }
         fixture.wallet = fixture.reopen()
         return fixture
