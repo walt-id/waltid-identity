@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "contract": "wallet-gallery/v1",
+  "android": {
+    "appId": "id.walt.wallet.compose.test",
+    "task": ":waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest",
+    "helper": "waltid-applications/waltid-wallet-demo-compose/androidTestFixtures/kotlin/id/walt/walletdemo/compose/android/WalletGalleryEvidence.kt"
+  },
+  "drivers": [
+    {
+      "scenario": "wallet-simple",
+      "platform": "compose-android",
+      "test": "id.walt.walletdemo.compose.android.PublicDemoBackendE2ETest#receiveAndPresentAgainstPublicDemoIssuer2Verifier2",
+      "source": "waltid-applications/waltid-wallet-demo-compose/androidApp/src/androidTest/java/id/walt/walletdemo/compose/android/PublicDemoBackendE2ETest.kt",
+      "captures": [
+        "wallet-issuance-eudi-pid-mdoc-review",
+        "wallet-presentation-eudi-pid-mdoc-review"
+      ]
+    },
+    {
+      "scenario": "wallet-simple",
+      "platform": "compose-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2",
+      "source": "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "compose-ios-wallet-issuance-eudi-pid-mdoc-review",
+        "compose-ios-wallet-presentation-eudi-pid-mdoc-review"
+      ]
+    },
+    {
+      "scenario": "wallet-simple",
+      "platform": "native-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "native-ios-wallet-issuance-eudi-pid-mdoc-review",
+        "native-ios-wallet-presentation-eudi-pid-mdoc-review"
+      ]
+    }
+  ]
+}

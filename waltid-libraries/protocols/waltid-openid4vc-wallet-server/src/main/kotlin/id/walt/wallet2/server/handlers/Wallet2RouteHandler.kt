@@ -737,7 +737,14 @@ object Wallet2RouteHandler {
                                     "(do not echo authorizationRequest), or /reject with requestUrl. " +
                                     "If the request is invalid but a response can still be sent, the result has " +
                                     "valid=false and an error."
-                        request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }
+                        request {
+                            pathParameter<String>("walletId")
+                            queryParameter<Boolean>("includeDetails") {
+                                description = "Distinguish additional immutable claims with requested=false; defaults to false for released-client compatibility."
+                                required = false
+                            }
+                            body<PreviewPresentationRequest>()
+                        }
                         response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
@@ -748,7 +755,7 @@ object Wallet2RouteHandler {
                             transactionDataTypeRegistry = transactionDataTypeRegistry,
                             clientIdTrustConfiguration = clientIdTrustConfiguration,
                         )
-                        call.respond(result.toPreviewResponse())
+                        call.respond(result.toPreviewResponse(includeDetails = call.request.queryParameters["includeDetails"] == "true"))
                     }
 
                     post("/reject", {
@@ -986,11 +993,22 @@ object Wallet2RouteHandler {
 
             get("/deferred", {
                 summary = "List wallet-scoped deferred issuance handles"
-                request { pathParameter<String>("walletId") }
+                description = "Returns retained handles without polling. Opt in to status and issuer display metadata with includeDetails=true."
+                request {
+                    pathParameter<String>("walletId")
+                    queryParameter<Boolean>("includeDetails") {
+                        description = "Include presentation status and issuer display metadata; defaults to false for released-client compatibility."
+                        required = false
+                    }
+                }
                 response { HttpStatusCode.OK to { body<List<WalletIssuanceContinuation>>() } }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
-                call.respond(wallet.issuanceSessions().listIssuanceContinuations())
+                val continuations = wallet.issuanceSessions().listIssuanceContinuations()
+                call.respond(if (call.request.queryParameters["includeDetails"] == "true") continuations else continuations.map {
+                    // Preserve the released wire shape, including handles whose configuration is unknown.
+                    it.copy(status = WalletIssuanceContinuationStatus.UNRESOLVED, displayMetadataJson = null)
+                })
             }
             post("/deferred/{deferredCredentialId}", {
                 summary = "Resume retained deferred issuance"

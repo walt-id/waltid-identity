@@ -1,6 +1,6 @@
 import Foundation
-import WalletDemoSharingUI
-import WalletSDK
+@testable import WalletDemoSharingUI
+@testable import WalletSDK
 import XCTest
 
 /// What the shared sharing review says about a request, for each transport that can produce one.
@@ -9,6 +9,24 @@ import XCTest
 /// claim and which actions are offered, so it is where a transport could start describing a request as
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
+
+    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
+        let identity = option(queryID: "pid", credentialID: "one")
+        let address = option(queryID: "address", credentialID: "two")
+        let request = SharingRequest(requester: nil)
+        XCTAssertFalse(SharingReviewModel(request: request, credentialOptions: [identity]).allowsCredentialSelection(identity))
+        let both = SharingReviewModel(request: request, credentialOptions: [identity, address],
+            credentialRequirements: [.init(options: [["pid", "address"]])])
+        XCTAssertFalse(both.allowsCredentialSelection(identity))
+        XCTAssertFalse(both.allowsCredentialSelection(address))
+        let either = SharingReviewModel(request: request, credentialOptions: [identity, address],
+            credentialRequirements: [.init(options: [["pid"], ["address"]])])
+        XCTAssertTrue(either.allowsCredentialSelection(identity))
+        XCTAssertTrue(either.allowsCredentialSelection(address))
+        let alternatives = SharingReviewModel(request: request,
+            credentialOptions: [identity, option(queryID: "pid", credentialID: "second-copy")])
+        XCTAssertTrue(alternatives.allowsCredentialSelection(identity))
+    }
 
     // MARK: - Requester identity
 
@@ -255,6 +273,7 @@ final class SharingReviewModelTests: XCTestCase {
             "The authorized transaction is headed by the profile's label, not by its transaction_data type"
         )
         let items = review.request.transactionData.flatMap(\.items)
+        XCTAssertFalse(review.request.hasPaymentTransaction, "A payment-like label is not a supported payment type")
         XCTAssertTrue(
             items.contains { $0.value == .text("42.00 EUR") },
             "Transaction authorization must be reviewable as claims, not as a raw JSON dump"
@@ -263,6 +282,32 @@ final class SharingReviewModelTests: XCTestCase {
             items.contains { $0.value == .text("urn:test:payment") },
             "The transaction type stays visible, since the label is chosen by the wallet profile rather than by the request"
         )
+    }
+
+    func testPaymentDisplayUsesKnownTypesAndNeverSubstitutesForRequiredConsent() throws {
+        for type in ["urn:eudi:sca:payment:1", "org.waltid.transaction-data.payment-authorization"] {
+            let review = openIDPreview(transactionData: [PresentationTransactionData(
+                type: type, displayName: "Localized profile title", credentialQueryIDs: ["pid"], supportedFields: [],
+                rawJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#,
+                detailsJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#
+            )]).sharingReview()
+            XCTAssertTrue(review.request.hasPaymentTransaction)
+            let transactions = review.request.transactionData
+            let display = try XCTUnwrap(PaymentReviewState.notRequired.displays(transactions: transactions).first)
+            let values = display.fields.filter { $0.placement == .prominent }.map(\.item.value)
+            XCTAssertEqual(values.count, 3)
+            for value in ["42.00", "EUR", "Store"] { XCTAssertTrue(values.contains(.text(value))) }
+            XCTAssertFalse(display.technical.contains { $0.pathComponents.dropFirst().first == "details" })
+            if type == "urn:eudi:sca:payment:1" {
+                for state: PaymentReviewState in [.loading, .blocked("Missing issuer instructions")] {
+                    XCTAssertTrue(state.displays(transactions: transactions).isEmpty)
+                    XCTAssertFalse(state.canConfirm)
+                }
+                let consent = PaymentConsent(revision: "validated", locale: "en", title: "Review payment", securityHint: nil,
+                    affirmativeAction: "Pay", denialAction: nil, requiresUnsignedRequestWarning: true, fields: [])
+                XCTAssertEqual(PaymentReviewState.ready(consent).displays(transactions: transactions).map(\.id), ["validated"])
+            }
+        }
     }
 
     func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {
@@ -405,6 +450,99 @@ final class SharingReviewModelTests: XCTestCase {
             "Sharing nothing is not a way of answering a request"
         )
         XCTAssertTrue(review.hasCompleteCredentialSelection(review.defaultCredentialSelection()))
+    }
+
+
+    func testInformationChangesWithCredentialChoiceAndIsEmptyWithoutSelection() {
+        let first = informationOption(id: "one", name: "Ada")
+        let second = informationOption(id: "two", name: "Grace")
+        let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [first, second])
+        let details = [first, second].map { CredentialDisplayNormalizer.details(for: $0) }
+        XCTAssertEqual(review.informationToShare(selection: .init(credentials: [first.selection]), details: details)
+            .first?.fields.first?.item.rawValue, #""Ada""#)
+        XCTAssertEqual(review.informationToShare(selection: .init(credentials: [second.selection]), details: details)
+            .first?.fields.first?.item.rawValue, #""Grace""#)
+        XCTAssertTrue(review.informationToShare(selection: .init(credentials: []), details: details).isEmpty)
+    }
+
+    func testRepeatedCredentialCombinesQueriesAndRequiredFieldsStayFixed() {
+        let required = informationOption(query: "name", name: "Ada")
+        let optional = informationOption(query: "optional", name: "Ada", replacing: [
+            .init(path: "birth_date", name: "birth_date", valueJSON: #""1815-12-10""#, displayValue: "1815-12-10",
+                selectivelyDisclosable: true, required: true, selectable: false),
+            .init(path: "$.given_name", name: "given_name", valueJSON: #""Ada""#, displayValue: "Ada",
+                selectivelyDisclosable: true, required: false, selectable: true),
+        ])
+        let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [required, optional])
+        let groups = review.informationToShare(selection: .init(credentials: [required.selection, optional.selection]),
+            details: [required, optional].map { CredentialDisplayNormalizer.details(for: $0) })
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(groups.first?.options.count, 2)
+        XCTAssertEqual(groups.first?.fields.count, 2)
+        let name = groups.first?.fields.first { $0.item.pathComponents == ["given_name"] }
+        XCTAssertEqual(name?.included, true)
+        XCTAssertEqual(name?.optionalSelections.isEmpty, true)
+    }
+
+    func testAdditionalInformationIsVisibleWithoutUnrequestedProtocolMetadata() {
+        let extra = PresentationDisclosure(path: "family_name", name: "family_name", valueJSON: #""Lovelace""#,
+            displayValue: "Lovelace", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
+        let technical = PresentationDisclosure(path: "iss", name: "iss", valueJSON: #""Issuer""#,
+            displayValue: "Issuer", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
+        let option = informationOption(name: "Ada", extra: [extra, technical])
+        let details = CredentialDisplayNormalizer.details(for: option)
+        let fields = informationFields(option: option, details: details, disclosures: [])
+        XCTAssertEqual(fields.count, 2)
+        XCTAssertTrue(fields[1].included)
+        XCTAssertTrue(fields[1].alwaysIncluded)
+
+    }
+
+    func testNestedAndLiteralKeysWithTheSameLeafAreNotMerged() {
+        let options = [("nested", #"["address","name"]"#, "Vienna"), ("name", "name", "Ada"),
+                       ("literal", #"["address.name"]"#, "Literal")].map { query, path, value in
+            informationOption(query: query, name: value, replacing: [
+                .init(path: path, name: "name", valueJSON: "\"\(value)\"", displayValue: value,
+                    selectivelyDisclosable: true, required: true, selectable: false)
+            ])
+        }
+        let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: options)
+        let fields = review.informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
+            details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
+        XCTAssertEqual(fields.count, 3)
+        XCTAssertEqual(Set(fields.map(\.id)).count, 3)
+        let reversed = SharingReviewModel(request: review.request, credentialOptions: options.reversed())
+            .informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
+                details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
+        XCTAssertEqual(Dictionary(uniqueKeysWithValues: fields.map { ($0.item.rawValue, $0.id) }),
+            Dictionary(uniqueKeysWithValues: reversed.map { ($0.item.rawValue, $0.id) }))
+        XCTAssertEqual(Set(fields.compactMap { $0.item.rawValue }), [#""Vienna""#, #""Ada""#, #""Literal""#])
+    }
+
+    func testOptionalValuesRemainVisibleWithoutSharingUntilSelected() {
+        let option = informationOption(name: "Ada", required: false)
+        let details = CredentialDisplayNormalizer.details(for: option)
+        let field = informationFields(option: option, details: details, disclosures: [])[0]
+        XCTAssertFalse(field.included)
+        XCTAssertEqual(field.item.rawValue, #""Ada""#)
+        XCTAssertTrue(informationFields(option: option, details: details, disclosures: field.optionalSelections)[0].included)
+    }
+
+    func testOptionalClearTextRequestedFieldIsNotPresentedAsAdditional() {
+        let disclosure = PresentationDisclosure(path: "given_name", name: "given_name", valueJSON: #""Ada""#,
+            displayValue: "Ada", selectivelyDisclosable: false, required: false, selectable: false)
+        let option = informationOption(name: "Ada", replacing: [disclosure])
+        let field = informationFields(option: option, details: CredentialDisplayNormalizer.details(for: option), disclosures: [])[0]
+        XCTAssertTrue(field.included)
+        XCTAssertFalse(field.alwaysIncluded)
+    }
+
+    private func informationOption(id: String = "one", query: String = "pid", name: String, required: Bool = true,
+        extra: [PresentationDisclosure] = [], replacing: [PresentationDisclosure]? = nil) -> PresentationCredentialOption {
+        .init(queryID: query, credentialID: id, format: "dc+sd-jwt", issuer: "Issuer", subject: nil, label: "Identity",
+            credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#,
+            disclosures: replacing ?? [.init(path: "given_name", name: "given_name", valueJSON: "\"\(name)\"",
+                displayValue: name, selectivelyDisclosable: true, required: required, selectable: !required)] + extra)
     }
 
     // MARK: - Fixtures

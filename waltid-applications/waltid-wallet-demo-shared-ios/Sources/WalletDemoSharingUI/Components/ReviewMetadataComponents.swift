@@ -8,6 +8,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
     @Binding public var isExpanded: Bool
     public let summary: Summary
     public let details: Details
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         title: String,
@@ -36,12 +37,15 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                 HStack(alignment: .center, spacing: 8) {
                     summary
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                         .foregroundStyle(.secondary)
                 }
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isExpanded ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
             .accessibilityIdentifier(toggleAccessibilityIdentifier ?? "")
 
             if isExpanded {
@@ -49,6 +53,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                 details
             }
         }
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
     }
 }
 
@@ -71,67 +76,9 @@ public struct ReviewMetadataSection<Content: View>: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            titleView
-
-            VStack(alignment: .leading, spacing: 8) {
-                content
-            }
-            .padding(contentInsets)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    @ViewBuilder
-    private var titleView: some View {
-        let styledTitle = Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.tint)
-        if let titleAccessibilityIdentifier {
-            styledTitle.accessibilityIdentifier(titleAccessibilityIdentifier)
-        } else {
-            styledTitle
-        }
-    }
-}
-
-public struct MetadataDisclosure<Content: View>: View {
-    public let title: String
-    public let accessibilityIdentifier: String?
-    public let content: Content
-    @State private var isExpanded: Bool
-
-    public init(
-        title: String,
-        initiallyExpanded: Bool,
-        accessibilityIdentifier: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.accessibilityIdentifier = accessibilityIdentifier
-        self.content = content()
-        _isExpanded = State(initialValue: initiallyExpanded)
-    }
-
-    public var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            if isExpanded {
-                content.padding(.top, 4)
-            }
-        } label: {
-            disclosureLabel
-        }
-    }
-
-    @ViewBuilder
-    private var disclosureLabel: some View {
-        let label = Text(title).font(.caption.weight(.medium))
-        if let accessibilityIdentifier {
-            label.accessibilityIdentifier(accessibilityIdentifier)
-        } else {
-            label
+        WalletSection(title, titleIdentifier: titleAccessibilityIdentifier) {
+            VStack(alignment: .leading, spacing: 12) { content }
+                .padding(contentInsets)
         }
     }
 }
@@ -167,8 +114,9 @@ public struct MetadataIdentityView: View {
     public var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                if logoURL == nil {
+                    RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6))
+                }
                 if let logoURL {
                     AsyncImage(url: logoURL) { phase in
                         switch phase {
@@ -192,13 +140,11 @@ public struct MetadataIdentityView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.body.weight(.semibold))
-                    .lineLimit(2)
                 if let supportingText, !supportingText.isEmpty {
                     Text(supportingText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+                    }
             }
         }
     }
@@ -268,13 +214,13 @@ private struct MetadataDetailLine: View {
     var body: some View {
         if let value = item.value, !value.isEmpty {
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.label).font(.caption2).foregroundStyle(.secondary)
+                Text(item.label).font(.caption).foregroundStyle(.secondary)
                 if let linkURL {
                     Link(value, destination: linkURL)
-                        .font(.caption)
+                        .font(.body)
                         .accessibilityIdentifier(value)
                 } else {
-                    Text(value).font(.caption)
+                    Text(value).font(.body)
                 }
             }
         }

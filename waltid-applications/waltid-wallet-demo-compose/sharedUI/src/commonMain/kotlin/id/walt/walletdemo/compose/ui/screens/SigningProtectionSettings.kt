@@ -17,7 +17,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.displayMessage
+import id.walt.walletdemo.compose.logic.recoveryAvailability
+import id.walt.walletdemo.compose.ui.components.BiometricRecoveryNotice
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
@@ -84,17 +85,13 @@ internal fun SigningProtectionSettings(
         }
 
         if (!biometricSigningAvailable && state.signingProtectionMode != WalletDemoSigningProtectionMode.Disabled) {
-            Text(
-                state.biometricSigningAvailability?.displayMessage()
-                    ?: "Checking strong biometric availability...",
+            val availability = state.biometricSigningAvailability
+            if (availability == null) Text("Checking strong biometric availability...",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (state.biometricSigningAvailability == null) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability),
-            )
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability))
+            else BiometricRecoveryNotice(availability.recoveryAvailability(state.access.biometricAvailability), state.access.biometricKind,
+                Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability))
         }
 
         if (ready == null) {

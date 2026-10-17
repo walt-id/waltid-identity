@@ -231,7 +231,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
             selectedDisclosureOptions = listOf(MobileWalletPresentationDisclosureSelection(
-                option.queryId, option.credentialId, option.disclosures.single().path,
+                option.queryId, option.credentialId, option.disclosures.single { it.requested }.path,
             )),
         )
         val data = Json.parseToJsonElement(response.dataJson).jsonObject

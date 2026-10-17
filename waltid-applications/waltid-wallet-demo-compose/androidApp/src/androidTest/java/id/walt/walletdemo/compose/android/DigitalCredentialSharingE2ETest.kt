@@ -194,7 +194,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             // the issuer-scoped URL ending in the configuration id.
             candidateText = scenario.credentialConfigurationId,
             beforeShare = { device ->
-                listOf(PAYMENT_AUTHORIZATION_DISPLAY_NAME, "42.00", "EUR", "ACME Corp").forEach { expected ->
+                listOf("Review payment", "42.00", "EUR", "ACME Corp").forEach { expected ->
                     assertTextContainingVisibleAfterScrolling(
                         device = device,
                         substring = expected,
@@ -270,6 +270,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 )
                 val request = fixture.startCredentialRequest(session.requestJson)
                 val confirmationStarted = System.currentTimeMillis() / 1000.0
+                val expectedFailure = "TS12 authentication evidence is unavailable:"
                 val outcome = if (showPreview) {
                     fixture.enterProviderReview(request, scenario.credentialConfigurationId)
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
@@ -281,9 +282,16 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                             "Payment review is missing issuer instruction '$label'")
                     }
                     clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
+                    assertNotNull(
+                        "Unsigned payment confirmation did not open",
+                        waitForResource(fixture.device, "payment-unsigned-confirm", UI_ELEMENT_TIMEOUT),
+                    )
+                    assertFalse("Unsigned payment submitted before explicit confirmation", request.isComplete)
+                    clickByTag(fixture.device, "payment-unsigned-confirm")
+                    fixture.dismissProviderFailure(request, expectedFailure)
                     withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
                 } else {
-                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId) { device ->
+                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId, expectedFailure) { device ->
                         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { value ->
                             assertTextContainingVisibleInForegroundWindow(device, value, "Platform payment prompt is missing '$value'")
                         }
@@ -297,7 +305,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 ).lineSequence().any { line ->
                     val timestamp = line.trimStart().substringBefore(' ').toDoubleOrNull()
                     timestamp != null && timestamp >= confirmationStarted &&
-                        "TS12 authentication evidence is unavailable:" in line
+                        expectedFailure in line
                 }
                 assertTrue("Submission did not reach the native SCA key-policy rejection", rejectedByNativePolicy)
                 assertFalse("Rejected signing must not reach the verifier",
@@ -402,20 +410,15 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         message = "SCA payment currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
-                    // Open the exact age credential and assert its requested disclosure: a card can also
-                    // appear when the platform offered a credential without selecting claims.
-                    clickByTag(
-                        device = device,
-                        tag = WalletDemoSharingReviewTestTags.credentialCard(
-                            queryId = AGE_CREDENTIAL_QUERY_ID,
-                            credentialId = ageCredentialId,
-                        ),
-                    )
+                    // Check the exact age candidate and its disclosure directly in the consent review.
                     assertNotNull(
-                        "Age credential claims dialog did not open",
+                        "Age credential is missing from the wallet review",
                         waitForResource(
                             device = device,
-                            tag = WalletDemoSharingReviewTestTags.ClaimsDialog,
+                            tag = WalletDemoSharingReviewTestTags.credentialRow(
+                                queryId = AGE_CREDENTIAL_QUERY_ID,
+                                credentialId = ageCredentialId,
+                            ),
                             timeoutMs = UI_ELEMENT_TIMEOUT,
                         ),
                     )
@@ -424,7 +427,6 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         substring = AGE_DISCLOSURE_LABEL,
                         message = "Review did not receive the second credential",
                     )
-                    clickByTag(device, WalletDemoSharingReviewTestTags.ClaimsCloseButton)
                 },
             )
 
@@ -960,7 +962,6 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     })
                 })
             }))
-        private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
         /**
          * Holder binding, which for the DC API is the session-transcript check, plus issuer

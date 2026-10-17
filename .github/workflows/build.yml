@@ -16,6 +16,53 @@ permissions:
   pull-requests: read
 
 jobs:
+  wallet-visual-browser:
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.run-visual-browser == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+      options: --init --ipc=host
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build the production browser host
+        run: >-
+          python3 .github/scripts/mobile-ci/run-ios-phase.py
+          --output-dir waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual/timings
+          browser-build ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution
+          -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true
+          --max-workers=2 --console=plain
+      - name: Install the pinned browser test tools
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        run: npm ci
+      - name: Compare every browser catalogue state
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
+        run: >-
+          python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py
+          --output-dir ../build/reports/browser-visual/timings browser-compare npm test
+      - name: Retain browser comparisons and timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-visual-browser-${{ github.run_attempt }}
+          path: waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual
+          if-no-files-found: error
+          retention-days: 14
+
   wallet-visual-android:
     needs: macos-eligibility
     if: ${{ needs.macos-eligibility.outputs.run-visual-android == 'true' }}
@@ -245,6 +292,7 @@ jobs:
     needs:
       - macos-predicate-tests
       - wallet-visual-android
+      - wallet-visual-browser
       - android-eligibility
       - macos-eligibility
       - conformance-eligibility

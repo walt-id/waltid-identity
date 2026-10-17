@@ -3,14 +3,14 @@
     {
       "name": "iOS report action selects every lane that uses shared CI setup",
       "files": [".github/actions/ios-test-reports/action.yml"],
-      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-browser", "visual-compose", "visual-native"]
     },
     {
       "name": "commonMain-only library change selects simulator and visual renderers",
       "files": [
         "waltid-libraries/crypto/waltid-crypto/src/commonMain/kotlin/id/walt/crypto/Foo.kt"
       ],
-      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "iosMain change selects simulator and Apple visuals",
@@ -45,7 +45,7 @@
       "files": [
         "waltid-libraries/crypto/waltid-crypto/build.gradle.kts"
       ],
-      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "wallet-mobile change selects every iOS consumer lane",
@@ -59,14 +59,14 @@
       "files": [
         "waltid-libraries/protocols/waltid-openid4vp-wallet/src/commonMain/kotlin/id/waltid/openid4vp/wallet/request/AuthorizationRequestResolver.kt"
       ],
-      "lanes": ["ios-simulator", "native", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "native", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "shared Wallet2 change selects native integration tests",
       "files": [
         "waltid-libraries/protocols/waltid-openid4vc-wallet/src/commonMain/kotlin/id/walt/wallet2/handlers/WalletPresentationHandler.kt"
       ],
-      "lanes": ["ios-simulator", "native", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "native", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "native demo change selects native and Enterprise",
@@ -122,14 +122,14 @@
       "files": [
         "waltid-libraries/protocols/waltid-mobile-test-utils/src/commonMain/kotlin/id/walt/mobile/test/backend/DemoTestBackend.kt"
       ],
-      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "build-logic change selects every macOS lane",
       "files": [
         "build-logic/src/main/kotlin/id/walt/convention/KotlinConvention.kt"
       ],
-      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "SDK docs workflow change selects docs only",
@@ -164,7 +164,7 @@
       "files": [
         ".github/scripts/mobile-ci/run-ios-phase.py"
       ],
-      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "recovery lifecycle runner selects simulator coverage",
@@ -222,14 +222,14 @@
       "files": [
         "waltid-libraries/crypto/waltid-crypto2-signum/src/commonMain/kotlin/id/walt/crypto2/signum/SignumKeyProvider.kt"
       ],
-      "lanes": ["ios-simulator", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "sdk-docs", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "wallet recovery common source selects compilation and contract checks",
       "files": [
         "waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/src/commonMain/kotlin/id/walt/wallet2/recovery/BlockstoreRecovery.kt"
       ],
-      "lanes": ["ios-simulator", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["ios-simulator", "sdk-docs", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "shared attestation profile selects all demo consumers",
@@ -271,7 +271,7 @@
       "files": [
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/catalogue.json"
       ],
-      "lanes": ["visual-android", "visual-compose", "visual-native"]
+      "lanes": ["visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "native view changes compare SwiftUI only",
@@ -313,7 +313,7 @@
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/kotlin/id/walt/walletdemo/compose/ui/screens/SettingsScreen.kt"
       ],
-      "lanes": ["compose", "enterprise", "ios-simulator", "visual-android", "visual-compose"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "visual-android", "visual-compose", "visual-browser"]
     },
     {
       "name": "new app-hosted Keychain tests select simulator coverage",
@@ -334,7 +334,7 @@
       "files": [
         ".github/scripts/mobile-ci/verify_test_results.py"
       ],
-      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "native", "sdk-docs", "visual-android", "visual-compose", "visual-native", "visual-browser"]
     },
     {
       "name": "new native batch test selects its Enterprise execution lane",
@@ -370,6 +370,13 @@
         "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/portrait.jpg"
       ],
       "lanes": ["visual-android", "visual-compose", "visual-native"]
+    },
+    {
+      "name": "browser source selects browser visuals and Enterprise coverage",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/kotlin/WebWallet.kt"
+      ],
+      "lanes": ["enterprise", "visual-browser"]
     }
   ]
 }

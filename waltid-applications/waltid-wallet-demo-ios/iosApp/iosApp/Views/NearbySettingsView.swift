@@ -63,17 +63,20 @@ struct NearbySettingsView: View {
     }
 }
 
-private struct ConnectionSettingsView: View {
+struct ConnectionSettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
 
     var body: some View {
-        List {
-            Section { profiles([.defaultProfile, .bluetooth, .wifiAware]) }
-            Section { profiles([.provisionalNfcV2Hybrid, .provisionalNfcV2Direct, .provisionalNfcV2WifiAware]) } header: {
-                Text("Provisional NFC profiles")
-            } footer: {
+        WalletSheetScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                WalletSection { profiles([.defaultProfile, .bluetooth, .wifiAware]) }
+                WalletSection(String(localized: "Provisional NFC profiles")) {
+                    profiles([.provisionalNfcV2Hybrid, .provisionalNfcV2Direct, .provisionalNfcV2WifiAware])
+                }
                 Text("Use Automatic unless the reader requires a specific connection method. Changes apply to the current presentation before connection or approval. After that, they apply to the next presentation.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
+            .padding(20)
         }
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity)
@@ -84,22 +87,29 @@ private struct ConnectionSettingsView: View {
 
     @ViewBuilder
     private func profiles(_ profiles: [WalletDemoProximityTransportProfile]) -> some View {
-        ForEach(profiles) { profile in
-            Button { viewModel.proximityTransportProfile = profile } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(profile.title).foregroundStyle(.primary)
-                        Text(profile.description).font(.footnote).foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            ForEach(profiles) { profile in
+                if profile != profiles.first { Divider().padding(.horizontal, 16) }
+                Button { viewModel.proximityTransportProfile = profile } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(profile.title).foregroundStyle(.primary)
+                            Text(profile.description).font(.footnote).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.tint)
+                            .opacity(viewModel.proximityTransportProfile == profile ? 1 : 0)
+                            .accessibilityHidden(true)
                     }
-                    Spacer()
-                    if viewModel.proximityTransportProfile == profile { Image(systemName: "checkmark").foregroundStyle(.tint).accessibilityHidden(true) }
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, 16).padding(.vertical, 12)
                 }
-                .frame(minHeight: 44)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(profile.accessibilityIdentifier)
+                .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
+                .accessibilityAddTraits(viewModel.proximityTransportProfile == profile ? .isSelected : [])
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(profile.accessibilityIdentifier)
-            .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
-            .accessibilityAddTraits(viewModel.proximityTransportProfile == profile ? .isSelected : [])
         }
     }
 }

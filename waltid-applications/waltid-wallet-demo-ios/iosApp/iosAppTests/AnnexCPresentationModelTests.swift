@@ -158,6 +158,33 @@ final class AnnexCPresentationModelTests: XCTestCase {
         XCTAssertNil(model.review, "There is nothing safe to review when the wallet cannot bind a response to an origin")
     }
 
+    @MainActor
+    func testCancellationDuringPreparationCannotRestoreAReviewOrAutoSubmit() async {
+        for pauseAtPreview in [false, true] {
+            let started = expectation(description: "Preparation suspended")
+            let gate = PreparationGate(started: started)
+            let context = StubRequestContext()
+            let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+                                    previewGate: pauseAtPreview ? gate : nil)
+            let model = AnnexCPresentationModel(context: context, makeWallet: {
+                if !pauseAtPreview { await gate.wait() }
+                return wallet
+            })
+            let preparation = Task { await model.prepare() }
+            await fulfillment(of: [started], timeout: 5)
+            await model.prepare() // A repeated SwiftUI task must not open a second request.
+            model.cancel()
+            model.cancel()
+            await gate.release()
+            await preparation.value
+            await model.submit() // The preview-off path also cannot release a cancelled request.
+            XCTAssertNil(model.review)
+            XCTAssertNil(model.failure)
+            XCTAssertEqual(context.cancelCount, 1)
+            XCTAssertEqual(context.sendResponseCount, 0)
+        }
+    }
+
     // MARK: - Stubs
 
     /// Stands in for Apple's context, and for the platform's half of the two-stage flow.
@@ -231,6 +258,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
         private let preview: AnnexCPresentationPreview
         private let responseJSON: String
         private let submitFailure: (any Error)?
+        private let previewGate: PreparationGate?
         private let lock = NSLock()
         private var recorded: SubmittedPresentation?
 
@@ -240,11 +268,13 @@ final class AnnexCPresentationModelTests: XCTestCase {
         init(
             preview: AnnexCPresentationPreview,
             responseJSON: String = "{}",
-            submitFailure: (any Error)? = nil
+            submitFailure: (any Error)? = nil,
+            previewGate: PreparationGate? = nil
         ) {
             self.preview = preview
             self.responseJSON = responseJSON
             self.submitFailure = submitFailure
+            self.previewGate = previewGate
         }
 
         func previewAnnexCPresentation(
@@ -252,7 +282,8 @@ final class AnnexCPresentationModelTests: XCTestCase {
             verifiedOrigin: String,
             selectedRegistryEntryIDs: [String]
         ) async throws -> AnnexCPresentationPreview {
-            preview
+            await previewGate?.wait()
+            return preview
         }
 
         func submitAnnexCPresentation(
@@ -324,5 +355,23 @@ final class AnnexCPresentationModelTests: XCTestCase {
                 ),
             ]
         )
+    }
+}
+
+private actor PreparationGate {
+    private let started: XCTestExpectation
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+
+    init(started: XCTestExpectation) { self.started = started }
+    func wait() async {
+        started.fulfill()
+        if released { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }

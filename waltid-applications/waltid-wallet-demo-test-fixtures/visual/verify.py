@@ -14,6 +14,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 UI = ":waltid-applications:waltid-wallet-demo-compose:sharedUI"
 RUNTIME = "com.apple.CoreSimulator.SimRuntime.iOS-27-0"
+NATIVE_DEVICE = "com.apple.CoreSimulator.SimDeviceType.iPhone-17"
 
 
 def checked_output(*command):
@@ -26,13 +27,16 @@ def check_apple_environment(simulator, native):
     if native and checked_output("xcodebuildmcp", "--version") != "2.7.0":
         raise SystemExit("Use XcodeBuildMCP 2.7.0 for the catalogue's native result schema.")
     devices = json.loads(checked_output("xcrun", "simctl", "list", "devices", "available", "--json"))
-    if not any(device["udid"] == simulator for device in devices["devices"].get(RUNTIME, [])):
+    device = next((device for device in devices["devices"].get(RUNTIME, []) if device["udid"] == simulator), None)
+    if device is None:
         raise SystemExit("Choose an available, test-owned iOS 27.0 simulator with --simulator. No latest-runtime fallback is allowed.")
+    if native and device.get("deviceTypeIdentifier") != NATIVE_DEVICE:
+        raise SystemExit("SwiftUI baselines require an iPhone 17 simulator on iOS 27.0; other hardware changes hosted safe areas.")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--simulator", help="Test-owned iOS 27.0 simulator UUID; required for either iOS renderer")
+    parser.add_argument("--simulator", help="Test-owned iOS 27.0 simulator UUID; SwiftUI requires iPhone 17 hardware")
     parser.add_argument("--renderers", nargs="+", choices=["android", "compose-ios", "swiftui"],
                         default=["android", "compose-ios", "swiftui"])
     parser.add_argument("--output", type=Path, default=ROOT / "build/reports/wallet-visual")
@@ -104,6 +108,8 @@ def main():
                    "--scheme", "iosApp", "--configuration", "Debug", "--simulator-id", args.simulator,
                    "--derived-data-path", str(args.derived_data.resolve()), "--extra-args",
                    "-only-testing:iosAppTests/WalletVisualTests", "-only-testing:iosAppTests/WalletVisualComparatorTests",
+                   "-only-testing:iosAppTests/WalletVisualHostingTests",
+                   "-parallel-testing-enabled", "NO",
                    "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
                    "--json", json.dumps({"testRunnerEnv": test_env}), "--output", "json"]
         with (args.output / "native-stderr.log").open("w") as errors:

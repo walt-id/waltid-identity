@@ -41,12 +41,14 @@ kotlin {
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
+            implementation(identityLibs.compose.ui.tooling.preview)
             implementation(identityLibs.compose.material3)
             implementation(identityLibs.compose.material.icons.core)
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
-            implementation(identityLibs.coil.network.ktor3)
             implementation(identityLibs.coil.svg)
+            implementation(identityLibs.haze.core)
+            implementation(identityLibs.haze.blur)
             implementation(identityLibs.compose.resources)
             implementation(identityLibs.kotlinx.serialization.json)
         }
@@ -64,6 +66,8 @@ kotlin {
             if (enableAndroidBuild) {
                 androidMain.get().dependsOn(mobileMain)
                 androidMain.dependencies {
+                    // Ktor's Android engine races response cleanup when a composable cancels an image load.
+                    implementation(identityLibs.coil.network.okhttp)
                     // The system back gesture is registered against the host Activity's own
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
@@ -78,6 +82,7 @@ kotlin {
                 iosMain.get().apply {
                     dependsOn(mobileMain)
                     dependencies {
+                        implementation(identityLibs.coil.network.ktor3)
                         implementation(identityLibs.zxing.cpp.kotlin.native)
                     }
                 }
@@ -86,6 +91,7 @@ kotlin {
 
         if (enableWalletDemoComposeWeb) {
             getByName("wasmJsMain").dependencies {
+                implementation(identityLibs.coil.network.ktor3)
                 implementation(identityLibs.kotlinx.browser)
                 implementation(identityLibs.kotlinx.coroutines.core)
             }
@@ -124,6 +130,11 @@ kotlin {
                         implementation(identityLibs.roborazzi.core)
                         implementation(identityLibs.roborazzi.compose)
                     }
+                }
+                getByName("androidDeviceTest").dependencies {
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
+                    implementation(identityLibs.androidx.test.uiautomator)
                 }
             }
         }

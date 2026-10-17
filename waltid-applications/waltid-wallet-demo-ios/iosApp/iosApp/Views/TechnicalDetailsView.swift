@@ -31,6 +31,7 @@ struct SettingsCopyContent: View {
     let copyID: String
     var disclosureLabels: (show: LocalizedStringKey, hide: LocalizedStringKey)?
     var json = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expanded = false
     @State private var copied = false
 
@@ -49,7 +50,9 @@ struct SettingsCopyContent: View {
                 Spacer()
                 if let disclosureLabels {
                     Button { expanded.toggle() } label: {
-                        Image(systemName: expanded ? "chevron.up" : "chevron.down").frame(minWidth: 44, minHeight: 44)
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(Text(expanded ? disclosureLabels.hide : disclosureLabels.show))
@@ -75,6 +78,7 @@ struct SettingsCopyContent: View {
             }
             if copied { Text("Copied").font(.caption).foregroundStyle(.secondary) }
         }
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: expanded)
         .task(id: copied) {
             if copied {
                 do { try await Task.sleep(nanoseconds: 2_000_000_000); copied = false }

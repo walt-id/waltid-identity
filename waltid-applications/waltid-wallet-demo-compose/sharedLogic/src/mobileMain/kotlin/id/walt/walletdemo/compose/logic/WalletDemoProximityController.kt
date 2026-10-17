@@ -64,6 +64,7 @@ data class WalletDemoProximityDocumentSelection(
 /** Shared Android/iOS Compose state around the SDK-owned protocol state. */
 data class WalletDemoProximityUiState(
     val active: Boolean = false,
+    val closing: Boolean = false,
     val sessionState: ProximityState? = null,
     val selections: List<WalletDemoProximityDocumentSelection> = emptyList(),
     val continueAfterResponse: Boolean = false,
@@ -79,20 +80,22 @@ data class WalletDemoProximityUiState(
     val preparedSharing: ProximityPreparedSharing? = null,
     val recentPlan: ProximitySharingPlan? = null,
     val refreshingEngagementChoices: List<ProximityEngagementMethod> = emptyList(),
+    /** Capability-backed choices; no engagement material or session exists yet. */
+    val pendingEngagementChoices: List<ProximityEngagementMethod> = emptyList(),
 ) {
     val refreshingEngagement: Boolean get() = refreshingEngagementChoices.isNotEmpty()
 
-    val showsEngagement: Boolean get() = sessionState is ProximityState.EngagementReady || refreshingEngagement
+    val showsEngagement: Boolean get() = pendingEngagementChoices.isNotEmpty() || sessionState is ProximityState.EngagementReady || refreshingEngagement
 
     /** Connection methods stay in place while a mode change replaces the session. */
     val engagementChoices: List<ProximityEngagementMethod>
         get() = (sessionState as? ProximityState.EngagementReady)?.engagements.orEmpty()
             .map { if (it is ProximityEngagement.Qr) ProximityEngagementMethod.Qr else ProximityEngagementMethod.Nfc }
             .distinct().sortedBy { it == ProximityEngagementMethod.Qr }
-            .ifEmpty { refreshingEngagementChoices }
+            .ifEmpty { pendingEngagementChoices.ifEmpty { refreshingEngagementChoices } }
 
     val displayedEngagement: ProximityEngagementMethod?
-        get() = preferredEngagement?.takeIf { it in engagementChoices }
+        get() = if (pendingEngagementChoices.isNotEmpty()) null else preferredEngagement?.takeIf { it in engagementChoices }
             ?: engagementChoices.singleOrNull()?.takeUnless {
                 it == ProximityEngagementMethod.Nfc && nfcRequiresUserAction
             }
@@ -108,8 +111,17 @@ data class WalletDemoProximityUiState(
 
     val preparingApproval: Boolean get() = sessionState is ProximityState.PreparationRequired
 
+    val canClose: Boolean
+        get() = active && !closing && (isTerminal || preparingApproval || sessionState == null ||
+            ProximityActionType.Cancel in sessionState.legalActions)
+
+    val canChangeConnectionOptions: Boolean
+        get() = active && !closing && preparedSharing == null && hostActionInProgress == null &&
+            (sessionState == null || sessionState is ProximityState.EngagementReady ||
+                sessionState is ProximityState.CheckingPrerequisites || refreshingEngagement)
+
     val canApprove: Boolean
-        get() = pendingReviewId == null && review?.let { current ->
+        get() = !closing && pendingReviewId == null && review?.let { current ->
             selections.map { it.requestIndex }.toSet() == current.documents.map { it.requestIndex }.toSet() &&
                 selections.all { selected -> selected.disclosedElements.isNotEmpty() &&
                     current.documents.single { it.requestIndex == selected.requestIndex }.requiredElements.all { it in selected.disclosedElements } }
@@ -159,7 +171,7 @@ class WalletDemoProximityController(
     private var sessionJob: Job? = null
     private var hostActionJob: Job? = null
     private var generation: Long = 0
-    private var preparedEngagementLaunched = false
+    private var engagementLaunched = false
 
     fun start() {
         if (mutableState.value.active) return
@@ -171,6 +183,7 @@ class WalletDemoProximityController(
         val startGeneration = generation
         pendingConfiguration = configuration
         effectiveConfiguration = configuration
+        engagementLaunched = false
         mutableState.value = initialUiState().copy(active = true, approvalMode = mode)
         checkPrerequisitesAndStart(configuration, startGeneration)
     }
@@ -192,6 +205,18 @@ class WalletDemoProximityController(
                 if (!isCurrent(startGeneration)) return@launch
                 if (configuration.approval !is ProximityApproval.Prepared &&
                     (mutableState.value.automaticPermissionAction != null || !capabilities.mayStart)) return@launch
+
+                if (configuration.approval !is ProximityApproval.Prepared) {
+                    val choices = buildList {
+                        if (capabilities.nfcMayStart) add(ProximityEngagementMethod.Nfc)
+                        if (capabilities.qrMayStart) add(ProximityEngagementMethod.Qr)
+                    }
+                    if (mutableState.value.preferredEngagement !in choices) {
+                        mutableState.update { it.copy(pendingEngagementChoices = choices, preferredEngagement = null,
+                            refreshingEngagementChoices = emptyList()) }
+                        return@launch
+                    }
+                }
 
                 val started = wallet.startProximityPresentation(configuration)
                 if (!isCurrent(startGeneration)) {
@@ -371,6 +396,31 @@ class WalletDemoProximityController(
         job.start()
     }
 
+    /** One holder exit: dispatch only a legal cancellation, drain cleanup, then hide the task. */
+    fun requestClose() {
+        val current = mutableState.value
+        if (!current.canClose) return
+        val currentSession = session
+        val actionGeneration = generation
+        mutableState.update { it.copy(closing = true, actionError = null) }
+        scope.launch(dispatcher) {
+            val result = if (currentSession != null && !current.isTerminal && !current.preparingApproval && current.sessionState != null) {
+                try { currentSession.dispatch(ProximityAction.Cancel) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { ProximityActionResult.Rejected(demoSessionFailure) }
+            } else ProximityActionResult.Accepted
+            if (generation != actionGeneration || !mutableState.value.active) return@launch
+            if (result is ProximityActionResult.Rejected) {
+                mutableState.update { it.copy(closing = false, actionError = result.error) }
+                return@launch
+            }
+            dismiss(resetUi = false)
+            val closingGeneration = generation
+            withContext(NonCancellable) { closingJob?.join() }
+            if (generation == closingGeneration) mutableState.value = initialUiState()
+        }
+    }
+
     fun cancel() {
         if (mutableState.value.preparingApproval) { dismiss(); return }
         if (session == null) {
@@ -412,7 +462,9 @@ class WalletDemoProximityController(
         }
     }
 
-    fun dismiss() {
+    fun dismiss() = dismiss(resetUi = true)
+
+    private fun dismiss(resetUi: Boolean) {
         generation += 1
         val starting = sessionJob
         val hostAction = hostActionJob
@@ -425,7 +477,8 @@ class WalletDemoProximityController(
         session = null
         pendingConfiguration = null
         effectiveConfiguration = null
-        mutableState.value = initialUiState()
+        if (resetUi) mutableState.value = initialUiState()
+        else mutableState.update { it.copy(closing = true) }
         scheduleClose(closing, starting, hostAction, revoking)
     }
 
@@ -453,24 +506,34 @@ class WalletDemoProximityController(
         val mode = approvalModeProvider()
         val current = mutableState.value
         val previous = effectiveConfiguration ?: return
-        val awaitingPrerequisite = (current.sessionState as? ProximityState.CheckingPrerequisites)?.let {
-            !it.capabilities.mayStart || current.automaticPermissionAction != null
-        } == true
-        if (!current.active || current.preparedSharing != null || current.hostActionInProgress != null ||
-            (current.sessionState !is ProximityState.EngagementReady && !awaitingPrerequisite)) return
+        val awaitingChoiceOrPrerequisite = current.pendingEngagementChoices.isNotEmpty() ||
+            (current.sessionState as? ProximityState.CheckingPrerequisites)?.let {
+                !it.capabilities.mayStart || current.automaticPermissionAction != null
+            } == true
+        if (!current.active || current.closing || current.preparedSharing != null || current.hostActionInProgress != null ||
+            (current.sessionState != null && current.sessionState !is ProximityState.EngagementReady &&
+                !awaitingChoiceOrPrerequisite && !current.refreshingEngagement)) return
         val configuration = readerTrustSettingsProvider().applyTo(profileProvider().configuration())
             .copy(approval = mode.toApproval())
         val sameTransport = previous.session == configuration.session
         if (sameTransport && current.approvalMode == mode) return
         mutableState.update { it.copy(approvalMode = mode) }
         // Only an unchanged transport can retain its already prepared choice layout.
-        replaceSession(configuration, preserveEngagement = sameTransport && current.showsEngagement)
+        replaceSession(configuration, preserveEngagement = sameTransport && current.showsEngagement && current.pendingEngagementChoices.isEmpty())
     }
 
-    /** Reveals the prepared engagement and requests platform NFC UI after an explicit user choice. */
+    /** Starts the timed exchange only after a choice, then reveals the prepared engagement. */
     fun showEngagement(method: ProximityEngagementMethod) {
         val current = mutableState.value
-        if (current.sessionState !is ProximityState.EngagementReady || current.hostActionInProgress != null || method !in current.engagementChoices) return
+        if (current.closing || current.hostActionInProgress != null || method !in current.engagementChoices) return
+        if (current.pendingEngagementChoices.isNotEmpty()) {
+            val configuration = pendingConfiguration ?: return
+            mutableState.update { it.copy(preferredEngagement = method,
+                refreshingEngagementChoices = current.pendingEngagementChoices, pendingEngagementChoices = emptyList()) }
+            checkPrerequisitesAndStart(configuration, generation)
+            return
+        }
+        if (current.sessionState !is ProximityState.EngagementReady) return
         mutableState.update { current ->
             if (current.hostActionInProgress == null && method in current.engagementChoices) {
                 current.copy(preferredEngagement = method)
@@ -498,7 +561,7 @@ class WalletDemoProximityController(
         val previous = mutableState.value
         val nextApproval = (configuration.approval as? ProximityApproval.Prepared)?.sharing
         val revoking = previous.preparedSharing?.takeIf { it !== nextApproval }
-        preparedEngagementLaunched = false
+        engagementLaunched = false
         mutableState.value = initialUiState().copy(
             active = true, hostActionInProgress = action, approvalMode = previous.approvalMode,
             recentPlan = previous.recentPlan,
@@ -608,10 +671,10 @@ class WalletDemoProximityController(
         }
         refreshPreferences()
         val current = mutableState.value
-        if (sessionState is ProximityState.EngagementReady && current.preparedSharing != null && !preparedEngagementLaunched) {
+        if (sessionState is ProximityState.EngagementReady && !engagementLaunched) {
             current.preferredEngagement?.takeIf { it in current.engagementChoices }?.let {
-                // Approve and get ready also authorizes reopening the connection the holder just reviewed.
-                preparedEngagementLaunched = true
+                // A method choice (or Approve and get ready) authorizes the platform handoff.
+                engagementLaunched = true
                 showEngagement(it)
             }
         }

@@ -8,6 +8,8 @@ import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import okio.ByteString.Companion.toByteString
 import kotlin.io.encoding.Base64
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 @OptIn(CryptographyProviderApi::class)
 internal class PersistentDemoPinStore(
@@ -16,6 +18,8 @@ internal class PersistentDemoPinStore(
     private val clearRecord: () -> Unit,
     private val readBiometricUnlock: () -> Boolean,
     private val writeBiometricUnlock: (Boolean) -> Unit,
+    private val readBiometricSetupPending: () -> Boolean,
+    private val writeBiometricSetupPending: (Boolean) -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
     private val randomSalt: () -> ByteArray = { CryptographyRandom.nextBytes(SALT_SIZE_BYTES) },
 ) : DemoPinStore {
@@ -29,10 +33,14 @@ internal class PersistentDemoPinStore(
         writeBiometricUnlock(enabled)
     }
 
+    override fun isBiometricSetupPending(): Boolean = readBiometricSetupPending()
+    override fun setBiometricSetupPending(pending: Boolean) = writeBiometricSetupPending(pending)
+
     override suspend fun setPin(pin: String) {
         val salt = randomSalt()
         require(salt.size == SALT_SIZE_BYTES) { "PIN salt generation failed" }
         val verifier = derive(pin, salt, ITERATIONS)
+        currentCoroutineContext().ensureActive()
         writeRecord(
             listOf(
                 RECORD_VERSION,
@@ -48,7 +56,7 @@ internal class PersistentDemoPinStore(
     }
 
     override suspend fun verifyPin(pin: String): Boolean {
-        val record = readRecord() ?: return false
+        val record = requireNotNull(readRecord()) { "PIN verifier record is missing" }
         val parts = record.split(RECORD_SEPARATOR, limit = 4)
         require(parts.size == 4 && parts[0] == RECORD_VERSION) { "Unsupported PIN verifier record" }
 

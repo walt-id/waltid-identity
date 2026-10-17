@@ -53,9 +53,6 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
         wallet().resumeDeferredIssuance(deferredCredentialId)
 
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        wallet().present(requestUrl, did)
-
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         wallet().previewPresentation(requestUrl)
 

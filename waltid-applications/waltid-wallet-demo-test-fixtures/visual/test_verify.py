@@ -72,6 +72,8 @@ class ComparisonRunnerTests(unittest.TestCase):
         native = next(command for command in commands if command[0] == "xcodebuildmcp")
         self.assertIn("-only-testing:iosAppTests/WalletVisualTests", native)
         self.assertIn("-only-testing:iosAppTests/WalletVisualComparatorTests", native)
+        self.assertIn("-only-testing:iosAppTests/WalletVisualHostingTests", native)
+        self.assertEqual(native[native.index("-parallel-testing-enabled") + 1], "NO")
         environment = json.loads(native[native.index("--json") + 1])["testRunnerEnv"]
         self.assertEqual(environment["WALLET_VISUAL_RUN_ID"], "fresh-run")
         self.assertEqual(environment["WALLET_VISUAL_RECORD"], "0")
@@ -98,17 +100,31 @@ class ComparisonRunnerTests(unittest.TestCase):
 
 
 class AppleEnvironmentTests(unittest.TestCase):
-    def output(self, *command):
+    def output(self, *command, device_type=verify.NATIVE_DEVICE):
         if command[0] == "xcodebuild":
             return "Xcode 27.0\nBuild version 27A266a"
         if command[0] == "xcodebuildmcp":
             return "2.7.0"
-        return json.dumps({"devices": {verify.RUNTIME: [{"udid": "owned-simulator"}]}})
+        return json.dumps({"devices": {verify.RUNTIME: [{
+            "udid": "owned-simulator", "deviceTypeIdentifier": device_type}]}})
 
     def test_compose_needs_only_xcode_and_the_pinned_runtime(self):
-        with patch.object(verify, "checked_output", side_effect=self.output) as command:
+        output = lambda *command: self.output(*command, device_type="com.apple.CoreSimulator.SimDeviceType.iPhone-13")
+        with patch.object(verify, "checked_output", side_effect=output) as command:
             verify.check_apple_environment("owned-simulator", native=False)
         self.assertFalse(any(call.args[0] == "xcodebuildmcp" for call in command.call_args_list))
+
+    def test_native_accepts_the_pinned_runtime_and_hardware(self):
+        with patch.object(verify, "checked_output", side_effect=self.output):
+            verify.check_apple_environment("owned-simulator", native=True)
+
+    def test_native_rejects_other_or_unknown_hardware_on_the_same_runtime(self):
+        for device_type in ("com.apple.CoreSimulator.SimDeviceType.iPhone-13", None):
+            with self.subTest(device_type=device_type):
+                output = lambda *command: self.output(*command, device_type=device_type)
+                with patch.object(verify, "checked_output", side_effect=output), \
+                     self.assertRaisesRegex(SystemExit, "iPhone 17"):
+                    verify.check_apple_environment("owned-simulator", native=True)
 
     def test_a_different_runtime_is_rejected(self):
         with patch.object(verify, "checked_output", side_effect=self.output), \

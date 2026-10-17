@@ -142,6 +142,7 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
                 selectivelyDisclosable = disclosure.selectivelyDisclosable,
                 required = disclosure.required,
                 selectable = disclosure.selectable,
+                requested = disclosure.requested,
             )
         },
     )

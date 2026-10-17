@@ -56,6 +56,9 @@ on:
       run-visual-native:
         description: "Whether the complete native visual catalogue should run"
         value: ${{ jobs.decide.outputs.run-visual-native }}
+      run-visual-browser:
+        description: "Whether the complete browser visual catalogue should run"
+        value: ${{ jobs.decide.outputs.run-visual-browser }}
       should-run:
         description: "Whether any macOS lane should run"
         value: ${{ jobs.decide.outputs.should-run }}
@@ -79,6 +82,7 @@ jobs:
       run-visual-android: ${{ steps.decide.outputs.run-visual-android }}
       run-visual-compose: ${{ steps.decide.outputs.run-visual-compose }}
       run-visual-native: ${{ steps.decide.outputs.run-visual-native }}
+      run-visual-browser: ${{ steps.decide.outputs.run-visual-browser }}
       should-run: ${{ steps.decide.outputs.should-run }}
       reason: ${{ steps.decide.outputs.reason }}
     steps:

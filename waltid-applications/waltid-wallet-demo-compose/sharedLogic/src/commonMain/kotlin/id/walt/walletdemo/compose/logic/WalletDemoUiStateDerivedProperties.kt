@@ -29,8 +29,7 @@ val WalletDemoUiState.isError: Boolean
     get() = isErrorFor(selectedTab)
 
 val WalletDemoUiState.isStatusBusy: Boolean
-    get() = session is WalletSessionState.Bootstrapping ||
-        (operation.belongsTo(selectedTab) && operation.isBusyOperation)
+    get() = isStatusBusyFor(selectedTab)
 
 val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
     get() = !isBusy && offerPreview == null
@@ -66,17 +65,15 @@ val WalletDemoUiState.statusText: String
     get() = statusText(selectedTab)
 
 fun WalletDemoUiState.statusText(tab: WalletDemoTab): String =
-    statusBanner(tab)?.message.orEmpty()
+    operation.statusTextFor(tab) ?: tabStatusText(tab) ?: session.statusText(auth).orEmpty()
 
 fun WalletDemoUiState.statusBanner(tab: WalletDemoTab = selectedTab): WalletStatusBanner? {
-    val message = operation.statusTextFor(tab)
-        ?: tabStatusText(tab)
-        ?: session.statusText(auth)
-        ?: return null
+    if (session is WalletSessionState.Ready && operation.statusTextFor(tab) == null && tabStatusText(tab) == null) return null
+    val message = statusText(tab).takeIf { it.isNotEmpty() } ?: return null
     val kind = when {
         isErrorFor(tab) -> WalletStatusKind.Error
         isStatusBusyFor(tab) -> WalletStatusKind.Busy
-        isSuccessStatus(tab, message) -> WalletStatusKind.Success
+        operation is WalletOperationState.Succeeded && operation.belongsTo(tab) -> WalletStatusKind.Success
         else -> WalletStatusKind.Info
     }
     return WalletStatusBanner(message = message, kind = kind, occurrenceId = statusOccurrenceId)
@@ -94,12 +91,6 @@ val WalletDemoUiState.isStatusExpanded: Boolean
 private fun WalletDemoUiState.isStatusBusyFor(tab: WalletDemoTab): Boolean =
     session is WalletSessionState.Bootstrapping ||
         (operation.belongsTo(tab) && operation.isBusyOperation)
-
-private fun WalletDemoUiState.isSuccessStatus(tab: WalletDemoTab, message: String): Boolean =
-    (operation is WalletOperationState.Succeeded && operation.belongsTo(tab)) ||
-        message == WalletDisplayText.WalletReady ||
-        message == WalletDisplayText.PresentationSent ||
-        message.startsWith("Received ")
 
 private fun WalletDemoUiState.isErrorFor(tab: WalletDemoTab): Boolean =
     session is WalletSessionState.Failed ||
@@ -121,6 +112,7 @@ private fun WalletSessionState.statusText(auth: WalletAuthState): String? =
         WalletSessionState.NotBootstrapped -> when (auth) {
             is WalletAuthState.Setup -> WalletDisplayText.SetupPin
             is WalletAuthState.Login -> WalletDisplayText.UnlockPin
+            is WalletAuthState.BiometricSetup -> WalletDisplayText.EnableBiometricUnlock
             is WalletAuthState.StorageUnavailable -> auth.message
             WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }

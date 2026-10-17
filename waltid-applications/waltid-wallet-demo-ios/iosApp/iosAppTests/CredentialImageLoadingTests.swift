@@ -28,8 +28,8 @@ final class CredentialImageLoadingTests: XCTestCase {
             ClaimItem(path: .topLevel("text\(index)"), label: "Claim \(index)", value: .text("Value"), rawValue: nil)
         }
         for group in [
-            ClaimGroup(title: "Images", items: precedingItems + [item]),
-            ClaimGroup(title: "Images", items: [item], initiallyExpanded: false)
+            ClaimGroup(id: "images", title: "Images", items: precedingItems + [item]),
+            ClaimGroup(id: "collapsed-images", title: "Images", items: [item], initiallyExpanded: false)
         ] {
             let details = CredentialDetails(id: "test", title: "Test", issuer: nil, subject: nil,
                                             format: "vc+sd-jwt", addedAt: nil, groups: [group])
