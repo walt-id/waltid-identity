@@ -767,11 +767,10 @@ final class MockWalletUITests: XCTestCase {
         details.name = "rtl-credential-information"
         details.lifetime = .keepAlways
         add(details)
-        // Keep the swipe on native navigation chrome, outside the detail scroll view.
-        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
-            .withOffset(CGVector(dx: -3, dy: 0))
+        // Start on native Back and complete the pan across the bar before releasing.
+        back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             .press(forDuration: 0.05, thenDragTo: navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
-                .withOffset(CGVector(dx: 40, dy: 0)))
+                .withOffset(CGVector(dx: 3, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.2)
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertFalse(navigationBar.exists, "Swiping back must pop the detail page without closing the offer")
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
