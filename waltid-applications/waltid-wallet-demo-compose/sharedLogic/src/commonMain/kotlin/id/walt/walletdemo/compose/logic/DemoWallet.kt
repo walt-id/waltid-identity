@@ -31,6 +31,18 @@ interface DemoWallet {
         callbackUri: String,
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
+    /**
+     * Posts OpenID4VCI `credential_deleted` for a credential fetched but not stored.
+     * Session-based offer decline has no `notification_id` yet and can leave this unimplemented.
+     */
+    suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ) {
+    }
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */

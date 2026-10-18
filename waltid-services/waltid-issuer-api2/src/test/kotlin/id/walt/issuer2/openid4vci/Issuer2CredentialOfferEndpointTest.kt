@@ -19,9 +19,8 @@ import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.domain.CredentialProfile
-import id.walt.issuer2.repository.IssuanceSessionStorageCodec
-import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
@@ -710,7 +709,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         assertEquals(Instant.DISTANT_FUTURE.toEpochMilliseconds(), response.expiresAt)
-        val session = client.get("/issuer2/sessions/${response.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
+        val session = client.getSession(response.offerId)
         assertEquals(Instant.DISTANT_FUTURE, session.expiresAt)
     }
 
@@ -738,7 +737,7 @@ class Issuer2CredentialOfferEndpointTest {
             )
         )
 
-        val session = client.get("/issuer2/sessions/${response.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
+        val session = client.getSession(response.offerId)
         val issuanceRequest = session.issuanceRequests.single()
         assertEquals("Jane", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
         assertEquals("did:example:holder", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
@@ -852,11 +851,6 @@ class Issuer2CredentialOfferEndpointTest {
         get("/issuer2/profiles/$profileId").also {
             assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         }.body()
-
-    private suspend fun HttpClient.getSession(sessionId: String): IssuanceSession =
-        get("/issuer2/sessions/$sessionId").also {
-            assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-        }.bodyAsText().let(IssuanceSessionStorageCodec::decode)
 
     private suspend fun HttpClient.createCredentialOffer(
         request: CredentialOfferCreateRequest,

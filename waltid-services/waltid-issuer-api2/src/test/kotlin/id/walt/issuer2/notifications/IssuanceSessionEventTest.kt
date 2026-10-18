@@ -31,6 +31,9 @@ class IssuanceSessionEventTest {
             "credential_request_mso_mdoc_succeeded",
             "credential_request_mso_mdoc_failed",
             "issuance_status_changed",
+            "wallet_credential_accepted",
+            "wallet_credential_failure",
+            "wallet_credential_deleted",
         )
         val actual = IssuanceSessionEvent.entries.map { it.value }
 
