@@ -369,8 +369,10 @@ jobs:
             ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
             --no-configuration-cache \
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}" \
+            -Penterprise.ios.collectTestDiagnostics="${XCODE_TEST_DIAGNOSTICS}" \
             -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact"
         env:
+          XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
