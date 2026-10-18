@@ -1,6 +1,10 @@
 import json
+import os
 from pathlib import Path
 import re
+import subprocess
+import sys
+import tempfile
 import unittest
 
 
@@ -120,6 +124,46 @@ class IosConsumerWorkflowTest(unittest.TestCase):
             "Compare SwiftUI visual references using the shared framework",
         ))
         self.assertGreaterEqual(self.timeout(self.job), deadlines + 10)
+
+
+class EnterpriseIosWorkflowTest(unittest.TestCase):
+    def setUp(self):
+        workflow = (GITHUB / "workflows/gradle-macos.yml").read_text()
+        self.job = workflow.split("  enterprise-ios-mobile-tests:\n", 1)[1]
+        self.steps = dict(
+            (block.split("\n", 1)[0], block.split("\n", 1)[1])
+            for block in self.job.split("      - name: ")[1:]
+        )
+
+    def test_diagnostic_policy_reaches_the_enterprise_task(self):
+        execution = self.steps["Execute Enterprise iOS mobile platform tests"]
+        self.assertIn("XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}", execution)
+        script = execution.split("        run: |\n", 1)[1].split("        env:\n", 1)[0]
+        script = "\n".join(line[10:] for line in script.splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture = root / "arguments.json"
+            python = root / "python3"
+            python.write_text(
+                f"#!{sys.executable}\n"
+                "import json, os, sys\n"
+                "with open(os.environ['CAPTURE'], 'w') as stream:\n"
+                "    json.dump(sys.argv[1:], stream)\n"
+            )
+            python.chmod(0o755)
+            for policy in ("never", "on-failure"):
+                with self.subTest(policy=policy):
+                    subprocess.run(["bash", "-eu", "-c", script], check=True, env={
+                        **os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                        "CAPTURE": str(capture), "XCODE_TEST_DIAGNOSTICS": policy,
+                        "IOS_SIMULATOR_DESTINATION": "platform=iOS Simulator,name=iPhone 17,OS=27.0",
+                        "GITHUB_WORKSPACE": str(root / "workspace"), "RUNNER_TEMP": str(root / "runner temp"),
+                    })
+                    arguments = json.loads(capture.read_text())
+                    self.assertIn(f"-Penterprise.ios.collectTestDiagnostics={policy}", arguments)
+                    self.assertIn(f"-Penterprise.ios.walletCoreArtifact={root / 'runner temp/wallet-core-artifact'}", arguments)
+                    self.assertEqual(arguments.count("./gradlew"), 1)
+                    self.assertIn(":waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest", arguments)
 
 
 if __name__ == "__main__":
