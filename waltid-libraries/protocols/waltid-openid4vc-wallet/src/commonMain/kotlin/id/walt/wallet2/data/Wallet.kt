@@ -31,6 +31,7 @@ import kotlinx.serialization.json.Json
  * - Multiple key stores (e.g. software key store + HSM)
  * - Multiple credential stores (e.g. separate stores per credential type)
  * - One optional DID store
+ * - One optional transaction log store
  * - staticKey / staticDid fallbacks for store-less / isolated-only wallets
  *
  * The OSS default (POST /wallet with empty body) auto-creates one in-memory
@@ -85,6 +86,9 @@ data class Wallet(
      * instead of the first DID in the store.
      */
     val defaultDidId: String? = null,
+
+    /** Transaction history store for this wallet, or null when transaction logging is not configured. */
+    val transactionLogStore: WalletTransactionLogStore? = null,
 ) {
     private var resolvedStaticCrypto2Key: Crypto2Key? = null
     private sealed interface KeyAttestationSource {

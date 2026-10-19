@@ -13,8 +13,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
  *
  * Each subtype contains only its corresponding non-null detail object.
  *
- * Invalid values are rejected with [IllegalArgumentException] on construction; [TransactionLogCodec]
- * converts these into SerializationException when decoding.
+ * Invalid values are rejected with [IllegalArgumentException] on construction;
  *
  * This is a local log model, not the flattened export example in section 4.1 or a migration object.
  * Unavailable mandatory party metadata is nullable in the detail models; these partial entries

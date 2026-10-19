@@ -54,6 +54,6 @@ data class TransactionLogQuery(
 
 /** A page of entries with a continuation only when more entries were available at read time. */
 data class TransactionLogPage(
-    val entries: TransactionLog,
+    val entries: List<TransactionLog>,
     val nextCursor: TransactionLogCursor?,
 )

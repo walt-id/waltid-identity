@@ -268,6 +268,7 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
+        transactionLogStore = transactionLogStore,
     ).attachIssuanceSessionState(issuanceSessionState)
 
     /**
