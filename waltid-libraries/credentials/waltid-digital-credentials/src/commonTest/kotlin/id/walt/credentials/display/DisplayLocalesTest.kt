@@ -8,12 +8,18 @@ class DisplayLocalesTest {
 
     @Test
     fun prefersLanguageRegionThenLanguage() {
-        val selected = DisplayLocales.select(
-            items = listOf("en" to "English", "de" to "German", "de-AT" to "Austrian"),
-            preferredLocales = listOf("de-AT"),
-            localeOf = { it.first },
-        )
-        assertEquals("Austrian", selected?.second)
+        listOf(
+            listOf("de-AT") to "Austrian",
+            listOf("de-CH", "en") to "German",
+            listOf("fr", "de") to "German",
+        ).forEach { (preferences, expected) ->
+            val selected = DisplayLocales.select(
+                items = listOf("en" to "English", "de" to "German", "de-AT" to "Austrian"),
+                preferredLocales = preferences,
+                localeOf = { it.first },
+            )
+            assertEquals(expected, selected?.second, preferences.toString())
+        }
     }
 
     @Test
