@@ -35,7 +35,7 @@ import kotlin.test.assertNull
  * a profile that authorizes a type gets exactly the hash elements, one that does not gets nothing,
  * and an offer-scoped runtime override can grant a type the profile itself does not authorize.
  */
-class Issuer2TransactionDataAuthorizationTest {
+class Issuer2TransactionLogDataAuthorizationTest {
 
     @AfterEach
     fun clearConfig() {

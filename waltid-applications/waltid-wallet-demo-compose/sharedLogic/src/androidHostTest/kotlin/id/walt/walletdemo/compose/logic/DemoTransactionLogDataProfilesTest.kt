@@ -9,7 +9,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class DemoTransactionDataProfilesTest {
+class DemoTransactionLogDataProfilesTest {
     @Test
     fun deployedProfilesAreUsedWithoutLocalAdditions() = runTest {
         val profiles = listOf(MobileWalletTransactionDataProfile("deployed-payment", "Payment", listOf("amount")))

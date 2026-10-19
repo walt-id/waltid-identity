@@ -20,8 +20,6 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
@@ -60,7 +58,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightTransactionLogStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.transactionlog.CredentialDeletion
-import id.walt.wallet2.transactionlog.CredentialDeletionTransaction
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
 import id.walt.wallet2.transactionlog.TransactionResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
@@ -97,7 +95,7 @@ class MobileWalletFactoryTest {
         )) {
             database().use { database ->
                 val store = SqlDelightTransactionLogStore(database.queries)
-                store.store(CredentialDeletionTransaction(
+                store.store(CredentialDeletionTransactionLog(
                     transactionIdentifier = "deleted-credential",
                     time = LocalDateTime.parse("2026-10-19T19:00:00"),
                     transactionResult = TransactionResult.Completed,

@@ -1,13 +1,13 @@
 package id.walt.wallet2.data
 
-import id.walt.wallet2.transactionlog.Transaction
+import id.walt.wallet2.transactionlog.TransactionLog
 import id.walt.wallet2.transactionlog.TransactionLogPage
 import id.walt.wallet2.transactionlog.TransactionLogQuery
 
 /** Storage for one wallet's transaction history. Use a separate store instance per wallet. */
 interface WalletTransactionLogStore {
     /** Appends [entry]. Duplicate transaction identifiers must fail without overwriting history. */
-    suspend fun store(entry: Transaction)
+    suspend fun store(entry: TransactionLog)
 
     /** Reads a time-ordered page. Invalid queries and corrupt stored entries must fail explicitly. */
     suspend fun read(query: TransactionLogQuery = TransactionLogQuery()): TransactionLogPage

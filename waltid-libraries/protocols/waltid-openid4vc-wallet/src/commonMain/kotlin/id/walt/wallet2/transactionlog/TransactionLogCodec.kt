@@ -21,7 +21,7 @@ object TransactionLogCodec {
         coerceInputValues = true
     }
 
-    private val serializer = ListSerializer(Transaction.serializer())
+    private val serializer = ListSerializer(TransactionLog.serializer())
 
     fun encode(log: TransactionLog): String = json.encodeToString(serializer, log)
 
@@ -33,7 +33,7 @@ object TransactionLogCodec {
         }
         return entries.mapIndexed { index, entry ->
             try {
-                json.decodeFromJsonElement(Transaction.serializer(), entry)
+                json.decodeFromJsonElement(TransactionLog.serializer(), entry)
             } catch (e: SerializationException) {
                 throw SerializationException("Invalid transaction at index $index: ${e.message}", e)
             } catch (e: IllegalArgumentException) {

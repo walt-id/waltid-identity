@@ -2,7 +2,7 @@ package id.walt.wallet2.persistence.stores
 
 import id.walt.wallet2.data.WalletTransactionLogStore
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
-import id.walt.wallet2.transactionlog.Transaction
+import id.walt.wallet2.transactionlog.TransactionLog
 import id.walt.wallet2.transactionlog.TransactionLogCursor
 import id.walt.wallet2.transactionlog.TransactionLogPage
 import id.walt.wallet2.transactionlog.TransactionLogQuery
@@ -14,11 +14,11 @@ import kotlinx.serialization.json.Json
 /** SQLCipher-backed transaction history, with sorting and pagination performed in SQL. */
 public class SqlDelightTransactionLogStore(private val queries: WalletPersistenceQueries) : WalletTransactionLogStore {
     /** Appends an envelope without overwriting an existing transaction identifier. */
-    override suspend fun store(entry: Transaction) {
+    override suspend fun store(entry: TransactionLog) {
         queries.insertTransactionLogEntry(
             transaction_identifier = entry.transactionIdentifier,
             time = LocalDateTime.Formats.ISO.format(entry.time),
-            payload = Json.encodeToString(Transaction.serializer(), entry),
+            payload = Json.encodeToString(TransactionLog.serializer(), entry),
         )
     }
 
@@ -35,7 +35,7 @@ public class SqlDelightTransactionLogStore(private val queries: WalletPersistenc
                     queries.selectTransactionLogNewestFirst(cursorTime, cursor?.transactionIdentifier, fetchLimit)
             }
         }.executeAsList()
-        val entries = payloads.take(query.limit).map { Json.decodeFromString(Transaction.serializer(), it) }
+        val entries = payloads.take(query.limit).map { Json.decodeFromString(TransactionLog.serializer(), it) }
         return TransactionLogPage(
             entries = entries,
             nextCursor = if (payloads.size > query.limit) entries.last().let {

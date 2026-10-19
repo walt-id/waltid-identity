@@ -15,15 +15,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class TransactionLogCodecTest {
+class TransactionLogLogCodecTest {
 
     private val time = LocalDateTime(2026, 1, 2, 3, 4, 5)
     private val name = "Example"
     private val names = listOf(name, "Example alternative")
     private val claim = ClaimInfo("urn:eudi:pid:1", listOf("family_name"))
 
-    private fun allTransactions(): List<Transaction> = listOf(
-        PresentationTransaction(
+    private fun allTransactions(): List<TransactionLog> = listOf(
+        PresentationTransactionLog(
             "1", time, TransactionResult.Completed,
             Presentation(
                 listOf(claim), listOf(claim),
@@ -34,14 +34,14 @@ class TransactionLogCodecTest {
                 purpose = listOf(MultiLangString("en", "Verification")),
             ),
         ),
-        CredentialIssuanceTransaction(
+        CredentialIssuanceTransactionLog(
             "2", time, TransactionResult.Completed,
             CredentialIssuance(
                 1, 1, listOf("urn:eudi:pid:1"), true,
                 interactingPartyName = names, interactingPartyType = IssuerType.PIDProvider,
             ),
         ),
-        CredentialDeletionTransaction(
+        CredentialDeletionTransactionLog(
             "3", time, TransactionResult.Completed, CredentialDeletion("urn:eudi:pid:1", name),
         ),
     )
@@ -114,9 +114,9 @@ class TransactionLogCodecTest {
         )) {
             val log = allTransactions().map { transaction ->
                 when (transaction) {
-                    is PresentationTransaction -> transaction.copy(time = value)
-                    is CredentialIssuanceTransaction -> transaction.copy(time = value)
-                    is CredentialDeletionTransaction -> transaction.copy(time = value)
+                    is PresentationTransactionLog -> transaction.copy(time = value)
+                    is CredentialIssuanceTransactionLog -> transaction.copy(time = value)
+                    is CredentialDeletionTransactionLog -> transaction.copy(time = value)
                 }
             }
             val encoded = TransactionLogCodec.encode(log)
@@ -163,7 +163,7 @@ class TransactionLogCodecTest {
     @Test
     fun inMemoryStoreUsesCanonicalTimestampsForPagination() = runTest {
         val store = InMemoryTransactionLogStore()
-        val transaction = allTransactions().last() as CredentialDeletionTransaction
+        val transaction = allTransactions().last() as CredentialDeletionTransactionLog
         val entries = listOf(
             transaction.copy(transactionIdentifier = "1", time = LocalDateTime(2026, 1, 2, 3, 4)),
             transaction.copy(transactionIdentifier = "2", time = LocalDateTime(2026, 1, 2, 3, 4)),
@@ -213,7 +213,7 @@ class TransactionLogCodecTest {
               "credentialIssuance":{"credentialNumberRequested":1,"credentialNumberIssued":1,
                 "credentialIdentifier":["x"],"isUserTriggered":true,"interactingPartyType":"FutureProvider"}}]
         """.trimIndent()
-        val decoded = TransactionLogCodec.decode(text).single() as CredentialIssuanceTransaction
+        val decoded = TransactionLogCodec.decode(text).single() as CredentialIssuanceTransactionLog
         assertEquals(null, decoded.credentialIssuance.interactingPartyType)
     }
 }

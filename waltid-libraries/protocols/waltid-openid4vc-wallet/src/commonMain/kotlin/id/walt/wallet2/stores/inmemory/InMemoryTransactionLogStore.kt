@@ -1,7 +1,7 @@
 package id.walt.wallet2.stores.inmemory
 
 import id.walt.wallet2.data.WalletTransactionLogStore
-import id.walt.wallet2.transactionlog.Transaction
+import id.walt.wallet2.transactionlog.TransactionLog
 import id.walt.wallet2.transactionlog.TransactionLogCursor
 import id.walt.wallet2.transactionlog.TransactionLogPage
 import id.walt.wallet2.transactionlog.TransactionLogQuery
@@ -13,10 +13,10 @@ import kotlinx.datetime.LocalDateTime
 
 /** Process-local transaction history for development and testing; not durable storage. */
 class InMemoryTransactionLogStore : WalletTransactionLogStore {
-    private val entries = mutableMapOf<String, Transaction>()
+    private val entries = mutableMapOf<String, TransactionLog>()
     private val mutex = Mutex()
 
-    override suspend fun store(entry: Transaction) {
+    override suspend fun store(entry: TransactionLog) {
         mutex.withLock {
             check(entry.transactionIdentifier !in entries) { "Transaction identifier already exists: ${entry.transactionIdentifier}" }
             entries[entry.transactionIdentifier] = entry
@@ -24,7 +24,7 @@ class InMemoryTransactionLogStore : WalletTransactionLogStore {
     }
 
     override suspend fun read(query: TransactionLogQuery): TransactionLogPage = mutex.withLock {
-        val ascending = compareBy<Transaction> { it.sortValue(query.sortBy) }.thenBy { it.transactionIdentifier }
+        val ascending = compareBy<TransactionLog> { it.sortValue(query.sortBy) }.thenBy { it.transactionIdentifier }
         val comparator = when (query.sortOrder) {
             TransactionLogSortOrder.Ascending -> ascending
             TransactionLogSortOrder.Descending -> ascending.reversed()
@@ -64,7 +64,7 @@ class InMemoryTransactionLogStore : WalletTransactionLogStore {
         mutex.withLock { entries.clear() }
     }
 
-    private fun Transaction.sortValue(field: TransactionLogSortField): String = when (field) {
+    private fun TransactionLog.sortValue(field: TransactionLogSortField): String = when (field) {
         TransactionLogSortField.Time -> LocalDateTime.Formats.ISO.format(time)
     }
 }

@@ -4,9 +4,9 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.transactionlog.CredentialDeletion
-import id.walt.wallet2.transactionlog.CredentialDeletionTransaction
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
 import id.walt.wallet2.transactionlog.Presentation
-import id.walt.wallet2.transactionlog.PresentationTransaction
+import id.walt.wallet2.transactionlog.PresentationTransactionLog
 import id.walt.wallet2.transactionlog.TransactionLogQuery
 import id.walt.wallet2.transactionlog.TransactionLogSortField
 import id.walt.wallet2.transactionlog.TransactionLogSortOrder
@@ -27,14 +27,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class SqlDelightTransactionLogStoreTest {
+class SqlDelightTransactionLogLogStoreTest {
     @Test
     fun `round trips polymorphic envelopes and paginates in both directions`() = runTest {
         withDatabase { queries ->
             val store = SqlDelightTransactionLogStore(queries)
             assertTrue(store.read().entries.isEmpty())
             assertNull(store.read().nextCursor)
-            val declined = PresentationTransaction(
+            val declined = PresentationTransactionLog(
                 transactionIdentifier = "c",
                 time = LocalDateTime.parse("2026-10-19T19:00:00"),
                 transactionResult = TransactionResult.NotCompleted,
@@ -210,7 +210,7 @@ class SqlDelightTransactionLogStoreTest {
         }
     }
 
-    private fun deletion(id: String, day: Int = 19) = CredentialDeletionTransaction(
+    private fun deletion(id: String, day: Int = 19) = CredentialDeletionTransactionLog(
         transactionIdentifier = id,
         time = LocalDateTime(2026, 10, day, 19, 0, 0),
         transactionResult = TransactionResult.Completed,

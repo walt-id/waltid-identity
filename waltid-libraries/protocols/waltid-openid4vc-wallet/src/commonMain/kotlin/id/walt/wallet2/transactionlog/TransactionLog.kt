@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
  */
 @Serializable
 @JsonClassDiscriminator("transactionType")
-sealed interface Transaction {
+sealed interface TransactionLog {
     val transactionIdentifier: String
     val time: LocalDateTime
     val transactionResult: TransactionResult
@@ -31,13 +31,13 @@ sealed interface Transaction {
 /** TS10 sections 3.1-3.2: a presentation transaction with its required presentation detail. */
 @Serializable
 @SerialName("Presentation")
-data class PresentationTransaction(
+data class PresentationTransactionLog(
     override val transactionIdentifier: String,
     @Serializable(with = LocalDateTimeIso8601Serializer::class)
     override val time: LocalDateTime,
     override val transactionResult: TransactionResult,
     val presentation: Presentation,
-) : Transaction {
+) : TransactionLog {
     init {
         validateEnvelope(presentation.reasonOfNoncompletion)
     }
@@ -46,13 +46,13 @@ data class PresentationTransaction(
 /** TS10 sections 3.1 and 3.5: an issuance transaction with its required issuance detail. */
 @Serializable
 @SerialName("CredentialIssuance")
-data class CredentialIssuanceTransaction(
+data class CredentialIssuanceTransactionLog(
     override val transactionIdentifier: String,
     @Serializable(with = LocalDateTimeIso8601Serializer::class)
     override val time: LocalDateTime,
     override val transactionResult: TransactionResult,
     val credentialIssuance: CredentialIssuance,
-) : Transaction {
+) : TransactionLog {
     init {
         validateEnvelope()
     }
@@ -61,13 +61,13 @@ data class CredentialIssuanceTransaction(
 /** TS10 sections 3.1 and 3.6: a deletion transaction with its required deletion detail. */
 @Serializable
 @SerialName("CredentialDeletion")
-data class CredentialDeletionTransaction(
+data class CredentialDeletionTransactionLog(
     override val transactionIdentifier: String,
     @Serializable(with = LocalDateTimeIso8601Serializer::class)
     override val time: LocalDateTime,
     override val transactionResult: TransactionResult,
     val credentialDeletion: CredentialDeletion,
-) : Transaction {
+) : TransactionLog {
     init {
         validateEnvelope()
     }
@@ -80,15 +80,12 @@ enum class TransactionResult {
     NotCompleted,
 }
 
-/** TS10 section 3.16: a log is an array, including an empty array before any transactions. */
-typealias TransactionLog = List<Transaction>
-
-private fun Transaction.validateEnvelope() {
+private fun TransactionLog.validateEnvelope() {
     require(transactionIdentifier.isNotBlank()) { "Transaction identifier must not be blank" }
 }
 
 /** For transactions whose detail carries a reason: it is present if and only if the result is NotCompleted. */
-private fun Transaction.validateEnvelope(reasonOfNoncompletion: String?) {
+private fun TransactionLog.validateEnvelope(reasonOfNoncompletion: String?) {
     validateEnvelope()
     require((transactionResult == TransactionResult.NotCompleted) == (reasonOfNoncompletion != null)) {
         "A noncompletion reason is required if and only if the transaction was not completed"
