@@ -71,9 +71,10 @@ class JwtCredentialProofHandler(
             ?: throw invalidCredentialProof("JWT proof must be a string")
         val evidence = verifyJwtProof(jwt, proofMetadata, configuration, context)
         val signer = VerifiedCredentialBindingCandidate(evidence.holderKey, evidence.holderKid, evidence.holderDid)
-        val attestation = evidence.keyAttestation
-        if (attestation == null) return CredentialProofHandlerResult(
-            evidence, listOf(signer), CredentialBindingMultiplicity.PRESERVE_OCCURRENCES,
+        val attestation = evidence.keyAttestation ?: return CredentialProofHandlerResult(
+            evidence,
+            listOf(signer),
+            CredentialBindingMultiplicity.PRESERVE_OCCURRENCES,
         )
         val signingThumbprint = Jwk.sha256Thumbprint(evidence.holderKey.exportPublicJwk())
         return CredentialProofHandlerResult(
@@ -178,7 +179,10 @@ class JwtCredentialProofHandler(
 
         return when {
             hasJwk -> {
-                validateBindingMethod(credentialConfiguration, setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.CoseKey))
+                validateBindingMethod(
+                    credentialConfiguration,
+                    setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.CoseKey)
+                )
                 val jwk = header[JwtHeaderParams.JSON_WEB_KEY] as? JsonObject
                     ?: throw invalidCredentialProof("Credential proof jwk header must be a JSON object")
                 jwk.optionalString(JwtHeaderParams.ALGORITHM)?.let { jwkAlgorithm ->
@@ -199,8 +203,16 @@ class JwtCredentialProofHandler(
             hasKid -> {
                 val holderKid = header.requiredStringHeader(JwtHeaderParams.KEY_ID)
                 if (!holderKid.startsWith("did:") && attestation != null) {
-                    validateBindingMethod(credentialConfiguration, setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.CoseKey))
-                    val key = resolveAttestedHolderKey(attestation, holderKid, header.requiredStringHeader(JwtHeaderParams.ALGORITHM), proofJwt)
+                    validateBindingMethod(
+                        credentialConfiguration,
+                        setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.CoseKey)
+                    )
+                    val key = resolveAttestedHolderKey(
+                        attestation,
+                        holderKid,
+                        header.requiredStringHeader(JwtHeaderParams.ALGORITHM),
+                        proofJwt
+                    )
                     return ResolvedHolderKey(key = key, kid = holderKid, did = null)
                 }
                 requireCredentialProof(DidUtils.isDidUrl(holderKid)) {
@@ -246,7 +258,10 @@ class JwtCredentialProofHandler(
         for (index in candidates) {
             val key = attestation.attestedKeys[index]
             val declaredAlgorithm = jwks[index].optionalString(JwtHeaderParams.ALGORITHM)
-            if (declaredAlgorithm != null && declaredAlgorithm != algorithm || !key.spec.supportsJwsAlgorithm(jwsAlgorithm)) continue
+            if (declaredAlgorithm != null && declaredAlgorithm != algorithm || !key.spec.supportsJwsAlgorithm(
+                    jwsAlgorithm
+                )
+            ) continue
             try {
                 CompactJws.verify(proofJwt, key, setOf(jwsAlgorithm))
             } catch (e: CancellationException) {

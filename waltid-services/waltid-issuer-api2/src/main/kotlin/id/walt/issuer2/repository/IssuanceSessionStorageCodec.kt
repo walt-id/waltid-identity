@@ -42,8 +42,19 @@ object IssuanceSessionStorageCodec {
     }
 
     private val requestFields = setOf(
-        "profileId", "credentialConfigurationId", "issuerKey", "credentialData", "mapping",
-        "selectiveDisclosure", "idTokenClaimsMapping", "mDocNameSpacesDataMappingConfig",
-        "authorizedTransactionDataTypes", "msoData", "x5Chain", "issuerDid", "credentialStatus", "expectedCredentialProofKeyJwks",
+        "profileId",
+        "credentialConfigurationId",
+        "issuerKey",
+        "credentialData",
+        "mapping",
+        "selectiveDisclosure",
+        "idTokenClaimsMapping",
+        "mDocNameSpacesDataMappingConfig",
+        "authorizedTransactionDataTypes",
+        "msoData",
+        "x5Chain",
+        "issuerDid",
+        "credentialStatus",
+        "expectedCredentialProofKeyJwks",
     )
 }

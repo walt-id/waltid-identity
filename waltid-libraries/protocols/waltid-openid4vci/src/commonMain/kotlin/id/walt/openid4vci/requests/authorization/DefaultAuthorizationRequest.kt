@@ -54,23 +54,24 @@ data class DefaultAuthorizationRequest(
 
 /** Snapshot the declared request fields for persistence across authentication. */
 fun AuthorizationRequest.toDefaultAuthorizationRequest(): DefaultAuthorizationRequest =
-    if (this is DefaultAuthorizationRequest) this else DefaultAuthorizationRequest(
-        id = id,
-        requestedAt = requestedAt,
-        client = client,
-        responseTypes = responseTypes,
-        handledResponseTypes = handledResponseTypes,
-        requestedScopes = requestedScopes,
-        grantedScopes = grantedScopes,
-        requestedAudience = requestedAudience,
-        grantedAudience = grantedAudience,
-        redirectUri = redirectUri,
-        state = state,
-        issuerState = issuerState,
-        responseMode = responseMode,
-        defaultResponseMode = defaultResponseMode,
-        requestForm = requestForm,
-        issClaim = issClaim,
-        authorizationDetails = authorizationDetails,
-        authenticatedClient = authenticatedClient,
-    )
+    this as? DefaultAuthorizationRequest
+        ?: DefaultAuthorizationRequest(
+            id = id,
+            requestedAt = requestedAt,
+            client = client,
+            responseTypes = responseTypes,
+            handledResponseTypes = handledResponseTypes,
+            requestedScopes = requestedScopes,
+            grantedScopes = grantedScopes,
+            requestedAudience = requestedAudience,
+            grantedAudience = grantedAudience,
+            redirectUri = redirectUri,
+            state = state,
+            issuerState = issuerState,
+            responseMode = responseMode,
+            defaultResponseMode = defaultResponseMode,
+            requestForm = requestForm,
+            issClaim = issClaim,
+            authorizationDetails = authorizationDetails,
+            authenticatedClient = authenticatedClient,
+        )

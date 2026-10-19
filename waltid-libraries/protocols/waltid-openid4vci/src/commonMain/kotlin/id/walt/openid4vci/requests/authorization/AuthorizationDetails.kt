@@ -31,5 +31,6 @@ data class AuthorizationDetail(
         credentialConfigurationId: String = this.credentialConfigurationId,
         credentialIdentifiers: List<String>? = this.credentialIdentifiers,
         claims: JsonElement? = this.claims,
-    ): AuthorizationDetail = AuthorizationDetail(type, credentialConfigurationId, credentialIdentifiers, claims, locations)
+    ): AuthorizationDetail =
+        AuthorizationDetail(type, credentialConfigurationId, credentialIdentifiers, claims, locations)
 }

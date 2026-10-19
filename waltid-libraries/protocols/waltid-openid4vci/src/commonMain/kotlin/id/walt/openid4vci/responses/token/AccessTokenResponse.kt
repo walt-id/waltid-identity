@@ -85,6 +85,7 @@ sealed class AccessTokenResponseResult {
         val response: AccessTokenResponse,
         val credentialAuthorization: TokenCredentialAuthorization? = null,
     ) : AccessTokenResponseResult()
+
     data class Failure(
         val request: AccessTokenRequest,
         val error: OAuthError,

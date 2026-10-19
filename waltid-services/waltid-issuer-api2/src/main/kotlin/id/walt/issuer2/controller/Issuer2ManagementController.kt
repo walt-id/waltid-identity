@@ -57,8 +57,15 @@ class Issuer2ManagementController(
                     throw BadRequestException("${ex.message}: $validationMessage")
                 }
                 when (request) {
-                    is CredentialOfferCreateRequest -> call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
-                    is MultiCredentialOfferCreateRequest -> call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
+                    is CredentialOfferCreateRequest -> call.respond(
+                        HttpStatusCode.Created,
+                        offerService.createCredentialOffer(request, requestId)
+                    )
+
+                    is MultiCredentialOfferCreateRequest -> call.respond(
+                        HttpStatusCode.Created,
+                        offerService.createCredentialOffer(request, requestId)
+                    )
                 }
             }
 

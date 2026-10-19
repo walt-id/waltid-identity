@@ -14,14 +14,19 @@ import kotlinx.serialization.Serializable
 enum class CredentialFormat(val value: String) {
     @SerialName("jwt_vc_json")
     JWT_VC_JSON("jwt_vc_json"),
+
     @SerialName("jwt_vc_json-ld")
     JWT_VC_JSON_LD("jwt_vc_json-ld"),
+
     @SerialName("ldp_vc")
     LDP_VC("ldp_vc"),
+
     @SerialName("jwt_vc")
     JWT_VC("jwt_vc"),
+
     @SerialName("dc+sd-jwt")
     SD_JWT_VC("dc+sd-jwt"),
+
     @SerialName("mso_mdoc")
     MSO_MDOC("mso_mdoc");
 
