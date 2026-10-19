@@ -52,6 +52,8 @@ import kotlin.io.encoding.Base64
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 class StatusListDirectTrustSection113Test {
     private val provider = CryptographySoftwareKeyProvider()
@@ -221,6 +223,37 @@ class StatusListDirectTrustSection113Test {
         }
         assertContains(error.message!!, "delegated status signer")
         assertContains(error.message!!, "id-kp-oauthStatusSigning")
+    }
+
+    @Test
+    fun `status certificate outside its validity period is rejected`() = runTest {
+        val material = issuedMaterial()
+        val now = Clock.System.now()
+        listOf(
+            X509Certificate.Validity(notBefore = now - 730.days, notAfter = now - 365.days),
+            X509Certificate.Validity(notBefore = now + 1.days, notAfter = now + 365.days),
+        ).forEach { validity ->
+            val statusLeaf = issued(
+                subjectKey = material.statusKey,
+                issuerKey = material.caKey,
+                issuer = material.ca,
+                dn = "CN=Status issuer, O=Walt.id",
+                eku = setOf(OAUTH_STATUS_SIGNING_EKU),
+                validity = validity,
+            )
+            val error = assertThrows<IllegalArgumentException> {
+                authorizeStatusListSigner(
+                    request(
+                        credential = material.credentialLeaf,
+                        credentialChain = listOf(material.credentialLeaf, material.ca),
+                        statusChain = listOf(statusLeaf),
+                        verificationKey = publicKey(statusLeaf),
+                    ),
+                    authorizer = null,
+                )
+            }
+            assertContains(error.message!!, "currently valid delegated status signer")
+        }
     }
 
     @Test
@@ -468,9 +501,11 @@ class StatusListDirectTrustSection113Test {
         issuer: X509Certificate,
         dn: String,
         eku: Set<String> = emptySet(),
+        validity: X509Certificate.Validity? = null,
     ): X509Certificate = X509CertificateUtil.createCertificate(issuerKey, issuer, algorithm) {
         subjectDn = dn
         subjectPublicKey(subjectKey)
+        validity?.let { this.validity = it }
         if (eku.isNotEmpty()) {
             extensionExtendedKeyUsage { addKeyUsage(*eku.toTypedArray()) }
         }

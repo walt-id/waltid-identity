@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 suspend fun authorizeStatusListSigner(
     request: StatusListSignerAuthorizationRequest,
@@ -93,7 +94,7 @@ internal fun statusListSignerUnauthorizedMessage(
 
         request.signer.source == JwtKeyResolutionSource.X5C ->
             "the status-list x5c leaf does not match the referenced credential x5c leaf, " +
-                "and the status certificate is not a delegated status signer issued by the credential's CA " +
+                "and the status certificate is not a currently valid delegated status signer issued by the credential's CA " +
                 "with id-kp-oauthStatusSigning"
 
         referencedIssuer == null ->
@@ -180,7 +181,7 @@ private fun sameWebResolution(
 
 /**
  * §11.3, different status issuer: both certificates are issued by the credential's CA, and the
- * status certificate carries id-kp-oauthStatusSigning (IANA 1.3.6.1.5.5.7.3.45).
+ * status certificate is currently valid and carries id-kp-oauthStatusSigning (IANA 1.3.6.1.5.5.7.3.45).
  */
 private suspend fun delegatedStatusIssuer(request: StatusListSignerAuthorizationRequest): Boolean {
     val credentialChain = referencedCredentialCertificateChain(request.referencedCredential)
@@ -189,6 +190,8 @@ private suspend fun delegatedStatusIssuer(request: StatusListSignerAuthorization
     val statusLeaf = request.signer.certificateChain.firstOrNull()?.let(::decodeCertificateDer)?.let(::parseCertificate)
         ?: return false
     if (statusLeaf.encodedDer == credentialLeaf.encodedDer) return false
+    val now = Clock.System.now()
+    if (now < statusLeaf.data.validity.notBefore || now >= statusLeaf.data.validity.notAfter) return false
     if (!signedBy(credentialLeaf, credentialCa) || !signedBy(statusLeaf, credentialCa)) return false
     val purposes = statusLeaf.data.extensionExtendedKeyUsage?.keyPurposeIdList ?: return false
     return OAUTH_STATUS_SIGNING_EKU in purposes
