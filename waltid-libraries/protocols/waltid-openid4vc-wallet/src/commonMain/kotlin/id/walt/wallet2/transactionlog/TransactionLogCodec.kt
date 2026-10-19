@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonArray
  * invalid, or have an unknown transactionType, fail the whole decode with a [SerializationException]
  * naming the entry index.
  */
+//TODO - drop if not needed
 object TransactionLogCodec {
     private val json = Json {
         ignoreUnknownKeys = true

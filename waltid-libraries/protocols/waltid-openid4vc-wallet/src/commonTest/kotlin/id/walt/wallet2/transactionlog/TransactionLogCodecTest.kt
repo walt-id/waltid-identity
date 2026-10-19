@@ -1,5 +1,8 @@
 package id.walt.wallet2.transactionlog
 
+import id.walt.wallet2.stores.inmemory.InMemoryTransactionLogStore
+import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -14,12 +17,10 @@ import kotlin.test.assertTrue
 
 class TransactionLogCodecTest {
 
-    private val time = "2026-01-02T03:04:05"
-    private val party = Identifier("urn:example", "id-1")
+    private val time = LocalDateTime(2026, 1, 2, 3, 4, 5)
     private val name = "Example"
     private val names = listOf(name, "Example alternative")
     private val claim = ClaimInfo("urn:eudi:pid:1", listOf("family_name"))
-    private val pseudonym = Pseudonym("abc")
 
     private fun allTransactions(): List<Transaction> = listOf(
         PresentationTransaction(
@@ -43,40 +44,6 @@ class TransactionLogCodecTest {
         CredentialDeletionTransaction(
             "3", time, TransactionResult.Completed, CredentialDeletion("urn:eudi:pid:1", name),
         ),
-        OtherOperationTransaction("4", time, TransactionResult.Completed, OtherTransaction(listOf("backup"))),
-        W2WPresentationRequestTransaction(
-            "5", time, TransactionResult.Completed, W2WPresentationRequest(listOf(claim), listOf(claim)),
-        ),
-        W2WPresentationTransaction(
-            "6", time, TransactionResult.NotCompleted,
-            W2WPresentation(listOf(claim), emptyList(), "declined"),
-        ),
-        CredentialReissuanceTransaction(
-            "7", time, TransactionResult.Completed, CredentialIssuance(1, 1, listOf("x"), false),
-        ),
-        PseudonymGenerationTransaction("8", time, TransactionResult.Completed, PseudonymGeneration(pseudonym)),
-        PseudonymDeletionTransaction("9", time, TransactionResult.Completed, PseudonymDeletion(pseudonym)),
-        PseudonymousAuthenticationTransaction(
-            "10", time, TransactionResult.Completed,
-            PseudonymousAuthentication(party, PseudonymousAuthenticationPartyType.ServiceProvider, names, pseudonym),
-        ),
-        CertificateIssuanceTransaction(
-            "11", time, TransactionResult.Completed,
-            CertificateIssuance(party, CertificateIssuerType.QCertForESigProvider, names, listOf("DE"), "01"),
-        ),
-        CertificateDeletionTransaction(
-            "12", time, TransactionResult.Completed, CertificateDeletion("01", party, name),
-        ),
-        SigningSealingTransaction(
-            "13", time, TransactionResult.Completed,
-            SigningSealing(party, names, listOf("DE"), "s1", "01", "dtbsr"),
-        ),
-        DataDeletionRequestTransaction(
-            "14", time, TransactionResult.Completed, DataDeletionRequest(party, names, listOf(claim)),
-        ),
-        DPAReportTransaction(
-            "15", time, TransactionResult.Completed, DPAReport(listOf("Authority", "Authority alternative"), "DE"),
-        ),
     )
 
     @Test
@@ -89,10 +56,7 @@ class TransactionLogCodecTest {
             .map { it.jsonObject["transactionType"]!!.jsonPrimitive.content }
         assertEquals(
             listOf(
-                "Presentation", "CredentialIssuance", "CredentialDeletion", "OtherTransaction",
-                "W2WPresentationRequest", "W2WPresentation", "CredentialReissuance", "PseudonymGeneration",
-                "PseudonymDeletion", "PseudonymPresentation", "CertificateIssuance", "CertificateDeletion",
-                "SigningSealing", "DataDeletionRequest", "DPAReport",
+                "Presentation", "CredentialIssuance", "CredentialDeletion",
             ),
             types,
         )
@@ -114,12 +78,6 @@ class TransactionLogCodecTest {
             )),
             Triple(1, "credentialIssuance", mapOf("interactingPartyName" to expectedNames)),
             Triple(2, "credentialDeletion", mapOf("credentialIssuerName" to JsonPrimitive(name))),
-            Triple(9, "pseudonymousAuthentication", mapOf("interactingPartyName" to expectedNames)),
-            Triple(10, "certificateIssuance", mapOf("interactingPartyName" to expectedNames)),
-            Triple(11, "certificateDeletion", mapOf("certificateIssuerName" to JsonPrimitive(name))),
-            Triple(12, "signingSealing", mapOf("interactingPartyName" to expectedNames)),
-            Triple(13, "dataDeletionRequest", mapOf("interactingPartyName" to expectedNames)),
-            Triple(14, "dpaReport", mapOf("dpaName" to expectedDpaNames, "dpaCountry" to JsonPrimitive("DE"))),
         )
         expectedFields.forEach { (index, detailName, fields) ->
             val detail = entries[index].jsonObject[detailName]!!.jsonObject
@@ -139,11 +97,91 @@ class TransactionLogCodecTest {
             presentation["presentation"]!!.jsonObject["interactingPartyType"]!!.jsonPrimitive.content,
         )
         assertEquals("Completed", presentation["transactionResult"]!!.jsonPrimitive.content)
-        assertTrue(entries[12].jsonObject["signingSealing"] is JsonObject)
-        assertEquals(
-            "ESigESealCreationProvider",
-            entries[12].jsonObject["signingSealing"]!!.jsonObject["interactingPartyType"]!!.jsonPrimitive.content,
+        assertTrue(entries[2].jsonObject["credentialDeletion"] is JsonObject)
+    }
+
+    @Test
+    fun timestampsRoundTripUsingBuiltInIsoForEverySubtype() {
+        for ((value, expected) in listOf(
+            time to "2026-01-02T03:04:05",
+            LocalDateTime(2026, 1, 2, 3, 4) to "2026-01-02T03:04:00",
+            LocalDateTime(2024, 2, 29, 0, 0) to "2024-02-29T00:00:00",
+            LocalDateTime(0, 1, 1, 0, 0) to "0000-01-01T00:00:00",
+            LocalDateTime(9999, 12, 31, 23, 59, 59) to "9999-12-31T23:59:59",
+            LocalDateTime(2026, 1, 2, 3, 4, 5, 123456789) to "2026-01-02T03:04:05.123456789",
+            LocalDateTime(-1, 1, 2, 3, 4, 5) to "-0001-01-02T03:04:05",
+            LocalDateTime(10000, 1, 2, 3, 4, 5) to "+10000-01-02T03:04:05",
+        )) {
+            val log = allTransactions().map { transaction ->
+                when (transaction) {
+                    is PresentationTransaction -> transaction.copy(time = value)
+                    is CredentialIssuanceTransaction -> transaction.copy(time = value)
+                    is CredentialDeletionTransaction -> transaction.copy(time = value)
+                }
+            }
+            val encoded = TransactionLogCodec.encode(log)
+            (Json.parseToJsonElement(encoded) as JsonArray).forEach {
+                assertEquals(expected, it.jsonObject.getValue("time").jsonPrimitive.content)
+            }
+            assertEquals(log, TransactionLogCodec.decode(encoded))
+        }
+    }
+
+    @Test
+    fun rejectsInvalidTimestampStrings() {
+        val encoded = TransactionLogCodec.encode(allTransactions())
+        for (invalid in listOf(
+            "2026-01-02T03:04:05Z",
+            "2026-01-02T03:04:05+01:00",
+            "2026-01-02 03:04:05",
+            "2026-1-2T3:4:5",
+            "2026-02-29T03:04:05",
+            "2026-02-30T03:04:05",
+            "2026-01-02T24:00:00",
+        )) {
+            val error = assertFailsWith<SerializationException>(invalid) {
+                TransactionLogCodec.decode(encoded.replace(time.toString(), invalid))
+            }
+            assertTrue(error.message!!.contains("index 0"), error.message)
+        }
+    }
+
+    @Test
+    fun acceptsBuiltInIsoTimestampVariants() {
+        val encoded = TransactionLogCodec.encode(allTransactions())
+        for (value in listOf(
+            "2026-01-02T03:04",
+            "2026-01-02T03:04:05.000",
+            "2026-01-02T03:04:05.123",
+            "+10000-01-02T03:04:05",
+        )) {
+            val decoded = TransactionLogCodec.decode(encoded.replace(time.toString(), value))
+            decoded.forEach { assertEquals(LocalDateTime.parse(value), it.time) }
+        }
+    }
+
+    @Test
+    fun inMemoryStoreUsesCanonicalTimestampsForPagination() = runTest {
+        val store = InMemoryTransactionLogStore()
+        val transaction = allTransactions().last() as CredentialDeletionTransaction
+        val entries = listOf(
+            transaction.copy(transactionIdentifier = "1", time = LocalDateTime(2026, 1, 2, 3, 4)),
+            transaction.copy(transactionIdentifier = "2", time = LocalDateTime(2026, 1, 2, 3, 4)),
+            transaction.copy(transactionIdentifier = "3", time = LocalDateTime(2026, 1, 2, 3, 4, 1)),
+            transaction.copy(transactionIdentifier = "4", time = LocalDateTime(2026, 1, 2, 3, 4, 1, 1)),
         )
+        entries.forEach { store.store(it) }
+        for (order in TransactionLogSortOrder.entries) {
+            val first = store.read(TransactionLogQuery(limit = 2, sortOrder = order))
+            val cursor = first.nextCursor!!
+            val expectedTime = if (order == TransactionLogSortOrder.Ascending) "2026-01-02T03:04:00" else "2026-01-02T03:04:01"
+            assertEquals(expectedTime, cursor.sortValue)
+            val second = store.read(TransactionLogQuery(sortOrder = order, cursor = cursor))
+            val expected = if (order == TransactionLogSortOrder.Ascending) entries else entries.reversed()
+            assertEquals(expected, first.entries + second.entries)
+            val equivalentCursor = cursor.copy(sortValue = LocalDateTime.parse(cursor.sortValue).toString())
+            assertEquals(second, store.read(TransactionLogQuery(sortOrder = order, cursor = equivalentCursor)))
+        }
     }
 
     @Test

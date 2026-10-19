@@ -12,6 +12,7 @@ import id.walt.wallet2.transactionlog.TransactionLogSortField
 import id.walt.wallet2.transactionlog.TransactionLogSortOrder
 import id.walt.wallet2.transactionlog.TransactionResult
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -35,7 +36,7 @@ class SqlDelightTransactionLogStoreTest {
             assertNull(store.read().nextCursor)
             val declined = PresentationTransaction(
                 transactionIdentifier = "c",
-                time = "2026-10-19T19:00:00",
+                time = LocalDateTime.parse("2026-10-19T19:00:00"),
                 transactionResult = TransactionResult.NotCompleted,
                 presentation = Presentation(
                     listOfClaimsRequested = emptyList(),
@@ -51,7 +52,7 @@ class SqlDelightTransactionLogStoreTest {
                 val cursor = assertNotNull(first.nextCursor)
                 assertEquals(TransactionLogSortField.Time, cursor.sortBy)
                 assertEquals(order, cursor.sortOrder)
-                assertEquals(first.entries.last().time, cursor.sortValue)
+                assertEquals(first.entries.last().time, LocalDateTime.parse(cursor.sortValue))
                 val second = store.read(TransactionLogQuery(limit = 2, sortOrder = order, cursor = assertNotNull(first.nextCursor)))
                 val last = store.read(TransactionLogQuery(limit = 2, sortOrder = order, cursor = assertNotNull(second.nextCursor)))
                 val expected = if (order == TransactionLogSortOrder.Ascending) entries else entries.reversed()
@@ -64,6 +65,35 @@ class SqlDelightTransactionLogStoreTest {
             assertEquals("urn:example:pid", payload.getValue("credentialDeletion").jsonObject
                 .getValue("credentialIdentifier").jsonPrimitive.content)
             assertEquals(entries.reversed(), store.read(TransactionLogQuery(limit = Int.MAX_VALUE)).entries)
+        }
+    }
+
+    @Test
+    fun `fractional seconds round trip and equivalent ISO cursors paginate consistently`() = runTest {
+        withDatabase { queries ->
+            val store = SqlDelightTransactionLogStore(queries)
+            val entries = listOf(
+                deletion("a"),
+                deletion("b"),
+                deletion("c").copy(time = LocalDateTime(2026, 10, 19, 19, 0, 0, 100000000)),
+                deletion("d").copy(time = LocalDateTime(2026, 10, 19, 19, 0, 0, 123456789)),
+            )
+            entries.reversed().forEach { store.store(it) }
+
+            for (order in TransactionLogSortOrder.entries) {
+                val first = store.read(TransactionLogQuery(limit = 2, sortOrder = order))
+                val cursor = assertNotNull(first.nextCursor)
+                val second = store.read(TransactionLogQuery(sortOrder = order, cursor = cursor))
+                val expected = if (order == TransactionLogSortOrder.Ascending) entries else entries.reversed()
+                assertEquals(expected, first.entries + second.entries)
+                val equivalentTime = if (order == TransactionLogSortOrder.Ascending) {
+                    "2026-10-19T19:00"
+                } else {
+                    "2026-10-19T19:00:00.100"
+                }
+                val equivalentCursor = cursor.copy(sortValue = equivalentTime)
+                assertEquals(second, store.read(TransactionLogQuery(sortOrder = order, cursor = equivalentCursor)))
+            }
         }
     }
 
@@ -138,7 +168,7 @@ class SqlDelightTransactionLogStoreTest {
             val original = deletion("same")
             store.store(original)
 
-            assertFailsWith<SQLException> { store.store(original.copy(time = "2026-10-20T19:00:00")) }
+            assertFailsWith<SQLException> { store.store(original.copy(time = LocalDateTime.parse("2026-10-20T19:00:00"))) }
             assertEquals(listOf(original), store.read().entries)
         }
     }
@@ -182,7 +212,7 @@ class SqlDelightTransactionLogStoreTest {
 
     private fun deletion(id: String, day: Int = 19) = CredentialDeletionTransaction(
         transactionIdentifier = id,
-        time = "2026-10-${day}T19:00:00",
+        time = LocalDateTime(2026, 10, day, 19, 0, 0),
         transactionResult = TransactionResult.Completed,
         credentialDeletion = CredentialDeletion("urn:example:pid"),
     )

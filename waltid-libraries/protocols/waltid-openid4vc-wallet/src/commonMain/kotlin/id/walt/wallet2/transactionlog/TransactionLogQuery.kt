@@ -1,5 +1,7 @@
 package id.walt.wallet2.transactionlog
 
+import kotlinx.datetime.LocalDateTime
+
 /** Supported sort fields. Stores must handle each field explicitly, including cursor comparisons. */
 enum class TransactionLogSortField {
     Time,
@@ -24,7 +26,7 @@ data class TransactionLogCursor(
 ) {
     init {
         when (sortBy) {
-            TransactionLogSortField.Time -> requireValidTransactionTime(sortValue)
+            TransactionLogSortField.Time -> LocalDateTime.parse(sortValue)
         }
         require(transactionIdentifier.isNotBlank()) { "Cursor transaction identifier must not be blank" }
     }

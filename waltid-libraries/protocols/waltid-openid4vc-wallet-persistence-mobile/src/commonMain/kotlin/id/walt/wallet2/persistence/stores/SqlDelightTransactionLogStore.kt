@@ -8,6 +8,7 @@ import id.walt.wallet2.transactionlog.TransactionLogPage
 import id.walt.wallet2.transactionlog.TransactionLogQuery
 import id.walt.wallet2.transactionlog.TransactionLogSortField
 import id.walt.wallet2.transactionlog.TransactionLogSortOrder
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.json.Json
 
 /** SQLCipher-backed transaction history, with sorting and pagination performed in SQL. */
@@ -16,7 +17,7 @@ public class SqlDelightTransactionLogStore(private val queries: WalletPersistenc
     override suspend fun store(entry: Transaction) {
         queries.insertTransactionLogEntry(
             transaction_identifier = entry.transactionIdentifier,
-            time = entry.time,
+            time = LocalDateTime.Formats.ISO.format(entry.time),
             payload = Json.encodeToString(Transaction.serializer(), entry),
         )
     }
@@ -24,13 +25,14 @@ public class SqlDelightTransactionLogStore(private val queries: WalletPersistenc
     /** Reads a bounded page; malformed persisted envelopes fail rather than silently losing history. */
     override suspend fun read(query: TransactionLogQuery): TransactionLogPage {
         val cursor = query.cursor
+        val cursorTime = cursor?.let { LocalDateTime.Formats.ISO.format(LocalDateTime.parse(it.sortValue)) }
         val fetchLimit = query.limit.toLong() + 1
         val payloads = when (query.sortBy) {
             TransactionLogSortField.Time -> when (query.sortOrder) {
                 TransactionLogSortOrder.Ascending ->
-                    queries.selectTransactionLogOldestFirst(cursor?.sortValue, cursor?.transactionIdentifier, fetchLimit)
+                    queries.selectTransactionLogOldestFirst(cursorTime, cursor?.transactionIdentifier, fetchLimit)
                 TransactionLogSortOrder.Descending ->
-                    queries.selectTransactionLogNewestFirst(cursor?.sortValue, cursor?.transactionIdentifier, fetchLimit)
+                    queries.selectTransactionLogNewestFirst(cursorTime, cursor?.transactionIdentifier, fetchLimit)
             }
         }.executeAsList()
         val entries = payloads.take(query.limit).map { Json.decodeFromString(Transaction.serializer(), it) }
@@ -39,7 +41,7 @@ public class SqlDelightTransactionLogStore(private val queries: WalletPersistenc
             nextCursor = if (payloads.size > query.limit) entries.last().let {
                 TransactionLogCursor(
                     sortValue = when (query.sortBy) {
-                        TransactionLogSortField.Time -> it.time
+                        TransactionLogSortField.Time -> LocalDateTime.Formats.ISO.format(it.time)
                     },
                     transactionIdentifier = it.transactionIdentifier,
                     sortBy = query.sortBy,

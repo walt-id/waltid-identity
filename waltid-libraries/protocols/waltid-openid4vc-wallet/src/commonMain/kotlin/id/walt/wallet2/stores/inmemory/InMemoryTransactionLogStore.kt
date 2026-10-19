@@ -9,6 +9,7 @@ import id.walt.wallet2.transactionlog.TransactionLogSortField
 import id.walt.wallet2.transactionlog.TransactionLogSortOrder
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.datetime.LocalDateTime
 
 /** Process-local transaction history for development and testing; not durable storage. */
 class InMemoryTransactionLogStore : WalletTransactionLogStore {
@@ -28,8 +29,10 @@ class InMemoryTransactionLogStore : WalletTransactionLogStore {
             TransactionLogSortOrder.Ascending -> ascending
             TransactionLogSortOrder.Descending -> ascending.reversed()
         }
+        val cursor = query.cursor?.let {
+            it.copy(sortValue = LocalDateTime.Formats.ISO.format(LocalDateTime.parse(it.sortValue)))
+        }
         val remaining = entries.values.filter { entry ->
-            val cursor = query.cursor
             if (cursor == null) true else {
                 val comparison = entry.sortValue(query.sortBy).compareTo(cursor.sortValue).takeIf { it != 0 }
                     ?: entry.transactionIdentifier.compareTo(cursor.transactionIdentifier)
@@ -62,6 +65,6 @@ class InMemoryTransactionLogStore : WalletTransactionLogStore {
     }
 
     private fun Transaction.sortValue(field: TransactionLogSortField): String = when (field) {
-        TransactionLogSortField.Time -> time
+        TransactionLogSortField.Time -> LocalDateTime.Formats.ISO.format(time)
     }
 }

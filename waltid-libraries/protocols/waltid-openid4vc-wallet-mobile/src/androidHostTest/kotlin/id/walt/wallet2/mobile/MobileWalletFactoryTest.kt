@@ -72,6 +72,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -98,7 +99,7 @@ class MobileWalletFactoryTest {
                 val store = SqlDelightTransactionLogStore(database.queries)
                 store.store(CredentialDeletionTransaction(
                     transactionIdentifier = "deleted-credential",
-                    time = "2026-10-19T19:00:00",
+                    time = LocalDateTime.parse("2026-10-19T19:00:00"),
                     transactionResult = TransactionResult.Completed,
                     credentialDeletion = CredentialDeletion("urn:example:pid"),
                 ))
