@@ -8,6 +8,7 @@ import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.keys.*
 import id.walt.itb.*
+import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.data.Wallet
@@ -32,6 +33,7 @@ import java.net.SocketTimeoutException
 import java.util.UUID
 
 /** Manual live ITB fixture; never opted in by ordinary device CI. All disposable keys are deleted. */
+@PhysicalDeviceTest
 class ItbNativeWalletDeviceTest {
     @Test
     fun runOwnedItbSessions() = runBlocking {
