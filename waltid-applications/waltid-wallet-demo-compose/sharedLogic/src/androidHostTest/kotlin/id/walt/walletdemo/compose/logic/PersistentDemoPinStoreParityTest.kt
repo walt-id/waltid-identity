@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
@@ -57,12 +58,13 @@ class PersistentDemoPinStoreParityTest {
 
     @Test
     fun setPinFailsWhenSaltGenerationReturnsWrongSize() = runTest {
+        var stored: String? = null
         var biometricPending = false
         val store = PersistentDemoPinStore(
             readBiometricSetupPending = { biometricPending },
             writeBiometricSetupPending = { biometricPending = it },
             readRecord = { null },
-            writeRecord = { error("PIN record should not be persisted") },
+            writeRecord = { stored = it },
             clearRecord = {},
             readBiometricUnlock = { false },
             writeBiometricUnlock = {},
@@ -70,6 +72,7 @@ class PersistentDemoPinStoreParityTest {
         )
 
         assertFails { store.setPin(PARITY_PIN) }
+        assertNull(stored)
     }
 
     private companion object {
