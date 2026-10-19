@@ -107,6 +107,7 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 | `WalletKeyStore` | `SqlDelightKeyStore` | Versioned managed or software key descriptors |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
+| `WalletTransactionLogStore` | `SqlDelightTransactionLogStore` | TS10 transaction history |
 
 ## Database Schema
 
@@ -115,6 +116,7 @@ The mobile schema includes the following tables:
 - `key_references` - Versioned managed or software key descriptors
 - `credentials` - Stored credentials
 - `dids` - Stored DIDs
+- `transaction_log` - Transaction identifier, UTC timestamp, and serialized TS10 envelope
 
 This is a fresh mobile schema; it does not migrate or retain legacy key references. Schema creation is managed by SQLDelight on the target platform driver.
 

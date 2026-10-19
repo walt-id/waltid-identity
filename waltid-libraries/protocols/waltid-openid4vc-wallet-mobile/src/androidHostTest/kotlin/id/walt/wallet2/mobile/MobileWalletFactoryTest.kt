@@ -56,6 +56,12 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightTransactionLogStore
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.transactionlog.CredentialDeletion
+import id.walt.wallet2.transactionlog.CredentialDeletionTransaction
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +88,30 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MobileWalletFactoryTest {
+    @Test
+    fun `wallet deletion clears transaction log even with custom stores`() = runTest {
+        for (persistence in listOf(
+            MobileWalletPersistence(),
+            MobileWalletPersistence(credentialStore = InMemoryCredentialStore(), didStore = InMemoryDidStore()),
+        )) {
+            database().use { database ->
+                val store = SqlDelightTransactionLogStore(database.queries)
+                store.store(CredentialDeletionTransaction(
+                    transactionIdentifier = "deleted-credential",
+                    time = "2026-10-19T19:00:00",
+                    transactionResult = TransactionResult.Completed,
+                    credentialDeletion = CredentialDeletion("urn:example:pid"),
+                ))
+                val wallet = wallet(MobileWalletConfig(persistence = persistence), database, FakePlatformManagedKeyProvider())
+
+                wallet.deleteWallet()
+                wallet.deleteWallet()
+
+                assertTrue(store.read().entries.isEmpty())
+            }
+        }
+    }
+
     @Test
     fun `cold factory reopens saved identity and authenticates DID requests without creating keys`() = runTest {
         val verifier = JWKKey.generate(KeyType.secp256r1)

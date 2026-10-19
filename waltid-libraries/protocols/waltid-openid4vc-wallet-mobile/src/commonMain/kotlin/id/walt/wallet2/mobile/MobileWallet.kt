@@ -61,6 +61,8 @@ import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
+import id.walt.wallet2.data.WalletTransactionLogStore
+import id.walt.wallet2.stores.inmemory.InMemoryTransactionLogStore
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -204,6 +206,7 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
+    private val transactionLogStore: WalletTransactionLogStore = InMemoryTransactionLogStore(),
     private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
@@ -1076,6 +1079,7 @@ public class MobileWallet internal constructor(
             keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
             credentialStore.listCredentials().toList().forEach { credential -> credentialStore.removeCredential(credential.id) }
             didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
+            transactionLogStore.clear()
             // Registry failures cannot prevent removal of the already cleared local database.
             syncDigitalCredentialRegistration()
             localStoresCleared = true
