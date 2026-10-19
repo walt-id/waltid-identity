@@ -12,6 +12,8 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import id.walt.mobile.test.DigitalCredentialProviderTest
+import id.walt.mobile.test.EnterpriseMobileTest
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
@@ -66,11 +68,13 @@ import org.junit.runner.RunWith
  * branch for that case; the Create controller does not, up to and including 1.7.0-alpha03.
  */
 @RunWith(AndroidJUnit4::class)
+@DigitalCredentialProviderTest
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialIssuanceE2ETest {
 
     /** Requires the coordinated fixture's unattended test IdP; public-demo runs skip this case. */
     @Test
+    @EnterpriseMobileTest
     fun authorizationCodeRetainsCopiesThroughBrowserReturn() = runBlocking {
         val fixtureUrl = InstrumentationRegistry.getArguments()
             .getString("enterprise_fixture_base_url")?.takeIf { it.isNotBlank() }

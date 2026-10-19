@@ -29,12 +29,8 @@ case "$phase" in
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**\nwaltid-identity/build/reports/wallet-recovery/**'
     ;;
   compose-demo)
-    # The default image has no Google Play services. Keep GMS-only classes out of
-    # instrumentation discovery; their class-level assumption would otherwise
-    # collapse the reported test count and make Gradle fail the phase. Batch UI
-    # acceptance runs with its required fixture in the enterprise-mobile phase.
-    compose_demo_excluded_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest,id.walt.walletdemo.compose.android.BatchIssuanceE2ETest"
-    script="ANDROID_TEST_NOT_CLASS=$compose_demo_excluded_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
+    # Provider and Enterprise journeys run in lanes supplying their required environment.
+    script="ANDROID_TEST_NOT_ANNOTATION=id.walt.mobile.test.DigitalCredentialProviderTest,id.walt.mobile.test.EnterpriseMobileTest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**'
@@ -43,8 +39,7 @@ case "$phase" in
   dc-api-compose)
     # Dedicated Google APIs lane for the GMS-gated Digital Credentials E2Es.
     # The authorization journey runs with the coordinated Enterprise fixture.
-    dc_api_fixture_test="id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest#authorizationCodeRetainsCopiesThroughBrowserReturn"
-    script="ANDROID_TEST_NOT_CLASS=$dc_api_fixture_test ./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
+    script="./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
     # The cached artifact is the configured userdata disk, not a Quick Boot state. Always cold-boot
     # it so the first process/ADB/GMS state is recreated for every job and never restored from a
     # potentially poisoned host snapshot.

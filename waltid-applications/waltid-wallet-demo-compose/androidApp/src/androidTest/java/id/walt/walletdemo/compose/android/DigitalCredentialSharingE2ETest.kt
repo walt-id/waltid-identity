@@ -2,6 +2,8 @@
 
 package id.walt.walletdemo.compose.android
 
+import id.walt.mobile.test.DigitalCredentialProviderTest
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
@@ -74,6 +76,7 @@ import org.junit.runner.RunWith
 
 /** Unattended Credential Manager coverage using the ordinary demo fixture. */
 @RunWith(AndroidJUnit4::class)
+@DigitalCredentialProviderTest
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
     override val wallet: MobileWallet get() = provisionedWallet
