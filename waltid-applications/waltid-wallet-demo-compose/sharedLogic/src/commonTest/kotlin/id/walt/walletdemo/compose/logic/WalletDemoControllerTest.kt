@@ -34,6 +34,66 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun skipPinStartsUnlockedAndBootstraps() = runTest {
+        val wallet = FakeDemoWallet().apply { reportedSigningProtection = WalletDemoSigningProtection.None }
+        val controller = WalletDemoController(
+            wallet = wallet,
+            pinStore = InMemoryDemoPinStore(),
+            skipPin = true,
+            scope = backgroundScope,
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        runCurrent()
+
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertFalse(controller.state.value.pinLockEnabled)
+        assertEquals(1, wallet.bootstrapCalls)
+        assertIs<WalletSessionState.Ready>(controller.state.value.session)
+    }
+
+    @Test
+    fun authorizationCallbackWaitsForBootstrapThenContinues() = runTest {
+        val bootstrapGate = CompletableDeferred<Unit>()
+        val delegate = FakeDemoWallet(authorizationOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1")))
+            .apply { reportedSigningProtection = WalletDemoSigningProtection.None }
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
+                bootstrapGate.await()
+                return delegate.bootstrap(signingProtection)
+            }
+
+            override fun pendingAuthorizationIssuance() = WalletDemoIssuanceSession(
+                id = "pending-auth",
+                grant = WalletDemoIssuanceGrant.AuthorizationCode,
+                preview = offerPreview().copy(offeredCredentials = emptyList(), requiresIssuerAuthentication = true),
+            )
+
+            override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String): WalletDemoIssuanceOutcome =
+                delegate.continueAuthorizationIssuance(sessionId, callbackUri).also {
+                    delegate.credentials = listOf(sampleCredential.copy(id = "cred-1"))
+                }
+        }
+        val controller = WalletDemoController(
+            wallet = wallet,
+            pinStore = InMemoryDemoPinStore(),
+            skipPin = true,
+            scope = backgroundScope,
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val callback = "http://localhost:8080/?code=auth-code"
+        controller.handleDeepLink(callback)
+        runCurrent()
+
+        assertIs<WalletSessionState.Bootstrapping>(controller.state.value.session)
+        assertTrue(delegate.authorizationCallbackUris.isEmpty())
+        bootstrapGate.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf(callback), delegate.authorizationCallbackUris)
+        assertEquals(listOf("cred-1"), assertIs<WalletSessionState.Ready>(controller.state.value.session).credentials.map { it.id })
+    }
+
+    @Test
     fun localCardsAreReadyWhileRegistrationWaitsAndForegroundRefreshesCoalesce() = runTest {
         var calls = 0
         var completed = false
