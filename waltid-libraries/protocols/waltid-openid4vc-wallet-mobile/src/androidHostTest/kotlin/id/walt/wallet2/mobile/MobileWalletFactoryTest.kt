@@ -20,8 +20,6 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
@@ -391,18 +389,6 @@ class MobileWalletFactoryTest {
         return TestDatabase(driver, WalletPersistenceDatabase(driver))
     }
 
-    private data class BootstrapCase(
-        val keyType: MobileWalletKeyType,
-        val didMethod: String,
-        val signatureAlgorithm: SignatureAlgorithm,
-    )
-
-    private data class PolicyCase(
-        val configured: KeyUseAuthorizationPolicy,
-        val requested: KeyUseAuthorizationPolicy?,
-        val expected: KeyUseAuthorizationPolicy,
-    )
-
     private class TestDatabase(
         val driver: JdbcSqliteDriver,
         val database: WalletPersistenceDatabase,
@@ -420,11 +406,8 @@ class MobileWalletFactoryTest {
         var deleteCount = 0
         var generateFailure: Throwable? = null
         var preflightResult: KeyUseAuthorizationSupport? = null
-        val preflightPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
-        val generatedPolicies = mutableListOf<KeyUseAuthorizationPolicy>()
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
-            preflightPolicies += requirements.authorizationPolicy
             return preflightResult ?: if (requirements.protection == WalletKeyProtection.HardwareRequired)
                 KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
             else requirements.authorizationPolicy.toSupportedPreflight()
@@ -433,7 +416,6 @@ class MobileWalletFactoryTest {
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
             generateCount++
             generateFailure?.let { throw it }
-            generatedPolicies += request.requirements.authorizationPolicy
             val software = softwareProvider.generate(
                 GenerateSoftwareKeyRequest(request.id, request.requirements.spec, request.requirements.usages)
             )
