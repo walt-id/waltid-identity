@@ -107,59 +107,27 @@ final class WalletAPITests: XCTestCase {
         )
     }
 
-    func testPublicPersistenceConfigurationUsesEncryptedDefault() {
-        let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
-
-        acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
-    }
-
-    func testPublicPersistenceConfigurationAcceptsProvidedDatabaseKeyProvider() {
+    func testPersistenceConfigurationPreservesOverrides() {
         let provider = FakeDatabaseKeyProvider()
-        let configuration = WalletConfiguration(
-            persistence: WalletPersistence(databaseKey: .provided(provider))
-        )
-
-        acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
-    }
-
-    func testPublicPersistenceConfigurationAcceptsCustomCredentialStore() {
-        let store = FakeCredentialStore()
-        let configuration = WalletConfiguration(
-            persistence: WalletPersistence(credentialStore: store)
-        )
-
-        acceptsSendable(configuration.persistence)
-        XCTAssertNotNil(configuration.persistence.credentialStore)
-    }
-
-    func testPublicPersistenceConfigurationCombinesProvidedDatabaseKeyAndCustomCredentialStore() {
-        let provider = FakeDatabaseKeyProvider()
-        let store = FakeCredentialStore()
-        let configuration = WalletConfiguration(
-            persistence: WalletPersistence(
-                databaseKey: .provided(provider),
-                credentialStore: store
-            )
-        )
-
-        acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
-        XCTAssertNotNil(configuration.persistence.credentialStore)
-    }
-
-    func testPublicPersistenceExposesCredentialAndDidOverrides() {
         let credentialStore = FakeCredentialStore()
         let didStore = FakeDidStore()
-        let persistence = WalletPersistence(
-            credentialStore: credentialStore,
-            didStore: didStore
-        )
+        let cases: [(String, WalletPersistence, Bool, FakeCredentialStore?, FakeDidStore?)] = [
+            ("managed key", .init(databaseKey: .managed), false, nil, nil),
+            ("provided key", .init(databaseKey: .provided(provider)), true, nil, nil),
+            ("credential store", .init(credentialStore: credentialStore), false, credentialStore, nil),
+            ("provided key and credential store", .init(databaseKey: .provided(provider),
+                credentialStore: credentialStore), true, credentialStore, nil),
+            ("credential and DID stores", .init(credentialStore: credentialStore,
+                didStore: didStore), false, credentialStore, didStore),
+        ]
 
-        acceptsSendable(persistence)
-        XCTAssertNotNil(persistence.credentialStore)
-        XCTAssertNotNil(persistence.didStore)
+        for (name, persistence, isProvided, expectedCredentials, expectedDids) in cases {
+            let configuration = WalletConfiguration(persistence: persistence)
+            acceptsSendable(configuration.persistence)
+            XCTAssertEqual(configuration.persistence.databaseKey.isProvided, isProvided, name)
+            XCTAssertTrue((configuration.persistence.credentialStore as AnyObject?) === expectedCredentials, name)
+            XCTAssertTrue((configuration.persistence.didStore as AnyObject?) === expectedDids, name)
+        }
     }
 
     func testWalletDatabaseKeyDescriptionRedactsMaterial() {
