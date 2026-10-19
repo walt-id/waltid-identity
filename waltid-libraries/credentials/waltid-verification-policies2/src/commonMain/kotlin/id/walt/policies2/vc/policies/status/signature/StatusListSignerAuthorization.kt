@@ -17,8 +17,10 @@ import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyEncodingFormat
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
-import kotlinx.io.bytestring.toHexString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -277,14 +279,26 @@ private fun coseHashMatches(algorithm: Int?, hash: ByteArray, sha1: ByteArray, s
         else -> false
     }
 
-private fun samePublicKey(signer: ResolvedJwtVerificationKey, leaf: X509Certificate): Boolean {
-    val credentialKeyId = leaf.data.subjectPublicKeyInfo.keyId.toHexString()
-    if (signer.key.id.value.equals(credentialKeyId, ignoreCase = true)) return true
-    val statusLeaf = signer.certificateChain.firstOrNull()
-        ?.let(::decodeCertificateDer)
-        ?.let(::parseCertificate)
-        ?: return false
-    return statusLeaf.data.subjectPublicKeyInfo.encodedDer == leaf.data.subjectPublicKeyInfo.encodedDer
+/**
+ * Compares the key that verified the status-list signature with the credential key. `Key.id` is
+ * not evidence of key identity: resolvers take it from signer-controlled metadata such as a JWK `kid`.
+ */
+private suspend fun samePublicKey(signer: ResolvedJwtVerificationKey, leaf: X509Certificate): Boolean {
+    val signerSpki = spkiDer { signer.key } ?: return false
+    val credentialSpki = spkiDer { leaf.restoreSubjectPublicKey(X509CertificateUtil.services.cryptoRuntime) } ?: return false
+    return signerSpki.contentEquals(credentialSpki)
+}
+
+/** Both sides go through crypto2 export, so certificate encoding differences cannot cause a false mismatch. */
+private suspend fun spkiDer(key: suspend () -> Key): ByteArray? = try {
+    key().capabilities.publicKeyExporter
+        ?.exportPublicKey(KeyEncodingFormat.SPKI_DER)
+        ?.data
+        ?.toByteArray()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    null
 }
 
 private suspend fun signedBy(certificate: X509Certificate, issuer: X509Certificate): Boolean = runCatching {

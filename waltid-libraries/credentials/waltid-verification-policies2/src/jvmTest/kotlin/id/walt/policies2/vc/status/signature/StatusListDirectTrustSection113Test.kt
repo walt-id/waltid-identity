@@ -6,10 +6,12 @@ import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.ex
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.keyresolver.JwtKeyResolutionSource
 import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
+import id.walt.credentials.keyresolver.resolvers.WellKnownKeyResolver
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -17,6 +19,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.policies2.vc.policies.status.signature.StatusListEmbeddedKeyReference
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
 import id.walt.cose.Cose
@@ -30,17 +33,24 @@ import id.walt.policies2.vc.policies.status.signature.KeyResolutionFailedExcepti
 import id.walt.policies2.vc.policies.status.signature.SignatureInvalidException
 import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
+import io.mockk.coEvery
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.toHexString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StatusListDirectTrustSection113Test {
@@ -338,6 +348,68 @@ class StatusListDirectTrustSection113Test {
         assertTrue(error is SignatureInvalidException)
     }
 
+    @Test
+    fun `well-known JWK with the credential key ID but another key is not directly trusted`() = runTest {
+        val material = issuedMaterial()
+        val credentialKeyId = material.credentialLeaf.data.subjectPublicKeyInfo.keyId.toHexString()
+        val signer = verifiedWellKnownSigner(material, signingKey = material.statusKey, kid = credentialKeyId)
+        assertEquals(credentialKeyId, signer.signer.key.id.value)
+
+        val error = assertThrows<IllegalArgumentException> {
+            authorizeStatusListSigner(signer, authorizer = null)
+        }
+        assertContains(error.message!!, "not authorized")
+    }
+
+    @Test
+    fun `well-known JWK carrying the credential key is directly trusted`() = runTest {
+        val material = issuedMaterial()
+        authorizeStatusListSigner(
+            verifiedWellKnownSigner(material, signingKey = material.issuerKey, kid = "rotated-kid"),
+            authorizer = null,
+        )
+    }
+
+    /** Runs the real resolver and JWS verification; only the HTTPS metadata fetch is replaced. */
+    private suspend fun verifiedWellKnownSigner(
+        material: Material,
+        signingKey: Key,
+        kid: String,
+    ): StatusListSignerAuthorizationRequest {
+        val exported = signingKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        val jwk = JsonObject(
+            Json.parseToJsonElement(exported.data.toByteArray().decodeToString()).jsonObject + ("kid" to JsonPrimitive(kid)),
+        )
+        val jwt = CompactJws.sign(
+            payload = Json.encodeToString(buildJsonObject {
+                put("iss", STATUS_ISSUER)
+                put("status_list", buildJsonObject { put("bits", 1) })
+            }).encodeToByteArray(),
+            key = signingKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "statuslist+jwt")
+                put("x5t#S256", base64Url(sha256(material.credentialLeaf.encodedDer.toByteArray())))
+            },
+        )
+        val credential = credential(material.credentialLeaf)
+        mockkObject(WellKnownKeyResolver)
+        try {
+            coEvery { WellKnownKeyResolver.resolveJwkFromWellKnown(STATUS_ISSUER, any()) } returns
+                EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false)
+            val verified = StatusListSignatureVerifier().verifyJwtWithSigner(jwt, credential).getOrThrow()
+            assertEquals(JwtKeyResolutionSource.WELL_KNOWN, verified.signer.source)
+            return StatusListSignerAuthorizationRequest(
+                referencedCredential = credential,
+                statusListUri = "https://status.example/list/1",
+                signer = verified.signer,
+                embeddedKeyReference = verified.embeddedKeyReference,
+            )
+        } finally {
+            unmockkObject(WellKnownKeyResolver)
+        }
+    }
+
     private fun credential(leaf: X509Certificate, kid: String? = null) = W3C11(
         credentialData = buildJsonObject {},
         signature = JwtCredentialSignature(
@@ -464,5 +536,6 @@ class StatusListDirectTrustSection113Test {
 
     companion object {
         private const val OAUTH_STATUS_SIGNING_EKU = "1.3.6.1.5.5.7.3.45"
+        private const val STATUS_ISSUER = "https://status-issuer.example"
     }
 }
