@@ -25,14 +25,15 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
+import kotlin.jvm.JvmOverloads
 
-data class VerifiedStatusList<T>(
+data class VerifiedStatusList<T> @JvmOverloads constructor(
     val payload: T,
     val signer: ResolvedJwtVerificationKey,
     val embeddedKeyReference: StatusListEmbeddedKeyReference? = null,
 )
 
-data class StatusListSignerAuthorizationRequest(
+data class StatusListSignerAuthorizationRequest @JvmOverloads constructor(
     val referencedCredential: DigitalCredential,
     val statusListUri: String,
     val signer: ResolvedJwtVerificationKey,
@@ -75,6 +76,7 @@ class StatusListSignatureVerifier(
     suspend fun verifyJwt(jwt: String): Result<JsonObject> =
         verifyJwtWithSigner(jwt).map(VerifiedStatusList<JsonObject>::payload)
 
+    @JvmOverloads
     suspend fun verifyJwtWithSigner(
         jwt: String,
         referencedCredential: DigitalCredential? = null,
@@ -122,6 +124,7 @@ class StatusListSignatureVerifier(
     suspend fun verifyCwt(cwtBytes: ByteArray): Result<ByteArray> =
         verifyCwtWithSigner(cwtBytes).map(VerifiedStatusList<ByteArray>::payload)
 
+    @JvmOverloads
     suspend fun verifyCwtWithSigner(
         cwtBytes: ByteArray,
         referencedCredential: DigitalCredential? = null,
