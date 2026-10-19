@@ -1,12 +1,13 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,26 +27,34 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
+import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
+import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
+import id.walt.walletdemo.compose.ui.components.WalletMotion
+import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
+import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,9 +71,9 @@ internal fun CredentialsTab(
         value = withContext(Dispatchers.Default) { credentials.map { it.toCardDisplayData() } }
     }
     var expandedId by remember { mutableStateOf<String?>(null) }
-    var showDetailsBody by remember { mutableStateOf(false) }
-    var closing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var technicalOpen by remember { mutableStateOf(false) }
+    val savedPages = rememberSaveableStateHolder()
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val selectedCredential = credentials.firstOrNull { it.id == expandedId }
@@ -75,43 +85,21 @@ internal fun CredentialsTab(
     }
     val rawCredential = selectedCredential?.credentialDataJson?.takeIf { it.isNotBlank() }
         ?: "No raw credential available"
-    val showingDetails = selectedCredential != null || closing
+    val showingDetails = selectedCredential != null
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    fun requestClose() {
-        if (expandedId == null || closing) return
-        closing = true
-        showDetailsBody = false
-    }
+    fun requestClose() { technicalOpen = false; expandedId = null }
+    fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
 
-    fun toggleCard(id: String) {
-        if (closing) return
-        if (expandedId == id) {
-            requestClose()
-        } else {
-            expandedId = id
-            showDetailsBody = false
-        }
-    }
-
-    LaunchedEffect(expandedId) {
-        if (expandedId != null && !closing) {
-            delay(DetailsRevealDelayMillis)
-            if (expandedId != null && !closing) showDetailsBody = true
-        }
-    }
-
-    LaunchedEffect(closing) {
-        if (!closing) return@LaunchedEffect
-        delay(220)
-        expandedId = null
-        closing = false
-    }
-
-    LaunchedEffect(showingDetails, rawCredential, onDeleteCredential, clipboard) {
+    LaunchedEffect(expandedId) { technicalOpen = false }
+    LaunchedEffect(showingDetails, technicalOpen, rawCredential, onDeleteCredential, clipboard) {
         onDetailsChromeChange(
             if (showingDetails) {
                 CredentialDetailsChrome(
                     onClose = ::requestClose,
+                    title = "Technical details".takeIf { technicalOpen },
+                    onBack = ({ technicalOpen = false }).takeIf { technicalOpen },
                     onCopy = {
                         scope.launch(start = CoroutineStart.UNDISPATCHED) {
                             clipboard.setClipEntry(plainTextClipEntry(rawCredential))
@@ -133,7 +121,7 @@ internal fun CredentialsTab(
     }
 
     SystemBackHandler(enabled = showingDetails) {
-        requestClose()
+        if (technicalOpen) technicalOpen = false else requestClose()
     }
 
     Box(
@@ -144,40 +132,49 @@ internal fun CredentialsTab(
                 else Modifier,
             ),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(top = 8.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (session is WalletSessionState.NotBootstrapped || session is WalletSessionState.Bootstrapping) {
-                CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
-            } else if (session is WalletSessionState.Failed) {
-                Text(session.message)
-            } else if (credentials.isEmpty()) {
-                EmptyCredentialsState()
-            } else if (cards.isEmpty()) {
-                CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
-            } else {
-                CredentialCardStack(
-                    cards = cards,
-                    expandedId = expandedId,
-                    onOpenDetails = ::toggleCard,
-                )
-                if (showDetailsBody && selectedCredential != null && expanded == null) {
-                    CircularProgressIndicator()
-                }
-                AnimatedVisibility(
-                    visible = showDetailsBody && expanded != null,
-                    enter = fadeIn(tween(160)),
-                    exit = fadeOut(tween(180)),
+        AnimatedContent(technicalOpen, transitionSpec = { walletNavigationMotion(targetState, reduceMotion, rtl) },
+            label = "stored-credential-page") { technical ->
+            savedPages.SaveableStateProvider("${expandedId ?: "collection"}:$technical") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .walletNavigationBackground()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 8.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    expanded?.let { selected ->
-                        CredentialDetailsContent(
-                            details = selected,
+                    if (technical && expanded != null) {
+                        CredentialTechnicalInformation(expanded!!)
+                    } else if (session is WalletSessionState.NotBootstrapped || session is WalletSessionState.Bootstrapping) {
+                        CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
+                    } else if (session is WalletSessionState.Failed) {
+                        Text(session.message)
+                    } else if (credentials.isEmpty()) {
+                        EmptyCredentialsState()
+                    } else if (cards.isEmpty()) {
+                        CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
+                    } else {
+                        CredentialCardStack(
+                            cards = cards,
+                            expandedId = expandedId.takeIf { showingDetails },
+                            onOpenDetails = ::toggleCard,
                         )
+                        if (selectedCredential != null && expanded == null) {
+                            CircularProgressIndicator()
+                        }
+                        AnimatedContent(
+                            targetState = expanded.takeIf { showingDetails },
+                            transitionSpec = { fadeIn(WalletMotion.feedback(reduceMotion)) togetherWith fadeOut(WalletMotion.feedback(reduceMotion)) },
+                            label = "stored-credential-information",
+                        ) { details ->
+                            details?.let { selected ->
+                                CredentialDetailsContent(
+                                    details = selected,
+                                    onTechnicalDetails = { technicalOpen = true },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -196,12 +193,11 @@ internal fun CredentialsTab(
                         confirmDelete = false
                         if (id != null) {
                             expandedId = null
-                            closing = false
-                            showDetailsBody = false
                             onDeleteCredential?.invoke(id)
                         }
                     },
                     modifier = Modifier.testTag(WalletUiTestTags.DeleteCredentialConfirm),
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
                     Text("Delete")
                 }
@@ -215,23 +211,18 @@ internal fun CredentialsTab(
     }
 }
 
-private const val DetailsRevealDelayMillis = 220L
-
 @Composable
 private fun EmptyCredentialsState() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.CredentialsEmpty)
-            .padding(vertical = 56.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).aspectRatio(Id1AspectRatio).testTag(WalletUiTestTags.CredentialsEmpty),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Text("No credentials yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
-        Text(
-            "Receive a credential to see it here.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)) {
+            Text("No credentials yet", style = MaterialTheme.typography.titleMedium)
+            Text("Scan a credential offer to add your first credential.", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        }
     }
 }

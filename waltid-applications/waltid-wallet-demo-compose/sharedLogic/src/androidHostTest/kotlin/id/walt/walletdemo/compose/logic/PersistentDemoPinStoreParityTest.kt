@@ -12,7 +12,10 @@ class PersistentDemoPinStoreParityTest {
     @Test
     fun derivesAndVerifiesIndependentPbkdf2Vector() = runTest {
         var stored: String? = null
+        var biometricPending = false
         val store = PersistentDemoPinStore(
+            readBiometricSetupPending = { biometricPending },
+            writeBiometricSetupPending = { biometricPending = it },
             readRecord = { stored },
             writeRecord = { stored = it },
             clearRecord = { stored = null },
@@ -31,7 +34,10 @@ class PersistentDemoPinStoreParityTest {
     @Test
     fun rejectsTruncatedAndWrongVersionRecords() = runTest {
         var stored: String? = PARITY_RECORD
+        var biometricPending = false
         val store = PersistentDemoPinStore(
+            readBiometricSetupPending = { biometricPending },
+            writeBiometricSetupPending = { biometricPending = it },
             readRecord = { stored },
             writeRecord = { stored = it },
             clearRecord = { stored = null },
@@ -51,7 +57,10 @@ class PersistentDemoPinStoreParityTest {
 
     @Test
     fun setPinFailsWhenSaltGenerationReturnsWrongSize() = runTest {
+        var biometricPending = false
         val store = PersistentDemoPinStore(
+            readBiometricSetupPending = { biometricPending },
+            writeBiometricSetupPending = { biometricPending = it },
             readRecord = { null },
             writeRecord = { error("PIN record should not be persisted") },
             clearRecord = {},

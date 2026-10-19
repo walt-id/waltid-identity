@@ -10,7 +10,7 @@ internal enum class WalletDeepLinkScheme(val scheme: String) {
         fun parse(rawUrl: String): WalletDeepLinkScheme? {
             val scheme = rawUrl.substringBefore(':', missingDelimiterValue = "").takeIf { it.isNotBlank() }
                 ?: return null
-            entries.firstOrNull { it.scheme == scheme }?.let { return it }
+            entries.firstOrNull { it.scheme.equals(scheme, ignoreCase = true) }?.let { return it }
             val isHttp = scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)
             return if (isHttp && hasAuthorizationResponseParameter(rawUrl)) AuthorizationCallback else null
         }
@@ -58,7 +58,7 @@ internal object WalletDisplayText {
     const val InvalidOfferUrl = "invalid offer URL"
     const val InvalidRequestUrl = "invalid request URL"
     const val SelectCredentialForEveryRequest = "select a credential for every requested credential"
-    const val PinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
+    const val PinMustContain4Digits = "PIN must contain four digits"
     const val PinConfirmationDoesNotMatch = "PIN confirmation does not match"
     const val WrongPin = "Wrong PIN"
     const val UnlockWithBiometrics = "Unlock the wallet"

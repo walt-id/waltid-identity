@@ -10,6 +10,15 @@ import XCTest
 /// `.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh` asserts on the built products,
 /// and finally by acceptance on a physical device.
 final class SharedWalletConfigurationTests: XCTestCase {
+    func testRecoveryRuntimeShipsInsideTheAppBundle() throws {
+        // Simulator runs can resolve an unembedded framework from DerivedData; devices cannot.
+        let frameworks = try XCTUnwrap(Bundle.main.privateFrameworksURL)
+        let runtime = frameworks.appendingPathComponent(
+            "WalletSDKKeychainRecovery.framework/WalletSDKKeychainRecovery"
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: runtime.path), "Missing embedded recovery runtime")
+    }
+
     func testNativeDemoNamespaceMatchesTheIdentifiersBothBundlesAreEntitledTo() throws {
         try assertNamespaceMatchesTheEntitledIdentifiers(
             namespace: .nativeDemo,

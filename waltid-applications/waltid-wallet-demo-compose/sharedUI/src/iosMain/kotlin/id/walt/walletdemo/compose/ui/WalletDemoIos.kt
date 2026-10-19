@@ -120,15 +120,7 @@ fun walletDemoViewController(
     iosControllerScope?.cancel()
     val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     iosControllerScope = controllerScope
-    val controller = WalletDemoController(
-        wallet = wallet,
-        pinStore = createIosDemoPinStore(config.walletId),
-        biometricAuthenticator = createIosDemoBiometricAuthenticator(),
-        signingProtectionMode = parsedSigningProtectionMode,
-        signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
-        sharingSettings = sharingSettings,
-        scope = controllerScope,
-    )
+
     val readerTrustSettingsController = DemoReaderTrustSettingsController(
         createIosDemoReaderTrustSettingsStore(appGroupIdentifier)
     )
@@ -139,6 +131,16 @@ fun walletDemoViewController(
         readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
         systemPresentationActive = systemPresentationActive,
         requestNfcPresentment = requestNfcPresentment,
+    )
+    val controller = WalletDemoController(
+        wallet = wallet,
+        pinStore = createIosDemoPinStore(config.walletId),
+        biometricAuthenticator = createIosDemoBiometricAuthenticator(),
+        signingProtectionMode = parsedSigningProtectionMode,
+        signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
+        sharingSettings = sharingSettings,
+        scope = controllerScope,
+        canOpenExternalRequest = { !proximityController.state.value.active },
     )
     iosController = controller
     iosProximityController?.dismiss()

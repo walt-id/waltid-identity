@@ -77,4 +77,9 @@ dependencies {
     // Tests
     implementation(identityLibs.mokkery.gradle.plugin)
     testImplementation(kotlin("test-junit"))
+    testImplementation(gradleTestKit())
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("walletRoborazziVersion", identityCatalog.findVersion("roborazzi").get().requiredVersion)
 }

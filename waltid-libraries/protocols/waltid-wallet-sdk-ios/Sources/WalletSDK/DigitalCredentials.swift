@@ -23,6 +23,7 @@ public enum DigitalCredentialRegistrationStorage {
     public static func desiredRegistrations(
         appGroupIdentifier: String
     ) -> DesiredRegistrationProjection {
+        WalletCoreRuntime.initializeIfNeeded()
         let result = IosIdentityDocumentRegistry.companion
             .readDesiredRegistrations(appGroupIdentifier: appGroupIdentifier)
         if result is IosIdentityDocumentProjectionResultMissing { return .missing }
@@ -50,6 +51,7 @@ public enum DigitalCredentialRegistrationStorage {
         status: IdentityDocumentProviderRegistrationStore.Status,
         appGroupIdentifier: String
     ) {
+        WalletCoreRuntime.initializeIfNeeded()
         IosIdentityDocumentRegistry.companion.reportRegistrationStatus(
             appGroupIdentifier: appGroupIdentifier,
             status: status.walletRegistrationStatus

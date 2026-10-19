@@ -62,41 +62,21 @@ internal fun WalletDemoOfferedCredentialMetadata.offeredTypePayloadJson(): Strin
     }.toString()
 }
 
-fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCredentialClaimDisplayGroup> {
-    val entries = claims.mapIndexed { index, claim ->
-        val semantics = MdocClaimDisplaySemantics.describe(format = format, path = claim.path)
-        OfferClaimDisplayEntry(
-            group = semantics?.group,
-            sortOrder = semantics?.sortOrder ?: Int.MAX_VALUE,
-            sourceOrder = index,
-            display = WalletDemoCredentialClaimDisplay(
-                label = claim.displayName?.takeIf { it.isNotBlank() }
-                    ?: semantics?.label
-                    ?: CredentialDisplayVocabulary.humanizedClaimLabel(claim.path.lastOrNull().orEmpty()),
+fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCredentialClaimDisplayGroup> =
+    if (claims.isEmpty()) emptyList() else listOf(WalletDemoCredentialClaimDisplayGroup(
+        title = "Credential claims",
+        claims = claims.map { claim ->
+            WalletDemoCredentialClaimDisplay(
+                label = claim.displayLabel(format),
                 inclusion = if (claim.mandatory == true) "Always included" else "May be included",
-            ),
-        )
-    }
-    return entries
-        .groupBy { it.group }
-        .entries
-        .sortedBy { it.key?.order ?: 0 }
-        .map { (group, claims) ->
-            WalletDemoCredentialClaimDisplayGroup(
-                title = group?.title ?: "Credential claims",
-                claims = claims
-                    .sortedWith(compareBy(OfferClaimDisplayEntry::sortOrder, OfferClaimDisplayEntry::sourceOrder))
-                    .map(OfferClaimDisplayEntry::display),
             )
-        }
-}
+        },
+    ))
 
-private data class OfferClaimDisplayEntry(
-    val group: MdocClaimGroup?,
-    val sortOrder: Int,
-    val sourceOrder: Int,
-    val display: WalletDemoCredentialClaimDisplay,
-)
+fun WalletDemoCredentialClaimMetadata.displayLabel(format: String): String =
+    displayName?.takeIf { it.isNotBlank() }
+        ?: MdocClaimDisplaySemantics.describe(format = format, path = path)?.label
+        ?: CredentialDisplayVocabulary.humanizedClaimLabel(path.lastOrNull().orEmpty())
 
 enum class WalletDemoTransactionCodeInputMode {
     Numeric,

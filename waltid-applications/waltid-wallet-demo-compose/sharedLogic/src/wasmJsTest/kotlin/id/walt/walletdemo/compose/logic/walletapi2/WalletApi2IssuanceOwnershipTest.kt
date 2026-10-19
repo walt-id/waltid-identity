@@ -34,6 +34,20 @@ import kotlin.test.assertTrue
 
 class WalletApi2IssuanceOwnershipTest {
     @Test
+    fun presentationPreviewOptsInToAdditionalClaimDetails() = runTest {
+        val http = HttpClient(MockEngine { request ->
+            assertEquals("true", request.url.parameters["includeDetails"])
+            assertTrue(request.url.encodedPath.endsWith("/credentials/present/preview"))
+            respond("""{"valid":true,"credentialOptions":[]}""", HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"))
+        }) { install(ContentNegotiation) { json(walletApi2Json) } }
+        try {
+            assertTrue(WalletApi2Client("https://wallet.example", "token", http = http)
+                .previewPresentation("wallet", "openid4vp://request", "holder").valid)
+        } finally { http.close() }
+    }
+
+    @Test
     fun cancelledAuthorizationCannotBeRestoredByLateResponse() = runTest {
         withFixture {
             val session = start(authorization = true)
@@ -222,7 +236,6 @@ class WalletApi2IssuanceOwnershipTest {
                 { wallet.continuePreAuthorizedIssuance(session, null, copies()) },
                 { wallet.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state") },
                 { wallet.resumeDeferredIssuance("deferred") },
-                { wallet.present("request", null) },
                 { wallet.previewPresentation("request") },
                 { wallet.submitPresentation(handle, emptyList(), emptyList(), null) },
                 { wallet.rejectPresentation(handle) },

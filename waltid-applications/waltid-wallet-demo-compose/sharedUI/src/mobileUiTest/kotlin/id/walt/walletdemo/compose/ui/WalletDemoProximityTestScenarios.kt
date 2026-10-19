@@ -183,7 +183,7 @@ class WalletDemoProximityTestScenarios {
                 }
             }
         }
-        onNodeWithText("Share in person").assertIsDisplayed()
+        onNodeWithText("Show QR code").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
         onAllNodesWithText("Bluetooth").assertCountEquals(0)
         onAllNodesWithText("Wi-Fi Aware").assertCountEquals(0)
@@ -278,21 +278,21 @@ class WalletDemoProximityTestScenarios {
             .performScrollTo()
             .assertIsDisplayed()
         onNodeWithText("Reader intends to retain this data").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Mobile Driving Licence").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.proximityCredential(0, "credential-1")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
         onNodeWithText("Portrait available").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Proof of eligibility").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.proximityCredential(1, "proof-credential")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Share").assertIsDisplayed()
         onNodeWithText("Cancel").assertIsDisplayed()
         onNodeWithText("Decline").assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.proximityElement(0, namespace, "portrait"))
-            .performScrollTo()
+            .performScrollToContent(this)
             .performClick()
         assertEquals(element, toggled)
 
         onNodeWithTag(WalletUiTestTags.ProximityContinueAfterResponse)
-            .performScrollTo()
+            .performScrollToContent(this)
             .performClick()
         onNodeWithTag(WalletUiTestTags.ProximityApprove)
             .assertIsDisplayed()
@@ -378,7 +378,7 @@ private val hostActions = WalletDemoProximityHostActionExecutor {
     ProximityHostActionResult.Completed
 }
 
-private val permissionBlockedCapabilities = ProximityCapabilities(
+internal val permissionBlockedCapabilities = ProximityCapabilities(
     session = ProximitySessionConfiguration.Qr(),
     profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = ProximityTransportCapability(
@@ -424,6 +424,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
         ),
         groups = listOf(
             ClaimGroup(
+                id = "transaction:0",
                 title = "Personal details",
                 items = listOf(
                     ClaimItem(
@@ -445,6 +446,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
         ),
         groups = listOf(
             ClaimGroup(
+                id = "transaction:0",
                 title = "Credential data",
                 items = listOf(
                     ClaimItem(

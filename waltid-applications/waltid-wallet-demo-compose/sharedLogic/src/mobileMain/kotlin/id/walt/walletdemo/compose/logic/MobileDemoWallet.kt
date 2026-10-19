@@ -36,6 +36,7 @@ internal class MobileDemoWallet(
     private val warning: String? = null,
     private val isIos: Boolean = false,
     private val onRegistrationRefreshed: suspend () -> Unit = {},
+    private val preferredSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
 ) : ProximityDemoWallet {
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
@@ -144,7 +145,9 @@ internal class MobileDemoWallet(
             state.reason.explanation()
             else unavailableReasons.takeIf { choices.isEmpty() }?.distinct()?.joinToString("\n"), recoveryStorageNotice = if (isIos)
                 "The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database." else null,
-            recoveryUnavailableReasons = recoveryUnavailableReasons)
+            recoveryUnavailableReasons = recoveryUnavailableReasons,
+            preferredApproval = preferredSigningProtection.approvalChoice(),
+            existingKeyUnavailable = state is SigningIdentityState.Unavailable)
     }
 
     private fun recoveryChoice(provider: String, scope: RecoveryScope?): WalletDemoKeyChoice =
@@ -223,18 +226,7 @@ internal class MobileDemoWallet(
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
-        mobileWallet.credentials().map { credential ->
-            WalletDemoCredential(
-                id = credential.id,
-                format = credential.format,
-                issuer = credential.issuer,
-                subject = credential.subject,
-                label = credential.label ?: credential.format,
-                addedAt = credential.addedAt,
-                credentialDataJson = credential.credentialDataJson,
-                metadataJson = credential.metadataJson,
-            )
-        }
+        mobileWallet.credentials().map { it.toDemoCredential() }
 
     override suspend fun startIssuance(
         offerUrl: String,
@@ -275,12 +267,6 @@ internal class MobileDemoWallet(
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
         mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
-
-    override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        mobileWallet.present(requestUrl = requestUrl, did = did).toDemoOperationResult(
-            successMessage = WalletDisplayText.PresentationSent,
-            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
-        )
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         when (val result = mobileWallet.previewPresentation(requestUrl)) {
@@ -466,6 +452,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                         selectivelyDisclosable = disclosure.selectivelyDisclosable,
                         required = disclosure.required,
                         selectable = disclosure.selectable,
+                        requested = disclosure.requested,
                     )
                 },
             )
@@ -519,16 +506,15 @@ internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMe
         termsOfServiceUri = termsOfServiceUri,
     )
 
-private fun KeyUseAuthorizationPolicy.approvalChoice(isIos: Boolean): WalletDemoKeyChoice = WalletDemoKeyChoice(
-    toString(), when (this) {
-        KeyUseAuthorizationPolicy.None -> "No signing prompt"
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Current biometrics only"
-        KeyUseAuthorizationPolicy.BiometricAny -> "Current and future biometrics"
-        is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Biometrics with timed approval"
-        is KeyUseAuthorizationPolicy.DeviceCredential -> if (isIos) "Device passcode" else "Device screen lock"
-        is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> if (isIos) "Biometrics or device passcode" else "Biometrics or screen lock"
-    }, identityDescription(isIos),
-)
+private fun KeyUseAuthorizationPolicy.approvalChoice(isIos: Boolean): WalletDemoKeyChoice = when (this) {
+    KeyUseAuthorizationPolicy.None -> WalletDemoSigningProtection.None.approvalChoice()
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletDemoSigningProtection.BiometricPerUse.approvalChoice()
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> if (timeoutSeconds == 10)
+        WalletDemoSigningProtection.Biometric.approvalChoice() else WalletDemoKeyChoice(toString(), "Biometrics with timed approval", identityDescription(isIos))
+    KeyUseAuthorizationPolicy.BiometricAny -> WalletDemoKeyChoice(toString(), "Current and future biometrics", identityDescription(isIos))
+    is KeyUseAuthorizationPolicy.DeviceCredential -> WalletDemoKeyChoice(toString(), if (isIos) "Device passcode" else "Device screen lock", identityDescription(isIos))
+    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> WalletDemoKeyChoice(toString(), if (isIos) "Biometrics or device passcode" else "Biometrics or screen lock", identityDescription(isIos))
+}
 
 private fun KeyUseAuthorizationPolicy.identityDescription(isIos: Boolean): String = when (this) {
     KeyUseAuthorizationPolicy.None -> "Signing does not require system approval."

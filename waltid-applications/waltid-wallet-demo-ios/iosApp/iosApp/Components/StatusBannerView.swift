@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 
 struct StatusBannerView: View {
@@ -8,7 +9,7 @@ struct StatusBannerView: View {
     var isExpanded: Bool = false
     var onDismiss: (() -> Void)? = nil
     var onToggleExpanded: (() -> Void)? = nil
-    @Environment(\.walletDemoBranding) private var branding
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var dragOffset: CGFloat = 0
 
@@ -25,30 +26,41 @@ struct StatusBannerView: View {
                 .accessibilityIdentifier(WalletAccessibilityID.status)
             if isError {
                 Button(action: { onToggleExpanded?() }) {
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .accessibilityLabel(isExpanded ? "Collapse error" : "Expand error")
                 .accessibilityIdentifier(WalletAccessibilityID.statusExpand)
             }
             if onDismiss != nil {
                 Button(action: { onDismiss?() }) {
                     Image(systemName: "xmark")
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .accessibilityLabel("Dismiss status")
                 .accessibilityIdentifier(WalletAccessibilityID.statusDismiss)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: isError && !isExpanded ? 44 : nil, alignment: .top)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
         .cornerRadius(8)
+        .animation(WalletMotion.disclosure(reduceMotion: reduceMotion), value: isExpanded)
         .offset(x: dragOffset)
         .gesture(dismissGesture)
         .onTapGesture {
             if isError {
                 onToggleExpanded?()
             }
+        }
+        .onChange(of: message) { message in
+            guard UIAccessibility.isVoiceOverRunning else { return }
+            UIAccessibility.post(notification: .announcement, argument: NSAttributedString(string: message,
+                attributes: [.accessibilitySpeechQueueAnnouncement: true]))
         }
     }
 
@@ -71,15 +83,12 @@ struct StatusBannerView: View {
     }
 
     private var backgroundColor: Color {
-        if isError { return Color.red.opacity(0.12) }
-        if isLoading { return Color.secondary.opacity(0.12) }
-        return branding.primaryContainer
+        return Color.secondary.opacity(0.08)
     }
 
     private var foregroundColor: Color {
         if isError { return .red }
-        if isLoading { return .secondary }
-        return branding.onPrimaryContainer
+        return .secondary
     }
 }
 

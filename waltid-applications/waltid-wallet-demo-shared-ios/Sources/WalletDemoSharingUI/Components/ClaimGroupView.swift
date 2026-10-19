@@ -11,21 +11,22 @@ public struct ClaimGroupView: View {
 
     public var body: some View {
         if !group.items.isEmpty {
-            ReviewMetadataSection(
-                title: group.title,
-                titleAccessibilityIdentifier: WalletAccessibilityID.claimGroup(group.title)
-            ) {
-                if collapsible {
-                    MetadataDisclosure(
-                        title: "\(group.items.count) \(group.items.count == 1 ? "entry" : "entries")",
-                        initiallyExpanded: group.initiallyExpanded,
-                        accessibilityIdentifier: WalletAccessibilityID.claimGroupDisclosure(group.title)
-                    ) {
+            WalletSection(collapsible ? nil : group.title, titleIdentifier: WalletAccessibilityID.claimGroup(group.title)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if collapsible {
+                        MetadataDisclosure(
+                            title: group.title,
+                            initiallyExpanded: group.initiallyExpanded,
+                            accessibilityIdentifier: WalletAccessibilityID.claimGroupDisclosure(group.title)
+                        ) {
+                            claimItems.padding(.bottom, 12)
+                        }
+                    } else {
                         claimItems
                     }
-                } else {
-                    claimItems
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, collapsible ? 4 : 16)
             }
         }
     }

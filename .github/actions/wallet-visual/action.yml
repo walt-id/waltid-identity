@@ -1,0 +1,71 @@
+name: Compare wallet visual references
+description: Verify one complete renderer catalogue using the job's existing build
+inputs:
+  renderer:
+    description: android, compose-ios or swiftui
+    required: true
+  framework-artifact:
+    description: Verified release WalletCore artifact, required for SwiftUI
+    default: ''
+  derived-data:
+    description: Existing native app build directory
+    default: /tmp/xcode-derived
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.13'
+    - name: Prepare comparison tools and destination
+      id: prepare
+      shell: bash
+      env:
+        RENDERER: ${{ inputs.renderer }}
+        FRAMEWORK: ${{ inputs.framework-artifact }}
+      run: |
+        set -euo pipefail
+        case "$RENDERER" in
+          android|compose-ios) ;;
+          swiftui) test -n "$FRAMEWORK" ;;
+          *) echo '::error::Unsupported visual renderer'; exit 1 ;;
+        esac
+        python3 -m venv "$RUNNER_TEMP/wallet-visual-python"
+        "$RUNNER_TEMP/wallet-visual-python/bin/pip" install -r waltid-identity/waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt
+        echo "$RUNNER_TEMP/wallet-visual-python/bin" >> "$GITHUB_PATH"
+        if [[ "$RENDERER" != android ]]; then
+          simulator=$(xcrun simctl create 'Wallet visual comparison' com.apple.CoreSimulator.SimDeviceType.iPhone-17 com.apple.CoreSimulator.SimRuntime.iOS-27-0)
+          echo "simulator=$simulator" >> "$GITHUB_OUTPUT"
+        fi
+        if [[ "$RENDERER" == swiftui ]]; then
+          npm install --prefix "$RUNNER_TEMP/wallet-visual-tools" xcodebuildmcp@2.7.0
+          echo "$RUNNER_TEMP/wallet-visual-tools/node_modules/.bin" >> "$GITHUB_PATH"
+        fi
+    - name: Compare every catalogue cell for the renderer
+      shell: bash
+      env:
+        RENDERER: ${{ inputs.renderer }}
+        FRAMEWORK: ${{ inputs.framework-artifact }}
+        DERIVED_DATA: ${{ inputs.derived-data }}
+        SIMULATOR: ${{ steps.prepare.outputs.simulator }}
+      run: |
+        set -euo pipefail
+        arguments=(--renderers "$RENDERER" --gradle-root "$GITHUB_WORKSPACE" --output "$GITHUB_WORKSPACE/waltid-identity/build/reports/wallet-visual-$RENDERER")
+        [[ -z "$SIMULATOR" ]] || arguments+=(--simulator "$SIMULATOR")
+        [[ -z "$FRAMEWORK" ]] || arguments+=(--reuse-framework "$FRAMEWORK" --derived-data "$DERIVED_DATA")
+        python3 waltid-identity/waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py "${arguments[@]}"
+    - name: Retain comparison results and timings
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: wallet-visual-${{ inputs.renderer }}-${{ github.run_attempt }}
+        path: waltid-identity/build/reports/wallet-visual-${{ inputs.renderer }}
+        if-no-files-found: error
+        retention-days: 14
+    - name: Remove the comparison-owned simulator
+      if: always() && steps.prepare.outputs.simulator != ''
+      shell: bash
+      env:
+        SIMULATOR: ${{ steps.prepare.outputs.simulator }}
+      run: |
+        xcrun simctl shutdown "$SIMULATOR" || true
+        xcrun simctl delete "$SIMULATOR"

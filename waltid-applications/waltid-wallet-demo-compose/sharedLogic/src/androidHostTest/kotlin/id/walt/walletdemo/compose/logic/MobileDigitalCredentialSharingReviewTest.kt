@@ -32,6 +32,16 @@ class MobileDigitalCredentialSharingReviewTest {
         val review = digitalCredentialPreview(transactionData = listOf(payment)).toSharingReview()
         assertEquals("Super Store", review.request.transactionData.single().textValue("Payee name"))
         assertEquals("11.56", review.request.transactionData.single().textValue("Amount"))
+        val transaction = review.request.transactionData.single()
+        assertTrue(transaction.isPaymentTransaction)
+        val display = WalletDemoPaymentReview.NotRequired.displays(listOf(transaction)).single()
+        assertEquals(listOf(DisplayValue.Text("Super Store"), DisplayValue.NumberValue("11.56"), DisplayValue.Text("EUR")), display.fields
+            .filter { it.placement == WalletDemoPaymentFieldPlacement.Prominent }.map { it.item.value })
+        assertTrue(display.technical.none { it.pathComponents.getOrNull(1) == "details" })
+        listOf(WalletDemoPaymentReview.Loading, WalletDemoPaymentReview.Blocked("Missing issuer instructions")).forEach {
+            assertTrue(it.displays(listOf(transaction)).isEmpty(), "Unvalidated values cannot replace required consent")
+            assertEquals(false, it.canConfirm)
+        }
     }
 
     /**
@@ -54,6 +64,9 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals("ACME Corp", payment.textValue("Merchant name"))
         assertEquals("42.00", payment.textValue("Amount"))
         assertEquals("EUR", payment.textValue("Currency"))
+        assertTrue(payment.isPaymentTransaction)
+        assertEquals(listOf("ACME Corp", "42.00", "EUR"), WalletDemoPaymentReview.NotRequired
+            .displays(listOf(payment)).single().fields.map { (it.item.value as DisplayValue.Text).value })
     }
 
     /** Each item must survive the mapping: showing only the first authorizes the rest unseen. */
@@ -72,6 +85,7 @@ class MobileDigitalCredentialSharingReviewTest {
         )
         assertEquals("42.00", review.request.transactionData[0].textValue("Amount"))
         assertEquals("abc123", review.request.transactionData[1].textValue("Document digest"))
+        assertEquals(false, review.request.transactionData[1].isPaymentTransaction)
     }
 
     /**

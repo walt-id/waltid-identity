@@ -118,6 +118,7 @@ data class WalletDemoPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
+    val requested: Boolean = true,
 )
 
 data class WalletDemoTransactionDataItem(
