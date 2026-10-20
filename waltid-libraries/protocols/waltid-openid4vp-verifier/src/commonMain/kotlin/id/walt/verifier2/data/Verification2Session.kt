@@ -106,8 +106,13 @@ data class Verification2Session(
     @SerialName("presented_raw_data")
     var presentedRawData: PresentedRawData? = null,
 
+    /** One presentation per query id; for a query with `multiple: true` the last one. See [presentedPresentationsList]. */
     @SerialName("presented_presentations")
     var presentedPresentations: Map<String, VerifiablePresentation>? = null,
+
+    /** Every presentation per query id, also when a query with `multiple: true` received several. */
+    @SerialName("presented_presentations_list")
+    var presentedPresentationsList: Map<String, List<VerifiablePresentation>>? = null,
 
     @SerialName("presented_credentials")
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
@@ -141,6 +146,7 @@ data class Verification2Session(
     fun deletePII() {
         presentedRawData = null
         presentedPresentations = null
+        presentedPresentationsList = null
         presentedCredentials = null
 
         fun redactPolicyResult(policyResult: CredentialPolicyResult) {
