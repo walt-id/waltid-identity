@@ -163,7 +163,7 @@ class NfcMdocCarrierCodecTest {
             carrierRecord = carrier.carrierRecord.copy(
                 payload = ByteString(
                     carrier.carrierRecord.payload.toByteArray() +
-                        byteArrayOf(4, 0x16, 0x01, 0xff.toByte(), 0xa0.toByte()),
+                        "071601ffa1001882".hexToByteArray(), // Complete service-data field with PSM 130.
                 ),
             ),
         )
