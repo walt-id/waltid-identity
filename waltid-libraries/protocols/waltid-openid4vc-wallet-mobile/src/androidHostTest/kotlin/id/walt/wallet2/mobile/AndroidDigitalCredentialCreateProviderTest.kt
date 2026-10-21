@@ -167,9 +167,12 @@ class AndroidDigitalCredentialCreateProviderTest {
 
     @Test
     fun bindsTheNativeCallerSigningCertificateIntoTheOrigin() {
-        assertTrue(
-            AndroidDigitalCredentialCreateProvider.nativeAppOrigin(byteArrayOf(1, 2, 3))
-                .startsWith("android:apk-key-hash:"),
+        val callerOrigins = listOf(
+            byteArrayOf(1, 2, 3) to "android:apk-key-hash:A5BYxvLAy0ksUzsKTRTvd8wPeKvMztUofYShogEc-4E",
+            byteArrayOf(1, 2, 3, 4) to "android:apk-key-hash:n2SnR-G5fxMfq7a0Rylsm28CAeefs8U1bmx36JtqgGo",
         )
+        for ((certificate, expectedOrigin) in callerOrigins) {
+            assertEquals(expectedOrigin, AndroidDigitalCredentialCreateProvider.nativeAppOrigin(certificate))
+        }
     }
 }
