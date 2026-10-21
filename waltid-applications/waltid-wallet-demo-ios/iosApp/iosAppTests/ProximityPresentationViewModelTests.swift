@@ -458,7 +458,12 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testPreparingCreatesOneFreshSessionReopensNfcAndRevokesOnDismissal() async throws {
         let review = combinedProximityReview()
         let bridge = FakePreparedSharingBridge()
-        let submission = try fixtureSubmission(review)
+        let submission = try WalletSDK.ProximitySubmission(documents: [
+            .init(requestIndex: 0, credentialID: "payment-b",
+                disclosedElements: [.init(namespace: "org.iso.18013.5.1", elementIdentifier: "family_name")]),
+            .init(requestIndex: 1, credentialID: "proof-credential",
+                disclosedElements: [.init(namespace: "org.waltid.example.proof", elementIdentifier: "eligible")]),
+        ])
         let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: submission,
             expiresAt: Date().addingTimeInterval(60), bridge: bridge)
         let plan = WalletSDK.ProximitySharingPlan(review: review, expiresAt: Date().addingTimeInterval(600),
@@ -1584,7 +1589,8 @@ private struct FakeSharingPlanBridge: ProximitySharingPlanBridge {
     let sharing: WalletSDK.ProximityPreparedSharing
     var isExpired: Bool { false }
     func approve(_ submission: WalletSDK.ProximitySubmission) throws -> WalletSDK.ProximityPreparationResult {
-        .prepared(sharing)
+        XCTAssertEqual(submission, sharing.submission)
+        return .prepared(sharing)
     }
 }
 
