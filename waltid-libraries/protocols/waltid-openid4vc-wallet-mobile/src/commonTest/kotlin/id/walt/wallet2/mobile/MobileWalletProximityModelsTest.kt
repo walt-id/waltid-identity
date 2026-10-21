@@ -115,7 +115,7 @@ class ProximityModelsTest {
     }
 
     @Test
-    fun `NFCv2 retrieval cannot be selected without its NFC engagement path`() {
+    fun `NFCv2 retrieval cannot start before NFC engagement is available`() {
         val available = ProximityTransportCapability(
             implemented = true,
             profilePermitted = true,
@@ -123,17 +123,21 @@ class ProximityModelsTest {
             selected = true,
         )
         val unselected = available.copy(selected = false)
+        val capabilities = ProximityCapabilities(
+            session = ProximitySessionConfiguration.ProvisionalNfcV2(),
+            profile = ProximityProfile.Iso180135Edition2Dis2026,
+            qrEngagement = unselected,
+            nfcEngagement = available,
+            bluetoothLowEnergy = unselected,
+            nfcRetrieval = unselected,
+            nfcV2Retrieval = available,
+            wifiAwareRetrieval = unselected,
+        )
 
+        assertTrue(capabilities.mayStart)
         assertFailsWith<IllegalArgumentException> {
-            ProximityCapabilities(
-                session = ProximitySessionConfiguration.Qr(),
-                profile = ProximityProfile.Iso180135Edition2Dis2026,
-                qrEngagement = available,
-                nfcEngagement = unselected,
-                bluetoothLowEnergy = unselected,
-                nfcRetrieval = unselected,
-                nfcV2Retrieval = available,
-                wifiAwareRetrieval = unselected,
+            capabilities.copy(
+                nfcEngagement = available.copy(runtime = ProximityRuntimeObservation.NotChecked),
             )
         }
     }
