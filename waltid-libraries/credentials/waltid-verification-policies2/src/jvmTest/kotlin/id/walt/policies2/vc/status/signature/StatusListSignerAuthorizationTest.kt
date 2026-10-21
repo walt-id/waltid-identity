@@ -24,6 +24,14 @@ import kotlin.test.assertTrue
 class StatusListSignerAuthorizationTest {
 
     @Test
+    fun `direct trust accepts a matching https issuer resolved from well-known`() = runTest {
+        authorizeStatusListSigner(
+            request("https://issuer.example", JwtKeyResolutionSource.WELL_KNOWN, "https://issuer.example"),
+            authorizer = null,
+        )
+    }
+
+    @Test
     fun `direct trust accepts a matching DID signer`() = runTest {
         authorizeStatusListSigner(
             request("did:example:issuer", JwtKeyResolutionSource.DID, "did:example:issuer"),
@@ -48,6 +56,40 @@ class StatusListSignerAuthorizationTest {
     }
 
     @Test
+    fun `x5c signed status list with a different leaf is rejected even when issuer identifiers match`() = runTest {
+        val issuer = "https://issuer.example"
+        val error = assertThrows<IllegalArgumentException> {
+            authorizeStatusListSigner(
+                request(
+                    credentialIssuer = issuer,
+                    source = JwtKeyResolutionSource.X5C,
+                    signerIdentifier = issuer,
+                    statusListCertificates = listOf(OTHER_LEAF),
+                    credentialCertificates = listOf(MATCHING_LEAF),
+                ),
+                authorizer = null,
+            )
+        }
+        assertContains(error.message!!, "status-list x5c leaf does not match")
+        assertContains(error.message!!, "source=X5C")
+    }
+
+    @Test
+    fun `direct trust accepts a matching x5c leaf when issuer identifiers also match`() = runTest {
+        val issuer = "https://issuer.example"
+        authorizeStatusListSigner(
+            request(
+                credentialIssuer = issuer,
+                source = JwtKeyResolutionSource.X5C,
+                signerIdentifier = issuer,
+                statusListCertificates = listOf(MATCHING_LEAF),
+                credentialCertificates = listOf(MATCHING_LEAF),
+            ),
+            authorizer = null,
+        )
+    }
+
+    @Test
     fun `x5c signed status list with a different leaf is rejected`() = runTest {
         val error = assertThrows<IllegalArgumentException> {
             authorizeStatusListSigner(
@@ -57,7 +99,7 @@ class StatusListSignerAuthorizationTest {
         }
         assertContains(error.message!!, "status-list x5c leaf does not match")
         assertContains(error.message!!, "source=X5C")
-        assertContains(error.message!!, "same DID, https issuer, or x5c leaf")
+        assertContains(error.message!!, "x5t#S256")
     }
 
     @Test
