@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -19,11 +20,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class WalletBridgeKeyAttestationProviderTest {
     @Test
     fun importsConfiguredVerificationKeyAndForwardsEachRequest() = runTest {
-        val publicKey = newPublicKey()
+        val publicKey = newKey().let { key ->
+            key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec)
+        }
         val requests = mutableListOf<WalletBridgeKeyAttestationRequest>()
         val provider = object : WalletBridgeKeyAttestationProvider {
             override val verificationPublicJwk = publicKey.data.toByteArray().decodeToString()
@@ -53,16 +57,18 @@ class WalletBridgeKeyAttestationProviderTest {
 
     @Test
     fun rejectsPrivateMaterialInConfiguredVerificationKey() = runTest {
-        val publicKey = newPublicKey()
-        val publicJwk = Json.parseToJsonElement(publicKey.data.toByteArray().decodeToString()).jsonObject
-        val provider = object : WalletBridgeKeyAttestationProvider {
-            override val verificationPublicJwk = JsonObject(publicJwk + ("d" to JsonPrimitive("private"))).toString()
-            override suspend fun attest(request: WalletBridgeKeyAttestationRequest): String = error("Must not call provider")
+        val privateKey = assertIs<EncodedKey.Jwk>(newKey().capabilities.privateKeyExporter!!.exportPrivateKey())
+        val privateJwk = Json.parseToJsonElement(privateKey.data.toByteArray().decodeToString()).jsonObject
+        for (jwk in listOf(JsonObject(privateJwk + ("d" to JsonPrimitive("private"))), privateJwk)) {
+            val provider = object : WalletBridgeKeyAttestationProvider {
+                override val verificationPublicJwk = jwk.toString()
+                override suspend fun attest(request: WalletBridgeKeyAttestationRequest): String = error("Must not call provider")
+            }
+            assertFailsWith<IllegalArgumentException> { provider.toKeyAttestationProvider() }
         }
-        assertFailsWith<IllegalArgumentException> { provider.toKeyAttestationProvider() }
     }
 
-    private suspend fun newPublicKey() = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+    private suspend fun newKey() = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
         GenerateSoftwareKeyRequest(KeyId("test-attester"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
-    ).let { key -> key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec) }
+    )
 }

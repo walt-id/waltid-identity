@@ -73,13 +73,17 @@ class WalletSdkBridgeTest {
 
     @Test
     fun mapsOperationFailuresToTypedBridgeFailures() = runTest {
-        val result = walletBridgeCall<String> {
-            throw IllegalArgumentException("bad offer")
-        }
+        val failures = listOf(
+            IllegalArgumentException("bad offer") to WalletBridgeErrorCategory.invalidInput,
+            IllegalStateException("offline") to WalletBridgeErrorCategory.internalFailure,
+        )
+        for ((failure, expectedCategory) in failures) {
+            val result: WalletBridgeResult<List<String>> = walletBridgeCall { throw failure }
 
-        assertIs<WalletBridgeResult.Failure>(result)
-        assertEquals(WalletBridgeErrorCategory.invalidInput, result.error.category)
-        assertEquals("bad offer", result.error.message)
+            assertIs<WalletBridgeResult.Failure>(result)
+            assertEquals(expectedCategory, result.error.category)
+            assertEquals(failure.message, result.error.message)
+        }
     }
 
     @Test
