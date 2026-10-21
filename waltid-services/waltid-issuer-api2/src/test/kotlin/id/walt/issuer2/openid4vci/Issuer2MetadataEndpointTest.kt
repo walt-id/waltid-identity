@@ -743,10 +743,7 @@ class Issuer2MetadataEndpointTest {
             JWT_PROOF_SIGNING_ALGORITHMS,
             assertNotNull(openBadgeConfiguration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
         )
-        assertEquals(
-            setOf("ES256"),
-            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get(ProofType.ATTESTATION.value)).proofSigningAlgValuesSupported,
-        )
+        assertEquals(null, openBadgeConfiguration.proofTypesSupported?.get(ProofType.ATTESTATION.value))
     }
 
     private fun assertMdocConfiguration(
