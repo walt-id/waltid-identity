@@ -90,18 +90,18 @@
       "lanes": ["compose", "enterprise", "ios-simulator", "visual-compose"]
     },
     {
-      "name": "Compose shared mobile trust selects simulator coverage",
+      "name": "Compose shared mobile trust selects simulator, consumer and visual coverage",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/kotlin/id/walt/walletdemo/compose/logic/DemoClientIdTrust.kt"
       ],
-      "lanes": ["compose", "ios-simulator", "enterprise"]
+      "lanes": ["compose", "enterprise", "ios-simulator", "visual-android", "visual-compose"]
     },
     {
-      "name": "Compose shared mobile tests select simulator coverage",
+      "name": "Compose shared mobile tests select simulator and consumer coverage",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileTest/kotlin/id/walt/walletdemo/compose/logic/DemoClientIdTrustTest.kt"
       ],
-      "lanes": ["compose", "ios-simulator", "enterprise"]
+      "lanes": ["compose", "enterprise", "ios-simulator"]
     },
     {
       "name": "Swift package change selects WalletCore consumers, not Kotlin simulator",
@@ -370,13 +370,6 @@
         "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/NewBatchJourneyTests.swift"
       ],
       "lanes": ["compose", "enterprise", "visual-compose"]
-    },
-    {
-      "name": "shared mobile logic compares both Compose renderers",
-      "files": [
-        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/kotlin/WalletModel.kt"
-      ],
-      "lanes": ["enterprise", "visual-android", "visual-compose"]
     },
     {
       "name": "shared image fixtures compare every mobile renderer",
