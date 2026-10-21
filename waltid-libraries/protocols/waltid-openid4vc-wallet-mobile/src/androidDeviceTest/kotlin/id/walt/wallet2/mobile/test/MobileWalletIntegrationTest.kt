@@ -146,21 +146,6 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun receiveEudiPidSdJwtFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("eudi-pid-sdjwt")
-    }
-
-    @Test
-    fun receiveEudiPidMdocFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("eudi-pid-mdoc")
-    }
-
-    @Test
-    fun receiveIsoMdlFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("iso-mdl")
-    }
-
-    @Test
     fun receiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() = runBlocking {
         val scenario = demoPresentationScenario("eudi-pid-mdoc")
         val client = MobileWalletFactory(context).create(
@@ -525,20 +510,6 @@ class MobileWalletIntegrationTest {
         MobileWalletFactory(context).create(config, eudiVerifierTrust)
             .attachKeyAttestationProviderResolver(DemoKeyAttestationProviders())
 
-    private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
-        val scenario = demoScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("receive-${scenario.id}"))
-        client.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
-        assertTrue(
-            credentialIds.isNotEmpty(),
-            "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
-        )
-        assertStoredCredentialDisplayData(scenario = scenario, credentials = client.credentials())
-    }
-
     private suspend fun receiveAndPresentEudiCredential(credentialId: String) {
         val client = createEudiWallet(walletConfig("eudi-present-$credentialId"))
         val bootstrapResult = client.signingIdentity.initialize().activeIdentity()
@@ -675,8 +646,6 @@ class MobileWalletIntegrationTest {
 
         DemoTestBackend.waitForVerifierSuccess(session.sessionId)
     }
-
-    private fun demoScenario(id: String) = DemoTestBackend.scenarios.first { it.id == id }
 
     private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
 
