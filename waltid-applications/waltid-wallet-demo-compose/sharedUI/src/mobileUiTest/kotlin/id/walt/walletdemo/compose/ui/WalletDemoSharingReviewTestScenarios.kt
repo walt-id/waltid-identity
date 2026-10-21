@@ -271,6 +271,7 @@ class WalletDemoSharingReviewTestScenarios {
 
         onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
         onNodeWithTag(WalletDemoSharingReviewTestTags.RequesterSection).performScrollToContent(this).assertIsDisplayed()
+        onAllNodesWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).assertCountEquals(0)
         // An unsigned Digital Credentials request has no verifier metadata, so the authenticated origin
         // is the requester identity: shown once, and captioned as verified, because an uncaptioned origin
         // reads as one more self-asserted requester claim.
@@ -292,6 +293,8 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletDemoSharingReviewTestTags.ResponseProtectionSection, useUnmergedTree = true)
             .performScrollToContent(this)
             .assertIsDisplayed()
+        // A protocol without reader authentication must not invent a reader in expanded details.
+        onAllNodesWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).assertCountEquals(0)
         onNodeWithText("OpenID4VP dc_api.jwt").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Given name").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Ada").performScrollToContent(this).assertIsDisplayed()
@@ -381,24 +384,6 @@ class WalletDemoSharingReviewTestScenarios {
 
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
         onNodeWithTag(WalletDemoSharingReviewTestTags.CancelButton).assertIsNotEnabled()
-    }
-
-    /**
-     * A protocol without reader authentication gets no reader section at all, rather than one reporting
-     * an absent reader: the OpenID4VP Digital Credentials API has no reader to be trusted or not.
-     */
-    fun reviewWithoutReaderAuthenticationShowsNoReaderSection() = runComposeUiTest {
-        setContent {
-            WalletDemoSharingReviewScreen(
-                compact = false,
-                review = digitalCredentialReview(),
-                title = "Share digital credential?",
-                onSubmit = {},
-                onCancel = {},
-            )
-        }
-
-        onAllNodesWithTag(WalletDemoSharingReviewTestTags.ReaderTrustSection).assertCountEquals(0)
     }
 
     /**
