@@ -167,6 +167,7 @@ class WalletDemoAppTestScenarios(
         val pinStore = InMemoryDemoPinStore()
         val controller = WalletDemoController(WalletUiTestWallet(), pinStore)
         setWalletContent { WalletDemoApp(controller) }
+        onNodeWithTag(WalletUiTestTags.PinClearButton).assertIsDisplayed()
         onNodeWithText("Step 1 of 2").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed().assertIsFocused()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
@@ -322,15 +323,6 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.pinConfirmationInput").assertCountEquals(0)
     }
 
-    fun pinSetupOffersPINOnlyWhenBiometricsAreUnavailable() = runComposeUiTest {
-        val controller = WalletDemoController(WalletUiTestWallet(), InMemoryDemoPinStore())
-        setWalletContent { WalletDemoApp(controller) }
-        onNodeWithText("Choose a PIN").assertIsDisplayed()
-        confirmNewPin()
-        waitUntil { controller.state.value.auth == WalletAuthState.Unlocked }
-        assertFalse(controller.isBiometricUnlockEnabled())
-    }
-
     fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() = runComposeUiTest {
         val biometrics = RecordingDemoBiometricAuthenticator(available = false)
         val controller = WalletDemoController(WalletUiTestWallet(), InMemoryDemoPinStore(), biometrics)
@@ -348,7 +340,10 @@ class WalletDemoAppTestScenarios(
         val store = InMemoryDemoPinStore()
         val controller = WalletDemoController(WalletUiTestWallet(), store)
         setWalletContent { WalletDemoApp(controller) }
+        onNodeWithText("Choose a PIN").assertIsDisplayed()
         confirmNewPin()
+        waitUntil { controller.state.value.auth == WalletAuthState.Unlocked }
+        assertFalse(controller.isBiometricUnlockEnabled())
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsWalletAccess).performClick()
@@ -371,14 +366,6 @@ class WalletDemoAppTestScenarios(
         assertTrue(store.verifyPin("5678"))
         assertFalse(store.verifyPin("1234"))
         onNodeWithTag(WalletUiTestTags.SettingsChangePin).assertIsDisplayed()
-    }
-
-    fun pinSetupKeepsClearReachable() = runComposeUiTest {
-        val controller = WalletDemoController(WalletUiTestWallet(), InMemoryDemoPinStore())
-
-        setWalletContent { WalletDemoApp(controller) }
-
-        onNodeWithTag(WalletUiTestTags.PinClearButton).assertIsDisplayed()
     }
 
     fun keySetupDefaultNeedsOneConfirmation() = runComposeUiTest {
@@ -1135,6 +1122,11 @@ class WalletDemoAppTestScenarios(
 
         onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
         onAllNodesWithText("Not requested").assertCountEquals(0)
+        onAllNodesWithText("Key management algorithm").assertCountEquals(0)
+        onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performScrollToContent(this).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationResponseProtectionSection).performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Not requested").performScrollToContent(this).assertIsDisplayed()
         onAllNodesWithText("Key management algorithm").assertCountEquals(0)
         onAllNodesWithText("Verifier key thumbprint").assertCountEquals(0)
     }
@@ -2128,16 +2120,6 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag(WalletUiTestTags.PresentationReaderTrustSection).assertCountEquals(0)
     }
 
-    private fun ComposeUiTest.assertVerifierTechnicalDetailsCollapsedUntilRequested() {
-        onAllNodesWithText("Client ID").assertCountEquals(0)
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithTag("wallet.verifierTechnicalDetailsToggle").performClick()
-        onNodeWithText("Client ID").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("https://verifier.example/response").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("state-123").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("nonce-456").performScrollToContent(this).assertIsDisplayed()
-    }
-
     private fun ComposeUiTest.assertIssuerDetailsCollapsedUntilRequested() {
         onAllNodesWithText("Credential Issuer").assertCountEquals(0)
         onAllNodesWithText("https://issuer.example").assertCountEquals(0)
@@ -2151,24 +2133,6 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.OfferIssuerDetailsToggle).performScrollToContent(this).performClick()
         onAllNodesWithText("Credential Issuer").assertCountEquals(0)
         onAllNodesWithText("https://issuer.example").assertCountEquals(0)
-    }
-
-    private fun ComposeUiTest.assertRequesterDetailsCollapsedUntilRequested() {
-        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle)
-            .performScrollToContent(this)
-            .assertIsDisplayed()
-            .performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetails).performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("https://verifier.example").performScrollToContent(this).assertIsDisplayed().assertHasClickAction()
-        onNodeWithText("https://verifier.example/privacy").performScrollToContent(this).assertIsDisplayed().assertHasClickAction()
-        onNodeWithText("https://verifier.example/terms").performScrollToContent(this).assertIsDisplayed().assertHasClickAction()
-        onNodeWithTag(WalletUiTestTags.PresentationRequesterDetailsToggle).performScrollToContent(this).performClick()
-        onAllNodesWithText("https://verifier.example").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/privacy").assertCountEquals(0)
-        onAllNodesWithText("https://verifier.example/terms").assertCountEquals(0)
     }
 
     companion object {
