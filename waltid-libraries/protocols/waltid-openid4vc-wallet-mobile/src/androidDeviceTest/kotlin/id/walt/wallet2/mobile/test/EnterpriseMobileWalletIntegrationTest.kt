@@ -53,16 +53,6 @@ class EnterpriseMobileWalletIntegrationTest {
         get() = InstrumentationRegistry.getArguments().getString("enterprise_fixture_base_url")
 
     @Test
-    fun receiveEnterpriseMdlFromEnterpriseIssuer2() = runBlocking {
-        receiveCredentialFromEnterpriseIssuer2("enterprise-mdl")
-    }
-
-    @Test
-    fun receiveEnterpriseMdlWithClientAttestationFromEnterpriseIssuer2() = runBlocking {
-        receiveCredentialFromEnterpriseIssuer2("enterprise-mdl-client-attestation")
-    }
-
-    @Test
     fun receiveAndPresentEnterpriseMdlIssuer2Verifier2Flow() = runBlocking {
         receiveAndPresentEnterpriseCredential("enterprise-mdl")
     }
@@ -229,24 +219,6 @@ class EnterpriseMobileWalletIntegrationTest {
         } finally {
             instrumentation.runOnMainSync { activity.finish() }
         }
-    }
-
-    private suspend fun receiveCredentialFromEnterpriseIssuer2(scenarioId: String) {
-        val fixture = requireFixture()
-        val scenario = enterpriseScenario(fixture, scenarioId)
-        val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
-        val wallet = createWallet(
-            walletId = "android-enterprise-receive-${scenario.id}-${UUID.randomUUID()}",
-            attestation = offer.attestation,
-        )
-        wallet.signingIdentity.initialize().activeIdentity()
-
-        val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
-
-        assertTrue(
-            credentialIds.isNotEmpty(),
-            "Should receive ${scenario.displayName} from Enterprise issuer2",
-        )
     }
 
     private suspend fun receiveAndPresentEnterpriseCredential(scenarioId: String) {
