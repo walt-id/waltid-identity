@@ -63,19 +63,7 @@ class NfcEngagementApduProcessorTest {
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
         processor.process(selectFile(0xe104))
 
-        val serviceSelect = NdefMessage(
-            listOf(
-                NdefRecord(
-                    NdefTypeNameFormat.WELL_KNOWN,
-                    ByteString("Ts".encodeToByteArray()),
-                    payload = ByteString(
-                        byteArrayOf(NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.length.toByte()) +
-                            NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.encodeToByteArray(),
-                    ),
-                )
-            )
-        ).encode()
-        assertStatus(NfcStatusWord.SUCCESS, processor.process(updateBinary(0, withNlen(serviceSelect))))
+        assertStatus(NfcStatusWord.SUCCESS, processor.process(updateBinary(0, withNlen(serviceSelect()))))
         assertStatus(NfcStatusWord.SUCCESS, processor.process(updateBinary(0, withNlen(handoverRequest))))
 
         val result = assertIs<NfcConnectionHandover.Negotiated>(completed.single())
@@ -130,19 +118,7 @@ class NfcEngagementApduProcessorTest {
         )
         processor.process(selectAid(MdocNfcAid.NDEF_APPLICATION))
         processor.process(selectFile(0xe104))
-        val serviceSelect = NdefMessage(
-            listOf(
-                NdefRecord(
-                    NdefTypeNameFormat.WELL_KNOWN,
-                    ByteString("Ts".encodeToByteArray()),
-                    payload = ByteString(
-                        byteArrayOf(NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.length.toByte()) +
-                            NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.encodeToByteArray(),
-                    ),
-                ),
-            ),
-        ).encode()
-        processor.process(updateBinary(0, withNlen(serviceSelect)))
+        processor.process(updateBinary(0, withNlen(serviceSelect())))
 
         assertFailsWith<CancellationException> {
             processor.process(updateBinary(0, withNlen(handoverMessage("Hr"))))
@@ -164,7 +140,7 @@ class NfcEngagementApduProcessorTest {
     }
 
     @Test
-    fun `TNEP service parameters and status round trip exactly`() {
+    fun `TNEP service parameters and status match their wire records`() {
         val parameters = NfcTnepCodec.ServiceParameters(
             waitingTimeExponent = 5u,
             maximumWaitExtensions = 3u,
@@ -173,6 +149,11 @@ class NfcEngagementApduProcessorTest {
         val encodedParameters = NfcTnepCodec.serviceParameter(parameters)
         val encodedStatus = NfcTnepCodec.status(1u)
 
+        // Tp: v1.0, handover service, single response, wt=5, nWait=3, maxNdef=4096; Te: status 1.
+        assertContentEquals(
+            "91021a5470101375726e3a6e66633a736e3a68616e646f7665720005031000510201546501".hexToByteArray(),
+            NdefMessage(listOf(encodedParameters, encodedStatus)).encode(),
+        )
         assertEquals(parameters, NfcTnepCodec.parseServiceParameter(encodedParameters))
         assertEquals(1u, NfcTnepCodec.parseStatus(encodedStatus))
         assertEquals(null, NfcTnepCodec.parseStatus(encodedParameters))
@@ -258,6 +239,19 @@ class NfcEngagementApduProcessorTest {
             withoutCollisionResolution.embeddedMessage.records.single().type.toByteArray(),
         )
     }
+
+    private fun serviceSelect(): ByteArray = NdefMessage(
+        listOf(
+            NdefRecord(
+                NdefTypeNameFormat.WELL_KNOWN,
+                ByteString("Ts".encodeToByteArray()),
+                payload = ByteString(
+                    byteArrayOf(NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.length.toByte()) +
+                        NfcTnepCodec.CONNECTION_HANDOVER_SERVICE.encodeToByteArray(),
+                ),
+            ),
+        ),
+    ).encode()
 
     private fun handoverMessage(type: String): ByteArray {
         val carrier = carrier("0")
