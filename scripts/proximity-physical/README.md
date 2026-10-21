@@ -6,10 +6,13 @@ hardware-free guard evidence only. No physical configuration is qualified by its
 addition.** Existing physical runs remain separately authorized; adding this
 entry point does not resume a paused run.
 
-The reader uses Multipaz Android `0.100.0`, revision
-`7c0988bee3384d13a0732e0c33336ae0faf3b863`. Its NFC retrieval SELECT is corrected
-to the selected standard, as documented in the
+The reader uses `org.multipaz:multipaz-android` at the version declared in the
+[version catalog](../../gradle/libs.versions.toml). Its vendored NFC reader transport
+comes from Multipaz `0.100.0`, revision `7c0988bee3384d13a0732e0c33336ae0faf3b863`,
+with retrieval SELECT corrected to the selected standard, as documented in the
 [peer provenance](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/androidHostTest/kotlin/id/walt/wallet2/mobile/peer/README.md).
+The report's `peerRevision` identifies that vendored source, separately from the
+runtime dependency version.
 This is a modified independent reader, not an unmodified Multipaz interoperability
 claim. No peer dependency is added to published runtime artifacts.
 
