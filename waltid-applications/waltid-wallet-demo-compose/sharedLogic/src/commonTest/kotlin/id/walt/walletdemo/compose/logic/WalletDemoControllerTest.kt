@@ -325,7 +325,7 @@ class WalletDemoControllerTest {
                 saved.setProximityApprovalMode(mode)
             }
         }
-        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), sharingSettings = store)
+        val controller = controllerWith(FakeDemoWallet(), this, sharingSettings = store)
         controller.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
         assertEquals(WalletDemoProximityApprovalMode.AskEachTime, controller.state.value.proximityApprovalMode)
         assertEquals(WalletDemoProximityApprovalMode.AskEachTime, saved.proximityApprovalMode())
@@ -767,25 +767,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun biometricUnlockOpensWalletWithoutPin() = runTest {
-        val pinStore = InMemoryDemoPinStore()
-        pinStore.setPin("1234")
-        pinStore.setBiometricUnlockEnabled(true)
-        val wallet = FakeDemoWallet()
-        val biometrics = FakeDemoBiometricAuthenticator()
-        val controller = controllerWith(wallet, this, pinStore, biometrics)
-
-        assertTrue(controller.state.value.auth is WalletAuthState.Login)
-        controller.unlockWithBiometrics()
-        runCurrent()
-
-        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
-        assertEquals(1, biometrics.authenticateCalls)
-        assertEquals(1, wallet.bootstrapCalls)
-    }
-
-    @Test
-    fun cancelledBiometricsLeavesPinFallback() = runTest {
+    fun failedBiometricsLeavesPinFallback() = runTest {
         val pinStore = InMemoryDemoPinStore()
         pinStore.setPin("1234")
         pinStore.setBiometricUnlockEnabled(true)
@@ -821,10 +803,12 @@ class WalletDemoControllerTest {
         val biometrics = FakeDemoBiometricAuthenticator()
         val controller = controllerWith(wallet, this, pinStore, biometrics)
 
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
         controller.unlockWithBiometrics()
         runCurrent()
         assertEquals(1, biometrics.authenticateCalls)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, wallet.bootstrapCalls)
 
         controller.lock()
         val login = controller.state.value.auth as WalletAuthState.Login
