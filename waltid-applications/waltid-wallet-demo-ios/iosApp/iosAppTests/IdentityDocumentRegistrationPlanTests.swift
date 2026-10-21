@@ -1,15 +1,45 @@
 import XCTest
-import WalletDemoIdentityDocumentSupport
+@testable import WalletDemoIdentityDocumentSupport
 import WalletSDK
 
-/// Reconciliation semantics, exercised as a pure diff rather than against Apple's actor.
-///
-/// The Apple store wrapper around this planner does nothing but apply the plan, so these cases are
-/// where registration correctness is actually decided.
+/// Registration planning and serialized application of provider updates.
 final class IdentityDocumentRegistrationPlanTests: XCTestCase {
     private let mdl = "org.iso.18013.5.1.mDL"
     private let pid = "eu.europa.ec.eudi.pid.1"
     private var supported: Set<String> { [mdl, pid] }
+
+    func testProviderUpdatesDoNotOverlapWhileAwaitingAuthorization() async throws {
+        let queue = RegistrationReconciliationQueue()
+        let registrations = SuspendedRegistrations()
+        var updates: [Task<RegistrationPlan, Error>] = []
+        for _ in 0..<5 {
+            updates.append(await queue.enqueue(namespace: "wallet") {
+                await registrations.reconcile()
+            })
+        }
+        for update in updates { _ = try await update.value }
+        let result = await registrations.result
+        XCTAssertEqual(result.maximumConcurrentUpdates, 1)
+        XCTAssertEqual(result.completedUpdates, 5, "Changes arriving during authorization must still be applied")
+    }
+
+    func testFailedProviderUpdateDoesNotBlockLaterChanges() async throws {
+        let queue = RegistrationReconciliationQueue()
+        let failed = await queue.enqueue(namespace: "wallet") {
+            throw IdentityDocumentSupportFailure.missingDesiredRegistrations("wallet")
+        }
+        let next = await queue.enqueue(namespace: "wallet") {
+            RegistrationPlan(toAdd: [], toRemove: ["removed-credential"])
+        }
+        do {
+            _ = try await failed.value
+            XCTFail("The caller must receive the original failure")
+        } catch {
+            XCTAssertEqual(error as? IdentityDocumentSupportFailure, .missingDesiredRegistrations("wallet"))
+        }
+        let plan = try await next.value
+        XCTAssertEqual(plan.toRemove, ["removed-credential"])
+    }
 
     func testEmptyStoreAddsEveryDesiredRegistration() {
         let plan = reconciliationPlan(
@@ -210,5 +240,22 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
         )
 
         XCTAssertEqual(forward, reversed)
+    }
+}
+
+private actor SuspendedRegistrations {
+    private var active = 0
+    private var maximumActive = 0
+    private var completed = 0
+    var result: (maximumConcurrentUpdates: Int, completedUpdates: Int) { (maximumActive, completed) }
+
+    func reconcile() async -> RegistrationPlan {
+        active += 1
+        maximumActive = max(maximumActive, active)
+        // Model the suspension while the system presents consent, without a wall-clock delay.
+        for _ in 0..<10 { await Task.yield() }
+        active -= 1
+        completed += 1
+        return RegistrationPlan(toAdd: [], toRemove: [])
     }
 }
