@@ -72,35 +72,22 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
         XCTAssertEqual(card.startCount, 1)
     }
 
-    func testCapabilityReportsReadingAndCardSessionPrerequisitesWithoutSideEffects() async throws {
+    func testCapabilityReportsUnavailablePrerequisitesWithoutSideEffects() async throws {
         let scenarios: [(FakeNfcEnvironment, String)] = [
             (FakeNfcEnvironment(reading: false), "nfc_reading_unavailable"),
             (FakeNfcEnvironment(supported: false), "nfc_card_session_unsupported"),
+            (FakeNfcEnvironment(eligible: false), "nfc_system_ineligible"),
         ]
 
         for (environment, expectedCode) in scenarios {
             let capability = try await IOSNfcHostPlatformAdapter(environment: environment).__capability()
             let unavailable = try XCTUnwrap(
-                capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
+                capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable, expectedCode
             )
             XCTAssertEqual(unavailable.code, expectedCode)
-            XCTAssertEqual(environment.presentmentIntentCount, 0)
-            XCTAssertEqual(environment.sessionCount, 0)
+            XCTAssertEqual(environment.presentmentIntentCount, 0, expectedCode)
+            XCTAssertEqual(environment.sessionCount, 0, expectedCode)
         }
-    }
-
-    func testCapabilityDoesNotCreateSessionAndReportsSystemIneligibility() async throws {
-        let environment = FakeNfcEnvironment(eligible: false)
-        let adapter = IOSNfcHostPlatformAdapter(environment: environment)
-
-        let capability = try await adapter.__capability()
-
-        let unavailable = try XCTUnwrap(
-            capability as? Waltid_mdoc_proximity_mobileNfcHostAvailabilityUnavailable
-        )
-        XCTAssertEqual(unavailable.code, "nfc_system_ineligible")
-        XCTAssertEqual(environment.presentmentIntentCount, 0)
-        XCTAssertEqual(environment.sessionCount, 0)
     }
 
     func testFrameworkNeutralBridgeRoutesOneSessionWithoutGeneratedKmpTypes() async throws {
@@ -506,26 +493,19 @@ final class IOSNfcHostPlatformAdapterTests: XCTestCase {
         }
     }
 
-    func testPresentmentIntentFailureDoesNotBlockCardSessionCreation() async throws {
-        let environment = FakeNfcEnvironment(presentmentIntentFailure: TestFailure.failed)
-        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+    func testOptionalPresentmentIntentDoesNotBlockCardSessionCreation() async throws {
+        let scenarios: [(String, FakeNfcEnvironment)] = [
+            ("acquisition failure", FakeNfcEnvironment(presentmentIntentFailure: TestFailure.failed)),
+            ("unavailable", FakeNfcEnvironment(presentmentIntentAvailable: false)),
+        ]
+        for (name, environment) in scenarios {
+            let coordinator = CardSessionNfcHostCoordinator(environment: environment)
+            let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
 
-        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
-
-        XCTAssertEqual(environment.presentmentIntentCount, 1)
-        XCTAssertEqual(environment.sessionCount, 1)
-        await session.close(reason: .cancelled)
-    }
-
-    func testMissingPresentmentIntentDoesNotBlockCardSessionCreation() async throws {
-        let environment = FakeNfcEnvironment(presentmentIntentAvailable: false)
-        let coordinator = CardSessionNfcHostCoordinator(environment: environment)
-
-        let session = try await coordinator.prepare(router: FakeNfcRouter(response: Data()))
-
-        XCTAssertEqual(environment.presentmentIntentCount, 1)
-        XCTAssertEqual(environment.sessionCount, 1)
-        await session.close(reason: .cancelled)
+            XCTAssertEqual(environment.presentmentIntentCount, 1, name)
+            XCTAssertEqual(environment.sessionCount, 1, name)
+            await session.close(reason: .cancelled)
+        }
     }
 
     func testExpiredPresentmentIntentDoesNotBlockReaderDetection() async throws {
