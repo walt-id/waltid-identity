@@ -167,11 +167,7 @@ class ProximityRequestProcessorTest {
                     ),
                 )
                 val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-                val processor = ProximityRequestProcessor(
-                    wallet = fixture.wallet,
-                    configuration = ProximityConfiguration(),
-                    readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
-                )
+                val processor = processor(fixture)
                 val preview = processor.preview(context)
                 val prompt = MdocConsentPrompt(
                     bindingToken = ByteString(ByteArray(32) { (index + 16).toByte() }),
@@ -227,11 +223,7 @@ class ProximityRequestProcessorTest {
                 ),
             )
             val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-            val processor = ProximityRequestProcessor(
-                wallet = fixture.wallet,
-                configuration = ProximityConfiguration(),
-                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
-            )
+            val processor = processor(fixture)
             val preview = processor.preview(context)
             val prompt = MdocConsentPrompt(
                 bindingToken = ByteString(ByteArray(32) { 22 }),
@@ -288,11 +280,7 @@ class ProximityRequestProcessorTest {
                 },
             )
             val context = requestContext(request, transcript(), fixture.readerEphemeralKey)
-            val processor = ProximityRequestProcessor(
-                wallet = fixture.wallet,
-                configuration = ProximityConfiguration(),
-                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
-            )
+            val processor = processor(fixture)
             val preview = processor.preview(context)
             val prompt = MdocConsentPrompt(
                 bindingToken = ByteString(ByteArray(32) { 21 }),
@@ -334,11 +322,7 @@ class ProximityRequestProcessorTest {
     @Test
     fun `review retains authentication only for the satisfiable alternative document set`() = runTest {
         withFixture { fixture ->
-            val processor = ProximityRequestProcessor(
-                wallet = fixture.wallet,
-                configuration = ProximityConfiguration(),
-                readerAuthenticationAlgorithms = setOf(Cose.Algorithm.ES256),
-            )
+            val processor = processor(fixture)
             val request = DeviceRequest(
                 version = DeviceRequest.VERSION_WITH_SIGNING,
                 docRequests = listOf(
@@ -918,41 +902,53 @@ class ProximityRequestProcessorTest {
 
     @Test
     fun `cancellation during protected signing clears approval and allows a fresh session`() = runTest {
-        val signingEntered = CompletableDeferred<Unit>()
-        val releaseSigning = CompletableDeferred<Unit>()
-        var blockSigning = true
-        withFixture(holderTransform = { original ->
-            object : Key by original {
-                override val capabilities: KeyCapabilities = original.capabilities.copy(signer = Signer { data, algorithm ->
-                    if (blockSigning) { signingEntered.complete(Unit); releaseSigning.await() }
-                    requireNotNull(original.capabilities.signer).sign(data, algorithm)
-                })
+        for (cancelWorker in listOf(true, false)) {
+            val signingEntered = CompletableDeferred<Unit>()
+            val releaseSigning = CompletableDeferred<Unit>()
+            var blockSigning = true
+            withFixture(holderTransform = { original ->
+                object : Key by original {
+                    override val capabilities: KeyCapabilities = original.capabilities.copy(signer = Signer { data, algorithm ->
+                        if (blockSigning) { signingEntered.complete(Unit); releaseSigning.await() }
+                        requireNotNull(original.capabilities.signer).sign(data, algorithm)
+                    })
+                }
+            }) { fixture ->
+                val processor = processor(fixture)
+                val owner = owner(fixture, processor)
+                val context = requestContext(fixture.readerEphemeralKey)
+                val preview = processor.preview(context)
+                val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
+                val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
+                assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Approve(
+                    review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first()),
+                )))
+                decision.await()
+                val response = async {
+                    if (cancelWorker) processor.resolve(context, preview)
+                    else assertEquals("The proximity processor is closed", assertFailsWith<IllegalStateException> {
+                        processor.resolve(context, preview)
+                    }.message)
+                }
+                signingEntered.await()
+                assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Cancel))
+                if (cancelWorker) {
+                    response.cancelAndJoin()
+                    releaseSigning.complete(Unit)
+                    assertTrue(response.isCancelled)
+                } else {
+                    releaseSigning.complete(Unit)
+                    response.await()
+                }
+                assertEquals(ProximityState.Cancelled, owner.state.value)
+                blockSigning = false
+                val fresh = processor(fixture)
+                val freshPreview = fresh.preview(context)
+                val freshPrompt = prompt(freshPreview, 1)
+                val freshReview = fresh.review(freshPrompt)
+                assertEquals(null, fresh.accept(freshPrompt, freshReview.reviewId, submissionFor(freshReview, freshReview.documents.single().credentialOptions.first())))
+                assertIs<MdocResponseResolution.Send>(fresh.resolve(context, freshPreview))
             }
-        }) { fixture ->
-            val processor = processor(fixture)
-            val owner = owner(fixture, processor)
-            val context = requestContext(fixture.readerEphemeralKey)
-            val preview = processor.preview(context)
-            val decision = async(start = CoroutineStart.UNDISPATCHED) { owner.decide(prompt(preview, 1)) }
-            val review = assertIs<ProximityState.ReviewRequired>(owner.state.value).review
-            assertEquals(ProximityActionResult.Accepted, owner.dispatch(ProximityAction.Approve(
-                review.reviewId, submissionFor(review, review.documents.single().credentialOptions.first()),
-            )))
-            decision.await()
-            val response = async { processor.resolve(context, preview) }
-            signingEntered.await()
-            owner.dispatch(ProximityAction.Cancel)
-            response.cancelAndJoin()
-            releaseSigning.complete(Unit)
-            assertTrue(response.isCancelled)
-            assertEquals(ProximityState.Cancelled, owner.state.value)
-            blockSigning = false
-            val fresh = processor(fixture)
-            val freshPreview = fresh.preview(context)
-            val freshPrompt = prompt(freshPreview, 1)
-            val freshReview = fresh.review(freshPrompt)
-            assertEquals(null, fresh.accept(freshPrompt, freshReview.reviewId, submissionFor(freshReview, freshReview.documents.single().credentialOptions.first())))
-            assertIs<MdocResponseResolution.Send>(fresh.resolve(context, freshPreview))
         }
     }
 
