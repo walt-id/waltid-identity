@@ -13,8 +13,6 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.MontgomeryCurve
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.CryptoOperation
-import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.crypto.MdocKdf
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -131,7 +129,7 @@ class MdocSessionCipherTest {
             KeySpec.Montgomery(MontgomeryCurve.X25519),
             KeySpec.Montgomery(MontgomeryCurve.X448),
         )
-        for ((index, spec) in specs.filter(::supportsAgreementKeyGeneration).withIndex()) {
+        for ((index, spec) in specs.filter(runtime::supportsMdocAgreementKeyGeneration).withIndex()) {
             val device = agreementKey("device-$index", spec)
             val reader = agreementKey("reader-$index", spec)
             val deviceCose = (device.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
@@ -161,14 +159,4 @@ class MdocSessionCipherTest {
             setOf(KeyUsage.KEY_AGREEMENT),
         )
     )
-
-    private fun supportsAgreementKeyGeneration(spec: KeySpec): Boolean = runCatching {
-        runtime.resolveSoftwareProvider(
-            CryptoRequirement(
-                operation = CryptoOperation.GENERATE_KEY,
-                spec = spec,
-                usages = setOf(KeyUsage.KEY_AGREEMENT),
-            )
-        )
-    }.isSuccess
 }

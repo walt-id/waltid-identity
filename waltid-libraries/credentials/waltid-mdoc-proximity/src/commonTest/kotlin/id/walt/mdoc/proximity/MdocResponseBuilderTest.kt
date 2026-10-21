@@ -17,8 +17,6 @@ import id.walt.crypto2.keys.HpkeCiphertext
 import id.walt.crypto2.hpke.Hpke
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.CryptoOperation
-import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.crypto.MdocCrypto
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -224,7 +222,7 @@ class MdocResponseBuilderTest {
     fun `device MAC supports every provider-backed XDH session curve`() = runTest {
         val specs = listOf(MontgomeryCurve.X25519, MontgomeryCurve.X448)
             .map(KeySpec::Montgomery)
-            .filter(::supportsAgreementKeyGeneration)
+            .filter(runtime::supportsMdocAgreementKeyGeneration)
         for ((index, spec) in specs.withIndex()) {
             val holderKey = key(
                 "xdh-mac-holder-$index",
@@ -465,14 +463,4 @@ class MdocResponseBuilderTest {
         usages: Set<KeyUsage>,
         spec: KeySpec = KeySpec.Ec(EcCurve.P256),
     ) = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId(id), spec, usages))
-
-    private fun supportsAgreementKeyGeneration(spec: KeySpec): Boolean = runCatching {
-        runtime.resolveSoftwareProvider(
-            CryptoRequirement(
-                operation = CryptoOperation.GENERATE_KEY,
-                spec = spec,
-                usages = setOf(KeyUsage.KEY_AGREEMENT),
-            )
-        )
-    }.isSuccess
 }
