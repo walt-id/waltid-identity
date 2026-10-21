@@ -1627,31 +1627,6 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun receiveRefreshesCredentialsAndStatus() = runTest {
-        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
-        val controller = unlockedControllerWith(wallet, this)
-
-        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
-        controller.selectTab(WalletDemoTab.Receive)
-        controller.updateOfferUrl("openid-credential-offer://example")
-        controller.previewOffer()
-        runCurrent()
-        controller.acceptOffer()
-        runCurrent()
-
-        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
-        assertEquals(1, wallet.receiveCalls)
-        assertEquals(
-            WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive),
-            controller.state.value.operation,
-        )
-        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
-        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
-        val session = controller.state.value.session as WalletSessionState.Ready
-        assertEquals(wallet.credentials, session.credentials)
-    }
-
-    @Test
     fun receiveIgnoresBlankOfferUrl() = runTest {
         val wallet = FakeDemoWallet()
         val controller = unlockedControllerWith(wallet, this)
@@ -3191,7 +3166,7 @@ class WalletDemoControllerTest {
 
     @Test
     fun receiveCompletionTracksReceivedCredentialsAndCanStartNewFlow() = runTest {
-        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1"))
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
         val controller = unlockedControllerWith(wallet, this)
 
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
@@ -3201,20 +3176,28 @@ class WalletDemoControllerTest {
         controller.updateOfferUrl("openid-credential-offer://example")
         assertTrue(controller.state.value.receiveActionEnabled)
 
-        wallet.credentials = listOf(sampleCredential)
+        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
         controller.previewOffer()
         runCurrent()
         controller.acceptOffer()
         runCurrent()
 
+        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(
+            WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive),
+            controller.state.value.operation,
+        )
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(wallet.credentials, session.credentials)
         assertTrue(controller.state.value.receiveCompleted)
         assertNotNull(controller.state.value.issuanceReceipt)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
         assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
 
         controller.selectTab(WalletDemoTab.Receive)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
