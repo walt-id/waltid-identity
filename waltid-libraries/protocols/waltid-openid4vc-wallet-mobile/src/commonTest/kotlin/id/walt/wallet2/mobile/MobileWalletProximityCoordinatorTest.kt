@@ -279,7 +279,7 @@ class ProximityCoordinatorTest {
     }
 
     @Test
-    fun `unimplemented Wi-Fi Aware remains truthful without blocking or instantiating BLE fallback`() = runTest {
+    fun `unimplemented Wi-Fi Aware preserves BLE fallback without creating Wi-Fi resources`() = runTest {
         val ble = RecordingTransportFactory(BleProximityAvailability.Available)
         val wifiAware = RecordingWifiAwareTransportFactory(
             WifiAwareProximityAvailability.Unavailable(
@@ -637,7 +637,6 @@ class ProximityCoordinatorTest {
     ) : NfcHostPlatformAdapter {
         var capabilityCalls: Int = 0
         var prepareCalls: Int = 0
-        val routers: MutableList<NfcHostApduRouter> = mutableListOf()
 
         override suspend fun capability(): NfcHostAvailability {
             capabilityCalls++
@@ -649,7 +648,6 @@ class ProximityCoordinatorTest {
             sessionScope: CoroutineScope,
         ): NfcHostPreparation {
             prepareCalls++
-            routers += router
             return NfcHostPreparation.Ready(
                 object : PreparedNfcHostSession {
                     override suspend fun close(reason: ProximityCloseReason) = Unit
