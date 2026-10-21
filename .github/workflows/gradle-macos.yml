@@ -99,7 +99,7 @@ jobs:
     timeout-minutes: 115
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@330e523f8f393ad92f77e73bf87269f9b7e6fa4a
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -177,7 +177,7 @@ jobs:
       artifact-name: wallet-core-release-${{ github.run_attempt }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@330e523f8f393ad92f77e73bf87269f9b7e6fa4a
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -243,7 +243,7 @@ jobs:
         consumer: ${{ fromJSON((inputs.run-native || inputs.run-visual-native) && inputs.run-compose && '["native","compose","bridge"]' || inputs.run-native && '["native","bridge"]' || inputs.run-compose && '["compose","bridge"]' || '["native"]') }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@330e523f8f393ad92f77e73bf87269f9b7e6fa4a
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
@@ -341,7 +341,7 @@ jobs:
     runs-on: xcode-27
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@330e523f8f393ad92f77e73bf87269f9b7e6fa4a
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
