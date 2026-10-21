@@ -40,30 +40,33 @@ class MobileWalletRegistryIconsTest {
 
     @Test
     fun fallsBackToCredentialLogoThenIssuerLogo() = runTest {
-        val fetched = mutableListOf<String>()
-        val logo = solidColorPng(0x00AA00)
-        val icon = MobileWalletRegistryIcons.resolveIconPng(
-            metadata = displayMetadata(
-                credentialBackgroundUri = "https://issuer.example/missing-bg.png",
-                credentialLogoUri = "https://issuer.example/pid.png",
-                issuerLogoUri = "https://issuer.example/issuer.png",
-            ),
-            credentialData = buildJsonObject {},
-            displayName = "PID",
-            fetchHttps = { uri ->
-                fetched += uri
-                if (uri.endsWith("pid.png")) logo else null
-            },
-        )
+        for (availableLogo in listOf("pid.png", "issuer.png")) {
+            val fetched = mutableListOf<String>()
+            val logo = solidColorPng(0x00AA00)
+            val icon = MobileWalletRegistryIcons.resolveIconPng(
+                metadata = displayMetadata(
+                    credentialBackgroundUri = "https://issuer.example/missing-bg.png",
+                    credentialLogoUri = "https://issuer.example/pid.png",
+                    issuerLogoUri = "https://issuer.example/issuer.png",
+                ),
+                credentialData = buildJsonObject {},
+                displayName = "PID",
+                fetchHttps = { uri ->
+                    fetched += uri
+                    if (uri.endsWith(availableLogo)) logo else null
+                },
+            )
 
-        assertEquals(
-            listOf(
-                "https://issuer.example/missing-bg.png",
-                "https://issuer.example/pid.png",
-            ),
-            fetched,
-        )
-        assertContentEquals(logo, icon)
+            assertEquals(
+                listOf(
+                    "https://issuer.example/missing-bg.png",
+                    "https://issuer.example/pid.png",
+                ) + if (availableLogo == "issuer.png") listOf("https://issuer.example/issuer.png") else emptyList(),
+                fetched,
+                availableLogo,
+            )
+            assertContentEquals(logo, icon, availableLogo)
+        }
     }
 
     @Test
@@ -134,7 +137,7 @@ class MobileWalletRegistryIconsTest {
     }
 
     @Test
-    fun rejectsOversizedBase64PortraitBeforeDecoding() = runTest {
+    fun oversizedBase64PortraitFallsBackToDefaultColor() = runTest {
         val oversized = "A".repeat(MaxRegistryIconBase64Chars + 4)
         val icon = MobileWalletRegistryIcons.resolveIconPng(
             metadata = null,
