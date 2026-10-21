@@ -87,21 +87,7 @@ class AndroidDigitalCredentialRegistryTest {
     @Test
     fun mapsMdocMetadataWithoutRawCredentialsOrKeys() {
         val entry = with(registry) {
-            MobileWalletCredentialRegistryRecord(
-                registryEntryId = "opaque-id",
-                credentialId = "wallet-private-id",
-                format = MobileWalletDigitalCredentialFormat.MDOC,
-                type = "org.iso.18013.5.1.mDL",
-                fields = listOf(
-                    MobileWalletCredentialRegistryField(
-                        path = listOf("org.iso.18013.5.1", "given_name"),
-                        valueJson = "\"Ada\"",
-                        selectivelyDisclosable = true,
-                    )
-                ),
-                displayName = "Driving licence",
-                subtitle = "D-123-456",
-            ).toAndroidEntry()
+            mdocRecord().toAndroidEntry()
         } as MdocEntry
 
         val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
@@ -267,21 +253,7 @@ class AndroidDigitalCredentialRegistryTest {
     fun annexCMatcherDatabaseUsesOpaqueIdsAndMdocNamespaces() {
         val bytes = registry.encodeAnnexCCredentialDatabase(
             listOf(
-                MobileWalletCredentialRegistryRecord(
-                    registryEntryId = "opaque-id",
-                    credentialId = "wallet-private-id",
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
-                    type = "org.iso.18013.5.1.mDL",
-                    fields = listOf(
-                        MobileWalletCredentialRegistryField(
-                            path = listOf("org.iso.18013.5.1", "given_name"),
-                            valueJson = "\"Ada\"",
-                            selectivelyDisclosable = true,
-                        )
-                    ),
-                    displayName = "Driving licence",
-                    subtitle = "D-123-456",
-                )
+                mdocRecord()
             )
         )
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
@@ -304,21 +276,7 @@ class AndroidDigitalCredentialRegistryTest {
         val customIcon = byteArrayOf(7, 8, 9, 10)
         val bytes = registry.encodeAnnexCCredentialDatabase(
             listOf(
-                MobileWalletCredentialRegistryRecord(
-                    registryEntryId = "opaque-id",
-                    credentialId = "wallet-private-id",
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
-                    type = "org.iso.18013.5.1.mDL",
-                    fields = listOf(
-                        MobileWalletCredentialRegistryField(
-                            path = listOf("org.iso.18013.5.1", "given_name"),
-                            valueJson = "\"Ada\"",
-                            selectivelyDisclosable = true,
-                        )
-                    ),
-                    displayName = "Driving licence",
-                    iconPng = customIcon,
-                )
+                mdocRecord().copy(subtitle = "", iconPng = customIcon)
             )
         )
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
@@ -333,4 +291,20 @@ class AndroidDigitalCredentialRegistryTest {
         assertTrue(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = true))
         assertFalse(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = false))
     }
+
+    private fun mdocRecord() = MobileWalletCredentialRegistryRecord(
+        registryEntryId = "opaque-id",
+        credentialId = "wallet-private-id",
+        format = MobileWalletDigitalCredentialFormat.MDOC,
+        type = "org.iso.18013.5.1.mDL",
+        fields = listOf(
+            MobileWalletCredentialRegistryField(
+                path = listOf("org.iso.18013.5.1", "given_name"),
+                valueJson = "\"Ada\"",
+                selectivelyDisclosable = true,
+            )
+        ),
+        displayName = "Driving licence",
+        subtitle = "D-123-456",
+    )
 }
