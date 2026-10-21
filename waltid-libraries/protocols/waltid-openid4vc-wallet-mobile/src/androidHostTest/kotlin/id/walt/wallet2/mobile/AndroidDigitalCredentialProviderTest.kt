@@ -25,8 +25,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 private const val EXTRA_CREDENTIAL_SET_ID =
     "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ID"
@@ -44,22 +42,24 @@ class AndroidDigitalCredentialProviderTest {
     @Config(sdk = [35])
     @Test
     fun extractsTheOfficialProviderRequestAndUsesTheAuthenticatedNativeCallerOrigin() {
-        val signature = Signature(byteArrayOf(1, 2, 3, 4))
-        val intent = providerIntent(
-            requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
-            packageName = "id.walt.caller",
-            signingInfo = signingInfo(signature),
-            selectedCredentialSet = selectedCredentialSetExtras(),
+        val callerOrigins = listOf(
+            byteArrayOf(1, 2, 3) to "android:apk-key-hash:A5BYxvLAy0ksUzsKTRTvd8wPeKvMztUofYShogEc-4E",
+            byteArrayOf(1, 2, 3, 4) to "android:apk-key-hash:n2SnR-G5fxMfq7a0Rylsm28CAeefs8U1bmx36JtqgGo",
         )
+        for ((certificate, expectedOrigin) in callerOrigins) {
+            val intent = providerIntent(
+                requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
+                packageName = "id.walt.caller",
+                signingInfo = signingInfo(Signature(certificate)),
+                selectedCredentialSet = selectedCredentialSetExtras(),
+            )
 
-        val input = AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
+            val input = AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
 
-        assertEquals("id.walt.caller", input.providerRequest.callingAppInfo.packageName)
-        assertEquals(
-            AndroidDigitalCredentialProvider.nativeAppOrigin(signature.toByteArray()),
-            input.request.verifiedOrigin,
-        )
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, input.request.protocol)
+            assertEquals("id.walt.caller", input.providerRequest.callingAppInfo.packageName)
+            assertEquals(expectedOrigin, input.request.verifiedOrigin)
+            assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, input.request.protocol)
+        }
     }
 
     @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -88,45 +88,28 @@ class AndroidDigitalCredentialProviderTest {
      * `MobileWallet.previewDigitalCredentialPresentation` reads as unrestricted matching over the whole
      * store.
      *
-     * The envelope offers a single alternative because that is the one shape whose *protocol request*
-     * resolution needs no attribution, so a missing selection could otherwise pass unnoticed.
+     * Both single-alternative request shapes need no protocol attribution, so a missing selection
+     * could otherwise pass unnoticed.
      */
     @OptIn(ExperimentalDigitalCredentialApi::class)
     @Config(sdk = [35])
     @Test
     fun rejectsARegistryRequestThatCarriesNoSelectedCredentialSet() {
-        val intent = providerIntent(
-            requestJson = """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
-            packageName = "id.walt.caller",
-            signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
+        val requests = listOf(
+            """{"requests":[{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}]}""",
+            """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
         )
-
-        assertFailsWith<IllegalArgumentException> {
-            AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
-        }
-    }
-
-    /**
-     * The refusal happens during extraction, before any wallet is consulted. `extract` is the only
-     * boundary between Credential Manager and credential matching, so nothing downstream can receive a
-     * request built from a missing selection.
-     */
-    @OptIn(ExperimentalDigitalCredentialApi::class)
-    @Config(sdk = [35])
-    @Test
-    fun refusesAMissingSelectionBeforeProducingAnyPlatformNeutralRequest() {
-        val extraction = runCatching {
-            AndroidDigitalCredentialProvider.extract(
-                providerIntent(
-                    requestJson = """{"protocol":"openid4vp-v1-unsigned","data":{"nonce":"n"}}""",
-                    packageName = "id.walt.caller",
-                    signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
-                ),
-                """{"apps":[]}""",
+        for (requestJson in requests) {
+            val intent = providerIntent(
+                requestJson = requestJson,
+                packageName = "id.walt.caller",
+                signingInfo = signingInfo(Signature(byteArrayOf(1, 2, 3, 4))),
             )
+            assertFailsWith<IllegalArgumentException>(requestJson) {
+                AndroidDigitalCredentialProvider.extract(intent, """{"apps":[]}""")
+            }
         }
 
-        assertNull(extraction.getOrNull())
         // And the same intent with a selection added does produce one, so the absence is what failed.
         assertEquals(
             listOf("opaque-entry"),
@@ -578,11 +561,6 @@ class AndroidDigitalCredentialProviderTest {
                 selection = selection,
             )
         }
-    }
-
-    @Test
-    fun bindsTheNativeCallerSigningCertificateIntoTheOrigin() {
-        assertTrue(AndroidDigitalCredentialProvider.nativeAppOrigin(byteArrayOf(1, 2, 3)).startsWith("android:apk-key-hash:"))
     }
 
     /**
