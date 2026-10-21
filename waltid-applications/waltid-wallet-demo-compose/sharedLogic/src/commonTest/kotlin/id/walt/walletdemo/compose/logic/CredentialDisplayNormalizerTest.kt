@@ -1172,10 +1172,6 @@ class CredentialDisplayNormalizerTest {
         val syntheticPngBytes = byteArrayOf(
             0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
         )
-        val syntheticJpegBytes = byteArrayOf(
-            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
-        )
         val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
-        val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
 }
