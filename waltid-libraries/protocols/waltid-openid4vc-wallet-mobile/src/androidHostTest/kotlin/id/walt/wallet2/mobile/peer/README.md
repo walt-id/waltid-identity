@@ -4,7 +4,9 @@
 [0.100.0 / 7c0988bee3384d13a0732e0c33336ae0faf3b863](https://github.com/openwallet-foundation/multipaz/blob/7c0988bee3384d13a0732e0c33336ae0faf3b863/multipaz/src/commonMain/kotlin/org/multipaz/mdoc/transport/NfcTransportMdocReader.kt).
 Upstream source SHA-256: `46fbfd751ca95fc022a67cb4769dd656ca563a3ac14b464724a2d660fa59d931`.
 The accompanying `LICENSE` is upstream Apache-2.0. No standard procedures are copied here.
-Other reader operations use the test-only `org.multipaz:multipaz-jvm:0.100.0` dependency.
+Other reader operations use the test-only `org.multipaz:multipaz-jvm` dependency at the
+`multipaz` version in the root [version catalog](../../../../../../../../../../../gradle/libs.versions.toml).
+That dependency version is independent of the vendored reader revision above.
 
 Changes to the upstream file:
 
