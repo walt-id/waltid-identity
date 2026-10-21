@@ -25,7 +25,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -442,18 +442,21 @@ class BleTransportProviderTest {
     }
 
     @Test
-    fun `session cancellation closes every prepared role idempotently`() = runTest {
+    fun `session cancellation closes prepared roles before explicit cleanup`() = runTest {
         val platform = FakePlatform()
         val sessionJob = Job()
         val sessionScope = CoroutineScope(coroutineContext + sessionJob)
         val prepared = provider(BleMdocRoles.Dual(centralUuid, peripheralUuid), platform).prepare(context, sessionScope)
 
-        sessionJob.cancel()
+        sessionJob.cancelAndJoin()
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.central.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.peripheral.closeReasons)
+
         prepared.close(ProximityCloseReason.CANCELLED)
         prepared.close(ProximityCloseReason.CANCELLED)
 
-        assertTrue(platform.central.closeReasons.isNotEmpty())
-        assertTrue(platform.peripheral.closeReasons.isNotEmpty())
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.central.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), platform.peripheral.closeReasons)
     }
 
     private fun provider(roles: BleMdocRoles, platform: FakePlatform) = DefaultBleProximityTransportProvider(
