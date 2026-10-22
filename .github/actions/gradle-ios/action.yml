@@ -74,7 +74,7 @@ runs:
       if: ${{ inputs.run-ios-simulator-tests == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
+      run: exec ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
 
     - name: Cleanup simulators before tests
       if: ${{ inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
@@ -91,7 +91,7 @@ runs:
       continue-on-error: true
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew iosSimulatorArm64Test
+      run: exec ./gradlew iosSimulatorArm64Test
 
     - name: Require portable Kotlin simulator test results
       if: ${{ always() && inputs.run-ios-simulator-tests == 'true' }}
