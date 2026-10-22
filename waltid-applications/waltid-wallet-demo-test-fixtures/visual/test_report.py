@@ -53,6 +53,7 @@ class NativeReceiptTests(unittest.TestCase):
         for key in ("id", "renderer", "kind", "mode", "test", "schemaVersion"):
             with self.subTest(key=key):
                 self.assertEqual(self.status(**{key: "different"}), "invalid")
+        self.assertEqual(self.status(schemaVersion=2), "invalid")
 
     def test_recording_never_passes(self):
         self.assertEqual(self.status(mode="record"), "recorded")
