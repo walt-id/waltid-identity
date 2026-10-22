@@ -15,9 +15,14 @@ class JsExamplesTest {
 
     @Test
     fun `run JS tests`() = runTest {
+        val completed = mutableListOf<String>()
         runExampleCommand(
             command = "all",
             commands = jsExampleCommands,
+            output = { line ->
+                if (line.startsWith("Completed: ")) completed += line.removePrefix("Completed: ")
+            },
         )
+        assertEquals(portableExampleCommands.map(ExampleCommand::name), completed)
     }
 }
