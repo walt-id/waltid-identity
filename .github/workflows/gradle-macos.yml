@@ -210,8 +210,8 @@ jobs:
         timeout-minutes: 60
         working-directory: waltid-identity
         run: |
-          exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
+          exec python3 .github/scripts/mobile-ci/temporary-swiftpm-observer.py run \
+            "$RUNNER_TEMP/wallet-core-build" \
             ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1
       - name: Package the framework and its build identity
         working-directory: waltid-identity
@@ -223,8 +223,8 @@ jobs:
           path: ${{ runner.temp }}/wallet-core-artifact/
           if-no-files-found: error
           retention-days: 1
-      - name: Retain failed framework build logs
-        if: failure() || cancelled()
+      - name: Retain framework build observations
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: wallet-core-framework-failure-logs
