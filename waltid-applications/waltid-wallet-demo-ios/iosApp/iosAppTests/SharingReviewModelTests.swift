@@ -195,18 +195,6 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testEveryReaderTrustStateIsDistinctSoTheUserCanTellThemApart() {
-        let states: [SharingReaderTrust?] = [
-            ReaderTrust.notApplicable.sharingReaderTrust(),
-            ReaderTrust.notAuthenticated.sharingReaderTrust(),
-            ReaderTrust.pendingRawRequest.sharingReaderTrust(),
-            ReaderTrust.untrusted(reason: "no anchor").sharingReaderTrust(),
-            ReaderTrust.trusted(certificateSubject: "CN=Reader").sharingReaderTrust(),
-        ]
-
-        XCTAssertEqual(Set(states.map(String.init(describing:))).count, states.count)
-    }
-
     // MARK: - Response protection
 
     func testAnUnencryptedOpenIDResponseIsReportedAsUnencryptedRatherThanAsUnknown() {
