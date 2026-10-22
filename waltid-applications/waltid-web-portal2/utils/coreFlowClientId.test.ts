@@ -13,6 +13,7 @@ import {
 } from "./coreFlowClientId.ts";
 
 test("blank redirect_uri sends the bare prefix so verifier2 can bind response_uri", () => {
+  assert.equal(REDIRECT_URI_CLIENT_ID_PREFIX, "redirect_uri");
   assert.equal(
     prefixedCoreFlowClientId("redirect_uri", "  "),
     REDIRECT_URI_CLIENT_ID_PREFIX,
