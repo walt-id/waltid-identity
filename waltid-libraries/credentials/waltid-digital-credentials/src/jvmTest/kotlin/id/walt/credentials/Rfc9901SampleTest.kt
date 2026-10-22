@@ -52,6 +52,8 @@ class Rfc9901SampleTest {
             val sut = SdJwtSelectiveDisclosure(Json.parseToJsonElement(testCase.contents).jsonArray, testCase.contents)
 
             assertEquals(testCase.sha256, sut.asHashed3())
+            val wireDisclosure = SdJwtSelectiveDisclosure(Json.parseToJsonElement(testCase.contents).jsonArray, testCase.disclosure)
+            assertEquals(testCase.sha256, wireDisclosure.asHashedFromEncoded())
         }
 
     @ParameterizedTest
@@ -59,13 +61,6 @@ class Rfc9901SampleTest {
     fun givenDisclosureCalculateHashUsingUsAscii(testCase: SampleData) =
         runTest {
             assertEquals(testCase.sha256, computeDigest(testCase.disclosure))
-        }
-
-    @ParameterizedTest
-    @MethodSource("rfcExamples")
-    fun givenContentsVerifyDisclosureUsingWalt(testCase: SampleData) =
-        runTest {
-            assertEquals(testCase.disclosure, encoded(testCase.contents))
         }
 
     @ParameterizedTest
