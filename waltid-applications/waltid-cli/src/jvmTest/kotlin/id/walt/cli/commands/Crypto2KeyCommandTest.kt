@@ -21,33 +21,15 @@ import kotlin.test.assertTrue
 
 class Crypto2KeyCommandTest {
     @Test
-    fun `generate supports every advertised crypto2 signing target`() = runTest {
-        val directory = Files.createTempDirectory("cli-key-generate")
-        val cases = mapOf(
-            "P-256" to "P-256",
-            "P-384" to "P-384",
-            "P-521" to "P-521",
-            "Ed25519" to "Ed25519",
-            "secp256k1" to "secp256k1",
-            "RSA" to "RSA",
-        )
-
-        cases.forEach { (option, expected) ->
-            val output = directory.resolve("$option.jwk")
-            val result = KeyGenerateCmd().test(listOf("-t", option, "-o", output.toString()))
-            assertEquals(0, result.statusCode, result.stderr)
-            val jwk = Json.parseToJsonElement(output.readText()) as JsonObject
-            assertEquals(expected, jwk["crv"]?.jsonPrimitive?.content ?: jwk["kty"]?.jsonPrimitive?.content)
-            assertTrue("d" in jwk || "p" in jwk)
-        }
-    }
-
-    @Test
     fun `private JWK PKCS8 and public SPKI round trip through strict PEM`() = runTest {
         val directory = Files.createTempDirectory("cli-key-convert")
         listOf("P-256", "P-384", "P-521", "Ed25519", "RSA", "secp256k1").forEach { algorithm ->
             val jwkPath = directory.resolve("$algorithm.jwk")
-            assertEquals(0, KeyGenerateCmd().test(listOf("-t", algorithm, "-o", jwkPath.toString())).statusCode)
+            val generated = KeyGenerateCmd().test(listOf("-t", algorithm, "-o", jwkPath.toString()))
+            assertEquals(0, generated.statusCode, generated.stderr)
+            val jwk = Json.parseToJsonElement(jwkPath.readText()) as JsonObject
+            assertEquals(algorithm, jwk["crv"]?.jsonPrimitive?.content ?: jwk["kty"]?.jsonPrimitive?.content)
+            assertTrue("d" in jwk || "p" in jwk)
             val original = KeyUtil.importJwk(jwkPath.readText())
             val expectedThumbprint = KeyUtil.thumbprint(original)
 
