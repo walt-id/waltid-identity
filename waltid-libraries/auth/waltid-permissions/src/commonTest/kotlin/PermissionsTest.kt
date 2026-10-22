@@ -64,14 +64,17 @@ class PermissionsTest {
 
                 println()
                 println("Checking permissions:")
-                checkPermission("orgA.tenant1.abc", "issue") expect true
-                checkPermissionInsights("orgA.tenant1.abc", "issue") expect true
-
-                checkPermissionInsights("orgA.tenant1.sub1.abc", "issue") expect false
-                checkPermissionInsights("orgA.tenant1.xyz", "config") expect true
-                checkPermissionInsights("orgA.tenant1.xyz", "something-else") expect false
-                checkPermissionInsights("orgB.somewhere.someresource", "something") expect true
-                checkPermissionInsights("orgX.tenant123456.issuer", "issue") expect true
+                listOf(
+                    Triple("orgA.tenant1.abc", "issue", true),
+                    Triple("orgA.tenant1.sub1.abc", "issue", false),
+                    Triple("orgA.tenant1.xyz", "config", true),
+                    Triple("orgA.tenant1.xyz", "something-else", false),
+                    Triple("orgB.somewhere.someresource", "something", true),
+                    Triple("orgX.tenant123456.issuer", "issue", true),
+                ).forEach { (target, operation, expected) ->
+                    checkPermissionInsights(target, operation) expect expected
+                    checkPermission(target, operation) expect expected
+                }
 
                 println()
             }

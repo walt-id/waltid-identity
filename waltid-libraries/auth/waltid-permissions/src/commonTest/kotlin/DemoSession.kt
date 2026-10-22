@@ -26,7 +26,14 @@ class DemoSession {
                 "waltid.customer_solutions.*.*.issuer:+config",
             )
         )) {
-            checkPermissionInsights("waltid.hwr_department.employees.max_mustermann", "create_badge").print()
+            listOf(
+                Triple("waltid.hwr_department.employees.max_mustermann", "create_badge", false),
+                Triple("waltid.customer_solutions.acme.project.issuer", "config", true),
+                Triple("waltid.customer_solutions.acme.project.not-issuer", "config", false),
+            ).forEach { (target, operation, expected) ->
+                checkPermissionInsights(target, operation).also { it.print() } expect expected
+                checkPermission(target, operation) expect expected
+            }
         }
     }
 }
