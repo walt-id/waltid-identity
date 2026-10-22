@@ -22,6 +22,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -176,6 +177,7 @@ class EngagementCoordinatorTest {
         selection.join()
 
         assertEquals(listOf(ProximityCloseReason.CANCELLED), late.closeReasons)
+        assertEquals(ProximityCloseReason.LOST_RACE, withTimeout(1_000) { connection.awaitClosed() })
     }
 
     @Test

@@ -43,12 +43,15 @@ class RicalTest {
         certificateChainDer = listOf(ByteString(byteArrayOf(4))),
     )
 
-    private fun signed(rical: Rical): SignedRical {
+    private fun signed(
+        rical: Rical,
+        signerChain: List<CoseCertificate> = listOf(CoseCertificate(byteArrayOf(6))),
+    ): SignedRical {
         val protected = coseCompliantCbor.encodeToByteArray(
             CoseHeaders.serializer(),
             CoseHeaders(
                 algorithm = Cose.Algorithm.ES256,
-                x5chain = listOf(CoseCertificate(byteArrayOf(6))),
+                x5chain = signerChain,
             ),
         )
         return SignedRical.fromCoseSign1(
@@ -103,11 +106,17 @@ class RicalTest {
         val original = value.exactMessage
         val projection = value.payload
         (projection.value.certificateInfos as MutableList).clear()
-        value.signerChainDer.toMutableList().clear()
         assertEquals(1, value.rical.certificateInfos.size)
         assertEquals(1, value.signerChainDer.size)
         assertEquals(original, value.exactMessage)
         assertEquals("provider", value.payload.value.provider)
+
+        val multipleSigners = signed(
+            value.rical,
+            signerChain = listOf(CoseCertificate(byteArrayOf(6)), CoseCertificate(byteArrayOf(8))),
+        )
+        (multipleSigners.signerChainDer as MutableList).clear()
+        assertEquals(listOf(ByteString(byteArrayOf(6)), ByteString(byteArrayOf(8))), multipleSigners.signerChainDer)
     }
 
     @Test
