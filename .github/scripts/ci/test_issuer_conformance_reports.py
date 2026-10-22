@@ -10,6 +10,9 @@ import unittest
 import issuer_conformance_reports as reports
 
 
+SUITE_VERSION = {"revision": "db1080a", "tag": "release-v5.2.3", "version": "5.2.4"}
+
+
 class IssuerConformanceReportsTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -44,7 +47,7 @@ class IssuerConformanceReportsTest(unittest.TestCase):
         destination = self.shards / f"issuer-conformance-proof-{proof}"
         errors = reports.prepare(source, destination, proof, setup, test)
         (destination / "identity-revision.txt").write_text("identity-commit\n")
-        reports.write_json(destination / "suite-version.json", reports.SUITE_PIN)
+        reports.write_json(destination / "suite-version.json", SUITE_VERSION)
         return destination, errors
 
     def make_both(self):
@@ -70,9 +73,6 @@ class IssuerConformanceReportsTest(unittest.TestCase):
             batch_modules=[{"result": "PASSED", "count": 32}],
         ))
 
-    def test_raw_credentials_errors_and_logs_never_reach_transfer_reports(self):
-        self.make_both()
-        reports.merge(self.shards, self.output)
         for directory in (self.shards, self.output):
             for path in directory.rglob("*.json"):
                 self.assertNotIn("PRIVATE", path.read_text())
@@ -88,9 +88,14 @@ class IssuerConformanceReportsTest(unittest.TestCase):
         for setup, test in (("failure", "skipped"), ("success", "failure"), ("success", "cancelled")):
             with self.subTest(setup=setup, test=test):
                 self.make_shard("jwt")
-                _, errors = self.make_shard("attestation", setup=setup, test=test)
+                directory, errors = self.make_shard("attestation", setup=setup, test=test)
                 self.assertTrue(errors)
                 self.assertTrue(reports.merge(self.shards, self.output))
+                status = reports.read_json(directory / "shard.json", {})
+                status["reportErrors"] = []
+                reports.write_json(directory / "shard.json", status)
+                self.assertIn("attestation: issuer setup and live test steps must both succeed.",
+                              reports.merge(self.shards, self.output))
 
     def test_empty_duplicate_wrong_mode_and_unaccepted_results_fail(self):
         mutations = {
@@ -107,6 +112,8 @@ class IssuerConformanceReportsTest(unittest.TestCase):
             with self.subTest(label=label):
                 _, errors = self.make_shard("jwt", mutate=mutation)
                 self.assertTrue(errors)
+                if label in ("empty", "duplicate"):
+                    self.assertIn("jwt: expected 20 distinct issuer variants.", errors)
 
     def test_missing_matrix_variant_is_not_hidden_by_valid_results(self):
         _, errors = self.make_shard("jwt", mutate=lambda rows, matrix: matrix[0].update(variantId="different"))
@@ -129,7 +136,7 @@ class IssuerConformanceReportsTest(unittest.TestCase):
     def test_missing_or_wrong_suite_revision_fails(self):
         self.make_both()
         path = self.shards / "issuer-conformance-proof-attestation/suite-version.json"
-        for version in ({}, {**reports.SUITE_PIN, "revision": "different"}):
+        for version in ({}, {**SUITE_VERSION, "revision": "different"}):
             reports.write_json(path, version)
             self.assertTrue(any("suite revision" in error for error in reports.merge(self.shards, self.output)))
 
