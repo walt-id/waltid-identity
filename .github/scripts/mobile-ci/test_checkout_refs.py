@@ -19,7 +19,7 @@ class CheckoutRefsTest(unittest.TestCase):
             output.touch()
             # Ref discovery is deterministic and offline. Exact revisions must bypass it.
             git = root / "git"
-            git.write_text('#!/bin/sh\necho called >> "$GIT_CALL_LOG"\ncase "$3" in *waltid-identity.git) exit 0;; *) exit "$GIT_DISCOVERY_EXIT";; esac\n')
+            git.write_text('#!/bin/sh\necho called >> "$GIT_CALL_LOG"\ncase "$*" in *waltid-identity.git*) exit 0;; *) exit "$GIT_DISCOVERY_EXIT";; esac\n')
             git.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
                    "GITHUB_OUTPUT": str(output), "GIT_CALL_LOG": str(calls),

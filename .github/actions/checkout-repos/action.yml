@@ -70,7 +70,8 @@ runs:
           local status=2
           if [ -n "$REF" ]; then
             status=0
-            GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code "$url" "$REF" || status=$?
+            # Keep the job token out of credential helpers; SwiftPM can block reading it from macOS Keychain.
+            GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote --exit-code "$url" "$REF" || status=$?
           fi
           case "$status" in
             0) echo "${key}=$REF" >> "$GITHUB_OUTPUT" ;;
