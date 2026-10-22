@@ -29,36 +29,24 @@ adb_shell() {
 }
 
 package_revision() {
-  local package_xml="$1"
-  [[ -f "$package_xml" ]] || return 1
-  awk '
-    function value(text, tag, pattern, match_text) {
-      pattern = "<" tag ">[0-9]+</" tag ">"
-      if (!match(text, pattern)) return ""
-      match_text = substr(text, RSTART, RLENGTH)
-      gsub(/<[^>]+>/, "", match_text)
-      return match_text
-    }
-    {
-      text = $0
-      if (index(text, "<revision>") > 0) {
-        in_revision = 1
-        text = substr(text, index(text, "<revision>") + length("<revision>"))
-      }
-      if (!in_revision) next
-      major = major == "" ? value(text, "major") : major
-      minor = minor == "" ? value(text, "minor") : minor
-      micro = micro == "" ? value(text, "micro") : micro
-      if (index(text, "</revision>") > 0) {
-        if (major == "") exit 1
-        printf "%s", major
-        if (minor != "") printf ".%s", minor
-        if (micro != "") printf ".%s", micro
-        printf "\n"
-        exit
-      }
-    }
-  ' "$package_xml"
+  python3 - "$1" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    revisions = ET.parse(sys.argv[1]).findall("./{*}localPackage/{*}revision")
+    if len(revisions) != 1:
+        raise ValueError("Expected one installed package revision")
+    parts = [revisions[0].findtext(f"{{*}}{name}", "").strip() for name in ("major", "minor", "micro")]
+    while parts and not parts[-1]:
+        parts.pop()
+    if not parts or not all(re.fullmatch(r"[0-9]+", part) for part in parts):
+        raise ValueError("Invalid installed package revision")
+    print(".".join(parts))
+except (OSError, ET.ParseError, ValueError) as error:
+    sys.exit(f"Cannot read Android SDK package revision: {error}")
+PY
 }
 
 avd_config_file() {
