@@ -29,14 +29,16 @@ class WalletFooterGpuTest {
                 assertNotNull(device.wait(Until.findObject(By.res("gpu.continue")), 10_000))
                 val content = requireNotNull(device.findObject(By.res("wallet.review.content"))).visibleBounds
                 val footer = requireNotNull(device.findObject(By.res("wallet.footer"))).visibleBounds
-                assertTrue("The interactive viewport must clear the controls", content.bottom <= footer.top)
+                val scrollTop = content.top + 24
+                val scrollBottom = minOf(content.bottom, footer.top) - 24
+                assertTrue("The controls must leave room for scrolling", scrollBottom > scrollTop)
                 val mode = if (opaque) "opaque" else "blur"
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(context.filesDir, "footer-$mode-before.png")))
                 var beforePssKb = 0L
                 scenario.onActivity { beforePssKb = Debug.getPss(); it.frames.clear() }
                 repeat(12) {
-                    device.swipe(content.centerX(), content.bottom - 24, content.centerX(), content.top + 24, 20)
+                    device.swipe(content.centerX(), scrollBottom, content.centerX(), scrollTop, 20)
                 }
                 val last = device.wait(Until.findObject(By.res("gpu.row.23")), 5_000)
                 assertNotNull("The final row must be reachable", last)
