@@ -5,10 +5,7 @@ ADB_BIN="${ADB_BIN:-adb}"
 ANDROID_SERIAL="${ANDROID_SERIAL:-}"
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 DC_API_BASELINE_SCHEMA="${DC_API_BASELINE_SCHEMA:-3}"
-DC_API_EMULATOR_PACKAGE_REVISION="${DC_API_EMULATOR_PACKAGE_REVISION:-37.2.12}"
-DC_API_PLATFORM_TOOLS_REVISION="${DC_API_PLATFORM_TOOLS_REVISION:-37.0.1}"
 DC_API_SYSTEM_IMAGE_PACKAGE="${DC_API_SYSTEM_IMAGE_PACKAGE:-system-images;android-37.0;google_apis;x86_64}"
-DC_API_SYSTEM_IMAGE_REVISION="${DC_API_SYSTEM_IMAGE_REVISION:-8}"
 DC_API_AVD_NAME="${DC_API_AVD_NAME:-dc-api-api37-pixel7-google-apis}"
 DC_API_AVD_ROOT="${ANDROID_AVD_HOME:-${HOME}/.android/avd}"
 DC_API_AVD_DIR="$DC_API_AVD_ROOT/${DC_API_AVD_NAME}.avd"
@@ -190,9 +187,14 @@ android_dc_api_manifest_current_values() {
   gms_version="$(gms_version_name)"
   gms_code="$(gms_version_code)"
 
-  if [[ "$emulator_revision" != "$DC_API_EMULATOR_PACKAGE_REVISION" ||
-    "$platform_tools_revision" != "$DC_API_PLATFORM_TOOLS_REVISION" ||
-    "$image_revision" != "$DC_API_SYSTEM_IMAGE_REVISION" ||
+  # CI selects these revisions before restoring the AVD. Local runs still require a complete
+  # SDK identity, and the immutable manifest rejects any host/image change on reuse.
+  if [[ ! "$emulator_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    ! "$platform_tools_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    ! "$image_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    "$emulator_revision" != "${DC_API_EMULATOR_PACKAGE_REVISION:-$emulator_revision}" ||
+    "$platform_tools_revision" != "${DC_API_PLATFORM_TOOLS_REVISION:-$platform_tools_revision}" ||
+    "$image_revision" != "${DC_API_SYSTEM_IMAGE_REVISION:-$image_revision}" ||
     "$image_sysdir" != "$(expected_avd_system_image_sysdir)" ||
     "$data_partition" != "6G" || "$device_profile" != "pixel_7" ||
     "$device_api" != "37" || -z "$device_fingerprint" ||
