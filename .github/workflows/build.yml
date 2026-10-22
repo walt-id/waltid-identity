@@ -72,7 +72,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout the coordinated source revisions
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@330e523f8f393ad92f77e73bf87269f9b7e6fa4a
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
