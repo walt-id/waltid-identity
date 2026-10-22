@@ -286,12 +286,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(signed.trustType, .trustedIssuer)
     }
 
-    func testWalletHasAsyncFacadeShape() async {
-        let wallet = Wallet(configuration: .init(), bridge: FakeWalletCoreBridge())
-
-        XCTAssertNotNil(wallet)
-    }
-
     func testProximityConfigurationUsesStableNativeDefaults() throws {
         let configuration = ProximityConfiguration()
 
@@ -835,10 +829,12 @@ final class WalletAPITests: XCTestCase {
 
     func testSubmitPresentationForwardsSelectionAndReturnsResult() async throws {
         let previewHandle = PresentationPreviewHandle(value: "presentation-preview-1")
+        let responseURL = URL(string: "https://verifier.example/presentation-complete")!
         let bridge = FakeWalletCoreBridge()
+        bridge.submitResult = .prepared(.openURL(responseURL))
         let wallet = Wallet(bridge: bridge)
 
-        _ = try await wallet.submitPresentation(
+        let result = try await wallet.submitPresentation(
             previewHandle: previewHandle,
             selectedCredentialOptions: [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")],
             selectedDisclosureOptions: [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")],
@@ -847,6 +843,7 @@ final class WalletAPITests: XCTestCase {
             paymentConsentRevision: "reviewed-revision"
         )
 
+        XCTAssertEqual(result, .prepared(.openURL(responseURL)))
         XCTAssertEqual(bridge.submitCalls.first?.paymentConsentRevision, "reviewed-revision")
         XCTAssertEqual(bridge.submitCalls.count, 1)
         XCTAssertEqual(bridge.submitCalls.first?.previewHandle, previewHandle)
