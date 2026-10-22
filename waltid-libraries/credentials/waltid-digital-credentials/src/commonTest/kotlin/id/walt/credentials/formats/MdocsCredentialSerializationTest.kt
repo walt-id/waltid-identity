@@ -72,9 +72,10 @@ class MdocsCredentialSerializationTest {
         assertContent(result, "credentialData")
         assertContent(result, "docType")
         assertContent(result, "format")
-        assertContent(result, "mso")
+        val mso = assertIs<JsonObject>(result["mso"])
+        assertEquals("1.0", mso["version"]?.jsonPrimitive?.content)
         assertTrue(result["format"] is JsonPrimitive)
-        assertEquals(expected = MSO_MDOC_FORMAT, actual = result["format"]!!.jsonPrimitive.content)
+        assertEquals(expected = "mso_mdoc", actual = result["format"]!!.jsonPrimitive.content)
 
     }
 

@@ -10,6 +10,7 @@ class DisplayLocalesTest {
     fun prefersLanguageRegionThenLanguage() {
         listOf(
             listOf("de-AT") to "Austrian",
+            listOf("de-CH") to "German",
             listOf("de-CH", "en") to "German",
             listOf("fr", "de") to "German",
         ).forEach { (preferences, expected) ->
