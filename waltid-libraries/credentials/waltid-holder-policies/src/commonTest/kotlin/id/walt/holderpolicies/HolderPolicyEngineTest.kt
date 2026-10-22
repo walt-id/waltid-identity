@@ -14,7 +14,11 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class HolderPolicyEngineTest {
 
@@ -50,7 +54,7 @@ class HolderPolicyEngineTest {
         ).second
     }
 
-    suspend fun basicTest(policy: HolderPolicy, expected: HolderPolicyAction) = runTest {
+    private suspend fun basicTest(policy: HolderPolicy, expected: HolderPolicyAction) {
         val credentialsWithSameIssuer = flowOf(waltidIssuedJoseSignedW3CCredential(), ossIssuedW3CSdJwt(), ossIssuedW3CSdJwt2())
         val policies = flowOf(policy)
         println("\nEvaluating policy \"${policy.description ?: "unnamed"}\": ${policy.serialized()}")
@@ -230,21 +234,26 @@ class HolderPolicyEngineTest {
             expected = HolderPolicyAction.ALLOW
         )
 
-        multiPolicyTest(
-            flowOf(
-                HolderPolicy(
-                    priority = 1,
-                    check = BasicHolderPolicyCheck(claimsValues = mapOf("name" to JsonPrimitive("JFF x vc-edu PlugFest 3 Interoperability"))),
-                    action = HolderPolicyAction.BLOCK,
+        for ((name, expected) in listOf(
+            "JFF x vc-edu PlugFest 3 Interoperability" to HolderPolicyAction.BLOCK,
+            "A different name" to HolderPolicyAction.ALLOW,
+        )) {
+            multiPolicyTest(
+                flowOf(
+                    HolderPolicy(
+                        priority = 1,
+                        check = BasicHolderPolicyCheck(claimsValues = mapOf("name" to JsonPrimitive(name))),
+                        action = HolderPolicyAction.BLOCK,
+                    ),
+                    HolderPolicy(
+                        priority = 99,
+                        apply = ApplyAllHolderPolicyCheck(),
+                        action = HolderPolicyAction.ALLOW,
+                    )
                 ),
-                HolderPolicy(
-                    priority = 99,
-                    apply = ApplyAllHolderPolicyCheck(),
-                    action = HolderPolicyAction.ALLOW,
-                )
-            ),
-            expected = HolderPolicyAction.BLOCK
-        )
+                expected = expected
+            )
+        }
     }
 
     private suspend fun customCredentialTest(
@@ -312,9 +321,20 @@ class HolderPolicyEngineTest {
             expected = HolderPolicyAction.BLOCK
         )
 
+        val withoutName = ossIssuedW3CSdJwtWithoutName()
         customCredentialTest(
             policies,
-            credentials = flowOf(ossIssuedW3CSdJwtWithoutName()), // without name
+            credentials = flowOf(withoutName), // JOSE parsing unwraps the vc envelope
+            expected = HolderPolicyAction.ALLOW
+        )
+
+        val undisclosed = CredentialParser.detectAndParse("${checkNotNull(withoutName.signed)}~").second
+        val undisclosedClaims = undisclosed.credentialData.getValue("vc").jsonObject
+        assertEquals(JsonPrimitive("https://www.w3.org/2018/credentials/v1"), undisclosedClaims.getValue("@context").jsonArray.first())
+        assertFalse("name" in undisclosedClaims)
+        customCredentialTest(
+            policies,
+            credentials = flowOf(undisclosed), // same SD-JWT envelope, without the name disclosure
             expected = HolderPolicyAction.ALLOW
         )
     }
