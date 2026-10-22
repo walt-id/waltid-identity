@@ -96,12 +96,23 @@ final class WalletLinkResolverTests: XCTestCase {
     }
 
     func testRejectsRedirectLoopsDowngradesOversizeAndErrors() async {
+        let offer = #"{"credential_issuer":"https://issuer.example","credential_configuration_ids":[]}"#
         for document in [WalletLinkDocument(status: 302, location: "/link"),
-            WalletLinkDocument(status: 302, location: "http://example.test/link"), WalletLinkDocument(status: 503)] {
-            do { _ = try await WalletLinkResolver.resolve("https://example.test/link") { _ in document }; XCTFail("Expected failure") }
-            catch { XCTAssertTrue(error is WalletLinkError) }
+            WalletLinkDocument(status: 302, location: "http://example.test/link"), WalletLinkDocument(status: 503, body: offer)] {
+            let recorder = LinkFetchRecorder()
+            do {
+                _ = try await WalletLinkResolver.resolve("https://example.test/link") { url in
+                    _ = await recorder.append(url)
+                    return document
+                }
+                XCTFail("Expected failure")
+            } catch { XCTAssertTrue(error is WalletLinkError) }
+            let fetched = await recorder.urls
+            XCTAssertEqual(fetched, ["https://example.test/link"])
         }
-        XCTAssertThrowsError(try WalletLinkResolver.routeDocument(url: "https://example.test/link", body: String(repeating: "x", count: 262_145)))
+        let atLimit = offer + String(repeating: " ", count: 262_144 - offer.utf8.count)
+        XCTAssertEqual(try WalletLinkResolver.routeDocument(url: "https://example.test/link", body: atLimit).kind, .offer)
+        XCTAssertThrowsError(try WalletLinkResolver.routeDocument(url: "https://example.test/link", body: atLimit + " "))
         do { _ = try await WalletLinkResolver.resolve("https://example.test/link") { _ in throw CancellationError() }; XCTFail("Expected cancellation") }
         catch { XCTAssertTrue(error is CancellationError) }
     }
