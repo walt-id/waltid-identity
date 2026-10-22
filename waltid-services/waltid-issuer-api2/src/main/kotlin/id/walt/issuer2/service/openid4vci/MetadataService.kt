@@ -80,7 +80,7 @@ class MetadataService @JvmOverloads constructor(
                 CredentialConfiguration.serializer(),
                 DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
-                configuration.vct?.let { validateSelfHostedVct(configurationId, it) }
+                configuration.vct?.let { validateVct(configurationId, it) }
             }
         }
 
@@ -181,17 +181,17 @@ class MetadataService @JvmOverloads constructor(
         if (credentialType in Issuer2EndpointPaths.reservedVctNames) {
             throw NotFoundException("Credential type metadata not found: $credentialType")
         }
-        val expectedVct = selfHostedVct(credentialType)
-        credentialConfigurations.entries.firstOrNull { (_, configuration) ->
-            configuration.vct == expectedVct
-        }
-            ?: throw NotFoundException("Credential type metadata not found: $credentialType")
+        val hostedVct = selfHostedVct(credentialType)
+        val resolvedVct = credentialConfigurations.values.firstNotNullOfOrNull { configuration ->
+            val vct = configuration.vct ?: return@firstNotNullOfOrNull null
+            when {
+                vct == hostedVct -> vct
+                vct == credentialType && !isHttpUrl(vct) -> vct
+                else -> null
+            }
+        } ?: throw NotFoundException("Credential type metadata not found: $credentialType")
 
-        return configuredTypeMetadata[expectedVct] ?: SdJwtVcTypeMetadataDraft04(
-            vct = expectedVct,
-            name = credentialType,
-            description = "$credentialType Verifiable Credential",
-        )
+        return configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
     }
 
     fun issuerBaseUrl(): String = baseUrl
@@ -284,6 +284,34 @@ class MetadataService @JvmOverloads constructor(
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
 
+    private fun validateVct(configurationId: String, vct: String) {
+        if (vct.contains(':')) {
+            val uri = runCatching { URI(vct) }.getOrNull()
+            require(uri != null && uri.isAbsolute) {
+                "Credential configuration '$configurationId' has invalid vct '$vct'. A vct containing ':' must be an absolute URI."
+            }
+        }
+        validateSelfHostedVct(configurationId, vct)
+    }
+
+    private fun isHttpUrl(value: String): Boolean =
+        value.startsWith("https://") || value.startsWith("http://")
+
+    private fun defaultTypeMetadata(credentialType: String, resolvedVct: String): SdJwtVcTypeMetadataDraft04 =
+        if (resolvedVct == EUDI_PID_VCT) {
+            SdJwtVcTypeMetadataDraft04(
+                vct = resolvedVct,
+                name = "EU Person Identification Data",
+                description = "EUDI Person Identification Data (urn:eudi:pid:1).",
+            )
+        } else {
+            SdJwtVcTypeMetadataDraft04(
+                vct = resolvedVct,
+                name = credentialType,
+                description = "$credentialType Verifiable Credential",
+            )
+        }
+
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
         // VCTs may be external URLs or non-HTTP identifiers. Only our own protocol paths collide.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
@@ -321,5 +349,6 @@ class MetadataService @JvmOverloads constructor(
 
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
+        private const val EUDI_PID_VCT = "urn:eudi:pid:1"
     }
 }
