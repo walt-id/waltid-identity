@@ -155,7 +155,7 @@ class DcqlMatcherTest {
     @Test
     fun testClaimSetMatch() {
         // Cred1 matches both sets, should return cred1
-        val matchResult = parseAndMatch( // language=json
+        val queryJson = // language=json
             """
             {
               "credentials": [
@@ -177,12 +177,25 @@ class DcqlMatcherTest {
               ]
             }
             """.trimIndent()
-        )
+        val matchResult = parseAndMatch(queryJson)
 
         assertTrue(matchResult.isSuccess)
         val matches = matchResult.getOrThrow()
         assertEquals(1, matches.size)
         assertEquals(listOf(cred1), matches["addr_query"])
+
+        val addressOnly = cred1.copy(
+            data = JsonObject(cred1.data + ("credentialSubject" to JsonObject(
+                cred1.data.getValue("credentialSubject").jsonObject - "given_name" - "family_name"
+            )))
+        )
+        val laterAlternative = DcqlMatcher.match(
+            DcqlParser.parse(queryJson).getOrThrow(), listOf(addressOnly)
+        ).getOrThrow()
+        assertEquals(
+            mapOf("addr_query" to listOf(addressOnly)),
+            laterAlternative.mapValues { it.value.map { match -> match.credential } }
+        )
     }
 
 
@@ -382,5 +395,6 @@ class DcqlMatcherTest {
 
         assertTrue(DcqlMatcher.match(query, listOf(cred1)).isFailure)
         assertTrue(DcqlMatcher.match(query, listOf(cred1)) { _, _ -> true }.isSuccess)
+        assertTrue(DcqlMatcher.match(query, listOf(cred1)) { _, _ -> false }.isFailure)
     }
 }
