@@ -50,7 +50,6 @@ jobs:
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       MIN_GMS_VERSION: '24.31.0'
       DC_API_SYSTEM_IMAGE_PACKAGE: 'system-images;android-37.0;google_apis;x86_64'
-      DC_API_SYSTEM_IMAGE_REVISION: '8'
       DC_API_AVD_NAME: 'dc-api-api37-pixel7-google-apis'
     steps:
       - name: Checkout all repos with ref fallback
@@ -86,46 +85,24 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Restore configured DC API AVD
-        if: matrix.phase == 'dc-api-compose'
-        id: dc-api-avd-cache
-        uses: actions/cache/restore@v5
-        with:
-          # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
-          # userdata contains that key in its adbd authorization list; omitting the matching host key
-          # makes a cross-runner cache boot as `unauthorized`. This excludes the ADB daemon/device
-          # runtime state (`adb*.log`, sockets, server state) and no Quick Boot snapshot is reused.
-          path: |
-            ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
-            ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
-            ~/.android/adbkey
-            ~/.android/adbkey.pub
-          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.2.12-platform-tools-37.0.1-system-image-8-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
-
-      - name: Report DC API AVD cache state
-        if: matrix.phase == 'dc-api-compose'
-        run: |
-          echo "DC API AVD cache hit: ${{ steps.dc-api-avd-cache.outputs.cache-hit || 'false' }}"
-
       - name: Configure Android device test phase
         id: android-device-phase
         run: ./waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh "${{ matrix.phase }}"
 
       # Older runner tools misparse minor API versions as android-0, breaking graphics setup.
-      - name: Set up Android tools for the Enterprise provider image
-        if: matrix.phase == 'enterprise-mobile'
+      - name: Set up Android tools for provider images
+        if: matrix.phase == 'enterprise-mobile' || matrix.phase == 'dc-api-compose'
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: '16111833'
           packages: ''
 
       - name: Preinstall Android emulator SDK packages
-        if: matrix.phase != 'dc-api-compose'
         shell: bash
         run: |
           set -euo pipefail
 
-          if [[ "${{ matrix.phase }}" == "enterprise-mobile" ]]; then
+          if [[ "${{ matrix.phase }}" == "enterprise-mobile" || "${{ matrix.phase }}" == "dc-api-compose" ]]; then
             # The emulator action prepends latest/bin, overriding setup-android's PATH entry.
             selected_tools="$(dirname "$(dirname "$(command -v sdkmanager)")")"
             if [[ "$selected_tools" != "$ANDROID_HOME/cmdline-tools/latest" ]]; then
@@ -155,6 +132,52 @@ jobs:
           retry_sdkmanager_install 'build-tools;37.0.0' platform-tools 'platforms;android-34' "platforms;android-${{ steps.android-device-phase.outputs.emulator_api_level }}"
           retry_sdkmanager_install emulator
           retry_sdkmanager_install "system-images;android-${{ steps.android-device-phase.outputs.emulator_api_level }};${{ steps.android-device-phase.outputs.emulator_target }};x86_64"
+
+      - name: Record selected DC API SDK identity
+        if: matrix.phase == 'dc-api-compose'
+        id: dc-api-sdk
+        shell: bash
+        run: |
+          source ./waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh
+          emulator_revision="$(package_revision "$ANDROID_HOME/emulator/package.xml")"
+          platform_tools_revision="$(package_revision "$ANDROID_HOME/platform-tools/package.xml")"
+          image_revision="$(package_revision "$ANDROID_HOME/${DC_API_SYSTEM_IMAGE_PACKAGE//;/\/}/package.xml")"
+          for revision in "$emulator_revision" "$platform_tools_revision" "$image_revision"; do
+            [[ "$revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || {
+              echo "::error::Cannot identify the installed DC API SDK packages" >&2
+              exit 1
+            }
+          done
+          # Select cache and validation from the same installed packages, not a second version list.
+          {
+            echo "DC_API_EMULATOR_PACKAGE_REVISION=$emulator_revision"
+            echo "DC_API_PLATFORM_TOOLS_REVISION=$platform_tools_revision"
+            echo "DC_API_SYSTEM_IMAGE_REVISION=$image_revision"
+          } >> "$GITHUB_ENV"
+          identity="emulator-$emulator_revision-platform-tools-$platform_tools_revision-image-$image_revision"
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+          echo "DC API selected SDK: $identity"
+
+      - name: Restore configured DC API AVD
+        if: matrix.phase == 'dc-api-compose'
+        id: dc-api-avd-cache
+        uses: actions/cache/restore@v5
+        with:
+          # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
+          # userdata contains that key in its adbd authorization list; omitting the matching host key
+          # makes a cross-runner cache boot as `unauthorized`. This excludes the ADB daemon/device
+          # runtime state (`adb*.log`, sockets, server state) and no Quick Boot snapshot is reused.
+          path: |
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
+            ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
+            ~/.android/adbkey
+            ~/.android/adbkey.pub
+          key: dc-api-avd-v7-${{ runner.os }}-api37-x86_64-pixel7-disk6g-${{ steps.dc-api-sdk.outputs.identity }}-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+
+      - name: Report DC API AVD cache state
+        if: matrix.phase == 'dc-api-compose'
+        run: |
+          echo "DC API AVD cache hit: ${{ steps.dc-api-avd-cache.outputs.cache-hit || 'false' }}"
 
       - name: Build Enterprise Android mobile test artifacts
         if: matrix.phase == 'enterprise-mobile'
@@ -186,7 +209,7 @@ jobs:
             ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
             ~/.android/adbkey
             ~/.android/adbkey.pub
-          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.2.12-platform-tools-37.0.1-system-image-8-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+          key: ${{ steps.dc-api-avd-cache.outputs.cache-primary-key }}
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
