@@ -22,7 +22,12 @@ group = "id.walt.walletdemo.compose"
 kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
-            browser()
+            browser {
+                testTask {
+                    useKarma { useChromeHeadless() }
+                }
+            }
+            binaries.executable()
         }
     }
 
