@@ -49,10 +49,13 @@ runs:
         SIMULATOR: ${{ steps.prepare.outputs.simulator }}
       run: |
         set -euo pipefail
-        arguments=(--renderers "$RENDERER" --gradle-root "$GITHUB_WORKSPACE" --output "$GITHUB_WORKSPACE/waltid-identity/build/reports/wallet-visual-$RENDERER")
+        output="$GITHUB_WORKSPACE/waltid-identity/build/reports/wallet-visual-$RENDERER"
+        arguments=(--renderers "$RENDERER" --gradle-root "$GITHUB_WORKSPACE" --output "$output")
         [[ -z "$SIMULATOR" ]] || arguments+=(--simulator "$SIMULATOR")
         [[ -z "$FRAMEWORK" ]] || arguments+=(--reuse-framework "$FRAMEWORK" --derived-data "$DERIVED_DATA")
-        python3 waltid-identity/waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py "${arguments[@]}"
+        exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
+          --output-dir "$output" visual-comparison \
+          python3 waltid-identity/waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py "${arguments[@]}"
     - name: Retain comparison results and timings
       if: always()
       uses: actions/upload-artifact@v7
