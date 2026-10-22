@@ -668,8 +668,15 @@ class Issuer2MetadataEndpointTest {
             )
             val publishedVct = assertNotNull(configuration.vct)
 
-            // The in-memory test server uses port 80; exercise the published URL's path on that server.
-            listOf("/.well-known/vct/$credentialConfigurationId", Url(publishedVct).encodedPath).forEach { metadataUrl ->
+            // The in-memory test server uses port 80; exercise a published HTTP VCT path on that server.
+            // Identifier VCTs such as urn:eudi:pid:1 are not URLs, so only the well-known route applies.
+            val metadataUrls = buildList {
+                add("/.well-known/vct/$credentialConfigurationId")
+                if (publishedVct.startsWith("http://") || publishedVct.startsWith("https://")) {
+                    add(Url(publishedVct).encodedPath)
+                }
+            }
+            metadataUrls.forEach { metadataUrl ->
                 val vctTypeMetadataRaw = client.get(metadataUrl)
                 assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status, metadataUrl)
                 val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
@@ -684,6 +691,12 @@ class Issuer2MetadataEndpointTest {
                     assertEquals(5, payment.getValue("claims").jsonArray.size)
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
                     assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
+                } else if (credentialConfigurationId == "urn:eudi:pid:1") {
+                    assertEquals("EU Person Identification Data", vctTypeMetadata.name)
+                    assertEquals(
+                        "EUDI Person Identification Data (urn:eudi:pid:1).",
+                        vctTypeMetadata.description,
+                    )
                 } else {
                     assertEquals(credentialConfigurationId, vctTypeMetadata.name)
                     assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
@@ -711,7 +724,12 @@ class Issuer2MetadataEndpointTest {
                 configuration.cryptographicBindingMethodsSupported,
             )
             assertEquals(credentialConfigurationId, configuration.scope)
-            assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
+            val expectedVct = if (credentialConfigurationId in IDENTIFIER_VCTS) {
+                credentialConfigurationId
+            } else {
+                "$ISSUER_BASE_URL/$credentialConfigurationId"
+            }
+            assertEquals(expectedVct, configuration.vct)
             assertEquals(
                 if (paymentDemo) setOf("ES256") else JWT_PROOF_SIGNING_ALGORITHMS,
                 assertNotNull(configuration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
@@ -917,6 +935,12 @@ class Issuer2MetadataEndpointTest {
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",
             SD_JWT_INTERNAL_CONFIG_ID,
+        )
+
+        val IDENTIFIER_VCTS = setOf(
+            "urn:eu.europa.ec.eudi:cor:1",
+            "urn:eudi:ehic:1",
+            "urn:eudi:pid:1",
         )
 
         val JWT_PROOF_BINDING_METHODS = setOf(

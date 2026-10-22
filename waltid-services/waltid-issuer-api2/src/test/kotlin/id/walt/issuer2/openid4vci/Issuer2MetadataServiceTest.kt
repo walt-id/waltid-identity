@@ -161,6 +161,32 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
+    fun `identifier VCTs are published unchanged and served as type metadata`() {
+        val pid = metadataService(metadataConfig = sdJwtMetadata("urn:eudi:pid:1", "urn:eudi:pid:1"))
+        assertEquals("urn:eudi:pid:1", pid.getCredentialConfiguration("urn:eudi:pid:1")?.vct)
+        val pidMetadata = pid.getVctTypeMetadata("urn:eudi:pid:1")
+        assertEquals("urn:eudi:pid:1", pidMetadata.vct)
+        assertEquals("EU Person Identification Data", pidMetadata.name)
+
+        val ehic = metadataService(metadataConfig = sdJwtMetadata("urn:eudi:ehic:1", "urn:eudi:ehic:1"))
+        val ehicMetadata = ehic.getVctTypeMetadata("urn:eudi:ehic:1")
+        assertEquals("urn:eudi:ehic:1", ehicMetadata.vct)
+        assertEquals("urn:eudi:ehic:1", ehicMetadata.name)
+
+        val external = metadataService(
+            metadataConfig = sdJwtMetadata("identity", "https://example.com/credentials/identity"),
+        )
+        assertFailsWith<NotFoundException> { external.getVctTypeMetadata("identity") }
+    }
+
+    @Test
+    fun `a vct containing a colon must be an absolute URI`() {
+        assertFailsWith<IllegalArgumentException> {
+            metadataService(metadataConfig = sdJwtMetadata("bad", "not a uri:value"))
+        }
+    }
+
+    @Test
     fun `unknown and reserved metadata types are not found`() {
         val service = metadataService(metadataConfig = sdJwtMetadata("EmployeeCredential", "vctBaseUrl"))
         assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
