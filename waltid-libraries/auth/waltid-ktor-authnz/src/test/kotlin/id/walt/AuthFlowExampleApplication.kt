@@ -47,12 +47,23 @@ fun loggingSetup() {
     }
 }
 
-fun startExample(wait: Boolean = true, jwt: Boolean): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
-    loggingSetup()
-    return embeddedServer(CIO, port = 8088, host = "0.0.0.0", module = {
+fun startExample(
+    wait: Boolean = true,
+    jwt: Boolean,
+    host: String = "0.0.0.0",
+    port: Int = 8088,
+    setupLogging: Boolean = true,
+): EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration> {
+    if (setupLogging) loggingSetup()
+    val server = embeddedServer(CIO, port = port, host = host, module = {
         this.module(jwt)
     })
-        .start(wait = wait)
+    return try {
+        server.start(wait = wait)
+    } catch (failure: Throwable) {
+        runCatching { server.stop(0, 1_000) }.exceptionOrNull()?.let(failure::addSuppressed)
+        throw failure
+    }
 }
 
 fun Application.module(jwt: Boolean) {
