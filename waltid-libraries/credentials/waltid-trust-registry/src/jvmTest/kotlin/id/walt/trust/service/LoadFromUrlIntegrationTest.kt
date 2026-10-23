@@ -1,21 +1,26 @@
 package id.walt.trust.service
 
+import id.walt.trust.fetcher.FetcherSecurityConfig
+import id.walt.trust.fetcher.SourceFetcher
 import id.walt.trust.model.AuthenticityState
 import id.walt.trust.model.SourceFamily
+import id.walt.trust.model.SourceLoadErrorCode
 import id.walt.trust.store.InMemoryTrustStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import org.junit.jupiter.api.parallel.Isolated
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
  * Integration tests for loading trust sources from URLs.
- * These tests require network access and are disabled by default.
- * Enable with: RUN_NETWORK_TESTS=true
+ * Provider tests require network access: RUN_NETWORK_TESTS=true.
+ * The API failure case uses a local host policy and needs no network.
  */
+@Isolated("Temporarily changes SourceFetcher.securityConfig")
 class LoadFromUrlIntegrationTest {
 
     @Test
@@ -113,22 +118,27 @@ class LoadFromUrlIntegrationTest {
 
     @Test
     fun `interface compiles and methods are callable`() {
-        // This test ensures the API compiles correctly.
-        // Network tests are enabled via RUN_NETWORK_TESTS=true
-        val store = InMemoryTrustStore()
-        val service = DefaultTrustRegistryService(store)
-
-        // Verify the method signature exists
-        runBlocking {
-            val result = service.loadSourceFromUrl(
-                sourceId = "test",
-                url = "https://example.invalid", // intentionally invalid
-                validateSignature = false
-            )
-            // Expected to fail (can't connect), but proves the method works
-            assertTrue(!result.success, "Should fail to connect to invalid URL")
-            assertTrue(result.error != null, "Should have error message")
-            println("API test passed - error as expected: ${result.error}")
+        val service = DefaultTrustRegistryService(InMemoryTrustStore())
+        val previousConfig = SourceFetcher.securityConfig
+        try {
+            SourceFetcher.securityConfig = FetcherSecurityConfig(allowedHosts = setOf("audit-only.invalid"))
+            runBlocking {
+                val result = service.loadSourceFromUrl(
+                    sourceId = "test",
+                    url = "https://example.invalid",
+                    validateSignature = false
+                )
+                assertTrue(!result.success, "Should reject a host outside the allow-list")
+                assertTrue(result.error != null, "Should have error message")
+                assertEquals("test", result.sourceId)
+                assertEquals(SourceLoadErrorCode.FETCH_FAILED, result.errorCode)
+                assertEquals(
+                    "URL validation failed: Host 'example.invalid' not in allowed hosts list",
+                    result.error
+                )
+            }
+        } finally {
+            SourceFetcher.securityConfig = previousConfig
         }
     }
 }
