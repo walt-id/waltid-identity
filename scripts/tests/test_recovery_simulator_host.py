@@ -42,6 +42,9 @@ class SimulatorHostTest(unittest.TestCase):
             return ""
 
         self.addCleanup(patch.stopall)
+        # Default to the per-test lookup path; cached-container tests opt in explicitly.
+        patch.dict(host.os.environ).start()
+        host.os.environ.pop(host.CONTAINER_ENV, None)
         patch.object(host, "simctl", side_effect=simctl).start()
         patch.object(host.uuid, "uuid4", return_value=self.run).start()
         patch.object(host.time, "monotonic", side_effect=lambda: self.now).start()
@@ -108,7 +111,7 @@ class SimulatorHostTest(unittest.TestCase):
         self.durations["get_app_container"] = 45
         self.output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
         self.assertEqual(self.pid + self.output + self.stopped, host.run_test("simulator-id", []))
-        self.assertEqual(180, self.calls[0][2])
+        self.assertEqual(180 - host.MIN_LAUNCH_WINDOW, self.calls[0][2])
         self.assertEqual(135, self.calls[1][2])
 
     def test_container_discovery_cannot_exhaust_the_budget_then_launch(self):
@@ -121,7 +124,35 @@ class SimulatorHostTest(unittest.TestCase):
         with patch.object(host, "simctl", side_effect=RuntimeError("simctl get_app_container timed out")) as simctl:
             with self.assertRaisesRegex(RuntimeError, "get_app_container timed out"):
                 host.run_test("simulator-id", [])
-            simctl.assert_called_once_with("get_app_container", "simulator-id", host.PACKAGE, "data", timeout=180)
+            simctl.assert_called_once_with("get_app_container", "simulator-id", host.PACKAGE, "data",
+                                           timeout=180 - host.MIN_LAUNCH_WINDOW)
+
+    def test_pre_resolved_container_skips_lookup_and_gives_launch_the_whole_budget(self):
+        container = self.container / "Devices" / "simulator-id" / "data"
+        (container / "Documents").mkdir(parents=True)
+        self.log = container / "Documents" / (self.run + ".log")
+        self.output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
+        host.os.environ[host.CONTAINER_ENV] = str(container)
+        self.assertEqual(self.pid + self.output + self.stopped, host.run_test("simulator-id", []))
+        self.assertEqual("launch", self.calls[0][0][0])
+        self.assertEqual(180, self.calls[0][2])
+
+    def test_pre_resolved_container_of_another_simulator_or_removed_falls_back_to_lookup(self):
+        other = self.container / "Devices" / "other-simulator" / "data"
+        other.mkdir(parents=True)
+        for value in (str(other), str(self.container / "Devices" / "simulator-id" / "gone")):
+            self.calls.clear()
+            self.output = "[  PASSED  ] 1 tests.\nRECOVERY_TEST_EXIT=0\n"
+            host.os.environ[host.CONTAINER_ENV] = value
+            self.assertEqual(self.pid + self.output + self.stopped, host.run_test("simulator-id", []))
+            self.assertEqual("get_app_container", self.calls[0][0][0])
+
+    def test_resolve_container_uses_its_own_generous_timeout(self):
+        self.assertEqual(self.container, host.resolve_container("simulator-id"))
+        self.assertEqual((("get_app_container", "simulator-id", host.PACKAGE, "data"), None,
+                          host.CONTAINER_DISCOVERY_TIMEOUT), self.calls[0])
+        with self.assertRaises(ValueError):
+            host.resolve_container("booted")
 
     def test_container_discovery_and_launch_do_not_reset_the_completion_deadline(self):
         self.durations.update(get_app_container=45, launch=135)
