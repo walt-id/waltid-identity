@@ -189,9 +189,12 @@ class SignUpTest {
     @Test
     fun `wrong codes end a sign-up`() = signUpTest {
         val pending = post("/email/signup", """{"email": "eve@example.com", "password": "eve-password"}""")
+        assertEquals(HttpStatusCode.Accepted, pending.status)
         val signUpId = json.parseToJsonElement(pending.text()).jsonObject["signup_id"]!!.jsonPrimitive.content
-        repeat(5) { post("/email/signup/confirm", """{"signup_id": "$signUpId", "code": "999999x"}""") }
-        assertNotEquals(HttpStatusCode.Created, post("/email/signup/confirm", """{"signup_id": "$signUpId", "code": "${sent.single().code}"}""").status)
+        repeat(5) {
+            assertEquals(HttpStatusCode.Unauthorized, post("/email/signup/confirm", """{"signup_id": "$signUpId", "code": "999999x"}""").status)
+        }
+        assertEquals(HttpStatusCode.TooManyRequests, post("/email/signup/confirm", """{"signup_id": "$signUpId", "code": "${sent.single().code}"}""").status)
         assertNull(accounts.lookupAccountUuid(EmailIdentifier("eve@example.com")))
     }
 
