@@ -3,7 +3,10 @@ package id.walt
 import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.security.PasswordHashingAlgorithm
+import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import id.walt.ktorauthnz.KtorAuthnzManager.passwordHashingConfig as config
 
 class PasswordHashingTest {
@@ -11,60 +14,41 @@ class PasswordHashingTest {
     @Test
     fun testPasswordHashSerialization() {
         val obj = PasswordHash("test", PasswordHashingAlgorithm.NONE)
-        println(obj)
-        val s = obj.toString()
-        println(s)
-        val obj2 = PasswordHash.fromString(s)
-        println(obj2)
-        check(obj == obj2)
+        val serialized = obj.toString()
+        assertEquals("NONE/test", serialized)
+        assertEquals(obj, PasswordHash.fromString("NONE/test"))
+        check(obj == PasswordHash.fromString(serialized))
     }
 
     @Test
     fun fullTest() {
-        config.selectedPwHashAlgorithm = PasswordHashingAlgorithm.NONE
-        config.selectedHashConversions = mapOf(
-            PasswordHashingAlgorithm.NONE to PasswordHashingAlgorithm.ARGON2
+        val previousConfig = config
+        config = PasswordHashingConfiguration(
+            pepper = "test-pepper",
+            selectedPwHashAlgorithm = PasswordHashingAlgorithm.NONE,
+            selectedHashConversions = mapOf(PasswordHashingAlgorithm.NONE to PasswordHashingAlgorithm.ARGON2)
         )
-        val pw = "Test"
-        println("Using password: $pw")
+        try {
+            val pw = "Test"
+            val hash = PasswordHashing.hash(pw)
+            assertEquals(PasswordHashingAlgorithm.NONE, hash.algorithm)
+            assertEquals("test-pepperTest", hash.hash)
+            assertEquals("NONE/test-pepperTest", hash.toString())
+            check(PasswordHashing.needsEvolving(hash))
+            assertEquals(PasswordHashingAlgorithm.ARGON2, PasswordHashing.evolvesTo(hash.algorithm))
 
-        println("Will hash with 'first' algorithm...")
-        val hash = PasswordHashing.hash(pw)
-        println("Hash: $hash (actual)")
-        check(hash.algorithm == config.selectedPwHashAlgorithm)
+            val firstValid = PasswordHashing.check(pw, hash)
+            check(firstValid.valid)
+            check(firstValid.updated)
+            val hash2 = assertNotNull(firstValid.updatedHash)
+            assertEquals(PasswordHashingAlgorithm.ARGON2, hash2.algorithm)
 
-        val expectedHash = "NONE/${config.pepper}$pw"
-        val expectedHashPart = "${config.pepper}$pw"
-        println("Hash: $expectedHash (expected)")
-
-        check(hash.hash == expectedHashPart)
-        check(hash.toString() == expectedHash)
-
-        val needsEvolving = PasswordHashing.needsEvolving(hash)
-        println("Does it need evolving? $needsEvolving")
-        check(needsEvolving)
-
-        val willEvolveTo = PasswordHashing.evolvesTo(hash.algorithm)
-        println("Will evolve to: $willEvolveTo")
-        check(willEvolveTo == PasswordHashingAlgorithm.ARGON2)
-
-        val firstValid = PasswordHashing.check(pw, hash)
-        println("First valid: ${firstValid.valid}")
-        check(firstValid.valid)
-        println("Was updated: ${firstValid.updated}")
-        check(firstValid.updated)
-
-        val hash2 = firstValid.updatedHash
-        println("Updated hash: $hash2")
-        check(hash2 != null)
-
-        println("Will check updated hash ('second' algorithm)...")
-        config.selectedPwHashAlgorithm = PasswordHashingAlgorithm.ARGON2
-        val u = PasswordHashing.check(pw, hash2)
-        println("Updated hash valid: " + u.valid)
-        check(u.valid)
-        println("Updated hash updated: " + u.updated)
-        check(!u.updated)
+            config.selectedPwHashAlgorithm = PasswordHashingAlgorithm.ARGON2
+            val updated = PasswordHashing.check(pw, hash2)
+            check(updated.valid)
+            check(!updated.updated)
+        } finally {
+            config = previousConfig
+        }
     }
-
 }
