@@ -52,6 +52,7 @@ object IssuanceSessionCrypto2Keys {
             when {
                 stored != null && sidecarMatchesRequest(request, stored) ->
                     request.copy(crypto2IssuerStoredKey = stored)
+
                 else -> request.copy(crypto2IssuerStoredKey = migrateLegacyKey(request))
             }
         }

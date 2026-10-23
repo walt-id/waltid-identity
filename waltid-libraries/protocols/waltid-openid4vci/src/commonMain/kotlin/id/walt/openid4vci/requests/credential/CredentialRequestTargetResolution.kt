@@ -66,6 +66,7 @@ fun CredentialRequest.resolveCredentialAuthorization(
                     "Unknown credential_configuration_id: $requestedConfigurationId",
                 )
             )
+
             else -> CredentialAuthorizationResolution.Failure(
                 CredentialError(
                     CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,

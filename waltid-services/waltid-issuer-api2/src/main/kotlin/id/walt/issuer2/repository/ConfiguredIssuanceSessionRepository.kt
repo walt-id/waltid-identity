@@ -91,7 +91,7 @@ class ConfiguredIssuanceSessionRepository(
         return IssuanceSessionCrypto2Keys.attachStoredKeys(session, migrated)
     }
 
-    private suspend fun persistSidecars(sessionId: String, sidecars: Map<String, String>, ttl: Duration) {
+    private fun persistSidecars(sessionId: String, sidecars: Map<String, String>, ttl: Duration) {
         if (sidecars.isEmpty()) {
             crypto2Keys.remove(sessionId)
         } else {

@@ -18,7 +18,8 @@ suspend fun AuthorizationServerMetadata.toSignedJwt(
     issuedAt: Instant = Clock.System.now(),
     keyId: String = signingKey.id.value,
 ): String {
-    val metadataClaims = Json.encodeToJsonElement(AuthorizationServerMetadata.serializer(), copy(signedMetadata = null)).jsonObject
+    val metadataClaims =
+        Json.encodeToJsonElement(AuthorizationServerMetadata.serializer(), copy(signedMetadata = null)).jsonObject
     val collisions = metadataClaims.keys.intersect(setOf("iss", "sub", "iat", "exp", "nbf", "aud", "jti"))
     require(collisions.isEmpty()) {
         "Authorization Server Metadata parameters must not use reserved JWT claims: ${collisions.sorted()}"

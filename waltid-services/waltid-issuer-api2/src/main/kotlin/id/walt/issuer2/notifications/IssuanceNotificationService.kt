@@ -8,12 +8,9 @@ import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
 import kotlin.coroutines.cancellation.CancellationException
 
 class IssuanceNotificationService {

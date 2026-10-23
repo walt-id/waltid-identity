@@ -42,7 +42,11 @@ fun registerIssuer2ConfigDecoders() {
     // otherwise choose the legacy constructor and silently discard newer fields.
     ConfigManager.registerCustomDecoder(Issuer2ServiceConfigDecoder())
     ConfigManager.registerCustomDecoder(
-        Issuer2KotlinxConfigDecoder(SignedMetadataConfig::class, SignedMetadataConfig.serializer(), ignoreUnknownKeys = false),
+        Issuer2KotlinxConfigDecoder(
+            SignedMetadataConfig::class,
+            SignedMetadataConfig.serializer(),
+            ignoreUnknownKeys = false
+        ),
     )
     ConfigManager.registerCustomDecoder(
         Issuer2KotlinxConfigDecoder(KeyAttestationConfig::class, KeyAttestationConfig.serializer()),

@@ -7,7 +7,7 @@ import kotlin.time.Instant
 
 /**
  * Authorization Request for the Authorization Endpoint (interface for extensibility).
-**/
+ **/
 interface AuthorizationRequest {
     val id: String
     val requestedAt: Instant

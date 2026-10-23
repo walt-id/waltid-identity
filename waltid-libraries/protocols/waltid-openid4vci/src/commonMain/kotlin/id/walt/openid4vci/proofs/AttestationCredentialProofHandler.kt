@@ -32,7 +32,7 @@ class AttestationCredentialProofHandler(
         }
         require(configuration.cryptographicBindingMethodsSupported?.any {
             it is CryptographicBindingMethod.Did ||
-                !w3c && (it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey)
+                    !w3c && (it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey)
         } != false) { "Standalone attestation has no compatible binding method; W3C JWT credentials require DID binding" }
     }
 
@@ -46,7 +46,8 @@ class AttestationCredentialProofHandler(
             ?: throw invalidCredentialProof("Attestation proof must be a string")
         val options = context.keyAttestation
             ?: throw CredentialProofServiceException("Standalone attestation trust is not configured")
-        val evidence = verifier.verify(jwt, proofMetadata, context, configuration, options, KeyAttestationUsage.STANDALONE_PROOF)
+        val evidence =
+            verifier.verify(jwt, proofMetadata, context, configuration, options, KeyAttestationUsage.STANDALONE_PROOF)
         return CredentialProofHandlerResult(
             VerifiedAttestationProof(evidence),
             evidence.resolveBindings(configuration),

@@ -111,10 +111,13 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
-      - name: Check reporting contracts and the committed catalogue
+      - name: Prepare the visual reporting environment
+        id: visual_environment
         run: |
           python3 -m venv "$RUNNER_TEMP/wallet-visual-python"
           "$RUNNER_TEMP/wallet-visual-python/bin/pip" install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt
+      - name: Check reporting contracts and the committed catalogue
+        run: |
           "$RUNNER_TEMP/wallet-visual-python/bin/python" -m unittest discover -s waltid-applications/waltid-wallet-demo-test-fixtures/visual -p 'test_*.py'
           "$RUNNER_TEMP/wallet-visual-python/bin/python" waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --check-index
       - uses: actions/setup-java@v5
@@ -127,7 +130,8 @@ jobs:
           ./gradlew -p build-logic test --tests WalletVisualVerificationTest --max-workers=2
           -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
       - name: Generate the PR reference gallery
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        id: reference_gallery
+        if: ${{ !cancelled() && steps.visual_environment.outcome == 'success' && github.event_name == 'pull_request' }}
         env:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -138,7 +142,7 @@ jobs:
           --base "$PR_BASE" --head "$PR_HEAD" --repository "$PR_BASE_REPOSITORY"
           --head-repository "$PR_HEAD_REPOSITORY" --output build/reports/wallet-gallery
       - name: Retain the reference gallery
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && steps.reference_gallery.outcome == 'success' && github.event_name == 'pull_request' }}
         uses: actions/upload-artifact@v7
         with:
           name: wallet-reference-gallery
