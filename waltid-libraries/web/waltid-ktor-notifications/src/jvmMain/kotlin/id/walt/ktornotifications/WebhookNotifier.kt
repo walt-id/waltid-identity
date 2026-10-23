@@ -2,6 +2,8 @@ package id.walt.ktornotifications
 
 import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessionWebhookNotification
 import id.walt.ktornotifications.core.KtorSessionUpdate
+import id.walt.webdatafetching.ssrf.BlockedAddressException
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.ktor.client.*
 import io.ktor.client.network.sockets.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -13,9 +15,12 @@ import io.ktor.utils.io.*
 object WebhookNotifier {
 
     private val webhookClient = HttpClient {
+        // The private-network guard follows redirects itself and checks every hop.
+        followRedirects = false
         install(ContentNegotiation) {
             json()
         }
+        installPrivateNetworkGuard()
     }
 
     /*
@@ -67,6 +72,9 @@ object WebhookNotifier {
             }
         }.getOrElse { ex ->
             if (ex is CancellationException) throw ex
+            if (generateSequence(ex) { it.cause }.any { it is BlockedAddressException }) {
+                throw IllegalArgumentException("Webhook destination is not allowed", ex)
+            }
             if (ex is ConnectTimeoutException) {
                 throw IllegalArgumentException(
                     "Could not connect to configured webhook URL for session update: ${config.url.hostWithPortIfSpecified}",

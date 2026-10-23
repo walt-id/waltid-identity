@@ -1,5 +1,6 @@
 package id.walt.verifier2
 
+import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
@@ -11,6 +12,12 @@ object OSSVerifier2FeatureCatalog : ServiceFeatureCatalog {
     val verifierService =
         BaseFeature("verifier-service", "Verifier Service Implementation", OSSVerifier2ServiceConfig::class)
 
+    val networkFetchGuard = BaseFeature(
+        "network-fetch-guard",
+        "Private-network guard for outbound webhooks",
+        NetworkFetchGuardConfig::class,
+    )
+
     val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
     val transactionDataProfilesFeature = OptionalFeature(
@@ -20,7 +27,7 @@ object OSSVerifier2FeatureCatalog : ServiceFeatureCatalog {
         default = true
     )
 
-    override val baseFeatures = listOf(verifierService)
+    override val baseFeatures = listOf(verifierService, networkFetchGuard)
     override val optionalFeatures: List<OptionalFeature> = listOf(
         devModeFeature,
         transactionDataProfilesFeature,
