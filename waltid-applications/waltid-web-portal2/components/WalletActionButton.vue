@@ -9,21 +9,32 @@ const emit = defineEmits<{
   click: [];
 }>();
 
-const language = ref<"en" | "de">("en");
+const browserLanguage = ref("en");
 
 onMounted(() => {
-  if (navigator.language.toLowerCase().startsWith("de")) {
-    language.value = "de";
-  }
+  browserLanguage.value = navigator.language.toLowerCase();
 });
+
+const dYouLanguage = computed(() =>
+  browserLanguage.value.startsWith("de") ? "de" : "en",
+);
+
+const franceLanguage = computed(() =>
+  browserLanguage.value.startsWith("fr") ? "fr" : "en",
+);
 
 const dYouSrc = computed(() => {
   const kind = props.action === "issue" ? "add" : "verify";
-  return `/wallets/d-you/d-you-wallet_button_${kind}_${language.value}.svg`;
+  return `/wallets/d-you/d-you-wallet_button_${kind}_${dYouLanguage.value}.svg`;
+});
+
+const franceSrc = computed(() => {
+  const kind = props.action === "issue" ? "add" : "verify";
+  return `/wallets/france-identite/france-identite_button_${kind}_${franceLanguage.value}.svg`;
 });
 
 const dYouLabel = computed(() => {
-  if (language.value === "de") {
+  if (dYouLanguage.value === "de") {
     return props.action === "issue"
       ? "Hinzufügen zu d-you Wallet"
       : "Verifizieren mit d-you Wallet";
@@ -33,27 +44,27 @@ const dYouLabel = computed(() => {
     : "Verify with d-you Wallet";
 });
 
-const labeledButton = computed(() => {
-  if (props.walletId === "eudi-reference-wallet") {
-    return {
-      icon: "/wallets/eu-wallet/eu_wallet.svg",
-      label:
-        props.action === "issue"
-          ? "Add to EUDI Reference Wallet"
-          : "Verify with EUDI Reference Wallet",
-    };
+const franceLabel = computed(() => {
+  if (franceLanguage.value === "fr") {
+    return props.action === "issue"
+      ? "Ajouter à France Identité"
+      : "Vérifier avec France Identité";
   }
-  if (props.walletId === "france-identite") {
-    return {
-      icon: "",
-      label:
-        props.action === "issue"
-          ? "Add to France Identité"
-          : "Verify with France Identité",
-    };
-  }
-  return null;
+  return props.action === "issue"
+    ? "Add to France Identité"
+    : "Verify with France Identité";
 });
+
+const eudiSrc = computed(() => {
+  const kind = props.action === "issue" ? "add" : "verify";
+  return `/wallets/eu-wallet/eu-wallet_button_${kind}_en.svg`;
+});
+
+const eudiLabel = computed(() =>
+  props.action === "issue"
+    ? "Add to EUDI Reference Wallet"
+    : "Verify with EUDI Reference Wallet",
+);
 </script>
 
 <template>
@@ -68,18 +79,23 @@ const labeledButton = computed(() => {
     <img :src="dYouSrc" alt="" class="h-[55px] w-auto" />
   </button>
   <button
-    v-else-if="labeledButton"
+    v-else-if="walletId === 'france-identite'"
     type="button"
-    class="relative flex h-16 w-full max-w-[28rem] items-center justify-center gap-3 rounded-full border border-gray-200 bg-white px-6 text-[17px] font-semibold whitespace-nowrap text-gray-900 shadow-[0_4px_16px_rgba(0,0,0,0.06)] disabled:opacity-60"
+    class="inline-flex border-0 bg-transparent p-0 leading-none disabled:opacity-60"
     :disabled="disabled"
+    :aria-label="franceLabel"
     @click="emit('click')"
   >
-    <img
-      v-if="labeledButton.icon"
-      :src="labeledButton.icon"
-      alt=""
-      class="h-7 w-auto"
-    />
-    {{ labeledButton.label }}
+    <img :src="franceSrc" alt="" class="h-[55px] w-auto" />
+  </button>
+  <button
+    v-else-if="walletId === 'eudi-reference-wallet'"
+    type="button"
+    class="inline-flex border-0 bg-transparent p-0 leading-none disabled:opacity-60"
+    :disabled="disabled"
+    :aria-label="eudiLabel"
+    @click="emit('click')"
+  >
+    <img :src="eudiSrc" alt="" class="h-[55px] w-auto" />
   </button>
 </template>
