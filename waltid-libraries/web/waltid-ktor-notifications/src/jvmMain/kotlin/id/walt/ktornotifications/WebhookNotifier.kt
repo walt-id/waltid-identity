@@ -125,13 +125,17 @@ internal class WebhookDeliveryQueue(
         if (worker?.isActive == true) return
         worker = scope.launch {
             while (isActive) {
-                try {
+                val claimed = try {
                     processDue()
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
                     log.error(ex) { "Webhook delivery worker failed; pending deliveries remain in the outbox" }
+                    0
                 }
+                // A full claim means more work may already be due. Poll again immediately so a backlog
+                // drains at the concurrency limit instead of one batch per poll interval.
+                if (claimed >= maxConcurrentDeliveries) continue
                 kotlinx.coroutines.withTimeoutOrNull(pollIntervalMilliseconds) { wakeUp.receive() }
             }
         }
@@ -174,16 +178,17 @@ internal class WebhookDeliveryQueue(
         return delivery.deliveryId
     }
 
-    suspend fun processDue(limit: Int = 100) = processingMutex.withLock {
+    suspend fun processDue(limit: Int = 100): Int = processingMutex.withLock {
         val now = clock()
+        // Claim only work that this process can start immediately. Reserving a large backlog behind the
+        // local semaphore could let leases expire before their HTTP requests begin.
+        val claims = store.claimDue(
+            nowEpochMilliseconds = now,
+            leaseUntilEpochMilliseconds = now + DELIVERY_LEASE_MILLISECONDS,
+            limit = minOf(limit, maxConcurrentDeliveries),
+        )
         coroutineScope {
-            // Claim only work that this process can start immediately. Reserving a large backlog behind the
-            // local semaphore could let leases expire before their HTTP requests begin.
-            store.claimDue(
-                nowEpochMilliseconds = now,
-                leaseUntilEpochMilliseconds = now + DELIVERY_LEASE_MILLISECONDS,
-                limit = minOf(limit, maxConcurrentDeliveries),
-            ).map { claim ->
+            claims.map { claim ->
                 async {
                     deliveryPermits.withPermit {
                         process(claim)
@@ -191,6 +196,7 @@ internal class WebhookDeliveryQueue(
                 }
             }.awaitAll()
         }
+        claims.size
     }
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()

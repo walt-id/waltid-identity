@@ -10,9 +10,16 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.nio.file.Files
@@ -142,6 +149,60 @@ class WebhookDeliveryQueueTest {
         queue.processDue()
 
         assertEquals(listOf("first", "second"), transport.deliveries.map(WebhookDelivery::event))
+    }
+
+    @Test
+    fun `processDue reports how many deliveries it claimed`() = runTest {
+        val transport = RecordingTransport()
+        val queue = queue(
+            store = FileWebhookDeliveryStore(temporaryDirectory()),
+            transport = transport,
+            clock = { 1_000L },
+            maxConcurrentDeliveries = 2,
+        )
+        repeat(5) { index -> queue.enqueue(update(event = "event-$index"), webhook()) }
+
+        assertEquals(2, queue.processDue())
+        assertEquals(2, queue.processDue())
+        assertEquals(1, queue.processDue())
+        assertEquals(0, queue.processDue())
+        assertEquals(5, transport.deliveries.size)
+    }
+
+    @Test
+    fun `worker drains a full backlog without waiting for the poll interval`() = runBlocking {
+        val delivered = AtomicInteger()
+        val transport = object : WebhookTransport {
+            override suspend fun deliver(
+                delivery: WebhookDelivery,
+                attempt: Int,
+                timestampEpochSeconds: Long,
+            ): WebhookAttemptResult {
+                delivered.incrementAndGet()
+                return WebhookAttemptResult(statusCode = 200)
+            }
+        }
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val queue = WebhookDeliveryQueue(
+            store = FileWebhookDeliveryStore(temporaryDirectory()),
+            transport = transport,
+            clock = { 1_000L },
+            jitter = { 0 },
+            pollIntervalMilliseconds = 30_000,
+            maxConcurrentDeliveries = 2,
+            scope = scope,
+        )
+        try {
+            repeat(4) { index -> queue.enqueue(update(event = "event-$index"), webhook()) }
+            queue.start()
+            withTimeout(5_000) {
+                while (delivered.get() < 4) delay(20)
+            }
+        } finally {
+            queue.stop()
+            scope.cancel()
+        }
+        assertEquals(4, delivered.get())
     }
 
     @Test
