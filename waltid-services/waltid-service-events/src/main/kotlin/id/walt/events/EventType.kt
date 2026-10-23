@@ -18,7 +18,9 @@ enum class EventType {
     @SerialName("IssuanceWalletEvent")
     IssuanceWalletEvent,
     @SerialName("PresentationWalletEvent")
-    PresentationWalletEvent;
+    PresentationWalletEvent,
+    @SerialName("UsageEvent")
+    UsageEvent;
 
     override fun toString(): String {
         return when (this) {
@@ -29,6 +31,7 @@ enum class EventType {
             CredentialWalletEvent -> "CredentialWalletEvent"
             IssuanceWalletEvent -> "IssuanceWalletEvent"
             PresentationWalletEvent -> "PresentationWalletEvent"
+            UsageEvent -> "UsageEvent"
         }
     }
 }
