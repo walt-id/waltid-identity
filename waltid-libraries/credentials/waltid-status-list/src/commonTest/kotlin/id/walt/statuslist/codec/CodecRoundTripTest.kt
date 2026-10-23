@@ -25,6 +25,13 @@ class CodecRoundTripTest {
         val decoded = BitstringStatusListCodec.decode(encoded)
         statuses.forEach { assertEquals(it.value, BitstringStatusListCodec.readStatus(decoded, it.index)) }
         assertEquals(0u, BitstringStatusListCodec.readStatus(decoded, 1))
+
+        val customStatuses = listOf(IndexedStatus(2, 1u), IndexedStatus(4, 3u), IndexedStatus(6, 7u))
+        val customDecoded = BitstringStatusListCodec.decode(
+            BitstringStatusListCodec.encode(customStatuses, statusSize = 3),
+        )
+        customStatuses.forEach { assertEquals(it.value, BitstringStatusListCodec.readStatus(customDecoded, it.index, 3)) }
+        assertEquals(0u, BitstringStatusListCodec.readStatus(customDecoded, 1, 3))
     }
 
     @Test
