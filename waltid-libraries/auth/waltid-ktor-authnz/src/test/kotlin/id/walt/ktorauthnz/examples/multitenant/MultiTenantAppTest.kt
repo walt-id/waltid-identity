@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.examples.multitenant
 
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -37,12 +38,14 @@ import kotlin.test.*
 /** Runs [multiTenantApp] for its four tenants, each with its own login, and checks that the tenants stay apart. */
 class MultiTenantAppTest {
 
-    private val idp = ExampleIdentityProvider(clientId = "org2-app")
-    private val verifier = ExampleVerifier()
-    private val directory = ExampleDirectory(mapOf("carol" to "ldap-secret"))
+    private val services = ExampleServiceScope()
+
+    private lateinit var idp: ExampleIdentityProvider
+    private lateinit var verifier: ExampleVerifier
+    private lateinit var directory: ExampleDirectory
 
     private val accounts = InMemoryAccountStore()
-    private val tenants = TenantDirectory.example(idp.discoveryUrl, directory.url, verifier.url)
+    private lateinit var tenants: TenantDirectory
     private val totpSecret = "JBSWY3DPEHPK3PXP"
 
     /** The "mail service": the last code sent per account. */
@@ -55,27 +58,45 @@ class MultiTenantAppTest {
     private lateinit var carol: String
 
     @BeforeTest
-    fun setUp() = runBlocking {
-        KtorAuthnzManager.sessionStore = InMemorySessionStore()
-        KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
-        KtorAuthnzManager.tokenHandler = KtorAuthNzTokenHandler()
-
-        alice = inAuthnzTenant("org1") {
-            accounts.addAccount(
-                UsernameIdentifier("alice"),
-                identifierData = mapOf(UserPass.id to UserPassStoredData("alice-password")),
-                accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret)),
-            )
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousEmailCodes = KtorAuthnzManager.emailCodes
+        val previousOnAccountRegistered = KtorAuthnzManager.onAccountRegistered
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.emailCodes = previousEmailCodes
+            KtorAuthnzManager.onAccountRegistered = previousOnAccountRegistered
         }
-        carol = inAuthnzTenant("org3") {
-            accounts.addAccount(LDAPIdentifier(directory.url, "carol"), accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret)))
+        idp = services.own(ExampleIdentityProvider(clientId = "org2-app"))
+        verifier = services.own(ExampleVerifier())
+        directory = services.own(ExampleDirectory(mapOf("carol" to "ldap-secret")))
+        tenants = TenantDirectory.example(idp.discoveryUrl, directory.url, verifier.url)
+        runBlocking {
+            KtorAuthnzManager.sessionStore = InMemorySessionStore()
+            KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
+            KtorAuthnzManager.tokenHandler = KtorAuthNzTokenHandler()
+
+            alice = inAuthnzTenant("org1") {
+                accounts.addAccount(
+                    UsernameIdentifier("alice"),
+                    identifierData = mapOf(UserPass.id to UserPassStoredData("alice-password")),
+                    accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret)),
+                )
+            }
+            carol = inAuthnzTenant("org3") {
+                accounts.addAccount(LDAPIdentifier(directory.url, "carol"), accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret)))
+            }
         }
     }
 
     @AfterTest
-    fun tearDown() {
-        idp.close(); verifier.close(); directory.close()
-    }
+    fun tearDown() = services.close()
 
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.enrollment
 
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.errors.HttpStatusError
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -46,18 +47,37 @@ import kotlin.test.*
 
 class SignUpTest {
 
+    private val services = ExampleServiceScope()
+
     private val accounts = InMemoryAccountStore()
     private val sent = mutableListOf<EmailCodeDelivery>()
     private val registered = mutableListOf<RegisteredAccount>()
     private val json = Json { ignoreUnknownKeys = true }
-    private val idp = ExampleIdentityProvider(clientId = "app")
+    private lateinit var idp: ExampleIdentityProvider
+
+    @BeforeTest
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousAttemptLimits = KtorAuthnzManager.attemptLimits
+        val previousEmailCodes = KtorAuthnzManager.emailCodes
+        val previousOnAccountRegistered = KtorAuthnzManager.onAccountRegistered
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.attemptLimits = previousAttemptLimits
+            KtorAuthnzManager.emailCodes = previousEmailCodes
+            KtorAuthnzManager.onAccountRegistered = previousOnAccountRegistered
+        }
+        idp = services.own(ExampleIdentityProvider(clientId = "app"))
+    }
 
     @AfterTest
-    fun tearDown() {
-        idp.close()
-        KtorAuthnzManager.onAccountRegistered = null
-        KtorAuthnzManager.emailCodes = null
-    }
+    fun tearDown() = services.close()
 
     private fun signUpTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         application {
