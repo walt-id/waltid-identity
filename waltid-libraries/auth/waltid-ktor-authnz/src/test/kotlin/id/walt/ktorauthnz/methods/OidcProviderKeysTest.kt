@@ -110,7 +110,11 @@ class OidcProviderKeysTest {
     fun `tokens naming unknown keys do not fetch the keys each time`() = oidcTest {
         assertEquals(HttpStatusCode.OK, login().status)
         idp.signedKid = "unknown-key"
-        repeat(5) { assertNotEquals(HttpStatusCode.OK, login().status) }
+        repeat(5) {
+            val response = login()
+            assertEquals(HttpStatusCode.InternalServerError, response.status)
+            assertEquals("OIDC JWKS must contain exactly one key for kid: unknown-key", response.bodyAsText())
+        }
         assertTrue(idp.jwksRequests.get() <= 2, "fetched ${idp.jwksRequests.get()} times")
     }
 }

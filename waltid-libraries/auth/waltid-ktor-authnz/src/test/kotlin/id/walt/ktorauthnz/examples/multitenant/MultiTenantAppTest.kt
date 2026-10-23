@@ -136,14 +136,6 @@ class MultiTenantAppTest {
     }
 
     @Test
-    fun `org1 logs in with password, then TOTP, then a code sent by email`() = app {
-        val token = loginAlice()
-        val me = json.parseToJsonElement(me("org1", token).bodyAsText()).jsonObject
-        assertEquals("org1", me["tenant"]?.jsonPrimitive?.content)
-        assertEquals(alice, me["account"]?.jsonPrimitive?.content)
-    }
-
-    @Test
     fun `org2 logs in with its identity provider, creating the account on first login`() = app {
         val started = client.get("/org2/auth/oidc/auth").session()
         val authorizationUrl = (started.nextStep as AuthSessionNextStepRedirectData).url
@@ -178,7 +170,11 @@ class MultiTenantAppTest {
     @Test
     fun `a token of one tenant is not accepted by another`() = app {
         val token = loginAlice()
-        assertEquals(HttpStatusCode.OK, me("org1", token).status)
+        val ownTenant = me("org1", token)
+        assertEquals(HttpStatusCode.OK, ownTenant.status)
+        val identity = json.parseToJsonElement(ownTenant.bodyAsText()).jsonObject
+        assertEquals("org1", identity["tenant"]?.jsonPrimitive?.content)
+        assertEquals(alice, identity["account"]?.jsonPrimitive?.content)
         assertEquals(HttpStatusCode.Unauthorized, me("org3", token).status)
     }
 
