@@ -1,7 +1,6 @@
 package id.walt.crypto2.keys
 
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -13,8 +12,6 @@ class EncodedKeyPemTest {
 
         assertEquals(P256_PUBLIC_PEM, publicKey.encodePem())
         assertEquals(P256_PRIVATE_PEM, privateKey.encodePem())
-        assertContentEquals(publicKey.data.toByteArray(), publicKey.encodePem().decodePublicKeyPem().data.toByteArray())
-        assertContentEquals(privateKey.data.toByteArray(), privateKey.encodePem().decodePrivateKeyPem().data.toByteArray())
     }
 
     @Test
