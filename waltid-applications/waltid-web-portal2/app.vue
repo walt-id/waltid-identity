@@ -6,7 +6,7 @@ const verifierBase = config.public.verifierBase as string;
 const activeTab = ref<"issue" | "verify">("issue");
 const mode = ref<"simple" | "advanced">("simple");
 const isMobile = ref(false);
-const { walletId, wallets } = useSelectedWallet();
+const { walletId, wallet, wallets } = useSelectedWallet();
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -70,6 +70,14 @@ const simpleAction = ref<"issue" | "verify">("issue");
 watch(walletId, () => {
   simpleProfileId.value = null;
 });
+
+watch(
+  () => wallet.value.issuance,
+  (supported) => {
+    if (!supported) activeTab.value = "verify";
+  },
+  { immediate: true },
+);
 
 const effectiveMode = computed(() =>
   isMobile.value ? "simple" : mode.value,
@@ -169,11 +177,14 @@ const hasResult = computed(() =>
         >
           <template v-if="effectiveMode === 'advanced'">
             <button
-              class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
+              class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0 disabled:cursor-not-allowed disabled:text-gray-300"
+              :disabled="!wallet.issuance"
               :class="
-                activeTab === 'issue'
-                  ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
-                  : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
+                !wallet.issuance
+                  ? 'text-gray-300'
+                  : activeTab === 'issue'
+                    ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
+                    : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
               "
               @click="activeTab = 'issue'"
             >

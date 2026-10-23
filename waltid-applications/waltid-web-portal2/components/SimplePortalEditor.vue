@@ -23,7 +23,12 @@ const props = defineProps<{
   profiles: ReturnType<typeof useProfiles>;
 }>();
 
-const { walletId } = useSelectedWallet();
+const { walletId, wallet } = useSelectedWallet();
+const issuanceSupported = computed(() => wallet.value.issuance);
+
+watch(issuanceSupported, (supported) => {
+  if (!supported) action.value = "verify";
+}, { immediate: true });
 const cards = ref<ProfileCard[]>([]);
 const cardsLoading = ref(false);
 const cardsError = ref<string | null>(null);
@@ -156,11 +161,14 @@ function clearSelection() {
                 >
                   <button
                     type="button"
-                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:cursor-not-allowed disabled:text-gray-300"
+                    :disabled="!issuanceSupported"
                     :class="
-                      action === 'issue'
-                        ? 'bg-slate-900 text-white'
-                        : 'text-[--color-text-muted] hover:text-[--color-text]'
+                      !issuanceSupported
+                        ? 'text-gray-300'
+                        : action === 'issue'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-[--color-text-muted] hover:text-[--color-text]'
                     "
                     @click="action = 'issue'"
                   >

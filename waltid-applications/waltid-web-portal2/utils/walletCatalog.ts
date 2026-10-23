@@ -18,6 +18,8 @@ export interface WalletDefinition {
   /** Verifier material injected by portal2. Absent for unsigned wallets. */
   materialId?: "german-eudi-wallet" | "france-identite" | "eudi-reference-wallet";
   dcApi: boolean;
+  /** When false, the portal keeps verification and does not offer issuance. */
+  issuance: boolean;
   verification: {
     signed: boolean;
     encrypted: boolean;
@@ -30,6 +32,7 @@ export const WALLETS: readonly WalletDefinition[] = [
     label: "walt.id",
     issuer: "community",
     dcApi: true,
+    issuance: true,
     verification: { signed: false, encrypted: false },
   },
   {
@@ -39,6 +42,7 @@ export const WALLETS: readonly WalletDefinition[] = [
     issuerTargetEnv: "NUXT_ES_EUDI_REF_ISSUER_TARGET",
     materialId: "eudi-reference-wallet",
     dcApi: true,
+    issuance: true,
     verification: { signed: true, encrypted: true },
   },
   {
@@ -48,6 +52,7 @@ export const WALLETS: readonly WalletDefinition[] = [
     issuerTargetEnv: "NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET",
     materialId: "france-identite",
     dcApi: false,
+    issuance: false,
     verification: { signed: true, encrypted: true },
   },
   {
@@ -57,6 +62,7 @@ export const WALLETS: readonly WalletDefinition[] = [
     issuerTargetEnv: "NUXT_ES_DYOU_ISSUER_TARGET",
     materialId: "german-eudi-wallet",
     dcApi: false,
+    issuance: true,
     verification: { signed: true, encrypted: true },
   },
 ];

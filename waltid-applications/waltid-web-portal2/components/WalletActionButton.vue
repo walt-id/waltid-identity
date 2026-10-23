@@ -65,6 +65,10 @@ const eudiLabel = computed(() =>
     ? "Add to EUDI Reference Wallet"
     : "Verify with EUDI Reference Wallet",
 );
+
+const issuanceBlocked = computed(
+  () => props.action === "issue" && props.walletId === "france-identite",
+);
 </script>
 
 <template>
@@ -81,8 +85,8 @@ const eudiLabel = computed(() =>
   <button
     v-else-if="walletId === 'france-identite'"
     type="button"
-    class="inline-flex border-0 bg-transparent p-0 leading-none disabled:opacity-60"
-    :disabled="disabled"
+    class="inline-flex border-0 bg-transparent p-0 leading-none disabled:cursor-not-allowed disabled:opacity-40 disabled:grayscale"
+    :disabled="disabled || issuanceBlocked"
     :aria-label="franceLabel"
     @click="emit('click')"
   >

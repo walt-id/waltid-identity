@@ -9,6 +9,12 @@ import {
 import { applyVerificationPolicy } from "./verificationRouting.ts";
 import { getWallet } from "./walletCatalog.ts";
 
+test("France Identité stays verification-only", () => {
+  assert.equal(getWallet("france-identite").issuance, false);
+  assert.equal(getWallet("eudi-reference-wallet").issuance, true);
+  assert.equal(getWallet("d-you").issuance, true);
+});
+
 test("community offers drop wallet selection and issuer configuration secrets", () => {
   const body = communityOfferBody({
     walletId: "walt-id",

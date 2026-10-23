@@ -268,26 +268,52 @@ profiles = {
         },
     },
 }
-json.dump({"configurations": configurations, "profiles": profiles, "kms": kms_id, "tokenKeyId": key_id}, open(path, "w"))
+json.dump({
+    "configurations": configurations,
+    "profiles": profiles,
+    "kms": kms_id,
+    "tokenKeyId": key_id,
+}, open(path, "w"))
 PY
 
 for issuer in eudi-reference france-identite d-you; do
   issuer_target="${root}.${issuer}"
-  issuer_body="$(python3 - "$tmp/issuers.json" "$issuer_target" <<'PY'
+  existing="$tmp/existing-${issuer}.json"
+  existing_code="$(curl -sS -o "$existing" -w "%{http_code}" \
+    -H "Authorization: Bearer ${ES_ADMIN_TOKEN}" \
+    -H "Accept: application/json" \
+    "${API_BASE}/v2/${issuer_target}/issuer-service-api/configuration/view" || true)"
+  if [[ "$existing_code" != "200" ]]; then
+    printf '{}' > "$existing"
+  fi
+  issuer_body="$(python3 - "$tmp/issuers.json" "$issuer_target" "$issuer" "$existing" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1]))
-print(json.dumps({
+target, issuer, existing_path = sys.argv[2:]
+existing = json.load(open(existing_path))
+configurations = data["configurations"]
+if issuer == "france-identite":
+    configurations = {"pid-mdoc": configurations["pid-mdoc"]}
+body = {
     "type": "issuer2",
-    "_id": sys.argv[2],
-    "kms": data["kms"],
-    "tokenKeyId": data["tokenKeyId"],
-    "credentialConfigurations": data["configurations"],
-}))
+    "_id": target,
+    "kms": existing.get("kms") or data["kms"],
+    "tokenKeyId": existing.get("tokenKeyId") or data["tokenKeyId"],
+    "credentialConfigurations": configurations,
+}
+if existing.get("signedMetadata"):
+    body["signedMetadata"] = existing["signedMetadata"]
+print(json.dumps(body))
 PY
 )"
   request POST "${API_BASE}/v1/${issuer_target}/resource-api/services/create" "$issuer_body"
   request PUT "${API_BASE}/v2/${issuer_target}/issuer-service-api/configuration/update" "$issuer_body"
-  for profile in pid-mdoc pid-sd-jwt mdl sca-payment; do
+  if [[ "$issuer" == "france-identite" ]]; then
+    profile_ids=(pid-mdoc)
+  else
+    profile_ids=(pid-mdoc pid-sd-jwt mdl sca-payment)
+  fi
+  for profile in "${profile_ids[@]}"; do
     profile_body="$(python3 - "$tmp/issuers.json" "$profile" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1]))
