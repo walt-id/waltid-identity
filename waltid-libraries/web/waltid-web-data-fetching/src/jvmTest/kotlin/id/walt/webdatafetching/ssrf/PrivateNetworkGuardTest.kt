@@ -28,6 +28,7 @@ class PrivateNetworkGuardTest {
     @BeforeTest
     @AfterTest
     fun resetSettings() {
+        System.clearProperty("walt.ssrf.allowLoopback")
         PrivateNetworkGuardSettings.allowLoopback = false
         PrivateNetworkGuardSettings.allowPrivateNetworks = false
         PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
@@ -92,6 +93,15 @@ class PrivateNetworkGuardTest {
 
         assertFailsWith<BlockedAddressException> { client.get("http://8.8.8.8/redirect-me") }
         assertTrue(!requestedLoopback, "the guard must reject the redirect target before it is ever requested")
+    }
+
+    @Test
+    fun `a test system property allows loopback without changing the deployment setting`() = runTest {
+        System.setProperty("walt.ssrf.allowLoopback", "true")
+        val engine = MockEngine { respondOk("hello") }
+        val client = guardedClient(engine)
+        assertTrue(client.get("http://127.0.0.1/admin").status.isSuccess())
+        assertTrue(!PrivateNetworkGuardSettings.allowLoopback)
     }
 
     @Test
