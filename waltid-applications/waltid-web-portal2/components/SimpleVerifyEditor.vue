@@ -2,10 +2,6 @@
 import type { useVerifierSession } from "~/composables/useVerifierSession";
 import type { useProfiles } from "~/composables/useProfiles";
 import {
-  SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS,
-  getSimplePidVerificationRequestOption,
-} from "~/data/simplePidVerificationRequests";
-import {
   getDcApiPresentationSupport,
   type DcApiPresentationSupport,
 } from "~/utils/dcApiPresentation";
@@ -15,7 +11,6 @@ import {
   dcqlFromIssuerMetadata,
   defaultSelectedClaimIds,
   isMdocConfiguration,
-  isPidConfiguration,
 } from "~/utils/dcqlFromIssuerMetadata";
 import { buildProfileCards, type ProfileCard } from "~/utils/profileCards";
 
@@ -33,12 +28,11 @@ const props = defineProps<{
 const config = useRuntimeConfig();
 const issuerBase = config.public.issuerBase as string;
 const issuerMetadata = useIssuerMetadata(issuerBase);
+const { wallet } = useSelectedWallet();
+const dYouButtonSrc = ref("/wallets/d-you/button_verify_en.svg");
 
 const selectedProfileId = ref<string | null>(
   props.card?.profileId ?? props.profileId ?? null,
-);
-const selectedPidRequestId = ref(
-  SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS[0]!.id,
 );
 const selectedClaimIds = ref<string[]>([]);
 const deliveryMethod = ref<DeliveryMethod>("qr");
@@ -49,8 +43,19 @@ const dcApiSupport = ref<DcApiPresentationSupport>(
 
 onMounted(() => {
   dcApiSupport.value = getDcApiPresentationSupport();
+  if (navigator.language.toLowerCase().startsWith("de")) {
+    dYouButtonSrc.value = "/wallets/d-you/button_verify_de.svg";
+  }
   if (!props.embedded) issuerMetadata.load();
 });
+
+watch(
+  () => wallet.value.dcApi,
+  (allowed) => {
+    if (!allowed) deliveryMethod.value = "qr";
+  },
+  { immediate: true },
+);
 
 watch(deliveryMethod, (method) => {
   if (method === "dc_api") {
@@ -91,27 +96,12 @@ const selectedClaims = computed(() =>
   ),
 );
 
-const isPidCard = computed(() =>
-  isPidConfiguration(
-    selectedCard.value?.configuration,
-    selectedCard.value?.credentialConfigurationId,
-  ),
-);
-
 const isMdocCard = computed(() =>
   isMdocConfiguration(selectedCard.value?.configuration),
 );
 
-const showPidWalletProfile = computed(
-  () => isPidCard.value && deliveryMethod.value === "qr",
-);
-
 const showIso180137 = computed(
   () => deliveryMethod.value === "dc_api" && isMdocCard.value,
-);
-
-const selectedPidRequestOption = computed(() =>
-  getSimplePidVerificationRequestOption(selectedPidRequestId.value),
 );
 
 const allClaimsSelected = computed(
@@ -171,18 +161,6 @@ function buildCredentialQuery() {
   );
 }
 
-function withGeneratedPidDcql() {
-  const option = selectedPidRequestOption.value;
-  const body = structuredClone(option.requestBody) as Record<string, unknown>;
-  const coreFlow =
-    body.core_flow && typeof body.core_flow === "object"
-      ? { ...(body.core_flow as Record<string, unknown>) }
-      : {};
-  coreFlow.dcql_query = { credentials: [buildCredentialQuery()] };
-  body.core_flow = coreFlow;
-  return { materialId: option.materialId, body };
-}
-
 async function submit() {
   if (!canSubmit.value) return;
 
@@ -215,12 +193,6 @@ async function submit() {
       },
       false,
     );
-    return;
-  }
-
-  if (showPidWalletProfile.value) {
-    const pid = withGeneratedPidDcql();
-    await props.session.createPidSession(pid.materialId, pid.body);
     return;
   }
 
@@ -370,7 +342,7 @@ async function submit() {
         </div>
       </details>
 
-      <section>
+      <section v-if="wallet.dcApi">
         <label class="form-label">Delivery method</label>
         <div
           class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
@@ -452,31 +424,29 @@ async function submit() {
         </p>
       </section>
 
-      <section v-if="showPidWalletProfile">
-        <label class="form-label">PID wallet profile</label>
-        <select v-model="selectedPidRequestId" class="form-select">
-          <option
-            v-for="requestOption in SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS"
-            :key="requestOption.id"
-            :value="requestOption.id"
-          >
-            {{ requestOption.label }}
-          </option>
-        </select>
-        <p class="mt-2 text-xs text-[--color-text-muted]">
-          {{ selectedPidRequestOption.description }}
-          <a
-            v-if="selectedPidRequestOption.link"
-            :href="selectedPidRequestOption.link"
-            target="_blank"
-            class="text-blue-500"
-            >Learn more</a
-          >
-        </p>
-      </section>
-
       <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
+          v-if="wallet.id === 'd-you'"
+          type="button"
+          class="inline-flex h-11 items-center gap-2 rounded-full border border-slate-300 bg-white px-3 disabled:opacity-50"
+          :disabled="!canSubmit || session.loading.value"
+          aria-label="Verify with d-you Wallet"
+          @click="submit"
+        >
+          <span class="inline-flex h-8 w-8 shrink-0 overflow-hidden">
+            <img
+              :src="dYouButtonSrc"
+              alt=""
+              class="h-8 max-w-none"
+              style="width: calc(202 / 55 * 2rem)"
+            />
+          </span>
+          <span class="text-sm font-semibold text-slate-900">
+            Verify with d-you Wallet
+          </span>
+        </button>
+        <button
+          v-else
           class="btn btn-primary w-full sm:w-auto"
           :disabled="!canSubmit || session.loading.value"
           @click="submit"

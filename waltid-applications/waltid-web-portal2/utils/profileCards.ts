@@ -20,6 +20,23 @@ function firstDisplay(
   return configuration?.credential_metadata?.display?.[0];
 }
 
+export function buildCardsFromConfigurations(
+  configurations: Record<string, IssuerCredentialConfiguration>,
+): ProfileCard[] {
+  return Object.entries(configurations).map(([id, configuration]) => {
+    const display = firstDisplay(configuration);
+    return {
+      profileId: id,
+      credentialConfigurationId: id,
+      name: display?.name || id,
+      description: display?.description,
+      backgroundImageUri: display?.background_image?.uri,
+      backgroundColor: display?.background_color || "#0f172a",
+      configuration,
+    };
+  });
+}
+
 export function buildProfileCards(
   profiles: IssuerProfile[],
   configurationFor: (
