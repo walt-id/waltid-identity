@@ -6,6 +6,7 @@ const verifierBase = config.public.verifierBase as string;
 const activeTab = ref<"issue" | "verify">("issue");
 const mode = ref<"simple" | "advanced">("simple");
 const isMobile = ref(false);
+const { walletId, wallets } = useSelectedWallet();
 
 const MOBILE_BREAKPOINT_PX = 768;
 
@@ -66,6 +67,10 @@ onBeforeUnmount(() => {
 const simpleProfileId = ref<string | null>(null);
 const simpleAction = ref<"issue" | "verify">("issue");
 
+watch(walletId, () => {
+  simpleProfileId.value = null;
+});
+
 const effectiveMode = computed(() =>
   isMobile.value ? "simple" : mode.value,
 );
@@ -106,6 +111,17 @@ const hasResult = computed(() =>
         <h1 class="text-2xl sm:text-3xl font-bold m-0 truncate">Demo Portal</h1>
       </div>
 
+      <div class="flex items-center gap-2">
+        <label class="sr-only" for="wallet-select">Wallet</label>
+        <select
+          id="wallet-select"
+          v-model="walletId"
+          class="form-select w-auto min-w-40 text-sm"
+        >
+          <option v-for="wallet in wallets" :key="wallet.id" :value="wallet.id">
+            {{ wallet.label }}
+          </option>
+        </select>
       <div
         v-if="!isMobile"
         class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
@@ -134,6 +150,7 @@ const hasResult = computed(() =>
         >
           Advanced
         </button>
+      </div>
       </div>
     </header>
 

@@ -119,6 +119,18 @@ Simple PID wallet presets do **not** ship keys or certificates to the browser. P
 
 Keep those values in local `.env` or a Kubernetes secret. Do not commit live key material. `NUXT_VERIFIER_PROXY_TARGET` is optional; if unset, the PID create route forwards to `NUXT_PUBLIC_VERIFIER_BASE` when that value is an absolute URL.
 
+The header wallet selector chooses which issuer and verifier policy the portal uses. **walt.id** uses the community issuer and an unsigned verification request. **EUDI Reference Wallet**, **France Identité**, and **d-you** use separate Enterprise issuer services. Credential cards are loaded from that issuer’s metadata. Offer creation, issuance events, and verification creation go through portal2. The browser sends a wallet id and does not receive issuer keys, verifier keys, or the Enterprise API token.
+
+```text
+NUXT_ES_BASE_URL=
+NUXT_ES_API_KEY=
+NUXT_ES_EUDI_REF_ISSUER_TARGET=
+NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET=
+NUXT_ES_DYOU_ISSUER_TARGET=
+```
+
+`NUXT_ES_API_KEY` is sent as `Authorization: Bearer` only from the portal2 server. Leave the Enterprise values empty until `scripts/provision-enterprise-demo.sh` has created the issuer services. That script reads `ES_ADMIN_TOKEN` and does not print it. On the public demo, organization creation is disabled, so the script creates a dedicated tenant in `ES_ORGANIZATION` (default `waltid`).
+
 ### Development
 
 1. **Install dependencies**:

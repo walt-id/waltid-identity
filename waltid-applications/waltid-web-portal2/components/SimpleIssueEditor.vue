@@ -21,6 +21,7 @@ const props = defineProps<{
 const config = useRuntimeConfig();
 const issuerBase = config.public.issuerBase as string;
 const issuerMetadata = useIssuerMetadata(issuerBase);
+const { wallet } = useSelectedWallet();
 
 const selectedProfileId = ref<string | null>(
   props.card?.profileId ?? props.profileId ?? null,
@@ -41,20 +42,18 @@ watch(deliveryMethod, (method) => {
 });
 
 watch(
+  () => wallet.value.dcApi,
+  (allowed) => {
+    if (!allowed) deliveryMethod.value = "qr";
+  },
+  { immediate: true },
+);
+
+watch(
   () => props.card?.profileId ?? props.profileId,
   (profileId) => {
     if (profileId) selectedProfileId.value = profileId;
   },
-);
-
-watch(
-  selectedProfileId,
-  (profileId) => {
-    if (profileId) {
-      props.profiles.loadDetail(profileId);
-    }
-  },
-  { immediate: true },
 );
 
 const profileCards = computed(() =>
@@ -71,12 +70,6 @@ const selectedCard = computed(
       (card) => card.profileId === selectedProfileId.value,
     ) ??
     null,
-);
-
-const selectedProfileDetail = computed(() =>
-  selectedProfileId.value
-    ? props.profiles.details.value[selectedProfileId.value]
-    : null,
 );
 
 const canSubmit = computed(() => {
@@ -177,13 +170,6 @@ async function submit() {
         :loading="issuerMetadata.loading.value"
         :error="issuerMetadata.error.value"
       />
-      <JsonViewer
-        label="Profile"
-        :value="selectedProfileDetail"
-        :loading="profiles.detailLoading.value"
-        :error="profiles.detailError.value"
-      />
-
       <section>
         <label class="form-label">Issuance flow</label>
         <div
@@ -216,7 +202,7 @@ async function submit() {
         </div>
       </section>
 
-      <section>
+      <section v-if="wallet.dcApi">
         <label class="form-label">Delivery method</label>
         <div
           class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
