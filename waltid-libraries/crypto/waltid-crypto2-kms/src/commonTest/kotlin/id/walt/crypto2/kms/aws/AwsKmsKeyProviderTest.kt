@@ -42,7 +42,10 @@ class AwsKmsKeyProviderTest {
             remoteKeyId = "remote-existing-key",
             publicKey = publicKey,
         )
-        val restored = runtime(mockClient { error("Restore must not call AWS") }).restore(
+        val restored = runtime(
+            mockClient { error("Restore must not call AWS") },
+            credentialResolver = AwsCredentialResolver { fail("Restore must not read AWS credentials") },
+        ).restore(
             StoredKeyCodec.decodeFromByteArray(StoredKeyCodec.encodeToByteArray(stored))
         )
 
@@ -175,15 +178,18 @@ class AwsKmsKeyProviderTest {
         assertEquals(4, requestIndex)
     }
 
-    private fun runtime(client: HttpClient): CryptoRuntime = CryptoRuntime(
+    private fun runtime(
+        client: HttpClient,
+        credentialResolver: AwsCredentialResolver = AwsCredentialResolver { reference ->
+            assertEquals(options.credentialReference, reference)
+            AwsCredentials("access-key", "secret-key", "session-token")
+        },
+    ): CryptoRuntime = CryptoRuntime(
         softwareProviders = emptyList(),
         managedProviders = listOf(
             AwsKmsKeyProvider(
                 client = client,
-                credentialResolver = AwsCredentialResolver { reference ->
-                    assertEquals(options.credentialReference, reference)
-                    AwsCredentials("access-key", "secret-key", "session-token")
-                },
+                credentialResolver = credentialResolver,
                 now = { Instant.parse("2026-07-17T12:00:00Z") },
             )
         ),

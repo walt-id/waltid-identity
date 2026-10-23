@@ -76,6 +76,7 @@ class AwsKmsSdkKeyProviderTest {
                 providerOptions = options.encode(),
             ),
         )
+        assertEquals(true, state.createdMultiRegion)
         assertEquals("alias/wallet-signing", state.aliasName)
         assertEquals(mapOf("service" to "wallet"), state.createdTags)
         assertEquals(listOf("eu-west-1"), state.replicaTargets)
@@ -155,6 +156,15 @@ class AwsKmsSdkKeyProviderTest {
         assertEquals(AwsKmsSdkKeyProvider.ID, ciphertext.provider)
         assertContentEquals(state.ciphertext, ciphertext.blob.toByteArray())
         assertContentEquals(plaintext, assertNotNull(key.capabilities.decryptor).decrypt(ciphertext, null))
+
+        val encryptRequest = assertNotNull(state.encryptRequest)
+        assertEquals("mrk-remote", encryptRequest.keyId)
+        assertEquals("RSAES_OAEP_SHA_256", encryptRequest.encryptionAlgorithm?.value)
+        assertContentEquals(plaintext, encryptRequest.plaintext)
+        val decryptRequest = assertNotNull(state.decryptRequest)
+        assertEquals("mrk-remote", decryptRequest.keyId)
+        assertEquals("RSAES_OAEP_SHA_256", decryptRequest.encryptionAlgorithm?.value)
+        assertContentEquals(state.ciphertext, decryptRequest.ciphertextBlob)
     }
 
     private fun runtime(state: FakeState): CryptoRuntime = CryptoRuntime(
@@ -171,6 +181,9 @@ class AwsKmsSdkKeyProviderTest {
         val signRegions = mutableListOf<String>()
         val deletionRegions = mutableListOf<String>()
         var aliasName: String? = null
+        var createdMultiRegion: Boolean? = null
+        var encryptRequest: EncryptRequest? = null
+        var decryptRequest: DecryptRequest? = null
         var createdTags: Map<String, String> = emptyMap()
         var aliasFailure: Throwable? = null
         var closeCount = 0
@@ -183,6 +196,7 @@ class AwsKmsSdkKeyProviderTest {
         private val state: FakeState,
     ) : AwsKmsSdkClient {
         override suspend fun createKey(request: CreateKeyRequest): CreateKeyResponse {
+            state.createdMultiRegion = request.multiRegion
             state.createdTags = request.tags.orEmpty().associate { requireNotNull(it.tagKey) to requireNotNull(it.tagValue) }
             return CreateKeyResponse {
                 keyMetadata = KeyMetadata {
@@ -213,11 +227,15 @@ class AwsKmsSdkKeyProviderTest {
         }
 
         override suspend fun verify(request: VerifyRequest): VerifyResponse = VerifyResponse { signatureValid = true }
-        override suspend fun encrypt(request: EncryptRequest): EncryptResponse =
-            EncryptResponse { ciphertextBlob = state.ciphertext }
+        override suspend fun encrypt(request: EncryptRequest): EncryptResponse {
+            state.encryptRequest = request
+            return EncryptResponse { ciphertextBlob = state.ciphertext }
+        }
 
-        override suspend fun decrypt(request: DecryptRequest): DecryptResponse =
-            DecryptResponse { plaintext = state.decryptedPlaintext }
+        override suspend fun decrypt(request: DecryptRequest): DecryptResponse {
+            state.decryptRequest = request
+            return DecryptResponse { plaintext = state.decryptedPlaintext }
+        }
 
         override suspend fun scheduleKeyDeletion(request: ScheduleKeyDeletionRequest): ScheduleKeyDeletionResponse {
             state.deletionRegions += region
