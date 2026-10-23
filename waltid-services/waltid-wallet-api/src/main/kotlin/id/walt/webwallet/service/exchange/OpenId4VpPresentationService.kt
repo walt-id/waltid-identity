@@ -161,6 +161,15 @@ class OpenId4VpPresentationService(
         request: String,
         requestObject: String,
     ): Url = walletPresentationRequestBuilder(request).apply {
+        // PTRID-753: walletPresentationRequestBuilder() drops every original query parameter
+        // (see its substringBefore("?") above), including client_id. AuthorizationRequestResolver's
+        // strict OpenID4VP 1.0 resolver (enforceFinalRequestObject = true, the default) requires
+        // client_id at the top level whenever request/request_uri is present -- for a signed
+        // Request Object this reconstructed URL is what gets re-resolved on the second internal
+        // pass (SSIKit2WalletService.useOpenId4VpPresentationRequest), so without this it throws
+        // "client_id is required alongside request or request_uri" for every Verifier that sends a
+        // signed JAR. Re-add it from the original request URL.
+        Url(request).parameters["client_id"]?.let { parameters.append("client_id", it) }
         parameters.append("request", requestObject)
     }.build()
 

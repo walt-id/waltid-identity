@@ -142,7 +142,8 @@ const {
   error,
   refresh,
 } = useLazyFetch<IssuerCredentials>(
-  `/wallet-api/wallet/${currentWallet.value}/issuers/${issuer}/credentials`,
+  `${config.public.walletApiBaseUrl}/wallet-api/wallet/${currentWallet.value}/issuers/${issuer}/credentials`,
+  { credentials: 'include' },
 );
 const credentialType = ref<string>("jwt_vc_json");
 
