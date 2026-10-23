@@ -1,5 +1,6 @@
 package id.walt.issuer2
 
+import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
@@ -36,6 +37,12 @@ object FeatureCatalog : ServiceFeatureCatalog {
         Issuer2ServiceConfig::class
     )
 
+    private val networkFetchGuard = BaseFeature(
+        "network-fetch-guard",
+        "Private-network guard for outbound webhooks",
+        NetworkFetchGuardConfig::class,
+    )
+
     private val authenticationService = BaseFeature(
         "authentication-service",
         "Authentication Service Implementation",
@@ -46,7 +53,7 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
-    override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService)
+    override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService, networkFetchGuard)
     override val optionalFeatures = listOf(entra, devModeFeature)
 
 }

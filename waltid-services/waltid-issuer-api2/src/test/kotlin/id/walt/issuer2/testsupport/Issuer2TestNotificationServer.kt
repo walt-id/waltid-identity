@@ -1,7 +1,10 @@
 package id.walt.issuer2.testsupport
 
 import id.walt.issuer2.notifications.IssuanceSessionEvent
+import id.walt.ktornotifications.NetworkFetchGuardState
+import id.walt.ktornotifications.applyNetworkFetchGuard
 import id.walt.ktornotifications.core.KtorSessionUpdate
+import id.walt.ktornotifications.currentNetworkFetchGuard
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -22,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class Issuer2TestNotificationServer {
     private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
     private var testServer: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
+    private var previousGuard: NetworkFetchGuardState? = null
 
     private fun Application.module() {
         install(ContentNegotiation) {
@@ -38,6 +42,13 @@ class Issuer2TestNotificationServer {
     }
 
     fun startServer() {
+        previousGuard = currentNetworkFetchGuard()
+        val previous = previousGuard!!
+        applyNetworkFetchGuard(
+            allowLoopback = true,
+            allowPrivateNetworks = previous.allowPrivateNetworks,
+            trustedHostSuffixes = previous.trustedHostSuffixes,
+        )
         testServer = embeddedServer(
             CIO,
             host = "127.0.0.1",
@@ -49,6 +60,10 @@ class Issuer2TestNotificationServer {
     fun stopServer() {
         testServer?.stop(500, 500)
         testServer = null
+        previousGuard?.let {
+            applyNetworkFetchGuard(it.allowLoopback, it.allowPrivateNetworks, it.trustedHostSuffixes)
+        }
+        previousGuard = null
     }
 
     fun reset() {

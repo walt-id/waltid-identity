@@ -1,6 +1,9 @@
 package id.walt.verifier2.events
 
 import com.sun.net.httpserver.HttpServer
+import id.walt.ktornotifications.applyNetworkFetchGuard
+import id.walt.ktornotifications.currentNetworkFetchGuard
+import id.walt.ktornotifications.NetworkFetchGuardState
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.verifier2.data.SessionEvent
@@ -18,8 +21,16 @@ import kotlin.test.assertTrue
 class Verifier2WebhookRecorder : AutoCloseable {
     private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
     private var server: HttpServer? = null
+    private var previousGuard: NetworkFetchGuardState? = null
 
-    fun start(): Verifier2WebhookRecorder {
+    fun start(allowLoopback: Boolean = true): Verifier2WebhookRecorder {
+        previousGuard = currentNetworkFetchGuard()
+        val previous = previousGuard!!
+        applyNetworkFetchGuard(
+            allowLoopback = allowLoopback,
+            allowPrivateNetworks = previous.allowPrivateNetworks,
+            trustedHostSuffixes = previous.trustedHostSuffixes,
+        )
         val httpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         httpServer.createContext("/webhook") { exchange ->
             val body = exchange.requestBody.readBytes().decodeToString()
@@ -95,6 +106,10 @@ class Verifier2WebhookRecorder : AutoCloseable {
         server?.stop(0)
         server = null
         receivedUpdates.clear()
+        previousGuard?.let {
+            applyNetworkFetchGuard(it.allowLoopback, it.allowPrivateNetworks, it.trustedHostSuffixes)
+        }
+        previousGuard = null
     }
 
     companion object {

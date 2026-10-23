@@ -59,6 +59,48 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
         )
 
     @Test
+    fun loopbackWebhookIsNotDeliveredWhenTheDeploymentRefusesIt() {
+        val host = "127.0.0.1"
+        val port = freePort()
+        Verifier2WebhookRecorder().start(allowLoopback = false).use { webhook ->
+            E2ETest(host, port, true).testBlock(
+                features = listOf(OSSVerifier2FeatureCatalog),
+                preload = {
+                    ConfigManager.preloadConfig(
+                        "verifier-service", OSSVerifier2ServiceConfig(
+                            clientId = null,
+                            clientMetadata = ClientMetadata(clientName = "Verifier2"),
+                            urlPrefix = "http://$host:$port/verification-session",
+                            urlHost = "openid4vp://authorize",
+                        )
+                    )
+                },
+                init = {
+                    DidService.apply {
+                        registerResolver(LocalResolver())
+                        updateResolversForMethods()
+                    }
+                },
+                module = Application::verifierModule,
+            ) {
+                val http = testHttpClient()
+                val created = testAndReturn("Create verification session") {
+                    http.post("/verification-session/create") {
+                        setBody(verificationSessionSetup(webhook.notifications()))
+                    }.body<VerificationSessionCreationResponse>()
+                }
+                testAndReturn("Fetch authorization request") {
+                    http.get("/verification-session/${created.sessionId}/request")
+                        .body<AuthorizationRequest>()
+                }
+                test("loopback webhook received nothing") {
+                    assertEquals(emptyList(), webhook.received())
+                }
+            }
+        }
+    }
+
+    @Test
     fun walletRejectionEmitsWalletErrorResponseReceived() {
         val host = "127.0.0.1"
         val port = freePort()
