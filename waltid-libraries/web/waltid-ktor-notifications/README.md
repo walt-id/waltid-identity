@@ -133,7 +133,8 @@ used. Production deployments must set the JVM property `waltid.webhook.delivery.
 subdirectories. The file store is intended for a single service process per directory; replicas must not share an
 outbox directory. Unreadable records are moved to the outbox's `corrupt` directory so they cannot block healthy
 deliveries. Delivery requests run with bounded concurrency, preventing one slow receiver from serially blocking
-the entire outbox.
+the entire outbox. When a poll claims a full batch, the worker polls again immediately, so a backlog drains at
+that concurrency limit instead of one batch per poll interval.
 
 Services that run multiple replicas can provide a distributed implementation of `WebhookDeliveryStore` through
 `WebhookNotifier.start(store)`. Claims, completion, rescheduling, and dead-letter transitions are lease-fenced so a
