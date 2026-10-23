@@ -108,13 +108,16 @@ path, key_id, kms_id = sys.argv[1:]
 proof = {
     "jwt": {"proof_signing_alg_values_supported": ["ES256"]},
 }
-def display(name, description, color):
+card_base = "https://issuer2.demo.walt.id/static/credential-cards"
+def display(name, description, color, image):
     return {
         "name": name,
         "locale": "en",
         "description": description,
         "background_color": color,
         "text_color": "#FFFFFF",
+        "background_image": {"uri": f"{card_base}/{image}"},
+        "logo": {"uri": f"{card_base}/waltid-mark.png", "alt_text": "walt.id"},
     }
 def claim(path, name):
     return {"path": path, "display": [{"name": name, "locale": "en"}]}
@@ -127,7 +130,7 @@ configurations = {
         "cryptographic_binding_methods_supported": ["cose_key"],
         "proof_types_supported": proof,
         "credential_metadata": {
-            "display": [display("PID", "Person Identification Data", "#0573F0")],
+            "display": [display("PID", "Person Identification Data", "#0573F0", "pid-mdoc.png")],
             "claims": [
                 claim(["eu.europa.ec.eudi.pid.1", "family_name"], "Family name"),
                 claim(["eu.europa.ec.eudi.pid.1", "given_name"], "Given name"),
@@ -143,7 +146,7 @@ configurations = {
         "cryptographic_binding_methods_supported": ["jwk"],
         "proof_types_supported": proof,
         "credential_metadata": {
-            "display": [display("PID", "Person Identification Data (SD-JWT)", "#1D4ED8")],
+            "display": [display("PID", "Person Identification Data (SD-JWT)", "#1D4ED8", "pid-sd-jwt.png")],
             "claims": [
                 claim(["family_name"], "Family name"),
                 claim(["given_name"], "Given name"),
@@ -159,7 +162,7 @@ configurations = {
         "cryptographic_binding_methods_supported": ["cose_key"],
         "proof_types_supported": proof,
         "credential_metadata": {
-            "display": [display("Mobile Driving Licence", "ISO 18013-5 mobile driving licence", "#0F766E")],
+            "display": [display("Mobile Driving Licence", "ISO 18013-5 mobile driving licence", "#0F766E", "mdl.png")],
             "claims": [
                 claim(["org.iso.18013.5.1", "family_name"], "Family name"),
                 claim(["org.iso.18013.5.1", "given_name"], "Given name"),
@@ -176,7 +179,7 @@ configurations = {
         "cryptographic_binding_methods_supported": ["jwk"],
         "proof_types_supported": proof,
         "credential_metadata": {
-            "display": [display("SCA Payment", "SD-JWT payment credential", "#0F172A")],
+            "display": [display("SCA Payment", "SD-JWT payment credential", "#0F172A", "payment-card.png")],
             "claims": [
                 claim(["card_scheme"], "Card scheme"),
                 claim(["card_last4"], "Last four digits"),
@@ -283,6 +286,7 @@ print(json.dumps({
 PY
 )"
   request POST "${API_BASE}/v1/${issuer_target}/resource-api/services/create" "$issuer_body"
+  request PUT "${API_BASE}/v2/${issuer_target}/issuer-service-api/configuration/update" "$issuer_body"
   for profile in pid-mdoc pid-sd-jwt mdl sca-payment; do
     profile_body="$(python3 - "$tmp/issuers.json" "$profile" <<'PY'
 import json, sys
