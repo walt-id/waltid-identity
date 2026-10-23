@@ -123,13 +123,14 @@ The header wallet selector chooses which issuer and verifier policy the portal u
 
 ```text
 NUXT_ES_BASE_URL=
-NUXT_ES_API_KEY=
+NUXT_ES_EMAIL=
+NUXT_ES_PASSWORD=
 NUXT_ES_EUDI_REF_ISSUER_TARGET=
 NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET=
 NUXT_ES_DYOU_ISSUER_TARGET=
 ```
 
-`NUXT_ES_API_KEY` is sent as `Authorization: Bearer` only from the portal2 server. Leave the Enterprise values empty until `scripts/provision-enterprise-demo.sh` has created the issuer services. That script reads `ES_ADMIN_TOKEN` and does not print it. On the public demo, organization creation is disabled, so the script creates a dedicated tenant in `ES_ORGANIZATION` (default `waltid`).
+`NUXT_ES_EMAIL` and `NUXT_ES_PASSWORD` stay on the portal2 server. It signs in at `{NUXT_ES_BASE_URL}/auth/account/emailpass` and sends the returned session token as `Authorization: Bearer`. Leave the Enterprise values empty until `scripts/provision-enterprise-demo.sh` has created the issuer services. That script reads `ES_ADMIN_TOKEN` and does not print it. On the public demo, organization creation is disabled, so the script creates a dedicated tenant in `ES_ORGANIZATION` (default `waltid`).
 
 ### Development
 

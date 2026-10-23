@@ -3,10 +3,10 @@ import { getWallet, isWalletId } from "../../utils/walletCatalog";
 import {
   communityMetadataUrl,
   communityProfilesUrl,
-  enterpriseApiKey,
   enterpriseIssuerTarget,
   enterpriseMetadataUrl,
 } from "../../utils/offerRouting";
+import { enterpriseAuthorization } from "../utils/enterpriseSession";
 
 async function fetchJson(url: string, authorization?: string): Promise<unknown> {
   const headers: Record<string, string> = { accept: "application/json" };
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
     const credentialIssuerMetadata = await fetchJson(url);
     return { walletId, issuerKind: "enterprise", credentialIssuerMetadata, profiles: [] };
   } catch {
-    const credentialIssuerMetadata = await fetchJson(url, `Bearer ${enterpriseApiKey()}`);
+    const credentialIssuerMetadata = await fetchJson(url, await enterpriseAuthorization());
     return { walletId, issuerKind: "enterprise", credentialIssuerMetadata, profiles: [] };
   }
 });

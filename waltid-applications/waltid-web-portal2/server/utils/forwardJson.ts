@@ -13,7 +13,9 @@ export async function readJsonObject(value: unknown): Promise<Record<string, unk
 export function httpError(error: unknown): never {
   const message = error instanceof Error ? error.message : "Request failed";
   const statusCode =
-    message.includes("is required") || message.includes("must be")
+    message.includes("is required") ||
+    message.includes("must be") ||
+    message.includes("is not configured")
       ? 400
       : 502;
   throw createError({ statusCode, statusMessage: message });

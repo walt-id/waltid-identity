@@ -1,8 +1,9 @@
 import { createError, defineEventHandler, getQuery, getRouterParam, proxyRequest } from "h3";
 import { getWallet, isWalletId } from "../../../utils/walletCatalog";
-import { enterpriseApiKey, enterpriseEventsUrl, enterpriseIssuerTarget } from "../../../utils/offerRouting";
+import { enterpriseEventsUrl, enterpriseIssuerTarget } from "../../../utils/offerRouting";
+import { enterpriseAuthorization } from "../../utils/enterpriseSession";
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const walletId = getQuery(event).walletId;
   const sessionId = getRouterParam(event, "sessionId");
   if (!isWalletId(walletId) || !sessionId) {
@@ -31,7 +32,7 @@ export default defineEventHandler((event) => {
 
   return proxyRequest(event, target, {
     headers: {
-      authorization: `Bearer ${enterpriseApiKey()}`,
+      authorization: await enterpriseAuthorization(),
       accept: "text/event-stream",
     },
   });

@@ -32,7 +32,6 @@ test("community offers drop wallet selection and issuer configuration secrets", 
 
 test("enterprise offers keep the offer contract and select the wallet issuer profile", () => {
   process.env.NUXT_ES_BASE_URL = "https://issuer.example";
-  process.env.NUXT_ES_API_KEY = "test-token";
   process.env.NUXT_ES_DYOU_ISSUER_TARGET = "waltid.portal-wallets.d-you";
 
   const forward = resolveOfferForward({
@@ -47,7 +46,7 @@ test("enterprise offers keep the offer contract and select the wallet issuer pro
     forward.url,
     enterpriseOfferUrl("waltid.portal-wallets.d-you", "pid-mdoc"),
   );
-  assert.equal(forward.authorization, "Bearer test-token");
+  assert.equal(forward.authorization, undefined);
   assert.deepEqual(forward.body, enterpriseOfferBody({
     authMethod: "PRE_AUTHORIZED",
     runtimeOverrides: { credentialData: { given_name: "Ada" } },
@@ -57,7 +56,6 @@ test("enterprise offers keep the offer contract and select the wallet issuer pro
 
 test("missing enterprise issuer target fails before the open issuer is used", () => {
   process.env.NUXT_ES_BASE_URL = "https://issuer.example";
-  process.env.NUXT_ES_API_KEY = "test-token";
   delete process.env.NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET;
 
   assert.throws(

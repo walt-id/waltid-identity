@@ -7,6 +7,7 @@ import {
   portalEventsUrl,
   resolveOfferForward,
 } from "../../utils/offerRouting";
+import { enterpriseAuthorization } from "../utils/enterpriseSession";
 import { forwardJson, httpError, readJsonObject } from "../utils/forwardJson";
 import { redactVerifierSecrets } from "../utils/pidMaterials";
 
@@ -41,7 +42,15 @@ export default defineEventHandler(async (event) => {
     httpError(error);
   }
 
-  const result = await forwardJson(forward.url, forward.body, forward.authorization);
+  let authorization: string | undefined;
+  if (forward.wallet.issuer === "enterprise") {
+    try {
+      authorization = await enterpriseAuthorization();
+    } catch (error) {
+      httpError(error);
+    }
+  }
+  const result = await forwardJson(forward.url, forward.body, authorization);
   if (result.status < 200 || result.status >= 300) {
     throw createError({
       statusCode: result.status,

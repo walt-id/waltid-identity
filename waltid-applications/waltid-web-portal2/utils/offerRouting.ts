@@ -49,14 +49,6 @@ export function enterpriseBaseUrl(): string {
   return base;
 }
 
-export function enterpriseApiKey(): string {
-  const key = process.env.NUXT_ES_API_KEY?.trim();
-  if (!key) {
-    throw new Error("NUXT_ES_API_KEY is not configured");
-  }
-  return key;
-}
-
 export function enterpriseIssuerTarget(wallet: WalletDefinition): string {
   if (!wallet.issuerTargetEnv) {
     throw new Error(`${wallet.id} does not use an Enterprise issuer`);
@@ -191,7 +183,6 @@ export function resolveOfferForward(payload: Record<string, unknown>): {
     wallet,
     url: enterpriseOfferUrl(issuerTarget, configurationId),
     body: enterpriseOfferBody(payload),
-    authorization: `Bearer ${enterpriseApiKey()}`,
     issuerTarget,
   };
 }
