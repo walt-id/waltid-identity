@@ -46,6 +46,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class AzureKeyVaultKeyProviderTest {
     private val options = AzureKeyVaultOptions(
@@ -68,7 +69,10 @@ class AzureKeyVaultKeyProviderTest {
                 privateMaterial = false,
             ),
         )
-        val restored = runtime(mockClient { error("Restore must not call Azure") }).restore(
+        val restored = runtime(
+            mockClient { error("Restore must not call Azure") },
+            credentialResolver = AzureCredentialResolver { fail("Restore must not read Azure credentials") },
+        ).restore(
             StoredKeyCodec.decodeFromByteArray(StoredKeyCodec.encodeToByteArray(stored))
         )
 
@@ -278,15 +282,18 @@ class AzureKeyVaultKeyProviderTest {
         }
     }
 
-    private fun runtime(client: HttpClient): CryptoRuntime = CryptoRuntime(
+    private fun runtime(
+        client: HttpClient,
+        credentialResolver: AzureCredentialResolver = AzureCredentialResolver { reference ->
+            assertEquals(options.credentialReference, reference)
+            AzureClientSecretCredential("client-id", "client-secret")
+        },
+    ): CryptoRuntime = CryptoRuntime(
         softwareProviders = emptyList(),
         managedProviders = listOf(
             AzureKeyVaultKeyProvider(
                 client = client,
-                credentialResolver = AzureCredentialResolver { reference ->
-                    assertEquals(options.credentialReference, reference)
-                    AzureClientSecretCredential("client-id", "client-secret")
-                },
+                credentialResolver = credentialResolver,
             )
         ),
     )
