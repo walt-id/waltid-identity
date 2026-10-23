@@ -2,6 +2,7 @@ package id.walt.statuslist.codec
 
 import id.walt.statuslist.model.IndexedStatus
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class CodecRoundTripTest {
@@ -16,6 +17,7 @@ class CodecRoundTripTest {
         val decoded = TokenStatusListCodec.decode(encoded)
         statuses.forEach { assertEquals(it.value, TokenStatusListCodec.readStatus(decoded, it.index, 1)) }
         assertEquals(0u, TokenStatusListCodec.readStatus(decoded, 1, 1))
+        assertContentEquals(byteArrayOf(0xB9.toByte(), 0xA3.toByte()), TokenStatusListCodec.decode("eNrbuRgAAhcBXQ"))
     }
 
     @Test
@@ -61,5 +63,6 @@ class CodecRoundTripTest {
         val decoded = TokenStatusListCodec.decode(encoded)
         statuses.forEach { assertEquals(it.value, TokenStatusListCodec.readStatus(decoded, it.index, 2)) }
         assertEquals(0u, TokenStatusListCodec.readStatus(decoded, 3, 2))
+        assertContentEquals(byteArrayOf(0xC9.toByte(), 0x44, 0xF9.toByte()), TokenStatusListCodec.decode("eNo76fITAAPfAgc"))
     }
 }
