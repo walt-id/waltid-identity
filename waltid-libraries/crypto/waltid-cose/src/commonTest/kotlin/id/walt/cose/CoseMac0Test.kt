@@ -13,7 +13,6 @@ class CoseMac0Test {
         // 1. 32-byte (256-bit) shared secret key
         val secretKeyBytes = "our-secret-key-that-is-32-bytes-long".encodeToByteArray()
         val hmacKey = CoseHmacKey(secretKeyBytes)
-        println("HMAC Key: $hmacKey")
 
         // 2. Define COSE parameters
         val protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.HMAC_256)
