@@ -18,16 +18,27 @@ import sys
 import threading
 import time
 import uuid
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / ".github/scripts/mobile-ci"))
 from proximity_physical_preflight import Device, FIXTURE, PEER_REVISION, PreconditionError, preflight, reject_ci
-from verify_test_results import verify
+from verify_test_results import test_class, test_name, verify
 
 SDK = ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile"
 NATIVE = ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/PhysicalTests"
 PACKAGE = "id.walt.proximity.physical"
 SDK_TASK = ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:"
+
+
+def verify_native_verdict(xml):
+    verify([xml])
+    observed = {
+        (test_class(case.get("classname", "")), test_name(case.get("name", "")))
+        for case in ET.parse(xml).iter("testcase")
+    }
+    if ("ProximityPhysicalDeviceTests", "testSuccessDisconnectAndFreshRecovery") not in observed:
+        raise PreconditionError("Missing passing native test: ProximityPhysicalDeviceTests#testSuccessDisconnectAndFreshRecovery")
 
 
 def command(args, *, timeout=30, data=None, check=True, environment=None):
@@ -411,7 +422,7 @@ def main():
             xml = private / "physical.xml"
             parsed = command(["xcresultparser", "-o", "junit", private / "physical.xcresult"], timeout=60)
             xml.write_text(parsed.stdout)
-            verify([xml], [{"class": "ProximityPhysicalDeviceTests", "name": "testSuccessDisconnectAndFreshRecovery"}])
+            verify_native_verdict(xml)
         if clean_source() != source: raise PreconditionError("Source changed during the physical run")
         report.update(status="passed", executedTests=2, skippedTests=0)
     except BaseException as error:

@@ -22,7 +22,9 @@ class IETFStatusValidator(
         idx = entry.index,
         bitSize = statusList.size,
         expansionAlgorithm = expansionAlgorithm,
-    )
+    ).let { bitValue ->
+        if (bitValue.all { it == '0' || it == '1' }) bitValue.reversed() else bitValue
+    }
 
     override fun customValidations(statusList: IETFStatusContent, attribute: IETFStatusPolicyAttribute) = Unit
 }

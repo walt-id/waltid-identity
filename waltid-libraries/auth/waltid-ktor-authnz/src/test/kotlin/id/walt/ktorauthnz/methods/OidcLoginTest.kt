@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.examples.services.startAndGetPort
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -51,6 +53,8 @@ import kotlin.uuid.Uuid
 /** A full OIDC login against a mock identity provider on a local port. */
 class OidcLoginTest {
 
+    private val services = ExampleServiceScope()
+
     private val clientId = "authnz-test-client"
 
     /** Accounts by identifier; account ids are whatever the library hands to [addAccountIdentifierToAccount]. */
@@ -73,7 +77,7 @@ class OidcLoginTest {
     }
 
     /** A mock IdP: discovery, token (ID token for [subject], with [sid] if set), userinfo, JWKS, end session. */
-    private inner class MockIdp {
+    private inner class MockIdp : AutoCloseable {
         var subject = "12345"
         var sid: String? = null
         var nonce = ""
@@ -89,9 +93,7 @@ class OidcLoginTest {
             ).jsonObject.let { JsonObject(it + ("kid" to JsonPrimitive("idp-key"))) }
         }
 
-        private val port = java.net.ServerSocket(0).use { it.localPort }
-
-        val server = embeddedServer(CIO, port = port) {
+        private val server = embeddedServer(CIO, host = "127.0.0.1", port = 0) {
             install(ContentNegotiation) { json() }
             routing {
                 get("/.well-known/openid-configuration") {
@@ -129,16 +131,30 @@ class OidcLoginTest {
                 get("/userinfo") { call.respond(buildJsonObject { put("sub", subject) }) }
                 get("/jwks") { call.respond(buildJsonObject { putJsonArray("keys") { add(publicJwk) } }) }
             }
-        }.start(wait = false)
+        }
+        private val port: Int = server.startAndGetPort()
 
-        fun port() = port
+        fun port(): Int = port
+
+        override fun close() = server.stop(0, 1_000)
     }
 
     private lateinit var idp: MockIdp
 
     @BeforeTest
-    fun setUp() {
-        idp = MockIdp()
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+        }
+        services.onClose { Accounts.byIdentifier.clear() }
+        idp = services.own(MockIdp())
         Accounts.byIdentifier.clear()
         KtorAuthnzManager.accountStore = Accounts
         KtorAuthnzManager.sessionStore = InMemorySessionStore()
@@ -147,7 +163,7 @@ class OidcLoginTest {
     }
 
     @AfterTest
-    fun tearDown() = idp.server.stop()
+    fun tearDown() = services.close()
 
     private fun oidcTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         val flow = AuthFlow.fromConfig(

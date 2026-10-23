@@ -26,7 +26,8 @@ class BitValueReader(
 
         val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
 
-        val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
+        val bitOffset = (bitStartPosition % BITS_PER_BYTE_UNSIGNED).toInt()
+        val bytesToRead = (bitOffset + bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
 
         val startIndex = byteStart.toInt()
         val endIndex = minOf(startIndex + bytesToRead, input.size)

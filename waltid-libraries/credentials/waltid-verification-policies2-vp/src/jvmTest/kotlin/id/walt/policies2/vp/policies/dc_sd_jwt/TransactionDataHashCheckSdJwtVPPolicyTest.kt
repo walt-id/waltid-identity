@@ -3,17 +3,23 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class TransactionDataHashCheckSdJwtVPPolicyTest {
@@ -25,7 +31,7 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
     fun `succeeds when presentation hashes match requested transaction data`() = runTest {
         val transactionData = transactionData()
         val presentation = samplePresentation().copy(
-            transactionDataHashes = calculateTransactionDataHashes(listOf(transactionData)),
+            transactionDataHashes = listOf("ZyrwkiwmShXyj-wTy-gTHxkw9w8viNppGFGgcPa-wNM"),
             transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
         )
 
@@ -41,7 +47,14 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
     @Suppress("DEPRECATION")
     fun `legacy policy alias uses per-credential transaction data in multi-query request`() = runTest {
         val selectedTransactionData = transactionData()
-        val otherTransactionData = transactionData().replace("42.00", "99.00")
+        val otherTransactionData = transactionData(amount = "99.00", credentialId = "other_payment_credential")
+        assertNotEquals(selectedTransactionData, otherTransactionData)
+        val selected = Json.parseToJsonElement(selectedTransactionData.decodeFromBase64Url().decodeToString()).jsonObject
+        val other = Json.parseToJsonElement(otherTransactionData.decodeFromBase64Url().decodeToString()).jsonObject
+        assertEquals(JsonPrimitive("42.00"), selected["amount"])
+        assertEquals(JsonArray(listOf(JsonPrimitive("payment_credential"))), selected["credential_ids"])
+        assertEquals(JsonPrimitive("99.00"), other["amount"])
+        assertEquals(JsonArray(listOf(JsonPrimitive("other_payment_credential"))), other["credential_ids"])
         val presentation = samplePresentation().copy(
             transactionDataHashes = calculateTransactionDataHashes(listOf(selectedTransactionData)),
             transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
@@ -90,6 +103,11 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
 
         assertTrue("dc+sd-jwt/transaction-data-hash-check" in results)
         assertFalse(TransactionDataHashesVPPolicy.ID in results)
+        val canonicalId = "dc+sd-jwt/transaction-data-hash-check"
+        assertEquals(setOf(canonicalId), results.keys)
+        val canonicalResult = results.getValue(canonicalId)
+        assertTrue(canonicalResult.success)
+        assertEquals(JsonPrimitive(1), canonicalResult.results["expected_transaction_data_items"])
     }
 
     @Test
@@ -261,16 +279,16 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         javaClass.classLoader.getResource(path)
     ) { "Missing fixture: $path" }.readText().trim()
 
-    private fun transactionData(): String = buildJsonObject {
+    private fun transactionData(amount: String = "42.00", credentialId: String = "payment_credential"): String = buildJsonObject {
         put("type", "org.waltid.transaction-data.payment-authorization")
         put("credential_ids", buildJsonArray {
-            add(JsonPrimitive("payment_credential"))
+            add(JsonPrimitive(credentialId))
         })
         put("require_cryptographic_holder_binding", true)
         put("transaction_data_hashes_alg", buildJsonArray {
             add(JsonPrimitive(DEFAULT_HASH_ALGORITHM))
         })
-        put("amount", "42.00")
+        put("amount", amount)
         put("currency", "EUR")
         put("payee", "ACME Corp")
     }.toString().encodeToByteArray().encodeToBase64Url()

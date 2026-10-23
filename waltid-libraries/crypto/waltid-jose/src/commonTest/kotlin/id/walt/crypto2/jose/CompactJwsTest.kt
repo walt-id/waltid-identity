@@ -73,28 +73,6 @@ class CompactJwsTest {
     }
 
     @Test
-    fun `unsupported protected-header semantics are rejected`() = runTest {
-        val key = generate(KeySpec.Ec(EcCurve.P256), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
-
-        assertFails {
-            CompactJws.sign(
-                byteArrayOf(),
-                key,
-                JwsAlgorithm.ES256,
-                JsonObject(mapOf("b64" to JsonPrimitive(false))),
-            )
-        }
-        assertFails {
-            CompactJws.sign(
-                byteArrayOf(),
-                key,
-                JwsAlgorithm.ES256,
-                JsonObject(mapOf("crit" to JsonArray(listOf(JsonPrimitive("exp"))))),
-            )
-        }
-    }
-
-    @Test
     fun `curve confusion and padded compact encoding are rejected`() = runTest {
         val p256 = generate(KeySpec.Ec(EcCurve.P256), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
         val p384 = generate(KeySpec.Ec(EcCurve.P384), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
@@ -148,21 +126,15 @@ class CompactJwsTest {
     fun `any b64 or crit protected header is rejected`() = runTest {
         val key = generate(KeySpec.Ec(EcCurve.P256), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
 
-        assertFails {
-            CompactJws.sign(
-                byteArrayOf(),
-                key,
-                JwsAlgorithm.ES256,
-                JsonObject(mapOf("b64" to JsonPrimitive(true))),
-            )
-        }
-        assertFails {
-            CompactJws.sign(
-                byteArrayOf(),
-                key,
-                JwsAlgorithm.ES256,
-                JsonObject(mapOf("crit" to JsonArray(emptyList()))),
-            )
+        listOf(
+            JsonObject(mapOf("b64" to JsonPrimitive(false))),
+            JsonObject(mapOf("crit" to JsonArray(listOf(JsonPrimitive("exp"))))),
+            JsonObject(mapOf("b64" to JsonPrimitive(true))),
+            JsonObject(mapOf("crit" to JsonArray(emptyList()))),
+        ).forEach { header ->
+            assertFails(header.toString()) {
+                CompactJws.sign(byteArrayOf(), key, JwsAlgorithm.ES256, header)
+            }
         }
     }
 

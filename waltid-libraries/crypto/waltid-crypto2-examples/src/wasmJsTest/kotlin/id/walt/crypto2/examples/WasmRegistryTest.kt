@@ -12,9 +12,14 @@ class WasmRegistryTest {
 
     @Test
     fun `run WASM tests`() = runTest {
+        val completed = mutableListOf<String>()
         runExampleCommand(
             command = "all",
             commands = wasmExampleCommands,
+            output = { line ->
+                if (line.startsWith("Completed: ")) completed += line.removePrefix("Completed: ")
+            },
         )
+        assertEquals(portableExampleCommands.map(ExampleCommand::name), completed)
     }
 }

@@ -1,8 +1,8 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
-import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft13
+import id.walt.sdjwt.metadata.type.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -349,6 +349,147 @@ class SDJWTVCTypeMetadataTest {
             expected = "sha256-ilOUJsTultOwLfz7QUcFALaRa3BP/jelX1ds04kB9yU=",
             actual = parsed.extendsIntegrity,
         )
+        assertEquals(
+            listOf(
+                DisplayInformation(
+                    locale = "en-US",
+                    name = "Betelgeuse Education Credential",
+                    description = "An education credential for all carbon-based life forms on Betelgeusians",
+                    rendering = RenderingMetadata(
+                        simple = SimpleRenderingMethod(
+                            logo = LogoMetadata(
+                                uri = "https://betelgeuse.example.com/public/education-logo.png",
+                                uriIntegrity = "sha256-LmXfh+9cLlJNXN+TsMk+PmKjZ5t0WRL5ca/xGgX3c1U=",
+                                alternativeText = "Betelgeuse Ministry of Education logo",
+                            ),
+                            backgroundImage = BackgroundImageMetadata(
+                                uri = "https://betelgeuse.example.com/public/credential-background.png",
+                                uriIntegrity = "sha256-5sBT7mMLylHLWrrS/qQ8aHpRAxoraWVmWX6eUVMlrrA=",
+                            ),
+                            backgroundColour = "#12107c",
+                            textColor = "#FFFFFF",
+                        ),
+                        svgTemplates = listOf(
+                            SvgTemplateRenderingMethod(
+                                uri = "https://betelgeuse.example.com/public/credential-english.svg",
+                                uriIntegrity = "sha256-I4JcBGO7UfrkOBrsV7ytNJAfGuKLQh+e+Z31mc7iAb4=",
+                                properties = SvgTemplateProperties(
+                                    orientation = SvgTemplateOrientation.Landscape,
+                                    colorScheme = SvgTemplateColorScheme.Light,
+                                    contrast = SvgTemplateContrast.High,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                DisplayInformation(
+                    locale = "de-DE",
+                    name = "Betelgeuse-Bildungsnachweis",
+                    description = null,
+                    rendering = RenderingMetadata(
+                        simple = SimpleRenderingMethod(
+                            logo = LogoMetadata(
+                                uri = "https://betelgeuse.example.com/public/education-logo-de.png",
+                                uriIntegrity = "sha256-LmXfh+9cLlJNXN+TsMk+PmKjZ5t0WRL5ca/xGgX3c1U=",
+                                alternativeText = "Logo des Betelgeusischen Bildungsministeriums",
+                            ),
+                            backgroundImage = BackgroundImageMetadata(
+                                uri = "https://betelgeuse.example.com/public/credential-background-de.png",
+                                uriIntegrity = "sha256-9cLlJNXN+TsMk+PmKjZ5t0WRL5ca/xGgX3c1ULmXfh=",
+                            ),
+                            backgroundColour = "#12107c",
+                            textColor = "#FFFFFF",
+                        ),
+                        svgTemplates = listOf(
+                            SvgTemplateRenderingMethod(
+                                uri = "https://betelgeuse.example.com/public/credential-german.svg",
+                                uriIntegrity = "sha256-I4JcBGO7UfrkOBrsV7ytNJAfGuKLQh+e+Z31mc7iAb4=",
+                                properties = SvgTemplateProperties(
+                                    orientation = SvgTemplateOrientation.Landscape,
+                                    colorScheme = SvgTemplateColorScheme.Light,
+                                    contrast = SvgTemplateContrast.High,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            assertNotNull(parsed.display),
+        )
+        assertEquals(
+            listOf(
+                ClaimInformation(
+                    path = listOf("name"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Vor- und Nachname", description = "Der Name des Studenten"),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Name", description = "The name of the student"),
+                    ),
+                    mandatory = true,
+                    sd = ClaimSdMetadata.Always,
+                    svgId = null,
+                ),
+                ClaimInformation(
+                    path = listOf("address"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Adresse", description = "Adresse zum Zeitpunkt des Abschlusses"),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Address", description = "Address at the time of graduation"),
+                    ),
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Always,
+                    svgId = null,
+                ),
+                ClaimInformation(
+                    path = listOf("address", "street_address"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Straße", description = null),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Street Address", description = null),
+                    ),
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Always,
+                    svgId = "address_street_address",
+                ),
+                ClaimInformation(
+                    path = listOf("degrees"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Abschlüsse", description = "Abschlüsse des Studenten"),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Degrees", description = "Degrees earned by the student"),
+                    ),
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Never,
+                    svgId = null,
+                ),
+                ClaimInformation(
+                    path = listOf("degrees", null),
+                    display = null,
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Always,
+                    svgId = null,
+                ),
+                ClaimInformation(
+                    path = listOf("degrees", null, "field_of_study"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Studienfach", description = null),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Field of Study", description = null),
+                    ),
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Never,
+                    svgId = null,
+                ),
+                ClaimInformation(
+                    path = listOf("degrees", null, "date_awarded"),
+                    display = listOf(
+                        ClaimDisplayMetadata(locale = "de-DE", label = "Verleihungsdatum", description = null),
+                        ClaimDisplayMetadata(locale = "en-US", label = "Date Awarded", description = null),
+                    ),
+                    mandatory = false,
+                    sd = ClaimSdMetadata.Always,
+                    svgId = null,
+                ),
+            ),
+            assertNotNull(parsed.claims),
+        )
+        assertEquals(emptyMap<String, JsonElement>(), parsed.customParameters)
+
 
 
     }

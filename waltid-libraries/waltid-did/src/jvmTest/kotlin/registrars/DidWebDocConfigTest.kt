@@ -15,6 +15,7 @@ import id.walt.did.dids.registrar.local.web.DidWebRegistrar
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.*
 
 class DidWebDocConfigTest {
@@ -129,47 +130,35 @@ class DidWebDocConfigTest {
 
     @Test
     fun testInvalidKeyIdReferenceFails() = runTest {
-        val privKey = JWKKey.generate(KeyType.secp256r1)
-        assertFails {
-            webRegistrar.register(
-                DidWebCreateOptions(
-                    domain = domain,
-                    path = path,
-                    didDocConfig = DidDocConfig(
-                        publicKeyMap = mapOf(privKey.getKeyId() to privKey),
-                        verificationConfigurationMap = mapOf(
-                            VerificationRelationshipType.Authentication to setOf(
-                                VerificationMethodConfiguration(
-                                    publicKeyId = randomUUIDString(),
-                                )
-                            ),
-                        ),
-                    ),
-                )
-            )
-        }
-        val keyList = listOf(
+        val publicKey = JWKKey.generate(KeyType.secp256r1).getPublicKey()
+        val singleKeyMap = mapOf(publicKey.getKeyId() to publicKey)
+        val mixedKeyMap = listOf(
             JWKKey.generate(KeyType.RSA).getPublicKey(),
-            privKey,
+            publicKey,
             JWKKey.generate(KeyType.secp256k1).getPublicKey(),
-        )
-        assertFails {
-            webRegistrar.register(
-                DidWebCreateOptions(
-                    domain = domain,
-                    path = path,
-                    didDocConfig = DidDocConfig(
-                        publicKeyMap = keyList.associateBy { it.getKeyId() },
-                        verificationConfigurationMap = mapOf(
-                            VerificationRelationshipType.Authentication to keyList.map {
-                                VerificationMethodConfiguration(
-                                    publicKeyId = it.getKeyId(),
-                                )
-                            }.toSet() + VerificationMethodConfiguration(randomUUIDString()),
-                        ),
+        ).associateBy { it.getKeyId() }
+
+        listOf(
+            singleKeyMap to setOf(randomUUIDString()),
+            mixedKeyMap to (mixedKeyMap.keys + randomUUIDString()),
+        ).forEach { (keys, invalidReferences) ->
+            val validConfig = DidDocConfig(
+                publicKeyMap = keys,
+                verificationConfigurationMap = mapOf(
+                    VerificationRelationshipType.Authentication to keys.keys.map {
+                        VerificationMethodConfiguration(publicKeyId = it)
+                    }.toSet(),
+                ),
+            )
+            assertFailsWith<IllegalArgumentException> {
+                validConfig.copy(
+                    verificationConfigurationMap = mapOf(
+                        VerificationRelationshipType.Authentication to invalidReferences.map {
+                            VerificationMethodConfiguration(publicKeyId = it)
+                        }.toSet(),
                     ),
                 )
-            )
+            }
         }
     }
 
@@ -246,7 +235,7 @@ class DidWebDocConfigTest {
             .filterNot { it == KeyType.Ed25519 }
             .forEach { keyType ->
                 val pubKey = JWKKey.generate(keyType).getPublicKey()
-                webRegistrar.register(
+                val result = webRegistrar.register(
                     DidWebCreateOptions(
                         domain = domain,
                         path = path,
@@ -264,6 +253,11 @@ class DidWebDocConfigTest {
                         ),
                     )
                 )
+                val expectedReference = JsonArray(listOf(JsonPrimitive("${result.did}#${pubKey.getKeyId()}")))
+                listOf("authentication", "assertionMethod", "capabilityDelegation", "capabilityInvocation", "keyAgreement")
+                    .forEach { relationship ->
+                        assertEquals(expectedReference, result.didDocument[relationship], "$keyType $relationship")
+                    }
             }
     }
 

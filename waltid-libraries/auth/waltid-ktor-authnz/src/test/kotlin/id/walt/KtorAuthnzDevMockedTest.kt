@@ -16,10 +16,30 @@ import io.ktor.server.auth.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 
 class KtorAuthnzDevMockedTest {
+
+    private val previousSessionStore = KtorAuthnzManager.sessionStore
+    private val previousTokenHandler = KtorAuthnzManager.tokenHandler
+    private val sessionStore = InMemorySessionStore()
+    private val tokenStore = InMemoryKtorAuthNzTokenStore()
+
+    @BeforeTest
+    fun setUp() {
+        KtorAuthnzManager.sessionStore = sessionStore
+        KtorAuthnzManager.tokenHandler = KtorAuthNzTokenHandler().also { it.tokenStore = tokenStore }
+    }
+
+    @AfterTest
+    fun tearDown() {
+        KtorAuthnzManager.sessionStore = previousSessionStore
+        KtorAuthnzManager.tokenHandler = previousTokenHandler
+    }
 
     @Test
     fun testUnMockedAuth() = testApplication {
@@ -36,9 +56,8 @@ class KtorAuthnzDevMockedTest {
         }
 
         val resp = client.get("/protected")
-        println(resp)
 
-        check(!resp.status.isSuccess())
+        assertEquals(HttpStatusCode.Unauthorized, resp.status)
     }
 
     @Test
@@ -48,15 +67,12 @@ class KtorAuthnzDevMockedTest {
             }
         }
 
-        val sessionStore = KtorAuthnzManager.sessionStore as InMemorySessionStore
         sessionStore.sessions["dev-session"] = AuthSession(
             id = "dev-session",
             status = AuthSessionStatus.SUCCESS,
             token = "dev-token",
             accountId = "11111111-1111-1111-1111-000000000000"
         )
-        val tokenHandler = KtorAuthnzManager.tokenHandler as KtorAuthNzTokenHandler
-        val tokenStore = tokenHandler.tokenStore as InMemoryKtorAuthNzTokenStore
         tokenStore.tokens["dev-token"] = "dev-session"
 
         routing {
@@ -69,7 +85,6 @@ class KtorAuthnzDevMockedTest {
         }
 
         val resp = client.get("/protected")
-        println(resp)
 
         check(resp.status.isSuccess())
         check("11111111-1111-1111-1111-000000000000" in resp.bodyAsText())

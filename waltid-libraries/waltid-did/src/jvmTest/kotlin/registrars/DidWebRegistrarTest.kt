@@ -46,7 +46,6 @@ class DidWebRegistrarTest : DidRegistrarTestBase(DidWebRegistrar()) {
                 arguments(DidWebCreateOptions(domain = "walt.id", path = "/prefix-test", keyType = KeyType.Ed25519), webDidAssertions),
                 arguments(DidWebCreateOptions(domain = "walt.id", path = "no-prefix/test", keyType = KeyType.Ed25519), webDidAssertions),
                 arguments(DidWebCreateOptions(domain = "walt.id", path = "", keyType = KeyType.Ed25519), webDidAssertions),
-                arguments(DidWebCreateOptions(domain = "walt.id", path = "", keyType = KeyType.Ed25519), webDidAssertions),
             )
 
         @JvmStatic

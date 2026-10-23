@@ -61,7 +61,7 @@ abstract class DidRegistrarTestBase(private val registrar: LocalRegistrarMethod)
             // assert [assertionMethod] is an array with elements
             assertTrue(!doc["assertionMethod"]!!.jsonArray.isEmpty())
             // assert [authentication] is an array with elements
-            assertTrue(!doc["assertionMethod"]!!.jsonArray.isEmpty())
+            assertTrue(!doc["authentication"]!!.jsonArray.isEmpty())
             // assert [capabilityInvocation] is an array with elements
             assertTrue(!doc["capabilityInvocation"]!!.jsonArray.isEmpty())
             // assert [capabilityDelegation] is an array with elements

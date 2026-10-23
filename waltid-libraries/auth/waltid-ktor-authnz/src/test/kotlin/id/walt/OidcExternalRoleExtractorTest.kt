@@ -69,6 +69,8 @@ class OidcExternalRoleExtractorTest {
         val result = OidcExternalRoleExtractor.extract(payload, config, "https://issuer", "subject")
 
         assertNotNull(result)
+        assertEquals("https://issuer", result.issuer)
+        assertEquals("subject", result.subject)
         assertEquals(setOf("tenant-admin", "auditor"), result.realmRoles)
         assertEquals(setOf("wallet-operator", "wallet-reader"), result.clientRoles["waltid_ktor_authnz"])
         assertEquals(1, result.clientRoles.size)
