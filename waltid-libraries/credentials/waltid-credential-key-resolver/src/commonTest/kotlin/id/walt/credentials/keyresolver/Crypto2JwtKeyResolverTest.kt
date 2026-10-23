@@ -106,9 +106,11 @@ class Crypto2JwtKeyResolverTest {
 
     @Test
     fun `did jwk resolution rejects multiple verification keys`() = runTest {
-        assertFailsWith<IllegalArgumentException> {
-            resolver("$DID_JWK#0", "$DID_JWK#1").resolveFromDid(DID_JWK, "$DID_JWK#0")
+        val resolver = resolver("$DID_JWK#0", "$DID_JWK#1")
+        val failure = assertFailsWith<IllegalArgumentException> {
+            resolver.resolveFromDid(DID_JWK, "$DID_JWK#0")
         }
+        assertEquals("did:jwk must resolve to exactly one verification key", failure.message)
     }
 
     @Test

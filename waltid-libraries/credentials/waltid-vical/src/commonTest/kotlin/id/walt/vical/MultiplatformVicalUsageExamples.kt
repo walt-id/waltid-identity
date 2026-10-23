@@ -7,6 +7,7 @@ import id.walt.cose.CoseVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -78,6 +79,7 @@ class MultiplatformVicalUsageExamples {
 
         assertTrue(receivedVical.verify(vicalProviderVerifier))
         assertEquals(vicalData, receivedVical.vicalData)
+        assertContentEquals(byteArrayOf(1, 2, 3, 4), receivedVical.vicalData.certificateInfos.single().serialNumber)
         assertEquals(listOf(vicalProviderCertificate), receivedVical.getCertificateChain())
     }
 }
