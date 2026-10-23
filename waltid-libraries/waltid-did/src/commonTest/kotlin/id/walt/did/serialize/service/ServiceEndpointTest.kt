@@ -18,7 +18,7 @@ class ServiceEndpointTest {
         //encoding single element
         assertEquals(
             expected = svcJsonEncodedString,
-            actual = Json.encodeToString(svcEndpoint.url),
+            actual = Json.encodeToString<ServiceEndpoint>(svcEndpoint),
         )
         //decoding single element
         assertEquals(
