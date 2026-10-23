@@ -48,12 +48,6 @@ class ParserTest {
         assertEquals(TrustedEntityType.TRUST_SERVICE_PROVIDER, tsp.entityType)
         assertEquals("Demo QTSP Austria", tsp.legalName)
         assertEquals("AT", tsp.country)
-    }
-
-    @Test
-    fun `TSL XML parser -- maps service statuses correctly`() {
-        val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         val grantedService = result.services.find { "CA/QC" in it.serviceType }
         assertNotNull(grantedService)
@@ -62,12 +56,6 @@ class ParserTest {
         val suspendedService = result.services.find { "TSA/QTST" in it.serviceType }
         assertNotNull(suspendedService)
         assertEquals(TrustStatus.SUSPENDED, suspendedService.status)
-    }
-
-    @Test
-    fun `TSL XML parser -- extracts subject DN from digital identity`() {
-        val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         val dnIdentities = result.identities.filter { it.subjectDn != null }
         assertTrue(dnIdentities.isNotEmpty(), "Should extract at least one subject DN")
@@ -75,17 +63,11 @@ class ParserTest {
             dnIdentities.any { it.subjectDn?.contains("Demo QTSP") == true },
             "Should find Demo QTSP subject DN"
         )
-    }
 
-    @Test
-    fun `TSL XML parser -- preserves raw status URI in metadata`() {
-        val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
-
-        val grantedService = result.services.find { it.status == TrustStatus.GRANTED }
-        assertNotNull(grantedService)
+        val grantedByStatus = result.services.find { it.status == TrustStatus.GRANTED }
+        assertNotNull(grantedByStatus)
         assertTrue(
-            grantedService.metadata["rawStatusUri"]?.contains("granted") == true,
+            grantedByStatus.metadata["rawStatusUri"]?.contains("granted") == true,
             "Should preserve raw status URI"
         )
     }
