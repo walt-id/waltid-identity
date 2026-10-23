@@ -19,6 +19,9 @@ type CredentialOfferCreateResponse = {
   sessionId?: string;
   credentialOffer?: string;
   txCodeValue?: string;
+  eventsUrl?: string;
+  credentialIssuerMetadataUrl?: string;
+  authorizationServerMetadataUrl?: string;
 };
 
 export function useIssuerSession(issuerBase: string) {
@@ -49,7 +52,9 @@ export function useIssuerSession(issuerBase: string) {
         flowType: "qr",
       };
 
-      sse.open(`${issuerBase}/issuer2/sessions/${sessionId}/events`);
+      sse.open(
+        data.eventsUrl || `${issuerBase}/issuer2/sessions/${sessionId}/events`,
+      );
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Unknown error";
     } finally {
@@ -91,16 +96,20 @@ export function useIssuerSession(issuerBase: string) {
       };
 
       // Issuer OpenID4VCI events only — no synthetic DC_API_* log lines.
-      sse.open(`${issuerBase}/issuer2/sessions/${sessionId}/events`);
+      sse.open(
+        data.eventsUrl || `${issuerBase}/issuer2/sessions/${sessionId}/events`,
+      );
 
       const offer = parseCredentialOfferFromUrl(credentialOffer);
       const [credentialIssuerMetadata, authorizationServerMetadata] =
         await Promise.all([
           fetchJson<unknown>(
-            `${issuerBase}/.well-known/openid-credential-issuer/openid4vci`,
+            data.credentialIssuerMetadataUrl ||
+              `${issuerBase}/.well-known/openid-credential-issuer/openid4vci`,
           ),
           fetchJson<unknown>(
-            `${issuerBase}/.well-known/oauth-authorization-server/openid4vci`,
+            data.authorizationServerMetadataUrl ||
+              `${issuerBase}/.well-known/oauth-authorization-server/openid4vci`,
           ),
         ]);
 
@@ -140,13 +149,18 @@ export function useIssuerSession(issuerBase: string) {
   async function postCredentialOffer(
     payload: unknown,
   ): Promise<CredentialOfferCreateResponse> {
-    const res = await fetch(`${issuerBase}/issuer2/credential-offers`, {
+    const { walletId } = useSelectedWallet();
+    const body =
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? { ...(payload as Record<string, unknown>), walletId: walletId.value }
+        : { walletId: walletId.value };
+    const res = await fetch("/api/credential-offers", {
       method: "POST",
       headers: {
         "content-type": "application/json",
         accept: "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const body = await res.text();

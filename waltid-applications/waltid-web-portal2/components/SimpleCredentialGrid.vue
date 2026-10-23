@@ -37,9 +37,12 @@ const emit = defineEmits<{
         />
         <span
           v-else
-          class="absolute inset-0 flex items-end p-4 text-white font-semibold"
+          class="absolute inset-0 flex flex-col justify-end p-4 text-white"
         >
-          {{ card.name }}
+          <span class="font-semibold">{{ card.name }}</span>
+          <span v-if="card.description" class="mt-1 text-sm text-white/80">
+            {{ card.description }}
+          </span>
         </span>
       </button>
     </div>
