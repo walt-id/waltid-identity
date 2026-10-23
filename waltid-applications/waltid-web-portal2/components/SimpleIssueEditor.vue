@@ -256,7 +256,15 @@ async function submit() {
       </section>
 
       <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+        <WalletActionButton
+          v-if="wallet.id !== 'walt-id'"
+          :wallet-id="wallet.id"
+          action="issue"
+          :disabled="!canSubmit || session.loading.value"
+          @click="submit"
+        />
         <button
+          v-else
           class="btn btn-primary w-full sm:w-auto"
           :disabled="!canSubmit || session.loading.value"
           @click="submit"

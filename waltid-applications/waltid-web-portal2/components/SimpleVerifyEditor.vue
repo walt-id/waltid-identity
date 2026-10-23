@@ -29,7 +29,6 @@ const config = useRuntimeConfig();
 const issuerBase = config.public.issuerBase as string;
 const issuerMetadata = useIssuerMetadata(issuerBase);
 const { wallet } = useSelectedWallet();
-const dYouButtonSrc = ref("/wallets/d-you/button_verify_en.svg");
 
 const selectedProfileId = ref<string | null>(
   props.card?.profileId ?? props.profileId ?? null,
@@ -43,9 +42,6 @@ const dcApiSupport = ref<DcApiPresentationSupport>(
 
 onMounted(() => {
   dcApiSupport.value = getDcApiPresentationSupport();
-  if (navigator.language.toLowerCase().startsWith("de")) {
-    dYouButtonSrc.value = "/wallets/d-you/button_verify_de.svg";
-  }
   if (!props.embedded) issuerMetadata.load();
 });
 
@@ -425,26 +421,13 @@ async function submit() {
       </section>
 
       <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-        <button
-          v-if="wallet.id === 'd-you'"
-          type="button"
-          class="inline-flex h-11 items-center gap-2 rounded-full border border-slate-300 bg-white px-3 disabled:opacity-50"
+        <WalletActionButton
+          v-if="wallet.id !== 'walt-id'"
+          :wallet-id="wallet.id"
+          action="verify"
           :disabled="!canSubmit || session.loading.value"
-          aria-label="Verify with d-you Wallet"
           @click="submit"
-        >
-          <span class="inline-flex h-8 w-8 shrink-0 overflow-hidden">
-            <img
-              :src="dYouButtonSrc"
-              alt=""
-              class="h-8 max-w-none"
-              style="width: calc(202 / 55 * 2rem)"
-            />
-          </span>
-          <span class="text-sm font-semibold text-slate-900">
-            Verify with d-you Wallet
-          </span>
-        </button>
+        />
         <button
           v-else
           class="btn btn-primary w-full sm:w-auto"
