@@ -175,11 +175,33 @@ runs:
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
-          xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
+          bash -e -o pipefail <<'TESTS'
+        IFS=, read -r platform device os extra <<< "${{ inputs.simulator-destination }}"
+        if [[ "$platform" != 'platform=iOS Simulator' || "$device" != name=?* || "$os" != OS=[0-9]* || -n "$extra" ]]; then
+          echo "::error::Native tests require a device-type name and explicit iOS version"
+          exit 1
+        fi
+        simulator=$(xcrun simctl create 'Native wallet CI' "${device#name=}" "iOS ${os#OS=}")
+        cleanup() {
+          test_status=$?
+          xcrun simctl delete "$simulator" || {
+            cleanup_status=$?
+            echo "::error::Failed to remove native test simulator"
+            (( test_status != 0 )) || test_status=$cleanup_status
+          }
+          exit "$test_status"
+        }
+        trap cleanup EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        # Finish cold startup before XCTest starts its application-launch deadline.
+        xcrun simctl bootstatus "$simulator" -b
+
+        xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -configuration Debug \
-          -destination "${{ inputs.simulator-destination }}" \
+          -destination "platform=iOS Simulator,id=$simulator" \
           -skip-testing:iosAppEnterpriseTests \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
@@ -189,6 +211,7 @@ runs:
           -enableCodeCoverage NO \
           -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+        TESTS
 
     - name: Execute Compose iOS demo app tests
       if: ${{ inputs.run-compose-demo-tests == 'true' }}
