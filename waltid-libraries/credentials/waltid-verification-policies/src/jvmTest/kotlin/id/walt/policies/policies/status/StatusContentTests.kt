@@ -3,6 +3,7 @@ package id.walt.policies.policies.status
 import id.walt.policies.policies.status.model.IETFStatusContent
 import id.walt.policies.policies.status.model.StatusContent
 import id.walt.policies.policies.status.model.W3CStatusContent
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -28,6 +29,10 @@ class StatusContentTest {
         val jsonString = json.encodeToString<StatusContent>(content)
         val decoded = json.decodeFromString<StatusContent>(jsonString)
 
+        assertEquals(
+            json.parseToJsonElement("""{"status":"W3CStatusContent","type":"BitstringStatusList","encodedList":"H4sIAAAAAAAAAGNgYGBgZGBkYGLg5mBg4GRgYuBjYGHgYeBh4GNgZeDl4GbgY-Bk4OXgZOBiEGDgYhBg4GIQYOBmEGDgZhBh4GYQYeBiEGPgYhBn4GIQYOBmEGDgZhBg4GYQ"}"""),
+            json.parseToJsonElement(jsonString),
+        )
         assertEquals(content, decoded)
         assertTrue(decoded is W3CStatusContent)
         assertEquals("BitstringStatusList", decoded.type)
@@ -81,6 +86,10 @@ class StatusContentTest {
         val jsonString = json.encodeToString<StatusContent>(content)
         val decoded = json.decodeFromString<StatusContent>(jsonString)
 
+        assertEquals(
+            json.parseToJsonElement("""{"status":"IETFStatusContent","bits":16,"lst":"binaryStatusList"}"""),
+            json.parseToJsonElement(jsonString),
+        )
         assertEquals(content, decoded)
         assertTrue(decoded is IETFStatusContent)
         assertEquals(16, decoded.size)
@@ -205,8 +214,14 @@ class StatusContentTest {
             }
         """.trimIndent()
 
-        assertThrows<Exception> {
-            json.decodeFromString<StatusContent>(incompleteJson)
+        for (input in listOf(
+            incompleteJson,
+            """{"status":"W3CStatusContent","encodedList":"statusData"}""",
+            """{"status":"W3CStatusContent","type":"BitstringStatusList"}""",
+        )) {
+            assertThrows<SerializationException> {
+                json.decodeFromString<StatusContent>(input)
+            }
         }
     }
 
@@ -219,7 +234,7 @@ class StatusContentTest {
             }
         """.trimIndent()
 
-        assertThrows<Exception> {
+        assertThrows<SerializationException> {
             json.decodeFromString<StatusContent>(incompleteJson)
         }
     }
