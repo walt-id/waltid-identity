@@ -14,7 +14,7 @@ class CompressionRoundTripTest {
 
     @Test
     fun `zlib round-trips empty small and larger arrays`() {
-        listOf(ByteArray(0), byteArrayOf(1, 2, 3), ByteArray(4096) { it.toByte() }).forEach { input ->
+        listOf(ByteArray(0), byteArrayOf(1, 2, 3), byteArrayOf(9, 8, 7, 6), ByteArray(4096) { it.toByte() }).forEach { input ->
             val compressed = ZlibCompressor.compress(input)
             assertTrue(compressed.isNotEmpty() || input.isEmpty())
             assertContentEquals(input, ZlibCompressor.decompress(compressed))
