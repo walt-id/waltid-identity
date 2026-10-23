@@ -62,6 +62,10 @@ class InMemoryTrustStoreTest {
 
         val sources = store.listSources().toList()
         assertEquals(2, sources.size)
+        assertEquals(
+            mapOf("src-1" to "Test Source", "src-2" to "Source 2"),
+            sources.associate { it.sourceId to it.displayName }
+        )
     }
 
     @Test
@@ -88,24 +92,24 @@ class InMemoryTrustStoreTest {
     @Test
     fun `find identities by certificate SHA-256`() = runTest {
         val store = createStore()
-        store.upsertIdentities(listOf(testIdentity))
+        store.upsertIdentities(
+            listOf(
+                testIdentity,
+                testIdentity.copy(
+                    identityId = "id-other",
+                    certificateSha256Hex = "1111111111111111111111111111111111111111111111111111111111111111"
+                )
+            )
+        )
 
-        val results = store.findIdentitiesByCertificateSha256(
-            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-        ).toList()
-        assertEquals(1, results.size)
-        assertEquals("id-1", results.first().identityId)
-    }
-
-    @Test
-    fun `find identities by certificate SHA-256 is case insensitive`() = runTest {
-        val store = createStore()
-        store.upsertIdentities(listOf(testIdentity))
-
-        val results = store.findIdentitiesByCertificateSha256(
+        for (fingerprint in listOf(
+            "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
             "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
-        ).toList()
-        assertEquals(1, results.size)
+        )) {
+            val results = store.findIdentitiesByCertificateSha256(fingerprint).toList()
+            assertEquals(1, results.size)
+            assertEquals("id-1", results.first().identityId)
+        }
     }
 
     @Test
@@ -115,10 +119,13 @@ class InMemoryTrustStoreTest {
             identityId = "id-dn",
             subjectDn = "CN=Test,O=Test Corp,C=AT"
         )
-        store.upsertIdentities(listOf(identityWithDn))
+        store.upsertIdentities(
+            listOf(identityWithDn, identityWithDn.copy(identityId = "id-other", subjectDn = "CN=Other,C=DE"))
+        )
 
         val results = store.findIdentitiesBySubjectDn("CN=Test,O=Test Corp,C=AT").toList()
         assertEquals(1, results.size)
+        assertEquals("id-dn", results.single().identityId)
     }
 
     @Test
@@ -128,10 +135,13 @@ class InMemoryTrustStoreTest {
             identityId = "id-ski",
             subjectKeyIdentifierHex = "aa11bb22cc33"
         )
-        store.upsertIdentities(listOf(identityWithSki))
+        store.upsertIdentities(
+            listOf(identityWithSki, identityWithSki.copy(identityId = "id-other", subjectKeyIdentifierHex = "dd44ee55ff66"))
+        )
 
         val results = store.findIdentitiesBySkiHex("AA11BB22CC33").toList()
         assertEquals(1, results.size)
+        assertEquals("id-ski", results.single().identityId)
     }
 
     @Test
@@ -142,10 +152,17 @@ class InMemoryTrustStoreTest {
             issuerDn = "CN=Issuer CA,C=AT",
             serialNumber = "12345"
         )
-        store.upsertIdentities(listOf(identityWithIssuerSerial))
+        store.upsertIdentities(
+            listOf(
+                identityWithIssuerSerial,
+                identityWithIssuerSerial.copy(identityId = "id-other-issuer", issuerDn = "CN=Other CA,C=DE"),
+                identityWithIssuerSerial.copy(identityId = "id-other-serial", serialNumber = "67890")
+            )
+        )
 
         val results = store.findIdentitiesByIssuerAndSerial("CN=Issuer CA,C=AT", "12345").toList()
         assertEquals(1, results.size)
+        assertEquals("id-is", results.single().identityId)
     }
 
     @Test
@@ -176,6 +193,7 @@ class InMemoryTrustStoreTest {
 
         val atResults = store.listEntities(EntityFilter(country = "AT")).toList()
         assertEquals(1, atResults.size)
+        assertEquals("entity-1", atResults.single().entityId)
     }
 
     @Test
@@ -235,6 +253,7 @@ class InMemoryTrustStoreTest {
 
         val services = store.listServicesForEntity("entity-1").toList()
         assertEquals(2, services.size)
+        assertEquals(setOf("svc-1", "svc-2"), services.map { it.serviceId }.toSet())
     }
 
     @Test
@@ -243,14 +262,16 @@ class InMemoryTrustStoreTest {
         store.upsertEntities(
             listOf(
                 testEntity,
-                testEntity.copy(entityId = "entity-2")
+                testEntity.copy(entityId = "entity-2"),
+                testEntity.copy(entityId = "entity-other", sourceId = "src-other")
             )
         )
         store.upsertServices(
             listOf(
                 testService,
                 testService.copy(serviceId = "svc-2"),
-                testService.copy(serviceId = "svc-3")
+                testService.copy(serviceId = "svc-3"),
+                testService.copy(serviceId = "svc-other", sourceId = "src-other", entityId = "entity-other")
             )
         )
 
