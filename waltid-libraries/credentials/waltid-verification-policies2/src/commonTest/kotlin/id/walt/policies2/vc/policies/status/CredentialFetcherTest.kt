@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -196,6 +197,7 @@ class CredentialFetcherTest {
         val second = assertIs<StatusListContent.Binary>(fetcher.fetch("https://example.com/status.cwt").getOrThrow())
         assertEquals(1, requests)
         assertEquals(first, second)
+        assertContentEquals(bytes, first.content)
     }
 
     @Test

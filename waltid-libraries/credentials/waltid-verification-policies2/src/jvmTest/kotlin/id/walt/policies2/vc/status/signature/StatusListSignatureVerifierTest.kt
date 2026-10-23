@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.assertThrows
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @DisplayName("StatusListSignatureVerifier Tests")
@@ -180,7 +180,7 @@ class StatusListSignatureVerifierTest {
             val result = verifier.verifyCwt(cwt)
             
             assertTrue(result.isSuccess)
-            assertNotNull(result.getOrThrow())
+            assertContentEquals(payload, result.getOrThrow())
         }
 
         @Test
@@ -194,6 +194,7 @@ class StatusListSignatureVerifierTest {
             val result = verifier.verifyCwtFromHex(cwtHex)
             
             assertTrue(result.isSuccess)
+            assertContentEquals(payload, result.getOrThrow())
         }
 
         @Test

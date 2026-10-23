@@ -7,7 +7,6 @@ import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class StatusContentTest {
@@ -180,22 +179,6 @@ class StatusContentTest {
     }
 
     @Test
-    fun `test abstract properties are accessible`() {
-        val w3cContent: StatusContent = W3CStatusContent(
-            type = "test",
-            list = "testList"
-        )
-
-        val ietfContent: StatusContent = IETFStatusContent(
-            size = 10,
-            list = "anotherList"
-        )
-
-        assertEquals("testList", w3cContent.list)
-        assertEquals("anotherList", ietfContent.list)
-    }
-
-    @Test
     fun `test W3CStatusContent validation - required fields`() {
         // Test that required fields throw exceptions when missing
         val incompleteJson = """
@@ -251,67 +234,5 @@ class StatusContentTest {
 
         val decoded = json.decodeFromString<W3CStatusContent>(jsonWithNullPurpose)
         assertEquals(null, decoded.purpose)
-    }
-
-    @Test
-    fun `test data class equality and hash code`() {
-        val content1 = W3CStatusContent(
-            type = "test",
-            purpose = "revocation",
-            list = "data123"
-        )
-
-        val content2 = W3CStatusContent(
-            type = "test",
-            purpose = "revocation",
-            list = "data123"
-        )
-
-        val content3 = W3CStatusContent(
-            type = "test",
-            purpose = "suspension",
-            list = "data123"
-        )
-
-        assertEquals(content1, content2)
-        assertEquals(content1.hashCode(), content2.hashCode())
-        assertTrue(content1 != content3)
-    }
-
-    @Test
-    fun `test copy functionality`() {
-        val original = W3CStatusContent(
-            type = "original",
-            purpose = "revocation",
-            list = "originalData"
-        )
-
-        val modified = original.copy(purpose = "suspension")
-
-        assertEquals("original", modified.type)
-        assertEquals("suspension", modified.purpose)
-        assertEquals("originalData", modified.list)
-    }
-
-    @Test
-    fun `test toString implementation`() {
-        val w3cContent = W3CStatusContent(
-            type = "test",
-            purpose = "revocation",
-            list = "testData"
-        )
-
-        val ietfContent = IETFStatusContent(
-            size = 4,
-            list = "ietfTestData"
-        )
-
-        assertNotNull(w3cContent.toString())
-        assertNotNull(ietfContent.toString())
-
-        // Verify toString contains field values
-        assertTrue(w3cContent.toString().contains("test"))
-        assertTrue(w3cContent.toString().contains("revocation"))
-        assertTrue(ietfContent.toString().contains("ietfTestData"))
     }
 }

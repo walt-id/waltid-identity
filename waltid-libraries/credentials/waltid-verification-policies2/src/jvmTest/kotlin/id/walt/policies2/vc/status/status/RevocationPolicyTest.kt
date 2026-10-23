@@ -38,7 +38,6 @@ class RevocationPolicyTest {
         val sut = RevocationPolicy()
         val result = sut.verify(credential = credential)
         assertEquals(expected = context.valid, actual = result.isSuccess)
-        assertEquals(expected = !context.valid, actual = result.isFailure)
     }
 
 
