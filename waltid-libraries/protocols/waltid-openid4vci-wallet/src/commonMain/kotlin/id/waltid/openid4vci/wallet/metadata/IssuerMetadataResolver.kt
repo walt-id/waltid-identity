@@ -440,26 +440,26 @@ private sealed class ResolveFailure {
     data class HttpStatus(
         override val url: String,
         val status: HttpStatusCode,
+        // Kept for callers that want it (e.g. server-side logging at the call site), but deliberately not
+        // rendered by describe() - url is attacker-influenced input, so its response body must not be
+        // echoed back into a message that ends up in a client-facing exception.
         val bodyPreview: String,
     ) : ResolveFailure() {
         override val throwable: Throwable? = null
-        override fun describe(): String {
-            val bodySuffix = if (bodyPreview.isNotBlank()) " body: $bodyPreview" else ""
-            return "$url → HTTP ${status.value} ${status.description};$bodySuffix"
-        }
+        override fun describe(): String = "$url → HTTP ${status.value} ${status.description}"
     }
 
     data class Parse(
         override val url: String,
         val error: Throwable,
+        // See the comment on HttpStatus.bodyPreview - not rendered by describe() for the same reason.
         val bodyPreview: String,
     ) : ResolveFailure() {
         override val throwable: Throwable get() = error
         override fun describe(): String {
             val name = error::class.simpleName ?: "Exception"
             val message = error.message?.takeIf { it.isNotBlank() } ?: "no message"
-            val bodySuffix = if (bodyPreview.isNotBlank()) " body: $bodyPreview" else ""
-            return "$url → parse error: $name: $message;$bodySuffix"
+            return "$url → parse error: $name: $message"
         }
     }
 }
