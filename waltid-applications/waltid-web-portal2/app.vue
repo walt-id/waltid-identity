@@ -116,7 +116,7 @@ const hasResult = computed(() =>
         <select
           id="wallet-select"
           v-model="walletId"
-          class="form-select w-auto min-w-40 text-sm"
+          class="form-select w-auto min-w-56 text-sm"
         >
           <option v-for="wallet in wallets" :key="wallet.id" :value="wallet.id">
             {{ wallet.label }}

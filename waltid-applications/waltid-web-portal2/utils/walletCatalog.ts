@@ -34,7 +34,7 @@ export const WALLETS: readonly WalletDefinition[] = [
   },
   {
     id: "eudi-reference-wallet",
-    label: "EUDI Reference Wallet",
+    label: "🇪🇺 EUDI Reference Wallet",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_EUDI_REF_ISSUER_TARGET",
     materialId: "eudi-reference-wallet",
@@ -43,7 +43,7 @@ export const WALLETS: readonly WalletDefinition[] = [
   },
   {
     id: "france-identite",
-    label: "France Identité",
+    label: "🇫🇷 France Identité",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET",
     materialId: "france-identite",
@@ -52,7 +52,7 @@ export const WALLETS: readonly WalletDefinition[] = [
   },
   {
     id: "d-you",
-    label: "d-you",
+    label: "🇩🇪 d-you",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_DYOU_ISSUER_TARGET",
     materialId: "german-eudi-wallet",
