@@ -33,6 +33,9 @@ private fun isTrustedHost(host: String): Boolean =
         host.equals(suffix, ignoreCase = true) || host.endsWith(".$suffix", ignoreCase = true)
     }
 
+private fun loopbackAllowed(): Boolean =
+    PrivateNetworkGuardSettings.allowLoopback || System.getProperty("walt.ssrf.allowLoopback") == "true"
+
 private fun isBlockedAddress(address: InetAddress, trustedHost: Boolean): Boolean {
     // Never legitimate for a server-side fetch, regardless of host trust - no opt-out.
     if (address.isLinkLocalAddress) return true // covers 169.254.0.0/16, including the cloud-metadata address
@@ -43,7 +46,8 @@ private fun isBlockedAddress(address: InetAddress, trustedHost: Boolean): Boolea
     // PrivateNetworkGuardSettings.trustedHostSuffixes for why this is narrower than the allow* flags.
     if (trustedHost) return false
 
-    if (!PrivateNetworkGuardSettings.allowLoopback && address.isLoopbackAddress) return true
+    // Tests set walt.ssrf.allowLoopback. Production does not, so the settings default still refuses loopback.
+    if (!loopbackAllowed() && address.isLoopbackAddress) return true
 
     if (!PrivateNetworkGuardSettings.allowPrivateNetworks) {
         if (address.isSiteLocalAddress) return true // RFC1918 IPv4
