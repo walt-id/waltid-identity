@@ -61,8 +61,8 @@ class SDJwtTestJVM {
     @Test
     fun presentSDJwt() {
         // parse previously created SD-JWT
-        val sdJwt =
-            SDJwt.parse("eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0")
+        val encoded = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0"
+        val sdJwt = SDJwt.parse(encoded)
 
         // present without disclosing SD fields
         val presentedUndisclosedJwt = sdJwt.present(discloseAll = false)
@@ -80,6 +80,13 @@ class SDJwtTestJVM {
         val presentedSelectiveJwt2 = sdJwt.present(SDMap.generateSDMap(listOf("sub")))
         println("present disclosing fields, using JSON paths: $presentedSelectiveJwt2")
 
+        assertEquals(Json.parseToJsonElement("""{"aud":"456"}"""), presentedUndisclosedJwt.fullPayload)
+        assertEquals(encoded.substringBefore('~') + "~", presentedUndisclosedJwt.toString())
+        listOf(presentedDisclosedJwt, presentedSelectiveJwt, presentedSelectiveJwt2).forEach { presented ->
+            assertEquals(Json.parseToJsonElement("""{"aud":"456","sub":"123"}"""), presented.fullPayload)
+            assertEquals(encoded + "~", presented.toString())
+        }
+
     }
 
     @Test
@@ -90,7 +97,7 @@ class SDJwtTestJVM {
         val undisclosedJwt =
             "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~"
 
-        // verify and parse presented SD-JWT with all fields undisclosed, throws Exception if verification fails!
+        // Verify and parse the presentation; the returned flags describe verification success.
         val parseAndVerifyResult = SDJwt.verifyAndParse(undisclosedJwt, cryptoProvider)
 
         // print full payload with disclosed fields only
@@ -100,6 +107,7 @@ class SDJwtTestJVM {
         // alternatively parse and verify in 2 steps:
         val parsedUndisclosedJwt = SDJwt.parse(undisclosedJwt)
         val isValid = parsedUndisclosedJwt.verify(cryptoProvider).verified
+        assertTrue(isValid)
         println("Undisclosed SD-JWT verified: $isValid")
 
         val disclosedJwt =
@@ -111,6 +119,14 @@ class SDJwtTestJVM {
         // print full payload with disclosed fields
         println("Disclosed JWT payload:")
         println(parsedDisclosedJwtVerifyResult.sdJwt.fullPayload.toString())
+
+        listOf(parseAndVerifyResult, parsedDisclosedJwtVerifyResult).forEach { result ->
+            assertTrue(result.signatureVerified)
+            assertTrue(result.disclosuresVerified)
+            assertTrue(result.verified)
+        }
+        assertEquals(Json.parseToJsonElement("""{"aud":"456"}"""), parseAndVerifyResult.sdJwt.fullPayload)
+        assertEquals(Json.parseToJsonElement("""{"aud":"456","sub":"123"}"""), parsedDisclosedJwtVerifyResult.sdJwt.fullPayload)
 
         val forgedDisclosure =
             parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDisclosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first() as ObjectPropertyDisclosure)
@@ -202,6 +218,7 @@ class SDJwtTestJVM {
 
         // Verifier sees `sub` (plain) and `nationalities = ["US"]`.
         val verified = SDJwt.verifyAndParse(presented.toString(), cryptoProvider)
+        assertTrue(verified.verified)
         val payload = verified.sdJwt.fullPayload
         assertEquals("123", payload["sub"]!!.jsonPrimitive.content)
         assertEquals(listOf("US"), payload["nationalities"]!!.jsonArray.map { it.jsonPrimitive.content })
