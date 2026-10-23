@@ -92,8 +92,10 @@ Base path: `/verification-session`
   - Streams live session updates (`event`, `session`)
 
 VICAL utilities:
-- `POST /vical/fetch` — Fetch a VICAL over HTTP(S) and return Base64
+- `POST /vical/fetch` — Fetch a VICAL and return Base64. `vicalFetchMode` in `verifier-service.conf` is `network-only` by default (http/https only; `file` URLs and private/loopback/link-local destinations are refused). `filesystem-only` and `both` read local files the service account can read. `disabled` removes the route. `allowPrivateNetworkVical` opts network fetches into RFC1918 and IPv6 unique-local addresses.
 - `POST /vical/validate` — Validate VICAL with provided verification key
+
+Verifier API 2 does not authenticate callers. Deployments, including the public demo, are expected to put their own access control in front of the service.
 
 ## Quick start
 

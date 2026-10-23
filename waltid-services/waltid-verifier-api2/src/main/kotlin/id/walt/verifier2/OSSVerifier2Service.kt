@@ -40,6 +40,19 @@ import kotlinx.serialization.serializer
 
 
 private val log = logger("Verifier2Service")
+
+private data class VicalFetchSettings(val mode: VicalFetchMode, val allowPrivateNetworks: Boolean)
+
+/**
+ * Absent configuration is the embedded and test case: network-only, private networks refused.
+ * An unknown mode fails when the config object is constructed, so this only defaults a missing config.
+ */
+private fun vicalFetchSettings(): VicalFetchSettings = try {
+    val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
+    VicalFetchSettings(VicalFetchMode.parse(config.vicalFetchMode), config.allowPrivateNetworkVical)
+} catch (_: IllegalArgumentException) {
+    VicalFetchSettings(VicalFetchMode.NETWORK_ONLY, false)
+}
 private const val VERIFICATION_SESSION = "verification-session"
 private const val VICAL = "vical"
 private const val ENVELOPE_QUERY_PARAM = "envelope"
@@ -63,7 +76,7 @@ enum class Verifier2RouteSurface {
     /** `GET transaction-data-profiles` - discloses the configured transaction data profiles. */
     TRANSACTION_DATA_PROFILES,
 
-    /** `POST vical/fetch` (fetches a caller-supplied http(s) URL) and `POST vical/validate`. */
+    /** `POST vical/fetch` (schemes follow `vicalFetchMode`) and `POST vical/validate`. */
     VICAL,
     ;
 
@@ -323,8 +336,9 @@ object Verifier2Service {
             route("", {
                 tags("VICAL")
             }) {
-                post("fetch", {
-                    summary = "Fetches a VICAL over HTTP(S) and returns it Base64-encoded"
+                val fetchSettings = vicalFetchSettings()
+                if (fetchSettings.mode != VicalFetchMode.DISABLED) post("fetch", {
+                    summary = "Fetches a VICAL and returns it Base64-encoded. Schemes follow vicalFetchMode (default: network-only)."
                     request {
                         body<VicalFetchRequest> {
                             example("Remote VICAL") {
@@ -335,8 +349,15 @@ object Verifier2Service {
                     response { HttpStatusCode.OK to { body<VicalFetchResponse>() } }
                 }) {
                     val vicalFetchRequest = call.receive<VicalFetchRequest>()
-                    val vicalCbor = withContext(Dispatchers.IO) { fetchBinaryFile(vicalFetchRequest.vicalUrl) }
-                    call.respond(VicalFetchResponse(vicalCbor?.encodeToBase64()))
+                    val vicalCbor = withContext(Dispatchers.IO) {
+                        fetchBinaryFile(
+                            url = vicalFetchRequest.vicalUrl,
+                            allowHttpUrls = fetchSettings.mode.allowsHttp,
+                            allowFileUrls = fetchSettings.mode.allowsFile,
+                            allowPrivateNetworks = fetchSettings.allowPrivateNetworks,
+                        )
+                    }
+                    call.respond(VicalFetchResponse(vicalCbor.encodeToBase64()))
                 }
 
                 post("validate", {
