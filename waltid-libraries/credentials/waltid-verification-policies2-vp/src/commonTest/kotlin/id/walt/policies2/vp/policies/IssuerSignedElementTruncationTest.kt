@@ -49,6 +49,7 @@ class IssuerSignedElementTruncationTest {
         assertEquals(true, summary["truncated"])
         // Hex, so two characters per byte: enough to recognise a format from its magic bytes.
         assertEquals(MAX_INLINE_BYTES * 2, (summary["prefix_hex"] as String).length)
+        assertEquals("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f", summary["prefix_hex"])
     }
 
     @Test
@@ -62,18 +63,21 @@ class IssuerSignedElementTruncationTest {
         assertEquals(333_334, summary["length"])
         assertEquals(true, summary["truncated"])
         assertEquals(MAX_INLINE_TEXT, (summary["prefix"] as String).length)
+        assertEquals("A".repeat(1024), summary["prefix"])
     }
 
     /** The serialised item carries the same bytes, so bounding the value alone would not bound the result. */
     @Test
     fun `a serialised item is hex until it grows and then a marked prefix`() {
         val small = ByteArray(MAX_INLINE_SERIALIZED_BYTES) { 1 }
-        assertIs<String>(small.truncatedHex(MAX_INLINE_SERIALIZED_BYTES))
+        val smallHex = assertIs<String>(small.truncatedHex(MAX_INLINE_SERIALIZED_BYTES))
+        assertEquals("01".repeat(256), smallHex)
 
         val large = ByteArray(500_000) { 2 }
         val summary = assertIs<Map<*, *>>(large.truncatedHex(MAX_INLINE_SERIALIZED_BYTES))
         assertEquals(500_000, summary["length"])
         assertEquals(true, summary["truncated"])
         assertTrue((summary["prefix_hex"] as String).length == MAX_INLINE_SERIALIZED_BYTES * 2)
+        assertEquals("02".repeat(256), summary["prefix_hex"])
     }
 }

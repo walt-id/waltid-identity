@@ -41,7 +41,10 @@ class TransactionDataMdocVpPolicyTest {
     @Test
     fun `succeeds when embedded transaction data matches the verifier request`() = runTest {
         val result = policy.runPolicy(
-            document = documentWithEmbeddedTransactionData(transactionData),
+            document = documentWithEmbeddedTransactionData(
+                transactionData,
+                embeddedHash = "Z_0fVCXOoYsKffB2takZFsyMGui6li-VhWQu6lUik-o".decodeFromBase64Url(),
+            ),
             mso = dummyMso(),
             verificationContext = dummyVerificationContext(transactionData),
         )
@@ -99,10 +102,15 @@ class TransactionDataMdocVpPolicyTest {
         assertFalse(result.success)
     }
 
-    private fun documentWithEmbeddedTransactionData(transactionData: List<String>): Document {
+    private fun documentWithEmbeddedTransactionData(
+        transactionData: List<String>,
+        embeddedHash: ByteArray? = null,
+    ): Document {
         val embeddedTransactionData = transactionData
             .singleOrNull()
-            ?.let { encoded -> mapOf("transaction_data_hash" to calculateTransactionDataHashes(listOf(encoded)).single().decodeFromBase64Url()) }
+            ?.let { encoded ->
+                mapOf("transaction_data_hash" to (embeddedHash ?: calculateTransactionDataHashes(listOf(encoded)).single().decodeFromBase64Url()))
+            }
             .orEmpty()
         val deviceSigned = DeviceSigned.fromDeviceSignedItems(
             namespacedItems = mapOf(DEMO_TRANSACTION_DATA_TYPE to embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }),
