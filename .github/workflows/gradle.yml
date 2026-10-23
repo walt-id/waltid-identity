@@ -74,6 +74,18 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-22.04 ]
+    services:
+      valkey:
+        image: valkey/valkey@sha256:ef0f9fb533b1f06fb7aba6478d758ca1c077d49e2bcb2b4365a4ea7f50b6d42e
+        ports:
+          - "127.0.0.1::6379"
+        options: >-
+          --read-only
+          --tmpfs /data:rw,noexec,nosuid,size=32m
+          --health-cmd "valkey-cli ping"
+          --health-interval 1s
+          --health-timeout 1s
+          --health-retries 15
     steps:
       - name: Set up swap space
         run: |
@@ -159,6 +171,13 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Prepare auth test backend
+        env:
+          VALKEY_CONTAINER: ${{ job.services.valkey.id }}
+        run: |
+          test "$(docker exec "$VALKEY_CONTAINER" valkey-cli CONFIG SET save "" appendonly no protected-mode no)" = OK
+          test "$(docker exec "$VALKEY_CONTAINER" valkey-cli DBSIZE)" = 0
+
       - name: Build and test
         if: ${{ !inputs.cacheless }}
         run: |
@@ -166,6 +185,7 @@ jobs:
           ./gradlew build allTests -PskipLiveConformance=true --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
         env:
           CI: "true"
+          VALKEY_TEST_PORT: ${{ job.services.valkey.ports['6379'] }}
           SKIP_LIVE_CONFORMANCE: "true"
           # Already installed serially above; leaving this on would reintroduce the dpkg race.
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
@@ -179,6 +199,7 @@ jobs:
           ./gradlew clean cleanAllTests build allTests -PskipLiveConformance=true --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
         env:
           CI: "true"
+          VALKEY_TEST_PORT: ${{ job.services.valkey.ports['6379'] }}
           SKIP_LIVE_CONFORMANCE: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
