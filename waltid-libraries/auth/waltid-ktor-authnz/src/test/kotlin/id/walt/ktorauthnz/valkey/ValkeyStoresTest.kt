@@ -23,20 +23,14 @@ import kotlin.uuid.Uuid
  */
 class ValkeyStoresTest {
 
-    private val port = System.getenv("VALKEY_TEST_PORT")?.toIntOrNull()
-
-    private fun withValkey(block: suspend () -> Unit) = runBlocking {
-        if (port == null) {
-            println("ValkeyStoresTest skipped: VALKEY_TEST_PORT is not set")
-            return@runBlocking
-        }
-        block()
+    private fun withValkey(block: suspend (Int) -> Unit) = runBlocking {
+        block(valkeyTestPort())
     }
 
     private fun key() = Uuid.random().toString()
 
     @Test
-    fun `expiring store keeps values for their lifetime and counts within a window`() = withValkey {
+    fun `expiring store keeps values for their lifetime and counts within a window`() = withValkey { port ->
         val store = ValkeyExpiringStore(null, "127.0.0.1", port, null, null)
         store.tryConnect()
 
@@ -59,7 +53,7 @@ class ValkeyStoresTest {
     }
 
     @Test
-    fun `revoking an account's sessions deletes them, and a dropped session leaves its account index`() = withValkey {
+    fun `revoking an account's sessions deletes them, and a dropped session leaves its account index`() = withValkey { port ->
         val store = ValkeySessionStore(null, "127.0.0.1", port, null, null)
         store.tryConnect()
         val account = key()
@@ -77,7 +71,7 @@ class ValkeyStoresTest {
     }
 
     @Test
-    fun `an account's sessions are listed, without expired ones`() = withValkey {
+    fun `an account's sessions are listed, without expired ones`() = withValkey { port ->
         val store = ValkeySessionStore(null, "127.0.0.1", port, null, null)
         val account = key()
         val flow = AuthFlow(method = "userpass", success = true)
@@ -92,7 +86,7 @@ class ValkeyStoresTest {
     }
 
     @Test
-    fun `unfinished sessions get the short lifetime`() = withValkey {
+    fun `unfinished sessions get the short lifetime`() = withValkey { port ->
         val store = ValkeySessionStore(null, "127.0.0.1", port, null, null, pendingSessionLifetime = 300.milliseconds)
         val flow = AuthFlow(method = "userpass", success = true)
         val pending = SessionManager.newSession(flow, persist = false)
