@@ -62,6 +62,9 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
     fun loopbackWebhookIsNotDeliveredWhenTheDeploymentRefusesIt() {
         val host = "127.0.0.1"
         val port = freePort()
+        val previousAllowLoopback = System.getProperty("walt.ssrf.allowLoopback")
+        System.clearProperty("walt.ssrf.allowLoopback")
+        try {
         Verifier2WebhookRecorder().start(allowLoopback = false).use { webhook ->
             E2ETest(host, port, true).testBlock(
                 features = listOf(OSSVerifier2FeatureCatalog),
@@ -96,6 +99,13 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
                 test("loopback webhook received nothing") {
                     assertEquals(emptyList(), webhook.received())
                 }
+            }
+        }
+        } finally {
+            if (previousAllowLoopback == null) {
+                System.clearProperty("walt.ssrf.allowLoopback")
+            } else {
+                System.setProperty("walt.ssrf.allowLoopback", previousAllowLoopback)
             }
         }
     }

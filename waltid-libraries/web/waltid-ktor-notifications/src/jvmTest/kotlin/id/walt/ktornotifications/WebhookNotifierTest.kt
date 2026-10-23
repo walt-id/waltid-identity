@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,8 +18,11 @@ class WebhookNotifierTest {
 
     private val update = KtorSessionUpdate(target = "session", event = "test", session = buildJsonObject {})
 
+    @BeforeTest
     @AfterTest
     fun resetGuard() {
+        // JVM test tasks set this so ordinary suites can bind 127.0.0.1. These cases assert the default refusal.
+        System.clearProperty("walt.ssrf.allowLoopback")
         applyNetworkFetchGuard(allowLoopback = false, allowPrivateNetworks = false, trustedHostSuffixes = emptySet())
     }
 
