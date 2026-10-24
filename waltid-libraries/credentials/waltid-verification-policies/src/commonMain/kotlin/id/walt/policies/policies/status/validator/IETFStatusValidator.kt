@@ -23,7 +23,12 @@ class IETFStatusValidator(
             idx = entry.index,
             bitSize = statusList.size,
             expansionAlgorithm = expansionAlgorithm,
-        ).reversed() // IETF Token Status List stores values LSB-first (see TokenStatusListCodec.reverseReadBits)
+        ).let { bitValue ->
+            // IETF Token Status List stores values LSB-first; reverse valid bits so
+            // binToInt matches the integer status (suspended = 2). Invalid bit lists
+            // are left as-is so error messages stay stable.
+            if (bitValue.all { it == '0' || it == '1' }) bitValue.reversed() else bitValue
+        }
 
     override fun customValidations(statusList: IETFStatusContent, attribute: IETFStatusPolicyAttribute) = Unit
 }

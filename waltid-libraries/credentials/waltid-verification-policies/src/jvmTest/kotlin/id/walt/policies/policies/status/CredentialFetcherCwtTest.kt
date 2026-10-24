@@ -32,12 +32,16 @@ class CredentialFetcherCwtTest {
     fun `fetch converts binary CWT to hex and leaves JWT as text`() = runTest {
         val cwt = IetfStatusListTokens.unsignedCwt(index = 0, status = 0u)
         val jwt = "eyJhbGciOiJFUzI1NiIsInR5cCI6InN0YXR1c2xpc3Qrand0In0.e30.sig"
+        val expectedAccept = "application/statuslist+jwt, application/statuslist+cwt, text/plain, */*"
+        val acceptHeaders = mutableListOf<String?>()
         val server = embeddedServer(Netty, port = 0) {
             routing {
                 get("cwt") {
+                    acceptHeaders += call.request.headers[HttpHeaders.Accept]
                     call.respondBytes(cwt, ContentType("application", "statuslist+cwt"))
                 }
                 get("jwt") {
+                    acceptHeaders += call.request.headers[HttpHeaders.Accept]
                     call.respondText(jwt, ContentType("application", "statuslist+jwt"))
                 }
             }
@@ -51,24 +55,14 @@ class CredentialFetcherCwtTest {
                 val fetchedJwt = fetcher.fetch("http://localhost:$port/jwt").getOrThrow()
                 assertEquals(cwt.toHexString(), fetchedCwt)
                 assertEquals(jwt, fetchedJwt)
+                assertEquals(2, acceptHeaders.size)
+                assertEquals(expectedAccept, acceptHeaders[0])
+                assertEquals(expectedAccept, acceptHeaders[1])
             } finally {
                 client.close()
             }
         } finally {
             server.stop()
         }
-    }
-
-    @Test
-    fun `fetch requests CWT and JWT accept types`() {
-        assertEquals(
-            "application/statuslist+jwt, application/statuslist+cwt, text/plain, */*",
-            io.ktor.http.headers {
-                append(
-                    HttpHeaders.Accept,
-                    "application/statuslist+jwt, application/statuslist+cwt, text/plain, */*",
-                )
-            }[HttpHeaders.Accept],
-        )
     }
 }
