@@ -86,13 +86,30 @@ class Crypto2ClientIdAuthenticationTest {
         val trust = ClientIdTrustConfiguration(trustedVerifierAttestationIssuers = setOf(attesterDid))
 
         assertIs<ClientValidationResult.Success>(clientId.authenticateVerifierAttestation(clientId, context, trust))
-        assertIs<ClientValidationResult.Failure>(
+        val untrustedIssuer = assertIs<ClientValidationResult.Failure>(
             clientId.authenticateVerifierAttestation(
                 clientId,
                 context,
                 ClientIdTrustConfiguration(),
             )
         )
+        assertEquals(
+            ClientIdError.AttestationError("Verifier Attestation issuer is not trusted: $attesterDid"),
+            untrustedIssuer.error,
+        )
+
+        val wrongProof = attesterKey.signJws(
+            "{}".encodeToByteArray(),
+            mapOf("jwt" to JsonPrimitive(attestation)),
+        )
+        val invalidProof = assertIs<ClientValidationResult.Failure>(
+            clientId.authenticateVerifierAttestation(
+                clientId,
+                context.copy(requestObjectJws = wrongProof),
+                trust,
+            )
+        )
+        assertEquals(ClientIdError.AttestationError("Invalid JWS signature"), invalidProof.error)
     }
 
     @Test
@@ -117,13 +134,14 @@ class Crypto2ClientIdAuthenticationTest {
         )
         val parts = requestObject.split('.').toMutableList()
         parts[2] = (if (parts[2].first() == 'A') "B" else "A") + parts[2].drop(1)
-        assertIs<ClientValidationResult.Failure>(
+        val invalidSignature = assertIs<ClientValidationResult.Failure>(
             clientId.authenticateDecentralizedIdentifier(
                 clientId,
                 context.copy(requestObjectJws = parts.joinToString(".")),
             )
         )
-        assertIs<ClientValidationResult.Failure>(
+        assertEquals(ClientIdError.DidResolutionFailed("Invalid JWS signature"), invalidSignature.error)
+        val missingKey = assertIs<ClientValidationResult.Failure>(
             clientId.authenticateDecentralizedIdentifier(
                 clientId,
                 context.copy(
@@ -133,6 +151,10 @@ class Crypto2ClientIdAuthenticationTest {
                     )
                 ),
             )
+        )
+        assertEquals(
+            ClientIdError.DidResolutionFailed("Key ID '$did#missing' from JWS not found in DID document."),
+            missingKey.error,
         )
     }
 
