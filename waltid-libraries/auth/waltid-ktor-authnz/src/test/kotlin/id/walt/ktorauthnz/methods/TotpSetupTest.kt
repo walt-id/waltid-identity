@@ -17,6 +17,7 @@ import id.walt.ktorauthnz.sessions.AuthSessionNextStepCustomData
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
+import id.walt.withIncorrectTotp
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -101,7 +102,10 @@ class TotpSetupTest {
             setup["otpauth_uri"]!!.jsonPrimitive.content,
         )
 
-        assertEquals(HttpStatusCode.Unauthorized, post("/auth/$session/totp-setup", """{"code": "000000"}""").status)
+        val rejected = withIncorrectTotp(secret) { incorrect ->
+            post("/auth/$session/totp-setup", """{"code": "$incorrect"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, rejected.status)
         assertEquals(AuthSessionStatus.SUCCESS, post("/auth/$session/totp-setup", """{"code": "${code(secret)}"}""").info().status)
         assertEquals(TOTPStoredData(secret), accounts.lookupStoredDataForAccount(newUser, TOTP))
 
