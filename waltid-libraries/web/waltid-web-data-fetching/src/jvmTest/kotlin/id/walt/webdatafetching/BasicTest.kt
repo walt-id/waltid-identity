@@ -3,12 +3,17 @@ package id.walt.webdatafetching
 import id.walt.webdatafetching.config.AllowList
 import id.walt.webdatafetching.config.TimeoutConfiguration
 import id.walt.webdatafetching.config.url.UrlConfiguration
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class BasicTest {
@@ -35,9 +40,11 @@ class BasicTest {
         )
 
         val dataFetcher = WebDataFetcher("test-url-filter")
-        assertFailsWith<IllegalArgumentException> {
+        val failure = assertFailsWith<IllegalArgumentException> {
             dataFetcher.fetch<JsonObject>(EXAMPLE_URL).body
         }
+        assertEquals(IllegalArgumentException::class, failure::class)
+        assertEquals("URL is not allowed: $EXAMPLE_URL", failure.message)
     }
 
     @Test
@@ -50,9 +57,15 @@ class BasicTest {
         val dataFetcher = WebDataFetcher("test-timeout")
         val url =
             "https://raw.githubusercontent.com/walt-id/waltid-identity/d550f21916b3c3551f23711ecf2c567d01d3cd48/waltid-services/waltid-integration-tests/src/main/resources/issuance/key.json"
-        assertFailsWith<DataFetchingException> {
+        val failure = assertFailsWith<DataFetchingException> {
             dataFetcher.fetch<JsonObject>(url).body
         }
+        assertTrue(
+            failure.cause is HttpRequestTimeoutException ||
+                failure.cause is ConnectTimeoutException ||
+                failure.cause is SocketTimeoutException,
+            "Expected an HTTP timeout, got ${failure.cause}",
+        )
     }
 
 }

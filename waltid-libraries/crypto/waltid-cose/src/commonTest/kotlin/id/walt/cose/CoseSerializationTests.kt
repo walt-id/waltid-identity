@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.fail
 
@@ -102,5 +103,6 @@ class CoseSerializationTests {
             CoseSign1.fromTagged("d28443a10126a10442313154546869732069732074686520636f6e74656e742e58408eb33e4ca31d1c465ab05aac34cc6b23d58fef5c083106c4d25a91aef0b0117e2af9a291aa32e14ab834dc56ed2a223444547e01f11d3b0916e5a4c345cacb36")
         println("Decoded COSE: $cose")
         assertEquals(cose.payload!!.decodeToString(), "This is the content.")
+        assertContentEquals("11".encodeToByteArray(), cose.unprotected.kid)
     }
 }

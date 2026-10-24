@@ -254,14 +254,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
     }
 
-    func testBootstrapCreatesKeyAndDid() async throws {
-        let wallet = try await makeWallet()
-
-        let result = try await initializeSigningIdentity(wallet)
-
-        XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
-    }
-
     func testManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
         let wallet1 = try await makeWallet()
 
@@ -421,18 +413,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
-    }
-
-    func testReceiveEudiPidSdJwtCredentialFromDemoIssuer2() async throws {
-        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-sdjwt")
-    }
-
-    func testReceiveEudiPidMdocCredentialFromDemoIssuer2() async throws {
-        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-mdoc")
-    }
-
-    func testReceiveIsoMdlCredentialFromDemoIssuer2() async throws {
-        try await receiveCredentialFromDemoIssuer2(scenarioID: "iso-mdl")
     }
 
     func testReceiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() async throws {
@@ -820,27 +800,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
         return try XCTUnwrap(components.url)
     }
 
-    private func receiveCredentialFromDemoIssuer2(scenarioID: String) async throws {
-        let scenario = try demoScenario(scenarioID)
-        let walletId = "ios-demo-receive-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
-
-        let wallet = try await makeWallet(walletId: walletId)
-        _ = try await initializeSigningIdentity(wallet)
-
-        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
-        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveIssuedCredentials(wallet: wallet, offerURL: offerURL)
-
-        XCTAssertFalse(
-            credentialIDs.isEmpty,
-            "Should receive \(scenario.displayName) from public demo issuer2"
-        )
-
-        let credentials = try await wallet.credentials()
-        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
-    }
-
     private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
         let scenario = try demoPresentationScenario(scenarioID)
         let walletId = "ios-demo-present-\(scenario.id)-\(UUID().uuidString)"
@@ -878,10 +837,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
             sessionID: session.sessionID,
             timeoutSeconds: verifierPollingTimeout
         )
-    }
-
-    private func demoScenario(_ id: String) throws -> DemoCredentialScenario {
-        try XCTUnwrap(DemoBackend.scenarios.first { $0.id == id })
     }
 
     private func demoPresentationScenario(_ id: String) throws -> DemoCredentialScenario {

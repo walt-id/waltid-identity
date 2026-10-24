@@ -188,7 +188,7 @@ class MdocTDateFormatTest {
             }
             assertRepeatedTag0ValidityInfo(validityInfoBytes(field) { tstr -> cborTag(0, cborTag(0, tstr)) })
         }
-        decodeValidityInfo(validityInfoBytes())
+        assertValidityValues(decodeValidityInfo(validityInfoBytes()))
     }
 
     private fun decodeTDate(bytes: ByteArray): Instant =
@@ -215,11 +215,24 @@ class MdocTDateFormatTest {
     }
 
     private fun assertRepeatedTag0ValidityInfo(bytes: ByteArray) {
-        try {
-            decodeValidityInfo(bytes)
+        val map = try {
+            coseCompliantCbor.decodeFromByteArray<CborMap>(bytes)
         } catch (_: Exception) {
+            assertFailsWith<Exception> { decodeValidityInfo(bytes) }
             return
         }
+        if (validityFields.all { (map[CborString(it)] as CborString).tags.toList() == listOf(0uL) }) {
+            assertValidityValues(decodeValidityInfo(bytes))
+        } else {
+            assertFailsWith<Exception> { decodeValidityInfo(bytes) }
+        }
+    }
+
+    private fun assertValidityValues(decoded: ValidityInfo) {
+        assertEquals(Instant.parse(TDATE_TEXT), decoded.signed)
+        assertEquals(Instant.parse(TDATE_TEXT), decoded.validFrom)
+        assertEquals(Instant.parse(VALID_UNTIL_TEXT), decoded.validUntil)
+        assertEquals(Instant.parse(TDATE_TEXT), decoded.expectedUpdate)
     }
 
     private fun assertTDate(map: CborMap, key: String, expected: String) {

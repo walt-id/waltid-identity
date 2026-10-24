@@ -246,18 +246,13 @@ class JVMMdocTest {
                 ReaderAuthentication(sessionTranscript, firstParsedDocRequest.itemsRequest)
             ), cryptoProvider
         )
-        println("Request verified: $reqVerified")
-        println("Requested doc type: ${firstParsedDocRequest.docType}")
-        println("Requested items:")
-        firstParsedDocRequest.nameSpaces.forEach { ns ->
-            println("- NameSpace: $ns")
-            firstParsedDocRequest.getRequestedItemsFor(ns).forEach {
-                println("-- ${it.key} (intent-to-retain: ${it.value})")
-            }
-        }
-
-        // load/parse mdoc and present using selective disclosure
-
+        assertTrue(reqVerified)
+        assertEquals(MDocTypes.ISO_MDL, firstParsedDocRequest.docType)
+        assertEquals(setOf("org.iso.18013.5.1"), firstParsedDocRequest.nameSpaces.toSet())
+        assertEquals(
+            mapOf("family_name" to true, "birth_date" to false),
+            firstParsedDocRequest.getRequestedItemsFor("org.iso.18013.5.1"),
+        )
     }
 
     @Test

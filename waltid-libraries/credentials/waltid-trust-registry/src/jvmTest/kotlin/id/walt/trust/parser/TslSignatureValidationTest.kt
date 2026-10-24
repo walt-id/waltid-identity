@@ -75,12 +75,10 @@ class TslSignatureValidationTest {
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `parse EU LoTL with signature validation`() = runTest {
-        val lotlXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
-
-        if (lotlXml == null) {
-            println("Skipping EU LoTL test - could not fetch")
-            return@runTest
-        }
+        val lotlXml = kotlin.test.assertNotNull(
+            fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml"),
+            "Failed to fetch required trust list: https://ec.europa.eu/tools/lotl/eu-lotl.xml"
+        )
 
         val config = TslParseConfig(validateSignature = true)
         val result = TslXmlParser.parse(lotlXml, "eu-lotl", "https://ec.europa.eu/tools/lotl/eu-lotl.xml", config)
@@ -113,12 +111,10 @@ class TslSignatureValidationTest {
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `parse German TSL with signature validation`() = runTest {
-        val deTslXml = fetchUrl("https://tl.bundesnetzagentur.de/TL-DE.xml")
-
-        if (deTslXml == null) {
-            println("Skipping German TSL test - could not fetch")
-            return@runTest
-        }
+        val deTslXml = kotlin.test.assertNotNull(
+            fetchUrl("https://tl.bundesnetzagentur.de/TL-DE.xml"),
+            "Failed to fetch required trust list: https://tl.bundesnetzagentur.de/TL-DE.xml"
+        )
 
         val config = TslParseConfig(validateSignature = true)
         val result = TslXmlParser.parse(deTslXml, "de-tsl", "https://tl.bundesnetzagentur.de/TL-DE.xml", config)
@@ -202,12 +198,21 @@ class TslSignatureValidationTest {
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `detect tampered content`() = runTest {
-        val lotlXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
+        val lotlXml = kotlin.test.assertNotNull(
+            fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml"),
+            "Failed to fetch required trust list: https://ec.europa.eu/tools/lotl/eu-lotl.xml"
+        )
 
-        if (lotlXml == null) {
-            println("Skipping tamper detection test - could not fetch")
-            return@runTest
-        }
+        val config = TslParseConfig(
+            validateSignature = true,
+            strictSignatureValidation = false
+        )
+
+        val original = TslXmlParser.parse(lotlXml, "original", config = config)
+        assertEquals(
+            AuthenticityState.INTEGRITY_VERIFIED, original.source.assurance.authenticityState,
+            "Original document must have a valid signature before tampering"
+        )
 
         // Tamper with the content
         val tamperedXml = lotlXml.replace(
@@ -215,10 +220,7 @@ class TslSignatureValidationTest {
             "<TSLSequenceNumber>99999</TSLSequenceNumber>"
         )
 
-        val config = TslParseConfig(
-            validateSignature = true,
-            strictSignatureValidation = false
-        )
+        assertNotEquals(lotlXml, tamperedXml, "Tampering must change the signed content")
 
         val result = TslXmlParser.parse(tamperedXml, "tampered", config = config)
 
@@ -234,12 +236,10 @@ class TslSignatureValidationTest {
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `signer certificate metadata is stored`() = runTest {
-        val lotlXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
-
-        if (lotlXml == null) {
-            println("Skipping metadata test - could not fetch")
-            return@runTest
-        }
+        val lotlXml = kotlin.test.assertNotNull(
+            fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml"),
+            "Failed to fetch required trust list: https://ec.europa.eu/tools/lotl/eu-lotl.xml"
+        )
 
         val config = TslParseConfig(validateSignature = true)
         val result = TslXmlParser.parse(lotlXml, "eu-lotl-meta", config = config)

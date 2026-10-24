@@ -204,13 +204,10 @@ class JavaProviderAdapterTest {
     @Test
     fun `adapter rejects changed managed-key identity`() = runTest {
         val changed = stored.copy(provider = ProviderId("changed-identity"))
-        val runtime = CryptoRuntime(
-            softwareProviders = emptyList(),
-            managedProviders = listOf(ChangedIdentityJavaProvider().asKotlinProvider()),
-        )
+        val provider = ChangedIdentityJavaProvider().asKotlinProvider()
 
         assertFailsWith<IllegalArgumentException> {
-            runtime.restore(changed)
+            provider.restore(changed)
         }
     }
 

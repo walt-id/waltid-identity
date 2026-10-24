@@ -16,12 +16,15 @@ import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertIs
@@ -58,6 +61,26 @@ class MdlCborTest {
         assertContains(serialized, "323031382D30382D3039") // "2018-08-09"
         assertContains(serialized, "6578706972795F64617465") // "expiry_date"
         assertContains(serialized, "323032342D31302D3230")  // "2024-10-20"
+
+        val decoded = coseCompliantCbor.decodeFromByteArray<CborMap>(serialized.hexToByteArray())
+        val textFields = mapOf(
+            "family_name" to "Mustermann", "given_name" to "Max", "birth_date" to "1970-01-01",
+            "issue_date" to "2018-08-09", "expiry_date" to "2024-10-20", "issuing_country" to "AT",
+            "issuing_authority" to "LPD Steiermark", "document_number" to "A/3f984/019",
+            "un_distinguishing_sign" to "AT",
+        )
+        assertEquals((textFields.keys + setOf("portrait", "driving_privileges")).map(::CborString).toSet(), decoded.keys)
+        textFields.forEach { (key, value) -> assertEquals(CborString(value), decoded[CborString(key)], key) }
+        assertContentEquals(mdl.portrait, assertIs<CborByteString>(decoded[CborString("portrait")]).toByteArray())
+        val privilege = assertIs<CborArray>(decoded[CborString("driving_privileges")]).single()
+        assertEquals(
+            CborMap(mapOf(
+                CborString("vehicle_category_code") to CborString("A"),
+                CborString("issue_date") to CborString("2018-08-09", 1004uL),
+                CborString("expiry_date") to CborString("2024-10-20", 1004uL),
+            )),
+            privilege,
+        )
     }
 
     @Test
@@ -380,30 +403,17 @@ class MdlCborTest {
     }
 
     @Test
-    fun drivingPrivilege() {
+    fun drivingPrivilegeDeserialization() {
+        val input = "a37576656869636c655f63617465676f72795f636f646561416a69737375655f64617465d903ec6a323031382d30382d" +
+                "30396b6578706972795f64617465d903ec6a323032342d31302d3230"
+
         val drivingPrivilege = DrivingPrivilege(
             vehicleCategoryCode = "A",
             issueDate = LocalDate.parse("2018-08-09"),
             expiryDate = LocalDate.parse("2024-10-20")
         )
-
-        val serialized = coseCompliantCbor.encodeToByteArray(drivingPrivilege).toHexString().uppercase()
-
-        assertContains(serialized, "76656869636C655F63617465676F72795F636F6465") // "vehicle_category_code"
-        assertContains(serialized, "69737375655F64617465") // "issue_date"
-        assertContains(serialized, "D903EC") // ISO mDL defines tag(1004) for CBOR type 6 for full-dates
-        assertContains(serialized, "323031382D30382D3039") // "2018-08-09"
-        assertContains(serialized, "6578706972795F64617465") // "expiry_date"
-        assertContains(serialized, "323032342D31302D3230")  // "2024-10-20"
-    }
-
-    @Test
-    fun drivingPrivilegeDeserialization() {
-        val input = "a37576656869636c655f63617465676f72795f636f646561416a69737375655f64617465d903ec6a323031382d30382d" +
-                "30396b6578706972795f64617465d903ec6a323032342d31302d3230"
-
-        val deserialized = coseCompliantCbor.decodeFromByteArray<DrivingPrivilege>(input.uppercase().hexToByteArray())
-        println("Deserialized: $deserialized")
+        assertContentEquals(input.hexToByteArray(), coseCompliantCbor.encodeToByteArray(drivingPrivilege))
+        val deserialized = coseCompliantCbor.decodeFromByteArray<DrivingPrivilege>(input.hexToByteArray())
 
         assertEquals(deserialized.vehicleCategoryCode, "A")
         assertEquals(deserialized.issueDate, LocalDate.parse("2018-08-09"))

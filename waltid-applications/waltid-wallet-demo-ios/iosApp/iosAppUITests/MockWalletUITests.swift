@@ -1043,6 +1043,12 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Not requested"].exists)
         XCTAssertFalse(app.staticTexts["Key management algorithm"].exists)
         XCTAssertFalse(app.staticTexts["Verifier key thumbprint"].exists)
+
+        ui.tapButton(identifier: "wallet.presentationRequesterDetailsToggle", fallbackLabel: "Show Verifier details")
+        XCTAssertTrue(app.staticTexts["Not requested"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Required"].exists)
+        XCTAssertFalse(app.staticTexts["Key management algorithm"].exists)
+        XCTAssertFalse(app.staticTexts["Verifier key thumbprint"].exists)
     }
 
     func testPresentationWithoutVerifierDisplayKeepsClientIDInTechnicalDetails() {

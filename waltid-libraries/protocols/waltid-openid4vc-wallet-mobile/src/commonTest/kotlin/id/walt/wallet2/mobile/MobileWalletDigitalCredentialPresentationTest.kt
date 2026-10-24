@@ -349,38 +349,31 @@ class MobileWalletDigitalCredentialPresentationTest {
     fun emptyDcqlClaimsAreRejectedBeforeAPreviewSessionIsCreated() = runTest {
         val fixture = walletFixture(sdJwtCredential())
 
-        assertFailsWith<IllegalArgumentException> {
-            fixture.wallet.previewDigitalCredentialPresentation(
-                dcApiRequest(
-                    data = dcApiRequestData(
-                        credentialQuery = """{
-                          "id":"pid","format":"jwt_vc_json","meta":{},"claims":[]
-                        }""",
-                    ),
-                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+        for (query in listOf(
+            """{"id":"pid","format":"dc+sd-jwt","meta":{"vct_values":["$SD_JWT_VCT"]},"claims":[]}""",
+            """{"id":"pid","format":"jwt_vc_json","meta":{},"claims":[]}""",
+        )) {
+            val failure = assertFailsWith<IllegalArgumentException> {
+                fixture.wallet.previewDigitalCredentialPresentation(
+                    dcApiRequest(
+                        data = dcApiRequestData(credentialQuery = query),
+                        selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+                    )
                 )
-            )
+            }
+            assertTrue(failure.message.orEmpty().contains("claims was set, but has no elements"))
         }
     }
 
     @Test
     fun signedDcApiPreviewRejectsRegisteredAlgorithmsTheHolderKeyCannotSatisfy() = runTest {
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
-        val trust = ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(
-                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
-                    ),
-                    vpFormatsSupported = mapOf(
-                        "dc+sd-jwt" to buildJsonObject {
-                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
-                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
-                        },
-                    ),
-                ),
-            ),
-        )
+        val trust = registeredVerifierTrust(verifierKey, mapOf(
+            "dc+sd-jwt" to buildJsonObject {
+                put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+            },
+        ))
         val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
 
         val error = assertFailsWith<IllegalArgumentException> {
@@ -401,21 +394,12 @@ class MobileWalletDigitalCredentialPresentationTest {
     @Test
     fun signedDcApiPreviewAcceptsRegisteredAlgorithmsTheHolderKeyCanSatisfy() = runTest {
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
-        val trust = ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(
-                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
-                    ),
-                    vpFormatsSupported = mapOf(
-                        "dc+sd-jwt" to buildJsonObject {
-                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
-                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
-                        },
-                    ),
-                ),
-            ),
-        )
+        val trust = registeredVerifierTrust(verifierKey, mapOf(
+            "dc+sd-jwt" to buildJsonObject {
+                put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+                put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+            },
+        ))
         val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
         val preview = fixture.wallet.previewDigitalCredentialPresentation(
             dcApiRequest(
@@ -433,24 +417,15 @@ class MobileWalletDigitalCredentialPresentationTest {
     @Test
     fun mixedFormatPreviewDoesNotOfferACredentialOutsideItsRegisteredAlgorithms() = runTest {
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
-        val trust = ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(
-                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
-                    ),
-                    vpFormatsSupported = mapOf(
-                        "jwt_vc_json" to buildJsonObject {
-                            put("alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
-                        },
-                        "dc+sd-jwt" to buildJsonObject {
-                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
-                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
-                        },
-                    ),
-                ),
-            ),
-        )
+        val trust = registeredVerifierTrust(verifierKey, mapOf(
+            "jwt_vc_json" to buildJsonObject {
+                put("alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+            },
+            "dc+sd-jwt" to buildJsonObject {
+                put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+            },
+        ))
         val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
         val error = assertFailsWith<IllegalArgumentException> {
             fixture.wallet.previewDigitalCredentialPresentation(
@@ -487,24 +462,15 @@ class MobileWalletDigitalCredentialPresentationTest {
         val defaultKey = ed25519SigningKey("default-ed25519")
         val mdocKey = signingKey("mdoc-p256")
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
-        val trust = ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(
-                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
-                    ),
-                    vpFormatsSupported = mapOf(
-                        "mso_mdoc" to buildJsonObject {
-                            put("deviceauth_alg_values", buildJsonArray { add(JsonPrimitive(-7)) })
-                        },
-                        "dc+sd-jwt" to buildJsonObject {
-                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("Ed25519")) })
-                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("Ed25519")) })
-                        },
-                    ),
-                ),
-            ),
-        )
+        val trust = registeredVerifierTrust(verifierKey, mapOf(
+            "mso_mdoc" to buildJsonObject {
+                put("deviceauth_alg_values", buildJsonArray { add(JsonPrimitive(-7)) })
+            },
+            "dc+sd-jwt" to buildJsonObject {
+                put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("Ed25519")) })
+                put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("Ed25519")) })
+            },
+        ))
         val fixture = walletFixtureWithKeys(
             keys = listOf(defaultKey, mdocKey),
             credentials = arrayOf(mdocCredential(holderKey = mdocKey)),
@@ -553,20 +519,11 @@ class MobileWalletDigitalCredentialPresentationTest {
         val defaultKey = ed25519SigningKey("default-ed25519")
         val mdocKey = signingKey("mdoc-p256")
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
-        val trust = ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(
-                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
-                    ),
-                    vpFormatsSupported = mapOf(
-                        "mso_mdoc" to buildJsonObject {
-                            put("deviceauth_alg_values", buildJsonArray { add(JsonPrimitive(-7)) })
-                        },
-                    ),
-                ),
-            ),
-        )
+        val trust = registeredVerifierTrust(verifierKey, mapOf(
+            "mso_mdoc" to buildJsonObject {
+                put("deviceauth_alg_values", buildJsonArray { add(JsonPrimitive(-7)) })
+            },
+        ))
         val fixture = walletFixtureWithKeys(
             keys = listOf(defaultKey, mdocKey),
             credentials = arrayOf(mdocCredential(holderKey = mdocKey)),
@@ -1007,6 +964,20 @@ class MobileWalletDigitalCredentialPresentationTest {
         dataJson = data,
         verifiedOrigin = "https://verifier.example",
         selectedRegistryEntryIds = selectedRegistryEntryIds,
+    )
+
+    private suspend fun registeredVerifierTrust(
+        key: JWKKey,
+        formats: Map<String, JsonObject>,
+    ) = ClientIdTrustConfiguration(
+        preRegisteredClients = mapOf(
+            "verifier2" to ClientMetadata(
+                jwks = ClientMetadata.Jwks(
+                    listOf(jwkWithKid(key.getPublicKey().exportJWKObject(), key.getKeyId())),
+                ),
+                vpFormatsSupported = formats,
+            ),
+        ),
     )
 
     private suspend fun signedRequestObject(

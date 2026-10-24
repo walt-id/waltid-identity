@@ -456,27 +456,6 @@ final class WalletViewModelPinTests: XCTestCase {
             identityDocumentRegistrationUpdate: {}, pinStore: store, biometricAuthenticator: biometrics)
     }
 
-    func testBiometricUnlockSkipsPinWhenEnabled() async throws {
-        let pinStore = InMemoryDemoPinStore()
-        try await pinStore.setPin("1234")
-        pinStore.isBiometricUnlockEnabled = true
-        let biometrics = FakeDemoBiometricAuthenticator()
-        let viewModel = WalletViewModel(
-            walletID: "pin-bio-\(UUID().uuidString)",
-            walletClient: MockWalletClient(),
-            identityDocumentRegistrationUpdate: {},
-            pinStore: pinStore,
-            biometricAuthenticator: biometrics
-        )
-
-        XCTAssertEqual(viewModel.auth, .login)
-        viewModel.unlockWithBiometrics()
-        try await waitUntil { viewModel.isReady }
-
-        XCTAssertEqual(viewModel.auth, .unlocked)
-        XCTAssertEqual(biometrics.authenticateCalls, 1)
-    }
-
     func testCancelledBiometricsLeavesPinFallback() async throws {
         let pinStore = InMemoryDemoPinStore()
         try await pinStore.setPin("1234")
@@ -543,8 +522,10 @@ final class WalletViewModelPinTests: XCTestCase {
             biometricAuthenticator: biometrics
         )
 
+        XCTAssertEqual(viewModel.auth, .login)
         viewModel.unlockWithBiometrics()
         try await waitUntil { viewModel.auth == .unlocked && viewModel.isReady }
+        XCTAssertEqual(viewModel.auth, .unlocked)
         XCTAssertEqual(biometrics.authenticateCalls, 1)
         let bootstrapCallsAfterUnlock = await walletClient.bootstrapCalls
         XCTAssertEqual(bootstrapCallsAfterUnlock, 1)
@@ -592,29 +573,18 @@ final class WalletViewModelPinTests: XCTestCase {
     }
 
     func testFreshSignupReportsBiometricAvailabilityWithoutSceneActivation() {
-        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: true)
-        let viewModel = WalletViewModel(
-            walletID: "pin-signup-available-\(UUID().uuidString)",
-            walletClient: MockWalletClient(),
-            identityDocumentRegistrationUpdate: {},
-            biometricAuthenticator: biometrics
-        )
+        for isAvailable in [true, false] {
+            let biometrics = FakeDemoBiometricAuthenticator(isAvailable: isAvailable)
+            let viewModel = WalletViewModel(
+                walletID: "pin-signup-\(UUID().uuidString)",
+                walletClient: MockWalletClient(),
+                identityDocumentRegistrationUpdate: {},
+                biometricAuthenticator: biometrics
+            )
 
-        XCTAssertEqual(viewModel.auth, .setup)
-        XCTAssertTrue(viewModel.isBiometricUnlockAvailable)
-    }
-
-    func testFreshSignupReportsBiometricsUnavailable() {
-        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: false)
-        let viewModel = WalletViewModel(
-            walletID: "pin-signup-unavailable-\(UUID().uuidString)",
-            walletClient: MockWalletClient(),
-            identityDocumentRegistrationUpdate: {},
-            biometricAuthenticator: biometrics
-        )
-
-        XCTAssertEqual(viewModel.auth, .setup)
-        XCTAssertFalse(viewModel.isBiometricUnlockAvailable)
+            XCTAssertEqual(viewModel.auth, .setup)
+            XCTAssertEqual(viewModel.isBiometricUnlockAvailable, isAvailable)
+        }
     }
 
     private func waitUntil(

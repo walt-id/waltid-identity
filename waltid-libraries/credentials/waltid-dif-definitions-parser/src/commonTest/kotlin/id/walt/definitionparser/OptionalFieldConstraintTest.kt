@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -135,12 +136,13 @@ class OptionalFieldConstraintTest {
             )
         )
 
+        val wrongTypeCredential = JsonObject(credential + ("type" to JsonPrimitive("DriversLicense")))
         val matched = PresentationDefinitionParser.matchCredentialsForInputDescriptor(
-            flowOf(credential),
+            flowOf(credential, wrongTypeCredential),
             inputDescriptor
         ).toList()
 
-        assertEquals(1, matched.size, "Credential should match when only optional fields are missing")
+        assertEquals(listOf(credential), matched, "Only the credential satisfying all required fields should match")
     }
 
     @Test

@@ -101,65 +101,32 @@ class AndroidSignumKeyBackendPolicyTest {
             ),
         )
 
-        assertFailsWith<SignumKeyPolicyMismatchException> {
-            validateAndroidNativePolicy(
-                alias = "biometric",
-                policy = policy,
-                isInsideSecureHardware = true,
-                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-                isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = 30,
-                isInvalidatedByBiometricEnrollment = true,
-                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
-            )
-        }
-        assertFailsWith<SignumKeyPolicyMismatchException> {
-            validateAndroidNativePolicy(
-                alias = "biometric",
-                policy = policy,
-                isInsideSecureHardware = true,
-                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-                isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = -2,
-                isInvalidatedByBiometricEnrollment = true,
-                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
-            )
-        }
-        assertFailsWith<SignumKeyPolicyMismatchException> {
-            validateAndroidNativePolicy(
-                alias = "biometric",
-                policy = policy,
-                isInsideSecureHardware = true,
-                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-                isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = -1,
-                isInvalidatedByBiometricEnrollment = true,
-                userAuthenticationType = KeyProperties.AUTH_DEVICE_CREDENTIAL,
-            )
-        }
-        assertFailsWith<SignumKeyPolicyMismatchException> {
-            validateAndroidNativePolicy(
-                alias = "biometric",
-                policy = policy,
-                isInsideSecureHardware = true,
-                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-                isUserAuthenticationRequired = false,
-                userAuthenticationValidityDurationSeconds = -1,
-                isInvalidatedByBiometricEnrollment = true,
-                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
-            )
-        }
-        assertFailsWith<SignumKeyPolicyMismatchException> {
-            validateAndroidNativePolicy(
-                alias = "biometric",
-                policy = policy,
-                isInsideSecureHardware = true,
-                securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
-                isUserAuthenticationRequired = true,
-                userAuthenticationValidityDurationSeconds = -1,
-                isInvalidatedByBiometricEnrollment = false,
-                userAuthenticationType = KeyProperties.AUTH_BIOMETRIC_STRONG,
-            )
+        data class NativeAuthentication(
+            val duration: Int = -1,
+            val required: Boolean = true,
+            val invalidatedByEnrollment: Boolean = true,
+            val authenticationType: Int = KeyProperties.AUTH_BIOMETRIC_STRONG,
+        )
+
+        listOf(
+            NativeAuthentication(duration = 30),
+            NativeAuthentication(duration = -2),
+            NativeAuthentication(authenticationType = KeyProperties.AUTH_DEVICE_CREDENTIAL),
+            NativeAuthentication(required = false),
+            NativeAuthentication(invalidatedByEnrollment = false),
+        ).forEach { native ->
+            assertFailsWith<SignumKeyPolicyMismatchException>(native.toString()) {
+                validateAndroidNativePolicy(
+                    alias = "biometric",
+                    policy = policy,
+                    isInsideSecureHardware = true,
+                    securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
+                    isUserAuthenticationRequired = native.required,
+                    userAuthenticationValidityDurationSeconds = native.duration,
+                    isInvalidatedByBiometricEnrollment = native.invalidatedByEnrollment,
+                    userAuthenticationType = native.authenticationType,
+                )
+            }
         }
     }
 

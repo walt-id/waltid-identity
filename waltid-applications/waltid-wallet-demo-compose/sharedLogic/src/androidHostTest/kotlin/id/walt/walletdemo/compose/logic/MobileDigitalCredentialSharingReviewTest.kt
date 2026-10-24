@@ -115,6 +115,7 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals("https://verifier.example", requester.fallbackName)
         assertEquals("https://verifier.example", requester.verifiedOrigin)
         assertNull(requester.display)
+        assertNull(review.request.readerTrust)
         assertEquals("openid4vp-v1-unsigned", review.request.technicalDetails.textValue("Protocol"))
         assertNull(review.request.technicalDetails.textValue("Client ID"))
         assertTrue(
@@ -226,15 +227,6 @@ class MobileDigitalCredentialSharingReviewTest {
             WalletDemoSharingResponseProtection.None,
             digitalCredentialPreview(responseMode = "dc_api").toSharingReview().request.responseProtection,
         )
-    }
-
-    /**
-     * The OpenID4VP DC API has no reader authentication, which maps to no reader-trust state at all rather
-     * than to a state that reads as a failed check.
-     */
-    @Test
-    fun protocolWithoutReaderAuthenticationHasNoReaderTrustState() {
-        assertNull(digitalCredentialPreview().toSharingReview().request.readerTrust)
     }
 
     @Test

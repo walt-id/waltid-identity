@@ -14,110 +14,86 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.fail
 
 class WalletIssuanceHandlerInvalidNonceTest {
 
     @Test
-    fun retriesOnceWithFreshNonceAndNewProof() = runTest {
-        var nonceRequests = 0
-        var credentialRequests = 0
-        val proofNonces = mutableListOf<String?>()
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler { request ->
-                    when (request.url.toString()) {
-                        NONCE_ENDPOINT -> respondJson(
-                            """{"c_nonce":"${if (++nonceRequests == 1) "stale-nonce" else "fresh-nonce"}"}"""
-                        )
-
-                        CREDENTIAL_ENDPOINT -> {
-                            credentialRequests++
-                            if (credentialRequests == 1) {
-                                respondJson(
-                                    """{"error":"invalid_nonce","error_description":"Proof nonce has expired"}""",
-                                    HttpStatusCode.BadRequest,
-                                )
-                            } else {
-                                respondJson("""{"credentials":[{"credential":"issued-credential"}]}""")
+    fun invalidNonceRebuildsProofOnceAndThenReturnsOrPropagatesError() = runTest {
+        for ((succeeds, expectedNonces) in listOf(
+            true to listOf("stale-nonce", "fresh-nonce"),
+            false to listOf("nonce-1", "nonce-2"),
+        )) {
+            var nonceRequests = 0
+            var credentialRequests = 0
+            val proofNonces = mutableListOf<String?>()
+            val submittedProofs = mutableListOf<List<String>?>()
+            HttpClient(MockEngine) {
+                engine {
+                    addHandler { request ->
+                        when (request.url.toString()) {
+                            NONCE_ENDPOINT -> {
+                                nonceRequests++
+                                val nonce = expectedNonces.getOrElse(nonceRequests - 1) { "nonce-$nonceRequests" }
+                                respondJson("""{"c_nonce":"$nonce"}""")
                             }
+                            CREDENTIAL_ENDPOINT -> {
+                                credentialRequests++
+                                val body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+                                submittedProofs += Json.parseToJsonElement(body).jsonObject["proofs"]
+                                    ?.jsonObject?.get("jwt")?.jsonArray?.map { it.jsonPrimitive.content }
+                                if (credentialRequests == 1 || !succeeds) {
+                                    respondJson(
+                                        if (succeeds) """{"error":"invalid_nonce","error_description":"Proof nonce has expired"}"""
+                                        else """{"error":"invalid_nonce"}""",
+                                        HttpStatusCode.BadRequest,
+                                    )
+                                } else respondJson("""{"credentials":[{"credential":"issued-credential"}]}""")
+                            }
+                            else -> error("Unexpected request: ${request.method.value} ${request.url}")
                         }
-
-                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
                     }
                 }
-            }
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-        }
-
-        val response = WalletIssuanceHandler.requestCredentialWithNonceRetry(
-            request = fetchRequest(),
-            nonceEndpoint = NONCE_ENDPOINT,
-            httpClient = client,
-            buildProof = { nonce ->
-                proofNonces += nonce
-                id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
-            },
-        )
-
-        assertEquals(listOf<String?>("stale-nonce", "fresh-nonce"), proofNonces)
-        assertEquals(2, nonceRequests)
-        assertEquals(2, credentialRequests)
-        assertEquals("issued-credential", response.credentials?.single()?.credential.toString().removeSurrounding("\""))
-    }
-
-    @Test
-    fun stopsAfterOneInvalidNonceRetry() = runTest {
-        var nonceRequests = 0
-        var credentialRequests = 0
-        val proofNonces = mutableListOf<String?>()
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler { request ->
-                    when (request.url.toString()) {
-                        NONCE_ENDPOINT -> respondJson("""{"c_nonce":"nonce-${++nonceRequests}"}""")
-                        CREDENTIAL_ENDPOINT -> {
-                            credentialRequests++
-                            respondJson("""{"error":"invalid_nonce"}""", HttpStatusCode.BadRequest)
-                        }
-                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
-                    }
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
                 }
-            }
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
+            }.use { client ->
+                suspend fun fetch() = WalletIssuanceHandler.requestCredentialWithNonceRetry(
+                    request = fetchRequest(),
+                    nonceEndpoint = NONCE_ENDPOINT,
+                    httpClient = client,
+                    buildProof = { nonce ->
+                        proofNonces += nonce
+                        id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
+                    },
+                )
+
+                if (succeeds) {
+                    val response = fetch()
+                    assertEquals("issued-credential", response.credentials?.single()?.credential.toString().removeSurrounding("\""))
+                } else {
+                    val failure = assertFailsWith<CredentialEndpointException> { fetch() }
+                    assertEquals(true, failure.isInvalidNonce)
+                }
+                assertEquals<List<String?>>(expectedNonces, proofNonces)
+                assertEquals<List<List<String>?>>(expectedNonces.map { listOf("proof-for-$it") }, submittedProofs)
+                assertEquals(2, nonceRequests)
+                assertEquals(2, credentialRequests)
             }
         }
-
-        val failure = try {
-            WalletIssuanceHandler.requestCredentialWithNonceRetry(
-                request = fetchRequest(),
-                nonceEndpoint = NONCE_ENDPOINT,
-                httpClient = client,
-                buildProof = { nonce ->
-                    proofNonces += nonce
-                    id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
-                },
-            )
-            fail("Expected invalid_nonce to be propagated after the retry")
-        } catch (error: CredentialEndpointException) {
-            error
-        }
-
-        assertEquals(true, failure.isInvalidNonce)
-        assertEquals(listOf<String?>("nonce-1", "nonce-2"), proofNonces)
-        assertEquals(2, nonceRequests)
-        assertEquals(2, credentialRequests)
     }
 
     @Test

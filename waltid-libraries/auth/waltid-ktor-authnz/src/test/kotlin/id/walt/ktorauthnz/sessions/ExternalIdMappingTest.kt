@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.methods.OIDC
+import id.walt.ktorauthnz.valkey.valkeyTestPort
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +17,6 @@ import kotlin.uuid.Uuid
 class ExternalIdMappingTest {
 
     private val namespace = OIDC.OIDC_SESSION_NAMESPACE
-    private val valkeyPort = System.getenv("VALKEY_TEST_PORT")?.toIntOrNull()
 
     private suspend fun session(account: String) = SessionManager.newSession(AuthFlow(method = "userpass", success = true), persist = false)
         .copy(status = AuthSessionStatus.SUCCESS, flows = null, accountId = account)
@@ -53,7 +53,7 @@ class ExternalIdMappingTest {
 
     @Test
     fun `in Valkey, where mappings also expire like sessions`() = runBlocking {
-        val port = valkeyPort ?: return@runBlocking println("ExternalIdMappingTest: Valkey case skipped, VALKEY_TEST_PORT is not set")
+        val port = valkeyTestPort()
         ValkeySessionStore(null, "127.0.0.1", port, null, null).apply { tryConnect() }.checkCleanup()
 
         val shortLived = ValkeySessionStore(null, "127.0.0.1", port, null, null, expiration = 1.seconds)

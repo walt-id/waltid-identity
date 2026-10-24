@@ -198,6 +198,10 @@ class SDArrayElementTest {
             decoys = 3,
         )
         val json = original.toJSON()
+        assertEquals(
+            Json.parseToJsonElement("""{"elements":[{"sd":true},{"sd":false}],"wildcard":{"sd":true},"decoyMode":"FIXED","decoys":3}"""),
+            json,
+        )
         val restored = SDArray.fromJSON(json)
         assertEquals(original.elements.size, restored.elements.size)
         assertEquals(original.elements[0].sd, restored.elements[0].sd)
@@ -217,7 +221,12 @@ class SDArrayElementTest {
             decoyMode = DecoyMode.RANDOM,
             decoys = 2,
         )
-        val restored = SDMap.fromJSON(original.toJSON())
+        val json = original.toJSON()
+        assertEquals(
+            Json.parseToJsonElement("""{"fields":{"a":{"sd":true},"b":{"sd":false,"children":{"fields":{"c":{"sd":true}},"decoyMode":"NONE","decoys":0}}},"decoyMode":"RANDOM","decoys":2}"""),
+            json,
+        )
+        val restored = SDMap.fromJSON(json)
         assertTrue(restored["a"]!!.sd)
         assertFalse(restored["b"]!!.sd)
         val nested = restored["b"]!!.children
@@ -750,6 +759,22 @@ class SDArrayElementTest {
             )
         )
         val presentationMap = SDMap.generateSDMap(listOf("nationalities.[0]"))
+
+        // RFC 9901 US/DE disclosures with fixed leading and interleaved decoys.
+        val fixedWire = """{"nationalities":[{"...":"6dLYJFX8lw978z3y7XFtpyivaHhn2yvU53TKoQNd8vk"},{"...":"pFndjkZ_VCzmyTa6UjlZo3dh-ko8aIKQc9DlGzhaVYo"},{"...":"c0WSaDEgAJiWZWc6Efsb5j7cUsTtTJ-TJXRtDZe6Wzg"},{"...":"7Cf6JkPudry3lcbwHgeZ8khAv1U1OSlerP0VkBJrWZ0"}]}"""
+        val fixed = SDPayload.parse(
+            fixedWire.encodeToByteArray().encodeToBase64Url(),
+            setOf(
+                "WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0",
+                "WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZBIiwgIkRFIl0",
+            ),
+        )
+        assertEquals(Json.parseToJsonElement("""{"nationalities":["US","DE"]}"""), fixed.fullPayload)
+        assertEquals(
+            Json.parseToJsonElement("""{"nationalities":["US"]}"""),
+            fixed.withSelectiveDisclosures(presentationMap).fullPayload,
+            "fixed leading decoy must not consume logical index 0",
+        )
 
         // Run a few iterations so randomized decoy positions exercise the alignment.
         repeat(10) {

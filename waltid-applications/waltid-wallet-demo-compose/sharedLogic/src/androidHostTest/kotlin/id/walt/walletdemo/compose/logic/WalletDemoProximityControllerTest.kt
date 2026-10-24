@@ -21,6 +21,7 @@ import id.walt.wallet2.mobile.ProximityConfiguration
 import id.walt.wallet2.mobile.ProximityCredentialOption
 import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
 import id.walt.wallet2.mobile.ProximityDocumentReview
+import id.walt.wallet2.mobile.ProximityDocumentSubmission
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityEngagement
@@ -36,6 +37,7 @@ import id.walt.wallet2.mobile.ProximityRequestedElement
 import id.walt.wallet2.mobile.ProximityReview
 import id.walt.wallet2.mobile.ProximitySession
 import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.ProximitySubmission
 import id.walt.wallet2.mobile.ProximityTransportCapability
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1156,7 +1158,14 @@ class WalletDemoProximityControllerTest {
         advanceUntilIdle()
         assertEquals(2, backend.startCalls)
         assertTrue(first.actions.isEmpty())
-        assertIs<ProximityApproval.Prepared>(backend.lastConfiguration!!.approval)
+        val prepared = assertIs<ProximityApproval.Prepared>(backend.lastConfiguration!!.approval)
+        assertEquals(
+            ProximitySubmission(listOf(
+                ProximityDocumentSubmission(0, "credential-a", setOf(familyName, portrait)),
+                ProximityDocumentSubmission(1, "proof-credential", setOf(eligibility)),
+            )),
+            prepared.sharing.submission,
+        )
         assertEquals(1, presentCalls)
         assertEquals(1, first.closeCalls)
         next.mutableState.value = ProximityState.Failed(ProximityError(ProximityErrorCategory.Policy,

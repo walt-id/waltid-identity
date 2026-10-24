@@ -1066,37 +1066,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
-    func testRecognizesMdocSignatureImageBytes() throws {
-        let details = CredentialDisplayNormalizer.details(
-            id: "credential-1",
-            title: "Mobile driving licence",
-            issuer: nil,
-            subject: nil,
-            format: "mso_mdoc",
-            addedAt: nil,
-            credentialDataJSON: """
-            {
-              "org.iso.18013.5.1": {
-                "signature_usual_mark": {
-                  "elementValue": \(syntheticPNGByteArrayJSON())
-                }
-              }
-            }
-            """
-        )
-
-        let signature = try XCTUnwrap(
-            details.groups
-                .flatMap(\.items)
-                .first { $0.path.id == "[\"org.iso.18013.5.1\"].signature_usual_mark.elementValue" }
-        )
-        XCTAssertEqual(signature.label, "Signature or usual mark")
-        guard case .image = signature.value.resolvedImage else {
-            return XCTFail("Expected signature_usual_mark to use the image display path")
-        }
-    }
-
-    func testRecognizesStandardMdocBiometricImageBytes() throws {
+    func testRecognizesMdocSignatureAndBiometricImageBytes() throws {
         let imageBytes = syntheticPNGByteArrayJSON()
         let details = CredentialDisplayNormalizer.details(
             id: "credential-1",
@@ -1108,6 +1078,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialDataJSON: """
             {
               "org.iso.18013.5.1": {
+                "signature_usual_mark": {"elementValue": \(imageBytes)},
                 "biometric_template_face": \(imageBytes),
                 "biometric_template_finger": \(imageBytes),
                 "biometric_template_signature_sign": \(imageBytes),
@@ -1119,8 +1090,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let claims = Dictionary(
             uniqueKeysWithValues: details.groups.flatMap(\.items).map { ($0.path.id, $0) }
         )
+        XCTAssertEqual(
+            claims["[\"org.iso.18013.5.1\"].signature_usual_mark.elementValue"]?.label,
+            "Signature or usual mark"
+        )
 
         for elementIdentifier in [
+            "signature_usual_mark.elementValue",
             "biometric_template_face",
             "biometric_template_finger",
             "biometric_template_signature_sign",

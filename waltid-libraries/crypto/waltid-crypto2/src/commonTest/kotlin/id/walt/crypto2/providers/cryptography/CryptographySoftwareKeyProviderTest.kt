@@ -102,6 +102,11 @@ class CryptographySoftwareKeyProviderTest {
             .generateSharedSecret(firstPublic, KeyAgreementAlgorithm.Ecdh)
 
         assertContentEquals(firstSecret.toByteArray(), secondSecret.toByteArray())
+
+        val message = "combined-signing-and-agreement".encodeToByteArray()
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
+        val signature = assertNotNull(first.capabilities.signer).sign(message, algorithm)
+        assertTrue(assertNotNull(first.capabilities.verifier).verify(message, signature, algorithm))
     }
 
     @Test
@@ -140,7 +145,7 @@ class CryptographySoftwareKeyProviderTest {
     }
 
     @Test
-    fun `restored key materializes once under concurrent first use`() = runTest {
+    fun `restored key supports concurrent first use`() = runTest {
         val spec = KeySpec.Ec(EcCurve.P256)
         val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         if (!supportsPrivateJwkImport(spec, usages)) return@runTest

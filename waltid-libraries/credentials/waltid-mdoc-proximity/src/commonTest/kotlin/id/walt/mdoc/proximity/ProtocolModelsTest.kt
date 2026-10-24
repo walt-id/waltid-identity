@@ -49,6 +49,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborInteger
@@ -357,6 +358,24 @@ class ProtocolModelsTest {
                 )
             )
         }
+
+        val encodedKey = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), publicKey)
+        fun engagementWithReaderAuth(value: Boolean) = coseCompliantCbor.encodeToByteArray(
+            CborElement.serializer(),
+            CborMap(mapOf(
+                CborInteger(0) to CborString("1.1"),
+                CborInteger(1) to CborArray(listOf(CborInteger(1), CborByteString(encodedKey, 24u))),
+                CborInteger(5) to CborArray(emptyList()),
+                CborInteger(6) to CborMap(mapOf(CborInteger(3) to CborBoolean(value))),
+            )),
+        )
+        assertEquals(
+            true,
+            coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(engagementWithReaderAuth(true)).capabilities?.readerAuthAll,
+        )
+        assertFailsWith<SerializationException> {
+            coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(engagementWithReaderAuth(false))
+        }
     }
 
     @Test
@@ -639,19 +658,6 @@ class ProtocolModelsTest {
     }
 
     @Test
-    fun `session status uses a deterministic exact encoding`() {
-        val encoded = coseCompliantCbor.encodeToByteArray(SessionData.serializer(), SessionData(status = 20u))
-        assertContentEquals("a16673746174757314".hexToByteArray(), encoded)
-
-        val dataEncoded = coseCompliantCbor.encodeToByteArray(
-            SessionData.serializer(),
-            SessionData(data = ByteArray(16)),
-        )
-        val dataMap = coseCompliantCbor.decodeFromByteArray<CborMap>(dataEncoded)
-        assertIs<CborByteString>(dataMap[CborString("data")])
-    }
-
-    @Test
     fun `conventional and provisional NFC methods have distinct wire contracts`() {
         val conventional = DeviceRetrievalMethod.Nfc(255u, 65_536u)
         val nfcV2 = DeviceRetrievalMethod.NfcV2
@@ -678,6 +684,13 @@ class ProtocolModelsTest {
     fun `session sequence numbers are explicit fields and conventional messages remain unchanged`() {
         val conventional = coseCompliantCbor.encodeToByteArray(SessionData.serializer(), SessionData(status = 20u))
         assertContentEquals("a16673746174757314".hexToByteArray(), conventional)
+
+        val dataEncoded = coseCompliantCbor.encodeToByteArray(
+            SessionData.serializer(),
+            SessionData(data = ByteArray(16)),
+        )
+        val dataMap = coseCompliantCbor.decodeFromByteArray<CborMap>(dataEncoded)
+        assertIs<CborByteString>(dataMap[CborString("data")])
 
         val sequenced = SessionData(status = 20u, seq = 0u)
         val sequencedBytes = coseCompliantCbor.encodeToByteArray(SessionData.serializer(), sequenced)

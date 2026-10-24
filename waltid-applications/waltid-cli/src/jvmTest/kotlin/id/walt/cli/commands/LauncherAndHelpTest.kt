@@ -18,12 +18,18 @@ class LauncherAndHelpTest {
         assertEquals(0, root.statusCode)
         listOf("key", "did", "vc", "vp").forEach { assertContains(root.stdout, it) }
 
-        assertContains(KeyGenerateCmd().test("--help").stdout, "--show-private")
-        assertContains(KeyConvertCmd().test("--help").stdout, "--output-format")
-        assertContains(DidCreateCmd().test("--help").stdout, "--method")
-        assertContains(VCVerifyCmd().test("--help").stdout, "Signature is mandatory")
-        assertContains(VPCreateCmd().test("--help").stdout, "--dcql-query")
-        assertContains(VPVerifyCmd().test("--help").stdout, "--verifiable-presentation")
+        listOf(
+            "key generate" to "--show-private",
+            "key convert" to "--output-format",
+            "did create" to "--method",
+            "vc verify" to "Signature is mandatory",
+            "vp create" to "--dcql-query",
+            "vp verify" to "--verifiable-presentation",
+        ).forEach { (command, expected) ->
+            val help = WaltIdCmd().test("$command --help")
+            assertEquals(0, help.statusCode, help.stderr)
+            assertContains(help.stdout, expected)
+        }
     }
 
     @Test

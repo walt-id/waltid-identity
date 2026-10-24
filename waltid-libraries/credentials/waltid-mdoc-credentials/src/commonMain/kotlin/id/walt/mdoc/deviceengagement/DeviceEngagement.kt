@@ -24,7 +24,7 @@ data class DeviceEngagement(
      * Version: the version of the device engagement structure. When key 5 or 6 are present, the version
      * shall be “1.1”, otherwise the version shall be “1.0”.
      * */
-    val version: String = if (originInfos != null && capabilities != null) "1.1" else "1.0"
+    val version: String = if (originInfos != null || capabilities != null) "1.1" else "1.0"
 
     init {
 
@@ -62,7 +62,7 @@ data class DeviceEngagement(
             require(
                 it.map { deviceRetrievalMethod ->
                     deviceRetrievalMethod.type to deviceRetrievalMethod.version
-                }.distinct().size == 1
+                }.distinct().size == it.size
             ) {
                 "A DeviceRetrievalMethod with a particular combination of type and version shall only be present once, input " +
                         "list was found to contain at least one duplicate"

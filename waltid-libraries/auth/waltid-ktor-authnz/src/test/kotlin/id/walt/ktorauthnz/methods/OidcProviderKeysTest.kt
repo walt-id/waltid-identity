@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.accounts.InMemoryAccountStore
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
@@ -28,22 +30,37 @@ import kotlin.time.Duration.Companion.seconds
 /** How the identity provider's signing keys are fetched: once, again for a new key id, but not for every unknown one. */
 class OidcProviderKeysTest {
 
-    private val idp = ExampleIdentityProvider(clientId = "app")
+    private val services = ExampleServiceScope()
+
+    private lateinit var idp: ExampleIdentityProvider
     private val json = Json { ignoreUnknownKeys = true }
 
     private var now = Clock.System.now()
 
     @BeforeTest
-    fun clear() {
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+        }
+        val previousClock = OIDC.jwksCache.clock
+        services.onClose {
+            OIDC.jwksCache.clock = previousClock
+            OIDC.jwksCache.clear(); OIDC.configurationCache.clear()
+        }
+        idp = services.own(ExampleIdentityProvider(clientId = "app"))
         OIDC.jwksCache.clear(); OIDC.configurationCache.clear()
         OIDC.jwksCache.clock = object : Clock { override fun now() = this@OidcProviderKeysTest.now }
     }
 
     @AfterTest
-    fun stop() {
-        idp.close()
-        OIDC.jwksCache.clock = Clock.System
-    }
+    fun stop() = services.close()
 
     private fun oidcTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         val flow = AuthFlow.fromConfig(
@@ -93,7 +110,11 @@ class OidcProviderKeysTest {
     fun `tokens naming unknown keys do not fetch the keys each time`() = oidcTest {
         assertEquals(HttpStatusCode.OK, login().status)
         idp.signedKid = "unknown-key"
-        repeat(5) { assertNotEquals(HttpStatusCode.OK, login().status) }
+        repeat(5) {
+            val response = login()
+            assertEquals(HttpStatusCode.InternalServerError, response.status)
+            assertEquals("OIDC JWKS must contain exactly one key for kid: unknown-key", response.bodyAsText())
+        }
         assertTrue(idp.jwksRequests.get() <= 2, "fetched ${idp.jwksRequests.get()} times")
     }
 }

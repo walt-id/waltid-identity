@@ -11,7 +11,6 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchExpectingSetupAndUnlock
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -51,6 +50,7 @@ class PinPersistenceTest {
         assertTrue(!device.hasObject(By.res("wallet.pinSubmitButton")))
         val chooseY = input.visibleBounds.centerY()
         input.setText(WalletComposeE2EHelper.PIN)
+        assertTrue(device.wait(Until.hasObject(By.text("Step 2 of 2")), 10_000))
         val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
         assertTrue(!device.hasObject(By.res("wallet.pinInput")))
         assertPinActionAboveKeyboard(instrumentation, device)
@@ -69,7 +69,7 @@ class PinPersistenceTest {
         WalletComposeE2EHelper.awaitWalletReady(device)
         WalletComposeE2EHelper.launch(context)
         requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 30_000))
-        assertTrue(!device.hasObject(By.text("Step 1 of 2")))
+        assertTrue("PIN setup was shown after relaunch", !device.hasObject(By.text("Step 1 of 2")))
         assertPinActionAboveKeyboard(instrumentation, device) // PIN-only Unlock focuses without a tap.
         requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("0000")
         assertTrue(device.wait(Until.hasObject(By.text("Wrong PIN")), 10_000))
@@ -106,16 +106,6 @@ class PinPersistenceTest {
         WalletComposeE2EHelper.launch(context)
         requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("5678")
         WalletComposeE2EHelper.awaitWalletReady(device)
-    }
-
-    @Test
-    fun relaunchShowsLoginAndAcceptsOriginalPin() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val device = UiDevice.getInstance(instrumentation)
-
-        launchExpectingSetupAndUnlock(context, device)
-        relaunchAndUnlock(context, device)
     }
 
     @Test

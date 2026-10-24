@@ -23,30 +23,15 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.time.TimeSource
 
-/**
- * What issuing and verifying one mdoc credential actually costs, with no HTTP, no database and no
- * framework around it.
- *
- * This sizes the protocol floor so that end-to-end figures can be attributed. Measured against it: the
- * enterprise API spends about 32ms of CPU per presentation while the raw ES256 verify underneath is
- * 0.7ms, so the question is how much of the remainder is credential work and how much is plumbing.
- *
- * Phase length is deliberately short so the suite stays fast; raise it with
- * `-Dwaltid.credentialBenchmarkSeconds=30` for a real reading.
- */
-class MdocCredentialThroughputTest {
-
-    // Fixed rather than read from a system property: this is commonTest, and neither system properties nor
-    // environment variables exist on every target it compiles for. A longer reading is taken by editing this.
-    private val durationMillis = 3L * 1_000L
+class MdocCredentialIssuanceTest {
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
-    fun `mdoc issuance and credential verification throughput`() = runTest {
+    fun `issuer and holder keys support successive credential issuance and verification`() = runTest {
         val issuerKey = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("issuer"),
@@ -91,42 +76,13 @@ class MdocCredentialThroughputTest {
             data = data,
         )
 
-        // A credential to verify repeatedly, and a JIT warm-up for both phases.
-        val document = Document(docType = docType, issuerSigned = issue())
-        repeat(50) {
-            issue()
-            verifyIssuerAuthentication(document = document, validateCertificateConstraints = false)
-        }
-        assertTrue(
-            verifyIssuerAuthentication(document = document, validateCertificateConstraints = false)
-                .certificateChain.isNotEmpty(),
-            "the benchmarked credential must actually verify - this throws if it does not - or the loop " +
-                "measures nothing",
-        )
-
-        suspend fun measure(label: String, operation: suspend () -> Unit) {
-            var count = 0L
-            val started = TimeSource.Monotonic.markNow()
-            while (started.elapsedNow().inWholeMilliseconds < durationMillis) {
-                operation()
-                count++
-            }
-            val millis = started.elapsedNow().inWholeMilliseconds
-            val perSecond = count * 1000.0 / millis
-            // String.format is JVM-only, so the numbers are rounded by hand to keep this test multiplatform.
-            fun Double.round(decimals: Int): String {
-                val factor = generateSequence(1.0) { it * 10 }.elementAt(decimals)
-                val scaled = kotlin.math.round(this * factor) / factor
-                return scaled.toString()
-            }
-            println(
-                "MDOC $label $count ops in $millis ms = ${perSecond.round(1)} ops/s single thread " +
-                        "(${(millis.toDouble() / count).round(3)} ms each), " +
-                        "${(perSecond * 24).round(1)} ops/s on 24 cores"
+        repeat(2) {
+            val document = Document(docType = docType, issuerSigned = issue())
+            assertTrue(
+                verifyIssuerAuthentication(document = document, validateCertificateConstraints = false)
+                    .certificateChain.isNotEmpty(),
             )
+            assertEquals(JsonObject(data.namespaces), document.issuerSigned.namespacesToJson())
         }
-
-        measure("issue") { issue() }
-        measure("verify") { verifyIssuerAuthentication(document = document, validateCertificateConstraints = false) }
     }
 }

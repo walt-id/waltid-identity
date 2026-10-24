@@ -24,76 +24,54 @@ class AndroidVendoredMatcherTest {
     private val assets = RuntimeEnvironment.getApplication().assets
 
     @Test
-    fun matcherAssetIsThePinnedMultipazBinary() {
-        val matcher = assets.open("id/walt/wallet2/mobile/identitycredentialmatcher.wasm")
-            .use { it.readBytes() }
-
-        assertEquals(
-            "420385a46bf554b34224c960051a0cd6c4ecff12ca2c3bdb8948a555afd6e0f8",
-            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
-            "vendored matcher content changed; see ANNEX-C-MATCHER.md before repinning",
+    fun matcherAssetsMatchPinnedBinaries() {
+        val expectedHashes = mapOf(
+            "id/walt/wallet2/mobile/identitycredentialmatcher.wasm" to
+                "420385a46bf554b34224c960051a0cd6c4ecff12ca2c3bdb8948a555afd6e0f8",
+            "id/walt/wallet2/mobile/issuance.wasm" to
+                "3a745c778f1881365cced1f4215b5e7e80f673928052f9d3883eb3d596d42c95",
+            "id/walt/wallet2/mobile/openid4vpmatcher.wasm" to
+                "5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79",
         )
+        for ((path, expectedHash) in expectedHashes) {
+            val matcher = assets.open(path).use { it.readBytes() }
+            assertEquals(
+                expectedHash,
+                MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
+                "$path changed; review the matcher provenance before repinning",
+            )
+        }
     }
 
     @Test
-    fun thirdPartyNoticeShipsBesideTheMatcher() {
-        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-identitycredentialmatcher.txt")
-            .use { it.readBytes() }.decodeToString()
-
-        assertTrue(notice.contains("7c0988bee3384d13a0732e0c33336ae0faf3b863"), "notice lost its provenance")
-        assertTrue(notice.contains("Apache License"), "notice lost the Apache-2.0 text")
-        assertTrue(notice.contains("MIT License"), "notice lost the cJSON attribution")
-    }
-
-    @Test
-    fun openId4VciMatcherAssetIsThePinnedGoogleIssuanceBinary() {
-        val matcher = assets.open("id/walt/wallet2/mobile/issuance.wasm")
-            .use { it.readBytes() }
-
-        assertEquals(
-            "3a745c778f1881365cced1f4215b5e7e80f673928052f9d3883eb3d596d42c95",
-            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
-            "vendored OpenID4VCI matcher content changed; see OPENID4VCI-MATCHER.md before repinning",
+    fun matcherNoticesRetainProvenanceAndAttribution() {
+        val requiredNotices = mapOf(
+            "id/walt/wallet2/mobile/NOTICE-identitycredentialmatcher.txt" to listOf(
+                "7c0988bee3384d13a0732e0c33336ae0faf3b863",
+                "Apache License",
+                "MIT License",
+            ),
+            "id/walt/wallet2/mobile/NOTICE-issuance.txt" to listOf(
+                "android/identity-samples",
+                "issuance.wasm",
+                "d5a8adc1b84061a4e3a9581cdaf867df89fb1f19",
+                "src/bin/issuance.rs",
+                "Apache License",
+                "LLVM Exception",
+                "MIT License",
+            ),
+            "id/walt/wallet2/mobile/NOTICE-openid4vpmatcher.txt" to listOf(
+                "5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e",
+                "Apache License",
+                "LLVM Exception",
+                "MIT License",
+            ),
         )
-    }
-
-    @Test
-    fun openId4VpMatcherAssetIsThePinnedVendoredBuild() {
-        val matcher = assets.open("id/walt/wallet2/mobile/openid4vpmatcher.wasm")
-            .use { it.readBytes() }
-
-        assertEquals(
-            "5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79",
-            MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
-            "vendored matcher content changed; see OPENID4VP-MATCHER.md before repinning",
-        )
-    }
-
-    @Test
-    fun openId4VciMatcherNoticeShipsBesideTheMatcher() {
-        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-issuance.txt")
-            .use { it.readBytes() }.decodeToString()
-
-        assertTrue(notice.contains("android/identity-samples"), "notice lost its provenance")
-        assertTrue(notice.contains("issuance.wasm"), "notice lost the asset name")
-        assertTrue(notice.contains("d5a8adc1b84061a4e3a9581cdaf867df89fb1f19"), "notice lost the pinned commit")
-        assertTrue(notice.contains("src/bin/issuance.rs"), "notice lost the Rust issuance source path")
-        assertTrue(notice.contains("Apache License"), "notice lost the Apache-2.0 text")
-        assertTrue(notice.contains("LLVM Exception"), "notice lost the compiler-builtins exception")
-        assertTrue(notice.contains("MIT License"), "notice lost the memchr attribution")
-    }
-
-    @Test
-    fun thirdPartyNoticeShipsBesideTheOpenId4VpMatcher() {
-        val notice = assets.open("id/walt/wallet2/mobile/NOTICE-openid4vpmatcher.txt")
-            .use { it.readBytes() }.decodeToString()
-
-        assertTrue(
-            notice.contains("5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e"),
-            "notice lost its provenance",
-        )
-        assertTrue(notice.contains("Apache License"), "notice lost the Apache-2.0 text")
-        assertTrue(notice.contains("LLVM Exception"), "notice lost the compiler-builtins exception")
-        assertTrue(notice.contains("MIT License"), "notice lost the memchr attribution")
+        for ((path, requiredText) in requiredNotices) {
+            val notice = assets.open(path).use { it.readBytes() }.decodeToString()
+            for (text in requiredText) {
+                assertTrue(notice.contains(text), "$path lost required notice text: $text")
+            }
+        }
     }
 }

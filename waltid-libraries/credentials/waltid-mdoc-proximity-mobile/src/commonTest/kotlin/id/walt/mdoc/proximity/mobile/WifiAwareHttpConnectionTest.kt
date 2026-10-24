@@ -80,14 +80,16 @@ class WifiAwareHttpConnectionTest {
             WifiAwareHttpConnection(truncated, maximumMessageBytes = 16).receive()
         }
         assertEquals("wifi_aware_http_invalid", truncatedFailure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PROTOCOL_ERROR), truncated.closeReasons)
 
         val oversized = FakeWifiAwareRawConnection(
-            mutableListOf(requestHeader(contentLength = 17)),
+            mutableListOf(request(ByteArray(17))),
         )
         val oversizedFailure = assertFailsWith<ProximityException> {
             WifiAwareHttpConnection(oversized, maximumMessageBytes = 16).receive()
         }
         assertEquals("wifi_aware_http_invalid", oversizedFailure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PROTOCOL_ERROR), oversized.closeReasons)
     }
 
     private fun request(body: ByteArray): ByteArray = requestHeader(body.size) + body

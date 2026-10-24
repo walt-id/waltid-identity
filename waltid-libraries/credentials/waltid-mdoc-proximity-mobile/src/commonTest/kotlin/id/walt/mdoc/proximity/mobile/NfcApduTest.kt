@@ -11,27 +11,29 @@ import kotlin.test.assertTrue
 
 class NfcApduTest {
     @Test
-    fun `all command APDU cases round trip exactly`() {
+    fun `short and extended command APDUs match independent wire vectors`() {
+        val payload = ByteArray(256) { it.toByte() }
+        // Wire encodings cross-checked with javax.smartcardio.CommandAPDU.
         val commands = listOf(
-            NfcCommandApdu(0u, 0xa4u, 0u, 0u),
-            NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 256),
-            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(byteArrayOf(1, 2, 3))),
+            NfcCommandApdu(0u, 0xa4u, 0u, 0u) to "00a40000",
+            NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 256) to "00c0000000",
+            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(byteArrayOf(1, 2, 3))) to "00d6000003010203",
             NfcCommandApdu(
                 0u, 0xd6u, 0u, 0u, ByteString(byteArrayOf(1, 2, 3)),
                 expectedResponseDataLength = 17,
-            ),
-            NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 65_536),
-            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(ByteArray(256) { it.toByte() })),
+            ) to "00d600000301020311",
+            NfcCommandApdu(0u, 0xc0u, 0u, 0u, expectedResponseDataLength = 65_536) to "00c00000000000",
+            NfcCommandApdu(0u, 0xd6u, 0u, 0u, ByteString(payload)) to "00d60000000100${payload.toHexString()}",
             NfcCommandApdu(
-                0u, 0xd6u, 0u, 0u, ByteString(ByteArray(256) { it.toByte() }),
+                0u, 0xd6u, 0u, 0u, ByteString(payload),
                 expectedResponseDataLength = 65_536,
-            ),
+            ) to "00d60000000100${payload.toHexString()}0000",
         )
 
-        commands.forEach { command ->
-            val encoded = command.encode()
+        commands.forEach { (command, hex) ->
+            val encoded = hex.hexToByteArray()
+            assertContentEquals(encoded, command.encode())
             assertEquals(command, NfcCommandApdu.decode(encoded))
-            assertContentEquals(encoded, NfcCommandApdu.decode(encoded).encode())
         }
     }
 

@@ -961,8 +961,7 @@ class WalletBatchIssuanceTest {
                         proofs += claims
                         assertEquals("POST", claims["htm"]?.jsonPrimitive?.content)
                         assertEquals("$BATCH_TEST_ISSUER/deferred", claims["htu"]?.jsonPrimitive?.content)
-                        val hash = id.walt.crypto.utils.ShaUtils.sha256Base64Url("access".encodeToByteArray())
-                        assertEquals(hash, claims["ath"]?.jsonPrimitive?.content)
+                        assertEquals("oFYf1knNtrqnhAVfBRuteW6gr-8X_KOCGVSd7rpOjBo", claims["ath"]?.jsonPrimitive?.content)
                         when (proofs.size) {
                             1 -> respond("""{"error":"use_dpop_nonce"}""", HttpStatusCode.Unauthorized,
                                 headersOf("DPoP-Nonce" to listOf("required-nonce"),

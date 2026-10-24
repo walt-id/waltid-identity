@@ -85,8 +85,13 @@ WALLET2_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:5432/wallet_test ./gradlew
   --tests '*ExposedIssuanceSessionStoreTest'
 ```
 
-Each test creates a fresh schema. Dispose of the fixture database after the run. The selected
-backend URL is a Gradle test input, so changing profiles cannot reuse the other backend's result.
+Each test creates a fresh schema. Dispose of the fixture database after the run.
+
+The PostgreSQL static-key migration case uses `WALLET2_TEST_POSTGRES_JDBC_URL`,
+`WALLET2_TEST_POSTGRES_USERNAME` and `WALLET2_TEST_POSTGRES_PASSWORD`. Without its URL,
+that case is reported as skipped. An invalid configured database fails the test.
+Configured PostgreSQL profiles always execute against their database; SQLite-only runs
+retain normal Gradle result reuse.
 
 ## Usage
 

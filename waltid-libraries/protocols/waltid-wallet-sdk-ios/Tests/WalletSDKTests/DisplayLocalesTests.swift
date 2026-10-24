@@ -3,12 +3,18 @@ import XCTest
 
 final class DisplayLocalesTests: XCTestCase {
     func testPrefersLanguageRegionThenLanguage() {
-        let selected = DisplayLocales.select(
-            [("en", "English"), ("de", "German"), ("de-AT", "Austrian")],
-            preferredLocales: ["de-AT"],
-            localeOf: { $0.0 }
-        )
-        XCTAssertEqual(selected?.1, "Austrian")
+        for (preferences, expected) in [
+            (["de-AT"], "Austrian"),
+            (["de-CH", "en"], "German"),
+            (["fr", "de"], "German"),
+        ] {
+            let selected = DisplayLocales.select(
+                [("en", "English"), ("de", "German"), ("de-AT", "Austrian")],
+                preferredLocales: preferences,
+                localeOf: { $0.0 }
+            )
+            XCTAssertEqual(selected?.1, expected, preferences.description)
+        }
     }
 
     func testFallsBackToUntaggedThenFirst() {

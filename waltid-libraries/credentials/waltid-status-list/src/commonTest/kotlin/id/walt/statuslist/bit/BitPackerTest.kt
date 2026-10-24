@@ -2,7 +2,6 @@ package id.walt.statuslist.bit
 
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class BitPackerTest {
@@ -35,15 +34,37 @@ class BitPackerTest {
     }
 
     @Test
-    fun `w3c big-endian sets the high bit of the first byte`() {
-        val packed = BitPacker.pack(
-            statuses = listOf(id.walt.statuslist.model.IndexedStatus(0, 1u)),
-            statusSize = 1,
-            bitOrder = BitOrder.MostSignificantFirst,
-            listSizeBytes = 1,
-            layout = StatusBitLayout.W3cHexBinary,
-        )
-        assertEquals(0x80.toByte(), packed[0])
+    fun `w3c values preserve their declared width`() {
+        fun assertPacked(value: UInt, bits: Int, index: Int, expected: ByteArray) {
+            val packed = BitPacker.pack(
+                statuses = listOf(id.walt.statuslist.model.IndexedStatus(index, value)),
+                statusSize = bits,
+                bitOrder = BitOrder.MostSignificantFirst,
+                listSizeBytes = expected.size,
+                layout = StatusBitLayout.W3cHexBinary,
+            )
+            assertContentEquals(expected, packed, "value=$value, bits=$bits, index=$index")
+        }
+
+        assertPacked(1u, 1, 0, byteArrayOf(0x80.toByte()))
+        assertPacked(0u, 3, 2, byteArrayOf(0x00, 0x00))
+        assertPacked(1u, 3, 2, byteArrayOf(0x00, 0x80.toByte()))
+        assertPacked(3u, 3, 2, byteArrayOf(0x01, 0x80.toByte()))
+        assertPacked(0x80000000u, 32, 0, byteArrayOf(0x80.toByte(), 0, 0, 0))
+        assertPacked(UInt.MAX_VALUE, 32, 0, byteArrayOf(-1, -1, -1, -1))
+    }
+
+    @Test
+    fun `w3c values cannot spill into the next entry`() {
+        assertFailsWith<IllegalArgumentException> {
+            BitPacker.pack(
+                statuses = listOf(id.walt.statuslist.model.IndexedStatus(2, 9u)),
+                statusSize = 3,
+                bitOrder = BitOrder.MostSignificantFirst,
+                listSizeBytes = 2,
+                layout = StatusBitLayout.W3cHexBinary,
+            )
+        }
     }
 
     @Test

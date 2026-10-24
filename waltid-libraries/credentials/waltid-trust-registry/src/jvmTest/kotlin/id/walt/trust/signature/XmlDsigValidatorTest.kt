@@ -191,12 +191,10 @@ class XmlDsigValidatorTest {
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `validate German national trust list signature`() = runTest {
         // Fetch the German national trust list
-        val deTslXml = fetchUrl("https://tl.bundesnetzagentur.de/TL-DE.xml")
-
-        if (deTslXml == null) {
-            println("Skipping German TSL test - could not fetch")
-            return@runTest
-        }
+        val deTslXml = kotlin.test.assertNotNull(
+            fetchUrl("https://tl.bundesnetzagentur.de/TL-DE.xml"),
+            "Failed to fetch required trust list: https://tl.bundesnetzagentur.de/TL-DE.xml"
+        )
 
         val result = XmlDsigValidator.validate(deTslXml)
 
@@ -236,23 +234,29 @@ class XmlDsigValidatorTest {
 
     /**
      * Test that tampered content is detected.
-     * Uses cached XML to avoid network dependency.
+     * Requires network access - enable by setting RUN_NETWORK_TESTS=true.
      */
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `reject document with tampered content`() = runTest {
-        val lotlXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
+        val lotlXml = kotlin.test.assertNotNull(
+            fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml"),
+            "Failed to fetch required trust list: https://ec.europa.eu/tools/lotl/eu-lotl.xml"
+        )
 
-        if (lotlXml == null) {
-            println("Skipping tamper test - could not fetch")
-            return@runTest
-        }
+        val original = XmlDsigValidator.validate(lotlXml)
+        assertEquals(
+            AuthenticityState.INTEGRITY_VERIFIED, original.state,
+            "Original document must have a valid signature before tampering"
+        )
 
         // Tamper with the document by changing the sequence number
         val tamperedXml = lotlXml.replace(
             Regex("<TSLSequenceNumber>\\d+</TSLSequenceNumber>"),
             "<TSLSequenceNumber>99999</TSLSequenceNumber>"
         )
+
+        assertNotEquals(lotlXml, tamperedXml, "Tampering must change the signed content")
 
         val result = XmlDsigValidator.validate(tamperedXml)
 

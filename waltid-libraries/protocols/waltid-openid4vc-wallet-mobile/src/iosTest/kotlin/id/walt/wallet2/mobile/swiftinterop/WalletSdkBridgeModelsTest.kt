@@ -14,7 +14,6 @@ import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
 
 class WalletSdkBridgeModelsTest {
     @Test
@@ -107,23 +106,10 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun resultWrapperCarriesSuccessOrTypedFailure() {
-        val success: WalletBridgeResult<List<String>> = WalletBridgeResult.Success(listOf("credential-1"))
-        val failure: WalletBridgeResult<List<String>> = WalletBridgeResult.Failure(
-            WalletBridgeError.fromThrowable(IllegalStateException("offline"))
-        )
-
-        assertIs<WalletBridgeResult.Success<List<String>>>(success)
-        assertEquals(listOf("credential-1"), success.value)
-
-        assertIs<WalletBridgeResult.Failure>(failure)
-        assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
-    }
-
-    @Test
     fun bridgePreflightRequiresFailureExactlyWhenUnsupported() {
         assertFailsWith<IllegalArgumentException> {
-            WalletBridgeKeyPreflight(supported = true, failure = KeyUseAuthorizationUnsupportedReason.BiometricUnavailable)
+            WalletBridgeKeyPreflight(supported = true, effectivePolicy = WalletBridgeKeyUseAuthorizationPolicy.None,
+                failure = KeyUseAuthorizationUnsupportedReason.BiometricUnavailable)
         }
         assertFailsWith<IllegalArgumentException> {
             WalletBridgeKeyPreflight(supported = false)

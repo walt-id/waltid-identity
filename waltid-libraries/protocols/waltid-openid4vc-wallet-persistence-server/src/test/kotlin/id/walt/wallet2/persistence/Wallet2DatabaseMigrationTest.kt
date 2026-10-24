@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.sql.Connection
 import java.sql.DriverManager
 import kotlinx.serialization.json.buildJsonObject
@@ -30,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
@@ -80,7 +82,7 @@ class Wallet2DatabaseMigrationTest {
     }
 
     @Test
-    fun `server credential store round trips holder key binding`() = runTest {
+    fun `server credential store preserves holder bindings and reports corrupt rows`() = runTest {
         val jdbcUrl = sharedMemoryUrl("credential-binding-roundtrip")
         DriverManager.getConnection(jdbcUrl).use { anchor ->
             val db = initWallet2Database(config(jdbcUrl))
@@ -95,41 +97,20 @@ class Wallet2DatabaseMigrationTest {
             )
             val store = ExposedCredentialStore("credentials", db)
 
-            store.addCredential(
-                StoredCredential(
-                    id = "mdoc-1",
-                    credential = MdocsCredential(
-                        credentialData = buildJsonObject { },
-                        signed = null,
-                        docType = "org.iso.18013.5.1.mDL",
-                    ),
-                    holderKeyBinding = binding,
-                )
+            val credential = StoredCredential(
+                id = "mdoc-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject { },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                holderKeyBinding = binding,
             )
-
+            store.addCredential(credential)
             assertEquals(binding, store.getCredential("mdoc-1")?.holderKeyBinding)
-        }
-    }
 
-    @Test
-    fun `server credential store reports an invalid persisted holder key binding`() = runTest {
-        val jdbcUrl = sharedMemoryUrl("credential-binding-corrupt")
-        DriverManager.getConnection(jdbcUrl).use { anchor ->
-            val db = initWallet2Database(config(jdbcUrl))
-            anchor.createStatement().use {
-                it.execute("INSERT INTO wallet2_credential_stores(id) VALUES ('credentials')")
-            }
-            val store = ExposedCredentialStore("credentials", db)
-            store.addCredential(
-                StoredCredential(
-                    id = "mdoc-corrupt-binding",
-                    credential = MdocsCredential(
-                        credentialData = buildJsonObject { },
-                        signed = null,
-                        docType = "org.iso.18013.5.1.mDL",
-                    ),
-                )
-            )
+            store.addCredential(credential.copy(id = "mdoc-corrupt-binding", holderKeyBinding = null))
+            assertNull(assertNotNull(store.getCredential("mdoc-corrupt-binding")).holderKeyBinding)
             anchor.createStatement().use {
                 it.execute(
                     "UPDATE wallet2_credentials SET holder_key_binding = '{' " +
@@ -215,7 +196,9 @@ class Wallet2DatabaseMigrationTest {
 
     @Test
     fun `legacy PostgreSQL wallet table gains crypto2 static key column and backfills`() = runTest {
-        val baseUrl = System.getenv("WALLET2_TEST_POSTGRES_JDBC_URL") ?: return@runTest
+        val baseUrl = System.getenv("WALLET2_TEST_POSTGRES_JDBC_URL")
+        assumeTrue(baseUrl != null, "WALLET2_TEST_POSTGRES_JDBC_URL is not set; PostgreSQL migration is unavailable")
+        requireNotNull(baseUrl)
         val username = System.getenv("WALLET2_TEST_POSTGRES_USERNAME").orEmpty()
         val password = System.getenv("WALLET2_TEST_POSTGRES_PASSWORD").orEmpty()
         val schema = "wallet2_static_${Uuid.random().toString().replace("-", "")}"

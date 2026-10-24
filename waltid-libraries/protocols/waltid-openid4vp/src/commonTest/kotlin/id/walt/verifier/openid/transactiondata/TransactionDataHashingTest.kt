@@ -9,10 +9,15 @@ class TransactionDataHashingTest {
     @Test
     fun `calculates sha-256 hashes over encoded transaction_data values`() {
         val encoded = TransactionDataTestFixtures.transactionData(hashAlgorithms = listOf("sha-256"))
+        val differentlyFormatted = "ewogInR5cGUiOiAib3JnLndhbHRpZC50cmFuc2FjdGlvbi1kYXRhLnBheW1lbnQtYXV0aG9yaXphdGlvbiIsCiAiY3JlZGVudGlhbF9pZHMiOiBbCiAgInBheW1lbnRfY3JlZGVudGlhbCIKIF0sCiAidHJhbnNhY3Rpb25fZGF0YV9oYXNoZXNfYWxnIjogWwogICJzaGEtMjU2IgogXSwKICJhbW91bnQiOiAiNDIuMDAiLAogInBheWVlIjogIkFDTUUgQ29ycCIsCiAiY3VycmVuY3kiOiAiRVVSIgp9"
 
-        val hashes = calculateTransactionDataHashes(listOf(encoded))
+        val hashes = calculateTransactionDataHashes(listOf(encoded, differentlyFormatted))
 
-        assertEquals(1, hashes.size)
+        // OID4VP B.3.3.1 hashes the received strings, preserving even JSON formatting differences.
+        assertEquals(
+            listOf("FQRrx7n-hnj_AbO_2-jBufe80bxdchqb5en1WlFBIgU", "nEqrWGZyHX6ZyvHF1W0sKk9h92-FrpgboRgbEKK9inY"),
+            hashes,
+        )
     }
 
     @Test

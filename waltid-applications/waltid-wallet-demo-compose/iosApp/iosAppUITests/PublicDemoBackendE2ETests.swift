@@ -630,13 +630,27 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["No credentials"].exists)
+        let savedPrefix = "issuance-saved-"
+        let savedCredentials = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", savedPrefix))
+        XCTAssertTrue(savedCredentials.firstMatch.waitForExistence(timeout: 10))
+        let savedCredentialIDs = Set(savedCredentials.allElementsBoundByIndex.map {
+            String($0.identifier.dropFirst(savedPrefix.count))
+        })
+        XCTAssertFalse(savedCredentialIDs.isEmpty)
 
         app.terminate()
         try await Task.sleep(nanoseconds: 2_000_000_000)
 
         ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
-        XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
+        let cardPrefix = "wallet.credentialCard."
+        let cards = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", cardPrefix))
+        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
+        let reopenedCredentialIDs = Set(cards.allElementsBoundByIndex.map {
+            String($0.identifier.dropFirst(cardPrefix.count))
+        })
+        XCTAssertEqual(reopenedCredentialIDs, savedCredentialIDs, "Restart must retain the credentials reported as saved")
     }
 
     private func publicDemoScenario() throws -> DemoCredentialScenario {
