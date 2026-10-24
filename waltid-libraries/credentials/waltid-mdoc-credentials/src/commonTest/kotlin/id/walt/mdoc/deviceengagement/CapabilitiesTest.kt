@@ -12,6 +12,7 @@ import kotlinx.serialization.decodeFromHexString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 
 class CapabilitiesTest {
 
@@ -97,16 +98,15 @@ class CapabilitiesTest {
 
         }
 
-        assertFails {
-
+        assertFailsWith<IllegalArgumentException> {
             Capabilities(
                 handoverSessionEstablishmentSupport = false,
             )
-
+        }
+        assertFailsWith<IllegalArgumentException> {
             Capabilities(
                 readerAuthAllSupport = false,
             )
-
         }
 
         val payloads = listOf<DataElement>(
