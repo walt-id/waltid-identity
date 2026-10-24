@@ -39,18 +39,22 @@ data class IETFStatusContent(
     @SerialName("bits")
     val size: Int = 1,
     @SerialName("lst")
-    @Serializable(with = StringOrByteStringSerializer::class)
+    @Serializable(with = Base64UrlByteStringSerializer::class)
     override val list: String,
 ) : StatusContent()
 
+/**
+ * CBOR form of IETF Token Status List `lst` on [IETFStatusContent.list].
+ *
+ * JSON leaves the claim as a string. CBOR reads the byte string as base64url, and writes
+ * base64url back to bytes, so JWT and CWT lists share the same expansion path.
+ */
 @OptIn(ExperimentalSerializationApi::class)
-object StringOrByteStringSerializer : KSerializer<String> {
-    override val descriptor = PrimitiveSerialDescriptor("StringOrByteString", PrimitiveKind.STRING)
+object Base64UrlByteStringSerializer : KSerializer<String> {
+    override val descriptor = PrimitiveSerialDescriptor("Base64UrlByteString", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): String {
         return if (decoder is CborDecoder) {
-            // CWT Token Status List `lst` is a bstr of compressed bits; expose it as base64url
-            // so JWT and CWT lists share the same expansion path.
             decoder.decodeSerializableValue(ByteArraySerializer()).encodeToBase64Url()
         } else {
             decoder.decodeString()

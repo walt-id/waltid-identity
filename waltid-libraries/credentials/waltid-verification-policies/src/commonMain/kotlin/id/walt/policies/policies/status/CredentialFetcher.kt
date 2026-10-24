@@ -48,6 +48,11 @@ class CredentialFetcher(
             }
         }
 
+        /**
+         * Content type wins. When it is missing or generic, a leading COSE_Sign1 tag (`0xD2`)
+         * or an untagged 4-element CBOR array (`0x84`) is treated as CWT. Any other body is
+         * decoded as text; this sniff is only a fallback for a mislabelled binary list.
+         */
         internal fun isCwt(contentType: ContentType?, bytes: ByteArray): Boolean {
             if (contentType?.match(STATUS_LIST_CWT) == true) return true
             if (contentType?.match(STATUS_LIST_JWT) == true) return false
