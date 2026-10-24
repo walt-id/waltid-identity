@@ -10,6 +10,8 @@ import id.walt.mdoc.encoding.TransformingSerializerTemplate
 import id.walt.mdoc.objects.DeviceSigned
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.deviceretrieval.ItemRequest
+import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
 import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -27,6 +29,38 @@ import id.walt.mdoc.objects.edition2.elements.IssuerSignedList as Edition2Issuer
 
 class Edition2CompatibilityTest {
     private val issuerAuth = CoseSign1(byteArrayOf(), CoseHeaders(), null, byteArrayOf())
+
+    @Test
+    fun multiDocumentConstructorPreservesRetention() {
+        val mapping = mapOf(
+            "org.example.mdl" to mapOf(
+                "org.example.identity" to listOf("family_name", "age_over_18", "family_name"),
+                "org.example.empty" to emptyList(),
+            ),
+            "org.example.photoid" to mapOf("org.example.photo" to listOf("portrait")),
+        )
+        val cases = listOf(
+            DeviceRequest(mapping) to false,
+            DeviceRequest(mapping, intentToRetain = false) to false,
+            DeviceRequest(mapping, intentToRetain = true) to true,
+        )
+        assertEquals(cases.first().first.docRequests, DeviceRequest.convertMappingToDocRequests(mapping))
+        for ((request, retain) in cases) {
+            val items = request.docRequests.map { it.itemsRequest.value }
+            assertEquals("1.0", request.version)
+            assertEquals(listOf("org.example.mdl", "org.example.photoid"), items.map { it.docType })
+            assertEquals(
+                mapOf("org.example.identity" to ItemsRequestList(listOf(
+                    ItemRequest("family_name", retain), ItemRequest("age_over_18", retain),
+                ))),
+                items[0].namespaces,
+            )
+            assertEquals(
+                mapOf("org.example.photo" to ItemsRequestList(listOf(ItemRequest("portrait", retain)))),
+                items[1].namespaces,
+            )
+        }
+    }
 
     @Test
     fun releasedConstructorsCopyAndSerializersRemainUsable() {

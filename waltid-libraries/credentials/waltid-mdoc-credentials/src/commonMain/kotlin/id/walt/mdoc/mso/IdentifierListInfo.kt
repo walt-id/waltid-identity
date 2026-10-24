@@ -111,7 +111,8 @@ data class IdentifierListInfo(
         }
 
         fun fromJSON(jsonObject: JsonObject) = IdentifierListInfo(
-            id = jsonObject.getValue("idx").let {
+            // Older decoders accepted "idx"; keep that spelling when the canonical "id" is absent.
+            id = (jsonObject["id"] ?: jsonObject.getValue("idx")).let {
                 Json.decodeFromJsonElement<ByteArray>(it)
             },
             uri = jsonObject.getValue("uri").jsonPrimitive.content,

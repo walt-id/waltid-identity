@@ -44,8 +44,14 @@ data class DeviceRequest(
         }
 
         fun convertMappingToDocRequests(docTypeRequestedElements: Map<String, Map<String, List<String>>>) =
+            convertMappingToDocRequests(docTypeRequestedElements, intentToRetain = false)
+
+        private fun convertMappingToDocRequests(
+            docTypeRequestedElements: Map<String, Map<String, List<String>>>,
+            intentToRetain: Boolean,
+        ) =
             docTypeRequestedElements.map { (docType, requestedElements) ->
-                DocRequest.fromValues(docType, requestedElements)
+                DocRequest.fromValues(docType, requestedElements, intentToRetain)
             }
     }
 
@@ -74,7 +80,7 @@ data class DeviceRequest(
      */
     constructor(docTypeRequestedElements: Map<String, Map<String, List<String>>>, intentToRetain: Boolean = false) : this(
         version = VERSION,
-        docRequests = convertMappingToDocRequests(docTypeRequestedElements)
+        docRequests = convertMappingToDocRequests(docTypeRequestedElements, intentToRetain)
     )
 
     /** Request individual credential */
