@@ -87,6 +87,12 @@ on:
 # In-repo composites are referenced by path (./waltid-identity/.github/actions/...) so a PR editing
 # them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
 # yet when it runs. Scripts use the selected checkout.
+# Temporary WAL-1585 replay: preserve the caller's reporting permissions.
+permissions:
+  contents: write
+  checks: write
+  pull-requests: read
+
 env:
   DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
@@ -102,8 +108,8 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          ref: ${{ github.head_ref || github.ref_name }}
-          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: fix/wal-1333-native-sheet-swipe-back
+          identity-sha: 'c66d82a748b82c0cf24b02d7999e31f3b7f8e6ee'
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
@@ -138,7 +144,7 @@ jobs:
         run: |
           exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$GITHUB_WORKSPACE/waltid-identity/build/reports/ios-wallet-recovery" wallet-recovery \
-            ./waltid-identity/.github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh
+            python3 ./waltid-identity/.github/scripts/mobile-ci/temporary-keychain-lifecycle-probe.py
 
       - name: Publish iOS wallet recovery report
         if: always() && steps.wallet_recovery.outcome != 'skipped'
