@@ -178,14 +178,14 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         @MethodSource("getTestScenarios")
         @DisplayName("Should throw StatusVerificationError for invalid bit characters")
         fun shouldRejectInvalidBitCharacters(scenario: TestScenario) = runTest {
-            testValidationError(scenario, listOf('1', '0', '2'), 3, "Invalid bit value: [1, 0, 2]")
+            testValidationError(scenario, listOf('1', '0', '2'), 3, "Invalid bit value:")
         }
 
         @ParameterizedTest
         @MethodSource("getTestScenarios")
         @DisplayName("Should throw StatusVerificationError for letter characters")
         fun shouldRejectLetterCharacters(scenario: TestScenario) = runTest {
-            testValidationError(scenario, listOf('1', 'a', '0'), 3, "Invalid bit value: [1, a, 0]")
+            testValidationError(scenario, listOf('1', 'a', '0'), 3, "Invalid bit value:")
         }
 
         @ParameterizedTest

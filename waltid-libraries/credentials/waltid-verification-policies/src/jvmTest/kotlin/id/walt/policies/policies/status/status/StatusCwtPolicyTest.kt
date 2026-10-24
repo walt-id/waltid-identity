@@ -39,10 +39,10 @@ class StatusCwtPolicyTest {
     private val tokens = mutableMapOf<String, Pair<ByteArray, ContentType>>()
 
     @BeforeAll
-    fun startServer() = runBlocking {
-        val valid = IetfStatusListTokens.signedCwt(index = 0, status = 0u)
-        val revoked = IetfStatusListTokens.signedCwt(index = 0, status = 1u)
-        val suspended = IetfStatusListTokens.signedCwt(index = 0, status = 2u, bits = 2)
+    fun startServer() {
+        val valid = IetfStatusListTokens.unsignedCwt(index = 0, status = 0u)
+        val revoked = IetfStatusListTokens.unsignedCwt(index = 0, status = 1u)
+        val suspended = IetfStatusListTokens.unsignedCwt(index = 0, status = 2u, bits = 2)
         tokens["cwt-valid"] = valid to ContentType("application", "statuslist+cwt")
         tokens["cwt-revoked"] = revoked to ContentType("application", "statuslist+cwt")
         tokens["cwt-suspended"] = suspended to ContentType("application", "statuslist+cwt")
@@ -65,7 +65,7 @@ class StatusCwtPolicyTest {
                 }
             }
         }.start(wait = false)
-        val port = server.engine.resolvedConnectors().first().port
+        val port = runBlocking { server.engine.resolvedConnectors().first().port }
         baseUrl = "http://localhost:$port"
     }
 

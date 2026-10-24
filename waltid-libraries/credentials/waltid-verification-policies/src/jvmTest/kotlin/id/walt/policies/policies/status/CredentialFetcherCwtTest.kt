@@ -10,6 +10,7 @@ import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +30,7 @@ class CredentialFetcherCwtTest {
 
     @Test
     fun `fetch converts binary CWT to hex and leaves JWT as text`() = runTest {
-        val cwt = IetfStatusListTokens.signedCwt(index = 0, status = 0u)
+        val cwt = IetfStatusListTokens.unsignedCwt(index = 0, status = 0u)
         val jwt = "eyJhbGciOiJFUzI1NiIsInR5cCI6InN0YXR1c2xpc3Qrand0In0.e30.sig"
         val server = embeddedServer(Netty, port = 0) {
             routing {
@@ -42,7 +43,7 @@ class CredentialFetcherCwtTest {
             }
         }.start(wait = false)
         try {
-            val port = server.engine.resolvedConnectors().first().port
+            val port = runBlocking { server.engine.resolvedConnectors().first().port }
             val client = HttpClient()
             try {
                 val fetcher = CredentialFetcher(client)

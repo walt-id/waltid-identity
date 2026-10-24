@@ -17,12 +17,13 @@ class IETFStatusValidator(
 ) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(fetcher, *reader) {
     private val bitValueReader = bitValueReaderFactory.new(strategy = LittleEndianRepresentation())
 
-    override suspend fun getBitValue(statusList: IETFStatusContent, entry: IETFEntry): List<Char> = bitValueReader.get(
-        bitstring = statusList.list,
-        idx = entry.index,
-        bitSize = statusList.size,
-        expansionAlgorithm = expansionAlgorithm,
-    )
+    override suspend fun getBitValue(statusList: IETFStatusContent, entry: IETFEntry): List<Char> =
+        bitValueReader.get(
+            bitstring = statusList.list,
+            idx = entry.index,
+            bitSize = statusList.size,
+            expansionAlgorithm = expansionAlgorithm,
+        ).reversed() // IETF Token Status List stores values LSB-first (see TokenStatusListCodec.reverseReadBits)
 
     override fun customValidations(statusList: IETFStatusContent, attribute: IETFStatusPolicyAttribute) = Unit
 }

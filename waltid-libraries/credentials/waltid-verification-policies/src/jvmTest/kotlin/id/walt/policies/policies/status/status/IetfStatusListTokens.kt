@@ -4,9 +4,6 @@ import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
-import id.walt.cose.toCoseSigner
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.MapElement
@@ -33,7 +30,7 @@ import kotlin.time.Duration.Companion.days
 @OptIn(ExperimentalSerializationApi::class)
 object IetfStatusListTokens {
 
-    suspend fun signedCwt(
+    fun unsignedCwt(
         index: Int,
         status: UInt,
         bits: Int = 1,
@@ -49,11 +46,12 @@ object IetfStatusListTokens {
                 statusList = IETFStatusContent(size = bits, list = lst),
             )
         )
-        val key = JWKKey.generate(KeyType.Ed25519)
-        return CoseSign1.createAndSign(
-            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.EdDSA),
+        val protected = coseCompliantCbor.encodeToByteArray(CoseHeaders(algorithm = Cose.Algorithm.EdDSA))
+        return CoseSign1(
+            protected = protected,
+            unprotected = CoseHeaders(),
             payload = payload,
-            signer = key.toCoseSigner(Cose.Algorithm.EdDSA),
+            signature = ByteArray(64),
         ).toTagged()
     }
 
