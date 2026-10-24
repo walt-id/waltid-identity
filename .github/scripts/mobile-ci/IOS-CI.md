@@ -8,7 +8,7 @@ do not need it. Linux docs and Kotlin simulator tests can start independently.
 The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.0
 on GitHub's [`xcode-27` arm64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md).
 The image currently uses macOS 27 and remains in public preview. Demo, bridge and
-Enterprise tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
+Enterprise and recovery tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
 there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the whole
 workflow, including framework verification. Composite actions inherit that pin
 and the supplied simulator configuration. Keep the producer and SDK-docs toolchain pins
