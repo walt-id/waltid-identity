@@ -705,12 +705,19 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.operation is WalletOperationState.Receiving }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
 
-        receiveGate.complete(Unit)
-        waitUntil(timeoutMillis = 5_000) {
-            controller.state.value.issuanceReceipt != null &&
+        val autoAdvance = mainClock.autoAdvance
+        mainClock.autoAdvance = false
+        try {
+            receiveGate.complete(Unit)
+            waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+            mainClock.advanceTimeBy(500)
+            waitUntil(timeoutMillis = 5_000) {
                 onAllNodes(hasTestTag("issuance-done") and isEnabled()).fetchSemanticsNodes().size == 1
+            }
+            onNodeWithTag("issuance-done").assertIsDisplayed().assertIsEnabled().performClick()
+        } finally {
+            mainClock.autoAdvance = autoAdvance
         }
-        onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
