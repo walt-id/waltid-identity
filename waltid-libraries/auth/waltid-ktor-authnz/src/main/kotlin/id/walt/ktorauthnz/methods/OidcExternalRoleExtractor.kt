@@ -22,12 +22,11 @@ object OidcExternalRoleExtractor {
             ?: emptySet()
 
         val configuredClientId = extractionConfig.clientId ?: config.clientId
-        val clientRolesRoot = resolvePath(idTokenPayload, extractionConfig.clientRolesClaimPath)
-            ?.jsonObject
+        val clientRolesRoot = resolvePath(idTokenPayload, extractionConfig.clientRolesClaimPath) as? JsonObject
 
         val allClientRoles = clientRolesRoot
             ?.mapValues { (_, value) ->
-                value.jsonObject["roles"]?.asStringSet().orEmpty()
+                (value as? JsonObject)?.get("roles")?.asStringSet().orEmpty()
             }
             .orEmpty()
             .filterValues { it.isNotEmpty() }
