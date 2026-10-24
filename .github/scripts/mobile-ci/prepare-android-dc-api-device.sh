@@ -278,8 +278,10 @@ assert_android_dc_api_launcher_health() {
   local resolved_activity=""
   local home_package=""
   local launcher_pid=""
+  local system_ui_pid=""
   local foreground=""
   local launcher_state=""
+  local system_ui_state=""
   local home_start_attempted=false
   local recovery_attempted=false
 
@@ -294,8 +296,16 @@ assert_android_dc_api_launcher_health() {
     fi
 
     launcher_pid="$(adb_shell pidof "$home_package" 2>/dev/null || true)"
+    system_ui_pid="$(adb_shell pidof com.android.systemui 2>/dev/null || true)"
     foreground="$(current_foreground_package || true)"
     launcher_state="$(adb_shell dumpsys activity processes "$home_package" 2>/dev/null || true)"
+    system_ui_state="$(adb_shell dumpsys activity processes com.android.systemui 2>/dev/null || true)"
+
+    if grep -Eqi '(^|[[:space:]])m?(notResponding|crashing)=true' <<< "$system_ui_state"; then
+      echo "::error::DC API System UI reports ANR/crash before test execution" >&2
+      printf '%s\n' "$system_ui_state" >&2
+      return 1
+    fi
 
     if grep -Eqi '(^|[[:space:]])m?(notResponding|crashing)=true' <<< "$launcher_state"; then
       healthy_for_seconds=0
@@ -310,7 +320,8 @@ assert_android_dc_api_launcher_health() {
       continue
     fi
 
-    if [[ -n "$launcher_pid" && "$foreground" == "$home_package" && -n "$launcher_state" ]]; then
+    if [[ -n "$launcher_pid" && -n "$system_ui_pid" && "$foreground" == "$home_package" &&
+      -n "$launcher_state" && -n "$system_ui_state" ]]; then
       healthy_for_seconds=$((healthy_for_seconds + DC_API_POLL_SECONDS))
       echo "DC API system UI health: package=$home_package pid=$launcher_pid foreground=$foreground healthyFor=${healthy_for_seconds}s"
       if (( healthy_for_seconds >= DC_API_LAUNCHER_STABILITY_SECONDS )); then
