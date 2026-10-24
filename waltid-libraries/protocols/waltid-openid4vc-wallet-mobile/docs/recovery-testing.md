@@ -162,9 +162,12 @@ only its own simulator:
 .github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh
 ```
 
-The iOS script uses the selected Xcode and newest available iOS runtime. Set
-`IOS_RECOVERY_DEVICE_TYPE` to an installed simulator device type when the
-configured default simulator type is unavailable.
+The iOS script uses the selected Xcode and honors `IOS_SIMULATOR_DESTINATION`
+(`platform=iOS Simulator,name=<device>,OS=<version>`) without falling back to
+another runtime. CI supplies this destination. Without it, local runs use
+iPhone 17 and let `simctl` select the newest compatible runtime. Set
+`IOS_RECOVERY_DEVICE_TYPE` to override the device type in either mode; an explicit
+destination's iOS version still applies.
 
 Host runner regressions: `python3 -m unittest discover -s scripts/tests -p
 'test_*recovery*.py'`. SDK lifecycle regressions:
