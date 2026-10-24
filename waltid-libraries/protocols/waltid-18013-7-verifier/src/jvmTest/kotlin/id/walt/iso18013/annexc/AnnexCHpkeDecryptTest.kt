@@ -7,13 +7,12 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.iso18013.annexc.TestResources.migrateToCrypto2
 import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.sha256
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborObjectAsArray
-import org.bouncycastle.crypto.hpke.HPKE
-import id.walt.iso18013.annexc.TestResources.migrateToCrypto2
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -60,13 +59,6 @@ class AnnexCHpkeDecryptTest {
 
     @Test
     fun `decryptToDeviceResponse roundtrips HPKE base mode P-256`() = runTest {
-        val hpke = HPKE(
-            HPKE.mode_base,
-            HPKE.kem_P256_SHA256,
-            HPKE.kdf_HKDF_SHA256,
-            HPKE.aead_AES_GCM128
-        )
-
         val recipientKeyPair = JWKKey.generate(KeyType.secp256r1)
 
         val recipientPublicCoseKey = recipientKeyPair.getCosePublicKey()
@@ -105,14 +97,6 @@ class AnnexCHpkeDecryptTest {
 
     @Test
     fun `decryptToDeviceResponse rejects skR not matching pkR`() = runTest {
-        HPKE(
-            HPKE.mode_base,
-            HPKE.kem_P256_SHA256,
-            HPKE.kdf_HKDF_SHA256,
-            HPKE.aead_AES_GCM128
-        )
-
-
         val recipientKeyPair = JWKKey.generate(KeyType.secp256r1)
         val wrongKeyPair = JWKKey.generate(KeyType.secp256r1)
 
@@ -140,13 +124,15 @@ class AnnexCHpkeDecryptTest {
         )
         val encryptedResponseB64 = encryptedResponseCbor.encodeToBase64Url()
 
-        assertFailsWith<Exception> {
+        val wrongPrivateKey = migrateToCrypto2(wrongKeyPair)
+        val failure = assertFailsWith<IllegalStateException> {
             AnnexCResponseVerifier.decryptToDeviceResponse(
                 encryptedResponseB64 = encryptedResponseB64,
                 encryptionInfoB64 = encryptionInfoB64,
                 origin = origin,
-                recipientPrivateKey = migrateToCrypto2(wrongKeyPair)
+                recipientPrivateKey = wrongPrivateKey
             )
         }
+        assertEquals("Recipient private key does not match the public key in EncryptionInfo", failure.message)
     }
 }
