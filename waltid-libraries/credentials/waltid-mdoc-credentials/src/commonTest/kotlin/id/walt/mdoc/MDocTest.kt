@@ -228,7 +228,9 @@ class MDocTest {
     @Test
     fun testx() {
         val exampleCborData = byteArrayOf((0xBF).toByte(), 0x1A, 0x12, 0x38, 0x00, 0x00, 0x41, 0x03, (0xFF).toByte())
-        println(Cbor.decodeFromByteArray<Map<Int, EncodedCBORElement>>(exampleCborData))
+        val decoded = Cbor.decodeFromByteArray<Map<Int, ByteStringElement>>(exampleCborData)
+        assertEquals(setOf(305659904), decoded.keys)
+        assertContentEquals(byteArrayOf(0x03), decoded.getValue(305659904).value)
     }
 
     @Test

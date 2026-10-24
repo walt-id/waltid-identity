@@ -5,10 +5,13 @@ import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.objects.mso.Status.IdentifierListInfo
 import id.walt.mdoc.objects.mso.UniformResourceIdentifier
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -91,10 +94,9 @@ class IdentifierListInfoIdTypeTest {
 
         val nonCompliant = out.toByteArray()
 
-        val result = runCatching { coseCompliantCbor.decodeFromByteArray<Status>(nonCompliant) }
-        assertTrue(
-            result.isFailure,
-            "An integer `id` violates ISO 18013-5 §9.1.2.6 (Identifier = bstr) and must be rejected"
-        )
+        val error = assertFailsWith<SerializationException> {
+            coseCompliantCbor.decodeFromByteArray<Status>(nonCompliant)
+        }
+        assertContains(requireNotNull(error.message), "Expected start of byte string, but found 01")
     }
 }
