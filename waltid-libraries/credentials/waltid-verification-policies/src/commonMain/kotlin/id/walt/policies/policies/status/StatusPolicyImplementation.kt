@@ -72,7 +72,7 @@ object StatusPolicyImplementation {
         credentialFetcher, w3cStatusReader, bitValueReaderFactory, statusListExpansionAlgorithmFactory
     )
 
-    private val tokenStatusListExpansionAlgorithm = TokenStatusListExpansionAlgorithm(base64UrlHandler)
+    private val tokenStatusListExpansionAlgorithm = TokenStatusListExpansionAlgorithm()
 
     private val ietfStatusValidator = IETFStatusValidator(
         fetcher = credentialFetcher,
