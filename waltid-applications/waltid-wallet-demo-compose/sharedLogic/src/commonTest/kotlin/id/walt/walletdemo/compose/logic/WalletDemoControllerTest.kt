@@ -2306,19 +2306,9 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSubmitRejectAndDismissUseSelectedHandle() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = "{}",
+                samplePresentationCredential.copy(
                     disclosures = listOf(
                         WalletDemoPresentationDisclosure(
                             label = "given_name",
@@ -2537,19 +2527,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationDisclosureSelectionDefaultsOffAndSubmitsSelectedPaths() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
+                samplePresentationCredential.copy(
                     label = "PID",
-                    issuer = "Example Issuer",
                     format = "vc+sd-jwt",
-                    credentialDataJson = "{}",
                     disclosures = listOf(
                         WalletDemoPresentationDisclosure(
                             label = "Given name",
@@ -2622,21 +2604,12 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCredentialOptionsWithSameCredentialIdToggleIndependently() = runTest {
-        val first = WalletDemoPresentationCredentialOption(
+        val first = samplePresentationCredential.copy(
             queryId = "identity",
-            credentialId = "cred-1",
             label = "PID identity",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val second = first.copy(queryId = "age", label = "PID age")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("identity", "age")))
@@ -2677,21 +2650,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSelectsOneCredentialOptionPerQuery() = runTest {
-        val first = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
+        val first = samplePresentationCredential.copy(
             label = "PID one",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val second = first.copy(credentialId = "cred-2", label = "PID two")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -2723,14 +2686,10 @@ class WalletDemoControllerTest {
     fun presentationPreviewCanSelectMultipleCredentialsForOneQueryWhenAllowed() = runTest {
         val firstDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.given_name")
         val secondDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-2", "$.given_name")
-        val first = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
+        val first = samplePresentationCredential.copy(
             multiple = true,
             label = "PID one",
-            issuer = "Example Issuer",
             format = "vc+sd-jwt",
-            credentialDataJson = "{}",
             disclosures = listOf(
                 WalletDemoPresentationDisclosure(
                     label = "Given name",
@@ -2754,11 +2713,7 @@ class WalletDemoControllerTest {
                 )
             ),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -2799,21 +2754,13 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSelectsFirstSatisfiableRequirementAlternativeOnly() = runTest {
-        val mdl = WalletDemoPresentationCredentialOption(
+        val mdl = samplePresentationCredential.copy(
             queryId = "mdl-id",
-            credentialId = "cred-1",
             label = "mDL",
-            issuer = "Example Issuer",
             format = "mso_mdoc",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val photoId = mdl.copy(queryId = "photo-id", credentialId = "cred-2", label = "Photo ID")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(mdl, photoId),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("mdl-id"), listOf("photo-id")))
@@ -2832,20 +2779,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationSelectionRequiresNonEmptySelectionWhenRequirementsAreEmpty() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
+        val option = samplePresentationCredential.copy(
             queryId = "optional-address",
-            credentialId = "cred-1",
             label = "Address",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(option),
             credentialRequirements = emptyList(),
         )
@@ -2879,20 +2817,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCredentialSelectionRequiresQueriesWithoutVisibleOptions() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
+        val option = samplePresentationCredential.copy(
             queryId = "identity",
-            credentialId = "cred-1",
             label = "PID identity",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(option),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(
@@ -3087,21 +3016,9 @@ class WalletDemoControllerTest {
         val presentationUrl = "openid4vp://example"
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
-            presentationPreview = WalletDemoPresentationPreview(
-                previewHandle = presentationPreviewHandle,
-                responseEncryption = WalletDemoResponseEncryption.NotRequired,
-                verifierMetadata = verifierMetadata("Example Verifier"),
-                clientId = "https://verifier.example",
+            presentationPreview = samplePresentationPreview.copy(
                 credentialOptions = listOf(
-                    WalletDemoPresentationCredentialOption(
-                        queryId = "pid",
-                        credentialId = "cred-1",
-                        label = "Example Credential",
-                        issuer = "Example Issuer",
-                        format = "jwt_vc_json",
-                        credentialDataJson = "{}",
-                        disclosures = emptyList(),
-                    )
+                    samplePresentationCredential
                 ),
                 credentialRequirements = listOf(
                     WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -3338,21 +3255,9 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCompletionKeepsItsResultUntilANewFlow() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = "{}",
-                    disclosures = emptyList(),
-                )
+                samplePresentationCredential
             ),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -3704,6 +3609,24 @@ class WalletDemoControllerTest {
     }
 
     private companion object {
+        val samplePresentationCredential = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            label = "Example Credential",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+
+        val samplePresentationPreview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
+            clientId = "https://verifier.example",
+            credentialOptions = emptyList(),
+        )
+
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
             format = "jwt_vc_json",
