@@ -12,7 +12,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class AnnexCDeterministicVectorTest {
 
@@ -64,16 +63,6 @@ class AnnexCDeterministicVectorTest {
             "Missing test resource: $resourcePath"
         }.bufferedReader().use { it.readText() }
         return json.decodeFromString(Vector.serializer(), text)
-    }
-
-    private fun hexToBytes(hex: String): ByteArray {
-        val clean = hex.trim().removePrefix("0x").replace(" ", "").replace("\n", "")
-        require(clean.length % 2 == 0) { "hex length must be even" }
-        return ByteArray(clean.length / 2) { i ->
-            clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
-        }.also { bytes ->
-            assertTrue(bytes.isNotEmpty(), "recipientPrivateKeyHex must not be empty for deterministic vector")
-        }
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
