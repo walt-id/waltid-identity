@@ -10,6 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.*
 
 class PaymentMetadataFetchSessionTest {
@@ -125,12 +126,23 @@ class PaymentMetadataFetchSessionTest {
                 assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/fourth") }
             }
         } finally { small.close() }
-        val oversized = HttpClient(MockEngine { respond("x".repeat(262_145)) })
-        try {
-            PaymentMetadataFetchSession(oversized).use { session ->
-                assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/oversized") }
-            }
-        } finally { oversized.close() }
+        for (size in listOf(262_144, 262_145)) {
+            val document = JsonPrimitive("x".repeat(size - 2))
+            val body = document.toString()
+            assertEquals(size, body.encodeToByteArray().size)
+            val client = HttpClient(MockEngine { respond(body) })
+            try {
+                PaymentMetadataFetchSession(client).use { session ->
+                    if (size == 262_144) {
+                        assertEquals(document, session.read("https://issuer.example/bounded"))
+                    } else {
+                        assertFailure(PaymentConsentFailure.METADATA_UNAVAILABLE) {
+                            session.read("https://issuer.example/bounded")
+                        }
+                    }
+                }
+            } finally { client.close() }
+        }
     }
 
     @Test
