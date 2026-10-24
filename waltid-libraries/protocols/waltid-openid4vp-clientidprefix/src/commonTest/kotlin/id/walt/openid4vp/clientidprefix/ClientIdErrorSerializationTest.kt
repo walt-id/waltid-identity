@@ -32,6 +32,8 @@ class ClientIdErrorSerializationTest {
         ClientIdError.UnsupportedPrefix("openid_federation"),
         ClientIdError.InvalidMetadata("no verification keys"),
         ClientIdError.SanDnsMismatch("verifier.example.com", listOf("other.example.com")),
+        ClientIdError.UnregisteredRedirectUri("https://other.example.com", listOf("https://verifier.example.com")),
+        ClientIdError.InvalidClient,
     )
 
     @Test
