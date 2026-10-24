@@ -32,6 +32,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 
 class WalletIssuanceHandlerPreviewTest {
 
@@ -237,34 +238,19 @@ class WalletIssuanceHandlerPreviewTest {
     fun signedPreviewRetainsExactMetadataResolutionAndSigner() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler { request ->
-                    when (request.url.toString()) {
-                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
-                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
-                            content = compactJwt,
-                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
-                        )
-                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
-                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
-                    }
-                }
-            }
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        val preview = signedMetadataClient(compactJwt).use { client ->
+            WalletIssuanceHandler.previewOffer(
+                wallet = Wallet(id = "signed-preview", staticKey = JWKKey.generate(KeyType.Ed25519)),
+                request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+                httpClient = client,
+                metadataTrustResolver = { candidate, expectedIssuer ->
+                    assertEquals(compactJwt, candidate)
+                    assertEquals(ISSUER, expectedIssuer)
+                    key.getPublicKey().verifyJws(candidate).getOrThrow()
+                    MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER)
+                },
+            )
         }
-
-        val preview = WalletIssuanceHandler.previewOffer(
-            wallet = Wallet(id = "signed-preview", staticKey = JWKKey.generate(KeyType.Ed25519)),
-            request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
-            httpClient = client,
-            metadataTrustResolver = { candidate, expectedIssuer ->
-                assertEquals(compactJwt, candidate)
-                assertEquals(ISSUER, expectedIssuer)
-                key.getPublicKey().verifyJws(candidate).getOrThrow()
-                MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER)
-            },
-        )
 
         val signed = assertIs<ResolvedCredentialIssuerMetadata.Signed>(preview.resolvedIssuerMetadata)
         assertEquals(compactJwt, signed.compactJwt)
@@ -305,34 +291,19 @@ class WalletIssuanceHandlerPreviewTest {
     fun detailedOfferResolutionRetainsExactSignedMetadataAndSigner() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler { request ->
-                    when (request.url.toString()) {
-                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
-                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
-                            content = compactJwt,
-                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
-                        )
-                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
-                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
-                    }
-                }
-            }
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-        }
-
         val signer = MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER)
-        val resolution = WalletIssuanceHandler.resolveOfferDetailed(
-            request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
-            httpClient = client,
-            metadataTrustResolver = { candidate, expectedIssuer ->
-                assertEquals(compactJwt, candidate)
-                assertEquals(ISSUER, expectedIssuer)
-                key.getPublicKey().verifyJws(candidate).getOrThrow()
-                signer
-            },
-        )
+        val resolution = signedMetadataClient(compactJwt).use { client ->
+            WalletIssuanceHandler.resolveOfferDetailed(
+                request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+                httpClient = client,
+                metadataTrustResolver = { candidate, expectedIssuer ->
+                    assertEquals(compactJwt, candidate)
+                    assertEquals(ISSUER, expectedIssuer)
+                    key.getPublicKey().verifyJws(candidate).getOrThrow()
+                    signer
+                },
+            )
+        }
 
         val signed = assertIs<ResolvedCredentialIssuerMetadata.Signed>(resolution.resolvedIssuerMetadata)
         assertEquals(compactJwt, signed.compactJwt)
@@ -344,30 +315,21 @@ class WalletIssuanceHandlerPreviewTest {
     fun detailedOfferResolutionRejectsUntrustedSignedMetadata() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
-        val client = HttpClient(MockEngine) {
-            engine {
-                addHandler { request ->
-                    when (request.url.toString()) {
-                        OFFER_URL -> respondJson(CREDENTIAL_OFFER)
-                        "$ISSUER/.well-known/openid-credential-issuer" -> respond(
-                            content = compactJwt,
-                            headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
-                        )
-                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
-                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
-                    }
-                }
+        val rejection = IllegalStateException("untrusted signer")
+        val failure = signedMetadataClient(compactJwt).use { client ->
+            assertFails {
+                WalletIssuanceHandler.resolveOfferDetailed(
+                    request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
+                    httpClient = client,
+                    metadataTrustResolver = { candidate, expectedIssuer ->
+                        assertEquals(compactJwt, candidate)
+                        assertEquals(ISSUER, expectedIssuer)
+                        throw rejection
+                    },
+                )
             }
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
-
-        assertFails {
-            WalletIssuanceHandler.resolveOfferDetailed(
-                request = ResolveOfferRequest(offerUrl = Url(OFFER_DEEP_LINK)),
-                httpClient = client,
-                metadataTrustResolver = { _, _ -> error("untrusted signer") },
-            )
-        }
+        assertSame(rejection, failure.cause)
     }
 
     @Test
@@ -410,6 +372,23 @@ class WalletIssuanceHandlerPreviewTest {
             )
         }
         assertEquals(PreviewSessionFailureReason.CONSUMED, error.reason)
+    }
+
+    private fun signedMetadataClient(compactJwt: String) = HttpClient(MockEngine) {
+        engine {
+            addHandler { request ->
+                when (request.url.toString()) {
+                    OFFER_URL -> respondJson(CREDENTIAL_OFFER)
+                    "$ISSUER/.well-known/openid-credential-issuer" -> respond(
+                        content = compactJwt,
+                        headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
+                    )
+                    "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                    else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                }
+            }
+        }
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
     }
 
     private fun credentialOffer(issuer: String): String = """
@@ -493,14 +472,6 @@ class WalletIssuanceHandlerPreviewTest {
               "authorization_endpoint": "$ISSUER/authorize",
               "token_endpoint": "$ISSUER/token",
               "authorization_details_types_supported":["openid_credential"],"response_types_supported": ["code"]
-            }
-        """
-        const val CREDENTIAL = """
-            {
-              "@context": ["https://www.w3.org/2018/credentials/v1"],
-              "type": ["VerifiableCredential"],
-              "issuer": "did:example:issuer",
-              "credentialSubject": {"id": "did:example:holder"}
             }
         """
     }
