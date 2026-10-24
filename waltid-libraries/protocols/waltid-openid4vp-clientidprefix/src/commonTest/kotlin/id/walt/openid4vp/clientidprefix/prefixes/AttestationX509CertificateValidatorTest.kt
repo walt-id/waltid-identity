@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.days
 class AttestationX509CertificateValidatorTest {
 
     @Test
-    fun leafWithoutKeyUsageIsAccepted() = runTest {
+    fun leafWithoutUsageExtensionsIsAccepted() = runTest {
         val context = leafContext()
         AttestationX509CertificateValidator().validate(context, MockX509Certificate("CN=leaf"))
         assertTrue(context.valid)
@@ -44,14 +44,6 @@ class AttestationX509CertificateValidatorTest {
                         it.message.contains("digitalSignature")
             }
         )
-    }
-
-    @Test
-    fun leafWithoutExtendedKeyUsageIsAccepted() = runTest {
-        val context = leafContext()
-        AttestationX509CertificateValidator().validate(context, MockX509Certificate("CN=leaf"))
-        assertTrue(context.valid)
-        assertFalse(context.log.any { it.severity == ValidationResult.Severity.ERROR })
     }
 
     @Test
@@ -85,7 +77,7 @@ class AttestationX509CertificateValidatorTest {
         val context = leafContext()
         AttestationX509CertificateValidator().validate(
             context,
-            certificateWithExtendedKeyUsage(AttestationX509CertificateValidator.mdocReaderAuthenticationEkuOid),
+            certificateWithExtendedKeyUsage("1.0.18013.5.1.6"),
         )
         assertTrue(context.valid)
     }
@@ -106,40 +98,16 @@ class AttestationX509CertificateValidatorTest {
     }
 
     private fun certificateWithKeyUsage(vararg usages: KeyUsage): X509Certificate =
-        object : X509Certificate {
-            inner class Data : X509Certificate.CertificateData {
-                override val version = 3
-                override val serialNumberRaw = ByteString()
-                override val issuerDn = "CN=issuer"
-                override val issuerDnRaw = ByteString()
-                override val validity = X509Certificate.Validity(
-                    Clock.System.now(),
-                    Clock.System.now() + 1.days,
-                )
-                override val subjectDn = "CN=leaf"
-                override val subjectDnRaw = ByteString()
-                override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
-                    get() = error("unused")
-                override val extensions: Map<String, Extension> = mapOf(
-                    KeyUsageExtension.OID to KeyUsageExtension.Builder().apply {
-                        addKeyUsage(*usages)
-                    },
-                )
-            }
-
-            override val data = Data()
-            override val signatureAlgorithmOid = ""
-            override val signatureValueRaw = ByteString()
-            override val encodedDer = ByteString()
-            override val fingerprintSha256: ByteString = ByteString()
-
-            override fun equals(other: Any?): Boolean =
-                encodedDer.equals((other as? X509Certificate)?.encodedDer)
-
-            override fun hashCode(): Int = encodedDer.hashCode()
-        }
+        certificateWithExtensions(mapOf(
+            KeyUsageExtension.OID to KeyUsageExtension.Builder().apply { addKeyUsage(*usages) },
+        ))
 
     private fun certificateWithExtendedKeyUsage(oid: String): X509Certificate =
+        certificateWithExtensions(mapOf(
+            ExtendedKeyUsageExtension.OID to ExtendedKeyUsageExtension.Builder().apply { addKeyUsage(oid) },
+        ))
+
+    private fun certificateWithExtensions(certificateExtensions: Map<String, Extension>): X509Certificate =
         object : X509Certificate {
             inner class Data : X509Certificate.CertificateData {
                 override val version = 3
@@ -154,11 +122,7 @@ class AttestationX509CertificateValidatorTest {
                 override val subjectDnRaw = ByteString()
                 override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
                     get() = error("unused")
-                override val extensions: Map<String, Extension> = mapOf(
-                    ExtendedKeyUsageExtension.OID to ExtendedKeyUsageExtension.Builder().apply {
-                        addKeyUsage(oid)
-                    },
-                )
+                override val extensions: Map<String, Extension> = certificateExtensions
             }
 
             override val data = Data()
