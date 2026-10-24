@@ -102,10 +102,10 @@ for number in range(1, 21):
     save()
     marker = None
     try:
-        attempt["boot"] = run(["xcrun", "simctl", "bootstatus", simulator, "-b"], f"{name}-boot.log")
+        attempt["boot"] = run(["xcrun", "simctl", "bootstatus", simulator, "-b"], f"{name}-boot.log", timeout=None)
         if attempt["boot"]["returncode"]:
             raise SystemExit(attempt["boot"]["returncode"])
-        attempt["install"] = run(["xcrun", "simctl", "install", simulator, str(app)], f"{name}-install.log")
+        attempt["install"] = run(["xcrun", "simctl", "install", simulator, str(app)], f"{name}-install.log", timeout=None)
         if attempt["install"]["returncode"]:
             raise SystemExit(attempt["install"]["returncode"])
         container = subprocess.check_output(["xcrun", "simctl", "get_app_container", simulator,
