@@ -5,10 +5,7 @@ ADB_BIN="${ADB_BIN:-adb}"
 ANDROID_SERIAL="${ANDROID_SERIAL:-}"
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 DC_API_BASELINE_SCHEMA="${DC_API_BASELINE_SCHEMA:-3}"
-DC_API_EMULATOR_PACKAGE_REVISION="${DC_API_EMULATOR_PACKAGE_REVISION:-37.2.12}"
-DC_API_PLATFORM_TOOLS_REVISION="${DC_API_PLATFORM_TOOLS_REVISION:-37.0.1}"
 DC_API_SYSTEM_IMAGE_PACKAGE="${DC_API_SYSTEM_IMAGE_PACKAGE:-system-images;android-37.0;google_apis;x86_64}"
-DC_API_SYSTEM_IMAGE_REVISION="${DC_API_SYSTEM_IMAGE_REVISION:-6.5.11}"
 DC_API_AVD_NAME="${DC_API_AVD_NAME:-dc-api-api37-pixel7-google-apis}"
 DC_API_AVD_ROOT="${ANDROID_AVD_HOME:-${HOME}/.android/avd}"
 DC_API_AVD_DIR="$DC_API_AVD_ROOT/${DC_API_AVD_NAME}.avd"
@@ -32,36 +29,24 @@ adb_shell() {
 }
 
 package_revision() {
-  local package_xml="$1"
-  [[ -f "$package_xml" ]] || return 1
-  awk '
-    function value(text, tag, pattern, match_text) {
-      pattern = "<" tag ">[0-9]+</" tag ">"
-      if (!match(text, pattern)) return ""
-      match_text = substr(text, RSTART, RLENGTH)
-      gsub(/<[^>]+>/, "", match_text)
-      return match_text
-    }
-    {
-      text = $0
-      if (index(text, "<revision>") > 0) {
-        in_revision = 1
-        text = substr(text, index(text, "<revision>") + length("<revision>"))
-      }
-      if (!in_revision) next
-      major = major == "" ? value(text, "major") : major
-      minor = minor == "" ? value(text, "minor") : minor
-      micro = micro == "" ? value(text, "micro") : micro
-      if (index(text, "</revision>") > 0) {
-        if (major == "") exit 1
-        printf "%s", major
-        if (minor != "") printf ".%s", minor
-        if (micro != "") printf ".%s", micro
-        printf "\n"
-        exit
-      }
-    }
-  ' "$package_xml"
+  python3 - "$1" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    revisions = ET.parse(sys.argv[1]).findall("./{*}localPackage/{*}revision")
+    if len(revisions) != 1:
+        raise ValueError("Expected one installed package revision")
+    parts = [revisions[0].findtext(f"{{*}}{name}", "").strip() for name in ("major", "minor", "micro")]
+    while parts and not parts[-1]:
+        parts.pop()
+    if not parts or not all(re.fullmatch(r"[0-9]+", part) for part in parts):
+        raise ValueError("Invalid installed package revision")
+    print(".".join(parts))
+except (OSError, ET.ParseError, ValueError) as error:
+    sys.exit(f"Cannot read Android SDK package revision: {error}")
+PY
 }
 
 avd_config_file() {
@@ -183,9 +168,14 @@ android_dc_api_manifest_current_values() {
   gms_version="$(gms_version_name)"
   gms_code="$(gms_version_code)"
 
-  if [[ "$emulator_revision" != "$DC_API_EMULATOR_PACKAGE_REVISION" ||
-    "$platform_tools_revision" != "$DC_API_PLATFORM_TOOLS_REVISION" ||
-    "$image_revision" != "$DC_API_SYSTEM_IMAGE_REVISION" ||
+  # CI selects these revisions before restoring the AVD. Local runs still require a complete
+  # SDK identity, and the immutable manifest rejects any host/image change on reuse.
+  if [[ ! "$emulator_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    ! "$platform_tools_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    ! "$image_revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ||
+    "$emulator_revision" != "${DC_API_EMULATOR_PACKAGE_REVISION:-$emulator_revision}" ||
+    "$platform_tools_revision" != "${DC_API_PLATFORM_TOOLS_REVISION:-$platform_tools_revision}" ||
+    "$image_revision" != "${DC_API_SYSTEM_IMAGE_REVISION:-$image_revision}" ||
     "$image_sysdir" != "$(expected_avd_system_image_sysdir)" ||
     "$data_partition" != "6G" || "$device_profile" != "pixel_7" ||
     "$device_api" != "37" || -z "$device_fingerprint" ||
@@ -288,8 +278,10 @@ assert_android_dc_api_launcher_health() {
   local resolved_activity=""
   local home_package=""
   local launcher_pid=""
+  local system_ui_pid=""
   local foreground=""
   local launcher_state=""
+  local system_ui_state=""
   local home_start_attempted=false
   local recovery_attempted=false
 
@@ -304,8 +296,16 @@ assert_android_dc_api_launcher_health() {
     fi
 
     launcher_pid="$(adb_shell pidof "$home_package" 2>/dev/null || true)"
+    system_ui_pid="$(adb_shell pidof com.android.systemui 2>/dev/null || true)"
     foreground="$(current_foreground_package || true)"
     launcher_state="$(adb_shell dumpsys activity processes "$home_package" 2>/dev/null || true)"
+    system_ui_state="$(adb_shell dumpsys activity processes com.android.systemui 2>/dev/null || true)"
+
+    if grep -Eqi '(^|[[:space:]])m?(notResponding|crashing)=true' <<< "$system_ui_state"; then
+      echo "::error::DC API System UI reports ANR/crash before test execution" >&2
+      printf '%s\n' "$system_ui_state" >&2
+      return 1
+    fi
 
     if grep -Eqi '(^|[[:space:]])m?(notResponding|crashing)=true' <<< "$launcher_state"; then
       healthy_for_seconds=0
@@ -320,7 +320,8 @@ assert_android_dc_api_launcher_health() {
       continue
     fi
 
-    if [[ -n "$launcher_pid" && "$foreground" == "$home_package" && -n "$launcher_state" ]]; then
+    if [[ -n "$launcher_pid" && -n "$system_ui_pid" && "$foreground" == "$home_package" &&
+      -n "$launcher_state" && -n "$system_ui_state" ]]; then
       healthy_for_seconds=$((healthy_for_seconds + DC_API_POLL_SECONDS))
       echo "DC API system UI health: package=$home_package pid=$launcher_pid foreground=$foreground healthyFor=${healthy_for_seconds}s"
       if (( healthy_for_seconds >= DC_API_LAUNCHER_STABILITY_SECONDS )); then

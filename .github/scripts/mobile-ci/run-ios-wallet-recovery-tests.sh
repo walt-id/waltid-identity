@@ -5,19 +5,20 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 identity_dir="$(cd "$script_dir/../../.." && pwd -P)"
 cd "$identity_dir"
 
+IFS=, read -r platform device os extra <<< "${IOS_SIMULATOR_DESTINATION:?Set the iOS simulator destination}"
+if [[ "$platform" != 'platform=iOS Simulator' || "$device" != name=?* || "$os" != OS=[0-9]* || -n "$extra" ]]; then
+  echo "::error::Recovery tests require a device-type name and explicit iOS version"
+  exit 1
+fi
+
 python3 -m unittest discover -s scripts/tests -p 'test_*recovery*.py'
 mkdir -p build/reports/ios-wallet-recovery
 output=$(mktemp -d "$identity_dir/build/reports/ios-wallet-recovery/run.XXXXXX")
 python3 scripts/build-recovery-simulator-host.py --output "$output/host"
 
-# Create and remove only this run's simulator. The default device type matches the iOS CI toolchain.
-runtime=$(xcrun simctl list runtimes --json | python3 -c '
-import json, sys
-runtimes = [r for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and r["name"].startswith("iOS ")]
-print(max(runtimes, key=lambda r: tuple(map(int, r["version"].split("."))))["identifier"])
-')
-simulator=$(xcrun simctl create "Wallet recovery" \
-  "${IOS_RECOVERY_DEVICE_TYPE:-com.apple.CoreSimulator.SimDeviceType.iPhone-17}" "$runtime")
+# Create and remove only this run's simulator, using the workflow's pinned destination.
+printf 'Recovery simulator: %s, iOS %s\n' "${device#name=}" "${os#OS=}"
+simulator=$(xcrun simctl create "Wallet recovery" "${device#name=}" "iOS ${os#OS=}")
 trap 'xcrun simctl delete "$simulator"' EXIT
 xcrun simctl boot "$simulator"
 xcrun simctl bootstatus "$simulator" -b

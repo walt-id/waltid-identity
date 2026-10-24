@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import id.walt.mobile.test.EnterpriseMobileTest
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
@@ -24,6 +25,7 @@ import java.io.File
 
 /** Real issuer and wallet acceptance; requires the coordinated Enterprise mobile fixture. */
 @RunWith(AndroidJUnit4::class)
+@EnterpriseMobileTest
 class BatchIssuanceE2ETest {
     @Test
     fun explicitCopiesSurviveActivityRelaunch() = runBlocking {
