@@ -82,6 +82,8 @@ class KeychainReportTest(unittest.TestCase):
             if "launch" in arguments:
                 kwargs["stdout"].write(ONE)
                 raise subprocess.TimeoutExpired(arguments, 120)
+            if "log" in arguments:
+                return subprocess.CompletedProcess(arguments, 0)
             self.assertIn("terminate", arguments)
             self.assertEqual(15, kwargs["timeout"])
             raise subprocess.TimeoutExpired(arguments, 15)
