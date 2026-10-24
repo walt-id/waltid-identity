@@ -136,6 +136,19 @@ def run(device, output, timeout=120):
             if receipt["crash_diagnostics"]:
                 break
             time.sleep(1)
+        # Temporary WAL-1585 observation of the incomplete hosted process exit.
+        # Query only this app's lifecycle after failure, before owned cleanup.
+        try:
+            with (output / "lifecycle.log").open("w") as stream:
+                capture = subprocess.run([
+                    "xcrun", "simctl", "spawn", device, "log", "show", "--style", "compact", "--info", "--debug",
+                    "--start", f"@{int(started_at)}", "--end", f"@{int(time.time()) + 1}",
+                    "--predicate", '(process == "runningboardd" OR process == "SpringBoard" OR process == "launchd_sim") '
+                    'AND (eventMessage CONTAINS "id.walt.crypto2.keychain-tests" OR eventMessage CONTAINS "KeychainTests")',
+                ], stdout=stream, stderr=subprocess.STDOUT, timeout=15)
+            receipt["lifecycle_capture_returncode"] = capture.returncode
+        except (OSError, subprocess.TimeoutExpired) as error:
+            receipt["lifecycle_capture_error"] = type(error).__name__
         if problem or receipt.get("alive_after_console_exit"):
             try:
                 cleanup = subprocess.run(["xcrun", "simctl", "terminate", device, BUNDLE],
