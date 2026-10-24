@@ -108,7 +108,10 @@ class TotpEnrollmentTest {
         val token = passwordToken()
         val start = json.decodeFromString<TotpEnrollmentStart>(post("/totp/enroll", token = token).bodyAsText())
         assertTrue(start.otpauthUri.startsWith("otpauth://totp/walt.id%20test:"))
-        assertEquals(HttpStatusCode.Unauthorized, post("/totp/enroll/confirm", """{"code":"000000"}""", token).status)
+        val rejected = withIncorrectTotp(start.secret) { incorrect ->
+            post("/totp/enroll/confirm", """{"code":"$incorrect"}""", token)
+        }
+        assertEquals(HttpStatusCode.Unauthorized, rejected.status)
         val confirmed = post("/totp/enroll/confirm", """{"code":"${code(start.secret)}"}""", token)
         assertEquals(HttpStatusCode.OK, confirmed.status, confirmed.bodyAsText())
         return start.secret to json.decodeFromString<RecoveryCodes>(confirmed.bodyAsText()).recoveryCodes

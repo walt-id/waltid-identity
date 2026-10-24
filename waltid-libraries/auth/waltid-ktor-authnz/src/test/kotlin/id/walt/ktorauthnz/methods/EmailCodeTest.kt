@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.errors.HttpStatusError
 import id.walt.ktorauthnz.KtorAuthnz
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.InMemoryAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
@@ -123,11 +124,24 @@ class EmailCodeTest {
 
     @Test
     fun `a new code replaces the previous one`() = emailTest {
-        val session = afterPassword()
-        post("/auth/$session/email-code/send").info()
-        val (old, new) = sent.map { it.code }
-        if (old != new) assertEquals(HttpStatusCode.Unauthorized, post("/auth/$session/email-code", """{"code": "$old"}""").status)
-        assertEquals(AuthSessionStatus.SUCCESS, post("/auth/$session/email-code", """{"code": "$new"}""").info().status)
+        for (replacementLength in listOf(6, 7)) {
+            val session = afterPassword()
+            val settings = assertNotNull(KtorAuthnzManager.emailCodes)
+            try {
+                KtorAuthnzManager.emailCodes = settings.copy(codeLength = replacementLength)
+                post("/auth/$session/email-code/send").info()
+                val (old, new) = sent.takeLast(2).map { it.code }
+                assertEquals(6, old.length)
+                assertEquals(replacementLength, new.length)
+                // Keep ordinary same-length replacement; the second row makes a collision impossible.
+                if (replacementLength != 6 || old != new) {
+                    assertEquals(HttpStatusCode.Unauthorized, post("/auth/$session/email-code", """{"code": "$old"}""").status)
+                }
+                assertEquals(AuthSessionStatus.SUCCESS, post("/auth/$session/email-code", """{"code": "$new"}""").info().status)
+            } finally {
+                KtorAuthnzManager.emailCodes = settings
+            }
+        }
     }
 
     @Test
