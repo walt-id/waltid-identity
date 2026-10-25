@@ -77,6 +77,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.oshai.kotlinlogging)
             implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.ktor.client.core)
         }

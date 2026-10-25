@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -183,6 +185,7 @@ internal fun CredentialsTab(
 
     if (confirmDelete) {
         AlertDialog(
+            modifier = Modifier.semantics { testTagsAsResourceId = true },
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete credential?") },
             text = { Text("This removes the credential from the wallet. This cannot be undone.") },

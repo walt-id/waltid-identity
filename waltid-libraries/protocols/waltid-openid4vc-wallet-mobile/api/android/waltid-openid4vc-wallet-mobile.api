@@ -111,6 +111,7 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public static synthetic fun createIssuanceHolderKeys$default (Lid/walt/wallet2/mobile/MobileWallet;ILid/walt/wallet2/mobile/MobileWalletKeyType;Ljava/lang/String;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun credentials (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun deleteCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun deleteTransactionLogEntry (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun deleteWallet (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun digitalCredentialCapabilities ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialCapabilities;
 	public final fun digitalCredentialErrorResponse (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialResponse;
@@ -135,6 +136,7 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun proximityPresentationCapabilities (Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun proximityPresentationCapabilities$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshDigitalCredentialRegistration (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun rejectDigitalCredentialPreview (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun rejectPresentation (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun rejectPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resumeDeferredIssuance (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -146,6 +148,8 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public static synthetic fun submitDigitalCredentialPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun submitPresentation (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun submitPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/Boolean;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun transactionLog (Lid/walt/wallet2/transactionlog/TransactionLogQuery;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun transactionLog$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/transactionlog/TransactionLogQuery;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/mobile/MobileWalletAnnexCDocumentRequest {

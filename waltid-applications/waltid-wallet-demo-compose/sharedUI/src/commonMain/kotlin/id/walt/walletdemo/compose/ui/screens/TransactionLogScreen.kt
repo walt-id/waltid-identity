@@ -174,7 +174,7 @@ private fun TransactionLogEntryCard(
         modifier = Modifier.fillMaxWidth().testTag("transactionLog.entry"),
     ) {
         Column(
-            Modifier.clickable(onClick = onToggle),
+            Modifier.testTag("transactionLog.entry.${entry.transactionIdentifier}").clickable(onClick = onToggle),
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(16.dp),
@@ -185,6 +185,7 @@ private fun TransactionLogEntryCard(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         stringResource(entry.type.labelResource()),
+                        modifier = Modifier.testTag("transactionLog.type.${entry.type.name}"),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
@@ -282,6 +283,7 @@ private fun TransactionLogResultBadge(result: WalletDemoTransactionLogResult) {
             )
             Text(
                 stringResource(result.labelResource()),
+                modifier = Modifier.testTag("transactionLog.result.${result.name}"),
                 style = MaterialTheme.typography.labelSmall,
                 color = content,
             )

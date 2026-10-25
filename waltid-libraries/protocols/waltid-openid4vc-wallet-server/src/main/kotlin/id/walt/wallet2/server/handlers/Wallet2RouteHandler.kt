@@ -766,11 +766,13 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<RejectPresentationByRequestUrlRequest>() }
                         response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<RejectPresentationByRequestUrlRequest>()
                         call.respond(
                             WalletPresentationHandler.rejectPresentationByRequestUrl(
                                 request = req,
                                 clientIdTrustConfiguration = clientIdTrustConfiguration,
+                                wallet = wallet,
                             )
                         )
                     }

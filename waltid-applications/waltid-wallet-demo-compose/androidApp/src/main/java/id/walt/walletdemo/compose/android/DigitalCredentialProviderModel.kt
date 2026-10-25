@@ -33,6 +33,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     private val context = context.applicationContext
     private val resultIntent = Intent()
     private var discardReview: (suspend () -> Unit)? = null
+    private var rejectReview: (suspend () -> Unit)? = null
     private var submitReview: (suspend (WalletDemoSharingSelection) -> Unit)? = null
     var reviewController by mutableStateOf<WalletDemoSharingReviewController?>(null)
         private set
@@ -61,6 +62,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         } else {
             val preview = wallet.previewDigitalCredentialPresentation(input.request)
             discardReview = { wallet.discardDigitalCredentialPreview(preview.requestId) }
+            rejectReview = { wallet.rejectDigitalCredentialPreview(preview.requestId) }
             currentCoroutineContext().ensureActive()
             install(preview.toSharingReview(), "Share digital credential?", showPreview,
                 preparePaymentConsent = { selection ->
@@ -97,10 +99,15 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     }
 
     fun cancel() {
-        if (submitting) return
-        if (failure == null) AndroidDigitalCredentialProvider.setCancellation(resultIntent)
-        else AndroidDigitalCredentialProvider.setFailure(resultIntent)
-        finish(resultIntent)
+        if (submitting || result != null) return
+        submitting = true
+        perform {
+            if (failure == null) {
+                rejectReview?.invoke()
+                AndroidDigitalCredentialProvider.setCancellation(resultIntent)
+            } else AndroidDigitalCredentialProvider.setFailure(resultIntent)
+            finish(resultIntent)
+        }
     }
 
     fun back() { if (!submitting) finish() }

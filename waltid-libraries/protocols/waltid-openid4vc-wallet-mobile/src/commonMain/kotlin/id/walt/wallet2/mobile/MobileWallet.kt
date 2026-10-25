@@ -879,6 +879,11 @@ public class MobileWallet internal constructor(
         WalletPresentationHandler.discardDcApiPreview(wallet, requestId)
     }
 
+    /** Records explicit refusal and consumes the retained review without releasing credentials. */
+    public suspend fun rejectDigitalCredentialPreview(requestId: String): Unit = lifecycle.use {
+        WalletPresentationHandler.rejectDcApiPreview(wallet, requestId)
+    }
+
     /**
      * Builds a response for a retained Digital Credentials preview. No network transport is performed.
      * Without [paymentConsentRevision], the host is responsible for platform-confirmed payment consent.
