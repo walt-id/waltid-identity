@@ -35,6 +35,21 @@ data class WalletDemoTransactionLogDetail(
     val value: String,
 )
 
+/** Logged claim paths only; personal claim values are not retained in transaction history. */
+data class WalletDemoTransactionLogClaim(val path: String) {
+    val label: String
+        get() = ClaimPath.semanticLeaf(path)
+            ?.let(CredentialDisplayVocabulary::humanizedClaimLabel)
+            ?: path
+}
+
+/** The log identifies credentials by type, not by wallet-local credential ID. */
+data class WalletDemoTransactionLogCredential(
+    val credentialIdentifier: String,
+    val requestedClaims: List<WalletDemoTransactionLogClaim>,
+    val presentedClaims: List<WalletDemoTransactionLogClaim>,
+)
+
 /**
  * A platform-agnostic projection of one transaction log entry for the demo UI.
  *
@@ -49,6 +64,7 @@ data class WalletDemoTransactionLogEntry(
     val result: WalletDemoTransactionLogResult,
     val relyingPartyName: String? = null,
     val details: List<WalletDemoTransactionLogDetail> = emptyList(),
+    val credentials: List<WalletDemoTransactionLogCredential> = emptyList(),
 )
 
 /**
@@ -86,4 +102,3 @@ data class WalletDemoTransactionLogState(
     val canLoadMore: Boolean
         get() = nextCursor != null && !isLoading && !isLoadingMore
 }
-

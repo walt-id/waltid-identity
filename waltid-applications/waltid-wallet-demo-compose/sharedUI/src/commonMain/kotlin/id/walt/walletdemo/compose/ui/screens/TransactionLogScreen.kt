@@ -153,7 +153,7 @@ private fun TransactionLogFilterRow(
 }
 
 @Composable
-private fun TransactionLogEntryCard(
+internal fun TransactionLogEntryCard(
     entry: WalletDemoTransactionLogEntry,
     expanded: Boolean,
     onToggle: () -> Unit,
@@ -165,7 +165,7 @@ private fun TransactionLogEntryCard(
         transitionSpec = { WalletMotion.disclosure(reduceMotion) },
         label = "transactionLog-chevron",
     ) { if (it) 180f else 0f }
-    val hasDetails = entry.details.isNotEmpty()
+    val hasDetails = entry.details.isNotEmpty() || entry.type == WalletDemoTransactionLogType.Presentation
 
     Surface(
         shape = MaterialTheme.shapes.large,
@@ -231,6 +231,45 @@ private fun TransactionLogEntryCard(
                                 Text(detail.value, style = MaterialTheme.typography.bodyMedium)
                             }
                         }
+                        if (entry.type == WalletDemoTransactionLogType.Presentation) {
+                            if (entry.credentials.isEmpty()) {
+                                Text(
+                                    stringResource(Res.string.transaction_log_no_claims_recorded),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            entry.credentials.forEach { credential ->
+                                Surface(
+                                    shape = MaterialTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.surfaceContainer,
+                                    modifier = Modifier.fillMaxWidth().testTag("transactionLog.credential"),
+                                ) {
+                                    Column(
+                                        Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                stringResource(Res.string.transaction_log_credential_type),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            Text(credential.credentialIdentifier, style = MaterialTheme.typography.titleSmall)
+                                        }
+                                        TransactionLogClaimList(
+                                            stringResource(Res.string.transaction_log_claims_requested),
+                                            credential.requestedClaims,
+                                            Modifier.testTag("transactionLog.claims.requested"),
+                                        )
+                                        TransactionLogClaimList(
+                                            stringResource(Res.string.transaction_log_claims_presented),
+                                            credential.presentedClaims,
+                                            Modifier.testTag("transactionLog.claims.presented"),
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     OutlinedButton(
                         onClick = onDelete,
@@ -242,6 +281,36 @@ private fun TransactionLogEntryCard(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(Res.string.transaction_log_delete))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionLogClaimList(
+    title: String,
+    claims: List<WalletDemoTransactionLogClaim>,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.labelLarge)
+        if (claims.isEmpty()) {
+            Text(
+                stringResource(Res.string.transaction_log_no_claims),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        claims.forEach { claim ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(claim.label, style = MaterialTheme.typography.bodyMedium)
+                if (claim.path != claim.label) {
+                    Text(
+                        claim.path,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -597,7 +597,7 @@ private fun decodeTransactionLogCursor(token: String): TransactionLogCursor {
     )
 }
 
-private fun TransactionLog.toDemoEntry(): WalletDemoTransactionLogEntry {
+internal fun TransactionLog.toDemoEntry(): WalletDemoTransactionLogEntry {
     val result = when (transactionResult) {
         TransactionResult.Completed -> WalletDemoTransactionLogResult.Completed
         TransactionResult.NotCompleted -> WalletDemoTransactionLogResult.NotCompleted
@@ -649,6 +649,19 @@ private fun TransactionLog.toDemoEntry(): WalletDemoTransactionLogEntry {
         result = result,
         relyingPartyName = relyingPartyName?.takeIf { it.isNotBlank() },
         details = details,
+        credentials = if (this is PresentationTransactionLog) {
+            val requested = presentation.listOfClaimsRequested.groupBy { it.credentialIdentifier }
+            val presented = presentation.listOfClaimsPresented.groupBy { it.credentialIdentifier }
+            (requested.keys + presented.keys).map { identifier ->
+                WalletDemoTransactionLogCredential(
+                    credentialIdentifier = identifier,
+                    requestedClaims = requested[identifier].orEmpty().flatMap { it.claims }
+                        .distinct().map(::WalletDemoTransactionLogClaim),
+                    presentedClaims = presented[identifier].orEmpty().flatMap { it.claims }
+                        .distinct().map(::WalletDemoTransactionLogClaim),
+                )
+            }
+        } else emptyList(),
     )
 }
 

@@ -16,6 +16,11 @@
     <string name="transaction_log_retry">Retry</string>
     <string name="transaction_log_load_more">Load more</string>
     <string name="transaction_log_unknown_party">Unknown party</string>
+    <string name="transaction_log_credential_type">Credential type</string>
+    <string name="transaction_log_claims_requested">Claims requested</string>
+    <string name="transaction_log_claims_presented">Claims presented</string>
+    <string name="transaction_log_no_claims">None</string>
+    <string name="transaction_log_no_claims_recorded">No requested or presented claims recorded.</string>
     <string name="transaction_log_filter_all">All</string>
     <string name="transaction_log_filter_presentation">Presentations</string>
     <string name="transaction_log_filter_issuance">Issuances</string>

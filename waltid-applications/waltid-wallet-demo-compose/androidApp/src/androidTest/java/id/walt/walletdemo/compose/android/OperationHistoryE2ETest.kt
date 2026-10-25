@@ -15,6 +15,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIME
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.findResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
@@ -55,7 +56,7 @@ class OperationHistoryE2ETest {
         assertSurface("issuance-done")
         clickByTag(device, "issuance-done")
         assertSurface("wallet.scanButton")
-        val issuedCard = device.wait(Condition<UiDevice, String?> { current ->
+        val issuedCard = device.wait(Condition { current ->
             current.findObjects(credentialCards).map { it.resourceName }
                 .singleOrNull { it !in existingCards }
         }, UI_ELEMENT_TIMEOUT)
@@ -88,6 +89,7 @@ class OperationHistoryE2ETest {
             "Presentation", "NotCompleted", "02-presentation-error", "Reason not completed",
         )
         assertFalse("The error must create a new history entry", presentationError == issuance)
+        assertPresentationClaims("02-presentation-error", presented = false)
         closeHistory()
 
         val session = DemoTestBackend.createVerifierSession(scenario)
@@ -102,6 +104,7 @@ class OperationHistoryE2ETest {
         )
         assertFalse("The successful presentation must create a new entry",
             presentationSuccess in setOf(issuance, presentationError))
+        assertPresentationClaims("03-presentation-success", presented = true)
         closeHistory()
 
         clickByTag(device, credentialTag)
@@ -158,6 +161,28 @@ class OperationHistoryE2ETest {
                     false
                 }
             }, UI_ELEMENT_TIMEOUT))
+    }
+
+    private fun assertPresentationClaims(screenshot: String, presented: Boolean) {
+        for (kind in listOf("requested", "presented")) {
+            val tag = "transactionLog.claims.$kind"
+            assertNotNull("Presentation must show $kind claims", findResourceAfterScrolling(device, tag))
+            val expected = if (kind == "presented" && !presented) listOf("None")
+                else listOf("Given name", "Family name")
+            assertTrue("The $kind list must show $expected",
+                device.wait(Condition<UiDevice, Boolean> { current ->
+                    val section = current.findObject(By.res(tag))
+                    val visible = section != null && expected.all { section.hasObject(By.text(it)) }
+                    if (!visible) {
+                        current.swipe(
+                            current.displayWidth / 2, current.displayHeight * 3 / 4,
+                            current.displayWidth / 2, current.displayHeight / 2, 20,
+                        )
+                    }
+                    visible
+                }, UI_ELEMENT_TIMEOUT))
+            captureHistory("$screenshot-$kind-claims")
+        }
     }
 
     private fun closeHistory() {
