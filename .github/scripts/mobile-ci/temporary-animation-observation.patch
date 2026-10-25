@@ -1,0 +1,72 @@
+diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+index 3f2e07b7cd..ce2b45ff64 100644
+--- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
++++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+@@ -45,6 +45,59 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     private var height: CGFloat = 0
+     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
+ 
++
++    // Temporary WAL-1585 observation; no layout or animation policy changes.
++    private var observationCount = 0
++    private var observationTokens: [NSObjectProtocol] = []
++
++    init() {
++        guard ProcessInfo.processInfo.environment["E2E_MOCK_WALLET"] == "1" else { return }
++        for name in [UIResponder.keyboardWillShowNotification, UIResponder.keyboardDidShowNotification,
++                     UIResponder.keyboardWillHideNotification, UIResponder.keyboardDidHideNotification,
++                     UIResponder.keyboardWillChangeFrameNotification, UIResponder.keyboardDidChangeFrameNotification] {
++            observationTokens.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
++                let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect ?? .zero
++                let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? -1
++                self?.observe("keyboard=\(name.rawValue) frame=\(frame) duration=\(duration)")
++                if name == UIResponder.keyboardWillShowNotification {
++                    for delay in [1.0, 5.0, 65.0] {
++                        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
++                            self?.observeLayers(after: delay)
++                        }
++                    }
++                }
++            })
++        }
++    }
++
++    deinit { observationTokens.forEach(NotificationCenter.default.removeObserver) }
++
++    func observe(_ message: String) {
++        guard ProcessInfo.processInfo.environment["E2E_MOCK_WALLET"] == "1", observationCount < 200 else { return }
++        observationCount += 1
++        print("WAL1585 animation t=\(ProcessInfo.processInfo.systemUptime) coordinator=\(ObjectIdentifier(self)) \(message)")
++    }
++
++    private func observeLayers(after delay: Double) {
++        guard Thread.isMainThread else { return }
++        var visited = 0
++        var active: [String] = []
++        func visit(_ layer: CALayer, depth: Int) {
++            guard visited < 3000, depth < 30, active.count < 30 else { return }
++            visited += 1
++            for key in layer.animationKeys() ?? [] {
++                if let animation = layer.animation(forKey: key) {
++                    active.append("\(type(of: layer)) key=\(key) duration=\(animation.duration) repeat=\(animation.repeatCount) speed=\(animation.speed) model=\(layer.frame) presentation=\(layer.presentation()?.frame ?? .zero)")
++                }
++            }
++            for child in layer.sublayers ?? [] { visit(child, depth: depth + 1) }
++        }
++        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
++            for window in scene.windows { visit(window.layer, depth: 0) }
++        }
++        observe("layers after=\(delay) visited=\(visited) active=\(active.count) values=\(active)")
++    }
++
+     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
+         guard #available(iOS 16, *), activePage === page, height.isFinite, height > 0,
+               let presentation = owner.sheetPresentationController else { return }
+@@ -54,6 +107,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+         let needsConfiguration = sheet !== presentation
+             || presentation.detents.map(\.identifier) != [identifier]
+         guard needsConfiguration || self.height != rounded else { return }
++        observe("detent page=\(ObjectIdentifier(page)) measured=\(height) old=\(self.height) new=\(rounded) configure=\(needsConfiguration) animated=\(animated) presenting=\(owner.isBeingPresented) inheritedDuration=\(UIView.inheritedAnimationDuration) ownerHeight=\(owner.view.bounds.height)")
+         self.height = rounded
+         let changes = { [self] in
+             if needsConfiguration {
