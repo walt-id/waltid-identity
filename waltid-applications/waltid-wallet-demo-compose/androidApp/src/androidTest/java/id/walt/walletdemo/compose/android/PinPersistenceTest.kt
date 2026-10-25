@@ -10,7 +10,6 @@ import androidx.test.uiautomator.Until
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchExpectingSetupAndUnlock
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -35,7 +34,7 @@ class PinPersistenceTest {
     }
 
     @Test
-    fun pinStepsKeepConfirmationSeparateAndActionsAboveTheKeyboard() {
+    fun pinSetupAndReplacementSurviveRelaunchAndSettingsRecreation() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
@@ -76,43 +75,7 @@ class PinPersistenceTest {
         assertTrue(device.findObject(By.res("wallet.pinInput")).text.isEmpty())
         assertPinActionAboveKeyboard(instrumentation, device)
         WalletComposeE2EHelper.unlock(device)
-    }
 
-    @Test
-    fun walletAccessChangesPinAndPersistsOnlyTheConfirmedReplacement() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val device = UiDevice.getInstance(instrumentation)
-        launchExpectingSetupAndUnlock(context, device)
-        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsButton")
-        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsWalletAccess")
-        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsChangePin")
-        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("1234")
-        assertTrue(device.wait(Until.hasObject(By.text("Choose a new PIN")), 10_000))
-        assertPinActionAboveKeyboard(instrumentation, device)
-        device.findObject(By.res("wallet.pinInput")).setText("5678")
-        val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
-        confirmation.setText("5678")
-        assertTrue(device.wait(Until.hasObject(By.text("PIN changed")), 10_000))
-        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
-        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsLock")
-        val input = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000))
-        input.setText("1234")
-        assertTrue(device.wait(Until.hasObject(By.text("Wrong PIN")), 10_000))
-        assertTrue(input.text.isEmpty())
-        assertPinActionAboveKeyboard(instrumentation, device)
-        input.setText("5678")
-        WalletComposeE2EHelper.awaitWalletReady(device)
-        WalletComposeE2EHelper.launch(context)
-        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("5678")
-        WalletComposeE2EHelper.awaitWalletReady(device)
-    }
-
-    @Test
-    fun settingsSurviveRotationAndActivityRecreationWithoutLocking() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val device = UiDevice.getInstance(instrumentation)
-        launchExpectingSetupAndUnlock(instrumentation.targetContext, device)
         WalletComposeE2EHelper.clickByTag(device, "wallet.settingsButton")
         WalletComposeE2EHelper.clickByTag(device, "wallet.settingsProximityPresentation")
         WalletComposeE2EHelper.clickByTag(device, "wallet.settingsReaderAuthentication")
@@ -143,6 +106,31 @@ class PinPersistenceTest {
             device.setOrientationNatural()
             device.unfreezeRotation()
         }
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.scanButton")), 10_000))
+
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsButton")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsWalletAccess")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsChangePin")
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("1234")
+        assertTrue(device.wait(Until.hasObject(By.text("Choose a new PIN")), 10_000))
+        assertPinActionAboveKeyboard(instrumentation, device)
+        device.findObject(By.res("wallet.pinInput")).setText("5678")
+        val replacementConfirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
+        replacementConfirmation.setText("5678")
+        assertTrue(device.wait(Until.hasObject(By.text("PIN changed")), 10_000))
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsLock")
+        val replacementInput = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000))
+        replacementInput.setText("1234")
+        assertTrue(device.wait(Until.hasObject(By.text("Wrong PIN")), 10_000))
+        assertTrue(replacementInput.text.isEmpty())
+        assertPinActionAboveKeyboard(instrumentation, device)
+        replacementInput.setText("5678")
+        WalletComposeE2EHelper.awaitWalletReady(device)
+        WalletComposeE2EHelper.launch(context)
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("5678")
+        WalletComposeE2EHelper.awaitWalletReady(device)
     }
 
     private fun assertPinActionAboveKeyboard(instrumentation: Instrumentation, device: UiDevice) {
