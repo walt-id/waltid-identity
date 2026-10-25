@@ -1,4 +1,4 @@
-name: Native animation owner suite observation (temporary)
+name: Native animation retirement observation (temporary)
 
 on:
   workflow_dispatch:
@@ -77,7 +77,7 @@ jobs:
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Observe animation ownership in the normal mock-wallet class
+      - name: Observe UIKit completion in the normal mock-wallet class
         timeout-minutes: 90
         working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
