@@ -78,6 +78,8 @@ optional second output-directory argument). The existing iOS recovery CI job run
 simulator, excluding the physical Secure Enclave suite. It exercises owned-key reopening, exact
 private-key recovery, policy mismatch and native-entry replacement. Simulator results
 do not establish Secure Enclave, biometric, passcode, or cloud-backup behavior.
+App output goes directly to `tests.log` and `app-stderr.log`; the runner waits for the launched
+process to exit and requires a complete test summary within the existing execution deadline.
 Incomplete launches fail with JUnit errors and a `launch.json` receipt containing the launch status,
 unfinished tests and available crash termination metadata. Raw crash memory and environment are not collected.
 
