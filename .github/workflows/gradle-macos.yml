@@ -1,4 +1,4 @@
-name: Native animation callback observation (temporary)
+name: Native repeated scan journey observation (temporary)
 
 on:
   workflow_dispatch:
@@ -77,7 +77,7 @@ jobs:
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Observe callback pairing in the original mock-wallet suite order
+      - name: Observe callback pairing in the previously failing scan journey
         timeout-minutes: 90
         working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
@@ -97,7 +97,8 @@ jobs:
           xcodebuild test -collect-test-diagnostics never \
             -project iosApp.xcodeproj -scheme iosApp -configuration Debug \
             -destination "platform=iOS Simulator,id=$simulator" \
-            -only-testing:iosAppUITests/MockWalletUITests \
+            -only-testing:iosAppUITests/MockWalletUITests/testScanReceiveDetailsAndShareUsesMockWallet \
+            -test-iterations 5 -run-tests-until-failure \
             -parallel-testing-enabled NO -enableCodeCoverage NO \
             -resultBundlePath "$GITHUB_WORKSPACE/animation-observation/TestResults.xcresult" \
             -derivedDataPath /tmp/xcode-derived OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
