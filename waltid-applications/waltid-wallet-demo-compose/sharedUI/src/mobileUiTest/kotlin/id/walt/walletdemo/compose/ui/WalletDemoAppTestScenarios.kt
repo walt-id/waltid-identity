@@ -719,7 +719,10 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
 
         receiveGate.complete(Unit)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.issuanceReceipt != null &&
+                onAllNodes(hasTestTag("issuance-done") and isEnabled()).fetchSemanticsNodes().size == 1
+        }
         onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
