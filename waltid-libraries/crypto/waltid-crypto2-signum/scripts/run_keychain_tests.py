@@ -101,13 +101,20 @@ def crash_diagnostics(started_at, pid=None, device=None):
 def run(device, output, timeout=120):
     if device in ("booted", "all"):
         raise ValueError("Select an exact simulator UDID")
+    output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    stdout, stderr = output / "tests.log", output / "app-stderr.log"
+    for path in (stdout, stderr):
+        path.write_text("")
     started_at = time.time()
     start = time.monotonic()
     code, problem = None, None
     try:
-        with (output / "tests.log").open("w") as stream:
-            result = subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process", "--console",
+        # simctl --console can return 0 after dropping the end of a completed
+        # suite's output. Give the app files directly, then wait for its PID.
+        with (output / "launch.log").open("w") as stream:
+            result = subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process",
+                                     f"--stdout={stdout}", f"--stderr={stderr}",
                                      device, BUNDLE, "--ktest_logger=GTEST",
                                      "--ktest_filter=*-id.walt.crypto2.signum.IosSecureEnclaveKeyTest.*"],
                                     stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
@@ -116,18 +123,36 @@ def run(device, output, timeout=120):
         problem = f"Keychain test launch exceeded {timeout} seconds"
     except OSError as error:
         problem = f"Cannot launch Keychain tests: {type(error).__name__}"
-    text = (output / "tests.log").read_text(errors="replace")
+    launched = re.search(r"^" + re.escape(BUNDLE) + r": (\d+)\s*$",
+                         (output / "launch.log").read_text(errors="replace"), re.MULTILINE)
+    pid = int(launched[1]) if launched else None
+    if code == 0 and pid is None:
+        problem = "simctl did not report the launched Keychain test process"
+    alive = False
+    while pid is not None:
+        try:
+            os.kill(pid, 0)
+            alive = True
+        except ProcessLookupError:
+            alive = False
+            break
+        except OSError as error:
+            problem = f"Cannot observe Keychain test process: {type(error).__name__}"
+            break
+        if problem or code != 0:
+            break
+        remaining = timeout - (time.monotonic() - start)
+        if remaining <= 0:
+            problem = f"Keychain test execution exceeded {timeout} seconds"
+            break
+        time.sleep(min(0.1, remaining))
+    text = "\n".join(path.read_text(errors="replace") for path in (stdout, stderr))
     receipt = report(output, text, code, problem)
     receipt["started_at_unix"] = started_at
     receipt["elapsed_seconds"] = round(time.monotonic() - start, 3)
-    launched = re.search(r"^" + re.escape(BUNDLE) + r": (\d+)\s*$", text, re.MULTILINE)
-    if launched:
-        receipt["pid"] = int(launched[1])
-        try:
-            os.kill(receipt["pid"], 0)
-            receipt["alive_after_console_exit"] = True
-        except ProcessLookupError:
-            receipt["alive_after_console_exit"] = False
+    if pid is not None:
+        receipt["pid"] = pid
+        receipt["alive_after_wait"] = alive
     if not receipt["success"]:
         # The caller deletes its simulator on failure; preserve the cause first.
         # CrashReporter can finish writing shortly after simctl returns.
@@ -136,20 +161,7 @@ def run(device, output, timeout=120):
             if receipt["crash_diagnostics"]:
                 break
             time.sleep(1)
-        # Temporary WAL-1585 observation of the incomplete hosted process exit.
-        # Query only this app's lifecycle after failure, before owned cleanup.
-        try:
-            with (output / "lifecycle.log").open("w") as stream:
-                capture = subprocess.run([
-                    "xcrun", "simctl", "spawn", device, "log", "show", "--style", "compact", "--info", "--debug",
-                    "--start", f"@{int(started_at)}", "--end", f"@{int(time.time()) + 1}",
-                    "--predicate", '(process == "runningboardd" OR process == "SpringBoard" OR process == "launchd_sim") '
-                    'AND (eventMessage CONTAINS "id.walt.crypto2.keychain-tests" OR eventMessage CONTAINS "KeychainTests")',
-                ], stdout=stream, stderr=subprocess.STDOUT, timeout=15)
-            receipt["lifecycle_capture_returncode"] = capture.returncode
-        except (OSError, subprocess.TimeoutExpired) as error:
-            receipt["lifecycle_capture_error"] = type(error).__name__
-        if problem or receipt.get("alive_after_console_exit"):
+        if problem or alive:
             try:
                 cleanup = subprocess.run(["xcrun", "simctl", "terminate", device, BUNDLE],
                                          capture_output=True, timeout=15)
