@@ -39,6 +39,7 @@ internal enum class SettingsDestination(val title: StringResource) {
     WalletAccess(Res.string.settings_wallet_access),
     SigningKey(Res.string.settings_signing_key),
     Technical(Res.string.settings_technical),
+    TransactionHistory(Res.string.settings_transaction_log),
     Nearby(Res.string.settings_nearby),
     Connection(Res.string.settings_connection),
     Server(Res.string.settings_server),
@@ -68,6 +69,7 @@ internal fun SettingsScreen(
     serverSettingsContent: (@Composable () -> Unit)? = null,
     initialDestination: SettingsDestination = SettingsDestination.Main,
     walletAccessContent: (@Composable () -> Unit)? = null,
+    transactionLogContent: (@Composable () -> Unit)? = null,
     onCancelPinChange: () -> Unit = {},
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
@@ -127,6 +129,10 @@ internal fun SettingsScreen(
                             walletAccessContent?.invoke()
                             return@NavEntry
                         }
+                        if (destination == SettingsDestination.TransactionHistory) {
+                            transactionLogContent?.invoke()
+                            return@NavEntry
+                        }
                         Column(
                             Modifier.weight(1f, fill = fillViewport).verticalScroll(rememberScrollState()).fillMaxWidth()
                                 .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
@@ -163,6 +169,14 @@ internal fun SettingsScreen(
                                         WalletNavigationRow(stringResource(Res.string.settings_technical),
                                             { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_code) })
+                                        if (transactionLogContent != null && currentState.transactionLog.supported) {
+                                            SettingsDivider()
+                                            WalletNavigationRow(stringResource(Res.string.settings_transaction_log),
+                                                { open(SettingsDestination.TransactionHistory) },
+                                                Modifier.testTag("settings.transactionLog"),
+                                                summary = stringResource(Res.string.settings_transaction_log_subtitle),
+                                                icon = { SettingsSymbol(Res.drawable.settings_history) })
+                                        }
                                     }
                                     if (currentState.pinLockEnabled) {
                                         WalletSection(stringResource(Res.string.settings_sharing),

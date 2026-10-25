@@ -81,6 +81,11 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun deleteCredential(credentialId: String): Boolean =
         wallet().deleteCredential(credentialId)
 
+    override fun supportsTransactionLog(): Boolean = wallet?.supportsTransactionLog() ?: false
+
+    override suspend fun readTransactionLog(cursor: String?, limit: Int): WalletDemoTransactionLogPage =
+        wallet().readTransactionLog(cursor, limit)
+
     override suspend fun deleteWallet() {
         mutex.withLock {
             wallet?.deleteWallet()

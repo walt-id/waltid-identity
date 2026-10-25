@@ -1578,6 +1578,92 @@ class WalletDemoController(
         }
     }
 
+    private var transactionLogJob: Job? = null
+
+    /** Reloads the newest page whenever the transaction log view is opened. */
+    fun openTransactionLog() {
+        val log = _state.value.transactionLog
+        if (!log.supported || log.isLoading) return
+        loadTransactionLog(reset = true)
+    }
+
+    /** Reloads the transaction log from the newest entry, discarding any loaded pages. */
+    fun refreshTransactionLog() {
+        if (!_state.value.transactionLog.supported) return
+        loadTransactionLog(reset = true)
+    }
+
+    /** Loads the next page using the stored keyset cursor. */
+    fun loadMoreTransactionLog() {
+        val log = _state.value.transactionLog
+        if (!log.supported || log.nextCursor == null || log.isLoading || log.isLoadingMore) return
+        loadTransactionLog(reset = false)
+    }
+
+    /** Switches the entry-type filter; applied in the UI layer without refetching. */
+    fun setTransactionLogFilter(filter: WalletDemoTransactionLogFilter) {
+        _state.update { it.copy(transactionLog = it.transactionLog.copy(filter = filter)) }
+    }
+
+    /** Expands or collapses the detail section of a single entry. */
+    fun toggleTransactionLogEntry(transactionIdentifier: String) {
+        _state.update {
+            val expanded = it.transactionLog.expandedIds
+            val updated = if (transactionIdentifier in expanded) expanded - transactionIdentifier
+            else expanded + transactionIdentifier
+            it.copy(transactionLog = it.transactionLog.copy(expandedIds = updated))
+        }
+    }
+
+    private fun loadTransactionLog(reset: Boolean) {
+        transactionLogJob?.cancel()
+        val cursor = if (reset) null else _state.value.transactionLog.nextCursor
+        _state.update {
+            it.copy(
+                transactionLog = it.transactionLog.copy(
+                    isLoading = reset,
+                    isLoadingMore = !reset,
+                    error = null,
+                    entries = if (reset) emptyList() else it.transactionLog.entries,
+                    nextCursor = if (reset) null else it.transactionLog.nextCursor,
+                    expandedIds = if (reset) emptySet() else it.transactionLog.expandedIds,
+                ),
+            )
+        }
+        transactionLogJob = scope.launch(dispatcher) {
+            runCatching { wallet.readTransactionLog(cursor = cursor) }
+                .onSuccess { page ->
+                    _state.update { state ->
+                        val existing = if (reset) emptyList() else state.transactionLog.entries
+                        val known = existing.mapTo(mutableSetOf()) { it.transactionIdentifier }
+                        val merged = existing + page.entries.filter { known.add(it.transactionIdentifier) }
+                        state.copy(
+                            transactionLog = state.transactionLog.copy(
+                                entries = merged,
+                                nextCursor = page.nextCursor,
+                                isLoading = false,
+                                isLoadingMore = false,
+                                loaded = true,
+                                error = null,
+                            ),
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    _state.update {
+                        it.copy(
+                            transactionLog = it.transactionLog.copy(
+                                isLoading = false,
+                                isLoadingMore = false,
+                                error = "Could not load the transaction log. Try again.",
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
     fun refreshIdentityDetails() {
         val session = _state.value.session as? WalletSessionState.Ready ?: return
         if (_state.value.identityBusy) return
@@ -1719,6 +1805,7 @@ class WalletDemoController(
                 Triple(result, credentials, deferred)
             }.onSuccess { (result, credentials, deferred) ->
                 ensureCurrentLoading(generation)
+                val transactionLogSupported = wallet.supportsTransactionLog()
                 _state.update {
                     if (it.auth != WalletAuthState.Unlocked || loadingGeneration.value != generation) return@update it
                     it.copy(
@@ -1734,6 +1821,7 @@ class WalletDemoController(
                         selectedSigningProtection = signingProtectionMode.resolve(result.signingProtection),
                         deferredCredentials = deferred,
                         signingProtectionReprovisionTarget = null,
+                        transactionLog = it.transactionLog.copy(supported = transactionLogSupported),
                     ).withPublishedStatus()
                 }
                 showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })

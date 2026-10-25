@@ -62,6 +62,8 @@ import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
 import id.walt.wallet2.data.WalletTransactionLogStore
+import id.walt.wallet2.transactionlog.TransactionLogPage
+import id.walt.wallet2.transactionlog.TransactionLogQuery
 import id.walt.wallet2.stores.inmemory.InMemoryTransactionLogStore
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -1072,6 +1074,16 @@ public class MobileWallet internal constructor(
      * Platform key/database removal cannot roll back. On failure, retry this method on the same
      * instance; other operations remain closed. Successful deletion is idempotent.
      */
+    /**
+     * Reads a time-ordered page of this wallet's transaction history.
+     *
+     * Continue with [TransactionLogPage.nextCursor] for keyset pagination over large histories.
+     */
+    public suspend fun transactionLog(query: TransactionLogQuery = TransactionLogQuery()): TransactionLogPage =
+        lifecycle.use {
+            transactionLogStore.read(query)
+        }
+
     public suspend fun deleteWallet(): Unit = lifecycle.delete {
         if (!localStoresCleared) {
             issuanceSessions.closeSessions()

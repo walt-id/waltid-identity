@@ -34,6 +34,52 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun reopeningTransactionLogFetchesNewestPageAndDiscardsPreviouslyLoadedPages() = runTest {
+        val oldEntry = WalletDemoTransactionLogEntry(
+            transactionIdentifier = "old",
+            type = WalletDemoTransactionLogType.Issuance,
+            time = "2026-10-24T12:00:00Z",
+            result = WalletDemoTransactionLogResult.Completed,
+        )
+        val olderEntry = oldEntry.copy(transactionIdentifier = "older")
+        val newEntry = oldEntry.copy(transactionIdentifier = "new", time = "2026-10-25T12:00:00Z")
+        var firstPage = WalletDemoTransactionLogPage(listOf(oldEntry), nextCursor = "older")
+        val cursors = mutableListOf<String?>()
+        val wallet = object : DemoWallet by FakeDemoWallet() {
+            override fun supportsTransactionLog(): Boolean = true
+
+            override suspend fun readTransactionLog(cursor: String?, limit: Int): WalletDemoTransactionLogPage {
+                cursors += cursor
+                return if (cursor == null) firstPage else WalletDemoTransactionLogPage(listOf(olderEntry))
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.openTransactionLog()
+        controller.openTransactionLog()
+        runCurrent()
+        assertEquals(listOf(oldEntry), controller.state.value.transactionLog.entries)
+        assertTrue(controller.state.value.transactionLog.loaded)
+        assertEquals(listOf<String?>(null), cursors)
+
+        controller.loadMoreTransactionLog()
+        runCurrent()
+        assertEquals(listOf(oldEntry, olderEntry), controller.state.value.transactionLog.entries)
+        controller.toggleTransactionLogEntry("old")
+
+        firstPage = WalletDemoTransactionLogPage(listOf(newEntry, oldEntry), nextCursor = "new-cursor")
+        controller.openTransactionLog()
+        runCurrent()
+
+        val state = controller.state.value.transactionLog
+        assertEquals(listOf(newEntry, oldEntry), state.entries)
+        assertEquals("new-cursor", state.nextCursor)
+        assertTrue(state.expandedIds.isEmpty())
+        assertFalse(state.isLoading)
+        assertEquals(listOf(null, "older", null), cursors)
+    }
+
+    @Test
     fun localCardsAreReadyWhileRegistrationWaitsAndForegroundRefreshesCoalesce() = runTest {
         var calls = 0
         var completed = false

@@ -52,6 +52,19 @@ interface DemoWallet {
     suspend fun deleteCredential(credentialId: String): Boolean
     suspend fun deleteWallet()
 
+    /** Only mobile wallets persist a transaction history; other hosts hide the transaction log view. */
+    fun supportsTransactionLog(): Boolean = false
+
+    /**
+     * Reads a page of transaction history entries, newest first.
+     * [cursor] is an opaque continuation token from a previous [WalletDemoTransactionLogPage.nextCursor];
+     * null starts from the newest entry. The default returns an empty page for wallets without a log.
+     */
+    suspend fun readTransactionLog(
+        cursor: String? = null,
+        limit: Int = 50,
+    ): WalletDemoTransactionLogPage = WalletDemoTransactionLogPage(entries = emptyList())
+
     /**
      * Web hosts persist authorization-code issuance across a full-page issuer redirect.
      * Mobile keeps the session in memory, so the default is no pending session.

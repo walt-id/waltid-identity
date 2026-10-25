@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.CredentialParser.getString
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
@@ -1032,16 +1033,17 @@ class WalletIssuanceSessionService(
                 transactionIdentifier = Uuid.random().toString(),
                 time = Clock.System.now().toLocalDateTime(TimeZone.UTC),
                 transactionResult = TransactionResult.Completed,
+                // TODO - store other metadata about the issuance, we could probably store here the whole WRPRC
                 credentialIssuance = CredentialIssuance(
                     // TODO - can we get the actual number requested from the issuer?
                     credentialNumberRequested = credentials.size,
                     credentialNumberIssued = credentials.size,
                     credentialIdentifier = credentials.mapNotNull { it.issuanceCredentialIdentifier() },
                     isUserTriggered = true,
+                    interactingPartyName = credentials.first().metadata?.get("issuerDisplay")?.jsonArray
+                        ?.firstOrNull()?.getString("name")?.let { listOf(it) },
                 ),
             ))
-            log.error { "test" }
-            log.info { "Logged stored credential issuance for wallet '${wallet.id}'" }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
