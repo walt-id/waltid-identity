@@ -1,5 +1,5 @@
 diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
-index 3f2e07b7cd..cf8925dec0 100644
+index 3f2e07b7cd..c61247dbdf 100644
 --- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
 +++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
 @@ -1,5 +1,6 @@
@@ -79,7 +79,7 @@ index 3f2e07b7cd..cf8925dec0 100644
          self.height = rounded
          let changes = { [self] in
              if needsConfiguration {
-@@ -148,3 +205,124 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
+@@ -148,3 +205,211 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
          }
      }
  }
@@ -96,6 +96,10 @@ index 3f2e07b7cd..cf8925dec0 100644
 +    private static var overflow = false
 +    private static var pending: [String: [String: Any]] = [:]
 +    private static var counts: [String: Int] = [:]
++    private static var creations: [[String: Any]] = []
++    private static var creationCount = 0
++    private static var creationLinksEmitted = 0
++    private static let creationKey = "wal1585AnimationCreation"
 +    private static var readBusy: (() -> Bool)?
 +
 +    static let installed: Void = {
@@ -129,9 +133,84 @@ index 3f2e07b7cd..cf8925dec0 100644
 +        }
 +        method_setImplementation(start, imp_implementationWithBlock(startBlock))
 +        method_setImplementation(stop, imp_implementationWithBlock(stopBlock))
++        for name in ["UIViewAnimationState", "UIViewSpringAnimationState"] {
++            guard let type = NSClassFromString(name),
++                  let method = class_getInstanceMethod(type, NSSelectorFromString("animationForLayer:forKey:forView:")),
++                  String(cString: method_getTypeEncoding(method)!) == "@40@0:8@16@24@32" else {
++                emit(["event": "creation-unavailable", "class": name])
++                continue
++            }
++            typealias Create = @convention(c) (AnyObject, Selector, AnyObject?, AnyObject?, AnyObject?) -> AnyObject?
++            let selector = NSSelectorFromString("animationForLayer:forKey:forView:")
++            let original = unsafeBitCast(method_getImplementation(method), to: Create.self)
++            let block: @convention(block) (AnyObject, AnyObject?, AnyObject?, AnyObject?) -> AnyObject? = { owner, layer, key, view in
++                let result = original(owner, selector, layer, key, view)
++                recordCreation(owner, animation: result, layer: layer, key: key, view: view)
++                return result
++            }
++            method_setImplementation(method, imp_implementationWithBlock(block))
++            emit(["event": "creation-installed", "class": name, "type": String(cString: method_getTypeEncoding(method)!)])
++        }
 +        emit(["event": "installed", "startType": String(cString: method_getTypeEncoding(start)!),
 +              "stopType": String(cString: method_getTypeEncoding(stop)!)])
 +    }()
++
++    private static func signature(_ animation: CAAnimation) -> String {
++        let basic = animation as? CABasicAnimation
++        return [String(describing: type(of: animation)),
++                (animation as? CAPropertyAnimation)?.keyPath ?? "nil", String(animation.duration),
++                basic?.fromValue.map { String(describing: $0) } ?? "nil",
++                basic?.toValue.map { String(describing: $0) } ?? "nil",
++                basic?.byValue.map { String(describing: $0) } ?? "nil"].joined(separator: "|")
++    }
++
++    private static func recordCreation(_ owner: AnyObject, animation: AnyObject?, layer: AnyObject?, key: AnyObject?, view: AnyObject?) {
++        guard let animation = animation as? CAPropertyAnimation, animation.keyPath == "position" else { return }
++        lock.lock()
++        defer { lock.unlock() }
++        guard animation.value(forKey: creationKey) == nil else { return }
++        creationCount += 1
++        // Diagnostic metadata only: Core Animation supports arbitrary KVC keys.
++        // The copied animation carries this scalar ID; no timing/value/delegate changes.
++        animation.setValue(creationCount, forKey: creationKey)
++        var row: [String: Any] = ["owner": String(describing: ObjectIdentifier(owner)),
++                                  "animation": String(describing: ObjectIdentifier(animation)),
++                                  "signature": signature(animation), "uptime": ProcessInfo.processInfo.systemUptime,
++                                  "key": key.map { String(describing: $0) } ?? "nil",
++                                  "creation": creationCount, "stack": Array(Thread.callStackSymbols.prefix(16))]
++        if let layer = layer as? CALayer {
++            row["layer"] = String(describing: ObjectIdentifier(layer))
++            row["layerClass"] = String(describing: type(of: layer))
++            row["layerBounds"] = String(describing: layer.bounds)
++            row["layerPosition"] = String(describing: layer.position)
++            row["layerDelegateClass"] = layer.delegate.map { String(describing: type(of: $0)) } ?? "nil"
++        }
++        if let view = view as? UIView {
++            var hierarchy: [String] = []
++            var node: UIView? = view
++            while let current = node, hierarchy.count < 10 {
++                hierarchy.append("\(type(of: current))@\(ObjectIdentifier(current)) frame=\(current.frame)")
++                node = current.superview
++            }
++            row["viewHierarchy"] = hierarchy
++        }
++        creations.append(row)
++        if creations.count > 256 { creations.removeFirst() }
++    }
++
++    private static func creationMatches(_ owner: AnyObject, _ animation: CAAnimation) -> [String: Any] {
++        if let token = animation.value(forKey: creationKey) as? Int {
++            let matches = creations.filter { $0["creation"] as? Int == token }
++            return ["match": matches.count == 1 ? "copied-creation-id" : "creation-id-not-retained",
++                    "creationID": token, "candidateCount": matches.count, "candidates": matches]
++        }
++        let ownerID = String(describing: ObjectIdentifier(owner))
++        let owned = creations.filter { $0["owner"] as? String == ownerID }
++        let exact = owned.filter { $0["signature"] as? String == signature(animation) }
++        let chosen = exact.isEmpty ? owned : exact
++        return ["match": exact.isEmpty ? "owner-only" : "owner-and-fingerprint",
++                "candidateCount": chosen.count, "candidates": Array(chosen.suffix(16))]
++    }
 +
 +    private static func callback(_ event: String, _ owner: AnyObject, _ animation: AnyObject?, finished: Bool? = nil) {
 +        lock.lock()
@@ -144,6 +223,14 @@ index 3f2e07b7cd..cf8925dec0 100644
 +                                           "ownerClass": String(describing: type(of: owner)),
 +                                           "returnAddresses": Thread.callStackReturnAddresses.map { $0.stringValue }]
 +                if let animation = animation as? CAAnimation {
++                    if (animation as? CAPropertyAnimation)?.keyPath == "position" {
++                        let creation = creationMatches(owner, animation)
++                        record["creation"] = creation
++                        if creationLinksEmitted < 3 {
++                            creationLinksEmitted += 1
++                            emit(["event": "creation-link", "creation": creation])
++                        }
++                    }
 +                    record["animationClass"] = String(describing: type(of: animation))
 +                    record["duration"] = animation.duration
 +                    record["repeat"] = animation.repeatCount
@@ -176,7 +263,7 @@ index 3f2e07b7cd..cf8925dec0 100644
 +        defer { lock.unlock() }
 +        let busy = readBusy?()
 +        emit(["event": "snapshot", "phase": phase, "pending": pending.count,
-+              "callbacks": callbackCount, "overflow": overflow,
++              "callbacks": callbackCount, "creations": creationCount, "overflow": overflow,
 +              "xctBusy": busy as Any? ?? "unavailable"])
 +        let signature = "\(busy as Any? ?? "unavailable")/" + pending.keys.sorted().joined(separator: ";")
 +        guard busy == true || !pending.isEmpty,

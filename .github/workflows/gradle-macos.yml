@@ -1,4 +1,4 @@
-name: Native repeated scan journey observation (temporary)
+name: Native animation owner observation (temporary)
 
 on:
   workflow_dispatch:
