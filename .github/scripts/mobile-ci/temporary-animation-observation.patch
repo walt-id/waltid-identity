@@ -1,8 +1,15 @@
 diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
-index 3f2e07b7cd..ce2b45ff64 100644
+index 3f2e07b7cd..cf8925dec0 100644
 --- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
 +++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
-@@ -45,6 +45,59 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+@@ -1,5 +1,6 @@
+ import SwiftUI
+ import UIKit
++import ObjectiveC
+ 
+ extension View {
+     /// Fit the active page, capped by the system's available presentation height.
+@@ -45,6 +46,61 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
      private var height: CGFloat = 0
      private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
  
@@ -13,6 +20,7 @@ index 3f2e07b7cd..ce2b45ff64 100644
 +
 +    init() {
 +        guard ProcessInfo.processInfo.environment["E2E_MOCK_WALLET"] == "1" else { return }
++        _ = WalletAnimationTrackerObservation.installed
 +        for name in [UIResponder.keyboardWillShowNotification, UIResponder.keyboardDidShowNotification,
 +                     UIResponder.keyboardWillHideNotification, UIResponder.keyboardDidHideNotification,
 +                     UIResponder.keyboardWillChangeFrameNotification, UIResponder.keyboardDidChangeFrameNotification] {
@@ -56,13 +64,14 @@ index 3f2e07b7cd..ce2b45ff64 100644
 +        for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
 +            for window in scene.windows { visit(window.layer, depth: 0) }
 +        }
++        WalletAnimationTrackerObservation.snapshot("keyboard-after-\(delay)")
 +        observe("layers after=\(delay) visited=\(visited) active=\(active.count) values=\(active)")
 +    }
 +
      func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
          guard #available(iOS 16, *), activePage === page, height.isFinite, height > 0,
                let presentation = owner.sheetPresentationController else { return }
-@@ -54,6 +107,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+@@ -54,6 +110,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
          let needsConfiguration = sheet !== presentation
              || presentation.detents.map(\.identifier) != [identifier]
          guard needsConfiguration || self.height != rounded else { return }
@@ -70,3 +79,128 @@ index 3f2e07b7cd..ce2b45ff64 100644
          self.height = rounded
          let changes = { [self] in
              if needsConfiguration {
+@@ -148,3 +205,124 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
+         }
+     }
+ }
++
++// Temporary WAL-1585 diagnostic. Never part of the durable application.
++// Observe the exact UIKit callbacks wrapped by XCTest; never alter their arguments,
++// return values, animation policy, completion callbacks, or XCTest's counter.
++private enum WalletAnimationTrackerObservation {
++    private static let lock = NSRecursiveLock()
++    private static var sequence = 0
++    private static var callbackCount = 0
++    private static var recent: [[String: Any]] = []
++    private static var dumpedSignatures: Set<String> = []
++    private static var overflow = false
++    private static var pending: [String: [String: Any]] = [:]
++    private static var counts: [String: Int] = [:]
++    private static var readBusy: (() -> Bool)?
++
++    static let installed: Void = {
++        guard ProcessInfo.processInfo.environment["E2E_MOCK_WALLET"] == "1",
++              let state = NSClassFromString("UIViewAnimationState"),
++              let notifier = NSClassFromString("XCTAnimationsIdleNotifier"),
++              let busy = class_getClassMethod(notifier, NSSelectorFromString("isAnimationInProgress")),
++              let start = class_getInstanceMethod(state, NSSelectorFromString("animationDidStart:")),
++              let stop = class_getInstanceMethod(state, NSSelectorFromString("animationDidStop:finished:")) else {
++            emit(["event": "unavailable"])
++            return
++        }
++        let busySelector = NSSelectorFromString("isAnimationInProgress")
++        let busyFunction = unsafeBitCast(method_getImplementation(busy), to: (@convention(c) (AnyObject, Selector) -> Bool).self)
++        readBusy = { busyFunction(notifier as AnyObject, busySelector) }
++        typealias Start = @convention(c) (AnyObject, Selector, AnyObject?) -> Void
++        typealias Stop = @convention(c) (AnyObject, Selector, AnyObject?, Bool) -> Void
++        let originalStart = unsafeBitCast(method_getImplementation(start), to: Start.self)
++        let originalStop = unsafeBitCast(method_getImplementation(stop), to: Stop.self)
++        let startSelector = NSSelectorFromString("animationDidStart:")
++        let stopSelector = NSSelectorFromString("animationDidStop:finished:")
++        let startBlock: @convention(block) (AnyObject, AnyObject?) -> Void = { owner, animation in
++            callback("start-enter", owner, animation)
++            originalStart(owner, startSelector, animation)
++            callback("start-exit", owner, animation)
++        }
++        let stopBlock: @convention(block) (AnyObject, AnyObject?, Bool) -> Void = { owner, animation, finished in
++            callback("stop-enter", owner, animation, finished: finished)
++            originalStop(owner, stopSelector, animation, finished)
++            callback("stop-exit", owner, animation, finished: finished)
++        }
++        method_setImplementation(start, imp_implementationWithBlock(startBlock))
++        method_setImplementation(stop, imp_implementationWithBlock(stopBlock))
++        emit(["event": "installed", "startType": String(cString: method_getTypeEncoding(start)!),
++              "stopType": String(cString: method_getTypeEncoding(stop)!)])
++    }()
++
++    private static func callback(_ event: String, _ owner: AnyObject, _ animation: AnyObject?, finished: Bool? = nil) {
++        lock.lock()
++        defer { lock.unlock() }
++        let key = "\(ObjectIdentifier(owner))/\(animation.map { String(describing: ObjectIdentifier($0)) } ?? "nil")"
++        if event == "start-enter", pending.count < 512 {
++            counts[key, default: 0] += 1
++            if pending[key] == nil {
++                var record: [String: Any] = ["key": key, "started": ProcessInfo.processInfo.systemUptime,
++                                           "ownerClass": String(describing: type(of: owner)),
++                                           "returnAddresses": Thread.callStackReturnAddresses.map { $0.stringValue }]
++                if let animation = animation as? CAAnimation {
++                    record["animationClass"] = String(describing: type(of: animation))
++                    record["duration"] = animation.duration
++                    record["repeat"] = animation.repeatCount
++                    record["speed"] = animation.speed
++                    record["removed"] = animation.isRemovedOnCompletion
++                    if let property = animation as? CAPropertyAnimation { record["keyPath"] = property.keyPath ?? "nil" }
++                }
++                pending[key] = record
++
++            }
++        }
++        if event == "stop-exit", let count = counts[key] {
++            if count > 1 { counts[key] = count - 1 }
++            else { counts.removeValue(forKey: key); pending.removeValue(forKey: key) }
++        }
++        var record: [String: Any] = ["event": event, "key": key, "balance": counts[key, default: 0],
++                                    "pending": pending.count, "xctBusy": readBusy?() as Any? ?? "unavailable"]
++        if let finished { record["finished"] = finished }
++        callbackCount += 1
++        record["callback"] = callbackCount
++        record["uptime"] = ProcessInfo.processInfo.systemUptime
++        record["main"] = Thread.isMainThread
++        recent.append(record)
++        if recent.count > 192 { recent.removeFirst() }
++        if pending.count >= 512 { overflow = true }
++    }
++
++    static func snapshot(_ phase: String) {
++        lock.lock()
++        defer { lock.unlock() }
++        let busy = readBusy?()
++        emit(["event": "snapshot", "phase": phase, "pending": pending.count,
++              "callbacks": callbackCount, "overflow": overflow,
++              "xctBusy": busy as Any? ?? "unavailable"])
++        let signature = "\(busy as Any? ?? "unavailable")/" + pending.keys.sorted().joined(separator: ";")
++        guard busy == true || !pending.isEmpty,
++              dumpedSignatures.count < 8, dumpedSignatures.insert(signature).inserted else { return }
++        for row in recent { emit(["event": "callback", "phase": phase, "record": row]) }
++        for key in pending.keys.sorted().prefix(30) {
++            emit(["event": "pending", "phase": phase, "balance": counts[key, default: 0], "record": pending[key]!])
++        }
++    }
++
++    private static func emit(_ fields: [String: Any]) {
++        lock.lock()
++        defer { lock.unlock() }
++        guard sequence < 3000 else { return }
++        sequence += 1
++        var row = fields
++        row["sequence"] = sequence
++        row["uptime"] = ProcessInfo.processInfo.systemUptime
++        row["pid"] = ProcessInfo.processInfo.processIdentifier
++        row["main"] = Thread.isMainThread
++        guard let data = try? JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]),
++              var line = "WAL1585 tracker ".data(using: .utf8) else { return }
++        line.append(data)
++        line.append(10)
++        FileHandle.standardError.write(line)
++    }
++}

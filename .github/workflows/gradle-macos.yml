@@ -1,4 +1,4 @@
-name: Native animation suite observation (temporary)
+name: Native animation callback observation (temporary)
 
 on:
   workflow_dispatch:
@@ -47,6 +47,20 @@ jobs:
           git apply --check "$patch"
           git apply "$patch"
           git diff > "$GITHUB_WORKSPACE/animation-observation/applied.patch"
+      - name: Retain the actual animation notifier implementation
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import hashlib, json, os, subprocess
+          binary = Path(os.environ['DEVELOPER_DIR']) / 'Platforms/iPhoneSimulator.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework/XCTAutomationSupport'
+          out = Path(os.environ['GITHUB_WORKSPACE']) / 'animation-observation'
+          disassembly = subprocess.check_output(['xcrun', 'otool', '-arch', 'arm64', '-tvV', str(binary)], text=True)
+          start = disassembly.find('+[XCTAnimationsIdleNotifier initialize]:')
+          end = disassembly.find('-[XCTMainRunLoopIdleNotifier init]:', max(start, 0))
+          (out / 'XCTAnimationsIdleNotifier.disassembly.txt').write_text(disassembly[start:end] if start >= 0 and end > start else disassembly)
+          metadata = {'binary': str(binary), 'sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'xcode': subprocess.check_output(['xcodebuild', '-version'], text=True)}
+          (out / 'notifier-binary.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          PYCODE
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
       - name: Configure the owning iOS build environment
@@ -63,14 +77,14 @@ jobs:
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Observe the original mock-wallet suite order
+      - name: Observe callback pairing in the original mock-wallet suite order
         timeout-minutes: 90
         working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
           exec python3 "$GITHUB_WORKSPACE/waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py" \
             --output-dir "$GITHUB_WORKSPACE/animation-observation" native-observation \
             bash -e -o pipefail <<'TESTS'
-          simulator=$(xcrun simctl create 'WAL1585 animation suite observation' 'iPhone 17' 'iOS 27.0')
+          simulator=$(xcrun simctl create 'WAL1585 animation callback observation' 'iPhone 17' 'iOS 27.0')
           cleanup() {
             result=$?
             xcrun simctl delete "$simulator" || { cleanup_result=$?; (( result != 0 )) || result=$cleanup_result; }
