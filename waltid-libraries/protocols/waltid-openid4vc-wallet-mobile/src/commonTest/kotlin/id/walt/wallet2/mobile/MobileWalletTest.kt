@@ -85,6 +85,8 @@ import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
@@ -194,6 +196,50 @@ class MobileWalletTest {
         deletion.join()
         wallet.deleteWallet()
         assertEquals(1, cleanups)
+    }
+
+    @Test
+    fun deletingACredentialAuditsACredentialDeletionTransactionLogEntry() = runTest {
+        val store = InMemoryCredentialStore().also {
+            it.addCredential(
+                StoredCredential(
+                    id = "pid-1",
+                    credential = SdJwtCredential(
+                        dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                        credentialData = buildJsonObject {
+                            put("vct", "https://credentials.example/identity_credential")
+                            put("given_name", "Ada")
+                        },
+                        issuer = "https://issuer.example",
+                        subject = "did:key:subject",
+                        signature = null,
+                        signed = null,
+                    ),
+                    metadata = buildJsonObject {
+                        put("issuerDisplay", buildJsonArray {
+                            add(buildJsonObject { put("name", "Example Issuer") })
+                        })
+                    },
+                )
+            )
+        }
+        val wallet = MobileWallet(
+            walletId = "deletion-audit", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = store,
+        )
+
+        assertTrue(wallet.deleteCredential("pid-1"))
+
+        val entry = assertIs<CredentialDeletionTransactionLog>(wallet.transactionLog().entries.single())
+        assertEquals(TransactionResult.Completed, entry.transactionResult)
+        assertEquals(
+            "https://credentials.example/identity_credential",
+            entry.credentialDeletion.credentialIdentifier,
+        )
+        assertEquals("Example Issuer", entry.credentialDeletion.credentialIssuerName)
+
+        assertFalse(wallet.deleteCredential("missing"))
+        assertEquals(1, wallet.transactionLog().entries.size)
     }
 
     @Test
