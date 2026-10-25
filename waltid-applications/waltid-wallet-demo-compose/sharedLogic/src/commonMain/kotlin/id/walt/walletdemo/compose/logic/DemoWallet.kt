@@ -66,6 +66,12 @@ interface DemoWallet {
     ): WalletDemoTransactionLogPage = WalletDemoTransactionLogPage(entries = emptyList())
 
     /**
+     * Removes a single transaction history entry by its [transactionIdentifier].
+     * Returns whether the entry existed; the default is a no-op for wallets without a log.
+     */
+    suspend fun deleteTransactionLogEntry(transactionIdentifier: String): Boolean = false
+
+    /**
      * Web hosts persist authorization-code issuance across a full-page issuer redirect.
      * Mobile keeps the session in memory, so the default is no pending session.
      */

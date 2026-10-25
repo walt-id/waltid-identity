@@ -1084,6 +1084,16 @@ public class MobileWallet internal constructor(
             transactionLogStore.read(query)
         }
 
+    /**
+     * Removes a single transaction history entry by its [transactionIdentifier].
+     *
+     * Returns whether the entry existed; deletion is idempotent and leaves other history untouched.
+     */
+    public suspend fun deleteTransactionLogEntry(transactionIdentifier: String): Boolean =
+        lifecycle.use {
+            transactionLogStore.remove(transactionIdentifier)
+        }
+
     public suspend fun deleteWallet(): Unit = lifecycle.delete {
         if (!localStoresCleared) {
             issuanceSessions.closeSessions()

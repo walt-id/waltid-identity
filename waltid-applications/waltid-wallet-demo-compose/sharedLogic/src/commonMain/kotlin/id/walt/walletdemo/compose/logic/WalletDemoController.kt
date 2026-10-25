@@ -1615,6 +1615,35 @@ class WalletDemoController(
         }
     }
 
+    /** Deletes a single transaction log entry and drops it from the loaded list on success. */
+    fun deleteTransactionLogEntry(transactionIdentifier: String) {
+        if (!_state.value.transactionLog.supported) return
+        scope.launch(dispatcher) {
+            runCatching { wallet.deleteTransactionLogEntry(transactionIdentifier) }
+                .onSuccess {
+                    _state.update { state ->
+                        state.copy(
+                            transactionLog = state.transactionLog.copy(
+                                entries = state.transactionLog.entries
+                                    .filterNot { it.transactionIdentifier == transactionIdentifier },
+                                expandedIds = state.transactionLog.expandedIds - transactionIdentifier,
+                            ),
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    _state.update {
+                        it.copy(
+                            transactionLog = it.transactionLog.copy(
+                                error = "Could not delete the transaction log entry. Try again.",
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
     private fun loadTransactionLog(reset: Boolean) {
         transactionLogJob?.cancel()
         val cursor = if (reset) null else _state.value.transactionLog.nextCursor

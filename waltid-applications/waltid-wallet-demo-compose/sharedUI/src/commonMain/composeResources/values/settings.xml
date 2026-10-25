@@ -25,6 +25,10 @@
     <string name="transaction_log_type_deletion">Credential deletion</string>
     <string name="transaction_log_result_completed">Completed</string>
     <string name="transaction_log_result_not_completed">Not completed</string>
+    <string name="transaction_log_delete">Delete</string>
+    <string name="transaction_log_delete_question">Delete this entry?</string>
+    <string name="transaction_log_delete_description">This removes the entry from the transaction history. This cannot be undone.</string>
+    <string name="transaction_log_delete_cancel">Cancel</string>
     <string name="settings_nearby">Nearby sharing</string>
     <string name="settings_connection">Connection method</string>
     <string name="settings_reader_authentication">Reader authentication</string>

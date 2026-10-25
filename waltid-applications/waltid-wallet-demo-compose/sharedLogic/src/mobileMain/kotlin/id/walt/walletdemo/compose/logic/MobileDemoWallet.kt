@@ -368,6 +368,9 @@ internal class MobileDemoWallet(
         )
     }
 
+    override suspend fun deleteTransactionLogEntry(transactionIdentifier: String): Boolean =
+        mobileWallet.deleteTransactionLogEntry(transactionIdentifier)
+
     override suspend fun deleteWallet() {
         mobileWallet.deleteWallet()
     }
