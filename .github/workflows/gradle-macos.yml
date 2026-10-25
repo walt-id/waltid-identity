@@ -1,4 +1,4 @@
-name: Native animation observation (temporary)
+name: Native animation suite observation (temporary)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ env:
 jobs:
   animation-observation:
     runs-on: xcode-27
-    timeout-minutes: 75
+    timeout-minutes: 110
     steps:
       - name: Checkout the observed failing tuple
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
@@ -63,14 +63,14 @@ jobs:
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Observe both original journeys across five repetitions
-        timeout-minutes: 55
+      - name: Observe the original mock-wallet suite order
+        timeout-minutes: 90
         working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
           exec python3 "$GITHUB_WORKSPACE/waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py" \
             --output-dir "$GITHUB_WORKSPACE/animation-observation" native-observation \
             bash -e -o pipefail <<'TESTS'
-          simulator=$(xcrun simctl create 'WAL1585 animation observation' 'iPhone 17' 'iOS 27.0')
+          simulator=$(xcrun simctl create 'WAL1585 animation suite observation' 'iPhone 17' 'iOS 27.0')
           cleanup() {
             result=$?
             xcrun simctl delete "$simulator" || { cleanup_result=$?; (( result != 0 )) || result=$cleanup_result; }
@@ -83,9 +83,8 @@ jobs:
           xcodebuild test -collect-test-diagnostics never \
             -project iosApp.xcodeproj -scheme iosApp -configuration Debug \
             -destination "platform=iOS Simulator,id=$simulator" \
-            -only-testing:iosAppUITests/MockWalletUITests/testPresentationDeclineSendsProtocolRejection \
-            -only-testing:iosAppUITests/MockWalletUITests/testUnsignedPaymentShowsLocalizedFieldsAndRequiresSeparateConfirmation \
-            -test-iterations 5 -parallel-testing-enabled NO -enableCodeCoverage NO \
+            -only-testing:iosAppUITests/MockWalletUITests \
+            -parallel-testing-enabled NO -enableCodeCoverage NO \
             -resultBundlePath "$GITHUB_WORKSPACE/animation-observation/TestResults.xcresult" \
             -derivedDataPath /tmp/xcode-derived OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
           TESTS
