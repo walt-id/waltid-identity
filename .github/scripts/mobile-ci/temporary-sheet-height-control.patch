@@ -1,0 +1,85 @@
+--- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
++++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+@@ -9,6 +9,18 @@
+ private struct WalletSheetSizingModifier: ViewModifier {
+     @StateObject private var sizing = WalletSheetSizingCoordinator()
+     func body(content: Content) -> some View { content.environment(\.walletSheetSizing, sizing) }
++}
++
++// Temporary single-factor control; only the scanner opts into this environment value.
++private struct WalletDiagnosticHoldSheetHeightKey: EnvironmentKey {
++    static let defaultValue = false
++}
++
++extension EnvironmentValues {
++    public var walletDiagnosticHoldSheetHeight: Bool {
++        get { self[WalletDiagnosticHoldSheetHeightKey.self] }
++        set { self[WalletDiagnosticHoldSheetHeightKey.self] = newValue }
++    }
+ }
+ 
+ private struct WalletSheetSizingKey: EnvironmentKey {
+@@ -27,6 +39,7 @@
+     private let content: Content
+     @Environment(\.walletSheetSizing) private var sizing
+     @Environment(\.accessibilityReduceMotion) private var reduceMotion
++    @Environment(\.walletDiagnosticHoldSheetHeight) private var diagnosticHoldHeight
+ 
+     public init(@ViewBuilder content: () -> Content) { self.content = content() }
+ 
+@@ -34,7 +47,7 @@
+         ScrollView {
+             VStack(spacing: 0) { content }
+                 .fixedSize(horizontal: false, vertical: true)
+-                .background(WalletSheetPageMeasurement(sizing: sizing, animated: !reduceMotion))
++                .background(WalletSheetPageMeasurement(sizing: sizing, animated: !reduceMotion, diagnosticHoldHeight: diagnosticHoldHeight))
+         }
+     }
+ }
+@@ -76,17 +89,21 @@
+ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
+     let sizing: WalletSheetSizingCoordinator?
+     let animated: Bool
++    let diagnosticHoldHeight: Bool
+ 
+     func makeUIViewController(context: Context) -> Controller { Controller() }
+     func updateUIViewController(_ controller: Controller, context: Context) {
+         controller.sizing = sizing
+         controller.animated = animated
++        controller.diagnosticHoldHeight = diagnosticHoldHeight
+         controller.scheduleMeasurement()
+     }
+ 
+     final class Controller: UIViewController {
+         weak var sizing: WalletSheetSizingCoordinator?
+         var animated = true
++        var diagnosticHoldHeight = false
++        private var measuredHeightBeforeHold: CGFloat?
+         private var measurementScheduled = false
+         private var waitingForNavigation = false
+ 
+@@ -144,7 +161,13 @@
+             // bottom safe area to custom detents itself, so exclude it from our target.
+             let chrome = max(0, viewport.minY) + max(0, page.view.bounds.height - viewport.maxY)
+                 + insets.top + insets.bottom - page.view.safeAreaInsets.bottom
+-            sizing.update(page: self, height: view.bounds.height + chrome, owner: owner, animated: animated)
++            let measuredHeight = view.bounds.height + chrome
++            if measuredHeight.isFinite && measuredHeight > 0,
++               !diagnosticHoldHeight || measuredHeightBeforeHold == nil {
++                measuredHeightBeforeHold = measuredHeight
++            }
++            let targetHeight = diagnosticHoldHeight ? (measuredHeightBeforeHold ?? measuredHeight) : measuredHeight
++            sizing.update(page: self, height: targetHeight, owner: owner, animated: animated)
+         }
+     }
+ }
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift
+@@ -82,6 +82,7 @@
+         .ignoresSafeArea(.container, edges: .bottom)
+         .accessibilityIdentifier("wallet.scanScreen")
+         .modifier(ScannerSheetSurface())
++        .environment(\.walletDiagnosticHoldSheetHeight, manual)
+         .onChange(of: input) { _ in resolutionError = nil }
+         .onChange(of: manual) { manual in inputFocused = manual }
+         .onDisappear { closed = true; resolutionTask?.cancel() }

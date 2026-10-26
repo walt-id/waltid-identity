@@ -1,4 +1,4 @@
-name: Native focus transition control (temporary)
+name: Native scanner height control (temporary)
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ env:
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
 
 jobs:
-  focus-control:
+  sheet-height-control:
     runs-on: xcode-27
     timeout-minutes: 110
     steps:
@@ -40,11 +40,11 @@ jobs:
           persist-credentials: false
       - name: Record the single-factor control source
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/focus-control"
-          patch="$GITHUB_WORKSPACE/probe-harness/.github/scripts/mobile-ci/temporary-focus-control.patch"
-          shasum -a 256 "$patch" > "$GITHUB_WORKSPACE/focus-control/patch-sha256.txt"
-          xcodebuild -version > "$GITHUB_WORKSPACE/focus-control/xcode-version.txt"
-          xcrun simctl list runtimes --json > "$GITHUB_WORKSPACE/focus-control/runtimes.json"
+          mkdir -p "$GITHUB_WORKSPACE/sheet-height-control"
+          patch="$GITHUB_WORKSPACE/probe-harness/.github/scripts/mobile-ci/temporary-sheet-height-control.patch"
+          shasum -a 256 "$patch" > "$GITHUB_WORKSPACE/sheet-height-control/patch-sha256.txt"
+          xcodebuild -version > "$GITHUB_WORKSPACE/sheet-height-control/xcode-version.txt"
+          xcrun simctl list runtimes --json > "$GITHUB_WORKSPACE/sheet-height-control/runtimes.json"
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
       - name: Configure the owning iOS build environment
@@ -54,18 +54,18 @@ jobs:
       - name: Run the normal provider prerequisite
         run: |
           exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir "$GITHUB_WORKSPACE/focus-control" provider \
+            --output-dir "$GITHUB_WORKSPACE/sheet-height-control" provider \
             waltid-identity/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh \
             --project-dir waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp \
             --destination "$IOS_SIMULATOR_DESTINATION" --derived-data /tmp/xcode-derived \
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Run bounded original and focus-control arms
+      - name: Run bounded original and scanner-height arms
         timeout-minutes: 90
         run: |
           exec python3 "$GITHUB_WORKSPACE/waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py" \
-            --output-dir "$GITHUB_WORKSPACE/focus-control" focus-control \
+            --output-dir "$GITHUB_WORKSPACE/sheet-height-control" sheet-height-control \
             python3 - <<'CONTROL'
           from pathlib import Path
           import hashlib, json, os, signal, subprocess, sys
@@ -73,19 +73,19 @@ jobs:
           workspace = Path(os.environ['GITHUB_WORKSPACE'])
           repo = workspace / 'waltid-identity'
           project = repo / 'waltid-applications/waltid-wallet-demo-ios/iosApp'
-          out = workspace / 'focus-control'
-          source = 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift'
-          patch = workspace / 'probe-harness/.github/scripts/mobile-ci/temporary-focus-control.patch'
-          expected = {'original': '957a2e0a42543980743555ed3e9b45e0e2a5b01f3822b687b731beae048f8eda', 'control': 'bad7cc2ca1456fdcca6f80aac74de5c9767ba17fe99f555cd0065c48378cb07d'}
-          assert hashlib.sha256(patch.read_bytes()).hexdigest() == '6a8f8d8fd819ecec1cba1f57c46dc8842a7c3d73cbee64b5203cead9f62bf130'
+          out = workspace / 'sheet-height-control'
+          sources = ['waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift', 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift']
+          patch = workspace / 'probe-harness/.github/scripts/mobile-ci/temporary-sheet-height-control.patch'
+          expected = {'original': {'waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift': '37860d541755f6ee379a7bf79a6e2ee97ae4a29b8b3dd9b14fdad3e77a056bde', 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift': '957a2e0a42543980743555ed3e9b45e0e2a5b01f3822b687b731beae048f8eda'}, 'control': {'waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift': '4b1e64c6e2b02fa74498f4cfaf6a9a04f9314e7a3cf34cdc4021af88637c9ec0', 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift': 'c87345c3a69c374c09049114e48722e264377a03cb23bd360101f0e40c5a41fa'}}
+          assert hashlib.sha256(patch.read_bytes()).hexdigest() == 'bc35570b27e429bfec7151a314404578079951114b8001840dddd228c4750d68'
           method = 'MockWalletUITests/testScanReceiveDetailsAndShareUsesMockWallet()'
           selection = 'iosAppUITests/MockWalletUITests/testScanReceiveDetailsAndShareUsesMockWallet'
           def interrupted(signum, frame):
               raise SystemExit(128 + signum)
-          
+
           signal.signal(signal.SIGTERM, interrupted)
           signal.signal(signal.SIGINT, interrupted)
-          
+
           rows = []
           overall = 0
 
@@ -108,15 +108,15 @@ jobs:
               patched = False
               simulator = None
               try:
-                  assert hashlib.sha256((repo / source).read_bytes()).hexdigest() == expected['original']
+                  assert {path: hashlib.sha256((repo / path).read_bytes()).hexdigest() for path in sources} == expected['original']
                   if arm == 'control':
                       run(['git', 'apply', '--check', str(patch)], cwd=repo)
                       run(['git', 'apply', str(patch)], cwd=repo)
                       patched = True
-                  actual = hashlib.sha256((repo / source).read_bytes()).hexdigest()
+                  actual = {path: hashlib.sha256((repo / path).read_bytes()).hexdigest() for path in sources}
                   assert actual == expected[arm]
-                  (destination / 'applied.patch').write_bytes(subprocess.check_output(['git', 'diff', '--', source], cwd=repo))
-                  simulator = subprocess.check_output(['xcrun', 'simctl', 'create', 'WAL1585 focus ' + label, 'iPhone 17', 'iOS 27.0'], text=True).strip()
+                  (destination / 'applied.patch').write_bytes(subprocess.check_output(['git', 'diff', '--', *sources], cwd=repo))
+                  simulator = subprocess.check_output(['xcrun', 'simctl', 'create', 'WAL1585 sheet height ' + label, 'iPhone 17', 'iOS 27.0'], text=True).strip()
                   run(['xcrun', 'simctl', 'bootstatus', simulator, '-b'])
                   bundle = destination / 'TestResults.xcresult'
                   command = ['xcodebuild', 'test', '-collect-test-diagnostics', 'never',
@@ -155,7 +155,7 @@ jobs:
                       if patched:
                           run(['git', 'apply', '-R', '--check', str(patch)], cwd=repo)
                           run(['git', 'apply', '-R', str(patch)], cwd=repo)
-                      assert hashlib.sha256((repo / source).read_bytes()).hexdigest() == expected['original']
+                      assert {path: hashlib.sha256((repo / path).read_bytes()).hexdigest() for path in sources} == expected['original']
 
           if len(rows) == 5 and all(row['case']['result'] == 'Passed' for row in rows if row['arm'] == 'original'):
               (out / 'stop-reason.txt').write_text('Baseline did not reproduce in the fixed batch; inconclusive. No extra repetitions.\n')
@@ -166,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: native-focus-control
-          path: focus-control/**
+          name: native-sheet-height-control
+          path: sheet-height-control/**
           if-no-files-found: error
           retention-days: 7
