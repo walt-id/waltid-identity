@@ -28,6 +28,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))//for Base64Utils
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
 
