@@ -692,11 +692,9 @@ class Issuer2MetadataEndpointTest {
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
                     assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
                 } else if (credentialConfigurationId == "urn:eudi:pid:1") {
-                    assertEquals("EU Person Identification Data", vctTypeMetadata.name)
-                    assertEquals(
-                        "EUDI Person Identification Data (urn:eudi:pid:1).",
-                        vctTypeMetadata.description,
-                    )
+                    val configured = ConfigManager.getConfig<Issuer2MetadataConfig>()
+                        .sdJwtVcTypeMetadataConfiguration.getValue(credentialConfigurationId)
+                    assertEquals(configured.copy(vct = publishedVct), vctTypeMetadata)
                 } else {
                     assertEquals(credentialConfigurationId, vctTypeMetadata.name)
                     assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)

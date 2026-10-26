@@ -186,7 +186,7 @@ class MetadataService @JvmOverloads constructor(
             val vct = configuration.vct ?: return@firstNotNullOfOrNull null
             when {
                 vct == hostedVct -> vct
-                vct == credentialType && !isHttpUrl(vct) -> vct
+                vct == credentialType && vctKind(vct) == VctKind.URN -> vct
                 else -> null
             }
         } ?: throw NotFoundException("Credential type metadata not found: $credentialType")
@@ -285,35 +285,46 @@ class MetadataService @JvmOverloads constructor(
         "$baseUrl/$credentialType"
 
     private fun validateVct(configurationId: String, vct: String) {
-        if (vct.contains(':')) {
-            val uri = runCatching { URI(vct) }.getOrNull()
-            require(uri != null && uri.isAbsolute) {
-                "Credential configuration '$configurationId' has invalid vct '$vct'. A vct containing ':' must be an absolute URI."
-            }
+        require(vct.isNotBlank()) {
+            "Credential configuration '$configurationId' requires a non-blank vct"
         }
-        validateSelfHostedVct(configurationId, vct)
+        when (vctKind(vct)) {
+            VctKind.HTTP -> validateSelfHostedVct(configurationId, vct)
+            VctKind.URN -> Unit
+            null -> throw IllegalArgumentException(
+                "Credential configuration '$configurationId' has invalid vct '$vct'. " +
+                    "Use an http(s) URL with a host, or a URN such as urn:eudi:pid:1."
+            )
+        }
     }
 
-    private fun isHttpUrl(value: String): Boolean =
-        value.startsWith("https://") || value.startsWith("http://")
+    /**
+     * Classifies a resolved vct. HTTP(S) requires a hierarchical URI with a host, compared
+     * case-insensitively on the scheme. A URN requires a namespace identifier and a non-empty
+     * namespace-specific string. Anything else, including a bare string or `https:foo`, is rejected.
+     */
+    private fun vctKind(vct: String): VctKind? {
+        if (vct.isBlank()) return null
+        val uri = runCatching { URI(vct) }.getOrNull() ?: return null
+        val scheme = uri.scheme ?: return null
+        return when {
+            scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true) ->
+                if (!uri.isOpaque && !uri.host.isNullOrBlank()) VctKind.HTTP else null
+            scheme.equals("urn", ignoreCase = true) && URN_WITH_NAMESPACE.matches(uri.schemeSpecificPart.orEmpty()) ->
+                VctKind.URN
+            else -> null
+        }
+    }
 
     private fun defaultTypeMetadata(credentialType: String, resolvedVct: String): SdJwtVcTypeMetadataDraft04 =
-        if (resolvedVct == EUDI_PID_VCT) {
-            SdJwtVcTypeMetadataDraft04(
-                vct = resolvedVct,
-                name = "EU Person Identification Data",
-                description = "EUDI Person Identification Data (urn:eudi:pid:1).",
-            )
-        } else {
-            SdJwtVcTypeMetadataDraft04(
-                vct = resolvedVct,
-                name = credentialType,
-                description = "$credentialType Verifiable Credential",
-            )
-        }
+        SdJwtVcTypeMetadataDraft04(
+            vct = resolvedVct,
+            name = credentialType,
+            description = "$credentialType Verifiable Credential",
+        )
 
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
-        // VCTs may be external URLs or non-HTTP identifiers. Only our own protocol paths collide.
+        // Only HTTP(S) VCTs that share this issuer's origin can collide with protocol routes.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
         val issuerUri = URI(baseUrl)
         if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
@@ -347,8 +358,11 @@ class MetadataService @JvmOverloads constructor(
         )
     }
 
+    private enum class VctKind { HTTP, URN }
+
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
-        private const val EUDI_PID_VCT = "urn:eudi:pid:1"
+        // NID may contain dots, as in urn:eu.europa.ec.eudi:cor:1. The first colon separates it from a non-empty NSS.
+        private val URN_WITH_NAMESPACE = Regex("^[^:\\s]+:\\S+$")
     }
 }
