@@ -32,5 +32,9 @@ excluded_classes=(
 python3 "$script_dir/verify_test_results.py" \
   --require-class id.walt.crypto2.signum.AndroidSignumKeyBackendDeviceTest \
   --reports "$identity_dir/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml"
+# Remove these EHIC allowances when https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93 is resolved.
 python3 "$script_dir/verify_test_results.py" \
+  --allow-skipped \
+    'id.walt.wallet2.mobile.test.MobileWalletIntegrationTest#receiveAndPresentEudiEhicSdJwtAgainstEudi' \
+    'id.walt.wallet2.mobile.test.MobileWalletIntegrationTest#previewAndSubmitEudiEhicSdJwtAgainstEudi' \
   --reports "$identity_dir/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml"
