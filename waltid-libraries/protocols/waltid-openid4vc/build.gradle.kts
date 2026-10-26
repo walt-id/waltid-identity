@@ -58,6 +58,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(identityLibs.ktor.client.java)
+            implementation(identityLibs.ktor.client.okhttp)
             implementation(identityLibs.java.cose)
             implementation(identityLibs.nimbus.jose.jwt)
         }
