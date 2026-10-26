@@ -5,7 +5,7 @@ This document lists third-party libraries used by :waltid-libraries:waltid-java-
 This distribution includes 2 third-party components, listed below with
 their license and copyright holder.
 
-* [org.jetbrains.kotlin:kotlin-stdlib 2.4.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
 * [org.jetbrains:annotations 13.0](http://www.jetbrains.org). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
