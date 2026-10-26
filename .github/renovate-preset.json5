@@ -67,6 +67,11 @@
       allowedVersions: '/^1\\.27.*alpine/',
     },
     {
+      description: 'iOS Compose visual baselines are recorded with Roborazzi 1.76.0. Bump it only together with those snapshots.',
+      matchPackageNames: ['/^io\\.github\\.takahirom(\\.roborazzi|:roborazzi)/'],
+      allowedVersions: '1.76.0',
+    },
+    {
       description: 'AGP 9.4 truncates comma-separated instrumentation filters; see android-gradle in the version catalogs.',
       matchDepNames: [
         'com.android.application',
