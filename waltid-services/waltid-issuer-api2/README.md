@@ -409,9 +409,16 @@ profile snapshot. The array receipt contains only the common flat receipt fields
 has no `profileId`, selection array, or configuration inventory, even for one entry.
 The wallet resolves the returned offer to obtain its OpenID4VCI configuration IDs.
 
-`AUTHORIZED` offers default to `issuerStateMode = INCLUDE` in OSS. An explicit `OMIT`
-cannot be combined with runtime overrides. Defaults for reference/value mode, expiry,
-and transaction codes are shared by both request forms.
+`AUTHORIZED` offers default to `issuerStateMode = OMIT`, matching Enterprise. Missing
+or null `issuerStateMode` omits `issuer_state` for both single and multi-credential
+requests, by reference or by value. Runtime overrides require an explicit
+`"issuerStateMode": "INCLUDE"`; missing, null, or `OMIT` with overrides returns Bad Request.
+Without `issuer_state`, authorization creates a profile-derived session rather than
+recovering the original offer session. Pre-authorized offers are unchanged.
+
+**Migration:** Send `"issuerStateMode": "INCLUDE"` to preserve the previous OSS behavior,
+including recovery of the original offer session and support for runtime overrides.
+Defaults for reference/value mode, expiry, and transaction codes are shared by both request forms.
 
 ### Sessions, authorization and proof copies
 

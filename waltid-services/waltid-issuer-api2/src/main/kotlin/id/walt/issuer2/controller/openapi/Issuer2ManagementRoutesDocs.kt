@@ -86,8 +86,12 @@ object Issuer2ManagementRoutesDocs {
             **Flow and expiry**
 
             - Both request formats support pre-authorized and authorization-code flows, by reference or by value.
-            - Authorization-code offers include `issuer_state` by default. `issuerStateMode: OMIT` is allowed
-              only for profile-based offers without runtime overrides; combining it with overrides returns Bad Request.
+            - Authorization-code offers default to `issuerStateMode: OMIT`, matching Enterprise. Missing or null
+              `issuerStateMode` omits `issuer_state` in both request formats and both delivery modes.
+            - Runtime overrides require explicit `issuerStateMode: INCLUDE` for authorization-code offers.
+              Missing, null, or `OMIT` with overrides returns Bad Request.
+            - Migration: send `"issuerStateMode": "INCLUDE"` to preserve previous OSS behavior and recover
+              the original offer session. Without it, authorization creates a profile-derived session.
             - `expiresInSeconds` defaults to `300` (five minutes). Use `-1` for no expiry.
 
             **Runtime overrides**

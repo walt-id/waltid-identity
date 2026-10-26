@@ -12,6 +12,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
+import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
@@ -525,7 +526,7 @@ class IssuanceNotificationRouteTest {
             }
             val client = apiClient()
             val createdOffer = client.createCredentialOffer(
-                Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
+                Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(issuerStateMode = IssuerStateMode.INCLUDE).withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(notificationServer.webhookUrl()),
