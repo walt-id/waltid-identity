@@ -96,12 +96,36 @@ class PrivateNetworkGuardTest {
     }
 
     @Test
-    fun `a test system property allows loopback without changing the deployment setting`() = runTest {
+    fun `an unset loopback choice follows the test system property`() = runTest {
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
         System.setProperty("walt.ssrf.allowLoopback", "true")
         val engine = MockEngine { respondOk("hello") }
         val client = guardedClient(engine)
         assertTrue(client.get("http://127.0.0.1/admin").status.isSuccess())
-        assertTrue(!PrivateNetworkGuardSettings.allowLoopback)
+        assertTrue(!PrivateNetworkGuardSettings.allowLoopbackExplicit)
+    }
+
+    @Test
+    fun `an explicit loopback deny wins over the test system property`() = runTest {
+        System.setProperty("walt.ssrf.allowLoopback", "true")
+        PrivateNetworkGuardSettings.allowLoopback = false
+        val engine = MockEngine { respondOk() }
+        val client = guardedClient(engine)
+        assertFailsWith<BlockedAddressException> { client.get("http://127.0.0.1/admin") }
+    }
+
+    @Test
+    fun `ipv4-mapped loopback and private addresses are refused`() = runTest {
+        val engine = MockEngine { respondOk() }
+        val client = guardedClient(engine)
+        assertFailsWith<BlockedAddressException> { client.get("http://[::ffff:127.0.0.1]/admin") }
+        assertFailsWith<BlockedAddressException> { client.get("http://[::ffff:10.1.2.3]/") }
+    }
+
+    @Test
+    fun `okhttp connect dns refuses loopback and returns a public literal`() {
+        assertFailsWith<java.net.UnknownHostException> { ConnectTimeDns.lookup("127.0.0.1") }
+        assertTrue(ConnectTimeDns.lookup("8.8.8.8").isNotEmpty())
     }
 
     @Test

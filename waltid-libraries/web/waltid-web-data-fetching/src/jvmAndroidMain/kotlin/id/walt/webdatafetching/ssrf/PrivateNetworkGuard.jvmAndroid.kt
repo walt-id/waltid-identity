@@ -2,6 +2,7 @@ package id.walt.webdatafetching.ssrf
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.okhttp.OkHttpConfig
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.HttpRequestBuilder
@@ -12,6 +13,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Dns
 import java.net.InetAddress
 import java.net.UnknownHostException
 
@@ -33,10 +35,23 @@ private fun isTrustedHost(host: String): Boolean =
         host.equals(suffix, ignoreCase = true) || host.endsWith(".$suffix", ignoreCase = true)
     }
 
-private fun loopbackAllowed(): Boolean =
-    PrivateNetworkGuardSettings.allowLoopback || System.getProperty("walt.ssrf.allowLoopback") == "true"
+private fun loopbackAllowed(): Boolean = when {
+    PrivateNetworkGuardSettings.allowLoopbackExplicit -> PrivateNetworkGuardSettings.allowLoopback
+    else -> System.getProperty("walt.ssrf.allowLoopback") == "true"
+}
+
+/** IPv4 address embedded in an IPv4-mapped IPv6 address (`::ffff:0:0/96`), or null. */
+private fun embeddedIpv4(address: InetAddress): InetAddress? {
+    val bytes = address.address
+    if (bytes.size != 16) return null
+    val mapped = (0 until 10).all { bytes[it] == 0.toByte() } &&
+        bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
+    if (!mapped) return null
+    return InetAddress.getByAddress(bytes.copyOfRange(12, 16))
+}
 
 private fun isBlockedAddress(address: InetAddress, trustedHost: Boolean): Boolean {
+    embeddedIpv4(address)?.let { return isBlockedAddress(it, trustedHost) }
     // Never legitimate for a server-side fetch, regardless of host trust - no opt-out.
     if (address.isLinkLocalAddress) return true // covers 169.254.0.0/16, including the cloud-metadata address
     if (address.isMulticastAddress) return true
@@ -97,7 +112,27 @@ private fun resolveRedirectTarget(base: Url, location: String): Url {
     throw UnsupportedRedirectException("Refusing to follow relative redirect Location '$location' from $base")
 }
 
+/**
+ * OkHttp calls this while connecting, and connects to the addresses it returns, so a second DNS answer
+ * cannot swap in a blocked address after the earlier check.
+ */
+internal object ConnectTimeDns : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val addresses = Dns.SYSTEM.lookup(hostname)
+        val trustedHost = isTrustedHost(hostname)
+        if (addresses.any { isBlockedAddress(it, trustedHost) }) {
+            throw UnknownHostException("Destination not allowed: $hostname")
+        }
+        return addresses
+    }
+}
+
 actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
+    // OkHttp connects to the addresses its Dns returns. The engine type is not visible on HttpClientConfig<*>,
+    // so this is a no-op for every other engine, which keeps the pre-connect check below.
+    engine {
+        if (this is OkHttpConfig) dns = ConnectTimeDns
+    }
     install(createClientPlugin("PrivateNetworkGuard") {
         on(Send) { request ->
             requireAllowedTarget(request.url.build())

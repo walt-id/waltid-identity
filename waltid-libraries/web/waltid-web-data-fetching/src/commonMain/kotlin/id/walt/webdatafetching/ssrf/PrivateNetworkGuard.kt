@@ -31,7 +31,28 @@ class BlockedAddressException(message: String) : Exception(message)
  */
 object PrivateNetworkGuardSettings {
     @Volatile
-    var allowLoopback: Boolean = false
+    private var allowLoopbackValue: Boolean = false
+
+    /**
+     * False until [allowLoopback] is assigned. While this is false, JVM tests may allow loopback via the
+     * `walt.ssrf.allowLoopback` system property. An assignment, including `false`, wins over that property.
+     */
+    @Volatile
+    var allowLoopbackExplicit: Boolean = false
+        private set
+
+    var allowLoopback: Boolean
+        get() = allowLoopbackValue
+        set(value) {
+            allowLoopbackValue = value
+            allowLoopbackExplicit = true
+        }
+
+    /** Returns to the unset default so the test system property can apply again. */
+    fun clearAllowLoopbackChoice() {
+        allowLoopbackExplicit = false
+        allowLoopbackValue = false
+    }
 
     @Volatile
     var allowPrivateNetworks: Boolean = false
@@ -52,5 +73,9 @@ object PrivateNetworkGuardSettings {
  * request" into "the attacker made a request as the server, from inside the network." It is not meaningful for a
  * client acting only on behalf of the end user running it (a wallet app talking to its own device), which is why
  * only the JVM/Android actual performs a real check; other platforms install a no-op.
+ *
+ * On OkHttp, including the JVM Native web-data-fetching engine, the same policy is also applied in the DNS
+ * implementation OkHttp uses to connect, so the addresses that were checked are the ones the connection uses.
+ * Other engines are checked before the engine connects.
  */
 expect fun HttpClientConfig<*>.installPrivateNetworkGuard()
