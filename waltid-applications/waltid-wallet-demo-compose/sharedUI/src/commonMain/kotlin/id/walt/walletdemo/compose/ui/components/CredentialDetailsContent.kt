@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.resources.*
@@ -57,6 +59,7 @@ internal fun CredentialDetailsOverflowMenu(
             )
         }
         DropdownMenu(
+            modifier = Modifier.semantics { testTagsAsResourceId = true },
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {

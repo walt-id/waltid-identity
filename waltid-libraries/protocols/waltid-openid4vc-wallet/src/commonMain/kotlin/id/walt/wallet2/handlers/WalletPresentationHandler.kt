@@ -12,6 +12,7 @@ import id.waltid.openid4vp.wallet.CredentialPresentationKey
 import id.waltid.openid4vp.wallet.CredentialPresentationKeyResolver
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.Key as Crypto2Key
@@ -35,6 +36,10 @@ import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.data.resolveHolderKey
+import id.walt.wallet2.transactionlog.ClaimInfo
+import id.walt.wallet2.transactionlog.Presentation
+import id.walt.wallet2.transactionlog.PresentationTransactionLog
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.walt.webdatafetching.WebDataFetcher
@@ -55,14 +60,20 @@ import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.jvm.JvmInline
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
@@ -1068,6 +1079,15 @@ object WalletPresentationHandler {
         previewedDcApiRequests.discard(wallet.id, requestId)
     }
 
+    /** Explicit refusal is a transaction; local dismissal of the review is not. */
+    suspend fun rejectDcApiPreview(wallet: Wallet, requestId: String) {
+        val preview = previewedDcApiRequests.consume(wallet.id, requestId)
+        logPresentation(
+            wallet, preview.request.authorizationRequest, preview.request.effectiveClientMetadata?.clientName,
+            null, TransactionResult.NotCompleted, "User declined",
+        )
+    }
+
     private suspend fun selectReviewedCredentials(
         wallet: Wallet,
         query: DcqlQuery,
@@ -1151,7 +1171,22 @@ object WalletPresentationHandler {
                 scaAuthorizer = scaAuthorizer,
             )
 
-            result.emitPresentationOutcome(onEvent)
+            result.exceptionOrNull()?.let { error ->
+                if (error is CancellationException) throw error
+                logPresentation(
+                    wallet, resolvedAuthorizationRequest.authorizationRequest,
+                    resolvedAuthorizationRequest.client.effectiveClientMetadata?.clientName,
+                    null, TransactionResult.NotCompleted, "Presentation submission failed (${error::class.simpleName})",
+                )
+            }
+            val outcome = result.emitPresentationOutcome(onEvent)
+            val (transactionResult, reasonOfNoncompletion) = outcome.toTransactionResult()
+            logPresentation(
+                wallet, resolvedAuthorizationRequest.authorizationRequest,
+                resolvedAuthorizationRequest.client.effectiveClientMetadata?.clientName,
+                selected, transactionResult, reasonOfNoncompletion,
+            )
+            outcome
         }
     }
 
@@ -1182,7 +1217,16 @@ object WalletPresentationHandler {
             errorDescription = request.errorDescription.takeIf { detectedError == null },
         )
 
-        return result.emitPresentationOutcome(onEvent)
+        val outcome = result.emitPresentationOutcome(onEvent)
+        val reason = request.errorDescription?.takeIf { it.isNotBlank() }
+            ?: detectedError?.let { "Presentation request rejected: $errorCode" }
+            ?: "User declined"
+        logPresentation(
+            wallet, authorizationRequest,
+            preview.resolvedAuthorizationRequest.client.effectiveClientMetadata?.clientName,
+            null, TransactionResult.NotCompleted, reason,
+        )
+        return outcome
     }
 
     /**
@@ -1196,6 +1240,7 @@ object WalletPresentationHandler {
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        wallet: Wallet? = null,
     ): WalletPresentResult {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(
             { WalletPresentationFormatRegistry.defaultCapabilities() },
@@ -1213,7 +1258,16 @@ object WalletPresentationHandler {
             error = errorCode,
             errorDescription = request.errorDescription,
         )
-        return result.emitPresentationOutcome(onEvent)
+        val outcome = result.emitPresentationOutcome(onEvent)
+        wallet?.let {
+            val reason = request.errorDescription?.takeIf { d -> d.isNotBlank() } ?: "User declined"
+            logPresentation(
+                it, resolvedAuthorizationRequest.authorizationRequest,
+                resolvedAuthorizationRequest.client.effectiveClientMetadata?.clientName,
+                null, TransactionResult.NotCompleted, reason,
+            )
+        }
+        return outcome
     }
 
     /**
@@ -1382,10 +1436,19 @@ object WalletPresentationHandler {
                 },
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
             ).getOrElse { error ->
+                if (error is CancellationException) throw error
                 onEvent(WalletSessionEvent.presentation_failed)
+                logPresentation(
+                    wallet, authorizationRequest, resolvedRequest.effectiveClientMetadata?.clientName,
+                    null, TransactionResult.NotCompleted, "Presentation response failed (${error::class.simpleName})",
+                )
                 throw error
             }.also {
                 onEvent(WalletSessionEvent.presentation_completed)
+                logPresentation(
+                    wallet, authorizationRequest, resolvedRequest.effectiveClientMetadata?.clientName,
+                    selected, TransactionResult.Completed, null,
+                )
             }
         }
     }
@@ -2292,6 +2355,103 @@ object WalletPresentationHandler {
             disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
+
+    /**
+     * Best-effort TS10 presentation audit entry. Mirrors issuance/deletion logging: gated on a
+     * configured [Wallet.transactionLogStore] and never allowed to fail the presentation itself.
+     *
+     * [selected] carries the credentials actually released and is null for declines or failures
+     * where nothing was presented. [reasonOfNoncompletion] must be present if and only if
+     * [transactionResult] is [TransactionResult.NotCompleted].
+     */
+    private suspend fun logPresentation(
+        wallet: Wallet,
+        authorizationRequest: AuthorizationRequest,
+        verifierName: String?,
+        selected: Map<String, List<DcqlMatcher.DcqlMatchResult>>?,
+        transactionResult: TransactionResult,
+        reasonOfNoncompletion: String?,
+    ) {
+        val store = wallet.transactionLogStore ?: return
+        try {
+            store.store(
+                PresentationTransactionLog(
+                    transactionIdentifier = Uuid.random().toString(),
+                    time = Clock.System.now().toLocalDateTime(TimeZone.UTC),
+                    transactionResult = transactionResult,
+                    presentation = Presentation(
+                        listOfClaimsRequested = authorizationRequest.dcqlQuery?.toRequestedClaimInfos().orEmpty(),
+                        listOfClaimsPresented = selected?.toPresentedClaimInfos().orEmpty(),
+                        interactingPartyName = verifierName?.takeIf { it.isNotBlank() }?.let { listOf(it) },
+                        // TODO - consider localization
+                        reasonOfNoncompletion = reasonOfNoncompletion,
+                    ),
+                )
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            log.error(error) { "Could not log credential presentation for wallet '${wallet.id}'" }
+        }
+    }
+
+    /**
+     * Maps a completed submission outcome onto a TS10 transaction result. A response the verifier
+     * accepted, or one prepared for the host to deliver, counts as completed; an explicit verifier
+     * rejection is a non-completion.
+     */
+    private fun WalletPresentResult.toTransactionResult(): Pair<TransactionResult, String?> = when {
+        transmissionSuccess == true -> TransactionResult.Completed to null
+        getUrl != null || formPostHtml != null -> TransactionResult.Completed to null
+        else -> TransactionResult.NotCompleted to "Verifier did not accept the presentation"
+    }
+
+    /** TS10 requested claims grouped by credential type; queries without resolvable claim paths are skipped. */
+    private fun DcqlQuery.toRequestedClaimInfos(): List<ClaimInfo> =
+        credentials.mapNotNull { query ->
+            val credentialIdentifier = query.meta.getTypeString()?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            val claims = query.claims.orEmpty()
+                .map { it.path.toClaimPath() }
+                .filter { it.isNotBlank() }
+                .distinct()
+            claims.takeIf { it.isNotEmpty() }?.let { ClaimInfo(credentialIdentifier, it) }
+        }
+
+    /** TS10 presented claims: the paths actually released per matched credential type. */
+    private fun Map<String, List<DcqlMatcher.DcqlMatchResult>>.toPresentedClaimInfos(): List<ClaimInfo> =
+        values.flatten().mapNotNull { match ->
+            val credentialIdentifier = match.presentedCredentialIdentifier() ?: return@mapNotNull null
+            val claims = match.toPresentationDisclosures()
+                .map { it.path.toClaimPath() }
+                .filter { it.isNotBlank() }
+                .distinct()
+            claims.takeIf { it.isNotEmpty() }?.let { ClaimInfo(credentialIdentifier, it) }
+        }
+
+    private fun DcqlMatcher.DcqlMatchResult.presentedCredentialIdentifier(): String? =
+        ((credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential)
+            ?.presentationCredentialIdentifier()
+
+    private fun DigitalCredential.presentationCredentialIdentifier(): String? {
+        val identifier = if (this is MdocsCredential) docType else {
+            (credentialData["vct"] as? JsonPrimitive)?.contentOrNull
+                ?: when (val type = credentialData["type"]) {
+                    is JsonArray -> (type.lastOrNull() as? JsonPrimitive)?.contentOrNull
+                    is JsonPrimitive -> type.contentOrNull
+                    else -> null
+                }
+        }
+        return identifier?.takeIf { it.isNotBlank() }
+    }
+
+    /** Human-readable dot path from DCQL claim path segments (unquoted string/index components). */
+    private fun List<JsonElement>.toClaimPath(): String =
+        joinToString(".") { part -> (part as? JsonPrimitive)?.contentOrNull ?: part.toString() }
+
+    /** Normalizes an internal (possibly JSON-quoted) disclosure path key into a human-readable dot path. */
+    private fun String.toClaimPath(): String =
+        split(".").joinToString(".") { segment -> segment.trim('"') }
 }
 
 /**

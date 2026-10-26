@@ -25,11 +25,21 @@ import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
+import id.walt.wallet2.transactionlog.CredentialIssuanceTransactionLog
+import id.walt.wallet2.transactionlog.PresentationTransactionLog
+import id.walt.wallet2.transactionlog.TransactionLog
+import id.walt.wallet2.transactionlog.TransactionLogCursor
+import id.walt.wallet2.transactionlog.TransactionLogQuery
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.walt.crypto2.keys.KeyOrigin
 import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
@@ -346,6 +356,21 @@ internal class MobileDemoWallet(
     override suspend fun deleteCredential(credentialId: String): Boolean =
         mobileWallet.deleteCredential(credentialId)
 
+    override fun supportsTransactionLog(): Boolean = true
+
+    override suspend fun readTransactionLog(cursor: String?, limit: Int): WalletDemoTransactionLogPage {
+        val page = mobileWallet.transactionLog(
+            TransactionLogQuery(limit = limit, cursor = cursor?.let(::decodeTransactionLogCursor)),
+        )
+        return WalletDemoTransactionLogPage(
+            entries = page.entries.map { it.toDemoEntry() },
+            nextCursor = page.nextCursor?.let(::encodeTransactionLogCursor),
+        )
+    }
+
+    override suspend fun deleteTransactionLogEntry(transactionIdentifier: String): Boolean =
+        mobileWallet.deleteTransactionLogEntry(transactionIdentifier)
+
     override suspend fun deleteWallet() {
         mobileWallet.deleteWallet()
     }
@@ -550,3 +575,95 @@ internal fun SigningIdentityFailure.explanation(): String = when (this) {
     SigningIdentityFailure.ProviderConflict -> "A different backup already uses this identifier. Choose another backup destination. The existing backup has not been overwritten."
     SigningIdentityFailure.ProviderConfirmationPending -> "The backup provider has not confirmed the backup yet. Check again later to continue setup with the same key."
 }
+
+private val transactionLogCursorJson = Json { ignoreUnknownKeys = true }
+
+@Serializable
+private data class TransactionLogCursorToken(
+    val sortValue: String,
+    val transactionIdentifier: String,
+)
+
+private fun encodeTransactionLogCursor(cursor: TransactionLogCursor): String =
+    transactionLogCursorJson.encodeToString(
+        TransactionLogCursorToken(cursor.sortValue, cursor.transactionIdentifier),
+    )
+
+private fun decodeTransactionLogCursor(token: String): TransactionLogCursor {
+    val decoded = transactionLogCursorJson.decodeFromString<TransactionLogCursorToken>(token)
+    return TransactionLogCursor(
+        sortValue = decoded.sortValue,
+        transactionIdentifier = decoded.transactionIdentifier,
+    )
+}
+
+internal fun TransactionLog.toDemoEntry(): WalletDemoTransactionLogEntry {
+    val result = when (transactionResult) {
+        TransactionResult.Completed -> WalletDemoTransactionLogResult.Completed
+        TransactionResult.NotCompleted -> WalletDemoTransactionLogResult.NotCompleted
+    }
+    val (type, relyingPartyName, details) = when (this) {
+        is PresentationTransactionLog -> Triple(
+            WalletDemoTransactionLogType.Presentation,
+            presentation.interactingPartyName?.firstOrNull(),
+            buildList {
+                presentation.interactingPartyName?.takeIf { it.isNotEmpty() }
+                    ?.let { add(WalletDemoTransactionLogDetail("Relying party", it.joinToString(", "))) }
+                presentation.purpose?.takeIf { it.isNotEmpty() }
+                    ?.let { purposes -> add(WalletDemoTransactionLogDetail("Purpose", purposes.joinToString(", ") { it.content })) }
+                add(WalletDemoTransactionLogDetail("Claims requested", presentation.listOfClaimsRequested.claimPathCount().toString()))
+                add(WalletDemoTransactionLogDetail("Claims shared", presentation.listOfClaimsPresented.claimPathCount().toString()))
+                presentation.reasonOfNoncompletion
+                    ?.let { add(WalletDemoTransactionLogDetail("Reason not completed", it)) }
+            },
+        )
+
+        is CredentialIssuanceTransactionLog -> Triple(
+            WalletDemoTransactionLogType.Issuance,
+            credentialIssuance.interactingPartyName?.firstOrNull(),
+            buildList {
+                credentialIssuance.interactingPartyName?.takeIf { it.isNotEmpty() }
+                    ?.let { add(WalletDemoTransactionLogDetail("Issuer", it.joinToString(", "))) }
+                add(WalletDemoTransactionLogDetail("Credentials requested", credentialIssuance.credentialNumberRequested.toString()))
+                add(WalletDemoTransactionLogDetail("Credentials issued", credentialIssuance.credentialNumberIssued.toString()))
+                credentialIssuance.credentialIdentifier.takeIf { it.isNotEmpty() }
+                    ?.let { add(WalletDemoTransactionLogDetail("Credential types", it.joinToString(", "))) }
+                add(WalletDemoTransactionLogDetail("User initiated", if (credentialIssuance.isUserTriggered) "Yes" else "No"))
+            },
+        )
+
+        is CredentialDeletionTransactionLog -> Triple(
+            WalletDemoTransactionLogType.Deletion,
+            credentialDeletion.credentialIssuerName,
+            buildList {
+                add(WalletDemoTransactionLogDetail("Credential type", credentialDeletion.credentialIdentifier))
+                credentialDeletion.credentialIssuerName
+                    ?.let { add(WalletDemoTransactionLogDetail("Issuer", it)) }
+            },
+        )
+    }
+    return WalletDemoTransactionLogEntry(
+        transactionIdentifier = transactionIdentifier,
+        type = type,
+        time = time.toString(),
+        result = result,
+        relyingPartyName = relyingPartyName?.takeIf { it.isNotBlank() },
+        details = details,
+        credentials = if (this is PresentationTransactionLog) {
+            val requested = presentation.listOfClaimsRequested.groupBy { it.credentialIdentifier }
+            val presented = presentation.listOfClaimsPresented.groupBy { it.credentialIdentifier }
+            (requested.keys + presented.keys).map { identifier ->
+                WalletDemoTransactionLogCredential(
+                    credentialIdentifier = identifier,
+                    requestedClaims = requested[identifier].orEmpty().flatMap { it.claims }
+                        .distinct().map(::WalletDemoTransactionLogClaim),
+                    presentedClaims = presented[identifier].orEmpty().flatMap { it.claims }
+                        .distinct().map(::WalletDemoTransactionLogClaim),
+                )
+            }
+        } else emptyList(),
+    )
+}
+
+private fun List<id.walt.wallet2.transactionlog.ClaimInfo>.claimPathCount(): Int =
+    sumOf { it.claims.size }

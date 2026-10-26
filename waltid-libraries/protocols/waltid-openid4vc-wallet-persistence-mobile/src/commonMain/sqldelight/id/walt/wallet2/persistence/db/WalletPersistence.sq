@@ -137,3 +137,38 @@ WHERE active.wallet_id = ? AND record.phase = 'Active';
 
 setActiveIdentity:
 INSERT OR REPLACE INTO wallet_active_identity (wallet_id, identity_id, key_id, did) VALUES (?, ?, ?, ?);
+
+-- TS10 transaction envelopes share the containing wallet's encrypted database.
+CREATE TABLE transaction_log (
+    transaction_identifier TEXT NOT NULL PRIMARY KEY,
+    time TEXT NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX transaction_log_time ON transaction_log (time, transaction_identifier);
+
+insertTransactionLogEntry:
+INSERT INTO transaction_log (transaction_identifier, time, payload) VALUES (?, ?, ?);
+
+selectTransactionLogOldestFirst:
+SELECT payload FROM transaction_log
+WHERE (:cursor_time IS NULL AND :cursor_id IS NULL) OR time > :cursor_time
+    OR (time = :cursor_time AND transaction_identifier > :cursor_id)
+ORDER BY time ASC, transaction_identifier ASC
+LIMIT :page_limit;
+
+selectTransactionLogNewestFirst:
+SELECT payload FROM transaction_log
+WHERE (:cursor_time IS NULL AND :cursor_id IS NULL) OR time < :cursor_time
+    OR (time = :cursor_time AND transaction_identifier < :cursor_id)
+ORDER BY time DESC, transaction_identifier DESC
+LIMIT :page_limit;
+
+deleteTransactionLogEntryById:
+DELETE FROM transaction_log WHERE transaction_identifier = ?;
+
+transactionLogChanges:
+SELECT changes();
+
+clearTransactionLog:
+DELETE FROM transaction_log;

@@ -115,6 +115,7 @@ internal fun WalletScreen(
             allowWalletReset = allowWalletReset,
             serverSettingsContent = serverSettingsContent,
             walletAccessContent = { WalletAccessSettingsScreen(controller, state.access) },
+            transactionLogContent = { TransactionLogScreen(controller, state.transactionLog) },
             onCancelPinChange = controller::cancelPinChange,
         )
         return

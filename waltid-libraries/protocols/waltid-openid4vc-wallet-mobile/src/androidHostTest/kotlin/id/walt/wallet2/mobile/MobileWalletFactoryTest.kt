@@ -20,8 +20,6 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
@@ -56,6 +54,12 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightTransactionLogStore
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.transactionlog.CredentialDeletion
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.Dispatchers
@@ -66,6 +70,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
+import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -82,6 +87,30 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MobileWalletFactoryTest {
+    @Test
+    fun `wallet deletion clears transaction log even with custom stores`() = runTest {
+        for (persistence in listOf(
+            MobileWalletPersistence(),
+            MobileWalletPersistence(credentialStore = InMemoryCredentialStore(), didStore = InMemoryDidStore()),
+        )) {
+            database().use { database ->
+                val store = SqlDelightTransactionLogStore(database.queries)
+                store.store(CredentialDeletionTransactionLog(
+                    transactionIdentifier = "deleted-credential",
+                    time = LocalDateTime.parse("2026-10-19T19:00:00"),
+                    transactionResult = TransactionResult.Completed,
+                    credentialDeletion = CredentialDeletion("urn:example:pid"),
+                ))
+                val wallet = wallet(MobileWalletConfig(persistence = persistence), database, FakePlatformManagedKeyProvider())
+
+                wallet.deleteWallet()
+                wallet.deleteWallet()
+
+                assertTrue(store.read().entries.isEmpty())
+            }
+        }
+    }
+
     @Test
     fun `cold factory reopens saved identity and authenticates DID requests without creating keys`() = runTest {
         val verifier = JWKKey.generate(KeyType.secp256r1)

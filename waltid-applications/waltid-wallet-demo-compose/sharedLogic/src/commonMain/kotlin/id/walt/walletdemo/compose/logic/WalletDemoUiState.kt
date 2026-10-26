@@ -44,6 +44,7 @@ data class WalletDemoUiState(
         WalletDemoProximityTransportProfile.Default,
     val proximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
     val pinLockEnabled: Boolean = true,
+    val transactionLog: WalletDemoTransactionLogState = WalletDemoTransactionLogState(),
 ) {
     val auth: WalletAuthState get() = access.auth
     val isAuthenticating: Boolean get() = access.isBusy

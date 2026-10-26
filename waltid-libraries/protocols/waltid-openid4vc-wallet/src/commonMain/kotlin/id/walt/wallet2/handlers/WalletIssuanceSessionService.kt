@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.CredentialParser.getString
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -19,6 +21,9 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
+import id.walt.wallet2.transactionlog.CredentialIssuance
+import id.walt.wallet2.transactionlog.CredentialIssuanceTransactionLog
+import id.walt.wallet2.transactionlog.TransactionResult
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -63,6 +68,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -999,6 +1006,7 @@ class WalletIssuanceSessionService(
                 emitEvent(WalletSessionEvent.issuance_credential_stored)
                 onCredentialStored(credential)
             }
+            logStoredCredentialIssuance(pendingWrites)
             removeDeferred(record)
             WalletIssuanceOutcome.Stored(record.sessionId, storedIds)
         } catch (error: CancellationException) {
@@ -1015,6 +1023,45 @@ class WalletIssuanceSessionService(
             failed(record.sessionId, code,
                 storedIds, if (code == WalletIssuanceErrorCode.INVALID_SESSION) emptyList() else listOf(record.public))
         }
+    }
+
+    private suspend fun logStoredCredentialIssuance(credentials: List<StoredCredential>) {
+        if (credentials.isEmpty()) return
+        val store = wallet.transactionLogStore ?: return
+        try {
+            store.store(CredentialIssuanceTransactionLog(
+                transactionIdentifier = Uuid.random().toString(),
+                time = Clock.System.now().toLocalDateTime(TimeZone.UTC),
+                transactionResult = TransactionResult.Completed,
+                // TODO - store other metadata about the issuance, we could probably store here the whole WRPRC
+                credentialIssuance = CredentialIssuance(
+                    // TODO - can we get the actual number requested from the issuer?
+                    credentialNumberRequested = credentials.size,
+                    credentialNumberIssued = credentials.size,
+                    credentialIdentifier = credentials.mapNotNull { it.issuanceCredentialIdentifier() },
+                    isUserTriggered = true,
+                    interactingPartyName = credentials.first().metadata?.get("issuerDisplay")?.jsonArray
+                        ?.firstOrNull()?.getString("name")?.let { listOf(it) },
+                ),
+            ))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            log.error(error) { "Could not log stored credential issuance for wallet '${wallet.id}'" }
+        }
+    }
+
+    private fun StoredCredential.issuanceCredentialIdentifier(): String? {
+        val issued = credential
+        val identifier = if (issued is MdocsCredential) issued.docType else {
+            (issued.credentialData["vct"] as? JsonPrimitive)?.contentOrNull
+                ?: when (val type = issued.credentialData["type"]) {
+                    is JsonArray -> (type.lastOrNull() as? JsonPrimitive)?.contentOrNull
+                    is JsonPrimitive -> type.contentOrNull
+                    else -> null
+                }
+        }
+        return identifier?.takeIf { it.isNotBlank() }
     }
 
     private suspend fun retainInterruptedDeferred(record: DeferredRecord) {

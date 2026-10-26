@@ -37,7 +37,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class TransactionDataProfilesIntegrationTest {
+class TransactionLogDataProfilesIntegrationTest {
 
     private val host = "127.0.0.1"
     private val port = freePort()

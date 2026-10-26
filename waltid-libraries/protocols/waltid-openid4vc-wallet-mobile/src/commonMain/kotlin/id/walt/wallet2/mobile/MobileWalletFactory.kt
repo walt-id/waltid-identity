@@ -23,6 +23,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
+import id.walt.wallet2.persistence.stores.SqlDelightTransactionLogStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -248,6 +249,7 @@ internal fun createSqlDelightMobileWallet(
         didStore = didStore,
         credentialStore = credentialStore,
         issuanceSessionStore = issuanceSessionStore,
+        transactionLogStore = SqlDelightTransactionLogStore(queries),
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
                 WalletKeyRequirements(

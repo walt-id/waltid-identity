@@ -20,6 +20,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
@@ -61,6 +62,13 @@ import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
+import id.walt.wallet2.data.WalletTransactionLogStore
+import id.walt.wallet2.transactionlog.CredentialDeletion
+import id.walt.wallet2.transactionlog.CredentialDeletionTransactionLog
+import id.walt.wallet2.transactionlog.TransactionLogPage
+import id.walt.wallet2.transactionlog.TransactionLogQuery
+import id.walt.wallet2.transactionlog.TransactionResult
+import id.walt.wallet2.stores.inmemory.InMemoryTransactionLogStore
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -83,12 +91,18 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 internal object MobileDidSupport {
     private val initializationMutex = Mutex()
@@ -204,6 +218,7 @@ public class MobileWallet internal constructor(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
+    private val transactionLogStore: WalletTransactionLogStore = InMemoryTransactionLogStore(),
     private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
@@ -265,6 +280,7 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
+        transactionLogStore = transactionLogStore,
     ).attachIssuanceSessionState(issuanceSessionState)
 
     /**
@@ -720,10 +736,61 @@ public class MobileWallet internal constructor(
      * the credential, regardless of whether the platform registry could be updated afterwards.
      */
     public suspend fun deleteCredential(credentialId: String): Boolean = lifecycle.use {
+        val stored = runCatching { credentialStore.getCredential(credentialId) }.getOrNull()
         val removed = credentialStore.removeCredential(credentialId)
         syncDigitalCredentialRegistration()
+        if (removed && stored != null) {
+            logCredentialDeletion(stored)
+        }
         return@use removed
     }
+
+    /**
+     * Appends a best-effort [CredentialDeletionTransactionLog] for a removed credential.
+     *
+     * Auditing never changes the authoritative deletion outcome: a logging failure is swallowed,
+     * and the entry is skipped when the credential type identifier cannot be determined (the TS10
+     * [CredentialDeletion.credentialIdentifier] is required and must not be blank).
+     */
+    private suspend fun logCredentialDeletion(stored: StoredCredential) {
+        val credentialIdentifier = stored.deletionCredentialIdentifier() ?: return
+        try {
+            transactionLogStore.store(
+                CredentialDeletionTransactionLog(
+                    transactionIdentifier = Uuid.random().toString(),
+                    time = Clock.System.now().toLocalDateTime(TimeZone.UTC),
+                    transactionResult = TransactionResult.Completed,
+                    credentialDeletion = CredentialDeletion(
+                        credentialIdentifier = credentialIdentifier,
+                        credentialIssuerName = stored.issuerDisplayName(),
+                    ),
+                )
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            // Auditing is best-effort; a logging failure must not fail the deletion.
+        }
+    }
+
+    /** The deleted credential's vct/docType, mirroring the issuance log's type identifier. */
+    private fun StoredCredential.deletionCredentialIdentifier(): String? {
+        val issued = credential
+        val identifier = if (issued is MdocsCredential) issued.docType else {
+            (issued.credentialData["vct"] as? JsonPrimitive)?.contentOrNull
+                ?: when (val type = issued.credentialData["type"]) {
+                    is JsonArray -> (type.lastOrNull() as? JsonPrimitive)?.contentOrNull
+                    is JsonPrimitive -> type.contentOrNull
+                    else -> null
+                }
+        }
+        return identifier?.takeIf { it.isNotBlank() }
+    }
+
+    /** The issuer display name persisted in the credential metadata under `issuerDisplay`. */
+    private fun StoredCredential.issuerDisplayName(): String? =
+        metadata?.get("issuerDisplay")?.jsonArray?.firstOrNull()?.jsonObject
+            ?.get("name")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
 
     /**
      * Resolves an OS-mediated OpenID4VP request and returns consent metadata without releasing a credential.
@@ -810,6 +877,11 @@ public class MobileWallet internal constructor(
     /** Cancels a retained DC API review, including an in-flight native authorization. */
     public suspend fun discardDigitalCredentialPreview(requestId: String): Unit = lifecycle.use {
         WalletPresentationHandler.discardDcApiPreview(wallet, requestId)
+    }
+
+    /** Records explicit refusal and consumes the retained review without releasing credentials. */
+    public suspend fun rejectDigitalCredentialPreview(requestId: String): Unit = lifecycle.use {
+        WalletPresentationHandler.rejectDcApiPreview(wallet, requestId)
     }
 
     /**
@@ -1068,6 +1140,26 @@ public class MobileWallet internal constructor(
      * Platform key/database removal cannot roll back. On failure, retry this method on the same
      * instance; other operations remain closed. Successful deletion is idempotent.
      */
+    /**
+     * Reads a time-ordered page of this wallet's transaction history.
+     *
+     * Continue with [TransactionLogPage.nextCursor] for keyset pagination over large histories.
+     */
+    public suspend fun transactionLog(query: TransactionLogQuery = TransactionLogQuery()): TransactionLogPage =
+        lifecycle.use {
+            transactionLogStore.read(query)
+        }
+
+    /**
+     * Removes a single transaction history entry by its [transactionIdentifier].
+     *
+     * Returns whether the entry existed; deletion is idempotent and leaves other history untouched.
+     */
+    public suspend fun deleteTransactionLogEntry(transactionIdentifier: String): Boolean =
+        lifecycle.use {
+            transactionLogStore.remove(transactionIdentifier)
+        }
+
     public suspend fun deleteWallet(): Unit = lifecycle.delete {
         if (!localStoresCleared) {
             issuanceSessions.closeSessions()
@@ -1076,6 +1168,7 @@ public class MobileWallet internal constructor(
             keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
             credentialStore.listCredentials().toList().forEach { credential -> credentialStore.removeCredential(credential.id) }
             didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
+            transactionLogStore.clear()
             // Registry failures cannot prevent removal of the already cleared local database.
             syncDigitalCredentialRegistration()
             localStoresCleared = true
