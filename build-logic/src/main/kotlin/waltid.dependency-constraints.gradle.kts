@@ -11,6 +11,8 @@ pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
         "jackson-core-tools",
         "jackson-databind-tools",
         "jackson-dataformat-cbor-tools",
+        // Netty 4.1 DNS only. The 4.2 aliases above must not be applied to Azure's 4.1 HTTP modules.
+        "netty-codec-dns",
         "netty-codec-compression",
         "netty-codec-http-v2",
         "netty-codec-http2-v2",
