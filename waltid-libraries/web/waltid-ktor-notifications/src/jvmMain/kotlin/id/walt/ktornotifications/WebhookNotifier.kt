@@ -5,6 +5,7 @@ import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.network.sockets.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -14,8 +15,9 @@ import io.ktor.utils.io.*
 
 object WebhookNotifier {
 
-    private val webhookClient = HttpClient {
-        // The private-network guard follows redirects itself and checks every hop.
+    private val webhookClient = HttpClient(OkHttp) {
+        // The guard follows redirects itself. OkHttp connects through the DNS the guard installs,
+        // so the addresses that were checked are the ones the webhook is posted to.
         followRedirects = false
         install(ContentNegotiation) {
             json()

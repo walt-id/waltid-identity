@@ -30,7 +30,7 @@ kotlin {
             api(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
         }
         jvmMain.dependencies {
-            implementation(identityLibs.ktor.client.cio)
+            implementation(identityLibs.ktor.client.okhttp)
             implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
         }
         jvmTest.dependencies {
