@@ -2,40 +2,40 @@
 
 This document lists third-party libraries used by :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi.
 
-This distribution includes 364 third-party components, listed below with
+This distribution includes 346 third-party components, listed below with
 their license and copyright holder.
 
-* [at.asitplus.signum:indispensable 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-asn1 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-asn1 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-asn1-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-asn1-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-josef 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-josef 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-josef-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-josef-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-oids 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-oids 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:indispensable-oids-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-oids-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:internals 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:internals 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:internals-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:internals-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:supreme 0.15.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:supreme 0.16.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
-* [at.asitplus.signum:supreme-jvm 0.15.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:supreme-jvm 0.16.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Jakob Heher, Christian Kollmann, Simon Müller
 * [at.asitplus:kmmresult 1.9.3](https://github.com/a-sit-plus/KmmResult). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Christian Kollmann
 * [at.asitplus:kmmresult-jvm 1.9.3](https://github.com/a-sit-plus/KmmResult). Apache License, Version 2.0.
   - Copyright (c) Bernd Prünster, Christian Kollmann
-* [at.asitplus:multibase 1.2.2](https://github.com/a-sit-plus/multibase). MIT License.
+* [at.asitplus:multibase 1.3.0](https://github.com/a-sit-plus/multibase). MIT License.
   - Copyright (c) Bernd Prünster, Simon Müller
-* [at.asitplus:multibase-jvm 1.2.2](https://github.com/a-sit-plus/multibase). MIT License.
+* [at.asitplus:multibase-jvm 1.3.0](https://github.com/a-sit-plus/multibase). MIT License.
   - Copyright (c) Bernd Prünster, Simon Müller
 * [co.touchlab:stately-common 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
   - Copyright (c) Kevin Galligan
@@ -57,6 +57,10 @@ their license and copyright holder.
   - Copyright (c) Kevin Galligan
 * [co.touchlab:stately-strict-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
   - Copyright (c) Kevin Galligan
+* [com.charleskorn.kaml:kaml 0.79.0](https://github.com/charleskorn/kaml). Apache License, Version 2.0.
+  - Copyright (c) Charles Korn
+* [com.charleskorn.kaml:kaml-jvm 0.79.0](https://github.com/charleskorn/kaml). Apache License, Version 2.0.
+  - Copyright (c) Charles Korn
 * [com.doist.x:normalize 1.3.3](https://github.com/Doist/doistx-normalize). MIT License.
   - Copyright (c) Doist Inc.
 * [com.doist.x:normalize-jvm 1.3.3](https://github.com/Doist/doistx-normalize). MIT License.
@@ -78,61 +82,23 @@ their license and copyright holder.
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
-* [com.fasterxml.jackson.core:jackson-core 2.21.3](https://github.com/FasterXML/jackson-core). Apache License, Version 2.0.
+* [com.fasterxml.jackson.core:jackson-core 2.21.1](https://github.com/FasterXML/jackson-core). Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
   - Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
-  - Copyright 2018-2020 Raffaello Giulietti
-* [com.fasterxml.jackson.core:jackson-databind 2.21.3](https://github.com/FasterXML/jackson). Apache License, Version 2.0.
+* [com.fasterxml.jackson.core:jackson-databind 2.21.1](https://github.com/FasterXML/jackson). Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
-* [com.fasterxml.jackson.dataformat:jackson-dataformat-yaml 2.21.3](https://github.com/FasterXML/jackson-dataformats-text). Apache License, Version 2.0.
+* [com.fasterxml.jackson.dataformat:jackson-dataformat-yaml 2.21.1](https://github.com/FasterXML/jackson-dataformats-text). Apache License, Version 2.0.
   - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
-* [com.fasterxml.jackson.datatype:jackson-datatype-jsr310 2.21.3](https://github.com/FasterXML/jackson-modules-java8/jackson-datatype-jsr310). Apache License, Version 2.0.
+* [com.fasterxml.jackson.datatype:jackson-datatype-jsr310 2.21.1](https://github.com/FasterXML/jackson-modules-java8/jackson-datatype-jsr310). Apache License, Version 2.0.
   - Copyright (c) Nick Williams
-* [com.fasterxml.jackson.module:jackson-module-kotlin 2.21.3](https://github.com/FasterXML/jackson-module-kotlin). Apache License, Version 2.0.
-  - copyright notice that is included in or attached to the work
-  - copyright license to reproduce, prepare Derivative Works of,
-  - Copyright [yyyy] [name of copyright owner]
-  - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
-* [com.fasterxml.jackson:jackson-bom 2.21.3](https://github.com/FasterXML/jackson-bom). Apache License, Version 2.0.
+* [com.fasterxml.jackson:jackson-bom 2.21.1](https://github.com/FasterXML/jackson-bom). Apache License, Version 2.0.
   - Copyright (c) FasterXML
-* [com.github.ajalt.clikt:clikt 5.1.0](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.clikt:clikt-core 5.1.0](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.clikt:clikt-core-jvm 5.1.0](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.clikt:clikt-jvm 5.1.0](https://github.com/ajalt/clikt/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.colormath:colormath 3.6.0](https://github.com/ajalt/colormath/). MIT License.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.colormath:colormath-jvm 3.6.0](https://github.com/ajalt/colormath/). MIT License.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-core 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-core-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-ffm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-ffm-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-graal-ffi 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-graal-ffi-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-jna 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
-* [com.github.ajalt.mordant:mordant-jvm-jna-jvm 3.0.2](https://github.com/ajalt/mordant/). Apache License, Version 2.0.
-  - Copyright (c) AJ Alt
 * [com.github.java-json-tools:btf 1.3](https://github.com/java-json-tools/btf). Apache License, Version 2.0 (elected; also offered under GNU LESSER GENERAL PUBLIC LICENSE, Version 3).
   - Copyright (c) John Huffaker
 * [com.github.java-json-tools:jackson-coreutils 2.0](https://github.com/java-json-tools/jackson-coreutils). Apache License, Version 2.0 (elected; also offered under GNU LESSER GENERAL PUBLIC LICENSE, Version 3).
@@ -157,7 +123,7 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see http://findbugs.sourceforge.net/.
 * [com.google.code.gson:gson 2.13.2](https://github.com/google/gson). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/google/gson.
-* [com.google.crypto.tink:tink 1.21.0](http://github.com/tink-crypto/tink-java). Apache License, Version 2.0.
+* [com.google.crypto.tink:tink 1.23.0](http://github.com/tink-crypto/tink-java). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see http://github.com/tink-crypto/tink-java.
 * [com.google.errorprone:error_prone_annotations 2.41.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
   - Copyright (c) Google LLC
@@ -169,7 +135,7 @@ their license and copyright holder.
   - Copyright [yyyy] [name of copyright owner]
 * com.google.guava:listenablefuture 9999.0-empty-to-avoid-conflict-with-guava. Apache License, Version 2.0.
   - Copyright (c) Kevin Bourrillion
-* [com.google.protobuf:protobuf-java 4.33.0](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
+* [com.google.protobuf:protobuf-java 4.33.6](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
   - Copyright (c) Protocol Buffers
 * [com.googlecode.libphonenumber:libphonenumber 8.11.1](https://github.com/google/libphonenumber/). Apache License, Version 2.0.
   - Copyright (c) Google
@@ -177,20 +143,8 @@ their license and copyright holder.
   - Copyright (c) Ugljesa Jovanovic
 * [com.ionspin.kotlin:bignum-jvm 0.3.10](https://github.com/ionspin/kotlin-multiplatform-bignum). Apache License, Version 2.0.
   - Copyright (c) Ugljesa Jovanovic
-* [com.nimbusds:nimbus-jose-jwt 10.9.1](https://connect2id.com). Apache License, Version 2.0.
+* [com.nimbusds:nimbus-jose-jwt 10.10](https://connect2id.com). Apache License, Version 2.0.
   - Copyright (c) Connect2id Ltd.
-* [com.sksamuel.cohort:cohort-api 2.9.9](https://www.github.com/sksamuel/cohort). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
-* [com.sksamuel.cohort:cohort-ktor 2.9.9](https://www.github.com/sksamuel/cohort). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
-* [com.sksamuel.hoplite:hoplite-core 2.9.0](http://www.github.com/sksamuel/hoplite). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
-* [com.sksamuel.hoplite:hoplite-hikaricp 2.9.0](http://www.github.com/sksamuel/hoplite). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
-* [com.sksamuel.hoplite:hoplite-hocon 2.9.0](http://www.github.com/sksamuel/hoplite). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
-* [com.sksamuel.tabby:tabby-fp 2.2.12](http://www.github.com/sksamuel/tabby). Apache License, Version 2.0.
-  - Copyright (c) Stephen Samuel
 * [com.soywiz:korlibs-annotations 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
   - Copyright (c) Carlos Ballesteros Velasco
 * [com.soywiz:korlibs-annotations-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
@@ -295,37 +249,35 @@ their license and copyright holder.
   - Copyright (c) Carlos Ballesteros Velasco
 * [com.soywiz:korlibs-time-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
   - Copyright (c) Carlos Ballesteros Velasco
-* [com.squareup.okhttp3:okhttp 5.3.2](https://square.github.io/okhttp/). Apache License, Version 2.0.
+* [com.squareup.okhttp3:okhttp 5.5.0](https://lysine.dev/okhttp/). Apache License, Version 2.0.
   - Copyright (c) Square, Inc.
-* [com.squareup.okhttp3:okhttp-jvm 5.3.2](https://square.github.io/okhttp/). Apache License, Version 2.0.
+* [com.squareup.okhttp3:okhttp-jvm 5.5.0](https://lysine.dev/okhttp/). Apache License, Version 2.0.
   - Copyright (c) Square, Inc.
-* [com.squareup.okio:okio 3.17.0](https://github.com/square/okio/). Apache License, Version 2.0.
+* [com.squareup.okio:okio 3.18.2](https://github.com/lysine-dev/okio/). Apache License, Version 2.0.
   - Copyright (c) Square, Inc.
-* [com.squareup.okio:okio-jvm 3.17.0](https://github.com/square/okio/). Apache License, Version 2.0.
+* [com.squareup.okio:okio-jvm 3.18.2](https://github.com/lysine-dev/okio/). Apache License, Version 2.0.
   - Copyright (c) Square, Inc.
-* [com.typesafe:config 1.4.8](https://github.com/lightbend/config). Apache License, Version 2.0.
+* [com.typesafe:config 1.4.9](https://github.com/lightbend/config). Apache License, Version 2.0.
   - Copyright (c) com.typesafe
 * [com.upokecenter:cbor 5.0.0-alpha2](https://github.com/peteroupc/CBOR-Java). Creative Commons Legal Code.
   - Copyright (c) Peter Occil
-* [com.zaxxer:HikariCP 5.1.0](https://github.com/brettwooldridge/HikariCP). Apache License, Version 2.0.
-  - Copyright (c) Zaxxer.com
 * [commons-codec:commons-codec 1.13](https://commons.apache.org/proper/commons-codec/). Apache License, Version 2.0.
-  - copyright notice that is included in or attached to the work
-  - copyright license to reproduce, prepare Derivative Works of,
-  - Copyright [yyyy] [name of copyright owner]
   - Copyright 2002-2019 The Apache Software Foundation
   - Copyright (C) 2002 Kevin Atkinson (kevina@gnu.org)
   - Copyright (c) 2008 Alexander Beider & Stephen P. Morse.
+  - copyright notice that is included in or attached to the work
+  - copyright license to reproduce, prepare Derivative Works of,
+  - Copyright [yyyy] [name of copyright owner]
 * [commons-io:commons-io 2.20.0](https://commons.apache.org/proper/commons-io/). Apache License, Version 2.0.
-  - copyright notice that is included in or attached to the work
-  - copyright license to reproduce, prepare Derivative Works of,
-  - Copyright [yyyy] [name of copyright owner]
   - Copyright 2002-2025 The Apache Software Foundation
-* [commons-logging:commons-logging 1.2](http://commons.apache.org/proper/commons-logging/). Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
+* [commons-logging:commons-logging 1.2](http://commons.apache.org/proper/commons-logging/). Apache License, Version 2.0.
   - Copyright 2003-2014 The Apache Software Foundation
+  - copyright notice that is included in or attached to the work
+  - copyright license to reproduce, prepare Derivative Works of,
+  - Copyright [yyyy] [name of copyright owner]
 * [de.cketti.unicode:kotlin-codepoints 0.11.0](https://github.com/cketti/kotlin-codepoints). MIT License.
   - Copyright (c) cketti
 * [de.cketti.unicode:kotlin-codepoints-jvm 0.11.0](https://github.com/cketti/kotlin-codepoints). MIT License.
@@ -392,11 +344,7 @@ their license and copyright holder.
   - Copyright (c) Reactive Circus
 * [io.github.reactivecircus.cache4k:cache4k-jvm 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
   - Copyright (c) Reactive Circus
-* [io.github.smiley4:ktor-openapi 5.6.0](https://github.com/SMILEY4/). Apache License, Version 2.0.
-  - Copyright (c) smiley4
-* [io.github.smiley4:ktor-redoc 5.6.0](https://github.com/SMILEY4/ktor-redoc). Apache License, Version 2.0.
-  - Copyright (c) smiley4
-* [io.github.smiley4:ktor-swagger-ui 5.6.0](https://github.com/SMILEY4/ktor-swagger-ui). Apache License, Version 2.0.
+* [io.github.smiley4:ktor-openapi 5.7.0](https://github.com/SMILEY4/). Apache License, Version 2.0.
   - Copyright (c) smiley4
 * [io.github.smiley4:schema-kenerator-core 2.7.2](https://github.com/SMILEY4/schema-kenerator). Apache License, Version 2.0.
   - Copyright (c) smiley4
@@ -408,139 +356,123 @@ their license and copyright holder.
   - Copyright (c) smiley4
 * [io.github.smiley4:schema-kenerator-swagger 2.7.2](https://github.com/SMILEY4/schema-kenerator). Apache License, Version 2.0.
   - Copyright (c) smiley4
-* [io.klogging:klogging 0.11.8](https://klogging.io). Apache License, Version 2.0.
-  - Copyright (c) Michael Strasser
-* [io.klogging:klogging-jvm 0.11.8](https://klogging.io). Apache License, Version 2.0.
-  - Copyright (c) Michael Strasser
-* [io.klogging:slf4j-klogging 0.11.8](https://klogging.io). Apache License, Version 2.0.
-  - Copyright (c) Michael Strasser
-* [io.ktor:ktor-client-apache5 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-apache5-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-cio 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-cio-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-content-negotiation 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-content-negotiation-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-core 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-core-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-encoding 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-encoding-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-java 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-java-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-json 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-json-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-logging 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-logging-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-okhttp 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-okhttp-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-client-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-events 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-events-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-http 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-http-cio 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-http-cio-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-http-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-io 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-io-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-network 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-network-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-network-tls 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-network-tls-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-resources 3.3.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-openapi-schema 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-resources-jvm 3.3.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-openapi-schema-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-resources 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-resources-jvm 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization-kotlinx 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization-kotlinx-json 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-serialization-kotlinx-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-auth 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-auth-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-cio 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-cio-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-auth-jvm 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-content-negotiation 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-core 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-content-negotiation-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-core-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-core 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-netty-jvm 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-core-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-resources 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-host-common 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-resources-jvm 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-host-common-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-sessions 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-resources 3.3.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-server-sessions-jvm 3.4.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-resources-jvm 3.3.2](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-sessions 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-sessions-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-status-pages 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-server-status-pages-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-sse 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-sse-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websockets 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-utils 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-  - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-utils-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-  - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-websocket-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-  - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-websocket-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-  - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-websockets 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
-  - Copyright (c) Jetbrains Team
-* [io.ktor:ktor-websockets-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websockets-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright (c) Jetbrains Team
 * [io.matthewnelson.encoding:base16 2.4.0](https://github.com/05nelsonm/encoding/). Apache License, Version 2.0.
   - Copyright (c) Matthew Nelson
@@ -558,6 +490,34 @@ their license and copyright holder.
   - Copyright (c) Matthew Nelson
 * [io.matthewnelson.encoding:core-jvm 2.4.0](https://github.com/05nelsonm/encoding/). Apache License, Version 2.0.
   - Copyright (c) Matthew Nelson
+* [io.netty:netty-buffer 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-codec-base 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-codec-compression 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-codec-http 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-codec-http2 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-common 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-handler 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-resolver 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport-classes-epoll 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport-classes-kqueue 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport-native-epoll 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport-native-kqueue 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
+* [io.netty:netty-transport-native-unix-common 4.2.9.Final](https://netty.io/). Apache License, Version 2.0.
+  - Copyright (c) The Netty Project
 * [io.swagger.core.v3:swagger-annotations 2.2.45](https://github.com/swagger-api/swagger-core/modules/swagger-annotations). Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
@@ -592,11 +552,15 @@ their license and copyright holder.
   - Copyright (c) Tony Tam, Ron Ratovsky, Francis Galiegue
 * io.swagger:swagger-parser-safe-url-resolver 1.0.75. Apache License, Version 2.0.
   - Copyright (c) Tony Tam, Ron Ratovsky, Francis Galiegue
-* [jakarta.activation:jakarta.activation-api 1.2.2](https://www.eclipse.org). GNU GENERAL PUBLIC LICENSE, Version 2 + Classpath Exception.
+* [it.krzeminski:snakeyaml-engine-kmp 3.1.1](https://github.com/krzema12/snakeyaml-engine-kmp/). Apache License, Version 2.0.
+  - Copyright (c) Piotr Krzemiński
+* [it.krzeminski:snakeyaml-engine-kmp-jvm 3.1.1](https://github.com/krzema12/snakeyaml-engine-kmp/). Apache License, Version 2.0.
+  - Copyright (c) Piotr Krzemiński
+* [jakarta.activation:jakarta.activation-api 1.2.2](https://www.eclipse.org). The 3-Clause BSD License.
   - Copyright (c) 2018 Oracle and/or its affiliates. All rights reserved.
 * [jakarta.validation:jakarta.validation-api 2.0.2](https://www.eclipse.org). GNU GENERAL PUBLIC LICENSE, Version 2 + Classpath Exception.
   - Copyright (c) Emmanuel Bernard, Emmanuel Bernard, Hardy Ferentschik, Gunnar Morling, Guillaume Smet
-* [jakarta.xml.bind:jakarta.xml.bind-api 2.3.3](https://www.eclipse.org). GNU GENERAL PUBLIC LICENSE, Version 2 + Classpath Exception.
+* [jakarta.xml.bind:jakarta.xml.bind-api 2.3.3](https://www.eclipse.org). The 3-Clause BSD License.
   - Copyright (c) 2017, 2018 Oracle and/or its affiliates. All rights reserved.
 * [javax.validation:validation-api 1.1.0.Final](http://beanvalidation.org). Apache License, Version 2.0.
   - Copyright (c) Emmanuel Bernard, Emmanuel Bernard, Hardy Ferentschik, Gunnar Morling
@@ -604,13 +568,13 @@ their license and copyright holder.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright (c) ForteScarlet
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright (c) ForteScarlet
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright (c) ForteScarlet
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright (c) ForteScarlet
 * [net.java.dev.jna:jna 5.14.0](https://github.com/java-native-access/jna). Apache License, Version 2.0 (elected; also offered under GNU LESSER GENERAL PUBLIC LICENSE, Version 2.1).
   - Copyright (c) Timothy Wall, Matthias Bläsing
@@ -623,26 +587,21 @@ their license and copyright holder.
 * [net.thauvin.erik.urlencoder:urlencoder-lib-jvm 1.6.0](https://github.com/ethauvin/urlencoder). Apache License, Version 2.0.
   - Copyright (c) Geert Bevin, Erik C. Thauvin, Adam
 * [org.apache.commons:commons-lang3 3.20.0](https://commons.apache.org/proper/commons-lang/). Apache License, Version 2.0.
-  - copyright notice that is included in or attached to the work
-  - copyright license to reproduce, prepare Derivative Works of,
-  - Copyright [yyyy] [name of copyright owner]
   - Copyright 2001-2025 The Apache Software Foundation
-* [org.apache.commons:commons-pool2 2.12.0](https://commons.apache.org/proper/commons-pool/). PUBLIC DOMAIN.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
-  - Copyright 2001-2023 The Apache Software Foundation
-* org.apache.httpcomponents.client5:httpclient5 5.5.1. Apache License, Version 2.0.
+* org.apache.httpcomponents.client5:httpclient5 5.6.4. Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 1999-2021 The Apache Software Foundation
-* org.apache.httpcomponents.core5:httpcore5 5.3.6. Apache License, Version 2.0.
+* org.apache.httpcomponents.core5:httpcore5 5.4.3. Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 2005-2021 The Apache Software Foundation
-* org.apache.httpcomponents.core5:httpcore5-h2 5.3.6. Apache License, Version 2.0.
+* org.apache.httpcomponents.core5:httpcore5-h2 5.4.3. Apache License, Version 2.0.
   - copyright notice that is included in or attached to the work
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
@@ -657,29 +616,31 @@ their license and copyright holder.
   - copyright license to reproduce, prepare Derivative Works of,
   - Copyright [yyyy] [name of copyright owner]
   - Copyright 2005-2022 The Apache Software Foundation
-* [org.bouncycastle:bcpkix-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
-  - Copyright (c) The Legion of the Bouncy Castle Inc.
-* [org.bouncycastle:bcprov-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
-  - Copyright (c) The Legion of the Bouncy Castle Inc.
-* [org.bouncycastle:bcutil-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
-  - Copyright (c) The Legion of the Bouncy Castle Inc.
+* [org.bouncycastle:bcpkix-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
+  - Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
+* [org.bouncycastle:bcprov-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
+  - Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
+* [org.bouncycastle:bcutil-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
+  - Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc. (https://www.bouncycastle.org).
 * [org.checkerframework:checker-qual 3.37.0](https://checkerframework.org/). MIT License.
   - Copyright 2004-present by the Checker Framework developers
 * [org.cose:cose-java 1.1.1-WALT-SNAPSHOT](https://github.com/cose-wg/cose-java). BSD3.
   - Copyright (c) Jim Schaad, Sebastien Bahloul
+* [org.eclipse.jetty.alpn:alpn-api 1.1.3.v20160715](http://www.eclipse.org/jetty/documentation/current/alpn-chapter.html). Eclipse Public License - v 1.0.
+  - Copyright (c) Mort Bay Consulting
 * [org.jetbrains.kotlin:kotlin-reflect 2.3.21](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
-* [org.jetbrains.kotlin:kotlin-stdlib 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
-* [org.jetbrains.kotlin:kotlin-stdlib-common 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-common 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
-* [org.jetbrains.kotlin:kotlin-stdlib-jdk7 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-jdk7 2.0.0](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
-* [org.jetbrains.kotlin:kotlin-stdlib-jdk8 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-jdk8 2.0.0](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
-* [org.jetbrains.kotlinx:atomicfu 0.32.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu 0.27.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:atomicfu-jvm 0.32.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:atomicfu-jvm 0.27.0](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-coroutines-bom 1.11.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
@@ -695,13 +656,13 @@ their license and copyright holder.
   - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.8.0-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:kotlinx-io-core 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-core 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-serialization-bom 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
@@ -713,8 +674,6 @@ their license and copyright holder.
   - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-serialization-core-jvm 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.jetbrains.kotlinx:kotlinx-serialization-hocon 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
-  - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-serialization-json 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
 * [org.jetbrains.kotlinx:kotlinx-serialization-json-io 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
@@ -725,8 +684,6 @@ their license and copyright holder.
   - Copyright (c) JetBrains Team
 * [org.jetbrains:annotations 23.0.0](https://github.com/JetBrains/java-annotations). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team
-* [org.json:json 20240303](https://github.com/douglascrockford/JSON-java). PUBLIC DOMAIN.
-  - Copyright (c) Douglas Crockford
 * [org.kotlincrypto.bitops:bits 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Crypto
 * [org.kotlincrypto.bitops:bits-jvm 0.3.0](https://github.com/KotlinCrypto/bitops/). Apache License, Version 2.0.
@@ -781,15 +738,25 @@ their license and copyright holder.
   - Copyright (C) 2009-2021 The Project Lombok Authors.
   - Copyright (c) 2000-2011 INRIA, France Telecom
   - Copyright © 2010 Reinier Zwitserloot.
-* [org.slf4j:jul-to-slf4j 2.0.18](http://www.slf4j.org). MIT License.
-  - Copyright (c) 2004-2022 QOS.ch Sarl (Switzerland)
 * [org.slf4j:slf4j-api 2.1.0-alpha1](http://www.slf4j.org). MIT License.
   - Copyright (c) 2004-2022 QOS.ch Sarl (Switzerland)
-* [org.webjars:redoc 2.1.5](http://webjars.org). MIT License.
-  - Copyright (c) James Ward
-* [org.webjars:swagger-ui 5.17.14](https://www.webjars.org). Apache License, Version 2.0.
-  - Copyright holder not declared by the publisher; see https://www.webjars.org.
 * [org.yaml:snakeyaml 2.5](https://bitbucket.org/snakeyaml/snakeyaml). Apache License, Version 2.0.
   - Copyright (c) Andrey Somov, Alexander Maslov
-* [redis.clients:jedis 5.2.0](https://github.com/redis/jedis). MIT License.
-  - Copyright holder not declared by the publisher; see https://github.com/redis/jedis.
+* [tools.jackson.core:jackson-core 3.1.1](https://github.com/FasterXML/jackson-core). Apache License, Version 2.0.
+  - copyright notice that is included in or attached to the work
+  - copyright license to reproduce, prepare Derivative Works of,
+  - Copyright [yyyy] [name of copyright owner]
+  - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+  - Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+* [tools.jackson.core:jackson-databind 3.1.1](https://github.com/FasterXML/jackson). Apache License, Version 2.0.
+  - copyright notice that is included in or attached to the work
+  - copyright license to reproduce, prepare Derivative Works of,
+  - Copyright [yyyy] [name of copyright owner]
+  - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+* [tools.jackson.module:jackson-module-kotlin 3.1.1](https://github.com/FasterXML/jackson-module-kotlin). Apache License, Version 2.0.
+  - copyright notice that is included in or attached to the work
+  - copyright license to reproduce, prepare Derivative Works of,
+  - Copyright [yyyy] [name of copyright owner]
+  - Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+* [tools.jackson:jackson-bom 3.1.1](https://github.com/FasterXML/jackson-bom). Apache License, Version 2.0.
+  - Copyright (c) FasterXML
