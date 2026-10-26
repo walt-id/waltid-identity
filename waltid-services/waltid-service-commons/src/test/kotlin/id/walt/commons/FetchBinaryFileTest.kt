@@ -13,7 +13,9 @@ import kotlin.test.assertContains
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class FetchBinaryFileTest {
 
@@ -71,6 +73,29 @@ class FetchBinaryFileTest {
             assertContains(e.message!!, "destination not allowed")
         }
         assertEquals(emptyMap(), hits)
+    }
+
+    @Test
+    fun `private network destinations are refused by default`() {
+        listOf(
+            "http://10.1.2.3/vical",
+            "http://172.16.5.5/vical",
+            "http://192.168.1.1/vical",
+            "http://[fd12::1]/vical",
+        ).forEach { url ->
+            val error = assertFailsWith<IllegalArgumentException>(url) { fetchBinaryFile(url) }
+            assertContains(error.message!!, "destination not allowed")
+        }
+    }
+
+    @Test
+    fun `private networks can be opted in without reopening loopback or metadata`() {
+        assertTrue(isBlockedFetchDestination(InetAddress.getByName("10.1.2.3")))
+        assertFalse(isBlockedFetchDestination(InetAddress.getByName("10.1.2.3"), allowPrivateNetworks = true))
+        assertFalse(isBlockedFetchDestination(InetAddress.getByName("fd12::1"), allowPrivateNetworks = true))
+        listOf("127.0.0.1", "169.254.169.254", "fd00:ec2::254", "0.0.0.0").forEach { host ->
+            assertTrue(isBlockedFetchDestination(InetAddress.getByName(host), allowPrivateNetworks = true), host)
+        }
     }
 
     @Test

@@ -26,17 +26,34 @@ private val fetchClient = OkHttpClient.Builder()
  * Fetches a binary file (e.g. a VICAL) from an `http` or `https` URL supplied by an API caller.
  *
  * Other schemes are rejected before any I/O. Redirects are not followed, the response is capped
- * at 10 MiB, and loopback, link-local (including cloud metadata), wildcard and multicast
- * destinations are refused at DNS resolution time, so the checked addresses are the ones connected to.
+ * at 10 MiB, and loopback, link-local (including cloud metadata), private (RFC1918 and IPv6 unique-local),
+ * wildcard and multicast destinations are refused inside OkHttp's [Dns], so the checked addresses are the
+ * ones connected to.
  *
  * @throws IllegalArgumentException if the URL is not allowed or the fetch fails
  */
 fun fetchBinaryFile(vicalUrl: String): ByteArray? =
-    fetchBinaryFile(vicalUrl, ::isBlockedFetchDestination, MAX_FETCH_BYTES)
+    fetchBinaryFile(vicalUrl, { isBlockedFetchDestination(it) }, MAX_FETCH_BYTES)
 
-internal fun isBlockedFetchDestination(address: InetAddress): Boolean =
-    address.isLoopbackAddress || address.isLinkLocalAddress || address.isAnyLocalAddress ||
+/**
+ * Loopback, link-local (including cloud metadata), wildcard and multicast addresses are always blocked.
+ * RFC1918 and IPv6 unique-local addresses are blocked unless [allowPrivateNetworks] is set.
+ */
+internal fun isBlockedFetchDestination(address: InetAddress, allowPrivateNetworks: Boolean = false): Boolean {
+    if (address.isLoopbackAddress || address.isLinkLocalAddress || address.isAnyLocalAddress ||
         address.isMulticastAddress || address == AWS_METADATA_IPV6
+    ) {
+        return true
+    }
+    if (allowPrivateNetworks) return false
+    if (address.isSiteLocalAddress) return true
+    val bytes = address.address
+    if (bytes.size == 16) {
+        val first = bytes[0].toInt() and 0xff
+        if (first == 0xfc || first == 0xfd) return true
+    }
+    return false
+}
 
 internal fun fetchBinaryFile(url: String, isBlockedAddress: (InetAddress) -> Boolean, maxBytes: Long): ByteArray {
     // OkHttp's parser accepts only http and https, and it is the parser the request is made with.
