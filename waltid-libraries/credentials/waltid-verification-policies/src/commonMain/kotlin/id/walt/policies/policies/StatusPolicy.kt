@@ -25,7 +25,13 @@ class StatusPolicy : CredentialWrapperValidatorPolicy() {
 
     override val name = "credential-status"
     override val description = "Verifies Credential Status"
-    override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc, VCFormat.sd_jwt_vc)
+    override val supportedVCFormats = setOf(
+        VCFormat.jwt_vc,
+        VCFormat.jwt_vc_json,
+        VCFormat.ldp_vc,
+        VCFormat.sd_jwt_vc,
+        VCFormat.mso_mdoc,
+    )
 
     @Transient
     @Contextual
