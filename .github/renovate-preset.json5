@@ -38,6 +38,35 @@
       dependencyDashboardApproval: true,
     },
     {
+      description: 'SKIE 0.10.15 supports Kotlin through 2.4.20. Raise this together with the SKIE pin.',
+      matchPackageNames: [
+        '/^org\\.jetbrains\\.kotlin(\\.|:|$)/',
+      ],
+      allowedVersions: '<=2.4.20',
+    },
+    {
+      description: 'Browser visual baselines are recorded with Playwright 1.62.0 and the pinned CI image. Bump the package, image digest, and baselines together.',
+      matchFileNames: [
+        'waltid-applications/waltid-wallet-demo-compose/webApp/visual/package.json',
+        'waltid-applications/waltid-wallet-demo-compose/webApp/visual/package-lock.json',
+      ],
+      matchPackageNames: ['@playwright/test'],
+      allowedVersions: '1.62.0',
+    },
+    {
+      description: 'Wallet API tables still use Exposed 1.0.0-rc-1 (UUIDTable and SchemaUtils varargs).',
+      matchPackageNames: ['/^org\\.jetbrains\\.exposed:/'],
+      matchCurrentVersion: '1.0.0-rc-1',
+      allowedVersions: '1.0.0-rc-1',
+    },
+    {
+      description: 'Frontend nginx images stay on the 1.27 Alpine line. Newer Alpine hangs QEMU image builds.',
+      matchDatasources: ['docker'],
+      matchPackageNames: ['nginx', 'nginxinc/nginx-unprivileged'],
+      matchCurrentVersion: '/1\\.27.*alpine/',
+      allowedVersions: '/^1\\.27.*alpine/',
+    },
+    {
       description: 'AGP 9.4 truncates comma-separated instrumentation filters; see android-gradle in the version catalogs.',
       matchDepNames: [
         'com.android.application',

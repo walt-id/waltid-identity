@@ -1,6 +1,7 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.4.21"
+# SKIE 0.10.15 supports Kotlin through 2.4.20.
+kotlin = "2.4.20"
 binary-compatibility-validator = "0.18.2"
 suspend-transform = "2.4.20-0.15.0"
 jspecify = "1.0.1"
@@ -182,14 +183,15 @@ coroutines-service-tests = "1.11.0"
 nimbus-e2e = "10.10"
 ktor-conformance-encoding = "3.6.0"
 smiley4-service-openapi = "5.7.0"
-exposed-wallet = "1.6.0"
+# Wallet API tables still use UUIDTable and the 1.0 SchemaUtils varargs.
+exposed-wallet = "1.0.0-rc-1"
 sqlite-wallet = "3.53.4.0"
 hikaricp-wallet = "6.3.3"
 mockk-wallet = "1.14.11"
 sqlite-migration = "3.53.4.0"
 postgres-migration = "42.7.3"
-kotlin-web3login = "2.4.21"
-ktor-web3login = "3.6.0"
+kotlin-web3login = "2.0.0"
+ktor-web3login = "3.3.3"
 nftkit-web3login = "1.2311291144.0"
 
 [libraries]
