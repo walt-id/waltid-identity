@@ -218,23 +218,18 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun receiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("eudi-pid-sdjwt")
+    fun publicDemoPidSdJwtSupportsDirectAndStepwisePresentation() = runBlocking {
+        exerciseDemoPresentations("eudi-pid-sdjwt", DemoPresentation.Direct, DemoPresentation.RecreatedStepwise)
     }
 
     @Test
-    fun receiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("eudi-pid-mdoc")
-    }
-
-    @Test
-    fun previewAndSubmitEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        previewAndSubmitDemoCredential("eudi-pid-sdjwt")
-    }
-
-    @Test
-    fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        previewAndSubmitDemoCredential("eudi-pid-mdoc")
+    fun publicDemoPidMdocPersistsAndSupportsDirectAndStepwisePresentation() = runBlocking {
+        assertEquals("eudi-pid-mdoc", DemoTestBackend.persistenceScenario.id)
+        // Reopen before any presentation can initialize state needed by the persistence path.
+        exerciseDemoPresentations(
+            DemoTestBackend.persistenceScenario.id,
+            DemoPresentation.RecreatedDirect, DemoPresentation.Direct, DemoPresentation.RecreatedStepwise,
+        )
     }
 
     @Test
@@ -424,7 +419,7 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun receiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("iso-mdl")
+        exerciseDemoPresentations("iso-mdl", DemoPresentation.Direct)
     }
 
     @Test
@@ -443,31 +438,6 @@ class MobileWalletIntegrationTest {
         val client2 = createEudiWallet(walletConfig)
         val credentials = client2.credentials()
         assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
-    }
-
-    @Test
-    fun demoCredentialPersistsAcrossWalletRecreation() = runBlocking {
-        val scenario = DemoTestBackend.persistenceScenario
-        val walletConfig = walletConfig("persist-${scenario.id}")
-
-        val client1 = MobileWalletFactory(context).create(walletConfig)
-        val bootstrapResult = client1.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        client1.receiveCredential(offer.offerUrl, offer.txCode)
-
-        val client2 = MobileWalletFactory(context).create(walletConfig)
-        val credentials = client2.credentials()
-        assertTrue(credentials.isNotEmpty(), "public demo credential should persist across client recreation")
-        assertStoredCredentialDisplayData(scenario = DemoTestBackend.persistenceScenario, credentials = credentials)
-
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val presentResult = client2.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            presentResult,
-            "Should present persisted public demo credential for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
-        )
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
     }
 
     private fun walletConfig(
@@ -580,71 +550,49 @@ class MobileWalletIntegrationTest {
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
 
-    private suspend fun receiveAndPresentDemoCredential(scenarioId: String) {
+    private enum class DemoPresentation { Direct, RecreatedDirect, RecreatedStepwise }
+
+    private suspend fun exerciseDemoPresentations(scenarioId: String, vararg modes: DemoPresentation) {
         val scenario = demoPresentationScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("present-${scenario.id}"))
-        val bootstrapResult = client.signingIdentity.initialize().activeIdentity()
+        val config = walletConfig("present-${scenario.id}")
+        val issuingClient = MobileWalletFactory(context).create(config)
+        val bootstrapResult = issuingClient.signingIdentity.initialize().activeIdentity()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
+        val credentialIds = issuingClient.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",
         )
 
-        val credentials = client.credentials()
-        assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
-        assertStoredCredentialDisplayData(scenario = scenario, credentials = credentials)
+        for (mode in modes) {
+            val client = if (mode == DemoPresentation.Direct) issuingClient else MobileWalletFactory(context).create(config)
+            val credentials = client.credentials()
+            assertEquals(credentialIds.toSet(), credentials.map { it.id }.toSet(), "${scenario.id}/$mode stored credentials")
+            assertStoredCredentialDisplayData(scenario = scenario, credentials = credentials)
 
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            presentResult,
-            "public demo verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
-        )
-
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
-    }
-
-    private suspend fun previewAndSubmitDemoCredential(scenarioId: String) {
-        val scenario = demoPresentationScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("preview-submit-${scenario.id}"))
-        val bootstrapResult = client.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
-        assertTrue(
-            credentialIds.isNotEmpty(),
-            "Should receive ${scenario.displayName} from public demo issuer2",
-        )
-
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
-        assertTrue(
-            preview.credentialOptions.isNotEmpty(),
-            "Should preview at least one matching credential for ${scenario.displayName}: preview=$preview",
-        )
-        assertTrue(
-            preview.credentialOptions.all { it.credentialId in credentialIds },
-            "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
-        )
-
-        val result = client.submitPresentation(
-            previewHandle = preview.previewHandle,
-            selectedCredentialOptions = preview.credentialOptions.map { option ->
-                MobileWalletPresentationCredentialSelection(
-                    queryId = option.queryId,
-                    credentialId = option.credentialId,
+            val session = DemoTestBackend.createVerifierSession(scenario)
+            val result = if (mode == DemoPresentation.RecreatedStepwise) {
+                val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
+                assertTrue(preview.credentialOptions.isNotEmpty(), "${scenario.id}/$mode should offer matching credentials: $preview")
+                assertTrue(
+                    preview.credentialOptions.all { it.credentialId in credentialIds },
+                    "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
                 )
-            },
-            did = bootstrapResult.did,
-        )
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            result,
-            "public demo verifier2 stepwise presentation should succeed for ${scenario.displayName}: preview=$preview, result=$result",
-        )
-
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+                client.submitPresentation(
+                    previewHandle = preview.previewHandle,
+                    selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+                    did = bootstrapResult.did,
+                )
+            } else {
+                client.present(session.authorizationRequestUri, did = bootstrapResult.did)
+            }
+            assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+                result,
+                "public demo verifier2 presentation should succeed for ${scenario.id}/$mode: credentials=$credentials, result=$result",
+            )
+            DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+        }
     }
 
     private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
