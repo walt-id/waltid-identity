@@ -1,0 +1,10 @@
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift
+@@ -83,7 +83,6 @@
+         .accessibilityIdentifier("wallet.scanScreen")
+         .modifier(ScannerSheetSurface())
+         .onChange(of: input) { _ in resolutionError = nil }
+-        .onChange(of: manual) { manual in inputFocused = manual }
+         .onDisappear { closed = true; resolutionTask?.cancel() }
+     }
+ 

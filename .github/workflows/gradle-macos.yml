@@ -1,4 +1,4 @@
-name: Native animation retirement observation (temporary)
+name: Native focus transition control (temporary)
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ env:
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
 
 jobs:
-  animation-observation:
+  focus-control:
     runs-on: xcode-27
     timeout-minutes: 110
     steps:
@@ -29,38 +29,22 @@ jobs:
           run-id: 40162930961
           github-token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           path: ${{ runner.temp }}/wallet-core-artifact
-      - name: Verify the shared release framework before observation
+      - name: Verify the shared release framework before control
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
-      - name: Checkout temporary observation source
+      - name: Checkout temporary control source
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           path: probe-harness
           persist-credentials: false
-      - name: Apply only the bounded observation
-        working-directory: waltid-identity
+      - name: Record the single-factor control source
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/animation-observation"
-          patch="$GITHUB_WORKSPACE/probe-harness/.github/scripts/mobile-ci/temporary-animation-observation.patch"
-          shasum -a 256 "$patch" > "$GITHUB_WORKSPACE/animation-observation/patch-sha256.txt"
-          git apply --check "$patch"
-          git apply "$patch"
-          git diff > "$GITHUB_WORKSPACE/animation-observation/applied.patch"
-      - name: Retain the actual animation notifier implementation
-        run: |
-          python3 - <<'PYCODE'
-          from pathlib import Path
-          import hashlib, json, os, subprocess
-          binary = Path(os.environ['DEVELOPER_DIR']) / 'Platforms/iPhoneSimulator.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework/XCTAutomationSupport'
-          out = Path(os.environ['GITHUB_WORKSPACE']) / 'animation-observation'
-          disassembly = subprocess.check_output(['xcrun', 'otool', '-arch', 'arm64', '-tvV', str(binary)], text=True)
-          start = disassembly.find('+[XCTAnimationsIdleNotifier initialize]:')
-          end = disassembly.find('-[XCTMainRunLoopIdleNotifier init]:', max(start, 0))
-          (out / 'XCTAnimationsIdleNotifier.disassembly.txt').write_text(disassembly[start:end] if start >= 0 and end > start else disassembly)
-          metadata = {'binary': str(binary), 'sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'xcode': subprocess.check_output(['xcodebuild', '-version'], text=True)}
-          (out / 'notifier-binary.json').write_text(json.dumps(metadata, indent=2) + '\n')
-          PYCODE
+          mkdir -p "$GITHUB_WORKSPACE/focus-control"
+          patch="$GITHUB_WORKSPACE/probe-harness/.github/scripts/mobile-ci/temporary-focus-control.patch"
+          shasum -a 256 "$patch" > "$GITHUB_WORKSPACE/focus-control/patch-sha256.txt"
+          xcodebuild -version > "$GITHUB_WORKSPACE/focus-control/xcode-version.txt"
+          xcrun simctl list runtimes --json > "$GITHUB_WORKSPACE/focus-control/runtimes.json"
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
       - name: Configure the owning iOS build environment
@@ -70,43 +54,119 @@ jobs:
       - name: Run the normal provider prerequisite
         run: |
           exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir "$GITHUB_WORKSPACE/animation-observation" provider \
+            --output-dir "$GITHUB_WORKSPACE/focus-control" provider \
             waltid-identity/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh \
             --project-dir waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp \
             --destination "$IOS_SIMULATOR_DESTINATION" --derived-data /tmp/xcode-derived \
             --app-group group.id.walt.wallet.native --keychain-group-suffix id.walt.wallet.native.shared \
             --app-bundle-id id.walt.wallet.native --appex-bundle-id id.walt.wallet.native.identitydocumentprovider \
             --development-team 9BB78CFW7Y --build-setting OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-      - name: Observe UIKit completion in the normal mock-wallet class
+      - name: Run bounded original and focus-control arms
         timeout-minutes: 90
-        working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
           exec python3 "$GITHUB_WORKSPACE/waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py" \
-            --output-dir "$GITHUB_WORKSPACE/animation-observation" native-observation \
-            bash -e -o pipefail <<'TESTS'
-          simulator=$(xcrun simctl create 'WAL1585 animation callback observation' 'iPhone 17' 'iOS 27.0')
-          cleanup() {
-            result=$?
-            xcrun simctl delete "$simulator" || { cleanup_result=$?; (( result != 0 )) || result=$cleanup_result; }
-            exit "$result"
-          }
-          trap cleanup EXIT
-          trap 'exit 130' INT
-          trap 'exit 143' TERM
-          xcrun simctl bootstatus "$simulator" -b
-          xcodebuild test -collect-test-diagnostics never \
-            -project iosApp.xcodeproj -scheme iosApp -configuration Debug \
-            -destination "platform=iOS Simulator,id=$simulator" \
-            -only-testing:iosAppUITests/MockWalletUITests \
-            -parallel-testing-enabled NO -enableCodeCoverage NO \
-            -resultBundlePath "$GITHUB_WORKSPACE/animation-observation/TestResults.xcresult" \
-            -derivedDataPath /tmp/xcode-derived OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
-          TESTS
-      - name: Retain observation on success or failure
+            --output-dir "$GITHUB_WORKSPACE/focus-control" focus-control \
+            python3 - <<'CONTROL'
+          from pathlib import Path
+          import hashlib, json, os, signal, subprocess, sys
+
+          workspace = Path(os.environ['GITHUB_WORKSPACE'])
+          repo = workspace / 'waltid-identity'
+          project = repo / 'waltid-applications/waltid-wallet-demo-ios/iosApp'
+          out = workspace / 'focus-control'
+          source = 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Views/WalletScanView.swift'
+          patch = workspace / 'probe-harness/.github/scripts/mobile-ci/temporary-focus-control.patch'
+          expected = {'original': '957a2e0a42543980743555ed3e9b45e0e2a5b01f3822b687b731beae048f8eda', 'control': 'bad7cc2ca1456fdcca6f80aac74de5c9767ba17fe99f555cd0065c48378cb07d'}
+          assert hashlib.sha256(patch.read_bytes()).hexdigest() == '6a8f8d8fd819ecec1cba1f57c46dc8842a7c3d73cbee64b5203cead9f62bf130'
+          method = 'MockWalletUITests/testScanReceiveDetailsAndShareUsesMockWallet()'
+          selection = 'iosAppUITests/MockWalletUITests/testScanReceiveDetailsAndShareUsesMockWallet'
+          def interrupted(signum, frame):
+              raise SystemExit(128 + signum)
+          
+          signal.signal(signal.SIGTERM, interrupted)
+          signal.signal(signal.SIGINT, interrupted)
+          
+          rows = []
+          overall = 0
+
+          def run(args, **kwargs):
+              return subprocess.run(args, check=True, **kwargs)
+
+          def nodes(value):
+              if isinstance(value, dict):
+                  if value.get('nodeType') == 'Test Case':
+                      yield value
+                  for child in value.values():
+                      yield from nodes(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      yield from nodes(child)
+
+          for label, arm in [('A1', 'original'), ('B1', 'control'), ('A2', 'original'), ('B2', 'control'), ('A3', 'original')]:
+              destination = out / label
+              destination.mkdir()
+              patched = False
+              simulator = None
+              try:
+                  assert hashlib.sha256((repo / source).read_bytes()).hexdigest() == expected['original']
+                  if arm == 'control':
+                      run(['git', 'apply', '--check', str(patch)], cwd=repo)
+                      run(['git', 'apply', str(patch)], cwd=repo)
+                      patched = True
+                  actual = hashlib.sha256((repo / source).read_bytes()).hexdigest()
+                  assert actual == expected[arm]
+                  (destination / 'applied.patch').write_bytes(subprocess.check_output(['git', 'diff', '--', source], cwd=repo))
+                  simulator = subprocess.check_output(['xcrun', 'simctl', 'create', 'WAL1585 focus ' + label, 'iPhone 17', 'iOS 27.0'], text=True).strip()
+                  run(['xcrun', 'simctl', 'bootstatus', simulator, '-b'])
+                  bundle = destination / 'TestResults.xcresult'
+                  command = ['xcodebuild', 'test', '-collect-test-diagnostics', 'never',
+                             '-project', 'iosApp.xcodeproj', '-scheme', 'iosApp', '-configuration', 'Debug',
+                             '-destination', 'platform=iOS Simulator,id=' + simulator,
+                             '-only-testing:' + selection, '-parallel-testing-enabled', 'NO',
+                             '-enableCodeCoverage', 'NO', '-resultBundlePath', str(bundle),
+                             '-derivedDataPath', '/tmp/xcode-derived', 'OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES']
+                  (destination / 'input.json').write_text(json.dumps({'arm': arm, 'sourceSha256': actual, 'simulator': simulator, 'command': command}, indent=2) + '\n')
+                  print('BEGIN ' + label + ' ' + arm, flush=True)
+                  execution = subprocess.run(command, cwd=project)
+                  (destination / 'exit-code.txt').write_text(str(execution.returncode) + '\n')
+                  for kind in ['summary', 'tests']:
+                      report = subprocess.check_output(['xcrun', 'xcresulttool', 'get', 'test-results', kind, '--path', str(bundle)])
+                      (destination / ('test-' + kind + '.json')).write_bytes(report)
+                  summary = json.loads((destination / 'test-summary.json').read_text())
+                  cases = list(nodes(json.loads((destination / 'test-tests.json').read_text())))
+                  assert len(cases) == 1 and cases[0]['nodeIdentifier'] == method, cases
+                  assert summary['totalTestCount'] == 1 and summary['skippedTests'] == 0, summary
+                  assert cases[0]['result'] in ['Passed', 'Failed'], cases
+                  assert (execution.returncode == 0) == (cases[0]['result'] == 'Passed'), (execution.returncode, cases)
+                  row = {'label': label, 'arm': arm, 'exitCode': execution.returncode, 'case': cases[0], 'devices': summary['devicesAndConfigurations']}
+                  rows.append(row)
+                  (out / 'completed-arms.json').write_text(json.dumps(rows, indent=2) + '\n')
+                  print('END ' + label + ' ' + json.dumps(row), flush=True)
+                  if execution.returncode:
+                      overall = execution.returncode
+                      if arm == 'control':
+                          (out / 'stop-reason.txt').write_text('Control failed; stop this hypothesis and inspect the retained result.\n')
+                          break
+              finally:
+                  try:
+                      if simulator:
+                          run(['xcrun', 'simctl', 'delete', simulator])
+                  finally:
+                      if patched:
+                          run(['git', 'apply', '-R', '--check', str(patch)], cwd=repo)
+                          run(['git', 'apply', '-R', str(patch)], cwd=repo)
+                      assert hashlib.sha256((repo / source).read_bytes()).hexdigest() == expected['original']
+
+          if len(rows) == 5 and all(row['case']['result'] == 'Passed' for row in rows if row['arm'] == 'original'):
+              (out / 'stop-reason.txt').write_text('Baseline did not reproduce in the fixed batch; inconclusive. No extra repetitions.\n')
+          (out / 'batch-completion.json').write_text(json.dumps({'planned': 5, 'completed': len(rows), 'exitCode': overall, 'observerApplied': False}, indent=2) + '\n')
+          sys.exit(overall)
+          CONTROL
+      - name: Retain control results on success or failure
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: native-animation-observation
-          path: animation-observation/**
+          name: native-focus-control
+          path: focus-control/**
           if-no-files-found: error
           retention-days: 7
