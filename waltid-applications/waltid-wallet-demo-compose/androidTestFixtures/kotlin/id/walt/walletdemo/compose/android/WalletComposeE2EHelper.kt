@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.view.WindowInsets
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
@@ -528,13 +529,22 @@ internal object WalletComposeE2EHelper {
             .maxByOrNull { (_, bounds) -> bounds.width().toLong() * bounds.height() }?.first ?: return false
         val bounds = viewport.visibleBounds
         viewport.unobscuredReviewBounds()?.let { if (!bounds.intersect(it)) return false }
-        fun visibleContent() = findObjects(By.pkg(walletPackage).text(Pattern.compile(".*"))).mapNotNull { node ->
-            try {
-                node.visibleBounds.takeIf { Rect.intersects(it, bounds) }
-                    ?.let { "${node.text}:$it" }
-            } catch (_: StaleObjectException) { null }
+        fun visibleContent(): List<String> {
+            val content = mutableListOf<String>()
+            fun collect(node: AccessibilityNodeInfo) {
+                if (!node.refresh()) throw StaleObjectException()
+                if (!node.isVisibleToUser) return
+                val nodeBounds = Rect().also(node::getBoundsInScreen)
+                node.text?.takeIf { node.packageName?.toString() == walletPackage && nodeBounds.intersect(bounds) }
+                    ?.let { content += "$it:$nodeBounds" }
+                for (index in 0 until node.childCount) node.getChild(index)?.let(::collect)
+            }
+            // Read the tree directly instead of creating a UiObject2 for every label twice per gesture.
+            collect(viewport.accessibilityNodeInfo)
+            return content
         }
-        val before = visibleContent()
+        // A replaced tree is movement, never proof that the scroll reached its end.
+        val before = try { visibleContent() } catch (_: StaleObjectException) { return true }
         val upper = bounds.top + bounds.height() * 15 / 100
         val lower = bounds.bottom - bounds.height() * 15 / 100
         swipe(bounds.centerX(), if (towardBottom) lower else upper,
@@ -542,7 +552,7 @@ internal object WalletComposeE2EHelper {
         waitForIdle()
         // UiObject2.scroll reports false on this Compose/API 37 host even before the end.
         // Compare the actual visible content after a bounded gesture instead of trusting that event.
-        return before != visibleContent()
+        return try { before != visibleContent() } catch (_: StaleObjectException) { true }
     }
 
     fun latestStatus(device: UiDevice): String = try {
