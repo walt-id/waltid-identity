@@ -67,6 +67,21 @@
       allowedVersions: '/^1\\.27.*alpine/',
     },
     {
+      description: 'Compose 1.12.2 changes recorded iOS snapshot pixels. Update the baselines in the same change.',
+      matchPackageNames: ['/^org\\.jetbrains\\.compose/'],
+      allowedVersions: '1.12.1',
+    },
+    {
+      description: 'Navigation 1.2.0 stays held until the iOS Compose baselines are updated with it.',
+      matchPackageNames: ['/^org\\.jetbrains\\.androidx\\.navigation3:/'],
+      allowedVersions: '1.1.2',
+    },
+    {
+      description: 'Multipaz 0.102 publishes JVM 21 inline bytecode. Android host tests still target Java 17.',
+      matchPackageNames: ['/^org\\.multipaz:/'],
+      allowedVersions: '0.101.0',
+    },
+    {
       description: 'iOS Compose visual baselines are recorded with Roborazzi 1.76.0. Bump it only together with those snapshots.',
       matchPackageNames: ['/^io\\.github\\.takahirom(\\.roborazzi|:roborazzi)/'],
       allowedVersions: '1.76.0',

@@ -19,13 +19,15 @@ android-gradle = "9.3.3"
 gradle-shadow = "9.6.1"
 buildconfig = "6.1.2"
 licensee = "1.14.1"
-compose-multiplatform = "1.12.2"
+# 1.12.2 changes recorded iOS Compose snapshot pixels.
+compose-multiplatform = "1.12.1"
 compose-material3 = "1.12.0-alpha03"
 compose-material-icons = "1.7.3"
 easyqrscan = "0.7.2"
 zxing = "3.5.4"
 zxing-cpp = "3.1.1"
-compose-navigation3 = "1.2.0"
+# Held with the Compose baseline pin.
+compose-navigation3 = "1.1.2"
 dokka = "2.2.0"
 coil = "3.6.3"
 haze = "2.0.1"
@@ -166,7 +168,8 @@ clikt-testkit = "3.1.1"
 password4j = "1.8.4"
 # renovate: datasource=npm depName=cose-js
 cose-js = "0.9.0"
-multipaz = "0.102.0"
+# 0.102 publishes JVM 21 inline bytecode; Android host tests still target 17.
+multipaz = "0.101.0"
 sqlcipher-swift = "4.19.0"
 kotlinx-browser = "0.5.0"
 # renovate: datasource=npm depName=canonicalize
