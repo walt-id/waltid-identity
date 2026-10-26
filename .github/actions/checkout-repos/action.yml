@@ -1,7 +1,8 @@
 name: Checkout all repos with ref fallback
 description: |
-  Checks out waltid-unified-build, waltid-identity, and waltid-identity-enterprise
-  repositories using a provided ref, falling back to main if it doesn't exist.
+  Checks out waltid-unified-build, waltid-identity, and waltid-identity-enterprise.
+  The requested ref is used when it exists. Unified build otherwise stays on
+  release/v0.23.x. Identity and Enterprise otherwise fall back to main.
 
 inputs:
   token:
@@ -31,7 +32,7 @@ runs:
         if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
         else
-          echo "ref=main" >> "$GITHUB_OUTPUT"
+          echo "ref=release/v0.23.x" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Checkout waltid-unified-build

@@ -2,6 +2,7 @@ package id.walt.issuer2.testsupport
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -69,6 +70,7 @@ suspend fun HttpClient.createWalletFlowCredentialOffer(
     } else {
         null
     },
+    runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
 ): CredentialOfferCreateResponse =
     createCredentialOffer(
         CredentialOfferCreateRequest(
@@ -78,6 +80,7 @@ suspend fun HttpClient.createWalletFlowCredentialOffer(
             issuerStateMode = issuerStateMode,
             txCode = txCodeMode?.txCode(),
             txCodeValue = txCodeMode?.txCodeValue(),
+            runtimeOverrides = runtimeOverrides,
         )
     )
 

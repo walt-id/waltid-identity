@@ -107,7 +107,7 @@ dependencies {
 //
 // web3j:core → org.bouncycastle:bcprov-jdk18on:1.80
 //   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
-//   Snyk said "no supported fix" at 1.80; 1.84 is now available
+//   1.85 also fixes the critical rfc822Name/URI name-constraint bypass.
 //
 // ktor-openapi → io.netty (4.2.x branch):
 //   CVE-2026-42583 (CWE-770, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
@@ -119,8 +119,11 @@ configurations.all {
         identityLibs.jackson.core.tools,
         identityLibs.jackson.core,
         identityLibs.bcprov.jdk18on,
-        identityLibs.netty.codec.compression,
+        identityLibs.netty.codec.v2,
         identityLibs.netty.codec.http.v2,
+        identityLibs.netty.codec.http2.v2,
+        identityLibs.netty.codec.compression,
+        identityLibs.netty.handler.v2,
         identityLibs.netty.transport.classes.epoll,
     )
 }

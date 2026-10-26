@@ -16,6 +16,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
 
+private val msoCbor = Cbor { ignoreUnknownKeys = true }
 
 /**
  * MDoc data structure containing doc type, issuer signed items, device signed items and errors, if any.
@@ -37,7 +38,8 @@ data class MDoc(
      */
     val MSO
         get() = _mso ?: issuerSigned.issuerAuth?.payload?.let { data ->
-            EncodedCBORElement.fromEncodedCBORElementData(data).decode<MSO>()
+            // Decode known MSO fields without changing the original bytes authenticated by issuerAuth.
+            msoCbor.decodeFromByteArray<MSO>(EncodedCBORElement.fromEncodedCBORElementData(data).value)
         }?.also { _mso = it }
 
     /**

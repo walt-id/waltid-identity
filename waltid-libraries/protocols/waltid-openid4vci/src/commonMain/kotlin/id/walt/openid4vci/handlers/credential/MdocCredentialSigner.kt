@@ -36,6 +36,7 @@ object MdocCredentialSigner {
         docType: String,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
@@ -73,6 +74,7 @@ object MdocCredentialSigner {
             data = MdocIssuer.MdocUniversalIssuanceData(namespaces),
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             valueMappingFunction = effectiveValueMappingFunction,
         )

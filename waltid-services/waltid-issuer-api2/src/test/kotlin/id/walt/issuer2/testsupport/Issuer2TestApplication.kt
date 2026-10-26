@@ -2,6 +2,7 @@ package id.walt.issuer2.testsupport
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
@@ -14,12 +15,16 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import kotlinx.coroutines.runBlocking
 
 fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
+    configureProfilesConfig: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
     loadIssuer2ConfigFiles()
     val serviceConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
     ConfigManager.loadedConfigurations["issuer-service" to Issuer2ServiceConfig::class] =
         configureServiceConfig(serviceConfig)
+    val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
+    ConfigManager.loadedConfigurations["issuer2-profiles" to Issuer2ProfilesConfig::class] =
+        configureProfilesConfig(profilesConfig)
     application {
         install(ServerContentNegotiation) {
             json(issuer2TestJson)

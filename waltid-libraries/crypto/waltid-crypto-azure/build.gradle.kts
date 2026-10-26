@@ -47,6 +47,7 @@ configurations.all {
         identityLibs.netty.codec.dns,
         identityLibs.netty.codec.http,
         identityLibs.netty.codec.http2,
+        identityLibs.netty.handler,
         identityLibs.jackson.core
     )
 }

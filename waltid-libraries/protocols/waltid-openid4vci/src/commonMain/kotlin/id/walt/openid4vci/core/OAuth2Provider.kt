@@ -147,6 +147,7 @@ interface OAuth2Provider {
         credentialStatus: Status? = null,
         validFrom: Instant? = null,
         validUntil: Instant? = null,
+        expectedUpdate: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
     ): CredentialResponseResult
 
