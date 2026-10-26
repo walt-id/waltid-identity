@@ -1,6 +1,5 @@
 package id.walt.policies.policies.status.validator
 
-import id.walt.policies.policies.Base64UrlHandler
 import id.walt.policies.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
 import id.walt.policies.policies.status.bit.LittleEndianRepresentation
@@ -44,7 +43,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
         val validator = IETFStatusValidator(
             fetcher = mockFetcher,
             bitValueReaderFactory = BitValueReaderFactory(),
-            expansionAlgorithm = TokenStatusListExpansionAlgorithm(Base64UrlHandler()),
+            expansionAlgorithm = TokenStatusListExpansionAlgorithm(),
             mockStatusReader,
         )
 
