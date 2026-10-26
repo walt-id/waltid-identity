@@ -99,6 +99,11 @@ object PresentationVerificationEngine {
     }
 
 
+    /**
+     * The VP policy results per query id. A query with `multiple: true` can have several presentations; their results
+     * are combined per policy so that none is lost: a policy that failed for any of them is reported with that
+     * failure, otherwise with the result of the last presentation.
+     */
     suspend fun verifyAllPresentations(
         parsedPresentations: Map<Pair<String, CredentialQuery>, VerifiablePresentation>,
         session: Verification2Session
@@ -117,10 +122,30 @@ object PresentationVerificationEngine {
             )
 
             query.id to policyResults
-        }.toMap()
+        }
 
-        return verifiedPresentations
+        return combinePolicyResultsByQuery(verifiedPresentations)
     }
+
+    internal fun combinePolicyResultsByQuery(
+        results: List<Pair<String, Map<String, VPPolicy2.PolicyRunResult>>>,
+    ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> =
+        results.groupBy({ it.first }, { it.second }).mapValues { (_, perPresentation) ->
+            buildMap {
+                for (policyResults in perPresentation) {
+                    for ((policy, result) in policyResults) {
+                        val kept = get(policy)
+                        if (kept == null || kept.errors.isEmpty()) put(policy, result)
+                    }
+                }
+            }
+        }
+
+    /** Every presentation per query id, in the order they were received. */
+    internal fun presentationsByQuery(
+        parsedPresentations: Map<Pair<String, CredentialQuery>, VerifiablePresentation>,
+    ): Map<String, List<VerifiablePresentation>> =
+        parsedPresentations.entries.groupBy({ it.key.second.id }, { it.value })
 
     suspend fun parseAllPresentations(
         vpTokenContents: ParsedVpToken,
@@ -232,7 +257,10 @@ object PresentationVerificationEngine {
             val parsedPresentations = parseAllPresentations(vpTokenContents, session)
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
-                presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
+                val byQuery = presentationsByQuery(parsedPresentations)
+                // One per query id, the last one, as before; every presentation is in presentedPresentationsList.
+                presentedPresentations = byQuery.mapValues { it.value.last() }
+                presentedPresentationsList = byQuery
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session)
@@ -282,8 +310,10 @@ object PresentationVerificationEngine {
             }
 
 
-            val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
-                it.key.second.id to when (val presentation = it.value) {
+            // Grouped, not mapped: a query with multiple: true has a credential (or several) per presentation, and the
+            // VC policies must run on all of them.
+            val allSuccessfullyValidatedAndProcessedData = parsedPresentations.entries.groupBy({ it.key.second.id }) {
+                when (val presentation = it.value) {
                     is JwtVcJsonPresentation -> {
                         if (presentation.vp == null) {
                             throw PresentationRejectionException(
@@ -297,7 +327,7 @@ object PresentationVerificationEngine {
                     is MsoMdocPresentation -> listOf(presentation.mdoc)
                     is LdpVcPresentation -> throw NotImplementedError()
                 }
-            }.toMap()
+            }.mapValues { (_, credentials) -> credentials.flatten() }
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 presentedCredentials = allSuccessfullyValidatedAndProcessedData
