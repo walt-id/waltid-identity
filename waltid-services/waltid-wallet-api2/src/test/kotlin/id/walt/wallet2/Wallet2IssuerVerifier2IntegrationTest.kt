@@ -103,6 +103,7 @@ import io.ktor.server.routing.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -248,14 +249,32 @@ class Wallet2IssuerVerifier2IntegrationTest {
     @Test
     fun `authorized batch selects one configuration from a mixed-format offer`() = runBatchE2EFlow(AuthenticationMethod.AUTHORIZED)
 
-    private fun runBatchE2EFlow(authMethod: AuthenticationMethod) {
+    @Test
+    fun `authorized single offer defaults to omit with direct authorization`() =
+        runBatchE2EFlow(AuthenticationMethod.AUTHORIZED, profileOnly = true, singleOffer = true)
+
+    @Test
+    fun `authorized single offer defaults to omit with mandatory PAR`() =
+        runBatchE2EFlow(AuthenticationMethod.AUTHORIZED, profileOnly = true, singleOffer = true, requirePar = true)
+
+    @Test
+    fun `authorized batch defaults to omit and issues distinct configurations without overrides`() =
+        runBatchE2EFlow(AuthenticationMethod.AUTHORIZED, profileOnly = true)
+
+    private fun runBatchE2EFlow(
+        authMethod: AuthenticationMethod,
+        profileOnly: Boolean = false,
+        singleOffer: Boolean = false,
+        requirePar: Boolean = false,
+    ) {
         val port = freePort()
         val baseUrl = "http://127.0.0.1:$port"
         val redirectUri = "openid://batch-callback"
         val profileId = "batch-profile"
         val configurationId = "batch_identity"
         val vct = "https://credentials.example/batch-identity"
-        val names = listOf("Alice", "Bob")
+        val names = if (singleOffer) listOf("Alice") else listOf("Alice", "Bob")
+        val selectedConfigurationIds = if (profileOnly && !singleOffer) listOf(configurationId, "second_identity") else listOf(configurationId)
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC, vct = vct, scope = configurationId,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
@@ -268,22 +287,30 @@ class Wallet2IssuerVerifier2IntegrationTest {
             credentialData = buildJsonObject { put("given_name", "Alice"); put("family_name", "Batch") },
         )
         val issuer = Issuer2Module(
-            Issuer2ServiceConfig(baseUrl, batchCredentialIssuance = BatchCredentialIssuance(5)),
+            Issuer2ServiceConfig(baseUrl, batchCredentialIssuance = BatchCredentialIssuance(5), enforcePushedAuthorizationRequests = requirePar),
             Issuer2MetadataConfig(credentialConfigurations = mapOf(
                 configurationId to Json.encodeToJsonElement(configuration),
+                "second_identity" to Json.encodeToJsonElement(configuration.copy(scope = "second_identity")),
                 "unused_badge" to Json.encodeToJsonElement(configuration.copy(
                     format = VciCredentialFormat.JWT_VC_JSON, vct = null, scope = "unused_badge",
                     credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential")),
                 )),
             )),
-            Issuer2ProfilesConfig(profiles = mapOf(profileId to profile, "unused-badge-profile" to profile.copy(
-                name = "unused-badge-profile", credentialConfigurationId = "unused_badge",
-                credentialData = buildJsonObject {
-                    put("@context", buildJsonArray { add("https://www.w3.org/2018/credentials/v1") })
-                    put("type", buildJsonArray { add("VerifiableCredential"); add("OpenBadgeCredential") })
-                    put("credentialSubject", buildJsonObject { put("given_name", "Must not be issued") })
-                },
-            ))),
+            Issuer2ProfilesConfig(profiles = mapOf(
+                profileId to profile,
+                "second-profile" to profile.copy(
+                    name = "second-profile", credentialConfigurationId = "second_identity",
+                    credentialData = buildJsonObject { put("given_name", "Bob"); put("family_name", "Batch") },
+                ),
+                "unused-badge-profile" to profile.copy(
+                    name = "unused-badge-profile", credentialConfigurationId = "unused_badge",
+                    credentialData = buildJsonObject {
+                        put("@context", buildJsonArray { add("https://www.w3.org/2018/credentials/v1") })
+                        put("type", buildJsonArray { add("VerifiableCredential"); add("OpenBadgeCredential") })
+                        put("credentialSubject", buildJsonObject { put("given_name", "Must not be issued") })
+                    },
+                ),
+            )),
         )
         HttpClient().use { oauthClient ->
             E2ETest("127.0.0.1", port, failEarly = true).testBlock(
@@ -343,34 +370,49 @@ class Wallet2IssuerVerifier2IntegrationTest {
                             val receipt = http.post("/issuer2/credential-offers") { setBody(buildJsonObject {
                                 put("authMethod", authMethod.name)
                                 put("valueMode", if (authMethod == AuthenticationMethod.AUTHORIZED) "BY_VALUE" else "BY_REFERENCE")
-                                if (authMethod == AuthenticationMethod.AUTHORIZED) put("issuerStateMode", "INCLUDE")
-                                put("credentials", buildJsonArray {
-                                    names.forEach { name -> add(buildJsonObject {
-                                        put("profileId", profileId)
-                                        put("runtimeOverrides", buildJsonObject {
-                                            put("credentialData", buildJsonObject { put("given_name", name); put("family_name", "Batch") })
-                                        })
-                                    }) }
-                                    if (authMethod == AuthenticationMethod.AUTHORIZED) add(buildJsonObject { put("profileId", "unused-badge-profile") })
-                                })
+                                if (authMethod == AuthenticationMethod.AUTHORIZED && !profileOnly) put("issuerStateMode", "INCLUDE")
+                                if (singleOffer) {
+                                    put("profileId", profileId)
+                                } else {
+                                    put("credentials", buildJsonArray {
+                                        names.forEachIndexed { index, name -> add(buildJsonObject {
+                                            put("profileId", if (profileOnly && index == 1) "second-profile" else profileId)
+                                            if (!profileOnly) put("runtimeOverrides", buildJsonObject {
+                                                put("credentialData", buildJsonObject { put("given_name", name); put("family_name", "Batch") })
+                                            })
+                                        }) }
+                                        if (authMethod == AuthenticationMethod.AUTHORIZED && !profileOnly) add(buildJsonObject { put("profileId", "unused-badge-profile") })
+                                    })
+                                }
                             }) }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }.body<JsonObject>()
                             val offerUrl = Url(receipt.getValue("credentialOffer").jsonPrimitive.content)
+                            if (profileOnly) {
+                                assertEquals("OMIT", receipt.getValue("issuerStateMode").jsonPrimitive.content)
+                                val offer = Json.parseToJsonElement(assertNotNull(offerUrl.parameters["credential_offer"])).jsonObject
+                                assertNull(offer.getValue("grants").jsonObject.getValue("authorization_code").jsonObject["issuer_state"])
+                            }
                             val preview = http.post("$path/credentials/receive/resolve-offer/batch") {
                                 setBody(ResolveOfferRequest(offerUrl))
                             }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<ResolveBatchOfferResponse>()
-                            assertEquals(listOf(configurationId) + if (authMethod == AuthenticationMethod.AUTHORIZED) listOf("unused_badge") else emptyList(),
+                            assertEquals(selectedConfigurationIds + if (authMethod == AuthenticationMethod.AUTHORIZED && !profileOnly) listOf("unused_badge") else emptyList(),
                                 preview.offer.credentialConfigurationIds)
                             assertEquals(5, preview.batchSize)
-                            val selections = listOf(WalletCredentialSelection(configurationId,
-                                holderBindings = keys.map { CredentialHolderBinding(keyId = it) }))
+                            val selections = selectedConfigurationIds.map { id -> WalletCredentialSelection(id,
+                                holderBindings = keys.map { CredentialHolderBinding(keyId = it) }) }
                             val received = if (authMethod == AuthenticationMethod.PRE_AUTHORIZED) {
                                 http.post("$path/credentials/receive") { setBody(ReceiveCredentialRequest(offerUrl, credentials = selections)) }
                             } else {
                                 val authorization = http.post("$path/credentials/receive/authorization-url/batch") {
-                                    setBody(GenerateBatchAuthorizationUrlRequest(offerUrl = offerUrl, credentialConfigurationIds = listOf(configurationId),
+                                    setBody(GenerateBatchAuthorizationUrlRequest(offerUrl = offerUrl, credentialConfigurationIds = selectedConfigurationIds,
                                         clientId = "wallet-client", redirectUri = Url(redirectUri)))
                                 }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<GenerateBatchAuthorizationUrlResult>()
-                                assertNotNull(authorization.authorizationUrl.parameters["authorization_details"])
+                                if (requirePar) {
+                                    assertNotNull(authorization.authorizationUrl.parameters["request_uri"])
+                                } else {
+                                    assertNotNull(authorization.authorizationUrl.parameters["authorization_details"])
+                                    assertNull(authorization.authorizationUrl.parameters["request_uri"])
+                                }
+                                if (profileOnly) assertNull(authorization.authorizationUrl.parameters["issuer_state"])
                                 var callback = authorization.authorizationUrl
                                 repeat(5) {
                                     if (!callback.toString().startsWith(redirectUri + "?")) {
@@ -390,7 +432,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                                     ))
                                 }
                             }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<ReceiveCredentialsResult>()
-                            assertEquals(4, received.credentialIds.size)
+                            assertEquals(names.size * keys.size, received.credentialIds.size)
                             val stored = received.credentialIds.map { id -> http.get("$path/credentials/$id")
                                 .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<StoredCredential>() }
                             assertEquals(2, stored.map { assertNotNull(it.holderKeyBinding).publicKeyThumbprint }.distinct().size)
@@ -398,7 +440,12 @@ class Wallet2IssuerVerifier2IntegrationTest {
                                 .groupingBy { it }.eachCount())
                             val issuerSession = http.get("/issuer2/sessions/${receipt.getValue("offerId").jsonPrimitive.content}")
                                 .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<JsonObject>()
-                            assertEquals(2, issuerSession.getValue("issuanceResults").jsonObject.size, "Unselected configurations must not be issued")
+                            if (profileOnly) {
+                                // Authorization without issuer_state uses a new profile-derived session.
+                                assertEquals("ACTIVE", issuerSession.getValue("status").jsonPrimitive.content)
+                            } else {
+                                assertEquals(2, issuerSession.getValue("issuanceResults").jsonObject.size, "Unselected configurations must not be issued")
+                            }
                             for (credential in stored) {
                                 val session = http.post("/verification-session/create") {
                                     setBody(CrossDeviceFlowSetup(core = GeneralFlowConfig(dcqlQuery = DcqlQuery(credentials = listOf(
