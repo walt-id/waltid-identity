@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
@@ -30,6 +31,7 @@ data class AndroidDemoMobileWallet(
             check(result.signingProtection == signingProtection) {
                 "Open the wallet app to apply the configured signing protection before using Digital Credentials"
             }
+            demoWallet.refreshDigitalCredentialRegistration()
         }
     }
 }
@@ -79,7 +81,7 @@ suspend fun createAndroidDemoMobileWallet(
                 ),
             ),
             DemoClientIdTrust.configuration,
-        ),
+        ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
     )
 }
@@ -92,7 +94,8 @@ fun createAndroidDemoWallet(
 
     return LazyProximityDemoWallet {
         createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
-            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning,
+                preferredSigningProtection = config.signingProtectionMode.defaultSelection)
         }
     }
 }

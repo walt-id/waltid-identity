@@ -157,7 +157,8 @@ class Issuer2CredentialOfferEndpointTest {
     fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
         val serviceConfig = issuer2ConfigDir()
         val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
-        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 2, dockerConfig to 2)) {
+        // The standalone catalog also includes isoPhotoIdEudi alongside isoMdl and isoPhotoId.
+        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 3, dockerConfig to 2)) {
             loadIssuer2ConfigFiles(profileFile)
             var checked = 0
             for ((profileId, profile) in ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles) {

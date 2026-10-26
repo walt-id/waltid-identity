@@ -90,6 +90,12 @@ continuing issuance. The provider receives the actual proof key, issuer nonce an
 advertised constraints. The wallet validates its signed answer before sending the proof.
 Reattach this runtime dependency after recreating a wallet; it is not persisted.
 Native Swift consumers configure `WalletConfiguration.keyAttestationProvider`.
+For multiple providers, attach a `KeyAttestationProviderResolver` with
+`wallet.attachKeyAttestationProviderResolver(resolver)`. Native Swift accepts a
+`KeyAttestationProviderResolver` in the same configuration property; existing fixed
+providers continue to work. Resolution receives the credential issuer from metadata,
+only runs when attestation is required, and retains the selected provider and its
+verification key throughout a proof collection. Returning null rejects that issuer.
 Issuer trust and evidence supporting the provider's claims remain separate requirements.
 
 Start an issuance session to resolve the offer and retain the exact reviewed
@@ -215,7 +221,9 @@ does not establish verifier trust and does not expose verifier key material.
 
 Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
 issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
-authoritative payment review. After preview and selection, prepare the review:
+authoritative payment review. Disclosure previews also expose additional clear-text values that the credential must transmit: `requested=false` distinguishes those immutable values from required or optional requested claims. The flag defaults to true for existing callers. SD-JWT extras come from the original signed payload, and mdoc previews retain only requested document elements. UI consumers must show extra personal information without making it selectable; credential/disclosure selection and payload generation remain SDK-owned.
+
+After preview and selection, prepare the payment review:
 
 ```kotlin
 val consent = wallet.preparePaymentConsent(
@@ -256,7 +264,12 @@ This follows AndroidX's nullable [`MdocField.fieldValue`](https://developer.andr
 contract for fields such as photos, and also applies to SD-JWT registry claims.
 Check `digitalCredentialRegistration` or the result of
 `refreshDigitalCredentialRegistration()` to detect and retry platform indexing
-failures independently of wallet loading.
+failures independently of wallet loading. Refreshes on one wallet serialize the credential snapshot
+and its publication. Cancellation propagates without publishing a completed result. Android also
+orders platform writes across process-local adapters: a submitted write retains its place until the
+provider callback finishes, even if the caller cancels, because Play services may ignore cancellation.
+A provider that never completes a callback blocks subsequent registry writes in that process; local
+wallet reads remain independent.
 
 ## In-person proximity presentation
 

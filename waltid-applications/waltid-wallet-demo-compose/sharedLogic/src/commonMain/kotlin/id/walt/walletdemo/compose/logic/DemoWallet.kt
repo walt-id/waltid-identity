@@ -9,6 +9,8 @@ interface DemoWallet {
     suspend fun resumeSigningIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
 
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult
+    /** Refreshes the platform index independently of local card readiness; web hosts have no index. */
+    suspend fun refreshDigitalCredentialRegistration() {}
     suspend fun signingProtectionAvailability(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability
@@ -30,7 +32,6 @@ interface DemoWallet {
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
-    suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */
     suspend fun preparePaymentConsent(

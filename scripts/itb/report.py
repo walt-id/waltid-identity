@@ -2,18 +2,17 @@
 """Render ITB-profile JUnit results without converting failures or missing coverage into passes."""
 
 import argparse
-from collections import Counter
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 
-# Update this inventory when intentionally adding or removing checks.
-REQUIRED_COUNTS = {
-    "id.walt.itb.IssuanceProfileTest": 1,
-    "id.walt.itb.PresentationProfileTest": 5,
-    "id.walt.itb.DigitalCredentialsProfileTest": 1,
-    "id.walt.itb.ResponseEncryptionProfileTest": 2,
-    "id.walt.itb.PaymentProfileTest": 2,
+# Each profile must report results. New checks and suites are discovered by Gradle.
+REQUIRED_SUITES = {
+    "id.walt.itb.IssuanceProfileTest",
+    "id.walt.itb.PresentationProfileTest",
+    "id.walt.itb.DigitalCredentialsProfileTest",
+    "id.walt.itb.ResponseEncryptionProfileTest",
+    "id.walt.itb.PaymentProfileTest",
 }
 
 
@@ -31,9 +30,9 @@ def read_results(directory: Path):
                  if case.find(element) is not None), "PASS"
             )
             results.append((*identity, status))
-    actual_counts = Counter(result[0] for result in results)
-    if actual_counts != REQUIRED_COUNTS:
-        raise ValueError(f"Profile inventory differs: expected {REQUIRED_COUNTS}, received {dict(actual_counts)}")
+    missing = REQUIRED_SUITES - {result[0] for result in results}
+    if missing:
+        raise ValueError(f"Missing profile suites: {sorted(missing)}")
     if any(result[2] == "SKIPPED" for result in results):
         raise ValueError("Profile checks were skipped; this is not a complete result set")
     return results

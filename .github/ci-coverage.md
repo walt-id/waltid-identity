@@ -18,7 +18,7 @@ requests it. Predicate tests and path eligibility still run so
 `docs/mobile-sdk-api` can start `sdk-docs`.
 
 Release candidate Maven publish is a separate job that waits for the
-Gradle job and, when requested, the live conformance job.
+Gradle job and, when requested, the live verifier, wallet and issuer conformance jobs.
 
 The following labels add coverage beyond automatic path selection. `ci:macos`
 and `ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
@@ -62,7 +62,7 @@ maintainers enforce the completion policy during review.
 | `conformance` | Issuer/verifier/wallet OpenID4VP and OpenID4VCI paths unless deferred, or `ci:conformance` / `ci:issuer-conformance` | Cloudflare tunnel + live conformance runners | The default Gradle job (live suites are skipped there) |
 | `android-device-tests` | Android-relevant paths, or `ci:android` / `ci:mobile` | Selected instrumented device phases | Host-side Android compilation in `gradle-build` |
 | `ios-simulator` | Kotlin `common*` / `ios*` sources, library Gradle files, wallet-mobile, shared build-logic/CI | Kotlin iOS compile + `iosSimulatorArm64Test` | Swift package, XCFramework, native/Compose demos, DocC |
-| `native` + `compose` (one WalletCore consumer job) | Native demo / Compose demo / `waltid-wallet-demo-shared-ios` / wallet-mobile / wallet-sdk-ios / `Package.swift` / shared build-logic | One WalletCore XCFramework assemble, then the selected demo tests and document-provider checks | Kotlin simulator tests, Enterprise iOS, ABI/DocC |
+| `native` + `compose` + `bridge` (independent WalletCore consumer jobs) | Native demo / Compose demo / `waltid-wallet-demo-shared-ios` / wallet-mobile / wallet-sdk-ios / `Package.swift` / shared build-logic | One shared release WalletCore XCFramework assemble, then each selected demo with its document-provider checks; Swift bridge tests whenever either demo is selected | Kotlin simulator tests, Enterprise iOS, ABI/DocC |
 | `enterprise` | wallet-mobile / persistence-mobile / wallet-sdk-ios / shared build-logic | Enterprise iOS mobile integration against Identity | Community Identity-only compilation |
 | `sdk-docs` | Mobile SDK modules, DocC/Dokka workflow, or `ci:sdk-docs` | Linux Dokka + snippets; macOS `checkKotlinAbi` with iOS targets, iOS-enabled Dokka, and Swift DocC | Demo Xcode tests |
 | `crypto2-platform-tests` | crypto2/jose/cose paths, or `ci:crypto2` | Windows + macOS x64 + macOS arm64/iOS crypto2 tests | Unrelated library changes |

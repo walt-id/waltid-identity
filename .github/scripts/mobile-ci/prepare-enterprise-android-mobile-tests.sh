@@ -7,7 +7,8 @@ workspace_dir="$(cd "$identity_dir/.." && pwd -P)"
 
 cd "$workspace_dir"
 
-./gradlew :waltid-enterprise-integration-tests:classes --no-configuration-cache
+# Release the fixture build JVM before starting the separate Android build.
+./gradlew :waltid-enterprise-integration-tests:classes --no-configuration-cache --no-daemon
 "$identity_dir/gradlew" -p "$identity_dir" \
   -PenableAndroidBuild=true \
   :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleAndroidDeviceTest \
@@ -15,5 +16,4 @@ cd "$workspace_dir"
   :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebugAndroidTest \
   --no-configuration-cache
 
-./gradlew --stop
 "$identity_dir/gradlew" -p "$identity_dir" --stop

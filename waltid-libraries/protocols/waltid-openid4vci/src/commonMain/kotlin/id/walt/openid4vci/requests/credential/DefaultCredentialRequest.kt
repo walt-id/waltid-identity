@@ -5,6 +5,8 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.requests.generateRequestId
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
@@ -15,6 +17,8 @@ data class DefaultCredentialRequest(
     @SerialName("id")
     override val id: String = generateRequestId(),
     @SerialName("requested_at")
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     override val requestedAt: Instant = Clock.System.now(),
     @SerialName("client")
     override val client: Client,

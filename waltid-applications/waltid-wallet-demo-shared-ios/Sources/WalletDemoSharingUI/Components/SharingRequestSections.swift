@@ -8,20 +8,21 @@ import WalletSDK
 /// request is anonymous or unauthenticated.
 public struct SharingRequestSections: View {
     private let request: SharingRequest
-    private let replacesGenericPayment: Bool
+    private let paymentReview: PaymentReviewState
 
-    public init(request: SharingRequest, compact: Bool = false, replacesGenericPayment: Bool = false) {
+    public init(request: SharingRequest, compact: Bool = false, paymentReview: PaymentReviewState = .notRequired) {
         self.request = request
-        self.replacesGenericPayment = replacesGenericPayment
+        self.paymentReview = paymentReview
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VerifierMetadataCard(request: request)
 
-            ForEach(request.transactionData.filter { !replacesGenericPayment || $0.transactionType != "urn:eudi:sca:payment:1" }) { group in
+            ForEach(request.transactionData.filter { !$0.isPaymentTransaction }) { group in
                 ClaimGroupView(group: group, collapsible: false)
             }
+            PaymentConsentView(state: paymentReview, transactions: request.transactionData.filter(\.isPaymentTransaction))
         }
     }
 }

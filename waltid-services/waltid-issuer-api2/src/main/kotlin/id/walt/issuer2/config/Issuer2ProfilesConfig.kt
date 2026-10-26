@@ -18,6 +18,8 @@ data class Issuer2ProfilesConfig(
     val defaultHaipIssuerX5chain: List<String> = emptyList(),
     val defaultHaipMdocIssuerX5chain: List<String> = emptyList(),
     val profiles: Map<String, CredentialProfileConfig> = emptyMap(),
+    val defaultEudiIssuerKey: JsonObject? = null,
+    val defaultEudiIssuerX5chain: List<String> = emptyList(),
 ) : WaltConfig()
 
 @Serializable

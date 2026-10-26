@@ -4,6 +4,10 @@ import WalletDemoSharingUI
 
 @main
 struct WalletDemoApp: App {
+    #if DEBUG
+    @MainActor private static let initialCredentialReadGate = MockInitialCredentialReadGate()
+    #endif
+
     @StateObject private var viewModel: WalletViewModel = {
         let env = ProcessInfo.processInfo.environment
         let defaults = UserDefaults.standard
@@ -16,24 +20,40 @@ struct WalletDemoApp: App {
         let signingProtectionMode = walletSigningProtectionMode(environment: env, defaults: defaults)
         if env["E2E_MOCK_WALLET"] == "1" {
             let delayMilliseconds = UInt64(env["E2E_MOCK_WALLET_DELAY_MS"] ?? "") ?? 0
+            var initialCredentialRead: (@Sendable () async -> Void)? = nil
             #if DEBUG
+            if env["E2E_MOCK_HOLD_INITIAL_READ"] == "1" {
+                initialCredentialRead = { await Self.initialCredentialReadGate.wait() }
+            }
             let imageCredential = Self.mockImageCredential(environment: env)
+            let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
             let imageCredential: (dataJSON: String, portraitValueJSON: String)? = nil
+            let registrationUpdate: (@Sendable () async throws -> Void)? = nil
             #endif
             return WalletViewModel(
                 walletID: walletID,
                 signingProtectionMode: signingProtectionMode,
                 walletClient: MockWalletClient(
+                    initialCredentialRead: initialCredentialRead,
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
                     duplicatePresentationOptions: env["E2E_MOCK_DUPLICATE_PRESENTATION_OPTIONS"] == "1",
+                    emptyPresentationOptions: env["E2E_MOCK_NO_MATCHES"] == "1",
                     transactionCodeRequired: env["E2E_MOCK_TX_CODE_REQUIRED"] == "1",
+                    paymentConsent: {
+                        #if DEBUG
+                        return try await MockWalletClient.uiTestPaymentConsent(env["E2E_MOCK_PAYMENT"])
+                        #else
+                        return nil
+                        #endif
+                    },
                     responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1",
                     mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1",
                     sampleCredentialDataJSON: imageCredential?.dataJSON,
                     samplePortraitDisclosureValueJSON: imageCredential?.portraitValueJSON
-                )
+                ),
+                identityDocumentRegistrationUpdate: registrationUpdate
             )
         }
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL") ?? DemoBackendDefaults.attestationBaseURL
@@ -61,6 +81,12 @@ struct WalletDemoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: viewModel)
+            #if DEBUG
+            .overlay(alignment: .bottom) {
+                MockInitialCredentialReadControl(gate: Self.initialCredentialReadGate)
+                    .padding(.bottom, 80)
+            }
+            #endif
             .environment(\.walletDemoBranding, .default)
             .tint(WalletDemoBranding.default.primary)
             .onOpenURL { url in
@@ -102,6 +128,7 @@ struct WalletDemoApp: App {
               let data = try? JSONSerialization.data(withJSONObject: [
                   "vct": "https://issuer.example/credential-types/mobile-driving-licence",
                   "given_name": "Ada",
+                  "age_over_18": true,
                   "family_name": "Lovelace",
                   "valid_to": 1_781_654_400,
                   "resident_address": [
@@ -121,6 +148,40 @@ struct WalletDemoApp: App {
     }
     #endif
 }
+
+#if DEBUG
+@MainActor
+private final class MockInitialCredentialReadGate: ObservableObject {
+    @Published private(set) var isPending = false
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            isPending = true
+        }
+    }
+
+    func complete() {
+        guard let continuation else { return }
+        self.continuation = nil
+        isPending = false
+        continuation.resume()
+    }
+}
+
+private struct MockInitialCredentialReadControl: View {
+    @ObservedObject var gate: MockInitialCredentialReadGate
+
+    var body: some View {
+        if gate.isPending {
+            Button("Complete mock credential read") { gate.complete() }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("wallet.test.completeInitialRead")
+        }
+    }
+}
+#endif
 
 private func walletSigningProtectionMode(
     environment: [String: String],

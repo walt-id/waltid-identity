@@ -96,7 +96,7 @@ internal suspend fun Wallet.resolveProofHolderBindings(
     defaultDid: String?,
 ): List<ResolvedCredentialHolderBinding> {
     CredentialRequestBuilder.validateBatchSize(metadata, holders.size)
-    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) != null) {
+    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider()) != null) {
         "Multiple instances require an advertised JWT proof type"
     }
     val bindings = holders.map { binding ->
@@ -106,7 +106,7 @@ internal suspend fun Wallet.resolveProofHolderBindings(
         require(configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired == null || material.crypto2Key != null) {
             "Key attestation requires a Crypto2 holder key"
         }
-        supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null)?.let { algorithms ->
+        supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider())?.let { algorithms ->
             if (material.crypto2Key != null) material.crypto2Key.selectJwsAlgorithm(algorithms)
             else require(requireNotNull(material.legacyKey).keyType.jwsAlg in algorithms) {
                 "Issuer does not support the selected holder key's proof algorithm"
@@ -237,7 +237,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
 
 /** Choose a DID only when its verification method belongs to the selected key. */
 private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStoreEntry, configuration: CredentialConfiguration): String? {
-    if (supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) == null) return null
+    if (supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider()) == null) return null
     val methods = configuration.cryptographicBindingMethodsSupported.orEmpty()
     val permitsJwk = methods.isEmpty() || methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }
     val method = did?.removePrefix("did:")?.substringBefore(':')
@@ -275,9 +275,22 @@ private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStor
     return null
 }
 
+/**
+ * Parsed JWT-secured W3C credentials are labeled `jwt_vc_json`.
+ * `jwt_vc` and `jwt_vc_json-ld` identify that same JWS encoding, so a credential matches any of them.
+ * Data Integrity (`ldp_vc`), SD-JWT VC, and mdoc stay distinct.
+ */
+internal fun issuedCredentialFormatMatches(issuedFormat: String, requestedFormat: String): Boolean {
+    if (issuedFormat == requestedFormat) return true
+    return issuedFormat in jwtSecuredW3cCredentialFormats && requestedFormat in jwtSecuredW3cCredentialFormats
+}
+
+private val jwtSecuredW3cCredentialFormats = setOf("jwt_vc_json", "jwt_vc_json-ld", "jwt_vc")
+private val w3cCredentialFormatsWithTypes = jwtSecuredW3cCredentialFormats + "ldp_vc"
+
 /** Check the requested credential kind independently of its holder-key association. */
 private fun DigitalCredential.requireRequestedConfiguration(configuration: CredentialConfiguration) {
-    require(format == configuration.format.value) {
+    require(issuedCredentialFormatMatches(format, configuration.format.value)) {
         "Issued credential format does not match the selected configuration"
     }
     configuration.vct?.takeIf { format == "dc+sd-jwt" }?.let { expected ->
@@ -290,7 +303,7 @@ private fun DigitalCredential.requireRequestedConfiguration(configuration: Crede
             "Issued credential document type does not match the selected configuration"
         }
     }
-    configuration.credentialDefinition?.type?.takeIf { format in setOf("jwt_vc_json", "jwt_vc_json-ld", "jwt_vc", "ldp_vc") }?.let { expected ->
+    configuration.credentialDefinition?.type?.takeIf { format in w3cCredentialFormatsWithTypes }?.let { expected ->
         val types = when (val value = credentialData["type"]) {
             is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
             is JsonPrimitive -> listOfNotNull(value.contentOrNull)

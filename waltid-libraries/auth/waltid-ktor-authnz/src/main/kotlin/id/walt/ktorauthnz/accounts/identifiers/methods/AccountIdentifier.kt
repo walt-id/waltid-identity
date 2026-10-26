@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.accounts.identifiers.methods
 
+import id.walt.ktorauthnz.exceptions.AccountNotFoundException
 import id.walt.ktorauthnz.KtorAuthnzManager
 import kotlinx.serialization.Serializable
 
@@ -26,7 +27,7 @@ sealed class AccountIdentifier {
     }
 
     suspend fun resolveToAccountId() = KtorAuthnzManager.accountStore.lookupAccountUuid(this)
-        ?: throw IllegalStateException("Account does not exist (for account identifier type ${this::class.simpleName})")
+        ?: throw AccountNotFoundException(accountIdentifierName)
 
     suspend fun resolveIfExists() = KtorAuthnzManager.accountStore.lookupAccountUuid(this)
 

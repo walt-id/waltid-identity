@@ -1,0 +1,11 @@
+{
+  "name": "wallet-demo-browser-visual-tests",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "record": "WALLET_VISUAL_RECORD=1 playwright test --update-snapshots=all"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0"
+  }
+}

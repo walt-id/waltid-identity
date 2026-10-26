@@ -23,8 +23,8 @@ public struct WalletConfiguration: Sendable {
     /// neither requested nor accepted.
     public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
 
-    /// Runtime provider for issuers requiring key attestations in credential proofs.
-    public var keyAttestationProvider: (any KeyAttestationProvider)?
+    /// Fixed provider or issuer-specific resolver for credentials requiring key attestation.
+    public var keyAttestationProvider: (any KeyAttestationProviderResolver)?
 
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
@@ -77,7 +77,7 @@ public struct WalletConfiguration: Sendable {
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
         signingIdentity: SigningIdentityConfiguration = .init(),
-        keyAttestationProvider: (any KeyAttestationProvider)? = nil
+        keyAttestationProvider: (any KeyAttestationProviderResolver)? = nil
     ) {
         self.walletID = walletID
         self.signingIdentity = signingIdentity
@@ -927,6 +927,10 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// mdoc document type from the offered credential configuration, when present.
     public let doctype: String?
 
+    /// Issuer display metadata in the same locale-preserving shape as a stored credential sidecar.
+    /// Claim definitions are advertised metadata, not received values or proof of issuer trust.
+    public let metadataJSON: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -941,6 +945,7 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - textColor: Suggested credential text color.
     ///   - vct: SD-JWT VC type from the offered configuration.
     ///   - doctype: mdoc document type from the offered configuration.
+    ///   - metadataJSON: Optional issuer display metadata and claim definitions.
     public init(
         configurationID: String,
         format: String,
@@ -952,7 +957,8 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         backgroundImageURI: URL? = nil,
         textColor: String? = nil,
         vct: String? = nil,
-        doctype: String? = nil
+        doctype: String? = nil,
+        metadataJSON: String? = nil
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -965,6 +971,7 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.textColor = textColor
         self.vct = vct
         self.doctype = doctype
+        self.metadataJSON = metadataJSON
     }
 
     /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.
@@ -1115,6 +1122,20 @@ public struct IssuanceSession: Equatable, Sendable {
 
 }
 
+/// Current retained state, refreshed by listing issuance continuations.
+public enum IssuanceContinuationStatus: Equatable, Sendable {
+    /// No recognized continuation state has been supplied.
+    case unresolved
+    /// The issuer is still processing the credential request.
+    case awaitingIssuer
+    /// Issued credentials are waiting to be saved locally.
+    case awaitingLocalSave
+    /// The issuer request outcome is uncertain; automatic retry is unsafe.
+    case remoteOutcomeUncertain
+    /// The local save outcome is uncertain; automatic takeover is unsafe.
+    case storageOutcomeUncertain
+}
+
 /// Issuance continuation awaiting issuer processing or local credential storage.
 public struct DeferredCredential: Equatable, Sendable {
     /// Opaque identifier used to resume this deferred operation.
@@ -1129,6 +1150,12 @@ public struct DeferredCredential: Equatable, Sendable {
     /// Issuer-recommended minimum polling interval in seconds.
     public let intervalSeconds: Int64?
 
+    /// Current retained state of the continuation.
+    public let status: IssuanceContinuationStatus
+
+    /// Issuer display metadata only, without credential values or protocol secrets.
+    public let displayMetadataJSON: String?
+
     /// Creates a deferred credential continuation.
     ///
     /// - Parameters:
@@ -1136,11 +1163,16 @@ public struct DeferredCredential: Equatable, Sendable {
     ///   - credentialConfigurationID: Credential configuration, if supplied by the original request.
     ///   - intervalSeconds: Issuer-recommended polling interval.
     ///   - credentialIdentifier: Optional issuer-granted dataset identifier.
-    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil) {
+    ///   - status: Current retained state of the continuation.
+    ///   - displayMetadataJSON: Optional issuer display metadata, without credential values or protocol secrets.
+    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil,
+                status: IssuanceContinuationStatus = .unresolved, displayMetadataJSON: String? = nil) {
         self.id = id
         self.credentialConfigurationID = credentialConfigurationID
         self.intervalSeconds = intervalSeconds
         self.credentialIdentifier = credentialIdentifier
+        self.status = status
+        self.displayMetadataJSON = displayMetadataJSON
     }
 }
 
@@ -1746,6 +1778,9 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     /// Whether apps may let the user toggle this claim for submission.
     public let selectable: Bool
 
+    /// False for additional clear-text data the credential must transmit even when not requested.
+    public let requested: Bool
+
     /// Creates a presentation disclosure.
     ///
     /// - Parameters:
@@ -1757,6 +1792,7 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     ///     disclose this claim.
     ///   - required: Whether the request requires this claim.
     ///   - selectable: Whether apps may let the user toggle this claim.
+    ///   - requested: Whether the presentation request asks for this claim, rather than additional clear-text data.
     public init(
         path: String,
         name: String?,
@@ -1764,7 +1800,8 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         displayValue: String?,
         selectivelyDisclosable: Bool,
         required: Bool? = nil,
-        selectable: Bool? = nil
+        selectable: Bool? = nil,
+        requested: Bool = true
     ) {
         self.path = path
         self.name = name
@@ -1773,6 +1810,9 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         self.selectivelyDisclosable = selectivelyDisclosable
         let resolvedRequired = required ?? !selectivelyDisclosable
         let resolvedSelectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        precondition(requested || (!selectivelyDisclosable && !resolvedRequired && !resolvedSelectable),
+            "Additional shared data must be immutable and independent of request requirements.")
+        self.requested = requested
         precondition(
             Self.hasValidSelectionState(
                 selectivelyDisclosable: selectivelyDisclosable,

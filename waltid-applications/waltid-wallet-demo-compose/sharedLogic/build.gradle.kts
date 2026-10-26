@@ -51,6 +51,10 @@ kotlin {
                 }
             }
 
+            val mobileTest = create("mobileTest") {
+                dependsOn(commonTest.get())
+            }
+
             if (enableAndroidBuild) {
                 androidMain {
                     dependsOn(mobileMain)
@@ -65,11 +69,14 @@ kotlin {
                     implementation(identityLibs.bouncycastle.prov)
                 }
 
-                getByName("androidHostTest").dependencies {
-                    implementation(kotlin("test"))
-                    implementation(identityLibs.junit)
-                    implementation(identityLibs.robolectric)
-                    implementation(identityLibs.kotlinx.coroutines.test)
+                getByName("androidHostTest") {
+                    dependsOn(mobileTest)
+                    dependencies {
+                        implementation(kotlin("test"))
+                        implementation(identityLibs.junit)
+                        implementation(identityLibs.robolectric)
+                        implementation(identityLibs.kotlinx.coroutines.test)
+                    }
                 }
 
                 getByName("androidDeviceTest").dependencies {
@@ -88,6 +95,10 @@ kotlin {
                 iosMain.dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
                     implementation(identityLibs.ktor.client.darwin)
+                }
+
+                iosTest {
+                    dependsOn(mobileTest)
                 }
             }
         }
@@ -119,8 +130,10 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     }
 }
 
-// iOS test binaries do not get the Xcode SwiftPM linkage package used by the demo app.
-// Keep iOS source/test compilation enabled, but skip native test executable linking.
-tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
-    enabled = false
+if (enableMobileWallet) {
+    val fixture = layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/key-attestation")
+    extra["demoKeyAttestationFixture"] = fixture
+    apply(from = fixture.file("sources.gradle.kts"))
+    val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
+    kotlin.sourceSets.named("mobileMain") { kotlin.srcDirs(demoKeyAttestationSources) }
 }

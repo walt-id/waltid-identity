@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.wallet2.consent.*
 import id.walt.wallet2.handlers.CredentialHolderBinding
 import id.walt.wallet2.handlers.WalletCredentialSelection
@@ -214,7 +216,7 @@ public class MobileWallet internal constructor(
     private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     private val registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
-    private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
+    private val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
@@ -242,6 +244,7 @@ public class MobileWallet internal constructor(
      */
     public val events: Flow<MobileWalletEvent> = eventStream.events
 
+    private val registrationMutex = Mutex()
     private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
@@ -270,6 +273,13 @@ public class MobileWallet internal constructor(
      */
     public fun attachKeyAttestationProvider(provider: KeyAttestationProvider): MobileWallet = apply {
         wallet.attachKeyAttestationProvider(provider)
+    }
+
+    /** Attaches issuer-specific key attestation support. Supply it again after wallet recreation. */
+    public fun attachKeyAttestationProviderResolver(
+        resolver: id.walt.wallet2.handlers.KeyAttestationProviderResolver,
+    ): MobileWallet = apply {
+        wallet.attachKeyAttestationProviderResolver(resolver)
     }
 
     private val annexCEngine = MobileWalletAnnexCEngine(
@@ -395,7 +405,14 @@ public class MobileWallet internal constructor(
                     } else {
                         val bindings = when (holders) {
                             is MobileWalletCredentialHolders.Existing -> holders.bindings
-                            is MobileWalletCredentialHolders.NewKeys -> createIssuanceHolderKeys(holders.count).also { generated += it }
+                            is MobileWalletCredentialHolders.NewKeys -> {
+                                val active = signingIdentityManager?.state()
+                                val identity = (active as? id.walt.wallet2.mobile.identity.SigningIdentityState.Active)?.identity
+                                check(active == null || identity != null) { "The wallet requires an active signing identity" }
+                                createIssuanceHolderKeys(holders.count,
+                                    keyUseAuthorizationPolicy = identity?.authorization,
+                                ).also { generated += it }
+                            }
                         }
                         WalletCredentialSelection(
                             selection.credentialConfigurationId, selection.credentialIdentifier,
@@ -634,14 +651,27 @@ public class MobileWallet internal constructor(
      * This is the retry entry point: it is safe to call at any time, and calling it again after a
      * failure re-publishes the current wallet state. It reports an adapter failure through the
      * returned result and [digitalCredentialRegistration], and only propagates an exception if
-     * reading the wallet's own credentials failed.
+     * reading the wallet's own credentials failed, or the caller was cancelled. Refreshes on this
+     * wallet serialize snapshot creation and publication; a queued retry reads the current store.
      */
     public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult = lifecycle.use {
         updateDigitalCredentialRegistration()
     }
 
-    private suspend fun updateDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
-        val records = registryRecords(registrationProjection)
+    private suspend fun updateDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult = registrationMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        val records = try {
+            registryRecords(registrationProjection)
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
+                available = false,
+                registeredEntryCount = 0,
+                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
+            )
+            throw failure
+        }
+        currentCoroutineContext().ensureActive()
         val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
@@ -652,6 +682,7 @@ public class MobileWallet internal constructor(
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
         }
+        currentCoroutineContext().ensureActive()
         // Creation options advertise issuance capability and must not share the presentation
         // replace lifecycle; failures here do not roll back a successful presentation projection.
         runCatching {
@@ -659,8 +690,9 @@ public class MobileWallet internal constructor(
         }.onFailure { failure ->
             if (failure is CancellationException) throw failure
         }
+        currentCoroutineContext().ensureActive()
         lastRegistrationResult.value = presentationResult
-        return presentationResult
+        presentationResult
     }
 
     /**
@@ -674,11 +706,7 @@ public class MobileWallet internal constructor(
     private suspend fun syncDigitalCredentialRegistration() {
         runCatching { updateDigitalCredentialRegistration() }.onFailure { failure ->
             if (failure is CancellationException) throw failure
-            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
-            )
+            // The failed snapshot was reported while holding registrationMutex.
         }
         runCatching { onDigitalCredentialRegistryChanged() }.onFailure { failure ->
             if (failure is CancellationException) throw failure
@@ -759,7 +787,8 @@ public class MobileWallet internal constructor(
             ),
             credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
             credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
-            readerTrust = MobileWalletReaderTrust.NotApplicable,
+            readerAuthentication = MobileWalletReaderAuthentication.NOT_APPLICABLE,
+            readerTrust = null,
         )
     }
 
@@ -1079,6 +1108,7 @@ public class MobileWallet internal constructor(
                     selectivelyDisclosable = disclosure.selectivelyDisclosable,
                     required = disclosure.required,
                     selectable = disclosure.selectable,
+                    requested = disclosure.requested,
                 )
             },
             metadataJson = metadata?.encodeJsonObject(),

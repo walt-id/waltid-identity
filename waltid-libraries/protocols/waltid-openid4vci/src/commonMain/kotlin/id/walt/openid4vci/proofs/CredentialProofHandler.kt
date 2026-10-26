@@ -20,7 +20,8 @@ interface CredentialProofHandler {
         proofMetadata: ProofTypeMetadata,
         configuration: CredentialConfiguration,
         capabilities: CredentialProofCapabilities,
-    ) {}
+    ) {
+    }
 }
 
 data class CredentialProofCapabilities(

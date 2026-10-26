@@ -14,6 +14,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
@@ -133,14 +134,21 @@ internal abstract class DigitalCredentialSharingE2E {
     protected suspend fun Fixture.completeWithoutWalletReview(
         request: DigitalCredentialRequestHandle,
         candidateText: String,
+        expectedProviderFailure: String? = null,
         onCredentialManagerPrompt: (UiDevice) -> Unit = {},
     ): Result<GetCredentialResponse> {
         val deadline = System.currentTimeMillis() + CREDENTIAL_OPERATION_TIMEOUT
         var candidateSelected = false
+        var failureDismissed = false
 
         while (!request.isComplete && System.currentTimeMillis() < deadline) {
             assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
-            if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
+            if (expectedProviderFailure != null && !failureDismissed &&
+                device.hasObject(By.pkg(context.packageName).text("Unable to share"))
+            ) {
+                dismissProviderFailure(request, expectedProviderFailure)
+                failureDismissed = true
+            } else if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
                 onCredentialManagerPrompt(device)
                 assertTrue(
                     "Could not click the '$candidateText' candidate",
@@ -163,8 +171,20 @@ internal abstract class DigitalCredentialSharingE2E {
             )
         }
         assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
+        assertEquals("Provider failure must remain visible until dismissed", expectedProviderFailure != null, failureDismissed)
 
         return request.await()
+    }
+
+    protected fun Fixture.dismissProviderFailure(request: DigitalCredentialRequestHandle, expectedMessage: String) {
+        assertTrue("Provider failure was not displayed",
+            device.wait(Until.hasObject(By.pkg(context.packageName).text("Unable to share")), UI_ELEMENT_TIMEOUT))
+        assertTrue("Provider failure did not explain '$expectedMessage'",
+            device.hasObject(By.pkg(context.packageName).textContains(expectedMessage)))
+        assertFalse("Provider failure completed before dismissal", request.isComplete)
+        val close = device.wait(Until.findObject(By.pkg(context.packageName).desc("Close request")), UI_ELEMENT_TIMEOUT)
+        assertNotNull("Provider failure has no close action", close)
+        close.click()
     }
 
     /** Candidate selection, optional confirmation and provider transition share one deadline. */

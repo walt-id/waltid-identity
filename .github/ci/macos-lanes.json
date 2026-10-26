@@ -7,9 +7,11 @@
     ".github/ci/*",
     ".github/scripts/ci/*",
     ".github/scripts/mobile-ci/run-ios-phase.py",
+    ".github/scripts/mobile-ci/verify_test_results.py",
     ".github/scripts/mobile-ci/wallet-core-artifact.py",
     ".github/actions/checkout-repos/*",
     ".github/actions/gradle-ios/*",
+    ".github/actions/ios-test-reports/*",
     ".github/actions/gradle-setup-action/*",
     ".github/actions/ios-build-setup/*",
     ".github/actions/set-properties/*",
@@ -19,7 +21,8 @@
     "gradle.properties",
     "gradlew",
     "settings.gradle.kts",
-    "gradle/libs.versions.toml"
+    "gradle/libs.versions.toml",
+    ".github/actions/wallet-visual/*"
   ],
   "lanes": {
     "ios-simulator": {
@@ -29,18 +32,20 @@
         "*/src/commonTest/*",
         "*/src/iosMain/*",
         "*/src/iosTest/*",
+        "*/src/iosAppTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/src/mobile*/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
         "*/src/iosSimulatorArm64Test/*",
-        ".github/scripts/mobile-ci/verify_proximity_suites.py",
-        ".github/scripts/mobile-ci/verify_test_results.py",
-        ".github/scripts/mobile-ci/proximity-test-suites.json",
+        ".github/scripts/mobile-ci/verify_platform_test_results.py",
         "scripts/*recovery*",
         "scripts/ios_simulator_test.py",
         "scripts/tests/test_*recovery*",
         ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
+        "waltid-libraries/crypto/waltid-crypto2-signum/scripts/*",
         "*/src/recoveryTest/*",
         "*/src/iosRecoveryTest/*"
       ]
@@ -50,31 +55,45 @@
       "patterns": [
         "*/Package.swift",
         ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh",
-        ".github/scripts/mobile-ci/verify_test_results.py",
-        ".github/scripts/mobile-ci/proximity-test-suites.json",
         "scripts/check-mobile-swift-parity-decision.sh",
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
         "waltid-libraries/protocols/waltid-openid4vp-wallet/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/swift/*"
       ]
     },
     "compose": {
       "description": "Compose iOS demo and its WalletCore/Swift integration",
       "patterns": [
-        "waltid-applications/waltid-wallet-demo-compose/*",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/src/common*/*",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/src/mobile*/*",
+        "waltid-applications/waltid-wallet-demo-compose/shared*/src/ios*/*",
+        "waltid-applications/waltid-wallet-demo-compose/iosApp/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/kotlin/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/sources.gradle.kts"
       ]
     },
     "enterprise": {
-      "description": "Enterprise iOS mobile integration against Identity wallet-mobile",
+      "description": "Enterprise iOS SDK and native/Compose batch integration",
       "patterns": [
+        "waltid-applications/waltid-wallet-demo-ios/*",
+        "waltid-applications/waltid-wallet-demo-compose/*",
+        "waltid-applications/waltid-wallet-demo-shared-ios/*",
+        "waltid-applications/mobile-e2e-fixtures/ios/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
@@ -93,6 +112,79 @@
         "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/*",
         "waltid-libraries/crypto/waltid-crypto2*/*",
         "waltid-libraries/crypto/waltid-jose/*"
+      ]
+    },
+    "visual-android": {
+      "description": "Complete Compose Android visual catalogue",
+      "patterns": [
+        "waltid-libraries/*/src/commonMain/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/*",
+        "waltid-libraries/*/src/androidMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/androidMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/androidHostTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/androidApp/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/androidMain/*"
+      ]
+    },
+    "visual-compose": {
+      "description": "Complete Compose iOS visual catalogue",
+      "patterns": [
+        "waltid-libraries/*/src/commonMain/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/*",
+        "waltid-libraries/*/src/iosMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/*",
+        "waltid-applications/waltid-wallet-demo-compose/iosApp/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/mobileMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/iosMain/*"
+      ]
+    },
+    "visual-native": {
+      "description": "Complete SwiftUI visual catalogue using the shared WalletCore build",
+      "patterns": [
+        "waltid-libraries/*/src/commonMain/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/*",
+        "waltid-libraries/*/src/iosMain/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-applications/waltid-wallet-demo-ios/*",
+        "waltid-applications/waltid-wallet-demo-shared-ios/*"
+      ]
+    },
+    "visual-browser": {
+      "description": "Complete browser account visual catalogue",
+      "patterns": [
+        "waltid-libraries/*/src/commonMain/*",
+        "waltid-libraries/*/src/wasmJsMain/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/webApp/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*"
       ]
     }
   }

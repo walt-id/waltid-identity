@@ -27,6 +27,7 @@ zxing-cpp = "3.1.1"
 compose-navigation3 = "1.1.2"
 dokka = "2.2.0"
 coil = "3.6.3"
+haze = "2.0.1"
 firebase-bom = "34.19.0"
 google-services = "4.5.0"
 
@@ -81,7 +82,7 @@ azure-keyvault-keys = "4.11.0"
 netty = "4.1.138.Final"
 netty-4_2 = "4.2.18.Final"
 jackson-core = "2.22.3"
-jackson-core-3 = "3.1.7"
+jackson-core-3 = "3.2.3"
 vertx = "4.5.34"
 rhino = "1.7.15.1"
 oci-sdk = "3.90.0"
@@ -90,10 +91,12 @@ oci-sdk = "3.90.0"
 web3j = "5.0.3"
 aaa4j-radius = "0.4.0"
 apache-ldap-api = "2.1.8"
+unboundid-ldapsdk = "7.0.5"
 mina-core = "2.2.8"
 commons-lang3 = "3.20.0"
 onetime = "2.2.0"
 kedis = "0.0.12"
+webauthn4j = "0.31.10.RELEASE"
 
 # Crypto
 # One Bouncy Castle flavour for the whole repo: the mainline jdk18on line. The lts8on line (2.7x) publishes the
@@ -101,6 +104,7 @@ kedis = "0.0.12"
 # Android device tests. jdk18on is also what Signum and web3j pull in, and it is what crypto2 needs for secp256k1.
 bouncycastle = "1.86"
 nimbus-jose = "10.10"
+# renovate: datasource=npm depName=jose
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
@@ -119,6 +123,7 @@ junit = "4.13.2"
 junit-jupiter = "6.1.3"
 mokkery = "3.5.0"
 robolectric = "4.17"
+roborazzi = "1.76.0"
 
 # AndroidX
 androidx-core = "1.19.1"
@@ -157,11 +162,14 @@ maven-xml = "4.0.0-rc-7"
 mordant = "3.0.2"
 clikt-testkit = "3.1.1"
 password4j = "1.8.4"
+# renovate: datasource=npm depName=cose-js
 cose-js = "0.9.0"
 multipaz = "0.101.0"
 sqlcipher-swift = "4.19.0"
 kotlinx-browser = "0.5.0"
+# renovate: datasource=npm depName=canonicalize
 canonicalize-npm = "2.0.0"
+# renovate: datasource=npm depName=uuid
 uuid-npm = "9.0.1"
 hoplite = "2.9.0"
 playwright = "1.60.0"
@@ -186,6 +194,7 @@ nftkit-web3login = "1.2311291144.0"
 
 [libraries]
 google-blockstore = { module = "com.google.android.gms:play-services-auth-blockstore", version = "16.4.0" }
+google-play-services-base = { module = "com.google.android.gms:play-services-base", version = "18.9.0" }
 
 # Plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -337,7 +346,10 @@ zxing-cpp-kotlin-native = { module = "io.github.zxing-cpp:kotlin-native", versio
 compose-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "compose-navigation3" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+haze-core = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-test-rules" }
@@ -349,6 +361,9 @@ androidx-credentials-registry-provider = { module = "androidx.credentials.regist
 androidx-credentials-registry-provider-play-services = { module = "androidx.credentials.registry:registry-provider-play-services", version.ref = "androidx-credentials-registry" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+roborazzi-core = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-compose-ios = { module = "io.github.takahirom.roborazzi:roborazzi-compose-ios", version.ref = "roborazzi" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 
 ## HTTP
@@ -427,6 +442,8 @@ jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
 jackson-databind-tools = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson-core-3" }
+jackson-dataformat-cbor-tools = { module = "tools.jackson.dataformat:jackson-dataformat-cbor", version.ref = "jackson-core-3" }
+jackson-bom-tools = { module = "tools.jackson:jackson-bom", version.ref = "jackson-core-3" }
 vertx-core = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
@@ -436,10 +453,13 @@ web3j-core = { module = "org.web3j:core", version.ref = "web3j" }
 web3j-utils = { module = "org.web3j:utils", version.ref = "web3j" }
 aaa4j-radius = { module = "org.aaa4j.radius:aaa4j-radius-client", version.ref = "aaa4j-radius" }
 apache-ldap-api = { module = "org.apache.directory.api:apache-ldap-api", version.ref = "apache-ldap-api" }
+unboundid-ldapsdk = { module = "com.unboundid:unboundid-ldapsdk", version.ref = "unboundid-ldapsdk" }
 mina-core = { module = "org.apache.mina:mina-core", version.ref = "mina-core" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
 kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
+webauthn4j-core = { module = "com.webauthn4j:webauthn4j-core", version.ref = "webauthn4j" }
+webauthn4j-test = { module = "com.webauthn4j:webauthn4j-test", version.ref = "webauthn4j" }
 
 ## a-sit-plus signum (mobile crypto)
 signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
@@ -530,6 +550,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-power-assert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }
 android-application = { id = "com.android.application", version.ref = "android-gradle" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }

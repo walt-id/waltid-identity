@@ -4,7 +4,7 @@ import id.walt.ktorauthnz.exceptions.RadiusAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.RADIUSConfiguration
 import id.walt.ktorauthnz.methods.requests.UserPassCredentials
@@ -68,7 +68,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         }) {
             val session = call.getAuthSession(authContext)
 
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
 
             val identifier = auth(session, credential, call)
             val authContext = authContext(call)

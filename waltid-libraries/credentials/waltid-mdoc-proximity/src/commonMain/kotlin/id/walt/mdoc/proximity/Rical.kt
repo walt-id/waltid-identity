@@ -16,6 +16,10 @@ import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray
 import kotlin.time.Clock
 import kotlin.time.Instant
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 
 /** Informative edition-2 RICAL data retained behind an explicit provider and profile policy. */
 @Serializable(with = RicalSerializer::class)

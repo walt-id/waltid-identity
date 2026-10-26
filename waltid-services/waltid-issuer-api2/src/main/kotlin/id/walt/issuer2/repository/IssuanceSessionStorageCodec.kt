@@ -10,6 +10,13 @@ object IssuanceSessionStorageCodec {
 
     internal fun normalize(stored: JsonObject): JsonObject {
         val normalized = stored.toMutableMap()
+        val authorizationRequest = stored["authorizationRequest"] as? JsonObject
+        if (authorizationRequest != null && authorizationRequest["client"] !is JsonObject) {
+            normalized["authorizationRequest"] = JsonNull
+            normalized["isClosed"] = JsonPrimitive(true)
+            normalized["status"] = JsonPrimitive("UNSUCCESSFUL")
+            normalized["statusReason"] = JsonPrimitive("Legacy authorization request; restart authorization")
+        }
         if ("issuanceRequests" !in stored) {
             // Original tokens used the configuration ID as their credential identifier.
             val identifier = stored.getValue("credentialConfigurationId")
@@ -35,8 +42,19 @@ object IssuanceSessionStorageCodec {
     }
 
     private val requestFields = setOf(
-        "profileId", "credentialConfigurationId", "issuerKey", "credentialData", "mapping",
-        "selectiveDisclosure", "idTokenClaimsMapping", "mDocNameSpacesDataMappingConfig",
-        "authorizedTransactionDataTypes", "msoData", "x5Chain", "issuerDid", "credentialStatus", "expectedCredentialProofKeyJwks",
+        "profileId",
+        "credentialConfigurationId",
+        "issuerKey",
+        "credentialData",
+        "mapping",
+        "selectiveDisclosure",
+        "idTokenClaimsMapping",
+        "mDocNameSpacesDataMappingConfig",
+        "authorizedTransactionDataTypes",
+        "msoData",
+        "x5Chain",
+        "issuerDid",
+        "credentialStatus",
+        "expectedCredentialProofKeyJwks",
     )
 }

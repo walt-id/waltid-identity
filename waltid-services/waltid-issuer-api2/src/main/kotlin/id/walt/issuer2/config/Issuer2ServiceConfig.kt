@@ -1,5 +1,7 @@
 package id.walt.issuer2.config
 
+import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
+
 import id.walt.openid4vci.proofs.attestation.KeyAttestationConfig
 import id.walt.commons.config.WaltConfig
 import id.walt.crypto.keys.KeySerialization
@@ -22,7 +24,24 @@ data class Issuer2ServiceConfig(
     /** Enables batch credential issuance and defines the maximum accepted batch size. */
     val batchCredentialIssuance: BatchCredentialIssuance? = null,
     val keyAttestationConfig: KeyAttestationConfig? = null,
+    /** Optional dedicated metadata signer, separate from token and credential signing. */
+    val signedMetadata: SignedMetadataConfig? = null,
 ) : WaltConfig() {
+    /** Preserves the full JVM constructor from before metadata signing configuration. */
+    constructor(
+        baseUrl: String,
+        ciTokenKey: String,
+        credentialEncryptionKey: String?,
+        enforcePushedAuthorizationRequests: Boolean,
+        clientAuthenticationConfig: ClientAuthenticationConfig?,
+        ciTokenStoredKey: String?,
+        batchCredentialIssuance: BatchCredentialIssuance?,
+        keyAttestationConfig: KeyAttestationConfig?,
+    ) : this(
+        baseUrl, ciTokenKey, credentialEncryptionKey, enforcePushedAuthorizationRequests,
+        clientAuthenticationConfig, ciTokenStoredKey, batchCredentialIssuance, keyAttestationConfig, null,
+    )
+
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
         baseUrl: String,

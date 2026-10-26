@@ -14,8 +14,10 @@ import kotlin.time.Instant
 sealed interface Session {
     @SerialName("subject")
     val subject: String?
+
     @SerialName("expires_at")
     val expiresAt: Map<TokenType, Instant>
+
     @SerialName("custom_attributes")
     val customAttributes: Map<String, String>
 

@@ -2,6 +2,8 @@ package id.walt.wallet2.mobile.test
 
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.mobile.identity.SigningIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityAuthorization
+import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +13,11 @@ import id.walt.wallet2.mobile.ScaAuthorizationTestActivity
 import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import org.junit.Assume.assumeTrue
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
+import androidx.test.uiautomator.UiDevice
+import id.walt.mobile.test.PhysicalDeviceTest
+import kotlinx.coroutines.delay
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
@@ -31,6 +38,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.UUID
+import java.util.regex.Pattern
 import kotlin.test.assertIs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -94,7 +102,14 @@ class EnterpriseMobileWalletIntegrationTest {
         val scenario = enterpriseScenario(fixture, "enterprise-mdl")
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
         val walletId = "android-enterprise-batch-${UUID.randomUUID()}"
-        val wallet = createWallet(walletId, null)
+        // The selected identity can differ from the build's default. Copies must retain its policy.
+        val wallet = MobileWalletFactory(context).create(MobileWalletConfig(
+            walletId = walletId,
+            signingIdentity = SigningIdentityConfiguration(
+                authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None),
+            ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
+        ))
         wallet.signingIdentity.initialize().activeIdentity()
         val session = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(offer.offerUrl)))
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(
@@ -152,7 +167,24 @@ class EnterpriseMobileWalletIntegrationTest {
         reopened.signingIdentity.initialize().activeIdentity()
         BatchAuthorizationTestActivity.callback = CompletableDeferred()
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authorization.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        val callback = withTimeout(120_000) { BatchAuthorizationTestActivity.callback.await() }
+        val callback = withTimeout(120_000) {
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            while (!BatchAuthorizationTestActivity.callback.isCompleted) {
+                // Approve browser onboarding and the external-app handoff, never a signing prompt.
+                try {
+                    // Chrome's sign-in dismissal label varies between bundled browser versions.
+                    val browserAction = device.findObject(By.res("com.android.chrome", "signin_fre_dismiss_button"))
+                        ?: device.findObject(By.pkg("com.android.chrome").text(Pattern.compile(
+                            "(?i)Accept & continue|Use without an account|No thanks|Open|Continue",
+                        )))
+                    browserAction?.click()
+                } catch (_: StaleObjectException) {
+                    // Chrome changed pages after lookup; the next iteration queries the new page.
+                }
+                delay(250)
+            }
+            BatchAuthorizationTestActivity.callback.await()
+        }
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
             reopened.continueAuthorizationIssuance(session.id, callback))
         assertEquals(2, stored.credentialIds.toSet().size)
@@ -161,6 +193,7 @@ class EnterpriseMobileWalletIntegrationTest {
 
     /** Operator-gated physical-device check; cancel the second holder's signing prompt. */
     @Test
+    @PhysicalDeviceTest
     fun batchSigningCancellationStoresNoCredential() = runBlocking {
         assumeTrue("Requires an operator cancelling the signing prompt",
             InstrumentationRegistry.getArguments().getString("wallet.batch.cancel") == "true")

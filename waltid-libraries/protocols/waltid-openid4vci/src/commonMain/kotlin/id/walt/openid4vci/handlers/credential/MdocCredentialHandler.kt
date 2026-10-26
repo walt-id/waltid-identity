@@ -36,7 +36,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
@@ -97,7 +96,6 @@ class MdocCredentialHandler(
             }
 
             computeCredentialResult(
-                request = request,
                 configuration = configuration,
                 issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
@@ -152,7 +150,6 @@ class MdocCredentialHandler(
         expectedUpdate: Instant?,
     ): CredentialResponseResult = try {
         computeCredentialResult(
-            request = request,
             configuration = configuration,
             issuanceBatch = issuanceBatch,
             x5Chain = x5Chain,
@@ -198,7 +195,7 @@ class MdocCredentialHandler(
         verifiedBinding: VerifiedCredentialBinding?,
         issuedAt: Instant,
     ): JsonObject {
-        if (dataMapping == null || dataMapping.isEmpty()) return credentialData
+        if (dataMapping.isNullOrEmpty()) return credentialData
         val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
         return credentialData.mergeMdocPayloadWithMapping(
             mapping = namespaceMapping,
@@ -219,7 +216,6 @@ class MdocCredentialHandler(
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeCredentialResult(
-        request: CredentialRequest,
         configuration: CredentialConfiguration,
         issuanceBatch: CredentialIssuanceBatch,
         x5Chain: List<X509Certificate>?,

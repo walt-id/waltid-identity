@@ -28,7 +28,9 @@ class KeyAttestationVerifier(
     private val clockSkewSeconds: Long = 60,
     private val now: () -> Instant = { Clock.System.now() },
 ) {
-    init { require(clockSkewSeconds >= 0) }
+    init {
+        require(clockSkewSeconds >= 0)
+    }
 
     suspend fun verify(
         jwt: String,
@@ -94,11 +96,13 @@ class KeyAttestationVerifier(
                 ?: throw invalidCredentialProof("Key attestation payload must be an object")
         }
         val issuedAt = payload.integer("iat")
-        val expiresAt = if (usage == KeyAttestationUsage.JWT_HEADER || "exp" in payload) payload.integer("exp") else null
+        val expiresAt =
+            if (usage == KeyAttestationUsage.JWT_HEADER || "exp" in payload) payload.integer("exp") else null
         val currentInstant = now()
         val currentTime = currentInstant.epochSeconds
         if (issuedAt > currentTime + clockSkewSeconds ||
-            expiresAt != null && (expiresAt <= currentTime - clockSkewSeconds || expiresAt <= issuedAt)) {
+            expiresAt != null && (expiresAt <= currentTime - clockSkewSeconds || expiresAt <= issuedAt)
+        ) {
             throw invalidCredentialProof("Key attestation is outside its valid lifetime")
         }
         payload["nbf"]?.let { value ->
@@ -157,7 +161,12 @@ internal suspend fun restoreAttestedKey(jwk: JsonObject): Key = attestationInput
         throw invalidCredentialProof("Attested JWK key_ops must allow verification")
     }
     val encoded = EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false)
-    val key = publicKeyRuntime.restore(encoded.toStoredSoftwareKey(KeyId(Jwk.sha256Thumbprint(encoded)), setOf(KeyUsage.VERIFY)))
+    val key = publicKeyRuntime.restore(
+        encoded.toStoredSoftwareKey(
+            KeyId(Jwk.sha256Thumbprint(encoded)),
+            setOf(KeyUsage.VERIFY)
+        )
+    )
     if (JwsAlgorithm.entries.none { key.spec.supportsJwsAlgorithm(it) }) {
         throw invalidCredentialProof("Attested JWK is not a supported signing key")
     }

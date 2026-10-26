@@ -83,7 +83,9 @@ public sealed interface MobileWalletCredentialHolders {
     }
 
     /**
-     * Creates distinct platform keys inside acceptance, using the wallet's configured key policy.
+     * Creates distinct platform keys inside acceptance, using the active signing identity's
+     * authorization policy. Wallets without identity management use their configured default policy.
+     * A managed identity must be active; pending or unavailable identities never fall back to defaults.
      *
      * @property count Number of credential instances for which to create distinct holder keys.
      */

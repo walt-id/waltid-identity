@@ -1,6 +1,8 @@
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.metadata.issuer.ClaimDescription
+import id.walt.openid4vci.metadata.issuer.ClaimDisplay
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.CredentialDisplayBackgroundImage
@@ -17,6 +19,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class WalletDisplayMetadataTest {
+
+    @Test
+    fun retainsClaimsWithoutArtworkAndPreservesOtherRequestMetadata() {
+        val original = issuerMetadata()
+        val configuration = original.credentialConfigurationsSupported.getValue("pid")
+        val issuer = original.copy(display = null, credentialConfigurationsSupported = mapOf("pid" to configuration.copy(
+            credentialMetadata = CredentialMetadata(claims = listOf(ClaimDescription(
+                path = listOf("namespace.with.dots", "given_name"), display = listOf(ClaimDisplay(name = "First name", locale = "en")),
+            ))),
+        )))
+        val request = kotlinx.serialization.json.buildJsonObject { put("custom", kotlinx.serialization.json.JsonPrimitive("kept")) }
+        val metadata = storedCredentialDisplayMetadata(issuer, "pid", request)!!
+        assertEquals(request["custom"], metadata["custom"])
+        assertEquals("namespace.with.dots", metadata.getValue("credentialClaims").jsonArray.single().jsonObject.getValue("path").jsonArray.first().jsonPrimitive.content)
+        assertNull(metadata["credentialDisplay"])
+        assertNull(storedCredentialDisplayMetadata(issuer, "unknown"))
+    }
 
     @Test
     fun persistsIssuerAndCredentialDisplayFields() {

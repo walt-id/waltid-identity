@@ -19,6 +19,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     private let nfcHost = IOSNfcHostPlatformAdapter()
 
     init(configuration: WalletConfiguration) async throws {
+        WalletCoreRuntime.initializeIfNeeded()
         let result = try await WalletSdkBridgeFactory(
             nfcHostPlatformAdapter: nfcHost
         ).create(
@@ -26,8 +27,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         self.bridge = try Self.successValue(result, as: WalletSdkBridge.self, operation: "create wallet bridge")
         if let provider = configuration.keyAttestationProvider {
-            let attached = try await bridge.attachKeyAttestationProvider(
-                provider: KMPKeyAttestationProviderAdapter(provider: provider)
+            let attached = try await bridge.attachKeyAttestationProviderResolver(
+                resolver: KMPKeyAttestationProviderResolverAdapter(resolver: provider)
             )
             _ = try Self.successAnyValue(attached, operation: "attach key attestation provider")
         }
@@ -542,6 +543,7 @@ public final class ProximityConfiguredReaderTrustEvaluator:
     private let evaluator: WalletCore.ProximityConfiguredReaderTrustEvaluator
 
     public init(configuration: ProximityReaderTrustConfiguration) {
+        WalletCoreRuntime.initializeIfNeeded()
         evaluator = WalletCore.ProximityConfiguredReaderTrustEvaluator(
             configuration: configuration.toKMPConfiguration()
         )
@@ -581,6 +583,7 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
               issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
             throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
         }
+        WalletCoreRuntime.initializeIfNeeded()
         let kmpScope: WalletCore.ProximityCrlScope
         switch scope {
         case .readerCertificate: kmpScope = .readerCertificate
@@ -1050,18 +1053,18 @@ private extension Waltid_openid4vc_walletWalletIssuanceBatchSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
             id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue)
+            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue, displayMetadata: credentialDisplayMetadata)
         )
     }
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
-    func toSwiftIssuanceOfferPreview(batchSize: Int?) throws -> IssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview(batchSize: Int?, displayMetadata: [String: String]) throws -> IssuanceOfferPreview {
         IssuanceOfferPreview(
             grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
             issuer: issuer.toSwiftIssuanceIssuerPreview(),
             credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
-                .map { $0.toSwiftIssuanceCredentialPreview() },
+                .map { $0.toSwiftIssuanceCredentialPreview(metadataJSON: displayMetadata[$0.configurationId]) },
             transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
             batchSize: batchSize
         )
@@ -1102,7 +1105,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
-    func toSwiftIssuanceCredentialPreview() -> IssuanceCredentialPreview {
+    func toSwiftIssuanceCredentialPreview(metadataJSON: String?) -> IssuanceCredentialPreview {
         IssuanceCredentialPreview(
             configurationID: configurationId,
             format: format,
@@ -1114,7 +1117,8 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:)),
             textColor: textColor,
             vct: vct,
-            doctype: doctype
+            doctype: doctype,
+            metadataJSON: metadataJSON
         )
     }
 }
@@ -1209,7 +1213,20 @@ private extension Waltid_openid4vc_walletWalletDeferredCredential {
 private extension Waltid_openid4vc_walletWalletIssuanceContinuation {
     func toSwiftDeferredCredential() -> DeferredCredential {
         DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
-            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier,
+            status: status.toSwift(), displayMetadataJSON: displayMetadataJson)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceContinuationStatus {
+    func toSwift() -> IssuanceContinuationStatus {
+        switch self {
+        case .awaitingIssuer: return .awaitingIssuer
+        case .awaitingLocalSave: return .awaitingLocalSave
+        case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
+        case .storageOutcomeUncertain: return .storageOutcomeUncertain
+        default: return .unresolved
+        }
     }
 }
 
@@ -1274,6 +1291,18 @@ private extension WalletConfiguration {
             ),
             signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration()
         )
+    }
+}
+
+final class KMPKeyAttestationProviderResolverAdapter: WalletBridgeKeyAttestationProviderResolver, @unchecked Sendable {
+    private let resolver: any KeyAttestationProviderResolver
+
+    init(resolver: any KeyAttestationProviderResolver) { self.resolver = resolver }
+
+    func __resolve(credentialIssuer: String) async throws -> (any WalletBridgeKeyAttestationProvider)? {
+        guard let provider = try await resolver.resolve(credentialIssuer: credentialIssuer) else { return nil }
+        try Task.checkCancellation()
+        return KMPKeyAttestationProviderAdapter(provider: provider)
     }
 }
 
@@ -1730,21 +1759,24 @@ private extension MobileWalletAnnexCPreview {
                 }
             ),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
-            readerTrust: readerTrust.toSwiftReaderTrust()
+            readerTrust: readerAuthentication.toSwiftReaderTrust(decision: readerTrust)
         )
     }
 }
 
-private extension MobileWalletReaderTrust {
-    func toSwiftReaderTrust() -> ReaderTrust {
-        if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
-        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
-        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
-        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
-        if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
-        // A state this SDK build does not know about cannot be reported as identifying the reader,
-        // and the reason string says so rather than implying a rejected trust policy.
-        return .untrusted(reason: "Unrecognized reader trust state")
+private extension MobileWalletReaderAuthentication {
+    func toSwiftReaderTrust(decision: Waltid_mdoc_reader_trustReaderTrustDecision?) -> ReaderTrust {
+        switch self {
+        case .notApplicable: return .notApplicable
+        case .notAuthenticated: return .notAuthenticated
+        case .pendingRawRequest: return .pendingRawRequest
+        case .verified:
+            guard let decision else { return .untrusted(reason: "No reader trust decision was made") }
+            if decision.state == .trusted, let displayName = decision.displayName {
+                return .trusted(certificateSubject: displayName)
+            }
+            return .untrusted(reason: decision.reason ?? "The reader is not trusted")
+        }
     }
 }
 
@@ -1923,7 +1955,8 @@ private extension MobileWalletPresentationDisclosure {
             displayValue: displayValue,
             selectivelyDisclosable: selectivelyDisclosable,
             required: required,
-            selectable: selectable
+            selectable: selectable,
+            requested: requested
         )
     }
 }

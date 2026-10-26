@@ -179,6 +179,8 @@ data class WalletIssuanceBatchSession(
     val id: String,
     val offer: WalletIssuanceOfferPreview,
     val batchSize: Int? = null,
+    /** Ordered/localized display metadata by configuration ID, using the stored credential sidecar shape. */
+    val credentialDisplayMetadata: Map<String, String> = emptyMap(),
 )
 
 /** Input used to start either supported grant from one offer. */
@@ -278,16 +280,33 @@ data class WalletDeferredCredential(
 }
 
 /** Retained issuance work, including local-save recovery whose original configuration may be unknown. */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class WalletIssuanceContinuation(
     val id: String,
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
+    /** Current retained state when returned by [WalletIssuanceSessionService.listIssuanceContinuations]. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val status: WalletIssuanceContinuationStatus = WalletIssuanceContinuationStatus.UNRESOLVED,
+    /** Issuer display metadata only; never credential values or protocol continuation secrets. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val displayMetadataJson: String? = null,
 ) {
     constructor(deferred: WalletDeferredCredential) : this(
         deferred.id, deferred.credentialConfigurationId, deferred.intervalSeconds, deferred.credentialIdentifier,
     )
+}
+
+/** A presentation hint, not permission to bypass the checks performed by resumeDeferred. */
+@Serializable
+enum class WalletIssuanceContinuationStatus {
+    UNRESOLVED,
+    AWAITING_ISSUER,
+    AWAITING_LOCAL_SAVE,
+    REMOTE_OUTCOME_UNCERTAIN,
+    STORAGE_OUTCOME_UNCERTAIN,
 }
 
 /** The released configured-only listing cannot describe every retained local-save handle. */
@@ -437,6 +456,10 @@ class WalletIssuanceSessionService(
 
     private fun ActiveSession.toBatchSession(): WalletIssuanceBatchSession = WalletIssuanceBatchSession(
         public.id, public.offer, resolved.issuerMetadata.metadata.batchCredentialIssuance?.batchSize,
+        credentialDisplayMetadata = resolved.offeredCredentials.mapNotNull { credential ->
+            storedCredentialDisplayMetadata(resolved.issuerMetadata.metadata, credential.credentialConfigurationId)
+                ?.let { credential.credentialConfigurationId to it.toString() }
+        }.toMap(),
     )
 
     private suspend fun startSession(
@@ -582,7 +605,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '$sessionId' for pre-authorized issuance" }
             return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
@@ -613,7 +637,8 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             withContext(NonCancellable) { restoreSession(active, SessionState.AWAITING_ACCEPTANCE) }
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not persist accepted issuance session '$sessionId'" }
             return failAndRemove(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
         return complete(active, retryTokenRejection = requirement != null) {
@@ -629,7 +654,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(callback.sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '${callback.sessionId}' for authorization callback" }
             return failed(callback.sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(callback.sessionId)
         val authorization = active.authorization
@@ -665,7 +691,8 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance session '$sessionId' for cancellation" }
             return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
         return try {
@@ -691,7 +718,8 @@ class WalletIssuanceSessionService(
             }
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not cancel issuance session '$sessionId'" }
             failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
     }
@@ -780,17 +808,50 @@ class WalletIssuanceSessionService(
                 require(record.id == deferredRecordId(persisted.public.id) && record.sessionId == persisted.sessionId) {
                     "Stored deferred credential binding is invalid"
                 }
-                results[persisted.public.id] = persisted.public
+                results[persisted.public.id] = persisted.public.withPresentation(
+                    remote = persisted.content is PersistedDeferredContent.Remote,
+                    claimed = persisted.claimed,
+                    metadata = when (val content = persisted.content) {
+                        is PersistedDeferredContent.Remote -> content.request.metadata?.displayMetadata()
+                        is PersistedDeferredContent.Received -> content.credentials.commonDisplayMetadata()
+                    },
+                )
             }
         // Unsaved progress remains valid only while its durable predecessor is still current.
         mutex.withLock {
             deferred.values.filter { record ->
                 sessionStore == null || !record.persistable ||
                     persistedRecords[deferredRecordId(record.public.id)] == record.persistedSnapshot
-            }.forEach { results[it.public.id] = it.public }
+            }.forEach { record ->
+                results[record.public.id] = record.public.withPresentation(
+                    remote = record.content is DeferredContent.Remote,
+                    claimed = record.claimed,
+                    metadata = when (val content = record.content) {
+                        is DeferredContent.Remote -> content.request.metadata?.displayMetadata()
+                        is DeferredContent.Received -> content.credentials.commonDisplayMetadata()
+                    },
+                )
+            }
         }
         return results.values.toList()
     }
+
+    private fun WalletIssuanceContinuation.withPresentation(remote: Boolean, claimed: Boolean, metadata: JsonObject?) = copy(
+        status = when {
+            remote && claimed -> WalletIssuanceContinuationStatus.REMOTE_OUTCOME_UNCERTAIN
+            remote -> WalletIssuanceContinuationStatus.AWAITING_ISSUER
+            claimed -> WalletIssuanceContinuationStatus.STORAGE_OUTCOME_UNCERTAIN
+            else -> WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE
+        },
+        displayMetadataJson = metadata?.toString(),
+    )
+
+    private fun JsonObject.displayMetadata(): JsonObject? =
+        JsonObject(filterKeys { it in setOf("issuerDisplay", "credentialDisplay", "credentialClaims") }).takeIf { it.isNotEmpty() }
+
+    // A retained local response can contain multiple kinds. Do not attribute the first one's art to all of them.
+    private fun List<StoredCredential>.commonDisplayMetadata(): JsonObject? =
+        map { it.metadata?.displayMetadata() }.distinct().singleOrNull()
 
     /**
      * Polls one deferred result, or finishes saving an already received response.
@@ -824,7 +885,8 @@ class WalletIssuanceSessionService(
             loadDeferred(id)
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance continuation '$id'" }
             return failed(id, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(id)
         // Observing another writer must never enter cleanup that can release its claim.
@@ -838,7 +900,8 @@ class WalletIssuanceSessionService(
                     }.map { it.id }
                 } catch (error: CancellationException) {
                     throw error
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    log.error(error) { "Could not check stored credentials for issuance session '${record.sessionId}'" }
                     return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE,
                         deferredCredentials = listOf(record.public))
                 }
@@ -942,8 +1005,11 @@ class WalletIssuanceSessionService(
             retainInterruptedDeferred(record)
             throw error
         } catch (error: Exception) {
-            retainInterruptedDeferred(record)
             val errorCode = (error as? IssuanceStageException)?.code ?: stage
+            if (errorCode == WalletIssuanceErrorCode.STORAGE) {
+                log.error(error) { "Could not store issued credentials for issuance session '${record.sessionId}'" }
+            }
+            retainInterruptedDeferred(record)
             val code = if (errorCode == WalletIssuanceErrorCode.NETWORK && record.claimed && record.content is DeferredContent.Remote)
                 WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN else errorCode
             failed(record.sessionId, code,
@@ -1067,6 +1133,10 @@ class WalletIssuanceSessionService(
                 cause is IllegalArgumentException || error.failure.stage == CredentialIssuanceStage.RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 error.failure.stage == CredentialIssuanceStage.STORAGE -> WalletIssuanceErrorCode.STORAGE
                 else -> WalletIssuanceErrorCode.NETWORK
+            }
+            // Credential storage failures are already logged when converted to an outcome.
+            if (code == WalletIssuanceErrorCode.STORAGE && error.storageOutcome == null) {
+                log.error(error) { "Could not store issuance progress for session '${active.public.id}'" }
             }
             throw IssuanceStageException(code, error, error.failure)
         }
@@ -1567,6 +1637,9 @@ class WalletIssuanceSessionService(
             invalidateActiveSessionBestEffort(sessionId)
             throw error
         } catch (error: Exception) {
+            if (error !is IssuanceStageException) {
+                log.error(error) { "Could not claim issuance session '$sessionId'" }
+            }
             invalidateActiveSessionBestEffort(sessionId)
             if (error is IssuanceStageException) throw error
             throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
@@ -1841,7 +1914,8 @@ class WalletIssuanceSessionService(
                     }
                 },
                 claimed = record.claimed,
-                public = record.public,
+                // Presentation fields are derived from retained content, not a second persisted source of truth.
+                public = record.public.copy(status = WalletIssuanceContinuationStatus.UNRESOLVED, displayMetadataJson = null),
                 sessionId = record.sessionId,
             )
             val replacement = WalletIssuanceSessionRecord(
@@ -1885,7 +1959,8 @@ class WalletIssuanceSessionService(
                 }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                log.error(error) { "Could not checkpoint received credentials for issuance session '${record.sessionId}'" }
                 return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE, deferredCredentials = listOf(public))
             }
             currentCoroutineContext().ensureActive()

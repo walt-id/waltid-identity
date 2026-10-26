@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.mdoc.readertrust.ReaderTrustState
+import id.walt.mdoc.readertrust.ReaderTrustDecision
 import id.walt.wallet2.mobile.MobileWalletAnnexCDocumentRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCParsedRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
@@ -8,7 +10,7 @@ import id.walt.wallet2.mobile.MobileWalletDigitalCredentialRequestInfo
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosure
-import id.walt.wallet2.mobile.MobileWalletReaderTrust
+import id.walt.wallet2.mobile.MobileWalletReaderAuthentication
 import id.walt.wallet2.mobile.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
 import kotlin.test.Test
@@ -30,6 +32,16 @@ class MobileDigitalCredentialSharingReviewTest {
         val review = digitalCredentialPreview(transactionData = listOf(payment)).toSharingReview()
         assertEquals("Super Store", review.request.transactionData.single().textValue("Payee name"))
         assertEquals("11.56", review.request.transactionData.single().textValue("Amount"))
+        val transaction = review.request.transactionData.single()
+        assertTrue(transaction.isPaymentTransaction)
+        val display = WalletDemoPaymentReview.NotRequired.displays(listOf(transaction)).single()
+        assertEquals(listOf(DisplayValue.Text("Super Store"), DisplayValue.NumberValue("11.56"), DisplayValue.Text("EUR")), display.fields
+            .filter { it.placement == WalletDemoPaymentFieldPlacement.Prominent }.map { it.item.value })
+        assertTrue(display.technical.none { it.pathComponents.getOrNull(1) == "details" })
+        listOf(WalletDemoPaymentReview.Loading, WalletDemoPaymentReview.Blocked("Missing issuer instructions")).forEach {
+            assertTrue(it.displays(listOf(transaction)).isEmpty(), "Unvalidated values cannot replace required consent")
+            assertEquals(false, it.canConfirm)
+        }
     }
 
     /**
@@ -52,6 +64,9 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals("ACME Corp", payment.textValue("Merchant name"))
         assertEquals("42.00", payment.textValue("Amount"))
         assertEquals("EUR", payment.textValue("Currency"))
+        assertTrue(payment.isPaymentTransaction)
+        assertEquals(listOf("ACME Corp", "42.00", "EUR"), WalletDemoPaymentReview.NotRequired
+            .displays(listOf(payment)).single().fields.map { (it.item.value as DisplayValue.Text).value })
     }
 
     /** Each item must survive the mapping: showing only the first authorizes the rest unseen. */
@@ -70,6 +85,7 @@ class MobileDigitalCredentialSharingReviewTest {
         )
         assertEquals("42.00", review.request.transactionData[0].textValue("Amount"))
         assertEquals("abc123", review.request.transactionData[1].textValue("Document digest"))
+        assertEquals(false, review.request.transactionData[1].isPaymentTransaction)
     }
 
     /**
@@ -225,20 +241,26 @@ class MobileDigitalCredentialSharingReviewTest {
     fun annexCReaderTrustStatesMapOntoReviewStates() {
         assertEquals(
             WalletDemoReaderTrust.NotAuthenticated,
-            annexCPreview(MobileWalletReaderTrust.NotAuthenticated).toSharingReview().request.readerTrust,
+            annexCPreview(MobileWalletReaderAuthentication.NOT_AUTHENTICATED).toSharingReview().request.readerTrust,
         )
         assertEquals(
             WalletDemoReaderTrust.PendingVerification,
-            annexCPreview(MobileWalletReaderTrust.PendingRawRequest).toSharingReview().request.readerTrust,
+            annexCPreview(MobileWalletReaderAuthentication.PENDING_RAW_REQUEST).toSharingReview().request.readerTrust,
         )
         assertEquals(
             WalletDemoReaderTrust.Untrusted("No reader trust policy is configured"),
-            annexCPreview(MobileWalletReaderTrust.Untrusted("No reader trust policy is configured"))
+            annexCPreview(
+                MobileWalletReaderAuthentication.VERIFIED,
+                ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, reason = "No reader trust policy is configured"),
+            )
                 .toSharingReview().request.readerTrust,
         )
         assertEquals(
             WalletDemoReaderTrust.Trusted("CN=Example Reader"),
-            annexCPreview(MobileWalletReaderTrust.Trusted("CN=Example Reader")).toSharingReview().request.readerTrust,
+            annexCPreview(
+                MobileWalletReaderAuthentication.VERIFIED,
+                ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = "CN=Example Reader"),
+            ).toSharingReview().request.readerTrust,
         )
     }
 
@@ -248,7 +270,7 @@ class MobileDigitalCredentialSharingReviewTest {
      */
     @Test
     fun annexCReviewStatesItsFixedEncryptionAndRequestedDocuments() {
-        val review = annexCPreview(MobileWalletReaderTrust.NotAuthenticated).toSharingReview()
+        val review = annexCPreview(MobileWalletReaderAuthentication.NOT_AUTHENTICATED).toSharingReview()
 
         val encryption = review.request.responseProtection
         assertTrue(encryption is WalletDemoSharingResponseProtection.Encrypted, "expected encryption, got $encryption")
@@ -266,7 +288,7 @@ class MobileDigitalCredentialSharingReviewTest {
     @Test
     fun annexCRequiresOneCredentialPerRequestedDocument() {
         val review = annexCPreview(
-            readerTrust = MobileWalletReaderTrust.NotAuthenticated,
+            readerAuthentication = MobileWalletReaderAuthentication.NOT_AUTHENTICATED,
             credentialOptions = listOf(
                 credentialOption(queryId = MDL_DOC_TYPE, credentialId = "credential-1"),
                 credentialOption(queryId = PHOTO_ID_DOC_TYPE, credentialId = "credential-2"),
@@ -309,11 +331,13 @@ class MobileDigitalCredentialSharingReviewTest {
         ),
         credentialOptions = credentialOptions,
         credentialRequirements = emptyList(),
-        readerTrust = MobileWalletReaderTrust.NotApplicable,
+        readerAuthentication = MobileWalletReaderAuthentication.NOT_APPLICABLE,
+        readerTrust = null,
     )
 
     private fun annexCPreview(
-        readerTrust: MobileWalletReaderTrust,
+        readerAuthentication: MobileWalletReaderAuthentication,
+        readerTrust: ReaderTrustDecision? = null,
         credentialOptions: List<MobileWalletPresentationCredentialOption> = listOf(
             credentialOption(queryId = MDL_DOC_TYPE),
         ),
@@ -329,6 +353,7 @@ class MobileDigitalCredentialSharingReviewTest {
             },
         ),
         credentialOptions = credentialOptions,
+        readerAuthentication = readerAuthentication,
         readerTrust = readerTrust,
     )
 

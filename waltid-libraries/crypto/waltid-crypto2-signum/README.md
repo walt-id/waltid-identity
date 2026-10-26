@@ -73,9 +73,13 @@ scripts/test-ios-keychain.sh <simulator-udid>
 ```
 
 Run from this module directory. The script builds with `-PenableIosKeychainTests=true`, installs an
-isolated test application and saves its output under `build/keychain-tests.*`. It exercises owned-key
-reopening, exact private-key recovery, policy mismatch and native-entry replacement. Simulator results
+isolated test application and saves its log and JUnit results under `build/keychain-tests.*` (or an
+optional second output-directory argument). The existing iOS recovery CI job runs this host on its
+simulator, excluding the physical Secure Enclave suite. It exercises owned-key reopening, exact
+private-key recovery, policy mismatch and native-entry replacement. Simulator results
 do not establish Secure Enclave, biometric, passcode, or cloud-backup behavior.
+Incomplete launches fail with JUnit errors and a `launch.json` receipt containing the launch status,
+unfinished tests and available crash termination metadata. Raw crash memory and environment are not collected.
 
 Android's `AndroidInteractiveAuthorizationTest` is opt-in. Pass the instrumentation argument
 `wallet.authorization=biometric`, `credential`, or `cancel`, and use the named action for both generated

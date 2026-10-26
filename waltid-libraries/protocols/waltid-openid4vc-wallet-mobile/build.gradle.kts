@@ -71,6 +71,7 @@ kotlin {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
             api(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity"))
+            api(project(":waltid-libraries:credentials:waltid-mdoc-reader-trust"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-proximity-mobile"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -98,7 +99,7 @@ kotlin {
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 api(identityLibs.androidx.fragment)
-                implementation(identityLibs.ktor.client.android)
+                implementation(identityLibs.ktor.client.okhttp)
                 implementation(identityLibs.androidx.credentials.registry.mdoc)
                 implementation(identityLibs.androidx.credentials.registry.openid)
                 implementation(identityLibs.androidx.credentials.registry.sdjwtvc)
@@ -156,6 +157,7 @@ kotlin {
                     implementation(identityLibs.kotlinx.coroutines.test)
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.uiautomator)
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.ktor.client.mock)
                     implementation(identityLibs.ktor.client.content.negotiation)
@@ -263,4 +265,12 @@ if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponent
         }
         tasks.named("check") { dependsOn(verifyMatcherPackaging) }
     }
+}
+
+if (enableAndroidBuild) {
+    val fixture = layout.projectDirectory.dir("../../../waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation")
+    extra["demoKeyAttestationFixture"] = fixture
+    apply(from = fixture.file("sources.gradle.kts"))
+    val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
+    kotlin.sourceSets.named("androidDeviceTest") { kotlin.srcDirs(demoKeyAttestationSources) }
 }

@@ -34,6 +34,7 @@ import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.toDefaultAuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
@@ -42,7 +43,6 @@ import id.walt.openid4vci.requests.credential.CredentialAuthorizationResolution
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.resolveCredentialAuthorization
-import id.walt.openid4vci.requests.credential.toAuthorizationDetails
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -66,6 +66,7 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.InvalidTokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.resolveTokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.authorizedByVerifiedToken
@@ -96,6 +97,7 @@ import kotlin.time.Duration.Companion.minutes
 private val logger = KotlinLogging.logger {}
 
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
+private const val INTERNAL_AUTHORIZATION_REQUEST_ID_PARAMETER = "_issuer2_request_id"
 private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
@@ -212,7 +214,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     ) to null
 
                 is PushedAuthorizationResponseResult.Failure ->
-                    oauth2Provider.writePushedAuthorizationError(parRequest, responseResult.error) to responseResult.error
+                    oauth2Provider.writePushedAuthorizationError(
+                        parRequest,
+                        responseResult.error
+                    ) to responseResult.error
             }
         } catch (e: CancellationException) {
             throw e
@@ -301,9 +306,17 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return oauth2Provider.writeAuthorizationError(authorizationRequest, authorizationError)
         }
         val internalAuthorizationRequest =
-            resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
+            resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId) +
+                    (INTERNAL_AUTHORIZATION_REQUEST_ID_PARAMETER to listOf(authorizationRequest.id))
         val authorizationRequestEnvelope = try {
-            internalAuthorizationRequest.encodeExternalLoginAuthorizationParameters()
+            internalAuthorizationRequest.encodeExternalLoginAuthorizationParameters().also {
+                sessionService.saveSession(
+                    issuanceSession.copy(
+                        authorizationRequest = authorizationRequest.toDefaultAuthorizationRequest(),
+                        externalAuthorizationState = null,
+                    )
+                )
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -327,29 +340,31 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
     }
 
+    internal suspend fun resolveExternalLoginSession(envelope: String): IssuanceSession {
+        val parameters = envelope.decodeExternalLoginAuthorizationParameters()
+        val sessionId = parameters[INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER]?.singleOrNull()
+            ?: throw IllegalArgumentException("Missing issuance session id in internal authorization request")
+        val session = requireNotNull(sessionService.getSessionOrNull(sessionId)) { "Invalid login reference" }
+        require(session.isActiveAuthorizationCodeSession()) { "Expired or invalid login reference" }
+        val stored = requireNotNull(session.authorizationRequest) { "Missing stored authorization request" }
+        require(
+            parameters[INTERNAL_AUTHORIZATION_REQUEST_ID_PARAMETER]?.singleOrNull() == stored.id &&
+                    parameters.withoutInternalAuthorizationSession() == stored.requestForm.withoutInternalAuthorizationSession()
+        ) {
+            "Authorization parameters do not match the accepted request"
+        }
+        return session
+    }
+
     suspend fun processExternalLoginInterception(
         externalAuthorizationRequest: String?,
         authorizationRequestEnvelope: String?,
         requestId: String,
     ) {
-        val (authorizationRequestParameters, session) = try {
-            val decodedAuthorizationRequestParameters = authorizationRequestEnvelope
-                ?.takeIf { it.isNotBlank() }
-                ?.decodeExternalLoginAuthorizationParameters()
-                ?: throw IllegalArgumentException("Missing authorization request envelope")
-            val authorizationRequestParameters =
-                when (val result = oauth2Provider.createAuthorizationRequest(decodedAuthorizationRequestParameters)) {
-                    is AuthorizationRequestResult.Success -> result.request.requestForm
-                    is AuthorizationRequestResult.Failure -> throw IllegalArgumentException(
-                        result.error.description ?: result.error.error
-                    )
-                }
-
-            val sessionId = authorizationRequestParameters[INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER]?.singleOrNull()
-                ?: authorizationRequestParameters["issuer_state"]?.singleOrNull()
-                ?: throw IllegalArgumentException("Missing issuance session id in internal authorization request")
-
-            authorizationRequestParameters to sessionService.getSession(sessionId)
+        val session = try {
+            val session = resolveExternalLoginSession(requireNotNull(authorizationRequestEnvelope))
+            require(session.externalAuthorizationState == null) { "Login reference has already been used" }
+            session
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -375,7 +390,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
             sessionService.saveSession(
                 session.copy(
-                    authorizationRequest = authorizationRequestParameters.withoutInternalAuthorizationSession(),
                     externalAuthorizationState = externalState,
                 )
             )
@@ -443,7 +457,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return oauth2Provider.writeAuthorizationError(authorizationError)
         }
 
-        val authorizationRequestParameters = session.authorizationRequest ?: run {
+        val storedAuthorizationRequest = session.authorizationRequest ?: run {
             val authorizationError = OAuthError(
                 OAuthErrorCodes.INVALID_REQUEST,
                 "Session has no stored authorization request",
@@ -458,37 +472,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return oauth2Provider.writeAuthorizationError(authorizationError)
         }
 
-        val authorizationRequest = try {
-            when (val result = oauth2Provider.createAuthorizationRequest(authorizationRequestParameters)) {
-                is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
-                is AuthorizationRequestResult.Failure -> {
-                    notificationService.notify(
-                        requestId = requestId,
-                        session = session,
-                        event = IssuanceSessionEvent.AUTHORIZATION_REQUEST_FAILED,
-                        error = result.error.error,
-                        errorDescription = result.error.description,
-                    )
-                    return oauth2Provider.writeAuthorizationError(result.error)
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.warn(e) { "Could not restore authorization request for issuance session ${session.sessionId}" }
-            val authorizationError = OAuthError(
-                OAuthErrorCodes.SERVER_ERROR,
-                "Could not restore the authorization request",
-            )
-            notificationService.notify(
-                requestId = requestId,
-                session = session,
-                event = IssuanceSessionEvent.AUTHORIZATION_REQUEST_FAILED,
-                error = authorizationError.error,
-                errorDescription = authorizationError.description,
-            )
-            return oauth2Provider.writeAuthorizationError(authorizationError)
-        }
+        val authorizationRequest = storedAuthorizationRequest.withIssuer(metadataService.issuerBaseUrl())
 
         if (!session.isActiveAuthorizationCodeSession()) {
             val authorizationError = OAuthError(OAuthErrorCodes.INVALID_REQUEST, "issuer_state is invalid")
@@ -576,7 +560,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return createAuthorizationResponse(
             issuanceSession = updatedSession,
             authorizationRequest = authorizationRequest,
-            parameters = authorizationRequestParameters,
             claims = idTokenClaims,
             requestId = requestId,
         )
@@ -729,7 +712,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     return response
                 }
 
-                val authorizedSession = establishIssuanceSelection(session, requireNotNull(result.credentialAuthorization).credentialIdentifiers)
+                val authorizedSession = establishIssuanceSelection(
+                    session,
+                    requireNotNull(result.credentialAuthorization).credentialIdentifiers
+                )
                 val response = oauth2Provider.writeAccessTokenResponse(result.request, result.response)
                 notificationService.notify(
                     requestId = requestId,
@@ -749,15 +735,22 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             "Token request has no issuance session"
         }
         val session = sessionService.getSession(sessionId)
-        val authorizationConfigurations = session.authorizationRequest?.let { parameters ->
+        if (session.isClosed) {
+            throw InvalidTokenCredentialAuthorization(
+                accessTokenRequest,
+                "Issuance session is closed; restart authorization"
+            )
+        }
+        val authorizationConfigurations = session.authorizationRequest?.requestForm?.let { parameters ->
             credentialConfigurationIdsFromAuthorizationDetails(parameters) +
-                metadataService.credentialConfigurationIdsForScopes(
-                    parameters["scope"].orEmpty().flatMap { it.split(' ') }.filter(String::isNotBlank).toSet()
-                )
+                    metadataService.credentialConfigurationIdsForScopes(
+                        parameters["scope"].orEmpty().flatMap { it.split(' ') }.filter(String::isNotBlank).toSet()
+                    )
         }.orEmpty()
         val includeDetails = accessTokenRequest.authorizationDetails.any {
             it.type == OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
-        } || session.authorizationRequest?.let(::credentialConfigurationIdsFromAuthorizationDetails)?.isNotEmpty() == true
+        } || session.authorizationRequest?.requestForm?.let(::credentialConfigurationIdsFromAuthorizationDetails)
+            ?.isNotEmpty() == true
         return resolveTokenCredentialAuthorization(
             request = accessTokenRequest,
             candidates = session.issuanceRequests.map { it.toCredentialAuthorization() },
@@ -781,7 +774,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
             return session
         }
-        val current = requireNotNull(sessionService.claimSession(session.sessionId)) { "Issuance session is being processed" }
+        val current =
+            requireNotNull(sessionService.claimSession(session.sessionId)) { "Issuance session is being processed" }
         try {
             val selected = current.authorizedCredentialIdentifiers ?: current.issuanceRequests
                 .map { it.credentialIdentifier }.filter { it in identifiers }
@@ -955,7 +949,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 observedSession.issuanceRequests.map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
                     tokenClaims,
                     observedSession.authorizedCredentialIdentifiers,
-                    metadataService.credentialConfigurationIdsForScopes(tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()),
+                    metadataService.credentialConfigurationIdsForScopes(
+                        tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()
+                    ),
                 )
             )
         ) {
@@ -1021,7 +1017,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 throw e
             } catch (e: CredentialProofServiceException) {
                 logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
-                return oauth2Provider.writeCredentialError(OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential proof verification unavailable"))
+                return oauth2Provider.writeCredentialError(
+                    OAuthError(
+                        OAuthErrorCodes.SERVER_ERROR,
+                        "Credential proof verification unavailable"
+                    )
+                )
             } catch (e: CredentialProofValidationException) {
                 return rejectCredentialRequest(
                     requestWithSession,
@@ -1247,16 +1248,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             }
-            val credentialResponse = when (val result = credentialResponseResult) {
-                is CredentialResponseResult.Success -> result.response
+            val credentialResponse = when (credentialResponseResult) {
+                is CredentialResponseResult.Success -> credentialResponseResult.response
                 is CredentialResponseResult.Failure -> {
-                    val response = if (result.error.isRetryableProofFailure()) {
+                    val response = if (credentialResponseResult.error.isRetryableProofFailure()) {
                         retryCredentialRequest(
                             requestWithSession,
                             session,
                             configuration.format,
                             requestId,
-                            result.error,
+                            credentialResponseResult.error,
                         )
                     } else {
                         failClaimedCredentialRequest(
@@ -1264,7 +1265,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             session,
                             configuration.format,
                             requestId,
-                            result.error,
+                            credentialResponseResult.error,
                         )
                     }
                     claimFinalized = true
@@ -1326,16 +1327,19 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
             val response = oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
             val issuanceResults = session.issuanceResults + (
-                issuanceRequest.credentialIdentifier to IssuanceResult(
-                    issuedCredentialFormat = configuration.format.value,
-                )
-            )
+                    issuanceRequest.credentialIdentifier to IssuanceResult(
+                        issuedCredentialFormat = configuration.format.value,
+                    )
+                    )
             val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
                 .map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
                     tokenClaims, null,
-                    metadataService.credentialConfigurationIdsForScopes(tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()),
+                    metadataService.credentialConfigurationIdsForScopes(
+                        tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()
+                    ),
                 ).map { it.credentialIdentifier }
-            val issuanceComplete = establishedSelection.isNotEmpty() && establishedSelection.all { it in issuanceResults }
+            val issuanceComplete =
+                establishedSelection.isNotEmpty() && establishedSelection.all { it in issuanceResults }
             val updatedSession = try {
                 withContext(NonCancellable) {
                     sessionService.saveSession(
@@ -1405,7 +1409,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             if (claimFinalized) {
                 throw e
             }
-            claimFinalized = true
             return failClaimedCredentialRequest(
                 requestWithSession,
                 session,
@@ -1469,7 +1472,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private suspend fun createAuthorizationResponse(
         issuanceSession: IssuanceSession,
         authorizationRequest: AuthorizationRequest,
-        parameters: Map<String, List<String>>,
         claims: JsonObject?,
         requestId: String,
     ): AuthorizationResponseHttp {
@@ -1508,7 +1510,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
 
         val updatedSession = issuanceSession.copy(
-            authorizationRequest = parameters,
+            authorizationRequest = authorizationRequest.toDefaultAuthorizationRequest(),
             authorizationClaims = claims ?: issuanceSession.authorizationClaims,
             externalAuthorizationState = null,
         )
@@ -1564,9 +1566,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private fun IssuanceSession.isActiveAuthorizationCodeSession(): Boolean =
         authenticationMethod == AuthenticationMethod.AUTHORIZED &&
-            status in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL) &&
-            !isClosed &&
-            expiresAt > Clock.System.now()
+                status in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL) &&
+                !isClosed &&
+                expiresAt > Clock.System.now()
 
     private suspend fun createAuthorizationCodeSessionFromProfile(
         authorizationRequest: AuthorizationRequest,
@@ -1583,7 +1585,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 sessionId = UUID.randomUUID().toString(),
                 authenticationMethod = AuthenticationMethod.AUTHORIZED,
                 issuanceRequests = profiles.map { it.toIssuanceRequest() },
-                authorizationRequest = parameters,
+                authorizationRequest = authorizationRequest.toDefaultAuthorizationRequest(),
                 expiresAt = Clock.System.now() + AUTHORIZATION_CODE_SESSION_LIFETIME,
                 notifications = notifications,
             )
@@ -1763,6 +1765,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
         )
     }
+
     /** Reports a retryable rejection without changing the issuance-session lifecycle. */
     private suspend fun rejectCredentialRequest(
         request: CredentialRequest,
@@ -1771,6 +1774,19 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         requestId: String,
         error: CredentialError,
     ): CredentialResponseHttp {
+        if (error.isRetryableProofFailure()) {
+            logger.warn {
+                "Credential proof rejected: " + JsonObject(
+                    mapOf(
+                        "requestId" to JsonPrimitive(requestId),
+                        "credential_configuration_id" to JsonPrimitive(request.credentialConfigurationId),
+                        "credential_identifier" to JsonPrimitive(request.credentialIdentifier),
+                        "error" to JsonPrimitive(error.error),
+                        "error_description" to JsonPrimitive(error.description),
+                    )
+                )
+            }
+        }
         notificationService.notify(
             requestId = requestId,
             session = session,
@@ -1820,14 +1836,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         error: CredentialError,
     ): CredentialResponseHttp {
         restoreClaimedSession(session)
-        notificationService.notify(
-            requestId = requestId,
-            session = session,
-            event = credentialRequestEvent(format, succeeded = false),
-            error = error.error,
-            errorDescription = error.description,
-        )
-        return oauth2Provider.writeCredentialError(request, error)
+        return rejectCredentialRequest(request, session, format, requestId, error)
     }
 
     private suspend fun restoreClaimedSession(session: IssuanceSession) {
@@ -1933,7 +1942,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 (INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER to listOf(sessionId))
 
     private fun Map<String, List<String>>.withoutInternalAuthorizationSession(): Map<String, List<String>> =
-        filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER }
+        filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER && it != INTERNAL_AUTHORIZATION_REQUEST_ID_PARAMETER }
 
     private fun parseQueryParameters(query: String): Map<String, List<String>> =
         parseQueryString(query).entries().associate { it.key to it.value }
@@ -1981,7 +1990,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)
                 )
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

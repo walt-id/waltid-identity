@@ -22,3 +22,8 @@ fi
 "$identity_dir/gradlew" -p "$identity_dir" \
   :waltid-applications:waltid-wallet-demo-compose:androidE2eTests:connectedProductionDebugAndroidTest \
   --info
+
+for module in androidApp androidE2eTests; do
+  python3 "$script_dir/verify_test_results.py" \
+    --reports "$identity_dir/waltid-applications/waltid-wallet-demo-compose/$module/build/outputs/androidTest-results/**/*.xml"
+done

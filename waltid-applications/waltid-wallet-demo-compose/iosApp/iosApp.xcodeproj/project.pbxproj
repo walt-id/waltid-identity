@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13330000000000000000022 /* WalletIssuanceUI.swift */; };
 		A14440000000000000000003 /* EnterpriseMobileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000004 /* EnterpriseMobileFixture.swift */; };
 		A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000002 /* BatchIssuanceE2ETests.swift */; };
 		B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */; };
@@ -14,10 +15,12 @@
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
 		C0DE00000000000000001201 /* ComposeNfcHostPlatformAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001202 /* ComposeNfcHostPlatformAdapter.swift */; };
 		C0DE00000000000000000102 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */; };
+		C01333000000000000000101 /* WalletGalleryEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01333000000000000000001 /* WalletGalleryEvidence.swift */; };
 		C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000003 /* WalletE2EHelpers.swift */; };
 		C0DE00000000000000000105 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* TestHelpers.swift */; };
 		C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000007 /* WalletE2EClient.swift */; };
 		C0DE00000000000000000107 /* DemoBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* DemoBackend.swift */; };
+		C0DE00000000000000000108 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000009 /* EudiOfferFlow.swift */; };
 		CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */; };
 		C0DE00000000000000001021 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDK */; };
 		C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */; };
@@ -70,6 +73,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A13330000000000000000022 /* WalletIssuanceUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletIssuanceUI.swift; path = "../../../mobile-e2e-fixtures/ios/WalletIssuanceUI.swift"; sourceTree = "<group>"; };
 		A14440000000000000000004 /* EnterpriseMobileFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EnterpriseMobileFixture.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/EnterpriseMobileFixture.swift"; sourceTree = "<group>"; };
 		A14440000000000000000002 /* BatchIssuanceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BatchIssuanceE2ETests.swift; path = "BatchIssuanceE2ETests.swift"; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -79,11 +83,13 @@
 		B33B17ED2C2C3957001A32F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C0DE00000000000000001202 /* ComposeNfcHostPlatformAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeNfcHostPlatformAdapter.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicDemoBackendE2ETests.swift; sourceTree = "<group>"; };
+		C01333000000000000000001 /* WalletGalleryEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletGalleryEvidence.swift; path = "../../../mobile-e2e-fixtures/ios/WalletGalleryEvidence.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TestHelpers.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/TestHelpers.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletE2EClient.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/WalletE2EClient.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000008 /* DemoBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoBackend.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/DemoBackend.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000009 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiOfferFlow.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/EudiOfferFlow.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000001031 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
 		C0DE00000000000000001032 /* IdentityDocumentProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = IdentityDocumentProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE00000000000000001033 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
@@ -185,10 +191,13 @@
 				A14440000000000000000002 /* BatchIssuanceE2ETests.swift */,
 				A14440000000000000000004 /* EnterpriseMobileFixture.swift */,
 				C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */,
+				C01333000000000000000001 /* WalletGalleryEvidence.swift */,
 				C0DE00000000000000000003 /* WalletE2EHelpers.swift */,
+				A13330000000000000000022 /* WalletIssuanceUI.swift */,
 				C0DE00000000000000000006 /* TestHelpers.swift */,
 				C0DE00000000000000000007 /* WalletE2EClient.swift */,
 				C0DE00000000000000000008 /* DemoBackend.swift */,
+				C0DE00000000000000000009 /* EudiOfferFlow.swift */,
 			);
 			path = iosAppUITests;
 			sourceTree = "<group>";
@@ -406,10 +415,13 @@
 				A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */,
 				A14440000000000000000003 /* EnterpriseMobileFixture.swift in Sources */,
 				C0DE00000000000000000102 /* PublicDemoBackendE2ETests.swift in Sources */,
+				C01333000000000000000101 /* WalletGalleryEvidence.swift in Sources */,
 				C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */,
+				A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */,
 				C0DE00000000000000000105 /* TestHelpers.swift in Sources */,
 				C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */,
 				C0DE00000000000000000107 /* DemoBackend.swift in Sources */,
+				C0DE00000000000000000108 /* EudiOfferFlow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

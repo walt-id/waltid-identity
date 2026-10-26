@@ -43,7 +43,10 @@ class AuthorizationCodeTokenEndpoint(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.grantTypes.contains(GrantType.AuthorizationCode.value)
 
-    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest, options: TokenResponseOptions): AccessTokenResponseResult {
+    override suspend fun handleTokenEndpointRequest(
+        request: AccessTokenRequest,
+        options: TokenResponseOptions
+    ): AccessTokenResponseResult {
         val unresolvedRequest = request.withSession(null)
 
         if (!canHandleTokenEndpointRequest(request)) {

@@ -2,6 +2,7 @@
 
 package id.walt.walletdemo.compose.logic.walletapi2
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -35,6 +36,7 @@ internal data class PersistedAuthorizationIssuance(
     val codeVerifier: String? = null,
     val authorizationState: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>,
+    val walletId: String? = null,
 )
 
 @Serializable
@@ -80,6 +82,7 @@ internal data class WalletKeyInfo(
     val keyId: String,
     val keyType: String? = null,
     val algorithm: String? = null,
+    val publicJwk: JsonObject? = null,
 )
 
 @Serializable
@@ -114,9 +117,11 @@ internal data class ReceiveCredentialRequestDto(
     val offerUrl: String,
     val txCode: String? = null,
     val did: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -151,6 +156,8 @@ internal data class DeferredCredentialHandleDto(
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
+    val status: String? = null,
+    val displayMetadataJson: String? = null,
 )
 
 @Serializable
@@ -199,6 +206,7 @@ internal data class CredentialIssuanceFailureDto(
 @Serializable
 internal data class GenerateAuthorizationUrlRequestDto(
     val offerUrl: String,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val usePkce: Boolean = true,
@@ -223,9 +231,11 @@ internal data class ReceiveAuthorizedCredentialRequestDto(
     val credentialEndpoint: String,
     val credentials: List<IssuanceCredentialSelectionDto>,
     val nonceEndpoint: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val did: String? = null,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -356,6 +366,7 @@ internal data class PreviewCredentialDisclosureDto(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    val requested: Boolean = true,
 )
 
 @Serializable
@@ -409,12 +420,6 @@ internal data class RejectPresentationRequestDto(
     val requestUrl: String,
     val errorCode: String? = null,
     val errorDescription: String? = null,
-)
-
-@Serializable
-internal data class PresentCredentialRequestDto(
-    val requestUrl: String,
-    val did: String? = null,
 )
 
 @Serializable

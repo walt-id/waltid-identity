@@ -175,11 +175,16 @@ fun Route.globalImplicitVc() {
         {
             "method": "vc",
             "config": {
-                "verification": {
-                    "request_credentials": [
-                        "OpenBadgeCredential"
-                    ]
-                }
+                "verifierUrl": "http://localhost:7004",
+                "setup": {
+                    "flow_type": "cross_device",
+                    "core_flow": {
+                        "dcql_query": {
+                            "credentials": [{"id": "badge", "format": "jwt_vc_json", "meta": {"type_values": [["OpenBadgeCredential"]]}}]
+                        }
+                    }
+                },
+                "identifierClaim": ["credentialSubject", "id"]
             },
             "success": true
         }

@@ -25,7 +25,7 @@ object DemoClientIdTrust {
      * - `x509_san_dns:verifier.example.com` (commented next to `clientId: "verifier2"`)
      * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
      *
-     * Demo material only, not a production CA. Valid until 2026-10-14.
+     * Demo material only, not a production CA. Valid 2026-08-13 until 2028-08-13.
      * Production wallets should pin a CA and use client-auth leaves.
      */
     val VERIFIER2_EXAMPLE_LEAF_PEM = """
@@ -233,7 +233,7 @@ object DemoClientIdTrust {
      * Additional demo trust-registry CAs for signed Request Objects.
      * Self-signed. Valid until 2029-03-19.
      */
-    val TRUST_REGISTRY_RC_PROVIDER_PEM = """
+    val WEBUILD_RP_ROOT = """
         -----BEGIN CERTIFICATE-----
         MIIDfjCCAySgAwIBAgIQRAL20BMQkFskig+t5XJgmDAKBggqhkjOPQQDAjCByzEL
         MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
@@ -254,6 +254,83 @@ object DemoClientIdTrust {
         L2lzc3Vlci8wMWEwYTAzZS00NWFkLTdjMjQtOTM5OS05M2Y0Y2E3MzEyNjkwCgYI
         KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         AiAwrUu7Q8mZxYlhUZ72F4vfj6wRMI5qxY7TFJiWS50z0w==
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+    /**
+     * WeBuild Raidiam "EUDI Sandbox Registration Certificate Signer" root (self-signed).
+     * Source: ETSI TL https://tl-api.dev.idunion.info/api/v1/DblnEVuf/etsi/tl.xml. Valid until 2027-10-18.
+     */
+    val WEBUILD_RAIDIAM_ROOT = """
+        -----BEGIN CERTIFICATE-----
+        MIIDQzCCAiugAwIBAgIFXpo73NswDQYJKoZIhvcNAQELBQAwYzELMAkGA1UEBhMC
+        R0IxHTAbBgNVBAoMFFJhaWRpYW0gU2VydmljZXMgTHRkMTUwMwYDVQQDDCxFVURJ
+        IFNhbmRib3ggUmVnaXN0cmF0aW9uIENlcnRpZmljYXRlIFNpZ25lcjAeFw0yNjA5
+        MTgxNjAwNDBaFw0yNzEwMTgxNjAwNDBaMGMxCzAJBgNVBAYTAkdCMR0wGwYDVQQK
+        DBRSYWlkaWFtIFNlcnZpY2VzIEx0ZDE1MDMGA1UEAwwsRVVESSBTYW5kYm94IFJl
+        Z2lzdHJhdGlvbiBDZXJ0aWZpY2F0ZSBTaWduZXIwggEiMA0GCSqGSIb3DQEBAQUA
+        A4IBDwAwggEKAoIBAQDaN+7O9dDWMEtuICRcBYzKhAIp74Sa9XcOFaAYkvhiFPAo
+        kT3rpjDiDPBKfR7qK8oIPQwv3zz1Z9MwxYvLRiks9NIGvDlLxIXYCbd6JYVK9BZx
+        Rvm3fFZTdpLlT6GEmgwolyhJFVTg2WfgrAmVB9gUU9VC1v7dLLKgmApniSJlYHbQ
+        TW0y46oF9JRSKxc6KXR3qMsa063l5LGa0ouRs5j3Dec3vaJHAI6CzLiJ5ZEkZCuY
+        4KZrgda7nqmTzB2QRmobdgEMzOAMbiTxJyDM/NhOHEQWkArrL+8b84drQThLIsEp
+        VFyFGcji7sixC7av5AYZKb+FdmqoBEeDmVLgjqjJAgMBAAEwDQYJKoZIhvcNAQEL
+        BQADggEBAGYHa14y8YJYZIHQAmcYuAoUr9GXqmIFHyNXkBCcZovq4y3iGWn8t3Ru
+        2waETu/71E5RuSoH+ZiFRG9sGn3nIJXTeTojWB9iYNYz67G8sRmBzO2Af18uVLry
+        txb45J+F36ILlwBtIWSeEVCak/aRZfVEUIa9mRERRzy4DpAO8qgcFX2FRUGVKXUk
+        Y0kZsOz19x0TDpsuIrI4a2ctowTlzn1BuzbtoyC8sTLybLCd4IxlrVpwAMUCUbys
+        tFKDtZu+QP7cVmIfMHjIN7bryyFdqdOf93A251S3NdFU2fMw80anIJhup4zLZ9CG
+        gu43JYSWIGqKFtXzQ2NGETUJWclnOKM=
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+    /**
+     * Test wallet-gateway verifier leaf and issuing CA for signed Request Objects.
+     * SAN DNS `mc.test.walletgateway.com`. Leaf valid until 2027-01-13.
+     * The root is omitted: its ECDSA AlgorithmIdentifier has NULL parameters, which
+     * RFC 5758 section 3.2 forbids and the iOS parser rejects. Requests must omit it from x5c.
+     */
+    val WALLET_GATEWAY_TEST_LEAF_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIDTDCCAvOgAwIBAgIIDzMLWn1TTSkwCgYIKoZIzj0EAwIwgYAxEzARBgoJkiaJ
+        k/IsZAEZFgN0c3QxGjAYBgoJkiaJk/IsZAEZFgptY2ludGVybmFsMRMwEQYKCZIm
+        iZPyLGQBGRYDcGtpMRMwEQYDVQQKEwpNYXN0ZXJjYXJkMSMwIQYDVQQDExpNQyBJ
+        bnRlcm5hbCBUU1QgU3ViIENBMSBHMTAeFw0yNjEwMTUxMTM5NTdaFw0yNzAxMTMx
+        MTM5NTdaMIGwMRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYK
+        bWNpbnRlcm5hbDELMAkGA1UEBhMCVVMxETAPBgNVBAgTCE1pc3NvdXJpMRQwEgYD
+        VQQHEwtTYWludCBMb3VpczEdMBsGA1UEChMUTWFzdGVyY2FyZCBXb3JsZHdpZGUx
+        KDAmBgNVBAMTH01hc3RlcmNhcmQgVmVyaWZpY2F0aW9uIFNlcnZpY2UwWTATBgcq
+        hkjOPQIBBggqhkjOPQMBBwNCAASveanYl46jFem1BxGlQRpsA08l3F4JVvuAk/g4
+        XC4DmIH9VFdnTX+QiD2fR6bWzucRoF919OYInYOtYT06L9LHo4IBIzCCAR8wRwYD
+        VR0RBEAwPoIZbWMudGVzdC53YWxsZXRnYXRld2F5LmNvbYYhaHR0cHM6Ly9tYy50
+        ZXN0LndhbGxldGdhdGV3YXkuY29tMA4GA1UdDwEB/wQEAwIAgDAMBgNVHRMBAf8E
+        AjAAMB0GA1UdDgQWBBTNXoPd5X4jyvTA0ekiBtqTVEVeRTAfBgNVHSMEGDAWgBQz
+        oCCQj4uO3ydfRMx5xjPu1LryqzATBgNVHSUEDDAKBggrBgEFBQcDAjBhBgNVHR8E
+        WjBYMFagVKBShlBodHRwOi8vY3JsZHAuZWNtcy5tY2xvY2FsLmludDoxMzUzNi8z
+        M2EwMjA5MDhmOGI4ZWRmMjc1ZjQ0Y2M3OWM2MzNlZWQ0YmFmMmFiLmNybDAKBggq
+        hkjOPQQDAgNHADBEAiAHZSNOrAiMMvvArE93ysDZHBozcRBLFL/CP/HRZWdffAIg
+        fU6s/qGN0/W0vGjvYxtOlQ4/JZbr2QQl4fecA722jNI=
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+    val WALLET_GATEWAY_TEST_SUB_CA_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIC0jCCAligAwIBAgIIDzMLWm4GFc8wCgYIKoZIzj0EAwMwgYAxEzARBgoJkiaJ
+        k/IsZAEZFgN0c3QxGjAYBgoJkiaJk/IsZAEZFgptY2ludGVybmFsMRMwEQYKCZIm
+        iZPyLGQBGRYDcGtpMRMwEQYDVQQKEwpNYXN0ZXJjYXJkMSMwIQYDVQQDExpNQyBJ
+        bnRlcm5hbCBUU1QgUm9vdCBDQSBHMTAeFw0yMjA4MDMwODU2MzBaFw0zMjA3MzEw
+        ODU2MzBaMIGAMRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYK
+        bWNpbnRlcm5hbDETMBEGCgmSJomT8ixkARkWA3BraTETMBEGA1UEChMKTWFzdGVy
+        Y2FyZDEjMCEGA1UEAxMaTUMgSW50ZXJuYWwgVFNUIFN1YiBDQTEgRzEwWTATBgcq
+        hkjOPQIBBggqhkjOPQMBBwNCAAQjC0fzby0qOaD+1vw4sNBm5epmJ7I2nmFEtG/Q
+        HUMit0xVZ9QtkrCWamV9NgVkzXML4Flu8fYMmzX2iXeaAv7uo4G5MIG2MA4GA1Ud
+        DwEB/wQEAwIAhjAdBgNVHQ4EFgQUM6AgkI+Ljt8nX0TMecYz7tS68qswDwYDVR0T
+        BAgwBgEB/wIBADAfBgNVHSMEGDAWgBQKCorpqpXd2qvlKDnVs6Suq10jhTBTBgNV
+        HR8ETDBKMEigRqBEhkJodHRwOi8vY3JsZHAuZWNtcy5tY2xvY2FsLmludDoxMzUz
+        Ni9tYy1pbnRlcm5hbC10c3Qtcm9vdC1jYS1nMS5jcmwwCgYIKoZIzj0EAwMDaAAw
+        ZQIxAIF3EU2ON1T8KHeusNw1hDiqZT5nG/bAR1bcaOIiAM5iU5r60qT5CKytMViq
+        fqaS+wIwIgcz6N/9B5E29/SssaK3UgRqWx/KeQDTBahLO1UpAf1GVVbBWP6ArR/8
+        n1Jc/HXi
         -----END CERTIFICATE-----
     """.trimIndent()
 
@@ -281,7 +358,10 @@ object DemoClientIdTrust {
         PID_UT_CA_PEM,
         AUTHOLOGIC_VERIFIER_PEM,
         AUTHOLOGIC_READER_PEM,
-        TRUST_REGISTRY_RC_PROVIDER_PEM,
+        WEBUILD_RP_ROOT,
+        WEBUILD_RAIDIAM_ROOT,
+        WALLET_GATEWAY_TEST_LEAF_PEM,
+        WALLET_GATEWAY_TEST_SUB_CA_PEM,
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(

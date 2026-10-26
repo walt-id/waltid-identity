@@ -26,6 +26,7 @@ import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.getSession
+import id.walt.issuer2.testsupport.Issuer2TestKeyAttester
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.errors.CredentialError
@@ -72,9 +73,10 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
     @Test
     fun scaSdJwtProfileIssuesDemoClaimsBoundToTheProofKey() = testApplication {
-        installIssuer2WithConfigFiles()
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(keyAttestationConfig = attester.issuerTrust) })
         val client = apiClient()
-        val flow = Issuer2WalletFlowDriver(client)
+        val flow = Issuer2WalletFlowDriver(client, keyAttestationProvider = attester)
         val scenario = Issuer2CredentialScenarios.configured.single { it.profileId == "scaPaymentCardSdJwt" }
         val offer = client.createWalletFlowCredentialOffer(scenario = scenario, authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED, txCodeMode = Issuer2TxCodeMode.NONE)
         val resolved = flow.resolve(offer)

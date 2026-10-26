@@ -1,5 +1,9 @@
 import Foundation
+#if DEBUG
+@testable import WalletSDK
+#else
 import WalletSDK
+#endif
 
 actor MockWalletClient: WalletClient {
     enum VerifierStyle {
@@ -8,9 +12,11 @@ actor MockWalletClient: WalletClient {
     }
 
     private var storedCredentials: [Credential]
+    private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
+    private let emptyPresentationOptions: Bool
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
@@ -28,9 +34,11 @@ actor MockWalletClient: WalletClient {
 
     init(
         storedCredentials: [Credential] = [],
+        initialCredentialRead: (@Sendable () async -> Void)? = nil,
         operationDelayMilliseconds: UInt64 = 0,
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
+        emptyPresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
@@ -44,9 +52,11 @@ actor MockWalletClient: WalletClient {
         deleteLocalDataError: Error? = nil
     ) {
         self.storedCredentials = storedCredentials
+        self.initialCredentialRead = initialCredentialRead
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
+        self.emptyPresentationOptions = emptyPresentationOptions
         self.transactionCodeRequired = transactionCodeRequired
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
@@ -59,6 +69,21 @@ actor MockWalletClient: WalletClient {
         self.deleteLocalDataDelayNanoseconds = deleteLocalDataDelayMilliseconds * 1_000_000
         self.deleteLocalDataError = deleteLocalDataError
     }
+
+    #if DEBUG
+    nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
+        guard let scenario else { return nil }
+        if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
+        return PaymentConsent(revision: "ui-test-payment", locale: "de", title: "Zahlung prüfen", securityHint: nil,
+            affirmativeAction: "Zahlen", denialAction: "Ablehnen", requiresUnsignedRequestWarning: scenario == "unsigned",
+            fields: [
+                .init(label: "Betrag", description: nil, value: "11.56 EUR", placement: .prominent),
+                .init(label: "Empfänger", description: nil, value: "Super Store", placement: .main),
+                .init(label: "Transaktions-ID", description: nil, value: "txn-1", placement: .details),
+                .init(label: "Omitted", description: nil, value: "bound-but-hidden", placement: .omitted),
+            ])
+    }
+    #endif
 
     private(set) var bootstrapCalls = 0
 
@@ -79,6 +104,10 @@ actor MockWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
+        if let initialCredentialRead {
+            self.initialCredentialRead = nil
+            await initialCredentialRead()
+        }
         try await delayOperation()
         return storedCredentials
     }
@@ -140,11 +169,6 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func present(request: URL, did: String?) async throws -> PresentationResult {
-        try await delayOperation()
-        return .transmitted(.succeeded(verifierResponseJSON: "{}"))
-    }
-
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await delayOperation()
         if let presentationPreviewResultOverride {
@@ -154,7 +178,7 @@ actor MockWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: duplicatePresentationOptions ? duplicateOptions : [defaultOption],
+                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? duplicateOptions : [defaultOption]),
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
@@ -297,7 +321,7 @@ actor MockWalletClient: WalletClient {
                 name: "given_name",
                 valueJSON: "\"Ada\"",
                 displayValue: "Ada",
-                selectivelyDisclosable: true
+                selectivelyDisclosable: true, required: true, selectable: false
             )
         ]
         if let samplePortraitDisclosureValueJSON {
@@ -329,7 +353,7 @@ actor MockWalletClient: WalletClient {
                     name: "Identity disclosure",
                     valueJSON: "\"Ada\"",
                     displayValue: "Ada",
-                    selectivelyDisclosable: true
+                    selectivelyDisclosable: true, required: true, selectable: false
                 )
             ]),
             defaultOption.with(queryID: "age", disclosures: [
@@ -338,7 +362,7 @@ actor MockWalletClient: WalletClient {
                     name: "Age disclosure",
                     valueJSON: "\"Over 18\"",
                     displayValue: "Over 18",
-                    selectivelyDisclosable: true
+                    selectivelyDisclosable: true, required: true, selectable: false
                 )
             ])
         ]
@@ -360,6 +384,7 @@ actor MockWalletClient: WalletClient {
     {
       "vct": "https://issuer.example/credential-types/mobile-driving-licence",
       "given_name": "Ada",
+      "age_over_18": true,
       "family_name": "Lovelace",
       "valid_to": 1781654400,
       "resident_address": {

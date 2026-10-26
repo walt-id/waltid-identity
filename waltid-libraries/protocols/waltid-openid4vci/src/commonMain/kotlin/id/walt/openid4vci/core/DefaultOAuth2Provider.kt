@@ -95,8 +95,16 @@ class DefaultOAuth2Provider(
 ) : OAuth2Provider {
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
-            is AuthorizationParameterResolution.Success ->
+            is AuthorizationParameterResolution.Direct ->
                 config.authorizationRequestValidator.validate(resolution.parameters)
+
+            is AuthorizationParameterResolution.Pushed -> {
+                // RFC 9126 section 4: policy may have changed since the request was pushed.
+                when (val validation = config.authorizationRequestValidator.validate(resolution.request.requestForm)) {
+                    is AuthorizationRequestResult.Failure -> validation
+                    is AuthorizationRequestResult.Success -> AuthorizationRequestResult.Success(resolution.request)
+                }
+            }
 
             is AuthorizationParameterResolution.Failure ->
                 AuthorizationRequestResult.Failure(resolution.error)
@@ -308,7 +316,11 @@ class DefaultOAuth2Provider(
         }
 
         val authResult =
-            if (config.clientAuthenticationServiceResolver == null && canSkipTokenClientAuthentication(parameters, headers)) {
+            if (config.clientAuthenticationServiceResolver == null && canSkipTokenClientAuthentication(
+                    parameters,
+                    headers
+                )
+            ) {
                 ClientAuthenticationResult.Unauthenticated
             } else {
                 authenticateClient(
@@ -394,7 +406,7 @@ class DefaultOAuth2Provider(
         headers: Map<String, List<String>>,
     ): Boolean =
         config.preAuthorizedCodeIssuer.anonymousAccessSupported &&
-            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
+                isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
 
     private fun validateAccessTokenRequest(
         parameters: Map<String, List<String>>,
@@ -448,7 +460,10 @@ class DefaultOAuth2Provider(
             val result = try {
                 handler.handleTokenEndpointRequest(request, options)
             } catch (error: InvalidTokenCredentialAuthorization) {
-                return AccessTokenResponseResult.Failure(error.request, OAuthError(OAuthErrorCodes.INVALID_REQUEST, error.message))
+                return AccessTokenResponseResult.Failure(
+                    error.request,
+                    OAuthError(OAuthErrorCodes.INVALID_REQUEST, error.message)
+                )
             }
             return when (result) {
                 is AccessTokenResponseResult.Success -> result.copy(
@@ -457,6 +472,7 @@ class DefaultOAuth2Provider(
                         else result.response
                     } ?: result.response.withOptions(options, result.request),
                 )
+
                 is AccessTokenResponseResult.Failure -> result
             }
         }
@@ -575,11 +591,17 @@ class DefaultOAuth2Provider(
                 CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message)
             )
         } catch (e: Exception) {
-            return CredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
+            return CredentialRequestResult.Failure(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                    e.message
+                )
+            )
         }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
             is CredentialRequestResult.Success ->
                 CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
+
             is CredentialRequestResult.Failure -> result
             is CredentialRequestResult.OAuthFailure -> result
         }
@@ -603,13 +625,18 @@ class DefaultOAuth2Provider(
         expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
-        val bindings = when (val verification = verifyCredentialProofs(request, configuration, proofValidationContext)) {
-            is CredentialProofVerification.Success -> verification.bindings
-            is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(verification.error)
-        }
+        val bindings =
+            when (val verification = verifyCredentialProofs(request, configuration, proofValidationContext)) {
+                is CredentialProofVerification.Success -> verification.bindings
+                is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(verification.error)
+            }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return missingCredentialHandler(configuration)
-        validateCredentialBindings(handler, configuration, bindings)?.let { return CredentialResponseResult.Failure(it) }
+        validateCredentialBindings(
+            handler,
+            configuration,
+            bindings
+        )?.let { return CredentialResponseResult.Failure(it) }
         val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
 
         return handler.sign(
@@ -649,10 +676,11 @@ class DefaultOAuth2Provider(
         expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
-        val bindings = when (val verification = verifyCredentialProofs(request, configuration, proofValidationContext)) {
-            is CredentialProofVerification.Success -> verification.bindings
-            is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(verification.error)
-        }
+        val bindings =
+            when (val verification = verifyCredentialProofs(request, configuration, proofValidationContext)) {
+                is CredentialProofVerification.Success -> verification.bindings
+                is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(verification.error)
+            }
         val registeredHandler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return missingCredentialHandler(configuration)
         val handler = registeredHandler as? Crypto2CredentialEndpointHandler
@@ -662,7 +690,11 @@ class DefaultOAuth2Provider(
                     description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
                 ),
             )
-        validateCredentialBindings(registeredHandler, configuration, bindings)?.let { return CredentialResponseResult.Failure(it) }
+        validateCredentialBindings(
+            registeredHandler,
+            configuration,
+            bindings
+        )?.let { return CredentialResponseResult.Failure(it) }
         val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
 
         return handler.sign(
@@ -769,7 +801,7 @@ class DefaultOAuth2Provider(
             ?.contentOrNull
             ?.takeIf { it.isNotBlank() }
         val anonymousPreAuthorizedAccess = clientId == null &&
-            tokenClaims?.get(JwtPayloadClaims.PRE_AUTHORIZED_CODE)?.jsonPrimitive?.contentOrNull != null
+                tokenClaims?.get(JwtPayloadClaims.PRE_AUTHORIZED_CODE)?.jsonPrimitive?.contentOrNull != null
         return withAccessTokenClient(clientId, anonymousPreAuthorizedAccess)
     }
 
@@ -781,7 +813,7 @@ class DefaultOAuth2Provider(
         return try {
             val collection = validateCredentialProofRequest(request.proofs, configuration, proofValidationContext)
             val shouldVerifyProofs = configuration.proofTypesSupported != null ||
-                (proofValidationContext != null && request.proofs != null)
+                    (proofValidationContext != null && request.proofs != null)
             if (!shouldVerifyProofs) return CredentialProofVerification.Success(emptyList())
 
             val context = proofValidationContext
@@ -950,17 +982,18 @@ class DefaultOAuth2Provider(
     private suspend fun resolveAuthorizationParameters(
         parameters: Map<String, List<String>>,
     ): AuthorizationParameterResolution {
-        val requestUriValues = parameters["request_uri"].orEmpty().filter { it.isNotBlank() }
+        val requestUriValues = parameters["request_uri"].orEmpty()
         if (requestUriValues.size > 1) {
             return AuthorizationParameterResolution.Failure(
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for request_uri not allowed")
             )
         }
 
-        val requestUri = requestUriValues.firstOrNull()
+        val requestUri = requestUriValues.firstOrNull()?.takeIf { it.isNotBlank() }
         val pushedAuthorizationConfig = config.pushedAuthorizationConfig
+        val required = pushedAuthorizationConfig?.enforcePushedAuthorizationRequests?.invoke() == true
         if (requestUri == null) {
-            return if (pushedAuthorizationConfig?.enforcePushedAuthorizationRequests == true) {
+            return if (required) {
                 AuthorizationParameterResolution.Failure(
                     OAuthError(
                         error = OAuthErrorCodes.INVALID_REQUEST,
@@ -968,7 +1001,7 @@ class DefaultOAuth2Provider(
                     )
                 )
             } else {
-                AuthorizationParameterResolution.Success(parameters)
+                AuthorizationParameterResolution.Direct(parameters)
             }
         }
 
@@ -981,7 +1014,7 @@ class DefaultOAuth2Provider(
             )
         }
 
-        val clientIdValues = parameters["client_id"].orEmpty().filter { it.isNotBlank() }
+        val clientIdValues = parameters["client_id"].orEmpty()
         val clientId = when (clientIdValues.size) {
             0 -> return AuthorizationParameterResolution.Failure(
                 OAuthError(
@@ -1001,7 +1034,11 @@ class DefaultOAuth2Provider(
             requestUriPrefix = pushedAuthorizationConfig.requestUriPrefix,
         ) ?: return AuthorizationParameterResolution.Failure(
             OAuthError(
-                error = OAuthErrorCodes.INVALID_REQUEST_URI,
+                error = if (required && !requestUri.startsWith(pushedAuthorizationConfig.requestUriPrefix)) {
+                    OAuthErrorCodes.INVALID_REQUEST
+                } else {
+                    OAuthErrorCodes.INVALID_REQUEST_URI
+                },
                 description = "request_uri is invalid",
             )
         )
@@ -1023,7 +1060,7 @@ class DefaultOAuth2Provider(
             )
         }
 
-        return AuthorizationParameterResolution.Success(entry.requestParameters)
+        return AuthorizationParameterResolution.Pushed(entry.authorizationRequest)
     }
 
     private fun oauthErrorPayload(error: OAuthError): Map<String, JsonElement> =
@@ -1052,6 +1089,7 @@ class DefaultOAuth2Provider(
         when (error.error) {
             OAuthErrorCodes.INVALID_CLIENT,
             OAuthErrorCodes.INVALID_TOKEN -> 401
+
             OAuthErrorCodes.INSUFFICIENT_SCOPE -> 403
             OAuthErrorCodes.SERVER_ERROR,
             OAuthErrorCodes.TEMPORARILY_UNAVAILABLE -> 500
@@ -1103,7 +1141,8 @@ class DefaultOAuth2Provider(
         )
 
     private sealed class AuthorizationParameterResolution {
-        data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
+        data class Direct(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
+        data class Pushed(val request: AuthorizationRequest) : AuthorizationParameterResolution()
         data class Failure(val error: OAuthError) : AuthorizationParameterResolution()
     }
 

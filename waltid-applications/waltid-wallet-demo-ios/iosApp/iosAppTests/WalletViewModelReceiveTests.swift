@@ -1,10 +1,274 @@
 import Foundation
 import WalletSDK
+import WalletDemoSharingUI
 import XCTest
 @testable import iosApp
 
 @MainActor
 final class WalletViewModelReceiveTests: XCTestCase {
+    func testIncompleteSavedReceiptRetainsEveryIDAndLocalRefreshCompletesIt() async throws {
+        for visible in [Set<String>(), Set(["credential-1"])] {
+            let client = TransactionCodeWalletClient(transactionCode: nil, storedCredentialIDs: ["credential-1", "credential-2"])
+            await client.setVisibleReceivedIDs(visible)
+            let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+            model.unlockForTests()
+            try await waitUntil { model.isReady && !model.isLoading }
+            model.offerUrl = "openid-credential-offer://issuer.example"
+            model.previewOffer()
+            try await waitUntil { model.offerPreview != nil && !model.isLoading }
+            model.acceptOffer()
+            try await waitUntil { !model.isLoading }
+            XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1", "credential-2"])
+            XCTAssertNotNil(model.issuanceReceipt)
+            XCTAssertTrue(model.receivedDetailsUnavailable)
+            XCTAssertFalse(model.issuanceReceiptComplete)
+            XCTAssertFalse(model.receiveCompleted)
+            XCTAssertNil(model.offerPreview)
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertFalse(model.issuanceReceiptComplete)
+            await client.setVisibleReceivedIDs(["credential-1", "credential-2"])
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertTrue(model.issuanceReceiptComplete)
+            XCTAssertTrue(model.receiveCompleted)
+            XCTAssertFalse(model.receivedDetailsUnavailable)
+            XCTAssertEqual(model.receivedCredentials.map(\.id), ["credential-1", "credential-2"])
+            let calls = await client.issuanceContinuationCalls
+            XCTAssertEqual(calls, 1)
+        }
+    }
+
+    func testFailedPostIssuanceReadKeepsReceiptAndLocalRefreshRecovers() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        await client.setCredentialReadFailure(true)
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
+        XCTAssertNotNil(model.issuanceReceipt?.detailsError)
+        XCTAssertFalse(model.issuanceReceiptComplete)
+        XCTAssertNil(model.offerPreview)
+        await client.setCredentialReadFailure(false)
+        model.refreshIssuanceStatus()
+        try await waitUntil { !model.isLoading }
+        XCTAssertNil(model.issuanceReceipt?.detailsError)
+        XCTAssertTrue(model.issuanceReceiptComplete)
+    }
+
+    func testPendingRegistrationDoesNotBlockStartupOrReceivingAndReconcilesAgain() async throws {
+        let registration = PendingRegistrationUpdate()
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {
+            try await registration.update()
+        })
+        model.unlockForTests()
+        try await waitUntilAsync { await registration.count == 1 }
+        guard model.isReady && !model.isLoading else {
+            await registration.complete()
+            XCTFail("Apple's registration service must not gate wallet readiness")
+            return
+        }
+
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.credentials.map(\.id), ["credential-1"])
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
+        XCTAssertFalse(model.isError)
+        let countWhilePending = await registration.count
+        XCTAssertEqual(countWhilePending, 1)
+
+        await registration.complete()
+        try await waitUntilAsync { await registration.count == 2 }
+        await registration.complete(.failure(WalletError.internalFailure("Registration unavailable")))
+        model.deleteCredential(id: "credential-1")
+        try await waitUntilAsync { await registration.count == 3 }
+        XCTAssertTrue(model.isReady)
+        XCTAssertTrue(model.credentials.isEmpty)
+        XCTAssertFalse(model.isError)
+        await registration.complete()
+    }
+
+    func testResolvedHTTPSOfferPreparesOnceAndKeepsItsSelectionUntilClosed() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        let url = URL(string: "https://issuer.example/offer?credential_offer_uri=https%3A%2F%2Fissuer.example%2F1")!
+        model.openResolvedLink(url, kind: .offer)
+        model.prepareExternalFlow()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        let preview = try XCTUnwrap(model.offerPreview)
+        let configuration = try XCTUnwrap(preview.credentials.first).configurationID
+        model.updateIssuanceCopies(configuration, 0)
+        model.txCode = "1234"
+        model.openResolvedLink(url, kind: .offer)
+        model.prepareExternalFlow()
+        let calls = await client.issuanceStartCalls
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(model.issuanceCopyCounts[configuration], 0)
+        XCTAssertEqual(model.txCode, "1234")
+        XCTAssertTrue(model.closeExternalFlow())
+        XCTAssertEqual(model.selectedTab, .credentials)
+        XCTAssertNil(model.externalFlow)
+    }
+
+    func testExternalLinkCannotReplaceNearbySession() {
+        let model = WalletViewModel(walletClient: TransactionCodeWalletClient(transactionCode: nil), identityDocumentRegistrationUpdate: {})
+        model.proximityPresentation.start()
+        defer { model.proximityPresentation.dismiss() }
+        XCTAssertTrue(model.proximityPresentation.active)
+        model.handleDeepLink(URL(string: "openid4vp://external")!)
+        XCTAssertNil(model.externalFlow)
+        XCTAssertNotNil(model.incomingLinkNotice)
+    }
+
+    func testCallbackWithoutSessionExplainsRecoveryWithoutReplayingAnOffer() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        let url = URL(string: "openid://callback?code=orphan&state=lost")!
+        model.handleDeepLink(url)
+        XCTAssertEqual(model.externalFlow, .unavailableCallback(url))
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        model.prepareExternalFlow()
+        let started = await client.issuanceStartCalls
+        let continued = await client.issuanceContinuationCalls
+        XCTAssertEqual(started, 0)
+        XCTAssertEqual(continued, 0)
+        XCTAssertTrue(model.closeExternalFlow())
+    }
+
+    func testExternalOfferWaitsForUnlockPreparesOnceAndKeepsReceiptUntilClosed() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        let url = URL(string: "openid-credential-offer://external")!
+        model.handleDeepLink(url)
+        model.prepareExternalFlow()
+        let before = await client.issuanceStartCalls
+        XCTAssertEqual(before, 0)
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        model.prepareExternalFlow()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.prepareExternalFlow()
+        model.handleDeepLink(url)
+        model.prepareExternalFlow()
+        let prepared = await client.issuanceStartCalls
+        let accepted = await client.issuanceContinuationCalls
+        XCTAssertEqual(prepared, 1)
+        XCTAssertEqual(accepted, 0)
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.selectedTab, .receive)
+        XCTAssertNotNil(model.issuanceReceipt)
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
+        XCTAssertTrue(model.closeExternalFlow())
+        XCTAssertFalse(model.closeExternalFlow())
+        XCTAssertEqual(model.selectedTab, .credentials)
+    }
+
+    func testExternalLinkCannotInterruptSending() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil, startsWithCredential: true,
+            presentationActionDelayNanoseconds: 300_000_000)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        let url = URL(string: "openid4vp://external")!
+        model.handleDeepLink(url)
+        model.prepareExternalFlow()
+        try await waitUntil { model.presentationPreview != nil && !model.isLoading && model.paymentReview.canConfirm }
+        model.submitPresentation()
+        XCTAssertTrue(model.isLoading, "The assertion must exercise an active submission")
+        XCTAssertFalse(model.closeExternalFlow())
+        model.handleDeepLink(URL(string: "openid-credential-offer://replacement")!)
+        XCTAssertEqual(model.externalFlow?.url, url)
+        XCTAssertEqual(model.selectedTab, .present)
+        XCTAssertNotNil(model.incomingLinkNotice)
+        try await waitUntil { !model.isLoading }
+        let calls = await client.presentationSubmitCalls
+        XCTAssertEqual(calls, 1)
+        XCTAssertTrue(model.closeExternalFlow())
+    }
+
+    func testClosingExternalPreviewDiscardsLateResolution() async throws {
+        let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 200_000_000, transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        model.handleDeepLink(URL(string: "openid-credential-offer://external")!)
+        model.prepareExternalFlow()
+        try await waitUntilAsync { await client.issuanceStartCalls == 1 }
+        XCTAssertTrue(model.closeExternalFlow())
+        try await waitUntilAsync { await client.cancelledIssuanceSessionIDs.count == 1 }
+        XCTAssertNil(model.offerPreview)
+        XCTAssertNil(model.externalFlow)
+        let accepted = await client.issuanceContinuationCalls
+        XCTAssertEqual(accepted, 0)
+    }
+
+    func testUncertainContinuationCannotResumeAndStatusRefreshOnlyReads() async throws {
+        for status in [IssuanceContinuationStatus.remoteOutcomeUncertain, .storageOutcomeUncertain] {
+            let client = TransactionCodeWalletClient(transactionCode: nil)
+            let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+            model.unlockForTests()
+            try await waitUntil { model.isReady }
+            let pending = DeferredCredential(id: "pending", credentialConfigurationID: nil, intervalSeconds: nil, status: status)
+            model.deferredCredentials = [pending]
+            model.resumeDeferredCredential(pending)
+            await Task.yield()
+            XCTAssertFalse(model.isLoading)
+            let before = await client.resumedDeferredCredentialIDs
+            XCTAssertTrue(before.isEmpty)
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertTrue(model.deferredCredentials.isEmpty)
+            let after = await client.resumedDeferredCredentialIDs
+            XCTAssertTrue(after.isEmpty)
+        }
+    }
+
+    func testReceiptKeepsEarlierSavedIdsAcrossContinuation() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil, deferWithProgress: true)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        model.deferredCredentials = [pending]
+        model.issuanceReceipt = IssuanceReceipt(pendingIDs: ["pending"])
+        model.lastReceivedCredentialIDs = ["earlier-saved"]
+        model.resumeDeferredCredential(pending)
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
+        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, ["pending"])
+        model.resumeDeferredCredential(pending)
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
+    }
+
+    func testRetainedPresentationDoesNotEraseNewIntervalOrUncertainFailure() {
+        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "pid", intervalSeconds: 15)
+        let lost = IssuanceOutcome.failed(sessionID: "session", error: .init(code: .remoteOutcomeUncertain, message: "Response lost"),
+            storedCredentialIDs: ["saved"], deferredCredentials: [pending])
+        guard case let .failed(_, _, saved, blocked) = lost.withContinuations([], resumingID: pending.id) else { return XCTFail() }
+        XCTAssertEqual(saved, ["saved"])
+        XCTAssertEqual(blocked.first?.status, .remoteOutcomeUncertain)
+        let retained = DeferredCredential(id: pending.id, credentialConfigurationID: "pid", intervalSeconds: 5,
+            status: .awaitingLocalSave, displayMetadataJSON: "{}")
+        guard case let .failed(_, _, _, latest) = lost.withContinuations([retained], resumingID: pending.id) else { return XCTFail() }
+        XCTAssertEqual(latest.first?.intervalSeconds, 15)
+        XCTAssertEqual(latest.first?.status, .awaitingLocalSave)
+        XCTAssertEqual(latest.first?.displayMetadataJSON, "{}")
+    }
+
     func testCopySelectionIsExplicitBoundedAndForwardedForBothGrants() async throws {
         for grant in [IssuanceGrant.preAuthorizedCode, .authorizationCode] {
             let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: grant, batchSize: 3)
@@ -109,7 +373,9 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.txCode = " abc-123 "
         XCTAssertTrue(viewModel.acceptOfferEnabled)
         viewModel.acceptOffer()
-        try await waitUntil { viewModel.selectedTab == .credentials && !viewModel.receivedCredentials.isEmpty }
+        try await waitUntil { viewModel.receiveCompleted && !viewModel.isLoading }
+        XCTAssertEqual(viewModel.selectedTab, .receive)
+        XCTAssertNotNil(viewModel.issuanceReceipt)
 
         let receiveCalls = await client.issuanceContinuationCalls
         let receivedTxCodes = await client.receivedTxCodes
@@ -320,7 +586,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
         viewModel.previewPresentation()
-        try await waitUntil { viewModel.presentationPreview != nil }
+        try await waitUntil { viewModel.presentationPreview != nil && viewModel.paymentReview.canConfirm }
 
         viewModel.submitPresentation()
         viewModel.submitPresentation()
@@ -617,6 +883,21 @@ final class WalletViewModelReceiveTests: XCTestCase {
     }
 }
 
+private actor PendingRegistrationUpdate {
+    private(set) var count = 0
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    func update() async throws {
+        count += 1
+        try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+
+    func complete(_ result: Result<Void, Error> = .success(())) {
+        continuation?.resume(with: result)
+        continuation = nil
+    }
+}
+
 private actor TransactionCodeWalletClient: WalletClient {
     private(set) var issuanceContinuationCalls = 0
     private(set) var issuanceStartCalls = 0
@@ -639,10 +920,14 @@ private actor TransactionCodeWalletClient: WalletClient {
     private let failWithProgress: Bool
     private let deferWithProgress: Bool
     private(set) var receivedIssuanceSelections: [[IssuanceCredentialSelection]?] = []
+    private(set) var resumedDeferredCredentialIDs: [String] = []
     private let issuanceGrant: IssuanceGrant
     private let startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
     private let presentationActionDelayNanoseconds: UInt64
+    private let storedCredentialIDs: [String]
+    private var visibleReceivedIDs: Set<String>? = nil
+    private var credentialReadFailure = false
 
     init(
         issuanceStartDelayNanoseconds: UInt64 = 0,
@@ -657,7 +942,8 @@ private actor TransactionCodeWalletClient: WalletClient {
         deferWithProgress: Bool = false,
         startsWithCredential: Bool = false,
         presentationPreviewDelayNanoseconds: UInt64 = 0,
-        presentationActionDelayNanoseconds: UInt64 = 0
+        presentationActionDelayNanoseconds: UInt64 = 0,
+        storedCredentialIDs: [String] = ["credential-1"]
     ) {
         self.issuanceStartDelayNanoseconds = issuanceStartDelayNanoseconds
         self.transactionCode = transactionCode
@@ -668,6 +954,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         self.startsWithCredential = startsWithCredential
         self.presentationPreviewDelayNanoseconds = presentationPreviewDelayNanoseconds
         self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
+        self.storedCredentialIDs = storedCredentialIDs
     }
 
     private(set) var bootstrapCalls = 0
@@ -709,9 +996,17 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
-        let available = startsWithCredential || credentialIssued ? [Self.credential] : []
+        if credentialReadFailure { throw WalletError.internalFailure("Storage read unavailable") }
+        let available = startsWithCredential || credentialIssued ? storedCredentialIDs.map { id in
+            Credential(id: id, format: Self.credential.format, issuer: Self.credential.issuer,
+                subject: Self.credential.subject, label: Self.credential.label, addedAt: nil,
+                credentialDataJSON: Self.credential.credentialDataJSON)
+        }.filter { visibleReceivedIDs?.contains($0.id) ?? true } : []
         return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
+
+    func setVisibleReceivedIDs(_ ids: Set<String>) { visibleReceivedIDs = ids }
+    func setCredentialReadFailure(_ fail: Bool) { credentialReadFailure = fail }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
@@ -768,7 +1063,7 @@ private actor TransactionCodeWalletClient: WalletClient {
                     stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
                 deferredCredentials: try await listDeferredIssuance())
         }
-        return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
     }
 
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
@@ -781,6 +1076,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        resumedDeferredCredentialIDs.append(deferredCredentialID)
         if deferWithProgress {
             credentialIssued = true
             return .deferred(sessionID: "session", storedCredentialIDs: [Self.credential.id],
@@ -791,10 +1087,6 @@ private actor TransactionCodeWalletClient: WalletClient {
             error: .init(code: .invalidSession, message: "No deferred credential in this test"),
             storedCredentialIDs: [], deferredCredentials: []
         )
-    }
-
-    func present(request: URL, did: String?) async throws -> PresentationResult {
-        .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {

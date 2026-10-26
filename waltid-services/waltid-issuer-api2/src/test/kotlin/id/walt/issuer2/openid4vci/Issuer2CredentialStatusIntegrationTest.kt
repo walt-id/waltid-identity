@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
@@ -10,7 +11,6 @@ import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
-import id.walt.openid4vci.handlers.credential.JwtUtils
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
@@ -24,6 +24,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -48,6 +49,14 @@ class Issuer2CredentialStatusIntegrationTest {
         const val JWT_VC_PROFILE_ID = "openBadgeCredential"
         const val SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val MDOC_PROFILE_ID = "isoPhotoId"
+    }
+
+    object JwtUtils {
+        fun parseJWTPayload(token: String): JsonObject {
+            return token.substringAfter(".").substringBefore(".").let {
+                Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
+            }
+        }
     }
 
     @AfterEach
@@ -112,7 +121,10 @@ class Issuer2CredentialStatusIntegrationTest {
         assertEquals("BitstringStatusListEntry", embeddedStatus["type"]?.jsonPrimitive?.content)
         assertEquals("revocation", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
         assertEquals("94567", embeddedStatus["statusListIndex"]?.jsonPrimitive?.content)
-        assertEquals("https://issuer.example.com/status/1", embeddedStatus["statusListCredential"]?.jsonPrimitive?.content)
+        assertEquals(
+            "https://issuer.example.com/status/1",
+            embeddedStatus["statusListCredential"]?.jsonPrimitive?.content
+        )
     }
 
     @Test
@@ -320,7 +332,10 @@ class Issuer2CredentialStatusIntegrationTest {
         assertNotNull(embeddedStatus)
         assertEquals("999", embeddedStatus["statusListIndex"]?.jsonPrimitive?.content)
         assertEquals("suspension", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
-        assertEquals("https://override.example.com/status/override", embeddedStatus["statusListCredential"]?.jsonPrimitive?.content)
+        assertEquals(
+            "https://override.example.com/status/override",
+            embeddedStatus["statusListCredential"]?.jsonPrimitive?.content
+        )
     }
 
     // ==================== SD-JWT VC Tests ====================

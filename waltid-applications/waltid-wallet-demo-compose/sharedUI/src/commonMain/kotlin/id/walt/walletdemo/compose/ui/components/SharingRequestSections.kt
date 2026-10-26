@@ -20,6 +20,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoSharingEncryptionMechanism
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequester
 import id.walt.walletdemo.compose.logic.WalletDemoSharingResponseProtection
+import id.walt.walletdemo.compose.logic.isPaymentTransaction
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentReview
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 /**
@@ -33,6 +35,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 internal fun SharingRequestSections(
     request: WalletDemoSharingRequest,
     modifier: Modifier = Modifier,
+    paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -40,9 +43,10 @@ internal fun SharingRequestSections(
     ) {
         VerifierMetadataCard(request)
 
-        request.transactionData.forEach { group ->
+        request.transactionData.filterNot { it.isPaymentTransaction }.forEach { group ->
             ClaimGroupSection(group, collapsible = false)
         }
+        PaymentConsentSection(paymentReview, request.transactionData.filter { it.isPaymentTransaction })
     }
 }
 

@@ -7,12 +7,23 @@ import XCTest
 final class DemoClientIdTrustTests: XCTestCase {
     func testDemoAnchorsParseAsDistinctCertificates() throws {
         let ders = try DemoClientIdTrust.x509TrustAnchorPems.map(der(fromPEM:))
-        XCTAssertEqual(ders.count, 11)
+        XCTAssertEqual(ders.count, 14)
         XCTAssertEqual(Set(ders).count, ders.count)
         XCTAssertEqual(
             DemoClientIdTrust.clientIDTrustConfiguration.x509TrustAnchorsPEM,
             DemoClientIdTrust.x509TrustAnchorPems
         )
+    }
+
+    func testDemoAnchorsInitializeWalletThroughKMP() async throws {
+        let wallet = try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: "demo-client-id-trust-\(UUID().uuidString)",
+                clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
+                defaultKeyUseAuthorizationPolicy: .none
+            )
+        )
+        try await wallet.deleteLocalData()
     }
 
     private func der(fromPEM pem: String) throws -> Data {

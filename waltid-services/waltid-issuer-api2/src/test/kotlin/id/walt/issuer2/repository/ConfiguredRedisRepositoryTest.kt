@@ -8,8 +8,8 @@ import id.walt.commons.persistence.PersistenceNode
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceRequest
+import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
@@ -23,20 +23,21 @@ import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecor
 import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
+import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.jsonObject
-import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 
 @Tag("redis")
 @EnabledIfEnvironmentVariable(named = "ISSUER2_REDIS_HOST", matches = ".+")
@@ -168,11 +169,16 @@ class ConfiguredRedisRepositoryTest {
         val now = Clock.System.now()
         return DefaultPARRecord(
             requestId = "redis-par-$suffix",
-            requestParameters = mapOf(
-                "client_id" to listOf("wallet-client"),
-                "response_type" to listOf("code"),
-                "redirect_uri" to listOf("https://wallet.example/callback"),
-                "scope" to listOf("openid"),
+            authorizationRequest = DefaultAuthorizationRequest(
+                client = DefaultClient("wallet-client", listOf("https://wallet.example/callback"), setOf("authorization_code"), setOf("code")),
+                responseTypes = setOf("code"), redirectUri = "https://wallet.example/callback", state = null,
+                requestedScopes = setOf("openid"),
+                requestForm = mapOf(
+                    "client_id" to listOf("wallet-client"),
+                    "response_type" to listOf("code"),
+                    "redirect_uri" to listOf("https://wallet.example/callback"),
+                    "scope" to listOf("openid"),
+                ),
             ),
             createdAt = now,
             expiresAt = now.plus(5.minutes),

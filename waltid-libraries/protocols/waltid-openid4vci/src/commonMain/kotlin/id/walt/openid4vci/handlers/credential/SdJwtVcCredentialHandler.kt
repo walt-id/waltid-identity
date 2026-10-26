@@ -147,7 +147,7 @@ class SdJwtVcCredentialHandler(
                     JsonPrimitive(now.epochSeconds.floorDiv(86_400L) * 86_400L)
 
                 claim == "exp" && template != null &&
-                    template.startsWith("<timestamp-in-seconds:") && template.endsWith(">") -> {
+                        template.startsWith("<timestamp-in-seconds:") && template.endsWith(">") -> {
                     val lifetime = Duration.parse(template.removePrefix("<timestamp-in-seconds:").removeSuffix(">"))
                     require(lifetime.isFinite() && lifetime > Duration.ZERO) {
                         "Generated SD-JWT expiry requires a finite, positive lifetime"

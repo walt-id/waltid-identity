@@ -56,7 +56,7 @@ data class IssuanceSession(
     val issuanceRequests: List<IssuanceRequest>,
     val issuanceResults: Map<String, IssuanceResult> = emptyMap(),
     val credentialOffer: CredentialOffer? = null,
-    val authorizationRequest: Map<String, List<String>>? = null,
+    val authorizationRequest: id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest? = null,
     val externalAuthorizationState: String? = null,
     val authorizationClaims: JsonObject? = null,
     val expiresAt: Instant,
@@ -73,9 +73,11 @@ data class IssuanceSession(
         require(issuanceRequests.map { it.credentialIdentifier }.distinct().size == issuanceRequests.size) {
             "credentialIdentifier values must be unique within an issuance session"
         }
-        require(authorizedCredentialIdentifiers == null ||
+        require(
+            authorizedCredentialIdentifiers == null ||
                 (authorizedCredentialIdentifiers.distinct().size == authorizedCredentialIdentifiers.size &&
-                    authorizedCredentialIdentifiers.all { id -> issuanceRequests.any { it.credentialIdentifier == id } })) {
+                        authorizedCredentialIdentifiers.all { id -> issuanceRequests.any { it.credentialIdentifier == id } })
+        ) {
             "authorizedCredentialIdentifiers must be unique identifiers from this session"
         }
         require(issuanceResults.keys.all { resultId ->
