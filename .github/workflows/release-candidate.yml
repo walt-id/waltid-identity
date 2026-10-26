@@ -142,7 +142,7 @@ jobs:
     needs: tag
     steps:
       - name: Dispatch integration-test-aws.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-aws.yml
           repo: walt-id/waltid-identity-enterprise
@@ -156,7 +156,7 @@ jobs:
     needs: tag
     steps:
       - name: Dispatch integration-test-azure.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-azure.yml
           repo: walt-id/waltid-identity-enterprise
@@ -172,7 +172,7 @@ jobs:
       # SonarCloud only reports on the latest analysis of main, so record it for the release evidence
       # now, while main still points at the tagged commits. Waits up to 30 minutes for the analysis.
       - name: Dispatch release-sonar-snapshot.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: release-sonar-snapshot.yml
           repo: walt-id/waltid-identity-enterprise
@@ -217,7 +217,7 @@ jobs:
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license

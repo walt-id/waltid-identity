@@ -31,7 +31,7 @@ RUN chmod +x ./gradlew \
     && grep -q "__WALLET_API_FLAVOR__" /out/index.html
 
 # RUN
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 
 COPY --from=build /out/ /usr/share/nginx/html/
 COPY waltid-applications/waltid-wallet-demo-compose/webApp/nginx.conf /etc/nginx/conf.d/default.conf
