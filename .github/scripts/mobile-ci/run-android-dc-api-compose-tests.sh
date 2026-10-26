@@ -12,12 +12,17 @@ validate_android_dc_api_device
 # These suites need Google Play services and run separately from ordinary Compose tests.
 test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
 IFS=',' read -r -a required_classes <<< "$test_classes"
+instrumentation_args=()
+if [[ -n "${ANDROID_TEST_NOT_CLASS:-}" ]]; then
+  instrumentation_args+=("-Pandroid.testInstrumentationRunnerArguments.notClass=$ANDROID_TEST_NOT_CLASS")
+fi
 
 test_status=0
 set +e
 "$identity_dir/gradlew" -p "$identity_dir" \
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest \
   "-Pandroid.testInstrumentationRunnerArguments.class=$test_classes" \
+  "${instrumentation_args[@]}" \
   -Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest \
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info

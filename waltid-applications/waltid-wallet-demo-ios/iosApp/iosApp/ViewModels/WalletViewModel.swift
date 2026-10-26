@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WalletDemoIdentityDocumentSupport
 import WalletDemoKeyAttestation
 import WalletDemoSharingUI
@@ -9,13 +10,6 @@ enum WalletTab: Hashable {
     case credentials
     case receive
     case present
-}
-
-enum WalletAuthState: Equatable {
-    case setup
-    case login
-    case storageUnavailable(String)
-    case unlocked
 }
 
 enum WalletStatusKind: Hashable {
@@ -70,10 +64,6 @@ private enum WalletStatusText {
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
-    static let pinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
-    static let pinConfirmationDoesNotMatch = "PIN confirmation does not match"
-    static let wrongPin = "Wrong PIN"
-    static let enableBiometricUnlock = "Enable biometric unlock"
     static let biometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
     static let receivedCredentialsUnavailable = "received credentials are not available locally"
     static let transactionDataProfilesUnavailable = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected."
@@ -144,11 +134,15 @@ class WalletViewModel: ObservableObject {
     }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
+    @Published var externalFlow: WalletExternalFlow?
+    @Published var incomingLinkNotice: String?
+    @Published private(set) var flowIsCommitting = false
     @Published var selectedTab: WalletTab = .credentials
     @Published var issuanceCopyCounts: [String: Int] = [:]
     @Published var offerPreview: IssuanceOfferPreview?
     @Published private(set) var authorizationRequestURL: URL?
     @Published var deferredCredentials: [DeferredCredential] = []
+    @Published var issuanceReceipt: IssuanceReceipt?
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
@@ -157,11 +151,16 @@ class WalletViewModel: ObservableObject {
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
     @Published var statusExpanded = false
-    @Published var auth: WalletAuthState = .setup
-    @Published var pin = ""
-    @Published var pinConfirmation = ""
-    @Published var useBiometrics = false
-    @Published private(set) var isBiometricUnlockAvailable = false
+    let access: WalletAccessController
+    private var accessObservation: AnyCancellable?
+    var auth: WalletAuthState { get { access.auth } set { access.auth = newValue } }
+    var pin: String { get { access.pin } set { access.pin = newValue } }
+    var pinConfirmation: String { get { access.confirmation } set { access.confirmation = newValue } }
+    var pinSetupStep: PinSetupStep { access.step }
+    var biometricSigningRecoveryAvailability: DemoBiometricAvailability {
+        biometricSigningAvailability?.recoveryAvailability(unlock: access.biometricAvailability) ?? .unavailable
+    }
+    var isBiometricUnlockAvailable: Bool { access.biometricAvailable }
     @Published var showDcApiPresentationPreview: Bool = DemoSharingSettings.showDcApiPresentationPreview(
         appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
     ) {
@@ -193,8 +192,8 @@ class WalletViewModel: ObservableObject {
             proximityPresentation.refreshPreferences()
         }
     }
-    @Published var pinError: String?
-    @Published var isAuthenticating = false
+    var pinError: String? { access.pinError }
+    var isAuthenticating: Bool { access.isBusy }
     @Published private(set) var pendingPresentationContinuationURL: URL?
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
@@ -254,6 +253,18 @@ class WalletViewModel: ObservableObject {
             credentialsByID[credential.id] = credential
         }
         return lastReceivedCredentialIDs.compactMap { credentialsByID[$0] }
+    }
+
+    var missingReceivedCredentialIDs: Set<String> {
+        let available = Set(credentials.map(\.id))
+        return Set(lastReceivedCredentialIDs).subtracting(available)
+    }
+
+    var receivedDetailsUnavailable: Bool { issuanceReceipt?.detailsError != nil || !missingReceivedCredentialIDs.isEmpty }
+
+    var issuanceReceiptComplete: Bool {
+        issuanceReceipt?.problem == nil && issuanceReceipt?.pendingIDs.isEmpty == true &&
+            !lastReceivedCredentialIDs.isEmpty && !receivedDetailsUnavailable
     }
 
     var presentationUrlEntryEnabled: Bool {
@@ -343,6 +354,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func resetWallet() {
+        access.cancelAttempt()
         receiveTask?.cancel()
         paymentConsentTask?.cancel()
         presentationTask?.cancel()
@@ -355,15 +367,8 @@ class WalletViewModel: ObservableObject {
                 await proximityPresentation.closeAndAwait()
                 try await walletClient.deleteLocalData()
                 identityScreen = nil
-                pinStore.clear()
+                access.reset()
                 clearWalletState()
-                pin = ""
-                pinConfirmation = ""
-                useBiometrics = false
-                pinError = nil
-                isAuthenticating = false
-                biometricPromptConsumed = false
-                auth = .setup
                 refreshBiometricSigningAvailability()
                 reconcileIdentityDocumentRegistrations()
             } catch {
@@ -377,6 +382,9 @@ class WalletViewModel: ObservableObject {
     }
 
     func lock() {
+        externalFlow = nil
+        selectedTab = .credentials
+        access.cancelAttempt()
         proximityPresentation.dismiss()
         receiveTask?.cancel()
         paymentConsentTask?.cancel()
@@ -391,6 +399,7 @@ class WalletViewModel: ObservableObject {
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         presentationCompleted = false
         clearPendingPresentationContinuation()
@@ -402,97 +411,37 @@ class WalletViewModel: ObservableObject {
         statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
         statusExpanded = false
         statusHideTask?.cancel()
-        pin = ""
-        pinConfirmation = ""
-        pinError = nil
-        isAuthenticating = false
-        biometricPromptConsumed = true
-        auth = .login
+        access.lock()
     }
 
-    func updateUseBiometrics(_ enabled: Bool) {
-        guard auth == .setup else { return }
-        if !enabled {
-            useBiometrics = false
-            pinError = nil
-            return
-        }
-        guard !isAuthenticating else { return }
-        guard biometricAuthenticator.isAvailable else {
-            useBiometrics = false
-            pinError = WalletStatusText.biometricUnlockNotAuthorized
-            return
-        }
-        useBiometrics = true
-        pinError = nil
-        isAuthenticating = true
-        Task {
-            let result = await biometricAuthenticator.authenticate(reason: WalletStatusText.enableBiometricUnlock)
-            isAuthenticating = false
-            guard auth == .setup else { return }
-            useBiometrics = result == .succeeded
-            if result != .succeeded {
-                pinError = WalletStatusText.biometricUnlockNotAuthorized
-            }
-        }
-    }
-
-    func submitPin() {
-        guard !isAuthenticating else { return }
-        switch auth {
-        case .setup:
-            submitSetupPin()
-        case .login:
-            submitLoginPin()
-        case .storageUnavailable, .unlocked:
-            break
-        }
-    }
-
-    func unlockWithBiometrics(force: Bool = false) {
-        guard auth == .login else { return }
-        guard force || !biometricPromptConsumed else { return }
-        guard !isAuthenticating else { return }
-        guard pinStore.isBiometricUnlockEnabled, biometricAuthenticator.isAvailable else { return }
-        biometricPromptConsumed = true
-        isAuthenticating = true
-        Task {
-            let result = await biometricAuthenticator.authenticate(reason: "Unlock the wallet")
-            isAuthenticating = false
-            guard auth == .login else { return }
-            if result == .succeeded {
-                auth = .unlocked
-                showBiometricSigningWarningIfNeeded(
-                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
-                )
-                bootstrapIfNeeded()
-            }
-        }
-    }
+    func updatePin(_ value: String) { access.updatePin(value) }
+    func updatePinConfirmation(_ value: String) { access.updatePin(value, confirming: true) }
+    func editSetupPin() { access.back() }
+    func clearPin() { access.clearPin() }
+    func submitPin() { access.submitPin() }
+    func unlockWithBiometrics(force: Bool = false) { access.unlockWithBiometrics(force: force) }
+    func retryBiometricSetup() { access.retryBiometricSetup() }
+    func continueWithoutBiometrics() { access.continueWithoutBiometrics() }
+    func startPinChange() { access.startPinChange() }
+    func cancelPinChange() { access.cancelPinChange() }
+    func setBiometricUnlockEnabled(_ enabled: Bool) { access.setBiometricUnlock(enabled) }
 
     func unlockForTests(pin: String = "1234") {
-        self.pin = pin
-        self.pinConfirmation = pin
-        submitPin()
+        updatePin(pin)
+        if auth == .setup && pinSetupStep == .confirm { updatePinConfirmation(pin) }
     }
 
-    func promptBiometricUnlockIfNeeded() {
-        guard auth == .login else { return }
-        unlockWithBiometrics()
-    }
+    func promptBiometricUnlockIfNeeded() { access.unlockWithBiometrics() }
 
     func handleApplicationBecameActive() {
         refreshBiometricAvailability()
         foregroundSequence += 1
         refreshBiometricSigningAvailability(warningSequence: foregroundSequence)
-        promptBiometricUnlockIfNeeded()
     }
 
-    var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
-
-    func refreshBiometricAvailability() {
-        isBiometricUnlockAvailable = biometricAuthenticator.isAvailable
-    }
+    var isBiometricUnlockEnabled: Bool { access.biometricEnabled }
+    var shouldPromptBiometricUnlock: Bool { access.shouldPromptBiometrics }
+    func refreshBiometricAvailability() { access.refreshBiometrics() }
 
     var isBiometricSigningAvailable: Bool {
         biometricSigningAvailability == .available
@@ -618,9 +567,6 @@ class WalletViewModel: ObservableObject {
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
     private var identityDocumentRegistrationTask: Task<Void, Never>?
     private var identityDocumentRegistrationNeedsUpdate = false
-    private let pinStore: DemoPinStore
-    private let biometricAuthenticator: any DemoBiometricAuthenticator
-    private var biometricPromptConsumed = false
 
     init(
         walletID: String = "default",
@@ -711,18 +657,30 @@ class WalletViewModel: ObservableObject {
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
             try await Self.defaultIdentityDocumentRegistrationUpdate()
         }
-        self.pinStore = pinStore ?? (
+        let accessStore = pinStore ?? (
             walletClient == nil
                 ? UserDefaultsDemoPinStore(walletID: walletID)
                 : InMemoryDemoPinStore()
         )
-        self.biometricAuthenticator = biometricAuthenticator ?? (
+        let accessBiometrics = biometricAuthenticator ?? (
             walletClient == nil
                 ? LocalAuthenticationBiometricAuthenticator()
                 : UnavailableDemoBiometricAuthenticator()
         )
+        self.access = WalletAccessController(store: accessStore, biometrics: accessBiometrics)
         transactionDataProfilesWarning = transactionDataProfiles.warning
-        auth = self.pinStore.hasPin ? .login : .setup
+        access.beforeSetupSave = { [weak self] in
+            guard let self else { return }
+            let selection = self.signingProtectionMode.resolve(self.selectedSigningProtection)
+            self.signingProtectionStore.save(selection)
+            self.selectedSigningProtection = selection
+        }
+        access.onUnlocked = { [weak self] in
+            guard let self else { return }
+            showBiometricSigningWarningIfNeeded(warningSequence: foregroundSequence > 0 ? foregroundSequence : nil)
+            bootstrapIfNeeded()
+        }
+        accessObservation = access.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         refreshBiometricAvailability()
         refreshBiometricSigningAvailability()
     }
@@ -822,53 +780,82 @@ class WalletViewModel: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
-        resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
-        switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
-        case .credentialOffer:
-            receiveTask?.cancel()
-            paymentConsentTask?.cancel()
-            presentationTask?.cancel()
-            cancelIssuanceIfPresent()
-            discardPresentationPreviewIfPresent()
-            selectedTab = .receive
-            offerUrl = url.absoluteString
-            offerPreview = nil
-            lastReceivedCredentialIDs = []
-            receiveCompleted = false
-            receiveNavigationResetKey += 1
-            presentationReview = nil
-            selectedPresentationCredentialOptions = []
-            selectedPresentationDisclosureOptions = []
-            presentationCompleted = false
-            clearPendingPresentationContinuation()
-            presentationNavigationResetKey += 1
-            resetFlowStatusForIncomingURL()
-        case .presentationRequest:
-            receiveTask?.cancel()
-            paymentConsentTask?.cancel()
-            presentationTask?.cancel()
-            cancelIssuanceIfPresent()
-            discardPresentationPreviewIfPresent()
-            selectedTab = .present
-            presentationRequestUrl = url.absoluteString
-            txCode = ""
-            offerPreview = nil
-            lastReceivedCredentialIDs = []
-            receiveCompleted = false
-            receiveNavigationResetKey += 1
-            presentationReview = nil
-            selectedPresentationCredentialOptions = []
-            selectedPresentationDisclosureOptions = []
-            presentationCompleted = false
-            clearPendingPresentationContinuation()
-            presentationNavigationResetKey += 1
-            resetFlowStatusForIncomingURL()
-        case .authorizationCallback:
-            continueAuthorization(callbackURI: url)
+        switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
+        case .credentialOffer: openResolvedLink(url, kind: .offer)
+        case .presentationRequest: openResolvedLink(url, kind: .presentation)
+        case .authorizationCallback: continueAuthorization(callbackURI: url)
         case nil:
-            break
+            if WalletLinkKind.classify(url.absoluteString) == .authorizationCallback {
+                continueAuthorization(callbackURI: url)
+            }
         }
+    }
+
+    /// Resolved scanner and external links enter the same authenticated task sheet.
+    func openResolvedLink(_ url: URL, kind: WalletLinkKind) {
+        if kind == .authorizationCallback { continueAuthorization(callbackURI: url); return }
+        let flowKind: WalletExternalFlow.Kind
+        switch kind {
+        case .offer: flowKind = .offer
+        case .presentation: flowKind = .presentation
+        default: return
+        }
+        if externalFlow?.url == url { return }
+        guard canAcceptExternalRequest && !proximityPresentation.active else {
+            incomingLinkNotice = "Finish the current operation before opening another link."
+            return
+        }
+        resetInputFocus()
+        receiveTask?.cancel()
+        paymentConsentTask?.cancel()
+        presentationTask?.cancel()
+        cancelIssuanceIfPresent()
+        discardPresentationPreviewIfPresent()
+        selectedTab = flowKind == .offer ? .receive : .present
+        offerUrl = flowKind == .offer ? url.absoluteString : ""
+        presentationRequestUrl = flowKind == .presentation ? url.absoluteString : ""
+        txCode = ""
+        offerPreview = nil
+        lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
+        receiveCompleted = false
+        receiveNavigationResetKey += 1
+        presentationReview = nil
+        selectedPresentationCredentialOptions = []
+        selectedPresentationDisclosureOptions = []
+        presentationCompleted = false
+        clearPendingPresentationContinuation()
+        presentationNavigationResetKey += 1
+        resetFlowStatusForIncomingURL()
+        externalFlow = .pending(url, flowKind)
+    }
+
+    private var canAcceptExternalRequest: Bool {
+        !flowIsCommitting && pendingPresentationContinuationURL == nil && pendingPresentationFormPostHTML == nil
+    }
+
+    var canDismissExternalFlow: Bool {
+        canAcceptExternalRequest && !isAuthenticating && identityScreen?.busy != true
+    }
+
+    func prepareExternalFlow() {
+        guard case let .pending(url, kind) = externalFlow, auth == .unlocked, isReady, !isLoading else { return }
+        externalFlow = .active(url, kind)
+        switch kind {
+        case .offer: previewOffer()
+        case .presentation: previewPresentation()
+        }
+    }
+
+    @discardableResult func closeExternalFlow() -> Bool {
+        guard externalFlow != nil, canDismissExternalFlow else { return false }
+        externalFlow = nil
+        incomingLinkNotice = nil
+        startNewReceiveFlow()
+        startNewPresentationFlow()
+        selectedTab = .credentials
+        return true
     }
 
     func startNewReceiveFlow() {
@@ -880,6 +867,7 @@ class WalletViewModel: ObservableObject {
         offerPreview = nil
         authorizationRequestURL = nil
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         receiveNavigationResetKey += 1
         isLoading = false
@@ -988,7 +976,7 @@ class WalletViewModel: ObservableObject {
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
 
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 let selections = try issuanceSelections(session.offer)
@@ -1032,7 +1020,9 @@ class WalletViewModel: ObservableObject {
         txCode = ""
         receiveCompleted = false
         receiveNavigationResetKey += 1
-        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
+        externalFlow = nil
+        selectedTab = .credentials
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .credentials)
         if let sessionID {
             Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
         }
@@ -1043,6 +1033,14 @@ class WalletViewModel: ObservableObject {
     }
 
     private func continueAuthorization(callbackURI: URL) {
+        guard canAcceptExternalRequest else { return }
+        if issuanceSession == nil {
+            if !proximityPresentation.active && externalFlow == nil && !isLoading && offerPreview == nil && presentationReview == nil {
+                externalFlow = .unavailableCallback(callbackURI)
+                selectedTab = .receive
+            }
+            return
+        }
         guard let session = issuanceSession,
               let preview = offerPreview,
               preview.grant == .authorizationCode else { return }
@@ -1051,7 +1049,7 @@ class WalletViewModel: ObservableObject {
             navigationResetKey: receiveNavigationResetKey
         )
         let previousCredentials = credentials
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 try await completeIssuanceOutcome(
@@ -1073,12 +1071,16 @@ class WalletViewModel: ObservableObject {
     }
 
     private func completeIssuanceOutcome(
-        _ outcome: IssuanceOutcome,
+        _ rawOutcome: IssuanceOutcome,
         previousCredentials: [Credential],
         request: ReceiveRequest
     ) async throws {
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
+        let outcome = try await refreshContinuations(rawOutcome)
+        try Task.checkCancellation()
+        guard isCurrent(request) else { return }
+        let issuer = offerPreview?.issuer
         let credentialIDs: [String]
         switch outcome {
         case let .stored(_, ids):
@@ -1088,9 +1090,11 @@ class WalletViewModel: ObservableObject {
             offerPreview = nil
             authorizationRequestURL = nil
             deferredCredentials = (deferredCredentials + deferred).reduce(into: [DeferredCredential]()) { result, credential in
-                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+                if let index = result.firstIndex(where: { $0.id == credential.id }) { result[index] = credential }
+                else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
+            issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(deferred.map(\.id)))
             receiveCompleted = false
             if !storedIDs.isEmpty {
                 let refreshed = try await walletClient.credentials()
@@ -1112,10 +1116,13 @@ class WalletViewModel: ObservableObject {
             return
         case let .failed(_, error, storedIDs, pending):
             deferredCredentials = (deferredCredentials + pending).reduce(into: []) { result, credential in
-                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+                if let index = result.firstIndex(where: { $0.id == credential.id }) { result[index] = credential }
+                else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
-            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty {
+            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty ||
+                [.invalidSession, .remoteOutcomeUncertain, .storageOutcomeUncertain].contains(error.code) {
+                issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(pending.map(\.id)), problem: error)
                 issuanceSession = nil
                 offerPreview = nil
                 authorizationRequestURL = nil
@@ -1131,7 +1138,14 @@ class WalletViewModel: ObservableObject {
         }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
-        let refreshedCredentials = try await walletClient.credentials()
+        var detailsError: String? = nil
+        let refreshedCredentials: [Credential]
+        do { refreshedCredentials = try await walletClient.credentials() }
+        catch is CancellationError { throw CancellationError() }
+        catch {
+            refreshedCredentials = credentials
+            detailsError = WalletStatusText.receivedCredentialsUnavailable
+        }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
         let receivedCredentialIDs = Self.resolvedReceivedCredentialIDs(
@@ -1139,14 +1153,13 @@ class WalletViewModel: ObservableObject {
             previousCredentials: previousCredentials,
             refreshedCredentials: refreshedCredentials
         )
-        let refreshedCredentialIDs = Set(refreshedCredentials.map(\.id))
-        let displayableReceivedCredentialIDs = receivedCredentialIDs.filter { refreshedCredentialIDs.contains($0) }
-        guard !displayableReceivedCredentialIDs.isEmpty else {
+        guard !receivedCredentialIDs.isEmpty else {
             credentials = refreshedCredentials
             issuanceSession = nil
             offerPreview = nil
             authorizationRequestURL = nil
             lastReceivedCredentialIDs = []
+            issuanceReceipt = nil
             receiveCompleted = false
             setError(
                 WalletStatusText.failure(
@@ -1163,13 +1176,14 @@ class WalletViewModel: ObservableObject {
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
-        lastReceivedCredentialIDs = displayableReceivedCredentialIDs
+        lastReceivedCredentialIDs = receivedCredentialIDs
+        issuanceReceipt = IssuanceReceipt(issuer: issuer, detailsError: detailsError)
         self.txCode = ""
         offerUrl = ""
-        receiveCompleted = false
+        receiveCompleted = issuanceReceiptComplete
         receiveNavigationResetKey += 1
-        selectedTab = .credentials
-        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .credentials)
+        selectedTab = .receive
+        setSuccess(WalletStatusText.receivedCredentials(receivedCredentialIDs.count), tab: selectedTab)
     }
 
     func updateTxCode(_ value: String) {
@@ -1177,17 +1191,32 @@ class WalletViewModel: ObservableObject {
     }
 
     func resumeDeferredCredential(_ credential: DeferredCredential) {
-        guard !isLoading, deferredCredentials.contains(where: { $0.id == credential.id }) else { return }
+        guard !isLoading, let retained = deferredCredentials.first(where: { $0.id == credential.id }), retained.canResume else { return }
+        let priorReceipt = issuanceReceipt.flatMap { $0.pendingIDs.contains(credential.id) ? $0 : nil }
+        let priorIDs = priorReceipt == nil ? [] : lastReceivedCredentialIDs
+        func receipt(_ pending: [DeferredCredential], problem: IssuanceFailure? = nil) -> IssuanceReceipt {
+            IssuanceReceipt(issuer: priorReceipt?.issuer,
+                pendingIDs: (priorReceipt?.pendingIDs ?? []).subtracting([credential.id]).union(pending.map(\.id)),
+                problem: priorReceipt?.problem ?? problem)
+        }
+        func receivedIDs(_ ids: [String]) -> [String] { (priorIDs + ids).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } }
         let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
-                let outcome = try await walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id)
+                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id), resumingID: credential.id)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 switch outcome {
                 case let .stored(_, credentialIDs):
-                    let refreshedCredentials = try await walletClient.credentials()
+                    var detailsError: String? = nil
+                    let refreshedCredentials: [Credential]
+                    do { refreshedCredentials = try await walletClient.credentials() }
+                    catch is CancellationError { throw CancellationError() }
+                    catch {
+                        refreshedCredentials = credentials
+                        detailsError = WalletStatusText.receivedCredentialsUnavailable
+                    }
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     credentials = refreshedCredentials
@@ -1195,13 +1224,16 @@ class WalletViewModel: ObservableObject {
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     deferredCredentials.removeAll { $0.id == credential.id }
-                    lastReceivedCredentialIDs = credentialIDs
-                    receiveCompleted = false
+                    lastReceivedCredentialIDs = receivedIDs(credentialIDs)
+                    let originalReceipt = receipt([])
+                    issuanceReceipt = IssuanceReceipt(issuer: originalReceipt.issuer, pendingIDs: originalReceipt.pendingIDs,
+                        problem: originalReceipt.problem, detailsError: detailsError)
+                    receiveCompleted = issuanceReceiptComplete
                     if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
                         offerUrl = ""
                         receiveNavigationResetKey += 1
-                        selectedTab = .credentials
-                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .credentials)
+                        selectedTab = .receive
+                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: selectedTab)
                     } else {
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
                     }
@@ -1212,17 +1244,20 @@ class WalletViewModel: ObservableObject {
                         guard isCurrent(request) else { return }
                         credentials = refreshed
                     }
-                    lastReceivedCredentialIDs = storedIDs
+                    lastReceivedCredentialIDs = receivedIDs(storedIDs)
+                    issuanceReceipt = receipt(pending)
                     deferredCredentials.removeAll { $0.id == credential.id }
                     deferredCredentials.append(contentsOf: pending)
                     setSuccess(WalletStatusText.issuanceProgress(saved: storedIDs.count, pending: pending.count), tab: .receive)
                 case .cancelled:
+                    issuanceReceipt = receipt([])
                     deferredCredentials.removeAll { $0.id == credential.id }
                     setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
                 case let .failed(_, error, storedIDs, pending):
                     deferredCredentials.removeAll { $0.id == credential.id }
                     deferredCredentials.append(contentsOf: pending)
-                    lastReceivedCredentialIDs = storedIDs
+                    lastReceivedCredentialIDs = receivedIDs(storedIDs)
+                    issuanceReceipt = receipt(pending, problem: error)
                     if !storedIDs.isEmpty {
                         let refreshed = try await walletClient.credentials()
                         try Task.checkCancellation()
@@ -1237,6 +1272,40 @@ class WalletViewModel: ObservableObject {
                 if isCurrent(request) {
                     setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
                 }
+            }
+        }
+    }
+
+    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: String? = nil) async throws -> IssuanceOutcome {
+        guard outcome.hasPendingCredentials else { return outcome }
+        do { return outcome.withContinuations(try await walletClient.listDeferredIssuance(), resumingID: resumingID) }
+        catch is CancellationError { throw CancellationError() }
+        // A status-read failure must not discard an already completed issuance result.
+        catch { return outcome.withContinuations([], resumingID: resumingID) }
+    }
+
+    /// Refresh local state only; this never polls the issuer or takes over another writer.
+    func refreshIssuanceStatus() {
+        guard !isLoading else { return }
+        let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
+        setLoading("Refreshing receiving status…", tab: .receive)
+        receiveTask = Task {
+            do {
+                let pending = try await walletClient.listDeferredIssuance()
+                let refreshed = try await walletClient.credentials()
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                credentials = refreshed
+                deferredCredentials = pending
+                if let receipt = issuanceReceipt {
+                    issuanceReceipt = IssuanceReceipt(issuer: receipt.issuer,
+                        pendingIDs: receipt.pendingIDs.intersection(pending.map(\.id)), problem: receipt.problem)
+                }
+                receiveCompleted = issuanceReceiptComplete
+                setSuccess("Receiving status updated", tab: .receive)
+            } catch is CancellationError { return }
+            catch {
+                if isCurrent(request) { setError(WalletStatusText.failure("Could not refresh receiving status", error), tab: .receive) }
             }
         }
     }
@@ -1260,32 +1329,6 @@ class WalletViewModel: ObservableObject {
     private struct ReceiveRequest {
         let offerURL: String
         let navigationResetKey: Int
-    }
-
-    func presentCredential() {
-        resetInputFocus()
-        let trimmedRequestUrl = presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let request = URL(string: trimmedRequestUrl) else {
-            setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.invalidRequestURL), tab: .present)
-            return
-        }
-
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
-        Task {
-            do {
-                let result = try await walletClient.present(
-                    request: request,
-                    did: did.isEmpty ? nil : did
-                )
-                handlePresentationResult(
-                    result,
-                    successMessage: WalletStatusText.presentationSent,
-                    failureMessage: WalletStatusText.presentationFinishedWithoutVerifierConfirmation
-                )
-            } catch {
-                setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
-            }
-        }
     }
 
     func previewPresentation() {
@@ -1400,7 +1443,7 @@ class WalletViewModel: ObservableObject {
         let selectedDid = did.isEmpty ? nil : did
 
         let consentRevision = paymentReview.consent?.revision
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
+        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.submitPresentation(
@@ -1422,6 +1465,7 @@ class WalletViewModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 resetPresentationToEntry()
+                presentationCompleted = true
                 setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
             }
         }
@@ -1439,7 +1483,7 @@ class WalletViewModel: ObservableObject {
             isReportingError = false
         }
 
-        setLoading(WalletStatusText.decliningPresentation, tab: .present)
+        setLoading(WalletStatusText.decliningPresentation, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.rejectPresentation(previewHandle: previewHandle)
@@ -1457,6 +1501,7 @@ class WalletViewModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 resetPresentationToEntry()
+                presentationCompleted = true
                 setError(WalletStatusText.failure(WalletStatusText.rejectFailed, error), tab: .present)
             }
         }
@@ -1468,6 +1513,7 @@ class WalletViewModel: ObservableObject {
 
     private func finishSuccessfulPresentation() {
         resetPresentationToEntry()
+        presentationCompleted = true
     }
 
     private func resetPresentationToEntry() {
@@ -1500,6 +1546,7 @@ class WalletViewModel: ObservableObject {
         guard pendingPresentationSuccessMessage != nil else { return }
         clearPendingPresentationContinuation()
         resetPresentationToEntry()
+        presentationCompleted = true
         setError(
             WalletStatusText.failure(WalletStatusText.presentationContinuationFailed, reason),
             tab: .present
@@ -1514,7 +1561,7 @@ class WalletViewModel: ObservableObject {
         clearPendingPresentationContinuation()
         switch result {
         case .transmitted(.failed):
-            presentationCompleted = false
+            presentationCompleted = true
             setError(failureMessage, tab: .present)
         case .prepared(.openURL(let url)):
             pendingPresentationSuccessMessage = successMessage
@@ -1588,60 +1635,7 @@ class WalletViewModel: ObservableObject {
         bootstrap(signingProtection: selectedSigningProtection)
     }
 
-    private func submitSetupPin() {
-        guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4To8Digits
-            return
-        }
-        guard pin == pinConfirmation else {
-            pinError = WalletStatusText.pinConfirmationDoesNotMatch
-            return
-        }
-        isAuthenticating = true
-        pinError = nil
-        Task {
-            let selection = signingProtectionMode.resolve(selectedSigningProtection)
-            do {
-                signingProtectionStore.save(selection)
-                selectedSigningProtection = selection
-                try await pinStore.setPin(pin)
-                pinStore.isBiometricUnlockEnabled = useBiometrics
-                isAuthenticating = false
-                auth = .unlocked
-                bootstrapIfNeeded()
-            } catch {
-                isAuthenticating = false
-                pinError = "PIN could not be saved"
-            }
-        }
-    }
-
-    private func submitLoginPin() {
-        guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4To8Digits
-            return
-        }
-        isAuthenticating = true
-        pinError = nil
-        Task {
-            let matches = await pinStore.verifyPin(pin)
-            isAuthenticating = false
-            guard auth == .login else { return }
-            if matches {
-                auth = .unlocked
-                showBiometricSigningWarningIfNeeded(
-                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
-                )
-                bootstrapIfNeeded()
-            } else {
-                pinError = WalletStatusText.wrongPin
-            }
-        }
-    }
-
-    private static func isValidPin(_ pin: String) -> Bool {
-        pin.range(of: #"^\d{4,8}$"#, options: .regularExpression) != nil
-    }
+    static let pinLength = WalletAccessController.pinLength
 
     private func bootstrap(signingProtection: WalletDemoSigningProtection) {
         setLoading(WalletStatusText.bootstrappingWallet)
@@ -1664,7 +1658,7 @@ class WalletViewModel: ObservableObject {
         requiredAppliedSigningProtection: WalletDemoSigningProtection? = nil
     ) async throws {
         if let service = try await walletClient.signingIdentityManager() {
-            let model = identityScreen ?? WalletIdentityScreenModel(service: service) { [weak self] in
+            let model = identityScreen ?? WalletIdentityScreenModel(service: service, preferredAuthorization: signingProtection.authorizationPolicy) { [weak self] in
                 guard let self else { return }
                 self.bootstrap(signingProtection: self.selectedSigningProtection)
             }
@@ -1775,6 +1769,8 @@ class WalletViewModel: ObservableObject {
     }
 
     private func clearWalletState() {
+        externalFlow = nil
+        selectedTab = .credentials
         did = ""
         keyID = ""
         publicJWK = ""
@@ -1790,6 +1786,7 @@ class WalletViewModel: ObservableObject {
         selectedPresentationDisclosureOptions = []
         deferredCredentials = []
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         presentationCompleted = false
         pendingPresentationContinuationURL = nil
@@ -1839,7 +1836,8 @@ class WalletViewModel: ObservableObject {
         )
     }
 
-    private func setLoading(_ message: String, tab: WalletTab? = nil) {
+    private func setLoading(_ message: String, tab: WalletTab? = nil, committing: Bool = false) {
+        flowIsCommitting = committing
         isLoading = true
         isError = false
         statusTab = tab
@@ -1850,6 +1848,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setSuccess(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = false
         statusTab = tab
@@ -1865,10 +1864,8 @@ class WalletViewModel: ObservableObject {
         previousCredentials: [Credential],
         refreshedCredentials: [Credential]
     ) -> [String] {
-        let refreshedIDs = Set(refreshedCredentials.map(\.id))
-        let returnedResolvedIDs = returnedCredentialIDs.filter { refreshedIDs.contains($0) }
-        if !returnedResolvedIDs.isEmpty {
-            return returnedResolvedIDs
+        if !returnedCredentialIDs.isEmpty {
+            return returnedCredentialIDs.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
         }
 
         let previousIDs = Set(previousCredentials.map(\.id))
@@ -1879,6 +1876,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setError(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = true
         statusTab = tab
@@ -1926,7 +1924,7 @@ class WalletViewModel: ObservableObject {
 
     private func statusBanner(for tab: WalletTab) -> WalletStatusBannerModel? {
         let message = statusMessage(for: tab)
-        guard !message.isEmpty else { return nil }
+        guard !message.isEmpty, message != WalletStatusText.walletReady else { return nil }
         let kind: WalletStatusKind
         if statusIsError(for: tab) {
             kind = .error

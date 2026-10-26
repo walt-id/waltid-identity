@@ -51,6 +51,10 @@ kotlin {
                 }
             }
 
+            val mobileTest = create("mobileTest") {
+                dependsOn(commonTest.get())
+            }
+
             if (enableAndroidBuild) {
                 androidMain {
                     dependsOn(mobileMain)
@@ -65,11 +69,14 @@ kotlin {
                     implementation(identityLibs.bouncycastle.prov)
                 }
 
-                getByName("androidHostTest").dependencies {
-                    implementation(kotlin("test"))
-                    implementation(identityLibs.junit)
-                    implementation(identityLibs.robolectric)
-                    implementation(identityLibs.kotlinx.coroutines.test)
+                getByName("androidHostTest") {
+                    dependsOn(mobileTest)
+                    dependencies {
+                        implementation(kotlin("test"))
+                        implementation(identityLibs.junit)
+                        implementation(identityLibs.robolectric)
+                        implementation(identityLibs.kotlinx.coroutines.test)
+                    }
                 }
 
                 getByName("androidDeviceTest").dependencies {
@@ -88,6 +95,10 @@ kotlin {
                 iosMain.dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
                     implementation(identityLibs.ktor.client.darwin)
+                }
+
+                iosTest {
+                    dependsOn(mobileTest)
                 }
             }
         }

@@ -1,0 +1,40 @@
+package id.walt.walletdemo.compose.ui
+
+import android.app.UiModeManager
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.platform.LocalContext
+
+@Composable
+internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
+    val motion = rememberCoroutineScope().coroutineContext[MotionDurationScale]
+    val context = LocalContext.current
+    val manager = remember(context) { context.getSystemService(UiModeManager::class.java) }
+    val accessibility = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
+    var screenReader by remember(accessibility) { mutableStateOf(accessibility?.isTouchExplorationEnabled == true) }
+    DisposableEffect(accessibility) {
+        val listener = AccessibilityManager.TouchExplorationStateChangeListener { screenReader = it }
+        accessibility?.addTouchExplorationStateChangeListener(listener)
+        onDispose { accessibility?.removeTouchExplorationStateChangeListener(listener) }
+    }
+    var contrast by remember(manager) { mutableStateOf(if (Build.VERSION.SDK_INT >= 34) manager?.contrast ?: 0f else 0f) }
+    DisposableEffect(manager, context) {
+        if (Build.VERSION.SDK_INT >= 34 && manager != null) {
+            val listener = UiModeManager.ContrastChangeListener { contrast = it }
+            manager.addContrastChangeListener(context.mainExecutor, listener)
+            onDispose { manager.removeContrastChangeListener(listener) }
+        } else onDispose {}
+    }
+    // Keep older RenderNode invalidation workarounds out of the scrolling footer.
+    // Older devices use a translucent scrim without a RenderNode blur pipeline.
+    return WalletVisualPreferences(reduceMotion = motion?.scaleFactor == 0f,
+        opaqueControls = contrast >= .5f, screenReaderEnabled = screenReader, blurSupported = Build.VERSION.SDK_INT >= 33)
+}

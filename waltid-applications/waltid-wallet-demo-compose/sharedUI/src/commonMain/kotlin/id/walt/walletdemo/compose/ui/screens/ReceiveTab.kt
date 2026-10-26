@@ -1,47 +1,45 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.receivedCredentials
+import id.walt.walletdemo.compose.logic.issuanceReceiptComplete
+import id.walt.walletdemo.compose.logic.missingReceivedCredentialIds
+import id.walt.walletdemo.compose.ui.components.*
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.acceptOfferEnabled
 import id.walt.walletdemo.compose.logic.offerReviewEnabled
-import id.walt.walletdemo.compose.logic.receiveActionEnabled
-import id.walt.walletdemo.compose.logic.receiveUrlEntryEnabled
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.OfferReviewActions
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
-import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
 internal fun ReceiveTab(
     state: WalletDemoUiState,
     requestDrafts: WalletRequestDrafts,
-    onOfferUrlChange: (String) -> Unit,
     onTxCodeChange: (String) -> Unit,
     onCopiesChange: (String, Int) -> Unit,
     onPreviewOffer: () -> Unit,
     onAcceptOffer: () -> Unit,
     onDeclineOffer: () -> Unit,
     onResumeDeferred: (String) -> Unit,
+    onDone: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = !LocalWalletSheet.current,
+    feedback: (@Composable () -> Unit)? = null,
 ) {
     val preview = state.offerPreview
     if (preview != null) {
         ReviewScaffold(
+            fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
             actions = {
                 OfferReviewActions(
@@ -53,6 +51,7 @@ internal fun ReceiveTab(
                 )
             },
         ) {
+            feedback?.invoke()
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,
@@ -65,49 +64,34 @@ internal fun ReceiveTab(
                 onDecline = onDeclineOffer,
                 showActions = false,
             )
-            DeferredCredentials(state, onResumeDeferred)
         }
         return
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(WalletUiTestTags.ReceiveTabContent)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        UrlActionSection(
-            title = "Receive",
-            value = requestDrafts.offerUrl,
-            onValueChange = onOfferUrlChange,
-            label = "Credential offer URL",
-            buttonText = "Receive",
-            enabled = state.receiveActionEnabled,
-            inputEnabled = state.receiveUrlEntryEnabled,
-            inputTestTag = WalletUiTestTags.OfferInput,
-            buttonTestTag = WalletUiTestTags.ReceiveButton,
-            scanButtonTestTag = WalletUiTestTags.OfferScanButton,
-            onClick = onPreviewOffer,
-        )
-        DeferredCredentials(state, onResumeDeferred)
-    }
-}
-
-@Composable
-private fun DeferredCredentials(
-    state: WalletDemoUiState,
-    onResumeDeferred: (String) -> Unit,
-) {
-    if (state.deferredCredentials.isEmpty()) return
-    Text("Pending credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-    state.deferredCredentials.forEach { pending ->
-        OutlinedButton(
-            onClick = { onResumeDeferred(pending.id) },
-            enabled = !state.isAuthenticating,
-        ) {
-            Text("Check ${pending.credentialConfigurationId ?: "credential"}")
+    if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
+        val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
+        val missingDetails = state.missingReceivedCredentialIds().isNotEmpty() || state.issuanceReceipt?.detailsError != null
+        val dismissal = rememberSuccessDismissal(state.receiveNavigationResetKey,
+            enabled = state.receiveCompleted && !state.isBusy && state.issuanceReceiptComplete() && pending.isEmpty()
+                && state.operation is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded
+                && state.receivedCredentials().isNotEmpty(), onDone = onDone)
+        ReviewScaffold(fillViewport = fillViewport,
+            modifier = modifier.then(dismissal).testTag(WalletUiTestTags.ReceiveTabContent), actions = {
+            WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
+                enabled = !state.isBusy, testTag = "issuance-done"),
+                secondary = if (pending.isNotEmpty() || missingDetails) {
+                    WalletAction(stringResource(Res.string.issuance_refresh_status), onRefresh,
+                        enabled = !state.isBusy, testTag = "issuance-refresh")
+                } else null)
+        }) {
+            feedback?.invoke()
+            IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred,
+                missingSavedCount = state.missingReceivedCredentialIds().size)
         }
+        return
     }
+
+    WalletRequestStatus(state, onRetry = onPreviewOffer,
+        retryEnabled = !state.isBusy && requestDrafts.offerUrl.isNotBlank(),
+        modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), fillViewport = fillViewport)
 }

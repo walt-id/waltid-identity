@@ -156,6 +156,8 @@ internal data class DeferredCredentialHandleDto(
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
+    val status: String? = null,
+    val displayMetadataJson: String? = null,
 )
 
 @Serializable
@@ -364,6 +366,7 @@ internal data class PreviewCredentialDisclosureDto(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    val requested: Boolean = true,
 )
 
 @Serializable
@@ -417,13 +420,6 @@ internal data class RejectPresentationRequestDto(
     val requestUrl: String,
     val errorCode: String? = null,
     val errorDescription: String? = null,
-)
-
-@Serializable
-internal data class PresentCredentialRequestDto(
-    val requestUrl: String,
-    val did: String? = null,
-    val keyId: String? = null,
 )
 
 @Serializable

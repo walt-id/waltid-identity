@@ -43,7 +43,7 @@ def run_phase(phase, command, output_dir):
     previous_handlers = {sig: signal.signal(sig, cancel) for sig in (signal.SIGINT, signal.SIGTERM)}
     exit_code = 1
     try:
-        print(f"iOS phase {phase}: started; output: {output_dir / (phase + '.log')}", flush=True)
+        print(f"CI phase {phase}: started; output: {output_dir / (phase + '.log')}", flush=True)
         with (output_dir / f"{phase}.log").open("w") as log:
             process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             while process.poll() is None:
@@ -57,7 +57,7 @@ def run_phase(phase, command, output_dir):
             if exit_code < 0:
                 exit_code = 128 - exit_code
     except OSError as error:
-        print(f"iOS phase {phase}: could not start command: {error}", flush=True)
+        print(f"CI phase {phase}: could not start command: {error}", flush=True)
     finally:
         if received_signal is not None:
             # Also clean up descendants if the direct child exited before its children.
@@ -70,7 +70,7 @@ def run_phase(phase, command, output_dir):
             exit_code=exit_code, status="cancelled" if received_signal else "completed",
         )
         metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
-        print(f"iOS phase {phase}: exit {exit_code}, {metadata['elapsed_seconds']}s", flush=True)
+        print(f"CI phase {phase}: exit {exit_code}, {metadata['elapsed_seconds']}s", flush=True)
     return exit_code
 
 

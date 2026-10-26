@@ -228,6 +228,23 @@ Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
 
+### Live review galleries
+
+`mobile-e2e-fixtures/wallet-gallery-drivers.json` registers the basic public-demo
+issuance and presentation journey for Compose Android, Compose iOS and native iOS.
+The playbook's `waltid-wallet-live-gallery` runner checks this contract against the
+selected clean product commit before running a gallery. Other scenarios require
+their own registered capture points before they can be selected.
+
+Gallery capture is opt-in: Android accepts `walletGalleryCapture=true` and a fresh
+32-character hex `walletGalleryRunId` as instrumentation arguments; iOS accepts
+`WALLET_GALLERY_CAPTURE=1` in the test runner environment. Captures follow the
+existing review-state assertions and retain the journey's backend verification.
+Request provenance contains SHA-256 digests rather than replayable request URLs.
+Normal E2E runs do not emit these gallery attachments. Store additional captures
+in ignored reports and PR user attachments; committed visual expectations remain
+the deterministic reference gallery.
+
 For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
 terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
 Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,

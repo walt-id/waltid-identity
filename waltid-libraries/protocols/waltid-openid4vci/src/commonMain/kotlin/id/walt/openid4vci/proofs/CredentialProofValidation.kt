@@ -13,7 +13,9 @@ internal fun validateCredentialProofRequest(
         if (configuration.proofTypesSupported != null) throw invalidCredentialProof("Credential request is missing proofs")
         return null
     }
-    val collection = try { proofs.normalized() } catch (e: IllegalArgumentException) {
+    val collection = try {
+        proofs.normalized()
+    } catch (e: IllegalArgumentException) {
         throw invalidCredentialProof(e.message ?: "Invalid credential proofs", e)
     }
     val supported = configuration.proofTypesSupported
@@ -23,8 +25,10 @@ internal fun validateCredentialProofRequest(
     }
     val maximumCount = context?.batchCredentialIssuance?.batchSize ?: 1
     if (collection.values.size > maximumCount) {
-        throw CredentialProofValidationException(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-            "Credential proof count exceeds the maximum batch size $maximumCount")
+        throw CredentialProofValidationException(
+            CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+            "Credential proof count exceeds the maximum batch size $maximumCount"
+        )
     }
     return collection
 }

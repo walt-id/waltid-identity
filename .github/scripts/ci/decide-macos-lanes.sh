@@ -17,9 +17,13 @@ write_outputs() {
   echo "run-enterprise=${RUN_ENTERPRISE}" >> "$GITHUB_OUTPUT"
   echo "run-sdk-docs=${RUN_SDK_DOCS}" >> "$GITHUB_OUTPUT"
 
-  if [[ "$RUN_IOS_SIMULATOR" == "true" || "$RUN_NATIVE" == "true" || "$RUN_COMPOSE" == "true" || "$RUN_ENTERPRISE" == "true" || "$RUN_SDK_DOCS" == "true" ]]; then
+  if [[ "$RUN_IOS_SIMULATOR" == "true" || "$RUN_NATIVE" == "true" || "$RUN_COMPOSE" == "true" || "$RUN_ENTERPRISE" == "true" || "$RUN_SDK_DOCS" == "true" || "$RUN_VISUAL_COMPOSE" == "true" || "$RUN_VISUAL_NATIVE" == "true" ]]; then
     should_run="true"
   fi
+  echo "run-visual-android=${RUN_VISUAL_ANDROID}" >> "$GITHUB_OUTPUT"
+  echo "run-visual-compose=${RUN_VISUAL_COMPOSE}" >> "$GITHUB_OUTPUT"
+  echo "run-visual-native=${RUN_VISUAL_NATIVE}" >> "$GITHUB_OUTPUT"
+  echo "run-visual-browser=${RUN_VISUAL_BROWSER}" >> "$GITHUB_OUTPUT"
   echo "should-run=${should_run}" >> "$GITHUB_OUTPUT"
   echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
   echo "macOS lane eligibility: simulator=${RUN_IOS_SIMULATOR} native=${RUN_NATIVE} compose=${RUN_COMPOSE} enterprise=${RUN_ENTERPRISE} sdk-docs=${RUN_SDK_DOCS}"
@@ -32,6 +36,10 @@ set_all_lanes() {
   RUN_COMPOSE="$1"
   RUN_ENTERPRISE="$1"
   RUN_SDK_DOCS="$1"
+  RUN_VISUAL_ANDROID="$1"
+  RUN_VISUAL_COMPOSE="$1"
+  RUN_VISUAL_NATIVE="$1"
+  RUN_VISUAL_BROWSER="$1"
 }
 
 label_match() {
@@ -41,9 +49,12 @@ label_match() {
       . as $pr_labels
       | {
           force_all: any($force_all[]; . as $force_label | ($pr_labels | index($force_label)) != null),
+          visuals: (($pr_labels | index("ci:visual")) != null),
           docs: (($pr_labels | index($docs_label)) != null)
         }
       | if .force_all then "force_all"
+        elif .visuals and .docs then "visuals_docs"
+        elif .visuals then "visuals"
         elif .docs then "docs"
         else "none"
         end
@@ -55,6 +66,10 @@ RUN_NATIVE="false"
 RUN_COMPOSE="false"
 RUN_ENTERPRISE="false"
 RUN_SDK_DOCS="false"
+RUN_VISUAL_ANDROID="false"
+RUN_VISUAL_COMPOSE="false"
+RUN_VISUAL_NATIVE="false"
+RUN_VISUAL_BROWSER="false"
 REASON=""
 
 case "$EVENT_NAME" in
@@ -98,6 +113,18 @@ case "$EVENT_NAME" in
         write_outputs
         exit 0
         ;;
+      visuals|visuals_docs)
+        RUN_VISUAL_ANDROID="true"
+        RUN_VISUAL_COMPOSE="true"
+        RUN_VISUAL_NATIVE="true"
+        RUN_VISUAL_BROWSER="true"
+        [[ "$matched_labels" != visuals_docs ]] || RUN_SDK_DOCS="true"
+        if [[ "$PR_DRAFT" == "true" ]]; then
+          REASON="ci:visual label on draft PR"
+          write_outputs
+          exit 0
+        fi
+        ;;
       docs)
         RUN_SDK_DOCS="true"
         if [[ "$PR_DRAFT" == "true" ]]; then
@@ -109,17 +136,17 @@ case "$EVENT_NAME" in
     esac
 
     if [[ "$PR_DRAFT" == "true" ]]; then
-      REASON="draft PR without ci:macos or ci:mobile label"
+      REASON="draft PR without a mobile CI opt-in label"
       write_outputs
       exit 0
     fi
 
+    # A failed API read must fail eligibility rather than publish all lanes skipped.
+    changed_paths="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
     changed_files=()
     while IFS= read -r changed_file; do
-      changed_files+=("$changed_file")
-    done < <(
-      gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename'
-    )
+      [[ -z "$changed_file" ]] || changed_files+=("$changed_file")
+    done <<< "$changed_paths"
 
     matched_lanes=()
     if ((${#changed_files[@]} > 0)); then
@@ -135,6 +162,10 @@ case "$EVENT_NAME" in
         compose) RUN_COMPOSE="true" ;;
         enterprise) RUN_ENTERPRISE="true" ;;
         sdk-docs) RUN_SDK_DOCS="true" ;;
+        visual-android) RUN_VISUAL_ANDROID="true" ;;
+        visual-compose) RUN_VISUAL_COMPOSE="true" ;;
+        visual-native) RUN_VISUAL_NATIVE="true" ;;
+        visual-browser) RUN_VISUAL_BROWSER="true" ;;
       esac
     done
 
@@ -143,6 +174,7 @@ case "$EVENT_NAME" in
     else
       REASON="no macOS-relevant path changes; use ci:macos, ci:mobile, or ci:sdk-docs to opt in"
     fi
+    [[ "$matched_labels" != visual* ]] || REASON="ci:visual label; $REASON"
     write_outputs
     exit 0
     ;;

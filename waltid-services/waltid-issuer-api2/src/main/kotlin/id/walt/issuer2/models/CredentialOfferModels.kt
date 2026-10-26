@@ -146,7 +146,8 @@ data class MultiCredentialOfferCreateResponse(
 @Serializable(with = CredentialOfferRequestBodySerializer::class)
 sealed interface CredentialOfferRequestBody
 
-object CredentialOfferRequestBodySerializer : JsonContentPolymorphicSerializer<CredentialOfferRequestBody>(CredentialOfferRequestBody::class) {
+object CredentialOfferRequestBodySerializer :
+    JsonContentPolymorphicSerializer<CredentialOfferRequestBody>(CredentialOfferRequestBody::class) {
     override fun selectDeserializer(element: JsonElement): DeserializationStrategy<CredentialOfferRequestBody> {
         val body = element as? JsonObject ?: throw SerializationException("Expected a credential offer JSON object")
         val hasProfile = "profileId" in body

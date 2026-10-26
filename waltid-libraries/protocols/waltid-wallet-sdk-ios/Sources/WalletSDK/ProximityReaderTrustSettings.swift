@@ -205,6 +205,7 @@ public enum ProximityReaderTrustSettingsCodec {
     /// - Parameter settings: Validated reader-trust settings to encode.
     public static func encode(_ settings: ProximityReaderTrustSettings) throws -> String {
         #if canImport(WalletCore) && os(iOS)
+        WalletCoreRuntime.initializeIfNeeded()
         return WalletCore.ProximityReaderTrustSettingsCodec.shared.encode(
             settings: settings.toKMPSettings()
         )
@@ -217,6 +218,7 @@ public enum ProximityReaderTrustSettingsCodec {
     /// - Parameter encoded: Versioned reader-trust settings document.
     public static func decode(_ encoded: String) throws -> ProximityReaderTrustSettings {
         #if canImport(WalletCore) && os(iOS)
+        WalletCoreRuntime.initializeIfNeeded()
         return try WalletCore.ProximityReaderTrustSettingsCodec.shared
             .decode(encoded: encoded)
             .toSwiftSettings()
@@ -238,6 +240,7 @@ public enum ProximityReaderTrustSettingsCodec {
         now: Date = Date()
     ) async throws -> ProximityReaderTrustImportPreview {
         #if canImport(WalletCore) && os(iOS)
+        WalletCoreRuntime.initializeIfNeeded()
         let preview = try await WalletCore.ProximityReaderTrustSettingsCodec.shared.prepareImport(
             sourceName: sourceName,
             bytes: data.toKotlinByteArray(),

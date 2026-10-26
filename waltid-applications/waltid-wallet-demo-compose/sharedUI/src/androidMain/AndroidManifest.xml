@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <!-- GoogleApiAvailability verifies both packages and their signatures. -->
+        <package android:name="com.google.android.gms" />
+        <package android:name="com.android.vending" />
+    </queries>
+</manifest>

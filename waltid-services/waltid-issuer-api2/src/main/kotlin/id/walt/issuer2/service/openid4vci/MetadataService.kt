@@ -58,9 +58,14 @@ class MetadataService @JvmOverloads constructor(
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
+
     // Eager loading makes invalid dedicated configuration fail initialization, without token-key fallback.
     private val dedicatedMetadataSigner = runBlocking {
-        MetadataJwtSigner.dedicatedSigner(serviceConfig.signedMetadata, metadataSigningKeyResolver, metadataSigningCertificateResolver)
+        MetadataJwtSigner.dedicatedSigner(
+            serviceConfig.signedMetadata,
+            metadataSigningKeyResolver,
+            metadataSigningCertificateResolver
+        )
     }
 
     private val issuerDisplay: List<IssuerDisplay>? =
@@ -80,7 +85,11 @@ class MetadataService @JvmOverloads constructor(
         }
 
     init {
-        validateKeyAttestationConfiguration(credentialConfigurations.values, serviceConfig.keyAttestationConfig, nonceValidationConfigured = true)
+        validateKeyAttestationConfiguration(
+            credentialConfigurations.values,
+            serviceConfig.keyAttestationConfig,
+            nonceValidationConfigured = true
+        )
     }
 
     private val configuredTypeMetadata: Map<String, SdJwtVcTypeMetadataDraft04> = buildMap {
@@ -92,7 +101,8 @@ class MetadataService @JvmOverloads constructor(
                 "Type metadata requires an SD-JWT credential configuration: '$configurationId'"
             }
             val vct = requireNotNull(configuration.vct) { "SD-JWT configuration '$configurationId' requires a VCT" }
-            val suppliedVct = metadata.vct?.let { if (it == INTERNAL_VCT_BASE_URL) selfHostedVct(configurationId) else it }
+            val suppliedVct =
+                metadata.vct?.let { if (it == INTERNAL_VCT_BASE_URL) selfHostedVct(configurationId) else it }
             require(suppliedVct == null || suppliedVct == vct) {
                 "Type metadata VCT does not match credential configuration '$configurationId'"
             }

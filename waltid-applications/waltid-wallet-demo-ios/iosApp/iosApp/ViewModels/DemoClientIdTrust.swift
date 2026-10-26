@@ -254,6 +254,54 @@ enum DemoClientIdTrust {
         -----END CERTIFICATE-----
         """
 
+    /// Test wallet-gateway verifier leaf and issuing CA for signed Request Objects.
+    /// SAN DNS `mc.test.walletgateway.com`. Leaf valid until 2027-01-13.
+    /// The root is omitted: its ECDSA AlgorithmIdentifier has NULL parameters, which
+    /// RFC 5758 section 3.2 forbids and the iOS parser rejects. Requests must omit it from x5c.
+    static let walletGatewayTestLeafPem = """
+        -----BEGIN CERTIFICATE-----
+        MIIDTDCCAvOgAwIBAgIIDzMLWn1TTSkwCgYIKoZIzj0EAwIwgYAxEzARBgoJkiaJ
+        k/IsZAEZFgN0c3QxGjAYBgoJkiaJk/IsZAEZFgptY2ludGVybmFsMRMwEQYKCZIm
+        iZPyLGQBGRYDcGtpMRMwEQYDVQQKEwpNYXN0ZXJjYXJkMSMwIQYDVQQDExpNQyBJ
+        bnRlcm5hbCBUU1QgU3ViIENBMSBHMTAeFw0yNjEwMTUxMTM5NTdaFw0yNzAxMTMx
+        MTM5NTdaMIGwMRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYK
+        bWNpbnRlcm5hbDELMAkGA1UEBhMCVVMxETAPBgNVBAgTCE1pc3NvdXJpMRQwEgYD
+        VQQHEwtTYWludCBMb3VpczEdMBsGA1UEChMUTWFzdGVyY2FyZCBXb3JsZHdpZGUx
+        KDAmBgNVBAMTH01hc3RlcmNhcmQgVmVyaWZpY2F0aW9uIFNlcnZpY2UwWTATBgcq
+        hkjOPQIBBggqhkjOPQMBBwNCAASveanYl46jFem1BxGlQRpsA08l3F4JVvuAk/g4
+        XC4DmIH9VFdnTX+QiD2fR6bWzucRoF919OYInYOtYT06L9LHo4IBIzCCAR8wRwYD
+        VR0RBEAwPoIZbWMudGVzdC53YWxsZXRnYXRld2F5LmNvbYYhaHR0cHM6Ly9tYy50
+        ZXN0LndhbGxldGdhdGV3YXkuY29tMA4GA1UdDwEB/wQEAwIAgDAMBgNVHRMBAf8E
+        AjAAMB0GA1UdDgQWBBTNXoPd5X4jyvTA0ekiBtqTVEVeRTAfBgNVHSMEGDAWgBQz
+        oCCQj4uO3ydfRMx5xjPu1LryqzATBgNVHSUEDDAKBggrBgEFBQcDAjBhBgNVHR8E
+        WjBYMFagVKBShlBodHRwOi8vY3JsZHAuZWNtcy5tY2xvY2FsLmludDoxMzUzNi8z
+        M2EwMjA5MDhmOGI4ZWRmMjc1ZjQ0Y2M3OWM2MzNlZWQ0YmFmMmFiLmNybDAKBggq
+        hkjOPQQDAgNHADBEAiAHZSNOrAiMMvvArE93ysDZHBozcRBLFL/CP/HRZWdffAIg
+        fU6s/qGN0/W0vGjvYxtOlQ4/JZbr2QQl4fecA722jNI=
+        -----END CERTIFICATE-----
+        """
+
+    static let walletGatewayTestSubCaPem = """
+        -----BEGIN CERTIFICATE-----
+        MIIC0jCCAligAwIBAgIIDzMLWm4GFc8wCgYIKoZIzj0EAwMwgYAxEzARBgoJkiaJ
+        k/IsZAEZFgN0c3QxGjAYBgoJkiaJk/IsZAEZFgptY2ludGVybmFsMRMwEQYKCZIm
+        iZPyLGQBGRYDcGtpMRMwEQYDVQQKEwpNYXN0ZXJjYXJkMSMwIQYDVQQDExpNQyBJ
+        bnRlcm5hbCBUU1QgUm9vdCBDQSBHMTAeFw0yMjA4MDMwODU2MzBaFw0zMjA3MzEw
+        ODU2MzBaMIGAMRMwEQYKCZImiZPyLGQBGRYDdHN0MRowGAYKCZImiZPyLGQBGRYK
+        bWNpbnRlcm5hbDETMBEGCgmSJomT8ixkARkWA3BraTETMBEGA1UEChMKTWFzdGVy
+        Y2FyZDEjMCEGA1UEAxMaTUMgSW50ZXJuYWwgVFNUIFN1YiBDQTEgRzEwWTATBgcq
+        hkjOPQIBBggqhkjOPQMBBwNCAAQjC0fzby0qOaD+1vw4sNBm5epmJ7I2nmFEtG/Q
+        HUMit0xVZ9QtkrCWamV9NgVkzXML4Flu8fYMmzX2iXeaAv7uo4G5MIG2MA4GA1Ud
+        DwEB/wQEAwIAhjAdBgNVHQ4EFgQUM6AgkI+Ljt8nX0TMecYz7tS68qswDwYDVR0T
+        BAgwBgEB/wIBADAfBgNVHSMEGDAWgBQKCorpqpXd2qvlKDnVs6Suq10jhTBTBgNV
+        HR8ETDBKMEigRqBEhkJodHRwOi8vY3JsZHAuZWNtcy5tY2xvY2FsLmludDoxMzUz
+        Ni9tYy1pbnRlcm5hbC10c3Qtcm9vdC1jYS1nMS5jcmwwCgYIKoZIzj0EAwMDaAAw
+        ZQIxAIF3EU2ON1T8KHeusNw1hDiqZT5nG/bAR1bcaOIiAM5iU5r60qT5CKytMViq
+        fqaS+wIwIgcz6N/9B5E29/SssaK3UgRqWx/KeQDTBahLO1UpAf1GVVbBWP6ArR/8
+        n1Jc/HXi
+        -----END CERTIFICATE-----
+        """
+
     /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
     static let x509TrustAnchorPems: [String] = [
         verifier2ExampleLeafPem,
@@ -268,6 +316,8 @@ enum DemoClientIdTrust {
         authologicReaderPem,
         webuildRpRootPem,
         webuildRaidiamRootPem,
+        walletGatewayTestLeafPem,
+        walletGatewayTestSubCaPem,
     ]
 
     static var clientIDTrustConfiguration: WalletClientIDTrustConfiguration {

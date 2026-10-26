@@ -245,6 +245,7 @@ public data class MobileWalletPresentationDisclosureSelection(
  * @property selectivelyDisclosable `true` when the credential format can selectively disclose this claim.
  * @property required `true` when the presentation request requires this claim for the matched query.
  * @property selectable `true` when apps may let the user toggle this claim for submission.
+ * @property requested `false` for additional clear-text data the credential must transmit.
  */
 public data class MobileWalletPresentationDisclosure(
     val path: String,
@@ -254,8 +255,12 @@ public data class MobileWalletPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
+    val requested: Boolean = true,
 ) {
     init {
+        require(requested || (!selectivelyDisclosable && !required && !selectable)) {
+            "Additional shared data must be immutable and independent of request requirements."
+        }
         require(!selectable || (selectivelyDisclosable && !required)) {
             "A selectable disclosure must be selectively disclosable and optional."
         }

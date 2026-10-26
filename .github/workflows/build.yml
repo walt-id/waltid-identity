@@ -16,10 +16,88 @@ permissions:
   pull-requests: read
 
 jobs:
-  macos-predicate-tests:
-    runs-on: ubuntu-22.04
+  wallet-visual-browser:
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.run-visual-browser == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
+      options: --init --ipc=host
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build the production browser host
+        run: >-
+          python3 .github/scripts/mobile-ci/run-ios-phase.py
+          --output-dir waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual/timings
+          browser-build ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution
+          -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true
+          --max-workers=2 --console=plain
+      - name: Install the pinned browser test tools
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        run: npm ci
+      - name: Compare every browser catalogue state
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
+        run: >-
+          python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py
+          --output-dir ../build/reports/browser-visual/timings browser-compare npm test
+      - name: Retain browser comparisons and timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-visual-browser-${{ github.run_attempt }}
+          path: waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual
+          if-no-files-found: error
+          retention-days: 14
+
+  wallet-visual-android:
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.run-visual-android == 'true' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout the coordinated source revisions
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./waltid-identity/.github/actions/gradle-setup-action
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
+      - name: Compare Compose Android visual references
+        uses: ./waltid-identity/.github/actions/wallet-visual
+        with:
+          renderer: android
+
+  macos-predicate-tests:
+    name: CI eligibility and visual contracts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - name: Test macOS lane predicates
         run: .github/scripts/ci/test-macos-lane-predicates.sh
       - name: Test CI eligibility
@@ -30,6 +108,48 @@ jobs:
         run: scripts/test-mobile-swift-parity-gate.sh
       - name: Test physical controller without hardware
         run: python3 -m unittest discover -s scripts/proximity-physical -p 'test_*.py'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Prepare the visual reporting environment
+        id: visual_environment
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wallet-visual-python"
+          "$RUNNER_TEMP/wallet-visual-python/bin/pip" install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt
+      - name: Check reporting contracts and the committed catalogue
+        run: |
+          "$RUNNER_TEMP/wallet-visual-python/bin/python" -m unittest discover -s waltid-applications/waltid-wallet-demo-test-fixtures/visual -p 'test_*.py'
+          "$RUNNER_TEMP/wallet-visual-python/bin/python" waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --check-index
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Check ordinary and coordinated verification defaults
+        run: >-
+          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --max-workers=2
+          -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
+      - name: Generate the PR reference gallery
+        id: reference_gallery
+        if: ${{ !cancelled() && steps.visual_environment.outcome == 'success' && github.event_name == 'pull_request' }}
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: >-
+          "$RUNNER_TEMP/wallet-visual-python/bin/python" waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py
+          --base "$PR_BASE" --head "$PR_HEAD" --repository "$PR_BASE_REPOSITORY"
+          --head-repository "$PR_HEAD_REPOSITORY" --output build/reports/wallet-gallery
+      - name: Retain the reference gallery
+        if: ${{ !cancelled() && steps.reference_gallery.outcome == 'success' && github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-reference-gallery
+          path: build/reports/wallet-gallery
+          if-no-files-found: error
+          retention-days: 14
+
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
@@ -123,7 +243,7 @@ jobs:
   ios-tests:
     uses: ./.github/workflows/gradle-macos.yml
     needs: macos-eligibility
-    if: ${{ needs.macos-eligibility.outputs.run-ios-simulator == 'true' || needs.macos-eligibility.outputs.run-native == 'true' || needs.macos-eligibility.outputs.run-compose == 'true' || needs.macos-eligibility.outputs.run-enterprise == 'true' || needs.macos-eligibility.outputs.run-sdk-docs == 'true' }}
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     secrets: inherit
     with:
       job_name_prefix: ios-tests
@@ -132,6 +252,8 @@ jobs:
       run-compose: ${{ needs.macos-eligibility.outputs.run-compose == 'true' }}
       run-enterprise: ${{ needs.macos-eligibility.outputs.run-enterprise == 'true' }}
       run-sdk-docs: ${{ needs.macos-eligibility.outputs.run-sdk-docs == 'true' }}
+      run-visual-compose: ${{ needs.macos-eligibility.outputs.run-visual-compose == 'true' }}
+      run-visual-native: ${{ needs.macos-eligibility.outputs.run-visual-native == 'true' }}
   android-device-tests:
     uses: ./.github/workflows/android-device-tests.yml
     needs: android-eligibility
@@ -173,6 +295,8 @@ jobs:
     timeout-minutes: 5
     needs:
       - macos-predicate-tests
+      - wallet-visual-android
+      - wallet-visual-browser
       - android-eligibility
       - macos-eligibility
       - conformance-eligibility

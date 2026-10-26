@@ -160,7 +160,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(rejectedAfterNotify, [previewHandle])
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Verifier notified")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
     }
 
     @MainActor
@@ -195,7 +195,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.completePresentationContinuation()
 
         XCTAssertNil(viewModel.pendingPresentationContinuationURL)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
         XCTAssertEqual(viewModel.presentationRequestUrl, "")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation rejected")
@@ -225,7 +225,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.failPresentationContinuation("network unavailable")
 
         XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
         XCTAssertTrue(viewModel.statusIsError(for: .present))
         XCTAssertEqual(
             viewModel.statusMessage(for: .present),
@@ -366,7 +366,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     }
 
     @MainActor
-    func testDidAndKeyAreCapturedAndStatusCanBeDismissed() async throws {
+    func testDidAndKeyAreCapturedWithoutIdleBannerAndOperationStatusCanBeDismissed() async throws {
         let viewModel = WalletViewModel(
             walletID: "settings-\(UUID().uuidString)",
             walletClient: MockWalletClient()
@@ -378,16 +378,25 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(viewModel.keyID, "mock-key-1")
         XCTAssertFalse(viewModel.publicJWK.isEmpty)
         XCTAssertFalse(viewModel.publicJWK.contains("\"d\""))
-        XCTAssertTrue(viewModel.isStatusVisible(for: .credentials))
+        for tab in [WalletTab.credentials, .receive, .present] {
+            XCTAssertFalse(viewModel.isStatusVisible(for: tab))
+        }
         XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
 
+        viewModel.offerUrl = "openid-credential-offer://mock"
+        viewModel.previewOffer()
+        try await waitUntil { viewModel.offerPreview != nil }
+        viewModel.declineOffer()
+        XCTAssertTrue(viewModel.isStatusVisible(for: .credentials))
+        XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Credential offer declined")
         viewModel.dismissStatus()
         XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
 
         viewModel.resetWallet()
         try await waitUntil { viewModel.auth == .setup && !viewModel.isReady }
         viewModel.unlockForTests()
-        try await waitUntil { viewModel.isReady && viewModel.isStatusVisible(for: .credentials) }
+        try await waitUntil { viewModel.isReady }
+        XCTAssertFalse(viewModel.isStatusVisible(for: .credentials))
         XCTAssertEqual(viewModel.statusMessage(for: .credentials), "Wallet ready")
     }
 

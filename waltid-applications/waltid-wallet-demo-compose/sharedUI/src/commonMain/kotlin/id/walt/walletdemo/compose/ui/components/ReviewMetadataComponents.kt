@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -20,12 +21,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.rotate
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -48,29 +48,9 @@ internal fun ReviewMetadataSection(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(modifier),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(contentPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                content()
-            }
+    WalletSection(title = title, modifier = modifier) {
+        Column(Modifier.padding(contentPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            content()
         }
     }
 }
@@ -88,29 +68,36 @@ internal fun ExpandableMetadataCard(
     summary: @Composable () -> Unit,
     details: @Composable () -> Unit,
 ) {
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f,
+        WalletMotion.disclosure(LocalWalletVisualPreferences.current.reduceMotion), label = "metadata-chevron")
     ReviewMetadataSection(title = title, modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
-                .clickable(role = Role.Button, onClick = onToggle)
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                summary()
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
+                    .clickable(role = Role.Button, onClick = onToggle)
+                    .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+                    .heightIn(min = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    summary()
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    modifier = Modifier.rotate(rotation),
+                    contentDescription = if (expanded) "Hide $title details" else "Show $title details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "Hide $title details" else "Show $title details",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (expanded) {
-            MetadataRowDivider()
-            details()
+            WalletExpandableContent(expanded) {
+                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MetadataRowDivider()
+                    details()
+                }
+            }
         }
     }
 }
@@ -133,7 +120,8 @@ internal fun MetadataIdentityRow(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                .then(if (logoUri == null) Modifier.background(
+                    MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             if (logoUri != null) {
@@ -166,16 +154,12 @@ internal fun MetadataIdentityRow(
                 text = name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             supportingText?.takeIf { it.isNotBlank() }?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -229,7 +213,7 @@ private fun MetadataDetailLine(item: MetadataDetailItem) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = if (linkUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             textDecoration = if (linkUri != null) TextDecoration.Underline else TextDecoration.None,
             modifier = if (linkUri != null) Modifier.clickable { uriHandler.openUri(linkUri) } else Modifier,
@@ -243,41 +227,6 @@ internal fun MetadataRowDivider() {
         color = MaterialTheme.colorScheme.outlineVariant,
         thickness = 0.5.dp,
     )
-}
-
-@Composable
-internal fun MetadataDisclosure(
-    title: String,
-    initiallyExpanded: Boolean,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    var expanded by rememberSaveable { mutableStateOf(initiallyExpanded) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .clickable(role = Role.Button) { expanded = !expanded }
-                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse $title" else "Expand $title",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (expanded) content()
-    }
 }
 
 private fun isHttpsUrl(value: String): Boolean = value.trim().startsWith("https://", ignoreCase = true)

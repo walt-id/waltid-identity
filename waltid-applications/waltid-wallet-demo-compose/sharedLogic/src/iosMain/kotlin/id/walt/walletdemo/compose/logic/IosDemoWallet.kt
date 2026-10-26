@@ -58,6 +58,7 @@ fun createIosDemoWallet(
             warning = transactionDataProfiles.warning,
             isIos = true,
             onRegistrationRefreshed = onDigitalCredentialRegistryChanged,
+            preferredSigningProtection = config.signingProtectionMode.defaultSelection,
         )
     }
 }

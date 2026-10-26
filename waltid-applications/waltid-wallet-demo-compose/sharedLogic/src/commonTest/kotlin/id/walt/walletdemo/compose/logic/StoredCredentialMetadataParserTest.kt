@@ -6,6 +6,28 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class StoredCredentialMetadataParserTest {
+    @Test
+    fun inclusionRequiresABooleanRatherThanText() {
+        val claims = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+            {"path":["required"],"mandatory":true},
+            {"path":["optional"],"mandatory":false},
+            {"path":["unknown"],"mandatory":"true"}
+        ]}""")
+        assertEquals(listOf(true, false, null), claims.map { it.mandatory })
+    }
+
+
+    @Test
+    fun malformedOptionalMetadataDoesNotHideValidDescriptionOrCrash() {
+        val display = StoredCredentialMetadataParser.credentialDisplay(
+            """{"credentialDisplay":[{"name":{},"locale":[],"logo":"invalid","background_image":false,"text_color":[],"description":"  Issuer description  "}]}"""
+        )
+        assertEquals("Issuer description", display?.description)
+        assertNull(display?.name)
+        assertNull(display?.logoUri)
+        assertNull(display?.backgroundImageUri)
+        assertNull(display?.textColor)
+    }
 
     @Test
     fun parsesIssuerDisplayNameAndLogo() {

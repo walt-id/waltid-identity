@@ -9,9 +9,30 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test fun duplicateResolvedLinkPreservesSelectionsInTheSameSheet() = scenarios.duplicateResolvedLinkPreservesSelectionsInTheSameSheet()
+
+    @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
+
+    @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()
+
+    @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
+
+    @Test fun walletAccessChangesPinUsingTheSharedEntryFlow() = scenarios.walletAccessChangesPinUsingTheSharedEntryFlow()
+
+    @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
+
+    @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
+    @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
+
+    @Test fun scannerPastePreservesEditsAndNeverStartsAFlow() = scenarios.scannerPastePreservesEditsAndNeverStartsAFlow()
+
+    @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
+
+    @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
+
     @Test
-    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
-        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+    fun singleOfferCopyControlsRespectTheAdvertisedLimit() =
+        scenarios.singleOfferCopyControlsRespectTheAdvertisedLimit()
 
     private val scenarios = WalletDemoAppTestScenarios { content ->
         // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.
@@ -32,16 +53,16 @@ class WalletDemoAppIosTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
-    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
-        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+    fun pinSetupOffersPINOnlyWhenBiometricsAreUnavailable() =
+        scenarios.pinSetupOffersPINOnlyWhenBiometricsAreUnavailable()
 
     @Test
     fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
 
     @Test
-    fun pinSetupKeepsSubmitReachableWhenScrolled() =
-        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+    fun pinSetupKeepsClearReachable() =
+        scenarios.pinSetupKeepsClearReachable()
 
     @Test
     fun pinSetupDoesNotAskForSigningApproval() =
@@ -70,8 +91,8 @@ class WalletDemoAppIosTest {
         scenarios.receiveDetailsStayScopedToReceiveTabNavigationStack()
 
     @Test
-    fun receiveTabDisablesUrlControlsWhileReceiving() =
-        scenarios.receiveTabDisablesUrlControlsWhileReceiving()
+    fun receiveReviewPreventsDuplicateAcceptanceWhileReceiving() =
+        scenarios.receiveReviewPreventsDuplicateAcceptanceWhileReceiving()
 
     @Test
     fun transactionCodeOfferCanBeDeclinedWithoutCode() =
@@ -86,8 +107,14 @@ class WalletDemoAppIosTest {
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 
     @Test
-    fun receiveAndPresentTabsExposeQrScanActions() =
-        scenarios.receiveAndPresentTabsExposeQrScanActions()
+    fun scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview() = scenarios.scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview()
+
+    @Test
+    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() = scenarios.scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests()
+
+    @Test
+    fun walletHomeExposesUnifiedScanAndNearby() =
+        scenarios.walletHomeExposesUnifiedScanAndNearby()
 
     @Test
     fun embeddedPresentationJourneyKeepsWalletChrome() =
@@ -122,24 +149,24 @@ class WalletDemoAppIosTest {
         scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
-    fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =
-        scenarios.presentationDetailsResolveDuplicateCredentialOptionsIndependently()
+    fun presentationInformationUnionsDuplicateCredentialOptions() =
+        scenarios.presentationInformationUnionsDuplicateCredentialOptions()
 
     @Test
-    fun presentDetailsStayScopedToPresentTabNavigationStack() =
-        scenarios.presentDetailsStayScopedToPresentTabNavigationStack()
+    fun presentationReviewSurvivesReturningFromTheWallet() =
+        scenarios.presentationReviewSurvivesReturningFromTheWallet()
 
     @Test
-    fun presentTabDisablesUrlControlsWhilePreviewing() =
-        scenarios.presentTabDisablesUrlControlsWhilePreviewing()
+    fun presentationRequestKeepsProgressVisibleUntilReviewIsReady() =
+        scenarios.presentationRequestKeepsProgressVisibleUntilReviewIsReady()
 
     @Test
     fun deepLinksRouteToReceiveAndPresentTabs() =
         scenarios.deepLinksRouteToReceiveAndPresentTabs()
 
     @Test
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() =
-        scenarios.deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged()
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() =
+        scenarios.duplicateExternalLinksPreserveReviewUntilExplicitlyClosed()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
@@ -169,8 +196,8 @@ class WalletDemoAppIosTest {
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
-    fun lockDoesNotAutoPromptBiometrics() =
-        scenarios.lockDoesNotAutoPromptBiometrics()
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() =
+        scenarios.newUnlockAttemptPromptsBiometricsOnceAfterLock()
 
     @Test
     fun settingsConfirmsAndAppliesSigningProtectionChange() =
@@ -185,6 +212,6 @@ class WalletDemoAppIosTest {
         scenarios.deleteFromCredentialsWhileAReviewIsActive()
 
     @Test
-    fun successStatusCanBeDismissedFromTheHeader() =
-        scenarios.successStatusCanBeDismissedFromTheHeader()
+    fun successStatusCanBeDismissedFromTheFooter() =
+        scenarios.successStatusCanBeDismissedFromTheFooter()
 }

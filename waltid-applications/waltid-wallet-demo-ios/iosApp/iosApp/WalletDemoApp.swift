@@ -26,8 +26,10 @@ struct WalletDemoApp: App {
                 initialCredentialRead = { await Self.initialCredentialReadGate.wait() }
             }
             let imageCredential = Self.mockImageCredential(environment: env)
+            let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
             let imageCredential: (dataJSON: String, portraitValueJSON: String)? = nil
+            let registrationUpdate: (@Sendable () async throws -> Void)? = nil
             #endif
             return WalletViewModel(
                 walletID: walletID,
@@ -37,12 +39,21 @@ struct WalletDemoApp: App {
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
                     duplicatePresentationOptions: env["E2E_MOCK_DUPLICATE_PRESENTATION_OPTIONS"] == "1",
+                    emptyPresentationOptions: env["E2E_MOCK_NO_MATCHES"] == "1",
                     transactionCodeRequired: env["E2E_MOCK_TX_CODE_REQUIRED"] == "1",
+                    paymentConsent: {
+                        #if DEBUG
+                        return try await MockWalletClient.uiTestPaymentConsent(env["E2E_MOCK_PAYMENT"])
+                        #else
+                        return nil
+                        #endif
+                    },
                     responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1",
                     mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1",
                     sampleCredentialDataJSON: imageCredential?.dataJSON,
                     samplePortraitDisclosureValueJSON: imageCredential?.portraitValueJSON
-                )
+                ),
+                identityDocumentRegistrationUpdate: registrationUpdate
             )
         }
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL") ?? DemoBackendDefaults.attestationBaseURL
@@ -117,6 +128,7 @@ struct WalletDemoApp: App {
               let data = try? JSONSerialization.data(withJSONObject: [
                   "vct": "https://issuer.example/credential-types/mobile-driving-licence",
                   "given_name": "Ada",
+                  "age_over_18": true,
                   "family_name": "Lovelace",
                   "valid_to": 1_781_654_400,
                   "resident_address": [

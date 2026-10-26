@@ -14,7 +14,9 @@ data class KeyAttestationConfig(
     /** Maximum entries in each attested_keys array; defaults to 20. Explicit null disables the limit. */
     val maxAttestedKeys: Int? = 20,
 ) {
-    init { require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" } }
+    init {
+        require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" }
+    }
 }
 
 @Serializable
@@ -26,13 +28,17 @@ sealed class KeyAttestationVerificationMethod {
     @Serializable
     @SerialName("key-reference")
     data class KeyReference(val reference: String) : KeyAttestationVerificationMethod() {
-        init { require(reference.isNotBlank()) { "Key attestation key reference must not be blank" } }
+        init {
+            require(reference.isNotBlank()) { "Key attestation key reference must not be blank" }
+        }
     }
 
     @Serializable
     @SerialName("x509-chain")
     data class X509Chain(val trustedRootCertificatesPem: List<String>) : KeyAttestationVerificationMethod() {
-        init { require(trustedRootCertificatesPem.isNotEmpty()) { "Key attestation trust roots must not be empty" } }
+        init {
+            require(trustedRootCertificatesPem.isNotEmpty()) { "Key attestation trust roots must not be empty" }
+        }
     }
 }
 
@@ -42,7 +48,10 @@ fun validateKeyAttestationConfiguration(
     nonceValidationConfigured: Boolean = false,
     handlers: CredentialProofHandlers = CredentialProofHandlers.defaults(),
 ) {
-    handlers.validateConfiguration(configurations, CredentialProofCapabilities(config != null, nonceValidationConfigured))
+    handlers.validateConfiguration(
+        configurations,
+        CredentialProofCapabilities(config != null, nonceValidationConfigured)
+    )
 }
 
 suspend fun KeyAttestationConfig.toVerificationOptions(

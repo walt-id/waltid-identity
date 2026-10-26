@@ -202,18 +202,3 @@ object W3cJwtVcCredentialSigner {
 
     private const val JWT_HEADER_X5C = "x5c"
 }
-
-
-object JwtUtils {
-    fun parseJWTPayload(token: String): JsonObject {
-        return token.substringAfter(".").substringBefore(".").let {
-            Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
-        }
-    }
-
-    fun parseJWTHeader(token: String): JsonObject {
-        return token.substringBefore(".").let {
-            Json.decodeFromString(it.decodeFromBase64Url().decodeToString())
-        }
-    }
-}
