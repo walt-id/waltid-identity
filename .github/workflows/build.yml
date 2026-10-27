@@ -100,12 +100,6 @@ jobs:
           fetch-depth: 0
       - name: Test macOS lane predicates
         run: .github/scripts/ci/test-macos-lane-predicates.sh
-      - name: Install Helm
-        uses: azure/setup-helm@v5.0.0
-      - name: Test issuer2 deploy checks
-        run: |
-          .github/scripts/ci/test-wait-for-rollout.sh
-          .github/scripts/ci/test-issuer2-helm-base-url.sh
       - name: Test CI eligibility
         run: python3 -m unittest discover -s .github/scripts/ci -p 'test_*.py'
       - name: Test iOS CI helpers

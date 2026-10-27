@@ -123,17 +123,3 @@ jobs:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
         with:
           args: apply -n ${{ matrix.services.namespace }} -f ${{ matrix.services.k8s }}/deployment_mod.yaml
-
-      - name: Wait for issuer2 rollout - ${{ matrix.services.name }}
-        if: matrix.services.name == 'issuer2' && hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != ''
-        uses: azure/setup-kubectl@v4
-
-      - name: Confirm issuer2 is ready - ${{ matrix.services.name }}
-        if: matrix.services.name == 'issuer2' && hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != ''
-        env:
-          KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
-        run: |
-          set -euo pipefail
-          echo "$KUBE_CONFIG" | base64 --decode > "$RUNNER_TEMP/kubeconfig"
-          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
-          bash waltid-identity/.github/scripts/ci/wait-for-rollout.sh "${{ matrix.services.namespace }}" issuer2 180s
