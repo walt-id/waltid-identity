@@ -76,7 +76,8 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     private weak var sheet: UISheetPresentationController?
     private var height: CGFloat = 0
     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
-    private var resizing = false
+    private weak var resizingPage: WalletSheetPageMeasurement.Controller?
+    private var resizeID: UUID?
     private var layoutCompletion: (id: UUID, action: () -> Void)?
 
     func afterLayout(id: UUID, _ completion: @escaping () -> Void) {
@@ -89,7 +90,8 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     }
 
     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
-        guard #available(iOS 16, *), activePage === page, !resizing, height.isFinite, height > 0,
+        guard #available(iOS 16, *), activePage === page,
+              resizingPage !== page || resizeID == nil, height.isFinite, height > 0,
               let presentation = owner.sheetPresentationController else { return }
         let rounded = ceil(height)
         // SwiftUI can reset the same presentation controller when the task root changes.
@@ -120,12 +122,17 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
             } else { presentation.invalidateDetents() }
         }
         if animated && !owner.isBeingPresented {
-            resizing = true
+            // A replacement page must not wait on the retiring page's animation.
+            // Only the current resize may release its coalescing state.
+            let id = UUID()
+            resizeID = id
+            resizingPage = page
             CATransaction.begin()
             CATransaction.setCompletionBlock { [weak self] in
                 DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    resizing = false
+                    guard let self, resizeID == id else { return }
+                    resizeID = nil
+                    resizingPage = nil
                     // Re-measure the current page, not a height captured before another update.
                     activePage?.scheduleMeasurement()
                 }
