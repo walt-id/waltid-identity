@@ -88,10 +88,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -150,7 +152,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: Exception) {
             logger.warn(e) { "Attestation challenge issuance failed (requestId=$requestId)" }
             AttestationChallengeResponseHttp(
-                payload = JsonObject(mapOf("error" to JsonPrimitive(OAuthErrorCodes.SERVER_ERROR))),
+                payload = buildJsonObject {
+                    put("error", OAuthErrorCodes.SERVER_ERROR)
+                    put("error_description", "Client attestation challenge service is unavailable")
+                },
                 status = 500,
             )
         }

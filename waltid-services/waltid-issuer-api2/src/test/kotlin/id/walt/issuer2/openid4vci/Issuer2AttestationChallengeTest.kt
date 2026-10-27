@@ -236,7 +236,10 @@ class Issuer2AttestationChallengeTest {
         val requestId = UUID.randomUUID().toString()
         val failed = fixture.protocol(challengeService { error("private signing details") }).processChallengeRequest(requestId)
         assertEquals(500, failed.status)
-        assertEquals(buildJsonObject { put("error", "server_error") }, failed.payload)
+        assertEquals(buildJsonObject {
+            put("error", "server_error")
+            put("error_description", "Client attestation challenge service is unavailable")
+        }, failed.payload)
         assertEquals("no-store", failed.headers[HttpHeaders.CacheControl])
         assertFailsWith<CancellationException> {
             fixture.protocol(challengeService { throw CancellationException("cancelled") }).processChallengeRequest(requestId)
@@ -252,7 +255,10 @@ class Issuer2AttestationChallengeTest {
         val client = install(fixture, challengeService = challengeService { error("private signing details") })
         val response = client.post("/openid4vci/challenge")
         assertEquals(HttpStatusCode.InternalServerError, response.status)
-        assertEquals(buildJsonObject { put("error", "server_error") }, response.body<JsonObject>())
+        assertEquals(buildJsonObject {
+            put("error", "server_error")
+            put("error_description", "Client attestation challenge service is unavailable")
+        }, response.body<JsonObject>())
         assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
     }
 
