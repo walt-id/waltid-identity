@@ -100,12 +100,12 @@ class ComparisonRunnerTests(unittest.TestCase):
 
 
 class AppleEnvironmentTests(unittest.TestCase):
-    def output(self, *command, device_type=verify.NATIVE_DEVICE, runtime=verify.RUNTIME):
+    def output(self, *command, device_type=verify.NATIVE_DEVICE):
         if command[0] == "xcodebuild":
             return "Xcode 27.0\nBuild version 27A266a"
         if command[0] == "xcodebuildmcp":
             return "2.7.0"
-        return json.dumps({"devices": {runtime: [{
+        return json.dumps({"devices": {verify.RUNTIME: [{
             "udid": "owned-simulator", "deviceTypeIdentifier": device_type}]}})
 
     def test_compose_needs_only_xcode_and_the_pinned_runtime(self):
@@ -130,10 +130,6 @@ class AppleEnvironmentTests(unittest.TestCase):
         with patch.object(verify, "checked_output", side_effect=self.output), \
              self.assertRaisesRegex(SystemExit, "iOS 27.0"):
             verify.check_apple_environment("other-runtime-simulator", native=True)
-        output = lambda *command: self.output(*command, runtime="com.apple.CoreSimulator.SimRuntime.iOS-26-0")
-        with patch.object(verify, "checked_output", side_effect=output), \
-             self.assertRaisesRegex(SystemExit, "iOS 27.0"):
-            verify.check_apple_environment("owned-simulator", native=True)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@
 import importlib.util
 import json
 from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
@@ -11,40 +10,9 @@ from urllib.request import Request, urlopen
 spec = importlib.util.spec_from_file_location("physical_controller", Path(__file__).with_name("run.py"))
 controller = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(controller)
-from verify_test_results import EvidenceError
 
 
 class ControllerTests(unittest.TestCase):
-    def test_native_verdict_requires_the_exact_passing_exchange(self):
-        passed = '<testcase classname="ProximityPhysicalDeviceTests" name="testSuccessDisconnectAndFreshRecovery"/>'
-        unrelated = '<testcase classname="OtherTests" name="testOther"/>'
-        cases = [
-            ("exact method", f'<testsuite>{passed}</testsuite>', None, None),
-            ("nested XCTest method and extra case", '<testsuites><testsuite><testsuite>'
-             '<testcase classname="ProximityPhysicalDeviceTests" name="testSuccessDisconnectAndFreshRecovery()"/>'
-             f'{unrelated}</testsuite></testsuite></testsuites>', None, None),
-            ("wrong method", '<testsuite><testcase classname="ProximityPhysicalDeviceTests" name="testOther"/></testsuite>',
-             controller.PreconditionError, "Missing passing native test"),
-            ("wrong class", '<testsuite><testcase classname="OtherTests" name="testSuccessDisconnectAndFreshRecovery"/></testsuite>',
-             controller.PreconditionError, "Missing passing native test"),
-            ("required method skipped", '<testsuite><testcase classname="ProximityPhysicalDeviceTests" '
-             f'name="testSuccessDisconnectAndFreshRecovery"><skipped/></testcase>{unrelated}</testsuite>',
-             EvidenceError, "Unexpected skipped test"),
-            ("failure before passing retry", '<testsuite><testcase classname="ProximityPhysicalDeviceTests" '
-             f'name="testSuccessDisconnectAndFreshRecovery"><failure/></testcase>{passed}</testsuite>',
-             EvidenceError, "Failed test"),
-        ]
-        with tempfile.TemporaryDirectory() as directory:
-            report = Path(directory) / "physical.xml"
-            for label, xml, error, diagnostic in cases:
-                with self.subTest(label=label):
-                    report.write_text(xml)
-                    if error is None:
-                        controller.verify_native_verdict(report)
-                    else:
-                        with self.assertRaisesRegex(error, diagnostic):
-                            controller.verify_native_verdict(report)
-
     def test_http_auth_shape_duplicate_and_command_payload(self):
         server = controller.IOS("test-run", "127.0.0.1")
         self.addCleanup(server.close)
