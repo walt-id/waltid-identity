@@ -582,3 +582,54 @@ migrated to valid typed records preserving client binding, authentication inform
 and original expiry. Otherwise, clients must submit a new PAR request. Unmigrated
 raw-map authorization sessions are closed and must restart. Old unbound login links
 must also restart. Unaffected pre-authorized sessions remain usable.
+
+
+## Client attestation challenges
+
+Challenges are disabled in the shipped configurations. To enable them, add the following
+inside the `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
+in `issuer-service.conf`, alongside `config`, and restart the issuer:
+
+```hocon
+challenge {
+  lifetimeSeconds = 300
+}
+```
+
+Omitting `challenge` or setting it to `null` disables issuance, discovery and enforcement.
+`challenge = {}` enables challenges with a 300-second lifetime. Custom lifetimes must be
+positive. Enabled challenges use the existing token signing key and are bound to this
+issuer. Authorization server metadata (including `signed_metadata` when configured)
+advertises `challenge_endpoint`.
+
+Fetch a challenge without authentication or a request body:
+
+```sh
+curl -i -X POST http://localhost:7005/openid4vci/challenge
+# HTTP 200, Cache-Control: no-store
+# {"attestation_challenge":"<signed-challenge>"}
+```
+
+The endpoint returns 404 when disabled. It is mounted with either the issuance or the
+authorization-code route group. Include the returned value in the `challenge` claim of
+the client attestation proof-of-possession JWT sent in `OAuth-Client-Attestation-PoP`.
+The same challenge can be reused at PAR, TOKEN and refresh until it expires; each request
+still needs a newly signed PoP with a fresh `jti`.
+
+If PAR or TOKEN receives a missing, expired or invalid challenge, it returns HTTP 400:
+
+```http
+OAuth-Client-Attestation-Challenge: <fresh-signed-challenge>
+
+{"error":"use_attestation_challenge"}
+```
+
+For example, retry `POST /openid4vci/par` with the same authorization parameters and a
+new PoP whose `challenge` is the response header value. Likewise, retry
+`POST /openid4vci/token` with the same authorization code, pre-authorized code or refresh
+token and a new PoP. Challenge rejection does not consume the grant. Browser clients can
+read the challenge header through CORS. Ordinary attestation errors retain their normal
+OAuth errors, and explicitly configured anonymous pre-authorized requests remain allowed.
+
+Attestation challenges are separate from credential proof `c_nonce` values from `/nonce`;
+neither can substitute for the other.
