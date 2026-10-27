@@ -35,7 +35,12 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 object PresentationVerificationEngine {
@@ -216,22 +221,49 @@ object PresentationVerificationEngine {
 
     /**
      * VP policy results per query id. A query with `multiple: true` can have several presentations.
-     * Their results are combined per policy so none is lost: a policy that failed for any of them is
-     * reported with that failure, otherwise with the result of the last presentation.
+     * Their results are combined per policy so none is lost, see [combinePresentationResults].
      */
     internal fun combinePolicyResultsByQuery(
         results: List<Pair<String, Map<String, VPPolicy2.PolicyRunResult>>>,
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> =
         results.groupBy({ it.first }, { it.second }).mapValues { (_, perPresentation) ->
-            buildMap {
-                for (policyResults in perPresentation) {
-                    for ((policy, result) in policyResults) {
-                        val kept = get(policy)
-                        if (kept == null || kept.errors.isEmpty()) put(policy, result)
-                    }
-                }
+            val policies = perPresentation.flatMapTo(LinkedHashSet()) { it.keys }
+            policies.associateWith { policy ->
+                combinePresentationResults(perPresentation.mapIndexedNotNull { index, byPolicy ->
+                    byPolicy[policy]?.let { index to it }
+                })
             }
         }
+
+    /**
+     * One policy's results for the presentations of a query, as `(presentation index, result)` in the order the
+     * presentations were received - the order of `presented_presentations`.
+     *
+     * A single presentation keeps its result unchanged. Several are combined into one result that succeeds only
+     * if all of them did, carries the errors of every failed presentation, and the results of the first failed
+     * one (or of the last, if none failed). [MULTIPLE_PRESENTATIONS_RESULT] then says how many presentations were
+     * checked and which of them failed.
+     */
+    internal fun combinePresentationResults(
+        results: List<Pair<Int, VPPolicy2.PolicyRunResult>>,
+    ): VPPolicy2.PolicyRunResult {
+        results.singleOrNull()?.let { return it.second }
+
+        val failed = results.filter { (_, result) -> result.errors.isNotEmpty() }
+        val representative = (failed.firstOrNull() ?: results.last()).second
+        return representative.copy(
+            success = results.all { (_, result) -> result.success },
+            results = representative.results + (MULTIPLE_PRESENTATIONS_RESULT to buildJsonObject {
+                put("count", results.size)
+                putJsonArray("failed_indexes") { failed.forEach { (index, _) -> add(index) } }
+            }),
+            errors = failed.flatMap { (_, result) -> result.errors },
+            executionTime = results.fold(Duration.ZERO) { total, (_, result) -> total + result.executionTime },
+        )
+    }
+
+    /** Result key under which [combinePresentationResults] reports the presentations a policy result covers. */
+    internal const val MULTIPLE_PRESENTATIONS_RESULT = "multiple_presentations"
 
     /** Every presentation per query id, in the order they were received. */
     internal fun presentationsByQuery(
