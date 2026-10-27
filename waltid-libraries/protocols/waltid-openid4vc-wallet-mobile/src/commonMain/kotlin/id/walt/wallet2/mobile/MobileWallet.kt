@@ -198,7 +198,12 @@ public data class WalletAttestationConfig(
  * Opt-in Enterprise Wallet Provider used for wallet instance and key attestations.
  *
  * The default address is the hosted Enterprise Stack demo. That deployment does not yet run the
- * wallet-provider feature, and [servicePath] is not provisioned there.
+ * wallet-provider feature, and [servicePath] is not provisioned. Sample apps leave this unset.
+ *
+ * @property baseUrl Origin of the Enterprise API, without a service path.
+ * @property servicePath Wallet-provider target, `organization.tenant.service`.
+ * @property bearerToken Optional bearer token for the wallet-provider API. Empty sends no Authorization header.
+ * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
 public data class WalletProviderConfig(
     public val baseUrl: String = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.BASE_URL,

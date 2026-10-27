@@ -623,7 +623,6 @@ class WalletViewModel: ObservableObject {
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
                     accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)]),
-            walletProvider: .enterpriseDemo,
             keyAttestationProvider: DemoKeyAttestationProviders()
         )
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)

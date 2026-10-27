@@ -10,6 +10,8 @@ import kotlinx.serialization.encodeToString
 import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.handlers.KeyAttestationRequest
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
@@ -49,6 +51,8 @@ object EnterpriseDemoWalletProvider {
  * The unit binding is kept for this client instance. A later receipt of a new holder key refreshes that
  * unit instead of presenting another key's attestation.
  */
+private val log = KotlinLogging.logger {}
+
 class WalletProviderHttpClient(
     private val baseUrl: String,
     private val servicePath: String,
@@ -166,7 +170,13 @@ class WalletProviderHttpClient(
 
     private suspend fun rememberVerificationKey(jwt: String?) {
         if (jwt.isNullOrBlank() || learnedVerificationKey != null) return
-        learnedVerificationKey = runCatching { verificationKeyFromJwt(jwt) }.getOrNull()
+        try {
+            learnedVerificationKey = verificationKeyFromJwt(jwt)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            log.debug(error) { "Could not read a verification key from the wallet provider attestation" }
+        }
     }
 
     private fun HttpRequestBuilder.authenticate() {
