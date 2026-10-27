@@ -80,7 +80,7 @@ class MetadataService @JvmOverloads constructor(
                 CredentialConfiguration.serializer(),
                 DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
-                configuration.vct?.let { validateSelfHostedVct(configurationId, it) }
+                configuration.vct?.let { validateVct(configurationId, it) }
             }
         }
 
@@ -181,17 +181,17 @@ class MetadataService @JvmOverloads constructor(
         if (credentialType in Issuer2EndpointPaths.reservedVctNames) {
             throw NotFoundException("Credential type metadata not found: $credentialType")
         }
-        val expectedVct = selfHostedVct(credentialType)
-        credentialConfigurations.entries.firstOrNull { (_, configuration) ->
-            configuration.vct == expectedVct
-        }
-            ?: throw NotFoundException("Credential type metadata not found: $credentialType")
+        val hostedVct = selfHostedVct(credentialType)
+        val resolvedVct = credentialConfigurations.values.firstNotNullOfOrNull { configuration ->
+            val vct = configuration.vct ?: return@firstNotNullOfOrNull null
+            when {
+                vct == hostedVct -> vct
+                vct == credentialType && vctKind(vct) == VctKind.URN -> vct
+                else -> null
+            }
+        } ?: throw NotFoundException("Credential type metadata not found: $credentialType")
 
-        return configuredTypeMetadata[expectedVct] ?: SdJwtVcTypeMetadataDraft04(
-            vct = expectedVct,
-            name = credentialType,
-            description = "$credentialType Verifiable Credential",
-        )
+        return configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
     }
 
     fun issuerBaseUrl(): String = baseUrl
@@ -284,8 +284,47 @@ class MetadataService @JvmOverloads constructor(
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
 
+    private fun validateVct(configurationId: String, vct: String) {
+        require(vct.isNotBlank()) {
+            "Credential configuration '$configurationId' requires a non-blank vct"
+        }
+        when (vctKind(vct)) {
+            VctKind.HTTP -> validateSelfHostedVct(configurationId, vct)
+            VctKind.URN -> Unit
+            null -> throw IllegalArgumentException(
+                "Credential configuration '$configurationId' has invalid vct '$vct'. " +
+                    "Use an http(s) URL with a host, or a URN such as urn:eudi:pid:1."
+            )
+        }
+    }
+
+    /**
+     * Classifies a resolved vct. HTTP(S) requires a hierarchical URI with a host, compared
+     * case-insensitively on the scheme. A URN requires a namespace identifier and a non-empty
+     * namespace-specific string. Anything else, including a bare string or `https:foo`, is rejected.
+     */
+    private fun vctKind(vct: String): VctKind? {
+        if (vct.isBlank()) return null
+        val uri = runCatching { URI(vct) }.getOrNull() ?: return null
+        val scheme = uri.scheme ?: return null
+        return when {
+            scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true) ->
+                if (!uri.isOpaque && !uri.host.isNullOrBlank()) VctKind.HTTP else null
+            scheme.equals("urn", ignoreCase = true) && URN_WITH_NAMESPACE.matches(uri.schemeSpecificPart.orEmpty()) ->
+                VctKind.URN
+            else -> null
+        }
+    }
+
+    private fun defaultTypeMetadata(credentialType: String, resolvedVct: String): SdJwtVcTypeMetadataDraft04 =
+        SdJwtVcTypeMetadataDraft04(
+            vct = resolvedVct,
+            name = credentialType,
+            description = "$credentialType Verifiable Credential",
+        )
+
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
-        // VCTs may be external URLs or non-HTTP identifiers. Only our own protocol paths collide.
+        // Only HTTP(S) VCTs that share this issuer's origin can collide with protocol routes.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
         val issuerUri = URI(baseUrl)
         if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
@@ -319,7 +358,11 @@ class MetadataService @JvmOverloads constructor(
         )
     }
 
+    private enum class VctKind { HTTP, URN }
+
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
+        // NID may contain dots, as in urn:eu.europa.ec.eudi:cor:1. The first colon separates it from a non-empty NSS.
+        private val URN_WITH_NAMESPACE = Regex("^[^:\\s]+:\\S+$")
     }
 }
