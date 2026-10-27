@@ -54,13 +54,13 @@ enum class Issuer2RouteSurface {
     /** The `.well-known` metadata routes and `openid4vci/jwks` - discovery, needed by every flow. */
     METADATA,
 
-    /** `openid4vci/token`, `nonce` and `credential` - the legs that actually issue. */
+    /** `openid4vci/token`, `nonce`, `challenge` and `credential` - the legs that actually issue. */
     ISSUANCE,
 
     /** `GET openid4vci/credential-offer` - only reachable when offers are created BY_REFERENCE. */
     CREDENTIAL_OFFER_BY_REFERENCE,
 
-    /** `openid4vci/par` and `authorize` - the authorization code flow. */
+    /** `openid4vci/par`, `authorize` and `challenge` - the authorization code flow. */
     AUTHORIZATION_CODE,
 
     /**
@@ -159,6 +159,15 @@ class OpenId4VciController(
                             ?: throw NotFoundException("Credential offer not found: $sessionId")
                     )
                 }
+
+            if (Issuer2RouteSurface.ISSUANCE in surfaces || Issuer2RouteSurface.AUTHORIZATION_CODE in surfaces) {
+                post(Issuer2EndpointPaths.CHALLENGE, OpenId4VciRoutesDocs.challenge()) {
+                    val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
+                    val response = protocolService.processChallengeRequest(requestId)
+                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                    call.respond(HttpStatusCode.fromValue(response.status), response.payload)
+                }
+            }
 
             if (Issuer2RouteSurface.AUTHORIZATION_CODE in surfaces) {
                 post(Issuer2EndpointPaths.PAR, OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
