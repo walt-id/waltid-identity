@@ -238,7 +238,10 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
         }
 
         fun isInternalDependency(moduleName: String): Boolean =
-            moduleName.startsWith("id.walt.") || moduleName.startsWith("id.walt:")
+            moduleName.startsWith("id.walt.") ||
+                moduleName.startsWith("id.walt:") ||
+                moduleName.startsWith("id.waltid.") ||
+                moduleName.startsWith("id.waltid:")
 
         fun parseDepsFromJson(jsonFile: File): List<ThirdPartyInfo> {
             if (!jsonFile.exists()) return emptyList()

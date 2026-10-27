@@ -16,6 +16,7 @@ import id.walt.issuer2.testsupport.*
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
+import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.sdjwt.SDJwt
@@ -86,6 +87,7 @@ class Issuer2RefreshAuthorizationTest {
                 CredentialOfferCredential(scenario.profileId, CredentialOfferRuntimeOverrides(credentialStatus = statuses[index]))
             },
             authMethod = AuthenticationMethod.AUTHORIZED,
+            issuerStateMode = IssuerStateMode.INCLUDE,
         ))
         val session = assertNotNull(repository.get(offer.offerId))
         val resolved = wallet.resolve(offer)

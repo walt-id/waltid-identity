@@ -5,19 +5,31 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 identity_dir="$(cd "$script_dir/../../.." && pwd -P)"
 cd "$identity_dir"
 
+# CI pins the device and runtime. Local runs let simctl select a compatible runtime.
+device_type="${IOS_RECOVERY_DEVICE_TYPE:-com.apple.CoreSimulator.SimDeviceType.iPhone-17}"
+runtime_description="newest compatible runtime"
+simulator_command=(xcrun simctl create "Wallet recovery" "$device_type")
+if [[ -n "${IOS_SIMULATOR_DESTINATION+x}" ]]; then
+  IFS=, read -r platform device os extra <<< "$IOS_SIMULATOR_DESTINATION"
+  if [[ "$platform" != "platform=iOS Simulator" || "$device" != name=?* || "$os" != OS=* ||
+        ! "${os#OS=}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ || -n "$extra" ||
+        "$IOS_SIMULATOR_DESTINATION" != "$platform,$device,$os" ]]; then
+    echo "::error::IOS_SIMULATOR_DESTINATION must specify a device-type name and explicit iOS version: platform=iOS Simulator,name=<device>,OS=<version>" >&2
+    exit 1
+  fi
+  device_type="${IOS_RECOVERY_DEVICE_TYPE:-${device#name=}}"
+  runtime_description="iOS ${os#OS=}"
+  simulator_command=(xcrun simctl create "Wallet recovery" "$device_type" "$runtime_description")
+fi
+
 python3 -m unittest discover -s scripts/tests -p 'test_*recovery*.py'
 mkdir -p build/reports/ios-wallet-recovery
 output=$(mktemp -d "$identity_dir/build/reports/ios-wallet-recovery/run.XXXXXX")
 python3 scripts/build-recovery-simulator-host.py --output "$output/host"
 
-# Create and remove only this run's simulator. The default device type matches the iOS CI toolchain.
-runtime=$(xcrun simctl list runtimes --json | python3 -c '
-import json, sys
-runtimes = [r for r in json.load(sys.stdin)["runtimes"] if r["isAvailable"] and r["name"].startswith("iOS ")]
-print(max(runtimes, key=lambda r: tuple(map(int, r["version"].split("."))))["identifier"])
-')
-simulator=$(xcrun simctl create "Wallet recovery" \
-  "${IOS_RECOVERY_DEVICE_TYPE:-com.apple.CoreSimulator.SimDeviceType.iPhone-17}" "$runtime")
+# Create and remove only this run's simulator.
+printf 'Recovery simulator device: %s; runtime: %s\n' "$device_type" "$runtime_description"
+simulator=$("${simulator_command[@]}")
 trap 'xcrun simctl delete "$simulator"' EXIT
 xcrun simctl boot "$simulator"
 xcrun simctl bootstatus "$simulator" -b

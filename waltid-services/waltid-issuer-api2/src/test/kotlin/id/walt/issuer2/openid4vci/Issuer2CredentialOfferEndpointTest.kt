@@ -154,6 +154,65 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun authorizedOfferModesAndOverridesMatchAcrossRequestFormats() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        // Use literal JSON so missing and explicit null remain distinct on the wire.
+        for (mode in listOf(null, "null", "\"OMIT\"", "\"INCLUDE\"")) {
+            for (batch in listOf(false, true)) {
+                for (valueMode in CredentialOfferValueMode.entries) {
+                    for (withOverrides in listOf(false, true)) {
+                        val overrides = if (withOverrides) ",\"runtimeOverrides\":{}" else ""
+                        val selection = if (batch) {
+                            """"credentials":[{"profileId":"$OPEN_BADGE_PROFILE_ID"},{"profileId":"$IDENTITY_SD_JWT_PROFILE_ID"$overrides}]"""
+                        } else {
+                            """"profileId":"$OPEN_BADGE_PROFILE_ID"$overrides"""
+                        }
+                        val modeField = mode?.let { ",\"issuerStateMode\":$it" }.orEmpty()
+                        val body = """{$selection,"authMethod":"AUTHORIZED","valueMode":"$valueMode"$modeField}"""
+                        val response = client.post("/issuer2/credential-offers") {
+                            contentType(ContentType.Application.Json)
+                            setBody(body)
+                        }
+                        val includesState = mode == "\"INCLUDE\""
+                        if (withOverrides && !includesState) {
+                            assertEquals(HttpStatusCode.BadRequest, response.status, "$body: ${response.bodyAsText()}")
+                            assertTrue(response.bodyAsText().contains("runtimeOverrides require issuerStateMode INCLUDE"), body)
+                        } else {
+                            assertEquals(HttpStatusCode.Created, response.status, "$body: ${response.bodyAsText()}")
+                            val receipt = json.parseToJsonElement(response.bodyAsText()).jsonObject
+                            assertEquals(if (includesState) "INCLUDE" else "OMIT", receipt["issuerStateMode"]?.jsonPrimitive?.content, body)
+                            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(receipt.getValue("credentialOffer").jsonPrimitive.content)
+                            val offer = when (valueMode) {
+                                CredentialOfferValueMode.BY_REFERENCE -> {
+                                    assertNull(offerRequest.credentialOffer)
+                                    val offerUri = Url(assertNotNull(offerRequest.credentialOfferUri))
+                                    val fetched = client.get("${offerUri.encodedPath}?${offerUri.encodedQuery}")
+                                    assertEquals(HttpStatusCode.OK, fetched.status, fetched.bodyAsText())
+                                    json.parseToJsonElement(fetched.bodyAsText()).jsonObject
+                                }
+                                CredentialOfferValueMode.BY_VALUE -> {
+                                    assertNull(offerRequest.credentialOfferUri)
+                                    assertNotNull(offerRequest.credentialOffer)
+                                    val offerUrl = Url(receipt.getValue("credentialOffer").jsonPrimitive.content)
+                                    json.parseToJsonElement(assertNotNull(offerUrl.parameters["credential_offer"])).jsonObject
+                                }
+                            }
+                            val grant = offer.getValue("grants").jsonObject.getValue("authorization_code").jsonObject
+                            assertEquals(if (batch) 2 else 1, offer.getValue("credential_configuration_ids").jsonArray.size, body)
+                            if (includesState) {
+                                assertEquals(receipt.getValue("offerId"), grant["issuer_state"], body)
+                            } else {
+                                assertFalse("issuer_state" in grant, body)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
         val serviceConfig = issuer2ConfigDir()
         val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
@@ -596,7 +655,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         assertEquals(AuthenticationMethod.AUTHORIZED, response.authMethod)
-        assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
+        assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(response.credentialOffer)
         assertNull(offerRequest.credentialOffer)
         val credentialOfferUri = assertNotNull(offerRequest.credentialOfferUri)
@@ -604,7 +663,7 @@ class Issuer2CredentialOfferEndpointTest {
             credentialOfferUri.endsWith("/openid4vci/credential-offer?id=${response.offerId}"),
             "Expected by-reference offer URI to point to the OSS issuer2 credential-offer endpoint",
         )
-        assertEquals(response.offerId, response.resolveOffer(client).grants?.authorizationCode?.issuerState)
+        assertNull(response.resolveOffer(client).grants?.authorizationCode?.issuerState)
     }
 
     private suspend fun assertAuthorizedByValueOffer(client: HttpClient) {
@@ -619,8 +678,8 @@ class Issuer2CredentialOfferEndpointTest {
         val offer = response.inlineOffer()
         assertEquals(ISSUER_BASE_URL, offer.credentialIssuer)
         assertEquals(listOf(CREDENTIAL_CONFIGURATION_ID), offer.credentialConfigurationIds)
-        assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
-        assertEquals(response.offerId, offer.grants?.authorizationCode?.issuerState)
+        assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
+        assertNull(offer.grants?.authorizationCode?.issuerState)
     }
 
     private suspend fun assertAuthorizedByValueOfferWithIssuerState(client: HttpClient) {
@@ -800,9 +859,9 @@ class Issuer2CredentialOfferEndpointTest {
                 assertNull(offer.grants?.authorizationCode)
             }
             AuthenticationMethod.AUTHORIZED -> {
-                assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
+                assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
                 assertNotNull(offer.grants?.authorizationCode)
-                assertEquals(response.offerId, offer.grants?.authorizationCode?.issuerState)
+                assertNull(offer.grants?.authorizationCode?.issuerState)
                 assertNull(offer.grants?.preAuthorizedCode)
             }
         }

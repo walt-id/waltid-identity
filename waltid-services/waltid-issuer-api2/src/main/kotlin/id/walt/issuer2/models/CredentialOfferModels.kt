@@ -66,7 +66,7 @@ data class CredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                    (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
+                    (issuerStateMode ?: IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
                     runtimeOverrides == null
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
@@ -123,7 +123,7 @@ data class MultiCredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                    (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
+                    (issuerStateMode ?: IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
                     credentials.none { it.runtimeOverrides != null }
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"

@@ -91,7 +91,9 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 )
 
                 val createdOffer =
-                    client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
+                    client.createCredentialOffer(
+                        Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(issuerStateMode = IssuerStateMode.INCLUDE)
+                    )
                 assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
                 assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
                 assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
@@ -324,7 +326,9 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
 
-        val createdOffer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
+        val createdOffer = client.createCredentialOffer(
+            Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(issuerStateMode = IssuerStateMode.INCLUDE)
+        )
         assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
         assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")

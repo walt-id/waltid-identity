@@ -13,7 +13,7 @@ their license and copyright holder.
   - Copyright (c) Peter Occil
 * [org.cose:cose-java 1.1.1-WALT-SNAPSHOT](https://github.com/cose-wg/cose-java). BSD3.
   - Copyright (c) Jim Schaad, Sebastien Bahloul
-* [org.jetbrains.kotlin:kotlin-stdlib 2.4.0](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright (c) Kotlin Team
 * [org.jetbrains:annotations 13.0](http://www.jetbrains.org). Apache License, Version 2.0.
   - Copyright (c) JetBrains Team

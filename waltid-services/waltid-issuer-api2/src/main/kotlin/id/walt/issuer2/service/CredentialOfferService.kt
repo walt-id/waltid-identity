@@ -101,7 +101,7 @@ class CredentialOfferService(
 
         val issuerStateMode = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> null
-            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.INCLUDE
+            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.OMIT
         }
         var resolvedTxCodeValue: String? = null
         val credentialConfigurationIds = resolvedCredentials
