@@ -25,6 +25,9 @@ class PresentedPresentationsSerializerTest {
         credentials = null,
     )
 
+    private fun Map<String, List<VerifiablePresentation>>.jwts(queryId: String) =
+        getValue(queryId).map { (it as JwtVcJsonPresentation).jwt }
+
     @Test
     fun newSessionsStoreAListPerQueryId() {
         val encoded = json.encodeToString(
@@ -35,7 +38,7 @@ class PresentedPresentationsSerializerTest {
 
         assertEquals(2, assertIs<JsonArray>(stored).size)
         val decoded = json.decodeFromString(PresentedPresentationsSerializer, encoded)
-        assertEquals(listOf("first", "second"), decoded.getValue("ids").map { (it as JwtVcJsonPresentation).jwt })
+        assertEquals(listOf("first", "second"), decoded.jwts("ids"))
     }
 
     @Test
@@ -45,6 +48,31 @@ class PresentedPresentationsSerializerTest {
 
         val decoded = json.decodeFromString(PresentedPresentationsSerializer, legacy.toString())
 
-        assertEquals(listOf("only"), decoded.getValue("ids").map { (it as JwtVcJsonPresentation).jwt })
+        assertEquals(listOf("only"), decoded.jwts("ids"))
+    }
+
+    @Test
+    fun aPreviouslyStoredSinglePresentationStillLoadsFromAJsonTree() {
+        val single = json.encodeToJsonElement(VerifiablePresentation.serializer(), presentation("only"))
+        val legacy = buildJsonObject { put("ids", single) }
+
+        val decoded = json.decodeFromJsonElement(PresentedPresentationsSerializer, legacy)
+
+        assertEquals(listOf("only"), decoded.jwts("ids"))
+    }
+
+    @Test
+    fun aSessionMixingBothShapesLoads() {
+        val single = json.encodeToJsonElement(VerifiablePresentation.serializer(), presentation("legacy"))
+        val list = json.encodeToJsonElement(
+            PresentationsOfQuerySerializer,
+            listOf(presentation("first"), presentation("second")),
+        )
+        val stored = buildJsonObject { put("old", single); put("new", list) }
+
+        val decoded = json.decodeFromJsonElement(PresentedPresentationsSerializer, stored)
+
+        assertEquals(listOf("legacy"), decoded.jwts("old"))
+        assertEquals(listOf("first", "second"), decoded.jwts("new"))
     }
 }
