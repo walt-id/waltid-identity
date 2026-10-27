@@ -2162,8 +2162,7 @@ object WalletIssuanceHandler {
         onAttestationObtained: suspend () -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): TokenClientAttestation? {
-        val assembler = attestationAssembler ?: return null
-        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+        val assembler = configuredAttestationAssembler(asMetadata, attestationAssembler) ?: return null
 
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
@@ -2206,8 +2205,7 @@ object WalletIssuanceHandler {
         onAttestationObtained: suspend () -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): ClientAttestationHeaders? {
-        val assembler = attestationAssembler ?: return null
-        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+        val assembler = configuredAttestationAssembler(asMetadata, attestationAssembler) ?: return null
 
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
@@ -2235,6 +2233,19 @@ object WalletIssuanceHandler {
 
     private fun AuthorizationServerMetadata.supportsAttestationBasedClientAuthentication(): Boolean =
         tokenEndpointAuthMethodsSupported?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
+
+    private fun configuredAttestationAssembler(
+        asMetadata: AuthorizationServerMetadata,
+        attestationAssembler: ClientAttestationAssembler?,
+    ): ClientAttestationAssembler? {
+        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+        if (attestationAssembler != null) return attestationAssembler
+        val methods = asMetadata.tokenEndpointAuthMethodsSupported.orEmpty()
+        if (methods.isNotEmpty() && methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }) {
+            error("This issuer requires a wallet instance attestation, and no wallet provider is configured")
+        }
+        return null
+    }
 
     private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(
         credentialIssuerBaseUrl: String,

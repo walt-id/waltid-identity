@@ -41,6 +41,7 @@ fun createIosDemoWallet(
                         platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
                     ),
                     attestationConfig = config.toWalletAttestationConfig(),
+                    walletProvider = config.toWalletProviderConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
                 paymentCredentialIssuers = demoPaymentCredentialIssuers,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },

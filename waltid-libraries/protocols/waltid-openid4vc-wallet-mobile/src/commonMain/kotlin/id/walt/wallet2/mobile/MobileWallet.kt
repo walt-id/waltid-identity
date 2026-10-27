@@ -24,7 +24,13 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.handlers.KeyAttestationProvider
+import id.walt.wallet2.handlers.KeyAttestationProviderResolver
+import id.walt.wallet2.walletprovider.WalletProviderHttpClient
+import id.walt.wallet2.walletprovider.walletProviderVerificationKey
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
@@ -188,6 +194,19 @@ public data class WalletAttestationConfig(
     public val hostHeader: String = "",
 )
 
+/**
+ * Opt-in Enterprise Wallet Provider used for wallet instance and key attestations.
+ *
+ * The default address is the hosted Enterprise Stack demo. That deployment does not yet run the
+ * wallet-provider feature, and [servicePath] is not provisioned there.
+ */
+public data class WalletProviderConfig(
+    public val baseUrl: String = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.BASE_URL,
+    public val servicePath: String = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.SERVICE_PATH,
+    public val bearerToken: String = "",
+    public val hostHeader: String = "",
+)
+
 /** Registration adapters select their projection at platform factory wiring; presentation uses full records. */
 internal enum class MobileWalletRegistryProjection { Full, MdocIdentity }
 
@@ -210,6 +229,7 @@ public class MobileWallet internal constructor(
     private val generateAndPersistHolderKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> id.walt.crypto2.keys.Key =
         { _, _ -> error("Holder key creation requires the persistent mobile wallet factory") },
     attestationConfig: WalletAttestationConfig? = null,
+    walletProviderConfig: WalletProviderConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
@@ -247,15 +267,33 @@ public class MobileWallet internal constructor(
     private val registrationMutex = Mutex()
     private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
-    private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
-        ClientAttestationAssembler(
+    private val walletProviderClient: WalletProviderHttpClient? = walletProviderConfig?.let { config ->
+        WalletProviderHttpClient(
+            baseUrl = config.baseUrl,
+            servicePath = config.servicePath,
+            bearerToken = config.bearerToken,
+            hostHeader = config.hostHeader,
+            httpClient = issuanceHttpClient ?: HttpClient(),
+            verificationKeyFromJwt = { jwt ->
+                walletProviderVerificationKey(jwt) { pem ->
+                    X509CertificateUtil.parseCertificatePem(pem)
+                        .restoreSubjectPublicKey(CryptoRuntime(defaultSoftwareKeyProviders()))
+                }
+            },
+        )
+    }
+
+    private val attestationAssembler: ClientAttestationAssembler? = when {
+        walletProviderClient != null -> ClientAttestationAssembler(walletProviderClient)
+        attestationConfig != null -> ClientAttestationAssembler(
             HttpWalletAttestationProvider(
-                baseUrl = config.baseUrl,
-                attesterPath = config.attesterPath,
-                bearerToken = config.bearerToken,
-                hostHeader = config.hostHeader,
+                baseUrl = attestationConfig.baseUrl,
+                attesterPath = attestationConfig.attesterPath,
+                bearerToken = attestationConfig.bearerToken,
+                hostHeader = attestationConfig.hostHeader,
             )
         )
+        else -> null
     }
 
     private val issuanceSessionState = id.walt.wallet2.handlers.WalletIssuanceSessionState(walletId, issuanceSessionStore)
@@ -265,7 +303,9 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
-    ).attachIssuanceSessionState(issuanceSessionState)
+    ).attachIssuanceSessionState(issuanceSessionState).also { created ->
+        walletProviderClient?.let { created.attachKeyAttestationProvider(it) }
+    }
 
     /**
      * Attaches the provider used when an issuer requires key attestation in a credential proof.
@@ -277,9 +317,14 @@ public class MobileWallet internal constructor(
 
     /** Attaches issuer-specific key attestation support. Supply it again after wallet recreation. */
     public fun attachKeyAttestationProviderResolver(
-        resolver: id.walt.wallet2.handlers.KeyAttestationProviderResolver,
+        resolver: KeyAttestationProviderResolver,
     ): MobileWallet = apply {
-        wallet.attachKeyAttestationProviderResolver(resolver)
+        val fallback = walletProviderClient
+        wallet.attachKeyAttestationProviderResolver(
+            if (fallback == null) resolver else KeyAttestationProviderResolver { issuer ->
+                resolver.resolve(issuer) ?: fallback
+            },
+        )
     }
 
     private val annexCEngine = MobileWalletAnnexCEngine(

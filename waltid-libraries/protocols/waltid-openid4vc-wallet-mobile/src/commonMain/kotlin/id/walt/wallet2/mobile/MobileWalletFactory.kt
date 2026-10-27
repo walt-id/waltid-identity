@@ -56,6 +56,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 public data class MobileWalletConfig(
     public val walletId: String = "default",
     public val attestationConfig: WalletAttestationConfig? = null,
+    /** Enterprise Wallet Provider. When set, issuance uses it for WIA and KA. */
+    public val walletProvider: WalletProviderConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
@@ -266,6 +268,7 @@ internal fun createSqlDelightMobileWallet(
             ))
         },
         attestationConfig = config.attestationConfig,
+        walletProviderConfig = config.walletProvider,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
         paymentCredentialIssuers = config.paymentCredentialIssuers,
