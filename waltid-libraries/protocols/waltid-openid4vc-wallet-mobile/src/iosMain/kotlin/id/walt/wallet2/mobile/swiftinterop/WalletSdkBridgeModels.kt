@@ -26,6 +26,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.mobile.WalletProviderConfig
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType

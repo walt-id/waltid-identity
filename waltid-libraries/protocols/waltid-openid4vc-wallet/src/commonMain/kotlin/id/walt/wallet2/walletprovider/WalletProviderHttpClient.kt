@@ -91,6 +91,7 @@ class WalletProviderHttpClient(
             jwt ?: error("Wallet provider did not return a wallet instance attestation")
         }
 
+    @Deprecated("Use the EncodedKey.Jwk overload")
     override suspend fun getAttestationJwt(instanceKey: LegacyKey, clientId: String): String {
         val publicJwk = instanceKey.getPublicKey().exportJWKObject()
         val encoded = EncodedKey.Jwk(BinaryData(Json.encodeToString(publicJwk).encodeToByteArray()), false)
