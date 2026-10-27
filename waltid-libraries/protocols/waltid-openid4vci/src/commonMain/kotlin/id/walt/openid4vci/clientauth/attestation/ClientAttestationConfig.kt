@@ -1,5 +1,6 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
 import id.walt.openid4vci.clientauth.attestation.verifier.KeyBasedClientAttestationVerifier
@@ -38,7 +39,9 @@ class ClientAttestationConfig(
         popMaxAgeSeconds = popMaxAgeSeconds,
     )
 
-    fun toAuthenticationMethod(): AttestationBasedClientAuthenticationMethod =
+    fun toAuthenticationMethod(
+        challengeService: AttestationChallengeService? = null,
+    ): AttestationBasedClientAuthenticationMethod =
         AttestationBasedClientAuthenticationMethod(
             attestationVerifier = attestationVerifier,
             acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
@@ -46,5 +49,6 @@ class ClientAttestationConfig(
             clock = clock,
             clockSkewSeconds = clockSkewSeconds,
             popMaxAgeSeconds = popMaxAgeSeconds,
+            challengeService = challengeService,
         )
 }
