@@ -16,6 +16,9 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Enterprise Wallet Provider. The demo value points at a deployment that is not set up yet.
+    public var walletProvider: WalletProviderConfiguration?
+
     /// Trust anchors used to authenticate verifier Request Objects.
     public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
 
@@ -67,6 +70,7 @@ public struct WalletConfiguration: Sendable {
     public init(
         walletID: String = "default",
         attestation: WalletAttestationConfiguration? = nil,
+        walletProvider: WalletProviderConfiguration? = nil,
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
         persistence: WalletPersistence = WalletPersistence(),
@@ -84,6 +88,7 @@ public struct WalletConfiguration: Sendable {
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
+        self.walletProvider = walletProvider
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
         self.keyAttestationProvider = keyAttestationProvider
@@ -548,6 +553,34 @@ public enum WalletKeyType: Equatable, Sendable {
 
     /// RSA key with a 4096-bit modulus.
     case rsa4096
+}
+
+/// Enterprise Wallet Provider used for wallet instance and key attestations.
+///
+/// ``enterpriseDemo`` addresses the hosted Enterprise Stack demo. That deployment does not yet
+/// run the wallet-provider feature, and the service path is not provisioned.
+public struct WalletProviderConfiguration: Equatable, Sendable {
+    public static let enterpriseDemo = WalletProviderConfiguration(
+        baseURL: "https://org4.enterprise.demo.walt.id",
+        servicePath: "org4.demo.wallet-provider"
+    )
+
+    public var baseURL: String
+    public var servicePath: String
+    public var bearerToken: String
+    public var hostHeader: String
+
+    public init(
+        baseURL: String,
+        servicePath: String,
+        bearerToken: String = "",
+        hostHeader: String = ""
+    ) {
+        self.baseURL = baseURL
+        self.servicePath = servicePath
+        self.bearerToken = bearerToken
+        self.hostHeader = hostHeader
+    }
 }
 
 /// Wallet attestation settings.
