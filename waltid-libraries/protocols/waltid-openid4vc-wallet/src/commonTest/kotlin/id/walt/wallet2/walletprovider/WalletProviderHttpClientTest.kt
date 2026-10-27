@@ -62,6 +62,30 @@ class WalletProviderHttpClientTest {
     }
 
     @Test
+    fun `refreshes the wallet instance attestation when the holder key changes`() = runTest {
+        val requests = mutableListOf<String>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val body = (request.body as TextContent).text
+                    requests += "${request.url.encodedPath} $body"
+                    val json = if (request.url.encodedPath.endsWith("/refresh")) {
+                        """{"unit_id":"wu-1","state":"operational","wia":"wia-rotated"}"""
+                    } else {
+                        """{"unit_id":"wu-1","state":"operational","wia":"wia-first"}"""
+                    }
+                    respond(json, HttpStatusCode.OK)
+                }
+            }
+        }
+        val provider = provider(client, softwareKey("provider"))
+        assertEquals("wia-first", provider.getAttestationJwt(publicKey("holder-1"), "wallet-client"))
+        assertEquals("wia-rotated", provider.getAttestationJwt(publicKey("holder-2"), "wallet-client"))
+        assertTrue(requests[1].contains("/refresh"))
+        assertTrue(requests[1].contains(""""rotate":"wia""""))
+    }
+
+    @Test
     fun `reports the provider status when activation fails`() = runTest {
         val provider = provider(
             HttpClient(MockEngine) { engine { addHandler { respond("missing", HttpStatusCode.NotFound) } } },

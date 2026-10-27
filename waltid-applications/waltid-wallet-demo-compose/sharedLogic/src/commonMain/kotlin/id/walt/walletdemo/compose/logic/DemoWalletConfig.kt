@@ -6,7 +6,7 @@ data class DemoWalletConfig(
     val attestationAttesterPath: String = DemoPublicBackendDefaults.attestationAttesterPath,
     val attestationBearerToken: String = DemoPublicBackendDefaults.attestationBearerToken,
     val attestationHostHeader: String = DemoPublicBackendDefaults.attestationHostHeader,
-    val walletProviderEnabled: Boolean = true,
+    val walletProviderEnabled: Boolean = false,
     val walletProviderBaseUrl: String = DemoPublicBackendDefaults.walletProviderBaseUrl,
     val walletProviderServicePath: String = DemoPublicBackendDefaults.walletProviderServicePath,
     val walletProviderBearerToken: String = "",
@@ -21,7 +21,11 @@ object DemoPublicBackendDefaults {
     const val attestationBearerToken = ""
     const val attestationHostHeader = ""
     const val transactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
-    /** Hosted Enterprise Stack demo. The wallet-provider service is not deployed or provisioned here yet. */
-    const val walletProviderBaseUrl = "https://org4.enterprise.demo.walt.id"
-    const val walletProviderServicePath = "org4.demo.wallet-provider"
+    /**
+     * Hosted Enterprise Stack demo. Same values as
+     * `EnterpriseDemoWalletProvider` in the wallet library. The wallet-provider service is not
+     * deployed or provisioned there yet, so sample apps leave it disabled.
+     */
+    const val walletProviderBaseUrl = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.BASE_URL
+    const val walletProviderServicePath = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.SERVICE_PATH
 }

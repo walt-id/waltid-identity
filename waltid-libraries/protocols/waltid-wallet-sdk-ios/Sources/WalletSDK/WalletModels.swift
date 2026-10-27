@@ -560,6 +560,9 @@ public enum WalletKeyType: Equatable, Sendable {
 /// ``enterpriseDemo`` addresses the hosted Enterprise Stack demo. That deployment does not yet
 /// run the wallet-provider feature, and the service path is not provisioned.
 public struct WalletProviderConfiguration: Equatable, Sendable {
+    /// Opt-in address for the hosted Enterprise Stack demo.
+    /// Keep this aligned with `EnterpriseDemoWalletProvider` in `WalletProviderHttpClient.kt`.
+    /// That deployment does not yet run the wallet-provider feature, so sample apps leave it unset.
     public static let enterpriseDemo = WalletProviderConfiguration(
         baseURL: "https://org4.enterprise.demo.walt.id",
         servicePath: "org4.demo.wallet-provider"

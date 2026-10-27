@@ -1058,6 +1058,18 @@ data class ExchangeCodeRequest(
  * Returns a [Flow] of [StoredCredential] for the full flow so callers can
  * react to each credential as it arrives (useful for streaming UIs).
  */
+internal fun attestationAssemblerForTokenMethods(
+    methods: Set<String>?,
+    attestationAssembler: ClientAttestationAssembler?,
+): ClientAttestationAssembler? {
+    if (methods?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true) return null
+    if (attestationAssembler != null) return attestationAssembler
+    if (methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }) {
+        error("This issuer requires a wallet instance attestation, and no wallet provider is configured")
+    }
+    return null
+}
+
 object WalletIssuanceHandler {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
@@ -2237,15 +2249,10 @@ object WalletIssuanceHandler {
     private fun configuredAttestationAssembler(
         asMetadata: AuthorizationServerMetadata,
         attestationAssembler: ClientAttestationAssembler?,
-    ): ClientAttestationAssembler? {
-        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
-        if (attestationAssembler != null) return attestationAssembler
-        val methods = asMetadata.tokenEndpointAuthMethodsSupported.orEmpty()
-        if (methods.isNotEmpty() && methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }) {
-            error("This issuer requires a wallet instance attestation, and no wallet provider is configured")
-        }
-        return null
-    }
+    ): ClientAttestationAssembler? = attestationAssemblerForTokenMethods(
+        asMetadata.tokenEndpointAuthMethodsSupported,
+        attestationAssembler,
+    )
 
     private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(
         credentialIssuerBaseUrl: String,
