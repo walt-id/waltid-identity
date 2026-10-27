@@ -6,11 +6,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
+cp -R "$ROOT/helm-charts" "$WORKDIR/helm-charts"
 cp "$ROOT/.github/workflows/data/helm-values.json" "$WORKDIR/helm-values.json"
 sed -i.bak 's/issuer2\.portal\.test\.waltid\.cloud/issuer2.example.waltid.cloud/g' "$WORKDIR/helm-values.json"
 
-helm dependency build "$ROOT/helm-charts/waltid" >/dev/null
-rendered="$(helm template waltid-helm-release "$ROOT/helm-charts/waltid" -f "$WORKDIR/helm-values.json")"
+helm dependency build "$WORKDIR/helm-charts/waltid" >/dev/null
+rendered="$(helm template waltid-helm-release "$WORKDIR/helm-charts/waltid" -f "$WORKDIR/helm-values.json")"
 
 issuer_url="$(printf '%s\n' "$rendered" | awk '
   $0 ~ /name: ISSUER2_BASE_URL/ { found=1; next }

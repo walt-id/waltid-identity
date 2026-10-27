@@ -26,3 +26,10 @@ if KUBECTL_EXIT=1 "$WAIT" identity-main issuer2 180s; then
   exit 1
 fi
 echo "PASS: startup failure fails the rollout check"
+
+repo_root="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+if ! grep -q 'scripts/ci/wait-for-rollout.sh' "$repo_root/.github/workflows/deployment.yml"; then
+  echo "FAIL: deployment.yml does not run wait-for-rollout.sh"
+  exit 1
+fi
+echo "PASS: deployment workflow uses the rollout helper"
