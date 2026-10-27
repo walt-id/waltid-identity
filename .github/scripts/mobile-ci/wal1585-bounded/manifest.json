@@ -19,7 +19,7 @@
   },
   "patches": {
     "compose-durable-candidate.patch": "5a6c73117066449417e25f6ad44bef92e1315cf63ea02ccf1830cc0e06ae36ee",
-    "native-selection.patch": "835954bc481d77ee8555a79277c57f7d66fd821c53b1225918bd5c7981a25da1",
+    "native-selection.patch": "4bc8dc4536f5f9531f1aa25b9bbccd1a8e9c11033bcbae931d47c9875c108222",
     "native-observation.patch": "8e51b27b258ae9e12c9c7664a4af0db4fb80d08b6b6afccbb70dda40b3ed6b43",
     "compose-candidate.patch": "d2e6f82983a73485dce6fb7c255ab24c98318ca889b2d32f65d3cd3732f898fa",
     "compose-original.patch": "371d52e369b156e4d32cc804d91ff15130d3ed550baa08a0ec696b5e776daed8"

@@ -15,7 +15,7 @@
              val creation = ProcessBuilder(
                  "xcrun", "simctl", "create", "Enterprise wallet $demo CI",
                  deviceType, "iOS $osVersion",
-@@ -713,12 +710,28 @@
+@@ -713,12 +710,27 @@
              val simulator = creation.inputStream.bufferedReader().use { it.readText().trim() }
              check(creation.waitFor() == 0 && simulator.isNotBlank()) { "Failed to create $demo test simulator" }
              AutoCloseable {
@@ -42,16 +42,15 @@
                      "-enableCodeCoverage", "NO", "-parallel-testing-enabled", "NO",
 -                    "-only-testing:iosAppUITests/BatchIssuanceE2ETests",
 +                    "-only-testing:iosAppUITests/BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch",
-+                    "-test-iterations", "1",
                  ) + testSelection
                  val projectDir = identityDir.resolve("waltid-applications/waltid-wallet-demo-$demo/iosApp")
                  // Cold Swift/Kotlin builds must finish before the fixture's test lifetime begins.
-@@ -735,6 +748,9 @@
+@@ -735,6 +747,9 @@
                  ) { "Expected one built $demo test run specification" }
                  withEnterpriseMobileFixture(resultBundle.parentFile.resolve("$demo-fixture.log")) {
                      runChecked(listOf("xcrun", "simctl", "bootstatus", simulator, "-b"), identityDir)
 +                    resultBundle.parentFile.resolve("execution-started.json").writeText(
-+                        """{"target":"BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch","budget":1,"iterations":1}""",
++                        """{"target":"BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch","budget":1,"repeatOptions":[]}""",
 +                    )
                      runChecked(
                          command = listOf(

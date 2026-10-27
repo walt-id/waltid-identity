@@ -139,8 +139,8 @@ def compose():
             run('compose-' + arm + '-boot', ['xcrun', 'simctl', 'bootstatus', simulator, '-b'])
             marker = OUT / ('execution-' + arm + '-started.json')
             with marker.open('x') as stream:
-                json.dump({'arm': arm, 'selection': selection, 'time': time.time(), 'iterations': 1}, stream)
-            results[arm] = run('compose-' + arm + '-test', ['xcodebuild', 'test-without-building', '-xctestrun', str(item['xctestrun']), '-destination', 'platform=iOS Simulator,id=' + simulator, '-only-testing:' + selection, '-parallel-testing-enabled', 'NO', '-enableCodeCoverage', 'NO', '-test-iterations', '1', '-collect-test-diagnostics', 'on-failure', '-resultBundlePath', str(OUT / (arm + '.xcresult'))], project, check=False)
+                json.dump({'arm': arm, 'selection': selection, 'time': time.time(), 'maximum_case_executions': 1, 'repeat_options': []}, stream)
+            results[arm] = run('compose-' + arm + '-test', ['xcodebuild', 'test-without-building', '-xctestrun', str(item['xctestrun']), '-destination', 'platform=iOS Simulator,id=' + simulator, '-only-testing:' + selection, '-parallel-testing-enabled', 'NO', '-enableCodeCoverage', 'NO', '-collect-test-diagnostics', 'on-failure', '-resultBundlePath', str(OUT / (arm + '.xcresult'))], project, check=False)
             run('compose-' + arm + '-shutdown', ['xcrun', 'simctl', 'shutdown', simulator], check=False)
         save('completion.json', {'exit_codes': results, 'one_comparison_only': True, 'no_runtime_extension': True})
         return int(any(results.values()))
