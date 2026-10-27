@@ -426,7 +426,7 @@ class Issuer2MetadataServiceTest {
 
     private companion object {
         val RESERVED_VCT_NAMES = listOf(
-            "authorize", "par", "token", "nonce", "credential", "credential-offer", "jwks", "external_login", "external",
+            "authorize", "par", "token", "nonce", "challenge", "credential", "credential-offer", "jwks", "external_login", "external",
         )
 
         const val CREDENTIAL_ENCRYPTION_KEY =

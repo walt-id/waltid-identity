@@ -7,6 +7,7 @@ import id.walt.commons.config.WaltConfig
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
@@ -67,6 +68,9 @@ data class Issuer2ServiceConfig(
 
     fun clientAttestationConfig(): ClientAttestationVerifierConfig? =
         clientAuthenticationConfig?.clientAttestationMethod()?.config
+
+    fun attestationChallengeConfig(): AttestationChallengeConfig? =
+        clientAuthenticationConfig?.clientAttestationMethod()?.challenge
 
     fun supportsPreAuthAnonymous(): Boolean =
         clientAuthenticationConfig?.supportsPreAuthAnonymous() == true

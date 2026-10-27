@@ -58,6 +58,7 @@ class MetadataService @JvmOverloads constructor(
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
+    private val supportsAttestationChallenges = serviceConfig.attestationChallengeConfig() != null
 
     // Eager loading makes invalid dedicated configuration fail initialization, without token-key fallback.
     private val dedicatedMetadataSigner = runBlocking {
@@ -142,6 +143,7 @@ class MetadataService @JvmOverloads constructor(
             baseUrl = baseUrl,
             codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/par",
+            challengeEndpointPath = if (supportsAttestationChallenges) "/${Issuer2EndpointPaths.CHALLENGE}" else null,
             requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             tokenEndpointAuthMethodsSupported =
                 if (supportsClientAttestation) setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) else null,

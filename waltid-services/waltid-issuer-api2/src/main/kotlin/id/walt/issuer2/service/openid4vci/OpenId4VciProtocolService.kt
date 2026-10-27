@@ -19,6 +19,9 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
+import id.walt.openid4vci.responses.challenge.AttestationChallengeResponse
+import id.walt.openid4vci.responses.challenge.AttestationChallengeResponseHttp
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
@@ -85,10 +88,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.put
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -129,12 +134,32 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
     private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     private val keyAttestation: KeyAttestationVerificationOptions? = null,
+    private val attestationChallengeService: AttestationChallengeService? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    suspend fun processChallengeRequest(requestId: String): AttestationChallengeResponseHttp {
+        val service = attestationChallengeService
+            ?: throw NotFoundException("Attestation challenges are disabled")
+        return try {
+            AttestationChallengeResponse(service.issue(metadataService.issuerBaseUrl())).toHttp()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.warn(e) { "Attestation challenge issuance failed (requestId=$requestId)" }
+            AttestationChallengeResponseHttp(
+                payload = buildJsonObject {
+                    put("error", OAuthErrorCodes.SERVER_ERROR)
+                    put("error_description", "Client attestation challenge service is unavailable")
+                },
+                status = 500,
+            )
+        }
+    }
 
     suspend fun processPushedAuthorizationRequest(
         parameters: Map<String, List<String>>,

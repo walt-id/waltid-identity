@@ -1,5 +1,6 @@
 package id.walt.issuer2.web.plugins
 
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.compression.*
@@ -10,6 +11,7 @@ fun Application.configureHTTP() {
     install(Compression)
     install(CORS) {
         allowHeaders { true }
+        exposeHeader(ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE)
         allowMethod(HttpMethod.Options)
         allowNonSimpleContentTypes = true
         allowCredentials = true
