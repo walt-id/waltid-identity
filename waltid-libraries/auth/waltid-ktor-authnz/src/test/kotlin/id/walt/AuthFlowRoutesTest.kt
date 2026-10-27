@@ -20,6 +20,8 @@ import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
+import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.openApi
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -34,9 +36,14 @@ import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AuthFlowRoutesTest {
 
@@ -139,5 +146,28 @@ class AuthFlowRoutesTest {
     fun `the provider hook can reject an authenticated caller`() = flowTest(validate = { null }) {
         val token = assertNotNull(post("/auth/email", """{"email":"alice@example.com","password":"123456"}""").info().token)
         assertEquals(HttpStatusCode.Unauthorized, client.get("/me") { bearerAuth(token) }.status)
+    }
+
+    @Test
+    fun `the session id of continued steps is a documented path parameter`() = testApplication {
+        application {
+            install(OpenApi)
+            routing {
+                route("auth") { authFlows(flows) }
+                route("api.json") { openApi() }
+            }
+        }
+        val paths = json.decodeFromString<JsonObject>(client.get("/api.json").bodyAsText())["paths"]!!.jsonObject
+        val continued = paths.filterKeys { it.startsWith("/auth/{sessionId}/") }
+        assertTrue(continued.isNotEmpty(), "no continued steps in ${paths.keys}")
+        continued.forEach { (path, operations) ->
+            operations.jsonObject.values.forEach { operation ->
+                val parameters = operation.jsonObject["parameters"]?.jsonArray.orEmpty().map { it.jsonObject }
+                assertTrue(
+                    parameters.any { it["name"]?.jsonPrimitive?.content == "sessionId" && it["in"]?.jsonPrimitive?.content == "path" },
+                    "$path does not declare sessionId: $parameters",
+                )
+            }
+        }
     }
 }
