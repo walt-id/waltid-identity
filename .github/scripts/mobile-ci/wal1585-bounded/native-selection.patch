@@ -1,0 +1,58 @@
+--- a/waltid-enterprise-integration-tests/build.gradle.kts
++++ b/waltid-enterprise-integration-tests/build.gradle.kts
+@@ -700,12 +700,9 @@
+         }
+         runChecked(command = frameworkCommand, workingDir = identityDir)
+         // Fresh app destinations prevent the other wallet from intercepting shared URL schemes.
+-        for (demo in listOf("ios", "compose")) {
++        for (demo in listOf("ios")) {
+             val bundle = if (demo == "ios") resultBundle else resultBundle.parentFile.resolve("compose-batch.xcresult")
+-            val testSelection = if (demo == "ios") listOf(
+-                "-only-testing:iosAppEnterpriseTests",
+-                "-skip-testing:iosAppEnterpriseTests/EnterpriseMobileWalletIntegrationTests/testBatchSigningCancellationStoresNoCredential",
+-            ) else emptyList()
++            val testSelection = emptyList<String>()
+             val creation = ProcessBuilder(
+                 "xcrun", "simctl", "create", "Enterprise wallet $demo CI",
+                 deviceType, "iOS $osVersion",
+@@ -713,12 +710,28 @@
+             val simulator = creation.inputStream.bufferedReader().use { it.readText().trim() }
+             check(creation.waitFor() == 0 && simulator.isNotBlank()) { "Failed to create $demo test simulator" }
+             AutoCloseable {
+-                runChecked(listOf("xcrun", "simctl", "delete", simulator), identityDir)
++                try {
++                    // Temporary diagnostic collection; no app or XCTest state changes.
++                    val container = ProcessBuilder(
++                        "xcrun", "simctl", "get_app_container", simulator, "id.walt.wallet.native", "data",
++                    ).start()
++                    val containerPath = container.inputStream.bufferedReader().use { it.readText().trim() }
++                    val containerExit = container.waitFor()
++                    val trace = file("$containerPath/Library/Caches/wal1585-ownership")
++                    val retained = resultBundle.parentFile.resolve("native-ownership")
++                    if (containerExit == 0 && trace.isDirectory) trace.copyRecursively(retained)
++                    resultBundle.parentFile.resolve("ownership-collection.json").writeText(
++                        """{"containerExit":$containerExit,"traceDirectoryPresent":${trace.isDirectory},"retained":${retained.isDirectory}}""",
++                    )
++                } finally {
++                    runChecked(listOf("xcrun", "simctl", "delete", simulator), identityDir)
++                }
+             }.use {
+                 val testArguments = listOf(
+                     "-destination", "platform=iOS Simulator,id=$simulator",
+                     "-enableCodeCoverage", "NO", "-parallel-testing-enabled", "NO",
+-                    "-only-testing:iosAppUITests/BatchIssuanceE2ETests",
++                    "-only-testing:iosAppUITests/BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch",
++                    "-test-iterations", "1",
+                 ) + testSelection
+                 val projectDir = identityDir.resolve("waltid-applications/waltid-wallet-demo-$demo/iosApp")
+                 // Cold Swift/Kotlin builds must finish before the fixture's test lifetime begins.
+@@ -735,6 +748,9 @@
+                 ) { "Expected one built $demo test run specification" }
+                 withEnterpriseMobileFixture(resultBundle.parentFile.resolve("$demo-fixture.log")) {
+                     runChecked(listOf("xcrun", "simctl", "bootstatus", simulator, "-b"), identityDir)
++                    resultBundle.parentFile.resolve("execution-started.json").writeText(
++                        """{"target":"BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch","budget":1,"iterations":1}""",
++                    )
+                     runChecked(
+                         command = listOf(
+                             "xcodebuild", "test-without-building",

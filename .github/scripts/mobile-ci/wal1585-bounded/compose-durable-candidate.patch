@@ -1,0 +1,52 @@
+--- a/waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/WalletE2EHelpers.swift
++++ b/waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/WalletE2EHelpers.swift
+@@ -223,9 +223,10 @@
+         let tagged = app.buttons.matching(identifier: identifier)
+         if tagged.firstMatch.waitForExistence(timeout: 20) {
+             // Navigation 3 retains both pages during motion; wait for the active page.
+-            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagged.count == 1 }, object: nil)
+-            XCTAssertEqual(XCTWaiter.wait(for: [unique], timeout: 5), .completed,
+-                "Button remained ambiguous after navigation: \(identifier)")
++            guard WalletButtonSnapshotGuard.wait(identifier: identifier, snapshot: { try self.app.snapshot() }) else {
++                XCTFail("Button remained ambiguous after navigation: \(identifier)")
++                return
++            }
+         }
+         XCTAssertTrue(button(identifier: identifier, fallbackLabel: fallbackLabel).waitForExistence(timeout: 20),
+                       "Button not found: \(identifier)")
+@@ -394,3 +395,35 @@
+         return elements[0]
+     }
+ }
++
++@MainActor
++private enum WalletButtonSnapshotGuard {
++    static func wait(
++        identifier: String,
++        snapshot: @escaping () throws -> any XCUIElementSnapshot,
++        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
++    ) -> Bool {
++        let deadline = now() + 5
++        let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
++            guard now() < deadline, let root = try? snapshot(), now() < deadline else { return false }
++            return count(identifier: identifier, in: root) == 1
++        }, object: nil)
++        return XCTWaiter.wait(for: [unique], timeout: 5) == .completed && now() < deadline
++    }
++
++    static func count(identifier: String, in root: any XCUIElementSnapshot) -> Int {
++        var pending = root.children
++        var matches = 0
++        while let element = pending.popLast() {
++            // Match the identifying properties used by XCUIElementQuery.matching(identifier:).
++            let properties: [String?] = [element.identifier, element.title, element.label,
++                                         element.value as? String, element.placeholderValue]
++            if element.elementType == .button && properties.contains(where: { $0 == identifier }) {
++                matches += 1
++                if matches > 1 { return matches }
++            }
++            pending.append(contentsOf: element.children)
++        }
++        return matches
++    }
++}

@@ -1,0 +1,293 @@
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift
+@@ -9,6 +9,7 @@
+     #endif
+ 
+     @StateObject private var viewModel: WalletViewModel = {
++        _ = WAL1585AnimationOwnership.installed
+         let env = ProcessInfo.processInfo.environment
+         let defaults = UserDefaults.standard
+         #if DEBUG
+@@ -207,3 +208,282 @@
+     static let attestationHostHeader = ""
+     static let transactionDataProfilesURL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
+ }
++
++import Foundation
++import UIKit
++import ObjectiveC
++
++// Temporary, single-execution WAL-1585 ownership diagnostic. No XCTest access.
++// Every intercepted method calls its original once with unchanged arguments/return value.
++// Associated witnesses retain only scalar identity; no owner, layer, view or animation.
++private enum WAL1585AnimationOwnership {
++    private static let lock = NSRecursiveLock()
++    private static var witnessKey: UInt8 = 0
++    private static var nextID = 0
++    private static var eventID = 0
++    private static let limit = 20000
++    private static var file: FileHandle?
++    private static var failed = false
++    private static var observedLayers: Set<Int> = []
++    private static let session = UUID().uuidString
++
++    private final class Witness: NSObject {
++        let id: Int
++        let kind: String
++        let address: String
++        init(id: Int, object: AnyObject) {
++            self.id = id
++            kind = String(describing: type(of: object))
++            address = String(describing: ObjectIdentifier(object))
++        }
++        deinit {
++            event("retired", ["object": id, "class": kind, "address": address,
++                "stack": Array(Thread.callStackSymbols.prefix(20))])
++        }
++    }
++
++    private static func identity(_ object: AnyObject) -> Int {
++        lock.lock(); defer { lock.unlock() }
++        if let existing = objc_getAssociatedObject(object, &witnessKey) as? Witness { return existing.id }
++        nextID += 1
++        let witness = Witness(id: nextID, object: object)
++        objc_setAssociatedObject(object, &witnessKey, witness, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
++        event("identity", ["object": witness.id, "class": witness.kind, "address": witness.address])
++        return witness.id
++    }
++
++    private static func event(_ name: String, _ fields: [String: Any] = [:]) {
++        lock.lock(); defer { lock.unlock() }
++        guard eventID <= limit, let file else { return }
++        eventID += 1
++        var row = eventID == limit + 1 ? ["event": "overflow"] : fields.merging(["event": name]) { _, b in b }
++        row["sequence"] = eventID
++        row["session"] = session
++        row["pid"] = ProcessInfo.processInfo.processIdentifier
++        row["uptime"] = ProcessInfo.processInfo.systemUptime
++        row["wallTime"] = Date().timeIntervalSince1970
++        row["mainThread"] = Thread.isMainThread
++        do {
++            var bytes = try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys])
++            bytes.append(10)
++            try file.write(contentsOf: bytes)
++        } catch {
++            if !failed { failed = true; NSLog("WAL1585 ownership trace write failed: %@", String(describing: error)) }
++        }
++    }
++
++    private static func selected(_ object: AnyObject?) -> CAPropertyAnimation? {
++        guard let a = object as? CAPropertyAnimation, a.keyPath == "position" else { return nil }
++        return a
++    }
++
++    private static func animation(_ a: CAPropertyAnimation) -> [String: Any] {
++        var row: [String: Any] = ["animation": identity(a), "class": String(describing: type(of: a)),
++            "keyPath": a.keyPath ?? "", "duration": a.duration, "beginTime": a.beginTime,
++            "repeatCount": a.repeatCount, "repeatDuration": a.repeatDuration,
++            "speed": a.speed, "timeOffset": a.timeOffset, "removedOnCompletion": a.isRemovedOnCompletion]
++        if let delegate = a.delegate { row["delegate"] = identity(delegate) }
++        if let b = a as? CABasicAnimation {
++            row["from"] = b.fromValue.map { String(describing: $0) } ?? "nil"
++            row["to"] = b.toValue.map { String(describing: $0) } ?? "nil"
++            row["by"] = b.byValue.map { String(describing: $0) } ?? "nil"
++        }
++        return row
++    }
++
++    private static func layer(_ layer: CALayer, view: AnyObject? = nil) -> [String: Any] {
++        let id = identity(layer)
++        lock.lock(); observedLayers.insert(id); lock.unlock()
++        var row: [String: Any] = ["layer": id, "class": String(describing: type(of: layer))]
++        if Thread.isMainThread {
++            row["bounds"] = String(describing: layer.bounds)
++            row["position"] = String(describing: layer.position)
++            if let parent = layer.superlayer { row["superlayer"] = identity(parent) }
++            var hierarchy: [[String: Any]] = []
++            var node = (view as? UIView) ?? (layer.delegate as? UIView)
++            while let current = node, hierarchy.count < 12 {
++                hierarchy.append(["view": identity(current), "class": String(describing: type(of: current)),
++                    "frame": String(describing: current.frame), "inWindow": current.window != nil])
++                node = current.superview
++            }
++            row["viewHierarchy"] = hierarchy
++        }
++        return row
++    }
++
++    private static func isSubclass(_ type: AnyClass, of base: AnyClass) -> Bool {
++        var candidate: AnyClass? = type
++        while let current = candidate {
++            if ObjectIdentifier(current) == ObjectIdentifier(base) { return true }
++            candidate = class_getSuperclass(current)
++        }
++        return false
++    }
++
++    private static func owns(_ type: AnyClass, _ selector: Selector) -> Bool {
++        var count: UInt32 = 0
++        guard let methods = class_copyMethodList(type, &count) else { return false }
++        defer { free(methods) }
++        return (0..<Int(count)).contains { method_getName(methods[$0]) == selector }
++    }
++
++    private static func types(_ method: Method) -> [String] {
++        var result: [String] = []
++        let returnType = method_copyReturnType(method)
++        result.append(String(cString: returnType)); free(returnType)
++        for i in 0..<method_getNumberOfArguments(method) {
++            if let value = method_copyArgumentType(method, i) { result.append(String(cString: value)); free(value) }
++        }
++        return result
++    }
++
++    private static func eligible(_ type: AnyClass, _ name: String, _ expected: [String]) -> Method? {
++        let selector = NSSelectorFromString(name)
++        guard owns(type, selector), let method = class_getInstanceMethod(type, selector) else { return nil }
++        let actual = types(method)
++        guard actual.count == expected.count, zip(actual, expected).allSatisfy({ a, e in
++            e == "pointer" ? a.hasPrefix("^") : e == "bool" ? ["B", "c"].contains(a) : a == e
++        }) else {
++            event("unsupported-signature", ["class": NSStringFromClass(type), "selector": name, "types": actual])
++            return nil
++        }
++        return method
++    }
++
++    static let installed: Void = {
++        do {
++            let root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("wal1585-ownership")
++            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
++            let target = root.appendingPathComponent("\(session).jsonl")
++            guard FileManager.default.createFile(atPath: target.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
++            file = try FileHandle(forWritingTo: target)
++        } catch { NSLog("WAL1585 ownership setup failed: %@", String(describing: error)); return }
++        guard let state = NSClassFromString("UIViewAnimationState") else { event("setup-unavailable"); return }
++        let capacity = Int(objc_getClassList(nil, 0))
++        let classes = UnsafeMutablePointer<AnyClass>.allocate(capacity: capacity)
++        defer { classes.deallocate() }
++        let count = min(capacity, Int(objc_getClassList(AutoreleasingUnsafeMutablePointer(classes), Int32(capacity))))
++        let all = (0..<count).map { classes[$0] }
++        var installed: [String] = []
++        for type in all where isSubclass(type, of: state) {
++            let label = NSStringFromClass(type)
++            let createName = "animationForLayer:forKey:forView:"
++            if let method = eligible(type, createName, ["@", "@", ":", "@", "@", "@"]) {
++                // Raw result pointers preserve the original method's +0 object ownership convention.
++                typealias Create = @convention(c) (AnyObject, Selector, AnyObject?, AnyObject?, AnyObject?) -> UnsafeMutableRawPointer?
++                let original = unsafeBitCast(method_getImplementation(method), to: Create.self)
++                let selector = NSSelectorFromString(createName)
++                let block: @convention(block) (AnyObject, AnyObject?, AnyObject?, AnyObject?) -> UnsafeMutableRawPointer? = { owner, l, k, v in
++                    let pointer = original(owner, selector, l, k, v)
++                    if let pointer, let a = selected(Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()) {
++                        var row = animation(a)
++                        row["owner"] = identity(owner); row["implementation"] = label
++                        row["key"] = (k as? String) ?? "nil"
++                        if let l = l as? CALayer { row["origin"] = layer(l, view: v) }
++                        row["stack"] = Array(Thread.callStackSymbols.prefix(24))
++                        event("created", row)
++                    }
++                    return pointer
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + createName)
++            }
++            let startName = "animationDidStart:"
++            if let method = eligible(type, startName, ["v", "@", ":", "@"]) {
++                typealias Start = @convention(c) (AnyObject, Selector, AnyObject?) -> Void
++                let original = unsafeBitCast(method_getImplementation(method), to: Start.self)
++                let selector = NSSelectorFromString(startName)
++                let block: @convention(block) (AnyObject, AnyObject?) -> Void = { owner, object in
++                    if let a = selected(object) { event("start-enter", animation(a).merging(["owner": identity(owner), "implementation": label]) { _, b in b }) }
++                    original(owner, selector, object)
++                    if let a = selected(object) { event("start-exit", ["animation": identity(a), "owner": identity(owner), "implementation": label]) }
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + startName)
++            }
++            let stopName = "animationDidStop:finished:"
++            if let method = eligible(type, stopName, ["v", "@", ":", "@", "bool"]) {
++                typealias Stop = @convention(c) (AnyObject, Selector, AnyObject?, Bool) -> Void
++                let original = unsafeBitCast(method_getImplementation(method), to: Stop.self)
++                let selector = NSSelectorFromString(stopName)
++                let block: @convention(block) (AnyObject, AnyObject?, Bool) -> Void = { owner, object, finished in
++                    if let a = selected(object) { event("stop-enter", ["animation": identity(a), "owner": identity(owner), "implementation": label, "finished": finished]) }
++                    original(owner, selector, object, finished)
++                    if let a = selected(object) { event("stop-exit", ["animation": identity(a), "owner": identity(owner), "implementation": label, "finished": finished]) }
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + stopName)
++            }
++        }
++        for type in all where isSubclass(type, of: CAAnimation.self) {
++            let label = NSStringFromClass(type)
++            let name = "copyWithZone:"
++            if let method = eligible(type, name, ["@", "@", ":", "pointer"]) {
++                // Raw pointers are essential: copy returns +1. Do not bridge or autorelease that return.
++                typealias Copy = @convention(c) (AnyObject, Selector, UnsafeRawPointer?) -> UnsafeMutableRawPointer?
++                let original = unsafeBitCast(method_getImplementation(method), to: Copy.self)
++                let selector = NSSelectorFromString(name)
++                let block: @convention(block) (AnyObject, UnsafeRawPointer?) -> UnsafeMutableRawPointer? = { source, zone in
++                    let pointer = original(source, selector, zone)
++                    if let a = selected(source), let pointer {
++                        let copy = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
++                        event("copied", ["source": identity(a), "copy": identity(copy), "implementation": label])
++                    }
++                    return pointer
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + name)
++            }
++        }
++        for type in all where isSubclass(type, of: CALayer.self) {
++            let label = NSStringFromClass(type)
++            let addName = "addAnimation:forKey:"
++            if let method = eligible(type, addName, ["v", "@", ":", "@", "@"]) {
++                typealias Add = @convention(c) (AnyObject, Selector, AnyObject?, AnyObject?) -> Void
++                let original = unsafeBitCast(method_getImplementation(method), to: Add.self)
++                let selector = NSSelectorFromString(addName)
++                let block: @convention(block) (AnyObject, AnyObject?, AnyObject?) -> Void = { object, animationObject, key in
++                    if let a = selected(animationObject), let l = object as? CALayer {
++                        var row = animation(a); row["origin"] = layer(l); row["key"] = (key as? String) ?? "nil"
++                        row["implementation"] = label; row["stack"] = Array(Thread.callStackSymbols.prefix(24))
++                        event("add-enter", row)
++                    }
++                    original(object, selector, animationObject, key)
++                    if let a = selected(animationObject) { event("add-exit", ["animation": identity(a), "layer": identity(object), "key": (key as? String) ?? "nil", "implementation": label]) }
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + addName)
++            }
++            let removeName = "removeAnimationForKey:"
++            if let method = eligible(type, removeName, ["v", "@", ":", "@"]) {
++                typealias Remove = @convention(c) (AnyObject, Selector, AnyObject?) -> Void
++                let original = unsafeBitCast(method_getImplementation(method), to: Remove.self)
++                let selector = NSSelectorFromString(removeName)
++                let block: @convention(block) (AnyObject, AnyObject?) -> Void = { object, key in
++                    recordRemoval(object, eventName: "remove-key-enter", implementation: label, key: key)
++                    original(object, selector, key)
++                    recordRemoval(object, eventName: "remove-key-exit", implementation: label, key: key)
++                }
++                method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + removeName)
++            }
++            for name in ["removeAllAnimations", "removeFromSuperlayer"] {
++                if let method = eligible(type, name, ["v", "@", ":"]) {
++                    typealias Remove = @convention(c) (AnyObject, Selector) -> Void
++                    let original = unsafeBitCast(method_getImplementation(method), to: Remove.self)
++                    let selector = NSSelectorFromString(name)
++                    let block: @convention(block) (AnyObject) -> Void = { object in
++                        recordRemoval(object, eventName: name + "-enter", implementation: label)
++                        original(object, selector)
++                        recordRemoval(object, eventName: name + "-exit", implementation: label)
++                    }
++                    method_setImplementation(method, imp_implementationWithBlock(block)); installed.append(label + "." + name)
++                }
++            }
++        }
++        event("installed", ["hooks": installed, "eventLimit": limit, "scope": "position animations only", "appSource": "c52f1778b6e88487f0be0864afde7edb00b224cf"])
++        NSLog("WAL1585 ownership installed (%ld hooks), session %@", installed.count, session)
++    }()
++
++    private static func recordRemoval(_ object: AnyObject, eventName: String, implementation: String, key: AnyObject? = nil) {
++        lock.lock(); defer { lock.unlock() }
++        guard let witness = objc_getAssociatedObject(object, &witnessKey) as? Witness,
++              observedLayers.contains(witness.id) else { return }
++        event(eventName, ["layer": witness.id, "implementation": implementation, "key": (key as? String) ?? "nil",
++            "stack": Array(Thread.callStackSymbols.prefix(20))])
++    }
++}

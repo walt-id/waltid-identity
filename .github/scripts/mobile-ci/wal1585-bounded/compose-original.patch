@@ -1,0 +1,17 @@
+--- a/waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/WalletE2EHelpers.swift
++++ b/waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/WalletE2EHelpers.swift
+@@ -223,7 +223,13 @@
+         let tagged = app.buttons.matching(identifier: identifier)
+         if tagged.firstMatch.waitForExistence(timeout: 20) {
+             // Navigation 3 retains both pages during motion; wait for the active page.
+-            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagged.count == 1 }, object: nil)
++            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
++                    let began = ProcessInfo.processInfo.systemUptime
++                    print("WAL1585_QUERY original begin \(identifier) \(began)")
++                    let count = tagged.count
++                    print("WAL1585_QUERY original end \(identifier) count=\(count) elapsed=\(ProcessInfo.processInfo.systemUptime - began)")
++                    return count == 1
++                }, object: nil)
+             XCTAssertEqual(XCTWaiter.wait(for: [unique], timeout: 5), .completed,
+                 "Button remained ambiguous after navigation: \(identifier)")
+         }

@@ -1,0 +1,28 @@
+{
+  "tuple": {
+    "identity": "c52f1778b6e88487f0be0864afde7edb00b224cf",
+    "enterprise": "b7501c0c568f351d383f4bf8d7a83e4f820682ba",
+    "unified": "1fef89185ad62339246905d88c45cbcac37341e6",
+    "enterprise_license": "89e50887a63586c021b4bb927e5c2c696c229ce1"
+  },
+  "framework": {
+    "artifact_id": 12745935414,
+    "name": "wallet-core-release-2",
+    "run_id": 40503413203,
+    "archive_sha256": "9af272d2a6bd3625f2fbb116f2d43ae05563505321f6c055d88e9716e77c6765",
+    "tar_sha256": "750ce8ae5f954984ddeef162c7c016c5c2bde0dc2e07da7c9659fc80d2ef7d54"
+  },
+  "budgets": {
+    "native": 1,
+    "compose_original": 1,
+    "compose_candidate": 1
+  },
+  "patches": {
+    "compose-durable-candidate.patch": "5a6c73117066449417e25f6ad44bef92e1315cf63ea02ccf1830cc0e06ae36ee",
+    "native-selection.patch": "835954bc481d77ee8555a79277c57f7d66fd821c53b1225918bd5c7981a25da1",
+    "native-observation.patch": "8e51b27b258ae9e12c9c7664a4af0db4fb80d08b6b6afccbb70dda40b3ed6b43",
+    "compose-candidate.patch": "d2e6f82983a73485dce6fb7c255ab24c98318ca889b2d32f65d3cd3732f898fa",
+    "compose-original.patch": "371d52e369b156e4d32cc804d91ff15130d3ed550baa08a0ec696b5e776daed8"
+  },
+  "query_measurement": "Same timestamp-only instrumentation around original live count and candidate public snapshot; no URL or credential values recorded."
+}
