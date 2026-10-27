@@ -15,7 +15,6 @@ import id.walt.wallet2.handlers.KeyAttestationRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import kotlinx.coroutines.test.runTest
@@ -29,19 +28,23 @@ class WalletProviderHttpClientTest {
     fun `activates once and signs only the proof key`() = runTest {
         val requests = mutableListOf<String>()
         val verificationKey = softwareKey("provider")
-        val client = client { request ->
-            val body = (request.body as TextContent).text
-            requests += request.url.encodedPath + " " + body
-            val json = when {
-                request.url.encodedPath.endsWith("/units") ->
-                    """{"unit_id":"wu-1","state":"operational","wia":"wia-token"}"""
-                request.url.encodedPath.endsWith("/wua") ->
-                    """{"unit_id":"wu-1","state":"operational","ka":"ka-one"}"""
-                request.url.encodedPath.endsWith("/refresh") ->
-                    """{"unit_id":"wu-1","state":"operational","ka":"ka-two"}"""
-                else -> error(request.url.encodedPath)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    val body = (request.body as TextContent).text
+                    requests += request.url.encodedPath + " " + body
+                    val json = when {
+                        request.url.encodedPath.endsWith("/units") ->
+                            """{"unit_id":"wu-1","state":"operational","wia":"wia-token"}"""
+                        request.url.encodedPath.endsWith("/wua") ->
+                            """{"unit_id":"wu-1","state":"operational","ka":"ka-one"}"""
+                        request.url.encodedPath.endsWith("/refresh") ->
+                            """{"unit_id":"wu-1","state":"operational","ka":"ka-two"}"""
+                        else -> error(request.url.encodedPath)
+                    }
+                    respond(json, HttpStatusCode.OK)
+                }
             }
-            respond(json, HttpStatusCode.OK)
         }
         val provider = provider(client, verificationKey)
         val first = publicKey("holder-1")
@@ -60,7 +63,10 @@ class WalletProviderHttpClientTest {
 
     @Test
     fun `reports the provider status when activation fails`() = runTest {
-        val provider = provider(client { respond("missing", HttpStatusCode.NotFound) }, softwareKey("provider"))
+        val provider = provider(
+            HttpClient(MockEngine) { engine { addHandler { respond("missing", HttpStatusCode.NotFound) } } },
+            softwareKey("provider"),
+        )
         val failure = assertFailsWith<IllegalStateException> {
             provider.getAttestationJwt(publicKey("holder-1"), "wallet-client")
         }
@@ -91,7 +97,4 @@ class WalletProviderHttpClientTest {
         verificationKeyFromJwt = { verificationKey },
     )
 
-    private fun client(handler: suspend (HttpRequestData) -> io.ktor.client.request.HttpResponseData) = HttpClient(MockEngine) {
-        engine { addHandler { request -> handler(request) } }
-    }
 }
