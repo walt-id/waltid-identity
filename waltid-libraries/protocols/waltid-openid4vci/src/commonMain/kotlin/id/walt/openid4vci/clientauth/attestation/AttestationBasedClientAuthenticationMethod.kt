@@ -1,5 +1,6 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
@@ -44,6 +45,7 @@ class AttestationBasedClientAuthenticationMethod(
     private val clock: () -> Instant = { Clock.System.now() },
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
+    private val challengeService: AttestationChallengeService? = null,
 ) : ClientAuthenticationMethod {
     private val inlineJwkResolver = Crypto2JwtKeyResolver(allowInlineJwk = true)
 
@@ -95,7 +97,8 @@ class AttestationBasedClientAuthenticationMethod(
 
         val now = clock()
         val expectedAudience = context.authorizationServerIssuer?.takeIf { it.isNotBlank() }
-            ?: return failure("Authorization server issuer is required for client attestation authentication")
+            ?: return if (challengeService != null) challengeServerError()
+            else failure("Authorization server issuer is required for client attestation authentication")
 
         val attestation = decodeJwt(attestationJwt) ?: return invalidJwt("client attestation")
         val attestationError = validateAttestation(attestation, now)
@@ -184,6 +187,27 @@ class AttestationBasedClientAuthenticationMethod(
         }
         if (!popSignatureValid) {
             return failure("Client attestation PoP signature is invalid")
+        }
+
+        if (challengeService != null) {
+            val service = challengeService
+            try {
+                val challenge = (pop.payload[JwtPayloadClaims.CHALLENGE] as? JsonPrimitive)
+                    ?.takeIf { it.isString }?.contentOrNull
+                if (challenge.isNullOrBlank() || !service.validate(challenge, expectedAudience)) {
+                    return ClientAuthenticationResult.Failure(
+                        OAuthError(
+                            OAuthErrorCodes.USE_ATTESTATION_CHALLENGE,
+                            "A valid client attestation challenge is required",
+                            mapOf(ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE to service.issue(expectedAudience)),
+                        ),
+                    )
+                }
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Exception) {
+                return challengeServerError()
+            }
         }
 
         return ClientAuthenticationResult.Authenticated(
@@ -282,6 +306,11 @@ class AttestationBasedClientAuthenticationMethod(
                 payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject,
             )
         }.getOrNull()
+
+    private fun challengeServerError(): ClientAuthenticationResult.Failure =
+        ClientAuthenticationResult.Failure(
+            OAuthError(OAuthErrorCodes.SERVER_ERROR, "Client attestation challenge service is unavailable"),
+        )
 
     private fun invalidJwt(label: String): ClientAuthenticationResult.Failure =
         failure("Invalid $label JWT")
