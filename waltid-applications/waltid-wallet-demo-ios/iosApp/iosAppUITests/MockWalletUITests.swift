@@ -778,7 +778,14 @@ final class MockWalletUITests: XCTestCase {
         waitForIdleResultDismissal(app)
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         XCTAssertTrue(app.staticTexts["Example Credential"].waitForExistence(timeout: 10))
+        let credentialCard = app.buttons["wallet.credentialCard.cred-1"]
+        XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
+        let personal = app.buttons["wallet.claimGroupDisclosure.Personal_details"]
+        XCTAssertTrue(personal.waitForExistence(timeout: 10))
+        XCTAssertEqual(personal.value as? String, "Expanded")
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait"), timeout: 10)
         XCTAssertTrue(app.staticTexts["Example Credential"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Issuer: Example Issuer"].waitForExistence(timeout: 10))
         ui.assertExists(identifier: "wallet.claim.given_name")
@@ -787,6 +794,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["2026-06-17"].exists)
         ui.tapButton(identifier: "credential-technical-details", fallbackLabel: "Technical details")
         ui.assertExists(identifier: "wallet.claim.system_format")
+        XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["No credential details available"].exists)
         XCTAssertTrue(app.staticTexts["jwt_vc_json"].waitForExistence(timeout: 10))
 
         ui.openScanner()
