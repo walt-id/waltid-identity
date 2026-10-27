@@ -161,6 +161,56 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
+    fun `identifier VCTs are published unchanged and served as type metadata`() {
+        val configured = SdJwtVcTypeMetadataDraft04(
+            name = "EU Person Identification Data",
+            description = "From configuration.",
+        )
+        val pid = metadataService(
+            metadataConfig = sdJwtMetadata("urn:eudi:pid:1", "urn:eudi:pid:1").copy(
+                sdJwtVcTypeMetadataConfiguration = mapOf("urn:eudi:pid:1" to configured),
+            ),
+        )
+        assertEquals("urn:eudi:pid:1", pid.getCredentialConfiguration("urn:eudi:pid:1")?.vct)
+        assertEquals(configured.copy(vct = "urn:eudi:pid:1"), pid.getVctTypeMetadata("urn:eudi:pid:1"))
+
+        val ehic = metadataService(metadataConfig = sdJwtMetadata("urn:eudi:ehic:1", "urn:eudi:ehic:1"))
+        val ehicMetadata = ehic.getVctTypeMetadata("urn:eudi:ehic:1")
+        assertEquals("urn:eudi:ehic:1", ehicMetadata.vct)
+        assertEquals("urn:eudi:ehic:1", ehicMetadata.name)
+        assertEquals("urn:eudi:ehic:1 Verifiable Credential", ehicMetadata.description)
+
+        val external = metadataService(
+            metadataConfig = sdJwtMetadata("identity", "https://example.com/credentials/identity"),
+        )
+        assertFailsWith<NotFoundException> { external.getVctTypeMetadata("identity") }
+    }
+
+    @Test
+    fun `uppercase HTTPS vct values stay external URLs`() {
+        val service = metadataService(
+            metadataConfig = sdJwtMetadata("identity", "HTTPS://example.com/credentials/identity"),
+        )
+        assertEquals(
+            "HTTPS://example.com/credentials/identity",
+            service.getCredentialConfiguration("identity")?.vct,
+        )
+        assertFailsWith<NotFoundException> { service.getVctTypeMetadata("identity") }
+        assertFailsWith<NotFoundException> {
+            service.getVctTypeMetadata("HTTPS://example.com/credentials/identity")
+        }
+    }
+
+    @Test
+    fun `blank malformed and non URN vct values are rejected`() {
+        listOf("", "   ", "https:foo", "foo:bar", "not a uri:value", "identity_credential").forEach { vct ->
+            assertFailsWith<IllegalArgumentException>(vct) {
+                metadataService(metadataConfig = sdJwtMetadata("bad", vct))
+            }
+        }
+    }
+
+    @Test
     fun `unknown and reserved metadata types are not found`() {
         val service = metadataService(metadataConfig = sdJwtMetadata("EmployeeCredential", "vctBaseUrl"))
         assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
