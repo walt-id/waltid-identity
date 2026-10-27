@@ -4,6 +4,38 @@ import UIKit
 extension View {
     /// Fit the active page, capped by the system's available presentation height.
     public func walletSheetSizing() -> some View { modifier(WalletSheetSizingModifier()) }
+
+    /// Request the keyboard after the new page content has finished resizing its sheet.
+    public func walletSheetAutofocus(_ focus: FocusState<Bool>.Binding, when requested: Bool) -> some View {
+        modifier(WalletSheetAutofocusModifier(focus: focus, requested: requested))
+    }
+}
+
+private struct WalletSheetAutofocusModifier: ViewModifier {
+    let focus: FocusState<Bool>.Binding
+    let requested: Bool
+    @Environment(\.walletSheetSizing) private var sizing
+    @State private var request: UUID?
+
+    func body(content: Content) -> some View {
+        content.onChange(of: requested) { requested in
+            cancelRequest()
+            guard requested else { focus.wrappedValue = false; return }
+            guard #available(iOS 16, *), let sizing else { focus.wrappedValue = true; return }
+            let id = UUID()
+            request = id
+            sizing.afterLayout(id: id) { [focus, request = $request] in
+                guard request.wrappedValue == id else { return }
+                request.wrappedValue = nil
+                focus.wrappedValue = true
+            }
+        }.onDisappear(perform: cancelRequest)
+    }
+
+    private func cancelRequest() {
+        if let request { sizing?.cancelAfterLayout(id: request) }
+        request = nil
+    }
 }
 
 private struct WalletSheetSizingModifier: ViewModifier {
@@ -44,16 +76,37 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     private weak var sheet: UISheetPresentationController?
     private var height: CGFloat = 0
     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
+    private var resizing = false
+    private var layoutCompletion: (id: UUID, action: () -> Void)?
+
+    func afterLayout(id: UUID, _ completion: @escaping () -> Void) {
+        layoutCompletion = (id, completion)
+        activePage?.scheduleMeasurement()
+    }
+
+    func cancelAfterLayout(id: UUID) {
+        if layoutCompletion?.id == id { layoutCompletion = nil }
+    }
 
     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
-        guard #available(iOS 16, *), activePage === page, height.isFinite, height > 0,
+        guard #available(iOS 16, *), activePage === page, !resizing, height.isFinite, height > 0,
               let presentation = owner.sheetPresentationController else { return }
         let rounded = ceil(height)
         // SwiftUI can reset the same presentation controller when the task root changes.
         // Reinstall our detent after scanner/loading/review transitions, not only for a new host.
         let needsConfiguration = sheet !== presentation
             || presentation.detents.map(\.identifier) != [identifier]
-        guard needsConfiguration || self.height != rounded else { return }
+        guard needsConfiguration || self.height != rounded else {
+            // Layout can finish before the sheet's presentation does.
+            if let transition = owner.transitionCoordinator, layoutCompletion != nil {
+                transition.animate(alongsideTransition: nil) { [weak page] _ in page?.scheduleMeasurement() }
+                return
+            }
+            let completion = layoutCompletion
+            layoutCompletion = nil
+            completion?.action()
+            return
+        }
         self.height = rounded
         let changes = { [self] in
             if needsConfiguration {
@@ -66,8 +119,23 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
                 presentation.prefersScrollingExpandsWhenScrolledToEdge = false
             } else { presentation.invalidateDetents() }
         }
-        if animated && !owner.isBeingPresented { presentation.animateChanges(changes) }
-        else { changes() }
+        if animated && !owner.isBeingPresented {
+            resizing = true
+            CATransaction.begin()
+            CATransaction.setCompletionBlock { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    resizing = false
+                    // Re-measure the current page, not a height captured before another update.
+                    activePage?.scheduleMeasurement()
+                }
+            }
+            presentation.animateChanges(changes)
+            CATransaction.commit()
+        } else {
+            changes()
+            page.scheduleMeasurement()
+        }
     }
 }
 
@@ -138,6 +206,10 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
             var owner = page
             while let parent = owner.parent { owner = parent }
             guard owner.presentingViewController != nil else { return }
+            // A focus request can queue a measurement before SwiftUI has laid out the
+            // replacement content. Flush the owning hierarchy before reading its geometry.
+            owner.view.layoutIfNeeded()
+            guard sizing.activePage === self, view.window != nil else { return }
             let viewport = scroll.convert(scroll.bounds, to: page.view)
             let insets = scroll.adjustedContentInset
             // Include navigation chrome, outer padding, and pinned actions. UIKit adds the
