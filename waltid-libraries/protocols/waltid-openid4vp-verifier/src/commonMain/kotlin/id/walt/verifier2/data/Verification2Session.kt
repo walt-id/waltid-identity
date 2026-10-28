@@ -52,10 +52,8 @@ data class Verification2Session(
 
     /**
      * (Optional) Expiration time
-     * Verification Session will expire if it is left unused (no presentation is pushed to the session)
-     *
-     * **The Session is no longer eligible for expiry if it was used and presentation data was made available**
-     * (no matter if successful or failed)
+     * New presentations and authorization request fetches are rejected after this time, even after use.
+     * Used sessions remain available for inspection until [retentionDate].
      */
     val expirationDate: Instant? = Clock.System.now().plus(UNUSED_SESSION_LIFETIME_MINUTES, DateTimeUnit.MINUTE, TimeZone.UTC),
 
@@ -80,6 +78,9 @@ data class Verification2Session(
     var notifications: KtorSessionNotifications? = null,
 
     val reattemptable: Boolean = true,
+
+    /** Unique ID of the latest accepted presentation attempt, shared by its status callbacks. */
+    var presentationId: String? = null,
 
     /**
      * Minimal authorization request if request is provided by URL
@@ -164,6 +165,13 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
+    fun requireAvailable(now: Instant = Clock.System.now()) {
+        require(expirationDate?.let { now < it } != false) { "This verification session is expired." }
+        require(reattemptable || status != VerificationSessionStatus.SUCCESSFUL) {
+            "This verification session has already completed successfully."
+        }
+    }
+
     /**
      * When the stored session may be discarded, or null to keep it indefinitely.
      *

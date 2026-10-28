@@ -20,6 +20,7 @@ import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
 import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.*
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
@@ -432,8 +433,8 @@ object Verifier2VPDirectPostHandler {
         log.trace { "Handling direct post for received data: $responseData" }
 
         val session = verificationSession
+        session.requireAvailable(verificationTime)
         val responseMode = session.authorizationRequest.responseMode
-        val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
         if (responseData is ErrorResponseDirectPost) {
             return handleWalletErrorResponse(session, responseData, updateSessionCallback)
@@ -451,17 +452,36 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
+        // Parse vp_token
+        val phaseStart = TimeSource.Monotonic.markNow()
+        val vpTokenContents = parseVpToken(vpTokenString)
+        val afterVpToken = phaseStart.elapsedNow()
+        // Start the attempt before validation can emit any callback.
+        session.updateSession(SessionEvent.attempted_presentation) {
+            presentationId = Uuid.random().toString()
+            attempted = true
+            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
+            statusReason = null
+            failure = null
+            policyResults = null
+            presentationValidationResults = null
+            presentedPresentations = null
+            presentedCredentials = null
+            responseCode = null
+            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
+        }
+        val afterSessionUpdate = phaseStart.elapsedNow()
+
         // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
         // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
-        if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
-            val idToken = extractIdToken(
-                responseData,
-                session,
-                ephemeralDecryptionKey,
-                crypto2EphemeralDecryptionKey,
-            )
-                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+        if (session.authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
             try {
+                val idToken = extractIdToken(
+                    responseData,
+                    session,
+                    ephemeralDecryptionKey,
+                    crypto2EphemeralDecryptionKey,
+                ) ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
                 val allowedAlgorithms = session.authorizationRequest.clientMetadata
                     ?.idTokenSignedResponseAlg
                     ?: ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG
@@ -484,18 +504,7 @@ object Verifier2VPDirectPostHandler {
             log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 
-        // Parse vp_token
-        val phaseStart = TimeSource.Monotonic.markNow()
-        val vpTokenContents = parseVpToken(vpTokenString)
-        val afterVpToken = phaseStart.elapsedNow()
         log.trace { "Parsed vp_token for state $receivedState: $vpTokenContents" }
-
-        session.updateSession(SessionEvent.attempted_presentation) {
-            attempted = true
-            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
-            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
-        }
-        val afterSessionUpdate = phaseStart.elapsedNow()
 
         // Process
 
@@ -630,6 +639,7 @@ object Verifier2VPDirectPostHandler {
         }
 
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
+            presentationId = Uuid.random().toString()
             attempted = true
             status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
