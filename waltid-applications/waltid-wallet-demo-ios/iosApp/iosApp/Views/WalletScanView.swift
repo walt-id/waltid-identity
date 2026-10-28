@@ -83,7 +83,7 @@ struct WalletScanView: View {
         .accessibilityIdentifier("wallet.scanScreen")
         .modifier(ScannerSheetSurface())
         .onChange(of: input) { _ in resolutionError = nil }
-        .walletSheetAutofocus($inputFocused, when: manual)
+        .walletSheetAutofocus($inputFocused, when: manual && !closed && !resolving && !dispatched)
         .onDisappear { closed = true; resolutionTask?.cancel() }
     }
 
