@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign Tagged="false">
+        <payload/>
+        <signatures>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                </ProtectedHeader>
+                <signature/>
+            </COSE_Signature>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                </ProtectedHeader>
+                <signature/>
+            </COSE_Signature>
+        </signatures>
+    </COSE_Sign>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign structure with attached payload and two signers (two COSE_Signature elements). The body-layer protected header shall not be present and the body-layer unprotected header shall not be present (uHeaders shall not be present in the body layer, clause 4.4). Each COSE_Signature (signer layer) shall contain only the minimum mandatory components: the protected header parameters alg, CWT Claims (enclosing iat) and x5chain. Each signer shall use its own signing certificate. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

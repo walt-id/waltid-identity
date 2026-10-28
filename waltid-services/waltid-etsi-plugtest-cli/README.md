@@ -283,3 +283,33 @@ Supported placeholders:
 - `{testCaseId}` - The test case ID (e.g., "SJV-EAA-1")
 
 Example: `fileNamePattern = "WALT-{testCaseId}"` produces files like `WALT-SJV-EAA-1.json`
+
+## CB-AdES Plugtests 2026 (`cbades` commands)
+
+These commands implement the ETSI CB-AdES Plugtests workflow (https://signature-plugtests.etsi.org/) on top of
+`waltid-libraries/ades/waltid-cbades`. The test-case definitions from the portal are under `testcases/cbades/`
+and the portal data files are in `testcases/cbades/Data/`.
+
+```bash
+CLI=build/install/waltid-etsi-plugtest-cli/bin/waltid-etsi-plugtest-cli   # ./gradlew :waltid-services:waltid-etsi-plugtest-cli:installDist
+
+# 1. Generate CB-B-*.cbor with the P12 issued by the plugtest PKI and an RFC 3161 TSA, and self-check them
+CBADES_P12_PASSWORD=... $CLI cbades generate --p12 walt.p12 --tsa-url https://tsa.example/tsr \
+    --participant WALT --pki-dir cbades-pki --output output/cbades --zip
+#    -> output/cbades/WALT/CB-B-*.cbor and output/cbades/WALT-signatures.zip (flat upload zip)
+
+# 2. Verify everybody else's signatures from the portal "download all" package
+$CLI cbades verify --package all.zip --participant WALT --trust extra-roots/ --output output/cbades-reports --zip
+#    -> Verification_of_<PARTICIPANT>_<CODE>.xml (root VALID / INVALID / INDETERMINATE, REPORT, SUBINDICATION)
+
+# 3. Augmentation tests (Aug-B-*.xml): augment other participants' signatures
+$CLI cbades augment --package all.zip --tsa-url https://tsa.example/tsr --participant WALT --output output/cbades-augmented --zip
+#    -> Aug<LEVEL>-<N>_<ORIGIN>_<CODE>.cbor
+```
+
+- If you leave out `--p12` and `--tsa-url`, the commands use the local test PKI and an in-process TSA. Only use this for dry runs.
+- Second signers, counter-signers and the X.509 attribute authority (CB-B-B-14) always come from the persistent local
+  test PKI in `--pki-dir`. Its root certificate and CRLs are written to `<pki-dir>/trust/`. Share them with the other
+  participants (forum) so they can build the chains, as CORUH did.
+- `--trust` accepts extra self-signed roots (trust anchors), intermediate certificates and CRLs, for example the roots
+  of other participants' test PKIs.

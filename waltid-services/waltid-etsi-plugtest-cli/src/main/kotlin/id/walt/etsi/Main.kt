@@ -9,23 +9,29 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
+import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
+import id.walt.etsi.cbades.CbAdesCommand
 import id.walt.etsi.config.ConfigManager
 import id.walt.etsi.generator.MdocGenerator
 import id.walt.etsi.generator.SdJwtVcGenerator
 import id.walt.etsi.validator.ContentValidator
 import id.walt.etsi.validator.CredentialValidator
+import id.walt.etsi.validator.SchemaResolver
 import id.walt.etsi.validator.ValidationResult
 import id.walt.etsi.validator.VendorFile
 import id.walt.etsi.validator.XmlReportGenerator
 import id.walt.etsi.validator.ZipParser
+import id.walt.policies2.vc.policies.JsonSchemaPolicy
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import java.io.File
+import kotlinx.serialization.json.JsonPrimitive
 
 private val log = KotlinLogging.logger {}
 
@@ -79,7 +85,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
         // Issuer-side schema check (offline): when schema/metadata dirs are supplied, validate each
         // generated SD-JWT VC against the JSON Schema resolved from its vct (via Type Metadata).
         val schemaResolver = if (schemaDir != null || metadataDir != null) {
-            id.walt.etsi.validator.SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
+            SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
         } else null
 
         echo("Loading test cases from: ${testCasesFile.absolutePath}")
@@ -160,14 +166,14 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                 // credential against the JSON Schema resolved from its vct.
                                 if (schemaResolver != null) {
                                     runCatching {
-                                        val (_, parsedCred) = id.walt.credentials.CredentialParser.detectAndParse(result.sdJwtVc)
+                                        val (_, parsedCred) = CredentialParser.detectAndParse(result.sdJwtVc)
                                         val credVct = parsedCred.credentialData["vct"]?.let {
-                                            (it as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                            (it as? JsonPrimitive)?.content
                                         }
                                         val schema = schemaResolver.resolveSchemaForVct(credVct)
                                         if (schema != null) {
-                                            val schemaResult = id.walt.policies2.vc.policies.JsonSchemaPolicy(schema = schema)
-                                                .verify(parsedCred, id.walt.policies2.vc.policies.PolicyExecutionContext.Empty)
+                                            val schemaResult = JsonSchemaPolicy(schema = schema)
+                                                .verify(parsedCred, PolicyExecutionContext.Empty)
                                             if (schemaResult.isSuccess) {
                                                 echo("      Schema check: PASS (vct=$credVct)")
                                             } else {
@@ -369,7 +375,7 @@ class ValidateCommand : CliktCommand(name = "validate") {
         // schema_url -> local schema file, then validate via the shared JsonSchemaPolicy.
         val schemaResolver = if (schemaDir != null || metadataDir != null) {
             echo("Schema validation enabled (schemaDir=${schemaDir?.absolutePath}, metadataDir=${metadataDir?.absolutePath})")
-            id.walt.etsi.validator.SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
+            SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
         } else null
 
         // Load test cases if provided
@@ -389,8 +395,8 @@ class ValidateCommand : CliktCommand(name = "validate") {
             (vendorFilter == null || file.vendorId.contains(vendorFilter!!, ignoreCase = true)) &&
                     (testCaseFilter == null || file.testCaseId.contains(testCaseFilter!!, ignoreCase = true)) &&
                     (formatFilter == null || when (formatFilter) {
-                        "sd-jwt-vc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.SD_JWT_VC
-                        "mdoc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.MDOC
+                        "sd-jwt-vc" -> file.format == VendorFile.FileFormat.SD_JWT_VC
+                        "mdoc" -> file.format == VendorFile.FileFormat.MDOC
                         else -> true
                     })
         }
@@ -551,7 +557,7 @@ fun main(args: Array<String>) {
     // Initialise DID resolvers (including did:web) so credentials with did:web issuers can be verified
     runBlocking { DidService.minimalInit() }
     EtsiCli()
-        .subcommands(GenerateCommand(), ListCommand(), ValidateCommand())
+        .subcommands(GenerateCommand(), ListCommand(), ValidateCommand(), CbAdesCommand.create())
         .main(args)
 }
 
@@ -560,6 +566,6 @@ fun main(args: Array<String>) {
  * - a directory containing sd-jwt-vc.json, negative.json, iso-mdoc.json (scraped files), or
  * - a single test-cases.json file (legacy format).
  */
-fun loadScrapedData(file: java.io.File): ScrapedData =
+fun loadScrapedData(file: File): ScrapedData =
     if (file.isDirectory) ScrapedData.loadFromDirectory(file)
     else Json.decodeFromString<ScrapedData>(file.readText())

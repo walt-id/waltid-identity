@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <srCms>
+                <SrCm>
+                    <commId>
+                        <id>http://uri.etsi.org/01903/v1.2.2#ProofOfOrigin</id>
+                    </commId>
+                </SrCm>
+            </srCms>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected srCms header parameter (label 262) with one SrCm whose commId shall be an oId with id "http://uri.etsi.org/01903/v1.2.2#ProofOfOrigin" (Annex C). The commQuals member shall not be present. No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>
