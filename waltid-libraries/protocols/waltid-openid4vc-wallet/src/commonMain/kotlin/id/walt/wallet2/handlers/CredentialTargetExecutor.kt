@@ -61,6 +61,7 @@ internal suspend fun executeCredentialTargets(
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
+                issuerMetadata = issuerMetadata,
                 onStage = { stage = it },
             )
             ensureOwned()
