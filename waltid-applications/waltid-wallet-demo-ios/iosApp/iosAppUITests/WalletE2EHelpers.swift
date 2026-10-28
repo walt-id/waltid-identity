@@ -330,11 +330,13 @@ final class WalletE2EUI {
             let coveredInput = input && footer.exists && footer.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
             return element.isHittable && !coveredInput
         }
-        for _ in 0..<6 where !uncoveredAndHittable() {
+        for _ in 0..<6 {
+            if uncoveredAndHittable() { return }
             app.swipeUp()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
-        for _ in 0..<6 where !uncoveredAndHittable() {
+        for _ in 0..<6 {
+            if uncoveredAndHittable() { return }
             app.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
