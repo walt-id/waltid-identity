@@ -22,10 +22,11 @@ object DemoPublicBackendDefaults {
     const val attestationHostHeader = ""
     const val transactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     /**
-     * Hosted Enterprise Stack demo. Same values as
-     * `EnterpriseDemoWalletProvider` in the wallet library. The wallet-provider service is not
-     * deployed or provisioned there yet, so sample apps leave it disabled.
+     * Hosted Enterprise Stack demo. Keep these aligned with `EnterpriseDemoWalletProvider` in the
+     * wallet library. This source set is also compiled for web, which does not depend on that
+     * library. The wallet-provider service is not deployed or provisioned there yet, so sample
+     * apps leave it disabled.
      */
-    const val walletProviderBaseUrl = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.BASE_URL
-    const val walletProviderServicePath = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.SERVICE_PATH
+    const val walletProviderBaseUrl = "https://org4.enterprise.demo.walt.id"
+    const val walletProviderServicePath = "org4.demo.wallet-provider"
 }

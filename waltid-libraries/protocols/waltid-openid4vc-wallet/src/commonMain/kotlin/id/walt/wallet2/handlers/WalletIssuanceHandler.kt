@@ -1052,6 +1052,17 @@ data class ExchangeCodeRequest(
 // ---------------------------------------------------------------------------
 
 /**
+ * Thrown when an issuer's only token authentication method is a wallet instance attestation
+ * and this wallet has no provider that can obtain one.
+ *
+ * A pre-authorized grant the issuer allows anonymously does not throw. That grant can be
+ * redeemed without a wallet instance attestation.
+ */
+public class WalletInstanceAttestationRequiredException(
+    message: String = "This issuer requires a wallet instance attestation, and no wallet provider is configured",
+) : IllegalStateException(message)
+
+/**
  * OpenID4VCI 1.0 credential issuance logic.
  *
  * Orchestrates the wallet-side steps using waltid-openid4vci-wallet primitives.
@@ -1061,11 +1072,15 @@ data class ExchangeCodeRequest(
 internal fun attestationAssemblerForTokenMethods(
     methods: Set<String>?,
     attestationAssembler: ClientAttestationAssembler?,
+    anonymousPreAuthorizedAccessSupported: Boolean = false,
 ): ClientAttestationAssembler? {
     if (methods?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true) return null
     if (attestationAssembler != null) return attestationAssembler
-    if (methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }) {
-        error("This issuer requires a wallet instance attestation, and no wallet provider is configured")
+    if (
+        !anonymousPreAuthorizedAccessSupported &&
+        methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }
+    ) {
+        throw WalletInstanceAttestationRequiredException()
     }
     return null
 }
@@ -1303,6 +1318,7 @@ object WalletIssuanceHandler {
             resolveInstanceKey = { keyMaterial.crypto2AttestationKey() },
             onAttestationObtained = { onEvent.emitSafely(WalletSessionEvent.issuance_attestation_obtained) },
             httpClient = httpClient,
+            anonymousPreAuthorizedAccessSupported = asMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
         )
 
         // private_key_jwt (RFC 7523). Engaged from authorization server metadata for the same reason
@@ -1636,6 +1652,7 @@ object WalletIssuanceHandler {
                 },
                 onAttestationObtained = onAttestationObtained,
                 httpClient = httpClient,
+                anonymousPreAuthorizedAccessSupported = it.preAuthorizedGrantAnonymousAccessSupported == true,
             )
         }
         val anonymousPreAuthorizedCode =
@@ -2173,8 +2190,13 @@ object WalletIssuanceHandler {
         resolveInstanceKey: suspend () -> Crypto2Key?,
         onAttestationObtained: suspend () -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        anonymousPreAuthorizedAccessSupported: Boolean = false,
     ): TokenClientAttestation? {
-        val assembler = configuredAttestationAssembler(asMetadata, attestationAssembler) ?: return null
+        val assembler = configuredAttestationAssembler(
+            asMetadata,
+            attestationAssembler,
+            anonymousPreAuthorizedAccessSupported,
+        ) ?: return null
 
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
@@ -2249,9 +2271,11 @@ object WalletIssuanceHandler {
     private fun configuredAttestationAssembler(
         asMetadata: AuthorizationServerMetadata,
         attestationAssembler: ClientAttestationAssembler?,
+        anonymousPreAuthorizedAccessSupported: Boolean = false,
     ): ClientAttestationAssembler? = attestationAssemblerForTokenMethods(
         asMetadata.tokenEndpointAuthMethodsSupported,
         attestationAssembler,
+        anonymousPreAuthorizedAccessSupported,
     )
 
     private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(

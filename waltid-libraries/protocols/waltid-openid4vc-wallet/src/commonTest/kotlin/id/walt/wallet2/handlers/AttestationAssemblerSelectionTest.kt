@@ -20,12 +20,23 @@ class AttestationAssemblerSelectionTest {
 
     @Test
     fun `fails closed when attestation is the only token method and no provider is configured`() {
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<WalletInstanceAttestationRequiredException> {
             attestationAssemblerForTokenMethods(setOf(attest), null)
         }
         assertEquals(
             "This issuer requires a wallet instance attestation, and no wallet provider is configured",
             error.message,
+        )
+    }
+
+    @Test
+    fun `allows an anonymous pre-authorized grant without a provider`() {
+        assertNull(
+            attestationAssemblerForTokenMethods(
+                setOf(attest),
+                null,
+                anonymousPreAuthorizedAccessSupported = true,
+            ),
         )
     }
 
