@@ -781,10 +781,13 @@ class Wallet2MoreUseCasesTest {
             // Reset the store (simulates a fresh service start without persistence)
             OSSWallet2Service.configureInMemory()
 
-            // Run 2: different port, same service config — store is clean
-            E2ETest(host, port + 1, failEarly = true).testBlock(
+            // Run 2: different port, same service config — store is clean.
+            // Ask the OS for another free port. port + 1 was never reserved and collides with
+            // whatever else this Gradle worker bound in the meantime.
+            val secondPort = freePort()
+            E2ETest(host, secondPort, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
-                preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:${port + 1}"))) },
+                preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$secondPort"))) },
                 init = {},
                 module = { wallet2Module(withPlugins = false) }
             ) {

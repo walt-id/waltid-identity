@@ -2,6 +2,7 @@ package id.walt.openid4vp.conformance.testplans.httpdata
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * A single entry of a conformance-suite test log (`GET /api/log/{testId}`).
@@ -22,6 +23,13 @@ data class TestLogEntry(
     val upload: String? = null,
     /** The uploaded image, once a placeholder has been filled. */
     val img: String? = null,
+    /**
+     * Value the suite compared, when this entry is a check.
+     *
+     * A gateway status here is a number (`502`). Other checks put strings or objects in the same
+     * field, so this stays a [JsonElement] and callers pick out the numeric HTTP status themselves.
+     */
+    val actual: JsonElement? = null,
 ) {
     /** An image placeholder that is still waiting to be filled. */
     val isPendingUpload: Boolean get() = upload != null && img == null
