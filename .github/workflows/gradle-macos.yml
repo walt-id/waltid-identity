@@ -202,17 +202,19 @@ jobs:
         id: revisions
         run: |
           python3 - <<'PYTHON'
-          import json, os, subprocess
+          import hashlib, json, os, subprocess
           paths = {"unified": ".", "identity": "waltid-identity", "enterprise": "waltid-identity-enterprise", "enterprise_license": "waltid-identity-enterprise-license"}
           refs = {key: subprocess.check_output(["git", "-C", path, "rev-parse", "HEAD"], text=True).strip() for key, path in paths.items()}
           print(json.dumps(refs, indent=2))
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("refs=" + json.dumps(refs) + "\n")
+              output.write("revision-key=" + hashlib.sha256(json.dumps(refs, sort_keys=True).encode()).hexdigest() + "\n")
+              output.write("xcode-key=" + hashlib.sha256(subprocess.check_output(["xcodebuild", "-version"])).hexdigest() + "\n")
           PYTHON
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
         with:
-          # Reuse unchanged release links on later runs of this PR; consumers still execute.
+          # Retain compiled inputs; Kotlin excludes framework links from Gradle's build cache.
           cache-read-only: false
       - name: Cache Kotlin Native dependencies
         uses: actions/cache@v5
@@ -221,6 +223,19 @@ jobs:
           key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
           restore-keys: |
             konan-${{ runner.os }}-${{ runner.arch }}-
+      - name: Cache release framework outputs and task history
+        uses: actions/cache@v5
+        with:
+          # Tar preserves framework symlinks. The build still validates every task's inputs.
+          # Exclude configuration-cache state and all test outputs.
+          path: |
+            waltid-identity/.gradle/*/executionHistory/*.bin
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosArm64/releaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/releaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release
+          key: wallet-core-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ steps.revisions.outputs.revision-key }}
+          restore-keys: |
+            wallet-core-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
       # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
         timeout-minutes: 60

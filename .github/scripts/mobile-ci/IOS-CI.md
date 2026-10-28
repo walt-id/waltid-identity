@@ -23,9 +23,14 @@ Downstream consumers check out those exact revisions and restore the same-run
 artifact. The manifest verifies the Identity commit, Xcode version, release
 configuration, platform coverage and file hashes before the framework is used.
 The archive is retained for one day; rerun the producer if it has expired.
-The producer also saves its Gradle build cache on PRs so unchanged release links
-can be restored on later runs. Gradle tracks task inputs; the same-run framework
-manifest and all consumer checks still apply. Other jobs retain the default cache policy.
+The producer saves compiled inputs in its Gradle build cache on PRs. Kotlin excludes
+framework links from that cache because it does not preserve framework symlinks.
+A separate tar cache retains only the two release framework outputs, the assembled
+XCFramework and Gradle execution history, scoped to the OS, architecture, exact
+Xcode build and Gradle wrapper. The full build still runs: Gradle validates inputs
+and rebuilds changed outputs before the same-run manifest is packaged. Configuration
+cache and test outputs are excluded. All consumer checks still execute, and other
+jobs retain the default cache policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
