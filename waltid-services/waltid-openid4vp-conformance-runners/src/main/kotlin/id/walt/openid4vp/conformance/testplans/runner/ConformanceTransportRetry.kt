@@ -47,5 +47,24 @@ internal object ConformanceTransportRetry {
         return false
     }
 
+    /**
+     * True when an issuer module was aborted before a verdict because the tunnel returned a
+     * gateway status.
+     *
+     * The suite records that as `INTERRUPTED` after `502`, `503`, or `504` on its own HTTP call
+     * (often the credential-issuer metadata fetch). A module that finished, including a negative
+     * test that failed its assertion, is not retried.
+     */
+    fun issuerInterruptedByGateway(status: String?, log: List<TestLogEntry>): Boolean {
+        if (!status.equals("INTERRUPTED", ignoreCase = true)) return false
+        return log.any { entry -> isGatewayStatus(entry.responseStatusCode) }
+    }
+
+    private fun isGatewayStatus(value: JsonElement?): Boolean {
+        val primitive = value as? JsonPrimitive ?: return false
+        val status = primitive.intOrNull ?: primitive.content.toIntOrNull()
+        return status in gatewayStatuses
+    }
+
     private fun httpStatus(actual: JsonElement?): Int? = (actual as? JsonPrimitive)?.intOrNull
 }

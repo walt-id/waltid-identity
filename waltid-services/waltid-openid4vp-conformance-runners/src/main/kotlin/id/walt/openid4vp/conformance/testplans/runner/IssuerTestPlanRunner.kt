@@ -128,7 +128,7 @@ class IssuerTestPlanRunner(
         modulesToRun.forEach { println("   - ${it.testModule}") }
 
         val moduleResults = modulesToRun.map { module ->
-            runModuleAttempt(testPlanId, module.testModule, module.variant, variant.credentialProofType)
+            runModuleRetryingGateway(testPlanId, module.testModule, module.variant, variant.credentialProofType)
         }
 
         return IssuerVariantRunResult(
@@ -138,6 +138,51 @@ class IssuerTestPlanRunner(
             planId = testPlanId,
             modules = moduleResults,
         )
+    }
+
+    /**
+     * Run one module, and once more when the suite interrupted it after a tunnel gateway status.
+     *
+     * The second attempt is the result that is reported. A module that finished with a verdict is
+     * never run again.
+     */
+    private suspend fun runModuleRetryingGateway(
+        testPlanId: String,
+        testModule: String,
+        moduleVariant: JsonObject,
+        proofType: String?,
+    ): IssuerVariantModuleRunResult {
+        val first = runModuleAttempt(testPlanId, testModule, moduleVariant, proofType)
+        if (!interruptedByGateway(first)) return first
+        first.testId?.let { cancelQuietly(it) }
+        println(
+            "Retrying $testModule once: the suite interrupted it after a gateway status from the tunnel",
+        )
+        return runModuleAttempt(testPlanId, testModule, moduleVariant, proofType)
+    }
+
+    private suspend fun interruptedByGateway(result: IssuerVariantModuleRunResult): Boolean {
+        if (result.accepted || !result.status.equals("INTERRUPTED", ignoreCase = true)) return false
+        val testId = result.testId?.takeIf { it.isNotBlank() } ?: return false
+        val log = try {
+            conformance.getTestLog(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Could not read the suite log before a tunnel retry (${e::class.simpleName})")
+            return false
+        }
+        return ConformanceTransportRetry.issuerInterruptedByGateway(result.status, log)
+    }
+
+    private suspend fun cancelQuietly(testId: String) {
+        try {
+            conformance.cancelTest(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Could not cancel test before retry (${e::class.simpleName})")
+        }
     }
 
     private suspend fun runModuleAttempt(

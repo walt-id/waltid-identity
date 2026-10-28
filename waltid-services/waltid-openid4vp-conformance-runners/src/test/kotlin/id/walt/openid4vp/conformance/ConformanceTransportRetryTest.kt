@@ -73,6 +73,42 @@ class ConformanceTransportRetryTest {
     }
 
     @Test
+    fun retriesWhenAnIssuerModuleWasInterruptedAfterAGatewayStatus() {
+        for (status in listOf(502, 503, 504)) {
+            val log = lenientJson.decodeFromString<List<TestLogEntry>>(
+                """[{"msg":"HTTP response","response_status_code":$status}]""",
+            )
+            assertTrue(
+                ConformanceTransportRetry.issuerInterruptedByGateway("INTERRUPTED", log),
+                "HTTP $status",
+            )
+        }
+        val textual = lenientJson.decodeFromString<List<TestLogEntry>>(
+            """[{"response_status_code":"502"}]""",
+        )
+        assertTrue(ConformanceTransportRetry.issuerInterruptedByGateway("interrupted", textual))
+    }
+
+    @Test
+    fun doesNotRetryAFinishedIssuerModuleOrANonGatewayInterrupt() {
+        val gateway = lenientJson.decodeFromString<List<TestLogEntry>>(
+            """[{"response_status_code":502}]""",
+        )
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway("FINISHED", gateway))
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway("WAITING", gateway))
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway(null, gateway))
+        val clientError = lenientJson.decodeFromString<List<TestLogEntry>>(
+            """[{"response_status_code":400,"result":"FAILURE"}]""",
+        )
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway("INTERRUPTED", clientError))
+        val nonNumeric = lenientJson.decodeFromString<List<TestLogEntry>>(
+            """[{"response_status_code":{"status":502}}]""",
+        )
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway("INTERRUPTED", nonNumeric))
+        assertFalse(ConformanceTransportRetry.issuerInterruptedByGateway("INTERRUPTED", emptyList()))
+    }
+
+    @Test
     fun connectionResetIsRetryableThroughTheCauseChain() {
         assertTrue(ConformanceTransportRetry.isConnectionReset(SocketException("Connection reset")))
         assertTrue(
