@@ -323,6 +323,11 @@ data class DeferredCredentialTransaction(
     val proofRequired: Boolean = false,
     /** Opaque wallet-scoped continuation. Access tokens and sender-key context stay in the wallet. */
     val deferredCredentialId: String? = null,
+    /**
+     * Stored response-decryption key for an encrypted deferred response. Present only for isolated
+     * fetch, which polls with [PollDeferredRequest]. Session continuations keep this key inside the wallet.
+     */
+    val responseDecryptionKey: String? = null,
 ) {
     init {
         require(credentialConfigurationId.isNotBlank())
@@ -331,6 +336,7 @@ data class DeferredCredentialTransaction(
         require(holderBindings.isNotEmpty())
         require(intervalSeconds > 0)
         require(deferredCredentialId == null || deferredCredentialId.isNotBlank())
+        require(responseDecryptionKey == null || responseDecryptionKey.isNotBlank())
     }
 }
 
@@ -895,6 +901,8 @@ data class PollDeferredRequest(
     val dpopKeyId: String? = null,
     /** Dataset identifier from the original deferred result, when provided by the issuer. */
     val credentialIdentifier: String? = null,
+    /** Stored response-decryption key when the original Credential Response was encrypted. */
+    val responseDecryptionKey: String? = null,
 ) {
     init {
         require(holderBindings.isNotEmpty() && holderBindings.none { it.key != null }) {
@@ -932,6 +940,7 @@ data class PollDeferredRequest(
         deferredCredentialEndpoint, transactionId, accessToken, credentialIssuerBaseUrl, credentialConfigurationId,
         metadata, label, keyId, proofRequired = this.proofRequired, holderBindings = this.holderBindings,
         tokenType = this.tokenType, dpopKeyId = this.dpopKeyId, credentialIdentifier = this.credentialIdentifier,
+        responseDecryptionKey = this.responseDecryptionKey,
     )
 }
 
@@ -1787,13 +1796,15 @@ object WalletIssuanceHandler {
         if (request.storeInWallet) require(request.holderBindings.size == requestedCount) {
             "Supply one holder binding for each proof when storing credentials"
         }
-        val credentialResponse = requestCredential(request, httpClient, dpop, issuerMetadata)
+        val exchange = requestCredential(request, httpClient, dpop, issuerMetadata)
+        val credentialResponse = exchange.response
         if (credentialResponse.transactionId != null) return FetchCredentialsResult(
             deferredCredential = DeferredCredentialTransaction(request.credentialConfigurationId,
                 request.credentialIdentifier, requireNotNull(credentialResponse.transactionId),
                 request.holderBindings.map { it.copy(key = null, keyId = it.keyId ?: request.keyId) },
                 intervalSeconds = requireNotNull(credentialResponse.interval),
-                proofRequired = request.effectiveProofs != null),
+                proofRequired = request.effectiveProofs != null,
+                responseDecryptionKey = exchange.responseDecryptionKey?.let(CredentialEncryption::exportResponseDecryptionKey)),
         )
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
@@ -1804,18 +1815,24 @@ object WalletIssuanceHandler {
         return FetchCredentialsResult(rawCredentials = rawCredentials)
     }
 
+    internal data class CredentialEndpointExchange(
+        val response: CredentialResponse,
+        val responseDecryptionKey: Crypto2Key? = null,
+    )
+
     private suspend fun requestCredential(
         request: FetchCredentialRequest,
         httpClient: HttpClient,
         dpop: DpopRequestContext? = null,
         issuerMetadata: CredentialIssuerMetadata? = null,
         onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialResponse {
+    ): CredentialEndpointExchange {
         val credentialRequestJson = CredentialRequestBuilder.build(
             CredentialIssuanceTarget(request.credentialConfigurationId, request.credentialIdentifier), request.effectiveProofs?.jwt)
         val prepared = CredentialEncryption.prepare(credentialRequestJson, issuerMetadata)
-        return requestCredentialResponse(request.credentialEndpoint.toString(), request.accessToken,
+        val response = requestCredentialResponse(request.credentialEndpoint.toString(), request.accessToken,
             credentialRequestJson, httpClient, dpop, prepared = prepared, onStage = onStage)
+        return CredentialEndpointExchange(response, prepared.responseDecryptionKey)
     }
 
     private suspend fun requestCredentialResponse(
@@ -1826,6 +1843,7 @@ object WalletIssuanceHandler {
         dpop: DpopRequestContext?,
         expectedTransactionId: String? = null,
         prepared: PreparedCredentialRequest? = null,
+        responseDecryptionKey: Crypto2Key? = prepared?.responseDecryptionKey,
         onStage: (CredentialIssuanceStage) -> Unit = {},
     ): CredentialResponse {
         val scheme = if (dpop != null) "DPoP" else "Bearer"
@@ -1854,7 +1872,7 @@ object WalletIssuanceHandler {
             dpop?.nonce = response.headers[DPOP_NONCE_HEADER] ?: dpopNonce
             if (response.status.isSuccess()) {
                 onStage(CredentialIssuanceStage.RESPONSE)
-                val credentialResponse = prepared?.responseDecryptionKey?.let { responseKey ->
+                val credentialResponse = responseDecryptionKey?.let { responseKey ->
                     val mediaType = response.contentType()?.withoutParameters()
                     require(mediaType?.contentType == "application" && mediaType.contentSubtype == "jwt") {
                         "Encrypted credential response must use application/jwt"
@@ -1921,8 +1939,21 @@ object WalletIssuanceHandler {
         dpop: DpopRequestContext? = null,
         issuerMetadata: CredentialIssuerMetadata? = null,
         onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialResponse {
-        suspend fun fetchWithFreshProof(): CredentialResponse {
+    ): CredentialResponse = exchangeCredentialWithNonceRetry(
+        request, nonceEndpoint, httpClient, buildProof, onProofGenerated, dpop, issuerMetadata, onStage,
+    ).response
+
+    internal suspend fun exchangeCredentialWithNonceRetry(
+        request: FetchCredentialRequest,
+        nonceEndpoint: String?,
+        httpClient: HttpClient,
+        buildProof: (suspend (String?) -> Proofs?)?,
+        onProofGenerated: suspend () -> Unit = {},
+        dpop: DpopRequestContext? = null,
+        issuerMetadata: CredentialIssuerMetadata? = null,
+        onStage: (CredentialIssuanceStage) -> Unit = {},
+    ): CredentialEndpointExchange {
+        suspend fun fetchWithFreshProof(): CredentialEndpointExchange {
             val proofs = buildProof?.let {
                 val nonce = requestProofNonce(httpClient, nonceEndpoint)
                 onStage(CredentialIssuanceStage.PROOF)
@@ -2650,9 +2681,11 @@ object WalletIssuanceHandler {
             labelOverride = request.label,
             httpClient = httpClient,
         )
+        val responseKey = request.responseDecryptionKey?.let { CredentialEncryption.importResponseDecryptionKey(it) }
         val credentialResponse = requestCredentialResponse(
             request.deferredCredentialEndpoint.toString(), request.accessToken,
-            buildJsonObject { put("transaction_id", request.transactionId) }, httpClient, dpop, request.transactionId)
+            buildJsonObject { put("transaction_id", request.transactionId) }, httpClient, dpop, request.transactionId,
+            responseDecryptionKey = responseKey)
         if (credentialResponse.transactionId != null) {
             onPending(DeferredCredentialPending(request.transactionId, requireNotNull(credentialResponse.interval)))
             onEvent.emitSafely(WalletSessionEvent.issuance_deferred)

@@ -10,9 +10,11 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.CredentialResponseEncryption
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
@@ -117,6 +119,16 @@ object CredentialEncryption {
         }
         return payload
     }
+
+    /** Retains the wallet's response key so a later encrypted Deferred Credential Response can be opened. */
+    fun exportResponseDecryptionKey(key: Key): String {
+        val stored = (key as? StorableKey)?.storedKey
+            ?: throw IllegalArgumentException("Credential response decryption key cannot be retained")
+        return StoredKeyCodec.encodeToString(stored)
+    }
+
+    suspend fun importResponseDecryptionKey(encoded: String): Key =
+        runtime.restore(StoredKeyCodec.decodeFromString(encoded))
 
     private suspend fun responseEncryptionKey(): Key = runtime.generateSoftwareKey(
         GenerateSoftwareKeyRequest(
