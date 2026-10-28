@@ -1275,6 +1275,7 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            walletProvider: walletProvider?.toKMPWalletProvider(),
             issuerMetadataTrustResolver: issuerMetadataTrustResolver.map {
                 KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
             },
@@ -1532,6 +1533,17 @@ extension Data {
         }
 
         return array
+    }
+}
+
+private extension WalletProviderConfiguration {
+    func toKMPWalletProvider() -> WalletProviderConfig {
+        WalletProviderConfig(
+            baseUrl: baseURL,
+            servicePath: servicePath,
+            bearerToken: bearerToken,
+            hostHeader: hostHeader
+        )
     }
 }
 

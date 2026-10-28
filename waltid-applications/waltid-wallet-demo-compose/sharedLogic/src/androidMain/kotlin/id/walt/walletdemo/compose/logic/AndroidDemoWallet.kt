@@ -68,6 +68,7 @@ suspend fun createAndroidDemoMobileWallet(
                     alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                 ),
                 attestationConfig = config.toWalletAttestationConfig(),
+                walletProvider = config.toWalletProviderConfig(),
                 transactionDataProfiles = transactionDataProfiles.profiles,
                 paymentCredentialIssuers = demoPaymentCredentialIssuers,
                 preferredLocales = LocaleList.getDefault().let { locales ->
