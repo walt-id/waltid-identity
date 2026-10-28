@@ -7,6 +7,7 @@ import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.ExpectedModuleOutcome
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.openid4vp.conformance.utils.JsonUtils.lenientJson
+import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -14,6 +15,7 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 
 class TestPlanRunner(
     val config: TestPlanConfiguration,
@@ -76,7 +78,7 @@ class TestPlanRunner(
         return modules.mapIndexed { index, module ->
             println()
             println("-- Module ${index + 1}/${modules.size}: ${module.testModule}")
-            runCatching { runModule(testPlanId, module) }.getOrElse { error ->
+            runCatching { runModuleRetryingTransport(testPlanId, module) }.getOrElse { error ->
                 println("Module ${module.testModule} failed: ${error.message}")
                 TestPlanResult(
                     testName = "$testPlanName / ${module.testModule}",
@@ -86,6 +88,70 @@ class TestPlanRunner(
                     expected = expectationFor(module.testModule),
                 )
             }
+        }
+    }
+
+    /**
+     * Run [module] once, and once more when the only evidence is a dead tunnel or a reset socket.
+     *
+     * The second attempt is the result that is reported. A verifier that accepted or rejected the
+     * presentation is never run again.
+     */
+    private suspend fun runModuleRetryingTransport(
+        testPlanId: String,
+        module: CreateTestPlanResponse.Module,
+    ): TestPlanResult {
+        var attempt = 0
+        while (true) {
+            attempt++
+            try {
+                val result = runModule(testPlanId, module)
+                if (attempt == 1 && result.errorMessage?.contains("connection reset", ignoreCase = true) == true) {
+                    println("Retrying ${module.testModule} once after a connection reset")
+                    continue
+                }
+                if (attempt == 1 && unusedVerifierAfterGateway(result)) {
+                    cancelQuietly(result.conformanceTestId)
+                    println(
+                        "Retrying ${module.testModule} once: the response endpoint returned a " +
+                            "gateway status and the verifier session stayed unused",
+                    )
+                    continue
+                }
+                return result
+            } catch (e: CancellationException) {
+                throw e
+            }
+        }
+    }
+
+    private suspend fun unusedVerifierAfterGateway(result: TestPlanResult): Boolean {
+        if (result.passed || result.verifierStatus != VerificationSessionStatus.UNUSED) return false
+        val testId = result.conformanceTestId
+        if (testId.isBlank() || testId == "N/A") return false
+        val log = try {
+            conformance.getTestLog(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Could not read the suite log before a tunnel retry (${e::class.simpleName})")
+            return false
+        }
+        return ConformanceTransportRetry.unusedVerifierAfterGateway(
+            verifierStatus = result.verifierStatus,
+            passed = result.passed,
+            log = log,
+        )
+    }
+
+    private suspend fun cancelQuietly(testId: String) {
+        if (testId.isBlank() || testId == "N/A") return
+        try {
+            conformance.cancelTest(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Could not cancel test before retry (${e::class.simpleName})")
         }
     }
 
@@ -123,6 +189,32 @@ class TestPlanRunner(
 
         println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=${testId}")
 
+        try {
+            return completeCreatedModule(testId, module, expected)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A module left running still holds the plan alias. The next createTest would replace
+            // its outcome with an alias conflict. Cancel before that, including before a retry.
+            cancelQuietly(testId)
+            if (ConformanceTransportRetry.isConnectionReset(e)) {
+                return TestPlanResult(
+                    testName = "$testPlanName / ${module.testModule}",
+                    conformanceTestId = testId,
+                    conformanceResult = "ERROR",
+                    errorMessage = "Connection reset",
+                    expected = expected,
+                )
+            }
+            throw e
+        }
+    }
+
+    private suspend fun completeCreatedModule(
+        testId: String,
+        module: CreateTestPlanResponse.Module,
+        expected: ExpectedModuleOutcome,
+    ): TestPlanResult {
         println("Checking if test is already ready for presentation")
         conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 

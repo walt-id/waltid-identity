@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 // carry it as their type, and must stay readable.
 @Serializable
 @SerialName("id.walt.commons.events.DidEvent")
+@Deprecated("Not written by any service: DID resolution is a UsageEvent with usageType DID_RESOLUTION. Kept so stored events stay readable.")
 class DidEvent(
     override val originator: String?,
     override val organization: String,
