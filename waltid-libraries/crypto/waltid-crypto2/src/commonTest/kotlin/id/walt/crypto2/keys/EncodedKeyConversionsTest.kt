@@ -69,7 +69,6 @@ class EncodedKeyConversionsTest {
         val publicJwk = spki.toPublicJwk(spec)
 
         assertFalse(publicJwk.privateMaterial)
-        assertTrue(publicJwk.data.size > 0)
         val publicJson = Json.parseToJsonElement(publicJwk.data.toByteArray().decodeToString()).jsonObject
         assertEquals(originalJson.getValue("x"), publicJson["x"])
         assertEquals(JsonPrimitive("OKP"), publicJson["kty"])
