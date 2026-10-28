@@ -49,6 +49,8 @@ public struct WalletConfiguration: Sendable {
     ///     and persisted wallet state.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - walletProvider: Optional Enterprise Wallet Provider. Sample apps leave this unset.
+    ///     The demo value names a deployment that is not provisioned yet.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
     ///     Request Objects. The default trusts no X.509 verifier by configuration.
     ///   - issuerMetadataTrustResolver: Verifies signed Credential Issuer Metadata
