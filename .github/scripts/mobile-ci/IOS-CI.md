@@ -23,6 +23,9 @@ Downstream consumers check out those exact revisions and restore the same-run
 artifact. The manifest verifies the Identity commit, Xcode version, release
 configuration, platform coverage and file hashes before the framework is used.
 The archive is retained for one day; rerun the producer if it has expired.
+The producer also saves its Gradle build cache on PRs so unchanged release links
+can be restored on later runs. Gradle tracks task inputs; the same-run framework
+manifest and all consumer checks still apply. Other jobs retain the default cache policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
@@ -122,7 +125,8 @@ start/end/exit metadata; it propagates command failures and terminates the comma
 process group on cancellation. Failed or cancelled consumer executions retain raw
 result bundles and phase logs for seven days, including when a bundle cannot be
 converted to JUnit. Converted consumer reports are also retained on success.
-There is no periodic resource sampling or unconditional Gradle profiling.
+The framework producer retains its phase log and Gradle timing report on success
+as well as failure. There is no periodic resource sampling.
 Missing required test reports fail the affected lane and the aggregate CI gate.
 
 Run the local helper checks with:
