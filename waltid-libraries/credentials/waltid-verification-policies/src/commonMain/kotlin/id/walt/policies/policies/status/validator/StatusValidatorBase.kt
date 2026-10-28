@@ -4,6 +4,7 @@ import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.StatusValueReader
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 
 abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
@@ -11,11 +12,19 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
 ) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
-    override suspend fun validate(entry: M, attribute: T): Result<Unit> = runCatching {
+    override suspend fun validate(entry: M, attribute: T): Result<Unit> =
+        validate(entry, attribute, authenticate = null)
+
+    protected suspend fun validate(
+        entry: M,
+        attribute: T,
+        authenticate: (suspend (String) -> Unit)?,
+    ): Result<Unit> = catchingCancellation {
         logger.debug { "Credential URL: ${entry.uri}" }
         // download status credential
         val statusListContent = fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
+        authenticate?.invoke(statusListContent)
         val matchingReader = reader.firstOrNull { it.canHandle(statusListContent) }
         requireNotNull(matchingReader) { "No available reader to handle the status list content." }
         // parse status list
@@ -51,4 +60,12 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
     }
 
     private fun binToInt(bin: String) = bin.toInt(2)
+}
+
+private suspend inline fun <T> catchingCancellation(block: suspend () -> T): Result<T> = try {
+    Result.success(block())
+} catch (cause: CancellationException) {
+    throw cause
+} catch (cause: Throwable) {
+    Result.failure(cause)
 }
