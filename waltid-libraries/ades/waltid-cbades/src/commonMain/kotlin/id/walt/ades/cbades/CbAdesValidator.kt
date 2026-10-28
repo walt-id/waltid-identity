@@ -156,8 +156,8 @@ class CbAdesValidator(
                         val tst = TimeStampToken(tok).tstInfo
                         modes.firstOrNull { (_, input) -> tst.messageImprintAlgorithm.digest(input).contentEquals(tst.messageImprint) }
                     }.getOrNull()
-                    if (chosen?.first == ArcTstImprintMode.BSTR_WRAPPED) {
-                        checks += ValidationCheck("info:arcTst-imprint", CheckStatus.INFO, "arcTst uHeaders[$index] imprint computed over the bstr-wrapped array", "TS 119 152-1 5.3.5.3")
+                    if (chosen?.first == ArcTstImprintMode.ARRAY) {
+                        checks += ValidationCheck("info:arcTst-imprint", CheckStatus.INFO, "arcTst uHeaders[$index] imprint computed over the CBOR array without the step 12 bstr wrapping", "TS 119 152-1 5.3.5.3")
                     }
                     (chosen ?: modes.first()).second
                 }

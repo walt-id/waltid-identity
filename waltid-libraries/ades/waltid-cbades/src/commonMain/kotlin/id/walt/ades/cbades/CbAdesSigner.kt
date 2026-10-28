@@ -74,7 +74,7 @@ class CbAdesSigningContext(
     val documentResolver: DocumentResolver? = transport?.let(DocumentResolver::http),
     val timestampDigest: AdesDigestAlgorithm = AdesDigestAlgorithm.SHA256,
     val externalAad: ByteArray = ByteArray(0),
-    val arcTstImprintMode: ArcTstImprintMode = ArcTstImprintMode.ARRAY,
+    val arcTstImprintMode: ArcTstImprintMode = ArcTstImprintMode.BSTR_WRAPPED,
     /** Certificates / CRLs / OCSP responses known to the signer (e.g. for offline CAs), embedded when required. */
     val additionalValidationData: ValidationData = ValidationData(),
 )

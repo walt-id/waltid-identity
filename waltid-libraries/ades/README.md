@@ -48,9 +48,10 @@ check(result.isValid)
 
 ## CB-AdES interpretation notes (ETSI CB-AdES Plugtests 2026)
 
-- The `arcTst` message imprint is computed over the encoded CBOR array of clause 5.3.5.3. This is what
-  the portal checker and the other participants use. The validator also accepts the bstr-wrapped
-  variant (`ArcTstImprintMode`).
+- The `arcTst` message imprint is computed over the clause 5.3.5.3 CBOR array wrapped in a CBOR byte string
+  (step 12). The spec editor confirmed this reading in the plugtest forum: the "step 11)" in the final sentence
+  is a typo for "step 12)". The validator also accepts imprints over the bare array, which some early
+  implementations produce (`ArcTstImprintMode`).
 - The `adoTst` imprint covers the payload encoded as a CBOR byte string. The `sigTst` imprint covers the
   raw signature value.
 - Countersignatures follow RFC 9338 clause 3.3:

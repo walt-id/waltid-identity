@@ -10,6 +10,7 @@ import id.walt.ades.model.CommitmentType
 import id.walt.ades.model.SignaturePolicyIdentifier
 import id.walt.ades.model.SignatureProductionPlace
 import id.walt.ades.test.TestPki
+import id.walt.ades.tsp.TimeStampToken
 import id.walt.ades.tsp.Rfc3161TimestampClient
 import id.walt.ades.validation.AdesLevel
 import id.walt.ades.validation.AdesValidationPolicy
@@ -165,6 +166,21 @@ class CbAdesTest {
             assertTrue(labels == listOf(1, 2, 3, 2, 3) || labels == listOf(1, 2, 3, 3), labels.toString())
         }
         validator.validate(again.encode()).assertPassed(AdesLevel.B_LTA)
+    }
+
+    @Test
+    fun arcTstImprintModes() = runTest {
+        val msg = signer.signSign1(payload, pki.credentials(), CbAdesSignatureParameters(level = AdesLevel.B_LTA))
+        val arcIndex = msg.headers.uHeaders.indexOfFirst { it.label == CbAdesLabels.ARC_TST }
+        val token = TimeStampToken(CbAdesComponents.parseTstContainer(msg.headers.uHeaders[arcIndex].value)!!.single())
+        val wrapped = CbAdesImprints.arcTst(true, msg.headers.protectedBytes, null, ByteArray(0), payload, msg.signature, msg.headers.uHeaders.take(arcIndex))
+        assertContentEquals(AdesDigestAlgorithm.SHA256.digest(wrapped), token.tstInfo.messageImprint, "default is the step 12 bstr-wrapped array")
+
+        val legacy = CbAdesSigner(CbAdesSigningContext(context.timestampSource, transport = pki.transport, trustAnchors = listOf(pki.root.certificate), arcTstImprintMode = ArcTstImprintMode.ARRAY))
+            .signSign1(payload, pki.credentials(), CbAdesSignatureParameters(level = AdesLevel.B_LTA))
+        val result = validator.validate(legacy.encode())
+        result.assertPassed(AdesLevel.B_LTA)
+        assertTrue(result.signatures.single().checks.any { it.id == "info:arcTst-imprint" }, "array-only imprint is accepted and reported")
     }
 
     @Test

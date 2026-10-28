@@ -20,12 +20,15 @@ fun interface DocumentResolver {
     }
 }
 
-/** How the arcTst message-imprint input is serialized (TS 119 152-1 5.3.5.3 step 12 is ambiguous, see plugtest forum). */
+/**
+ * How the arcTst message-imprint input is serialized. TS 119 152-1 V1.1.1 5.3.5.3 says "the CBOR byte string resulting
+ * of step 11)"; the spec editor confirmed in the 2026 plugtest forum that step 12) is meant, i.e. the bstr-wrapped array.
+ */
 enum class ArcTstImprintMode {
-    /** Digest over the encoded CBOR array (what the plugtest checker and most participants use). */
-    ARRAY,
-    /** Digest over the encoded array wrapped in a CBOR byte string (literal reading of step 12). */
+    /** Digest over the encoded array wrapped in a CBOR byte string (step 12, authoritative reading). */
     BSTR_WRAPPED,
+    /** Digest over the encoded CBOR array only (used by early plugtest implementations and the initial checker). */
+    ARRAY,
 }
 
 /** Identifies one signature inside a COSE message. */
@@ -88,7 +91,7 @@ object CbAdesImprints {
         payload: ByteArray,
         signature: ByteArray,
         precedingUHeaders: List<UHeaderElement>,
-        mode: ArcTstImprintMode = ArcTstImprintMode.ARRAY,
+        mode: ArcTstImprintMode = ArcTstImprintMode.BSTR_WRAPPED,
     ): ByteArray {
         val items = mutableListOf<CborItem>((if (isSign1) "Signature1" else "Signature").cbor(), bodyProtected.cbor())
         if (!isSign1) items += (signProtected ?: ByteArray(0)).cbor()
