@@ -74,6 +74,9 @@ dependencies {
     // Persistence
     implementation(identityLibs.sqldelight.gradle.plugin)
 
+    // X.509 certificate generation (waltid.x509)
+    implementation(identityLibs.bouncycastle.pkix)
+
     // Tests
     implementation(identityLibs.mokkery.gradle.plugin)
     testImplementation(kotlin("test-junit"))
