@@ -10,6 +10,7 @@ import id.walt.openid4vp.conformance.utils.JsonUtils.lenientJson
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -91,7 +92,7 @@ class WalletTestPlanRunner(
                         skipReason = "Not applicable to this variant: $inapplicable",
                     )
                 } else {
-                    runModule(testPlanId, module)
+                    runModuleRetryingTransport(testPlanId, module)
                 }
                 results.add(result)
 
@@ -160,6 +161,32 @@ class WalletTestPlanRunner(
 
         println("Created test plan: ${response.id}")
         return response
+    }
+
+    /**
+     * Run [module], and once more when the failure is a connection reset.
+     *
+     * The reset is raised by the call that opens the authorization request through the tunnel.
+     * The suite test is still running at that point, so it is cancelled before the retry or the
+     * next module. Creating another test under the same plan alias while this one is alive is
+     * what replaces the outcome with "Stopping test due to alias conflict".
+     */
+    private suspend fun runModuleRetryingTransport(
+        testPlanId: String,
+        module: CreateTestPlanResponse.Module,
+    ): TestPlanResult {
+        var attempt = 0
+        while (true) {
+            attempt++
+            val result = runModule(testPlanId, module)
+            val reset = result.conformanceResult == "ERROR" &&
+                result.errorMessage?.contains("connection reset", ignoreCase = true) == true
+            if (attempt == 1 && reset) {
+                println("   Retrying ${module.testModule} once after a connection reset")
+                continue
+            }
+            return result
+        }
     }
 
     /**
@@ -236,13 +263,29 @@ class WalletTestPlanRunner(
                 errorMessage = null
             )
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            val id = testId
+            if (id != null) {
+                try {
+                    conformance.cancelTest(id)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (cancel: Exception) {
+                    println("   Could not cancel test before the next module (${cancel::class.simpleName})")
+                }
+            }
             return TestPlanResult(
                 testName = "${testPlan.producerId}/$moduleId",
-                conformanceTestId = testId ?: moduleId,
+                conformanceTestId = id ?: moduleId,
                 conformanceResult = "ERROR",
                 walletStatus = "ERROR",
-                errorMessage = e.message ?: "Unknown error"
+                errorMessage = if (ConformanceTransportRetry.isConnectionReset(e)) {
+                    "Connection reset"
+                } else {
+                    e.message ?: "Unknown error"
+                },
             )
         }
     }
