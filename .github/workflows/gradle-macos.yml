@@ -1,5 +1,5 @@
-name: WAL1585 bounded repair evidence (temporary)
-run-name: WAL1585 one native trace and one Compose query comparison
+name: WAL1585 native ownership evidence (temporary)
+run-name: WAL1585 one native trace with required installation checks
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: wal1585-bounded-repair-20261027
+  group: wal1585-native-ownership-20261028
   cancel-in-progress: false
 
 env:
@@ -25,14 +25,10 @@ env:
 
 jobs:
   bounded-repair:
-    name: bounded-repair (${{ matrix.scope }})
-    if: ${{ inputs.authorization == 'bounded-20261027-224628' && github.run_attempt == 1 }}
+    name: native-ownership
+    if: ${{ inputs.authorization == 'native-ownership-20261028' && github.run_attempt == 1 }}
     runs-on: xcode-27
     timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        scope: [native, compose]
     steps:
       - name: Checkout the exact failed source tuple
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
@@ -64,12 +60,12 @@ jobs:
         with:
           gradle-properties-path: waltid-identity/gradle.properties
       - name: Execute the authorized scope exactly once
-        run: python3 probe-harness/.github/scripts/mobile-ci/wal1585-bounded/run.py '${{ matrix.scope }}'
+        run: python3 probe-harness/.github/scripts/mobile-ci/wal1585-bounded/run.py native
       - name: Retain finalized evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: wal1585-bounded-${{ matrix.scope }}
-          path: bounded-repair-evidence/${{ matrix.scope }}/
+          name: wal1585-native-ownership-20261028
+          path: bounded-repair-evidence/native/
           if-no-files-found: error
           retention-days: 7

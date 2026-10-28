@@ -8,7 +8,7 @@
          let env = ProcessInfo.processInfo.environment
          let defaults = UserDefaults.standard
          #if DEBUG
-@@ -207,3 +208,282 @@
+@@ -207,3 +208,323 @@
      static let attestationHostHeader = ""
      static let transactionDataProfilesURL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
  }
@@ -161,13 +161,44 @@
 +            let target = root.appendingPathComponent("\(session).jsonl")
 +            guard FileManager.default.createFile(atPath: target.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
 +            file = try FileHandle(forWritingTo: target)
-+        } catch { NSLog("WAL1585 ownership setup failed: %@", String(describing: error)); return }
-+        guard let state = NSClassFromString("UIViewAnimationState") else { event("setup-unavailable"); return }
-+        let capacity = Int(objc_getClassList(nil, 0))
-+        let classes = UnsafeMutablePointer<AnyClass>.allocate(capacity: capacity)
-+        defer { classes.deallocate() }
-+        let count = min(capacity, Int(objc_getClassList(AutoreleasingUnsafeMutablePointer(classes), Int32(capacity))))
-+        let all = (0..<count).map { classes[$0] }
++        } catch { abortSetup("trace-file", ["error": String(describing: error)]) }
++        guard let state = NSClassFromString("UIViewAnimationState"),
++              let spring = NSClassFromString("UIViewSpringAnimationState") else {
++            abortSetup("animation-state-class")
++        }
++        // Validate the originally intended hooks before replacing any implementation.
++        let requirements: [(AnyClass, String, [String])] = [
++            (spring, "animationForLayer:forKey:forView:", ["@", "@", ":", "@", "@", "@"]),
++            (state, "animationDidStart:", ["v", "@", ":", "@"]),
++            (state, "animationDidStop:finished:", ["v", "@", ":", "@", "bool"]),
++            (CAAnimation.self, "copyWithZone:", ["@", "@", ":", "pointer"]),
++            (CALayer.self, "addAnimation:forKey:", ["v", "@", ":", "@", "@"]),
++            (CALayer.self, "removeAnimationForKey:", ["v", "@", ":", "@"]),
++            (CALayer.self, "removeAllAnimations", ["v", "@", ":"]),
++            (CALayer.self, "removeFromSuperlayer", ["v", "@", ":"]),
++        ]
++        let required = requirements.map { NSStringFromClass($0.0) + "." + $0.1 }
++        var unavailable: [[String: Any]] = []
++        for requirement in requirements {
++            let type: AnyClass = requirement.0
++            let (name, signature) = (requirement.1, requirement.2)
++            if eligible(type, name, signature) == nil {
++                let method = class_getInstanceMethod(type, NSSelectorFromString(name))
++                unavailable.append(["class": NSStringFromClass(type), "selector": name,
++                    "owns": owns(type, NSSelectorFromString(name)),
++                    "resolvedTypes": method.map { types($0) } ?? []])
++            }
++        }
++        guard unavailable.isEmpty else { abortSetup("required-hook-unavailable", ["hooks": unavailable]) }
++        // Read through the Objective-C pointer wrapper so class objects become Swift metatypes.
++        // A Swift UnsafeMutablePointer<AnyClass> load bypasses that conversion.
++        // One allocated snapshot also avoids truncation between separate count/fill calls.
++        var count: UInt32 = 0
++        guard let classes = objc_copyClassList(&count) else { abortSetup("class-list-unavailable") }
++        defer { free(UnsafeMutableRawPointer(classes)) }
++        var seen: Set<ObjectIdentifier> = []
++        let all = (requirements.map { $0.0 } + (0..<Int(count)).map { classes[$0] })
++            .filter { seen.insert(ObjectIdentifier($0)).inserted }
 +        var installed: [String] = []
 +        for type in all where isSubclass(type, of: state) {
 +            let label = NSStringFromClass(type)
@@ -279,9 +310,19 @@
 +                }
 +            }
 +        }
-+        event("installed", ["hooks": installed, "eventLimit": limit, "scope": "position animations only", "appSource": "c52f1778b6e88487f0be0864afde7edb00b224cf"])
++        let missing = Set(required).subtracting(installed).sorted()
++        guard missing.isEmpty else { abortSetup("required-hook-not-installed", ["missing": missing]) }
++        event("installed", ["hooks": installed, "requiredHooks": required, "enumeratedClasses": count,
++            "eventLimit": limit, "scope": "position animations only", "appSource": "c52f1778b6e88487f0be0864afde7edb00b224cf"])
++        guard !failed else { abortSetup("trace-write") }
 +        NSLog("WAL1585 ownership installed (%ld hooks), session %@", installed.count, session)
 +    }()
++
++    private static func abortSetup(_ reason: String, _ fields: [String: Any] = [:]) -> Never {
++        event("installation-failed", fields.merging(["reason": reason]) { _, b in b })
++        try? file?.synchronize()
++        fatalError("WAL1585 ownership installation failed: \(reason)")
++    }
 +
 +    private static func recordRemoval(_ object: AnyObject, eventName: String, implementation: String, key: AnyObject? = nil) {
 +        lock.lock(); defer { lock.unlock() }

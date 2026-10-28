@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One authorized native execution or one original/candidate Compose comparison."""
+"""Prepared single native ownership execution; requires a new human scope decision."""
 import hashlib
 import json
 import os
@@ -60,7 +60,8 @@ def reverse(repo, name):
 
 def common():
     assert os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'No automatic repeat of this authorized execution'
-    assert os.environ['WAL1585_AUTHORIZATION'] == 'bounded-20261027-224628'
+    assert os.environ['WAL1585_AUTHORIZATION'] == 'native-ownership-20261028'
+    assert sys.argv[1] == 'native', 'The completed Compose comparison is outside this proposed scope'
     roots = {'identity': I, 'enterprise': E, 'unified': ROOT, 'enterprise_license': ROOT / 'waltid-identity-enterprise-license'}
     actual = {k: output(['git', 'rev-parse', 'HEAD'], v) for k, v in roots.items()}
     save('actual-checkouts.json', actual)
@@ -80,19 +81,61 @@ def common():
     shutil.copyfile(H / 'manifest.json', OUT / 'harness-manifest.json')
 
 
+def native_observation_summary(trace_dir):
+    required = {
+        'UIViewSpringAnimationState.animationForLayer:forKey:forView:',
+        'UIViewAnimationState.animationDidStart:',
+        'UIViewAnimationState.animationDidStop:finished:',
+        'CAAnimation.copyWithZone:',
+        'CALayer.addAnimation:forKey:',
+        'CALayer.removeAnimationForKey:',
+        'CALayer.removeAllAnimations',
+        'CALayer.removeFromSuperlayer',
+    }
+    files = sorted(trace_dir.glob('*.jsonl'))
+    errors = [] if files else ['No app-process ownership traces']
+    counts = {}
+    for path in files:
+        try:
+            rows = [json.loads(line) for line in path.read_text().splitlines() if line]
+            installed = [row for row in rows if row['event'] == 'installed']
+            if len(installed) != 1 or not required.issubset(installed[0]['hooks']):
+                errors.append(path.name + ': required installation hooks missing')
+            if [row['sequence'] for row in rows] != list(range(1, len(rows) + 1)):
+                errors.append(path.name + ': incomplete event sequence')
+            for row in rows:
+                event = row['event']
+                counts[event] = counts.get(event, 0) + 1
+                if event in {'overflow', 'installation-failed', 'setup-unavailable'}:
+                    errors.append(path.name + ': ' + event)
+        except (OSError, UnicodeError, ValueError, KeyError, TypeError) as error:
+            errors.append(path.name + ': unreadable trace: ' + str(error))
+    # An installed-only trace cannot establish creation/copy/start/layer ownership.
+    # A missing stop callback is the subject of the diagnostic, so do not require it.
+    missing_events = sorted({'identity', 'created', 'copied', 'add-enter', 'start-enter'} - counts.keys())
+    if missing_events:
+        errors.append('Missing ownership activity: ' + ', '.join(missing_events))
+    return {'installation_and_activity_checks_passed': not errors,
+            'sessions': len(files), 'events': counts, 'errors': errors,
+            'limit': 'This gate does not prove callback retirement or resolve the product stall.'}
+
+
 def native():
     apply(I, 'native-observation.patch')
     apply(E, 'native-selection.patch')
     method = I / 'waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/BatchIssuanceE2ETests.swift'
     pristine = subprocess.check_output(['git', 'show', 'HEAD:' + str(method.relative_to(I))], cwd=I)
     assert method.read_bytes() == pristine
-    save('original-method.json', {'sha256': sha(method), 'unchanged': True, 'selection': 'iosAppUITests/BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch', 'executions': 1})
+    save('original-method.json', {'sha256': sha(method), 'unchanged': True, 'selection': 'iosAppUITests/BatchIssuanceE2ETests/testExplicitCopiesSurviveRelaunch', 'maximum_case_executions': 1})
     result = run('native-enterprise', ['./gradlew', ':waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest', '--no-configuration-cache', '-Penterprise.ios.destination=platform=iOS Simulator,name=iPhone 17,OS=27.0', '-Penterprise.ios.collectTestDiagnostics=on-failure', '-Penterprise.ios.walletCoreArtifact=' + str(FRAMEWORK)], check=False)
     reports = E / 'waltid-enterprise-integration-tests/build/ios-test-results/enterprise-mobile'
     if reports.exists():
         shutil.copytree(reports, OUT / 'enterprise-results')
-    save('completion.json', {'exit_code': result, 'execution_marker_present': (reports / 'execution-started.json').exists(), 'no_runtime_extension': True})
-    return result
+    observation = native_observation_summary(OUT / 'enterprise-results/native-ownership')
+    save('ownership-quality.json', observation)
+    save('completion.json', {'exit_code': result, 'execution_marker_present': (reports / 'execution-started.json').exists(), 'no_runtime_extension': True,
+                            'observation_checks_passed': observation['installation_and_activity_checks_passed']})
+    return result or (0 if observation['installation_and_activity_checks_passed'] else 2)
 
 
 def product_receipt(derived, xctestrun):
