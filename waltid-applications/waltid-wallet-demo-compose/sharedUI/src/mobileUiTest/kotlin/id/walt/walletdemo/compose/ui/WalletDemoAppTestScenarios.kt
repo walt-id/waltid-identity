@@ -710,8 +710,8 @@ class WalletDemoAppTestScenarios(
         try {
             receiveGate.complete(Unit)
             waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-            mainClock.advanceTimeBy(500)
             waitUntil(timeoutMillis = 5_000) {
+                mainClock.advanceTimeByFrame()
                 onAllNodes(hasTestTag("issuance-done") and isEnabled()).fetchSemanticsNodes().size == 1
             }
             onNodeWithTag("issuance-done").assertIsDisplayed().assertIsEnabled().performClick()
