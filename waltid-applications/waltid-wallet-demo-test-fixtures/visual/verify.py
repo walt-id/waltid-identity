@@ -103,6 +103,7 @@ def main():
     if "swiftui" in args.renderers:
         # Explicitly forward CI detection so a child XCTest runner cannot accept references.
         test_env = report.runner_env(run_metadata)
+        # Match the native phase to avoid recompiling for unused coverage instrumentation.
         command = ["xcodebuildmcp", "simulator", "test", "--project-path",
                    str(ROOT / "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj"),
                    "--scheme", "iosApp", "--configuration", "Debug", "--simulator-id", args.simulator,
@@ -110,6 +111,7 @@ def main():
                    "-only-testing:iosAppTests/WalletVisualTests", "-only-testing:iosAppTests/WalletVisualComparatorTests",
                    "-only-testing:iosAppTests/WalletVisualHostingTests",
                    "-parallel-testing-enabled", "NO",
+                   "-enableCodeCoverage", "NO",
                    "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
                    "--json", json.dumps({"testRunnerEnv": test_env}), "--output", "json"]
         with (args.output / "native-stderr.log").open("w") as errors:
