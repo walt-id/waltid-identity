@@ -172,7 +172,7 @@ class IssuerTestPlanRunner(
             println("Could not read the suite log before a tunnel retry (${e::class.simpleName})")
             return false
         }
-        return ConformanceTransportRetry.issuerInterruptedByGateway(result.status, log)
+        return ConformanceTransportRetry.interruptedByGateway(result.status, log)
     }
 
     private suspend fun cancelQuietly(testId: String) {

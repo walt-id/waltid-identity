@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.http.SuiteReachedTerminalBeforeReady
 import id.walt.openid4vp.conformance.testplans.http.Verifier2Interface
 import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -121,8 +122,29 @@ class TestPlanRunner(
                 return result
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SuiteReachedTerminalBeforeReady) {
+                if (attempt == 1 && interruptedBeforeReadyByGateway(e)) {
+                    println(
+                        "Retrying ${module.testModule} once: the suite interrupted it before " +
+                            "WAITING after a gateway status from the tunnel",
+                    )
+                    continue
+                }
+                throw e
             }
         }
+    }
+
+    private suspend fun interruptedBeforeReadyByGateway(error: SuiteReachedTerminalBeforeReady): Boolean {
+        val log = try {
+            conformance.getTestLog(error.testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Could not read the suite log before a tunnel retry (${e::class.simpleName})")
+            return false
+        }
+        return ConformanceTransportRetry.interruptedBeforeReadyByGateway(error, log)
     }
 
     private suspend fun unusedVerifierAfterGateway(result: TestPlanResult): Boolean {
