@@ -59,7 +59,7 @@ class IetfStatusListTokenChecker(
         referencedCredential: DigitalCredential,
         signerAuthorizer: StatusListSignerAuthorizer?,
     ) {
-        val verified = signatureVerifier.verifyCwtWithSigner(decodeHex(token), referencedCredential).getOrElse {
+        val verified = signatureVerifier.verifyCwtFromHexWithSigner(token, referencedCredential).getOrElse {
             throw StatusVerificationError("Status list CWT signature verification failed: ${it.message}")
         }
         authorize(verified.signer, verified.embeddedKeyReference, statusListUri, referencedCredential, signerAuthorizer)
@@ -82,12 +82,5 @@ class IetfStatusListTokenChecker(
             ),
             signerAuthorizer,
         )
-    }
-
-    private fun decodeHex(hex: String): ByteArray {
-        require(hex.length % 2 == 0) { "Status list CWT hex must have even length" }
-        return ByteArray(hex.length / 2) { index ->
-            hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
-        }
     }
 }

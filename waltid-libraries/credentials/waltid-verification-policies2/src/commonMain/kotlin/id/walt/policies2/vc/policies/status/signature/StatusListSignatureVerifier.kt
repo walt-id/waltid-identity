@@ -171,9 +171,15 @@ class StatusListSignatureVerifier(
      * @param cwtHex The CWT as hex-encoded string
      * @return Result containing the verified payload as ByteArray, or failure with exception
      */
-    suspend fun verifyCwtFromHex(cwtHex: String): Result<ByteArray> = resultOfSuspend {
-        val cwtBytes = cwtHex.hexToByteArray()
-        verifyCwt(cwtBytes).getOrThrow()
+    suspend fun verifyCwtFromHex(cwtHex: String): Result<ByteArray> =
+        verifyCwtFromHexWithSigner(cwtHex).map(VerifiedStatusList<ByteArray>::payload)
+
+    @JvmOverloads
+    suspend fun verifyCwtFromHexWithSigner(
+        cwtHex: String,
+        referencedCredential: DigitalCredential? = null,
+    ): Result<VerifiedStatusList<ByteArray>> = resultOfSuspend {
+        verifyCwtWithSigner(cwtHex.hexToByteArray(), referencedCredential).getOrThrow()
     }
     
     /**

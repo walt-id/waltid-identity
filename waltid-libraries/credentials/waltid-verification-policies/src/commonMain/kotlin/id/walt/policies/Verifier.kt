@@ -1,17 +1,17 @@
 package id.walt.policies
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.policies.policies.status.signature.RAW_CREDENTIAL_CONTEXT_KEY
 import id.walt.policies.models.PolicyRequest
-import kotlinx.coroutines.CancellationException
 import id.walt.policies.models.PolicyResult
 import id.walt.policies.models.PresentationResultEntry
 import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
+import id.walt.policies.policies.status.signature.RAW_CREDENTIAL_CONTEXT_KEY
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.utils.VCFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex

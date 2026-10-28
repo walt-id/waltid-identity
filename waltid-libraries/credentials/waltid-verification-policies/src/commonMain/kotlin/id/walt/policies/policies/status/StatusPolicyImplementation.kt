@@ -14,6 +14,9 @@ import id.walt.policies.policies.status.model.*
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
+import id.walt.credentials.signatures.JwtCredentialSignature
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.mdoc.doc.MDoc
 import id.walt.policies.policies.status.reader.IETFCwtStatusValueReader
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
@@ -24,20 +27,26 @@ import id.walt.policies.policies.status.reader.format.CwtFormatMatcher
 import id.walt.policies.policies.status.reader.format.JwtFormatMatcher
 import id.walt.policies.policies.status.validator.IETFStatusValidator
 import id.walt.policies.policies.status.validator.W3CStatusValidator
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
+    private val logger = KotlinLogging.logger {}
+
     private val httpClient = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
@@ -169,8 +178,12 @@ object StatusPolicyImplementation {
                 return CredentialParser.parseOnly(raw)
             } catch (cause: CancellationException) {
                 throw cause
-            } catch (_: Throwable) {
+            } catch (cause: Throwable) {
+                logger.debug { "Could not parse raw credential for status-list signer authorization: ${cause.message}" }
             }
+        }
+        credential["mdoc"]?.jsonPrimitive?.contentOrNull?.let { hex ->
+            mdocReferencedCredential(hex)?.let { return it }
         }
         val issuer = referencedIssuer(credential)
             ?: throw StatusVerificationError("Referenced credential is required for status-list signer authorization")
@@ -179,6 +192,23 @@ object StatusPolicyImplementation {
             signature = null,
             signed = null,
             issuer = issuer,
+        )
+    }
+
+    private fun mdocReferencedCredential(hex: String): DigitalCredential? {
+        val chain = runCatching { MDoc.fromCBORHex(hex).issuerSigned.issuerAuth?.x5Chain }.getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return W3C11(
+            credentialData = buildJsonObject { },
+            signature = JwtCredentialSignature(
+                signature = "mdoc-issuer-auth",
+                jwtHeader = buildJsonObject {
+                    put("x5c", JsonArray(chain.map { JsonPrimitive(it.encodeToBase64()) }))
+                },
+            ),
+            signed = null,
+            issuer = null,
         )
     }
 

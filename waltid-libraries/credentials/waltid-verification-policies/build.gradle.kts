@@ -57,6 +57,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.slf4j.simple)
             implementation(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.ktor.server.test.host)
             implementation(identityLibs.ktor.server.content.negotiation)
