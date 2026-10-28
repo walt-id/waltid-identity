@@ -35,7 +35,12 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 object PresentationVerificationEngine {
@@ -209,10 +214,62 @@ object PresentationVerificationEngine {
             )
 
             query.id to policyResults
-        }.toMap()
+        }
 
-        return verifiedPresentations
+        return combinePolicyResultsByQuery(verifiedPresentations)
     }
+
+    /**
+     * VP policy results per query id. A query with `multiple: true` can have several presentations.
+     * Their results are combined per policy so none is lost, see [combinePresentationResults].
+     */
+    internal fun combinePolicyResultsByQuery(
+        results: List<Pair<String, Map<String, VPPolicy2.PolicyRunResult>>>,
+    ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> =
+        results.groupBy({ it.first }, { it.second }).mapValues { (_, perPresentation) ->
+            val policies = perPresentation.flatMapTo(LinkedHashSet()) { it.keys }
+            policies.associateWith { policy ->
+                combinePresentationResults(perPresentation.mapIndexedNotNull { index, byPolicy ->
+                    byPolicy[policy]?.let { index to it }
+                })
+            }
+        }
+
+    /**
+     * One policy's results for the presentations of a query, as `(presentation index, result)` in the order the
+     * presentations were received - the order of `presented_presentations`.
+     *
+     * A single presentation keeps its result unchanged. Several are combined into one result that succeeds only
+     * if all of them did, carries the errors of every failed presentation, and the results of the first failed
+     * one (or of the last, if none failed). [MULTIPLE_PRESENTATIONS_RESULT] then says how many presentations were
+     * checked and which of them failed.
+     */
+    internal fun combinePresentationResults(
+        results: List<Pair<Int, VPPolicy2.PolicyRunResult>>,
+    ): VPPolicy2.PolicyRunResult {
+        results.singleOrNull()?.let { return it.second }
+
+        val failed = results.filter { (_, result) -> result.errors.isNotEmpty() }
+        val representative = (failed.firstOrNull() ?: results.last()).second
+        return representative.copy(
+            success = results.all { (_, result) -> result.success },
+            results = representative.results + (MULTIPLE_PRESENTATIONS_RESULT to buildJsonObject {
+                put("count", results.size)
+                putJsonArray("failed_indexes") { failed.forEach { (index, _) -> add(index) } }
+            }),
+            errors = failed.flatMap { (_, result) -> result.errors },
+            executionTime = results.fold(Duration.ZERO) { total, (_, result) -> total + result.executionTime },
+        )
+    }
+
+    /** Result key under which [combinePresentationResults] reports the presentations a policy result covers. */
+    internal const val MULTIPLE_PRESENTATIONS_RESULT = "multiple_presentations"
+
+    /** Every presentation per query id, in the order they were received. */
+    internal fun presentationsByQuery(
+        parsedPresentations: Map<Pair<String, CredentialQuery>, VerifiablePresentation>,
+    ): Map<String, List<VerifiablePresentation>> =
+        parsedPresentations.entries.groupBy({ it.key.second.id }, { it.value })
 
     suspend fun parseAllPresentations(
         vpTokenContents: ParsedVpToken,
@@ -348,8 +405,9 @@ object PresentationVerificationEngine {
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
                 // Byte arrays compacted before storage; see CompactStoredBytes.
-                presentedPresentations = parsedPresentations
-                    .map { it.key.second.id to it.value.withCompactByteArrays() }.toMap()
+                presentedPresentations = presentationsByQuery(parsedPresentations).mapValues { (_, presentations) ->
+                    presentations.map { it.withCompactByteArrays() }
+                }
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
@@ -404,8 +462,10 @@ object PresentationVerificationEngine {
             }
 
 
-            val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
-                it.key.second.id to when (val presentation = it.value) {
+            // Grouped, not mapped: a query with multiple: true has a credential (or several) per
+            // presentation, and the VC policies must run on all of them. toMap() would keep only the last.
+            val allSuccessfullyValidatedAndProcessedData = parsedPresentations.entries.groupBy({ it.key.second.id }) {
+                when (val presentation = it.value) {
                     is JwtVcJsonPresentation -> {
                         if (presentation.vp == null) {
                             throw PresentationRejectionException(
@@ -419,7 +479,7 @@ object PresentationVerificationEngine {
                     is MsoMdocPresentation -> listOf(presentation.mdoc)
                     is LdpVcPresentation -> throw NotImplementedError()
                 }
-            }.toMap()
+            }.mapValues { (_, credentials) -> credentials.flatten() }
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 presentedCredentials = allSuccessfullyValidatedAndProcessedData
