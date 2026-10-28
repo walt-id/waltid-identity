@@ -92,6 +92,20 @@ class WebhookNotifierTest {
     }
 
     @Test
+    fun `a configured loopback deny still honors the test system property`() = runTest {
+        System.setProperty("walt.ssrf.allowLoopback", "true")
+        applyNetworkFetchGuard(allowLoopback = false, allowPrivateNetworks = false, trustedHostSuffixes = emptySet())
+        val hits = AtomicInteger()
+        val server = localServer(hits)
+        try {
+            WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            assertEquals(1, hits.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `a trusted hostname may resolve to loopback`() = runTest {
         applyNetworkFetchGuard(allowLoopback = false, allowPrivateNetworks = false, trustedHostSuffixes = setOf("localhost"))
         val hits = AtomicInteger()

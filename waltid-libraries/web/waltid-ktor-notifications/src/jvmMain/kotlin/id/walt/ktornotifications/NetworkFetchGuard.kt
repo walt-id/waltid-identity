@@ -15,7 +15,13 @@ fun applyNetworkFetchGuard(
     allowPrivateNetworks: Boolean,
     trustedHostSuffixes: Set<String>,
 ) {
-    PrivateNetworkGuardSettings.allowLoopback = allowLoopback
+    if (allowLoopback) {
+        PrivateNetworkGuardSettings.allowLoopback = true
+    } else {
+        // Configured false is the production default. Leaving the choice unset keeps the Gradle test
+        // property able to allow loopback; production has no such property, so it still refuses.
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+    }
     PrivateNetworkGuardSettings.allowPrivateNetworks = allowPrivateNetworks
     PrivateNetworkGuardSettings.trustedHostSuffixes = trustedHostSuffixes
 }
