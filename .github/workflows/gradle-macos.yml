@@ -227,15 +227,17 @@ jobs:
         uses: actions/cache@v5
         with:
           # Tar preserves framework symlinks. The build still validates every task's inputs.
+          # Keep the ownership directory intact, including its clean-close marker.
           # Exclude configuration-cache state and all test outputs.
           path: |
             waltid-identity/.gradle/*/executionHistory/*.bin
+            waltid-identity/.gradle/buildOutputCleanup
             waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosArm64/releaseFramework
             waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/releaseFramework
             waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release
-          key: wallet-core-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ steps.revisions.outputs.revision-key }}
+          key: wallet-core-state-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ steps.revisions.outputs.revision-key }}
           restore-keys: |
-            wallet-core-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
+            wallet-core-state-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
       # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
         timeout-minutes: 60

@@ -26,11 +26,13 @@ The archive is retained for one day; rerun the producer if it has expired.
 The producer saves compiled inputs in its Gradle build cache on PRs. Kotlin excludes
 framework links from that cache because it does not preserve framework symlinks.
 A separate tar cache retains only the two release framework outputs, the assembled
-XCFramework and Gradle execution history, scoped to the OS, architecture, exact
-Xcode build and Gradle wrapper. The full build still runs: Gradle validates inputs
+XCFramework, Gradle execution history and output-ownership metadata, scoped to the
+OS, architecture, exact Xcode build and Gradle wrapper. Gradle still validates inputs
 and rebuilds changed outputs before the same-run manifest is packaged. Configuration
-cache and test outputs are excluded. All consumer checks still execute, and other
-jobs retain the default cache policy.
+cache and test outputs are excluded. The complete ownership record, including its
+clean-close marker, prevents Gradle from deleting the restored files as stale before
+validating them. All consumer checks still execute, and other jobs retain the
+default cache policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
