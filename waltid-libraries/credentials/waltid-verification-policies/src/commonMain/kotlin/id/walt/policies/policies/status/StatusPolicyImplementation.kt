@@ -11,9 +11,15 @@ import id.walt.policies.policies.status.entry.W3CEntryExtractor
 import id.walt.policies.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
 import id.walt.policies.policies.status.model.*
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.W3C11
 import id.walt.policies.policies.status.reader.IETFCwtStatusValueReader
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
+import id.walt.policies.policies.status.signature.RAW_CREDENTIAL_CONTEXT_KEY
+import id.walt.policies.policies.status.signature.STATUS_LIST_SIGNER_AUTHORIZER_CONTEXT_KEY
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import id.walt.policies.policies.status.reader.format.CwtFormatMatcher
 import id.walt.policies.policies.status.reader.format.JwtFormatMatcher
 import id.walt.policies.policies.status.validator.IETFStatusValidator
@@ -21,10 +27,14 @@ import id.walt.policies.policies.status.validator.W3CStatusValidator
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
@@ -82,12 +92,21 @@ object StatusPolicyImplementation {
         ietfCwtStatusReader
     )
 
-    suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
-        getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
+    suspend fun verifyWithAttributes(
+        data: JsonObject,
+        attributes: StatusPolicyArgument,
+        context: Map<String, Any> = emptyMap(),
+    ): Result<Any> =
+        getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes, data, context) }
             ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
 
-    private suspend fun processStatusEntry(data: JsonElement, args: StatusPolicyArgument) = when (args) {
-        is IETFStatusPolicyAttribute -> processIETF(data, args)
+    private suspend fun processStatusEntry(
+        data: JsonElement,
+        args: StatusPolicyArgument,
+        credential: JsonObject,
+        context: Map<String, Any>,
+    ) = when (args) {
+        is IETFStatusPolicyAttribute -> processIETF(data, args, credential, context)
         is W3CStatusPolicyAttribute -> processW3C(data, args)
         is W3CStatusPolicyListArguments -> processListW3C(data, args)
     }
@@ -124,9 +143,54 @@ object StatusPolicyImplementation {
         "Verification failed: No matching status entries found for attributes, or status entries list is empty/shorter."
     }
 
-    private suspend fun processIETF(data: JsonElement, attribute: IETFStatusPolicyAttribute): Result<Unit> {
+    private suspend fun processIETF(
+        data: JsonElement,
+        attribute: IETFStatusPolicyAttribute,
+        credential: JsonObject,
+        context: Map<String, Any>,
+    ): Result<Unit> = try {
         val statusEntry = ietfEntryContentParser.parse(data)
-        return ietfStatusValidator.validate(statusEntry, attribute)
+        ietfStatusValidator.validate(
+            entry = statusEntry,
+            attribute = attribute,
+            referencedCredential = referencedCredential(credential, context),
+            signerAuthorizer = context[STATUS_LIST_SIGNER_AUTHORIZER_CONTEXT_KEY] as? StatusListSignerAuthorizer,
+        )
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Throwable) {
+        Result.failure(cause)
+    }
+
+    private suspend fun referencedCredential(credential: JsonObject, context: Map<String, Any>): DigitalCredential {
+        val raw = context[RAW_CREDENTIAL_CONTEXT_KEY] as? String
+        if (!raw.isNullOrBlank()) {
+            try {
+                return CredentialParser.parseOnly(raw)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (_: Throwable) {
+            }
+        }
+        val issuer = referencedIssuer(credential)
+            ?: throw StatusVerificationError("Referenced credential is required for status-list signer authorization")
+        return W3C11(
+            credentialData = credential,
+            signature = null,
+            signed = null,
+            issuer = issuer,
+        )
+    }
+
+    private fun referencedIssuer(credential: JsonObject): String? {
+        credential["iss"]?.jsonPrimitive?.contentOrNull?.let { return it }
+        credential["issuer"]?.let { issuer ->
+            return when (issuer) {
+                is JsonObject -> issuer["id"]?.jsonPrimitive?.contentOrNull
+                else -> issuer.jsonPrimitive.contentOrNull
+            }
+        }
+        return credential["vc"]?.jsonObject?.let(::referencedIssuer)
     }
 
     private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
