@@ -98,7 +98,7 @@ final class MockWalletUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "unsigned"])
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         ui.assertExists(identifier: "payment-unsigned-warning")
         XCTAssertTrue(app.staticTexts["Zahlung prüfen"].exists)
         XCTAssertTrue(app.staticTexts["11.56 EUR"].exists)
@@ -132,7 +132,7 @@ final class MockWalletUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "blocked"])
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         ui.assertExists(identifier: "payment-consent-blocked")
         XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].isEnabled)
         XCTAssertFalse(app.staticTexts["bound-but-hidden"].exists)
@@ -594,7 +594,7 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.openWalletLink("openid-credential-offer://mock")
+        ui.openDeepLink("openid-credential-offer://mock")
         XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
 
         ui.assertExists(identifier: "wallet.offerCredentialsSection")
@@ -609,7 +609,7 @@ final class MockWalletUITests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_NO_MATCHES": "1"])
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.buttons["wallet.presentationRejectButton"].isEnabled)
         XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].isEnabled)
@@ -881,7 +881,7 @@ final class MockWalletUITests: XCTestCase {
             ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
 
         XCTAssertFalse(app.staticTexts["Not requested"].exists)
@@ -908,7 +908,7 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
 
         XCTAssertTrue(app.descendants(matching: .any)["wallet.presentationVerifierSection"].waitForExistence(timeout: 10))
@@ -971,7 +971,7 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
 
         XCTAssertFalse(app.switches["wallet.presentationDisclosureToggle.8:identity6:cred-112:$.given_name"].exists)
