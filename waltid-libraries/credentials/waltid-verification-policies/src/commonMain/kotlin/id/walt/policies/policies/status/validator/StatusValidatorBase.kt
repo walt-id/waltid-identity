@@ -3,8 +3,8 @@ package id.walt.policies.policies.status.validator
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.StatusValueReader
+import id.walt.policies2.vc.policies.status.runStatusCheck
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CancellationException
 
 abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
@@ -19,7 +19,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         entry: M,
         attribute: T,
         authenticate: (suspend (String) -> Unit)?,
-    ): Result<Unit> = catchingCancellation {
+    ): Result<Unit> = runStatusCheck {
         logger.debug { "Credential URL: ${entry.uri}" }
         // download status credential
         val statusListContent = fetcher.fetch(entry.uri)
@@ -60,12 +60,4 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
     }
 
     private fun binToInt(bin: String) = bin.toInt(2)
-}
-
-private suspend inline fun <T> catchingCancellation(block: suspend () -> T): Result<T> = try {
-    Result.success(block())
-} catch (cause: CancellationException) {
-    throw cause
-} catch (cause: Throwable) {
-    Result.failure(cause)
 }

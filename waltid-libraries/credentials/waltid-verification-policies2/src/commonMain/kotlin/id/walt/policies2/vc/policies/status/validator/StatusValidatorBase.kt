@@ -3,6 +3,7 @@ package id.walt.policies2.vc.policies.status.validator
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.policies.status.CredentialFetcher
 import id.walt.policies2.vc.policies.status.StatusListContent
+import id.walt.policies2.vc.policies.status.runStatusCheck
 import id.walt.policies2.vc.policies.status.model.StatusContent
 import id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.StatusRetrievalError
@@ -16,7 +17,6 @@ import id.walt.policies2.vc.policies.status.signature.IetfStatusListTokenClaims
 import id.walt.policies2.vc.policies.status.signature.VerifiedStatusList
 import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 
@@ -35,7 +35,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         attribute: T,
         referencedCredential: DigitalCredential?,
         signerAuthorizer: StatusListSignerAuthorizer?,
-    ): Result<Unit> = catchingCancellation {
+    ): Result<Unit> = runStatusCheck {
         logger.debug { "Credential URL: ${entry.uri}" }
         val statusListContent = fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
@@ -132,12 +132,4 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
     }
 
     private fun binToInt(bin: String) = bin.toInt(2)
-}
-
-private suspend inline fun <T> catchingCancellation(block: suspend () -> T): Result<T> = try {
-    Result.success(block())
-} catch (cause: CancellationException) {
-    throw cause
-} catch (cause: Throwable) {
-    Result.failure(cause)
 }
