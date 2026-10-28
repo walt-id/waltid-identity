@@ -19,6 +19,8 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
+import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallengeService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
@@ -50,6 +52,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration.Companion.seconds
 
 data class OpenId4VciModule(
     val oauth2Provider: OAuth2Provider,
@@ -58,6 +61,7 @@ data class OpenId4VciModule(
     /** Crypto2 token signing key, or `null` when the configured token key is not crypto2-capable. */
     val crypto2TokenSigningKey: Crypto2JwtSigningKey?,
     val keyAttestation: KeyAttestationVerificationOptions? = null,
+    val attestationChallengeService: AttestationChallengeService? = null,
 ) {
 
     companion object {
@@ -110,6 +114,22 @@ data class OpenId4VciModule(
                 verificationKeyResolver = verificationKeyResolver,
             )
 
+            val attestationChallengeService = config.attestationChallengeConfig()?.let { challenge ->
+                crypto2TokenKey?.let { signingKey ->
+                    JwtAttestationChallengeService.crypto2(
+                        signingKeyResolver = Crypto2JwtSigningKeyResolver { signingKey },
+                        verificationKeyResolver = Crypto2JwtVerificationKeyResolver {
+                            Crypto2JwtVerificationKey(signingKey.key, setOf(signingKey.algorithm))
+                        },
+                        challengeLifetime = challenge.lifetimeSeconds.seconds,
+                    )
+                } ?: JwtAttestationChallengeService(
+                    signingKeyResolver = signingKeyResolver,
+                    verificationKeyResolver = verificationKeyResolver,
+                    challengeLifetime = challenge.lifetimeSeconds.seconds,
+                )
+            }
+
             val accessTokenIssuer = crypto2TokenKey?.let { signingKey ->
                 JwtAccessTokenIssuer.crypto2(Crypto2JwtSigningKeyResolver { signingKey })
             } ?: JwtAccessTokenIssuer(signingKeyResolver)
@@ -154,7 +174,7 @@ data class OpenId4VciModule(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = { config.enforcePushedAuthorizationRequests },
                     ),
-                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
+                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config, attestationChallengeService),
                     credentialRequestDecryptor = config.credentialEncryptionKey
                         ?.let(CredentialEncryptionKeyConfig::requestDecryptor),
 
@@ -175,6 +195,7 @@ data class OpenId4VciModule(
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,
+                attestationChallengeService = attestationChallengeService,
                 keyAttestation = runBlocking {
                     config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver).also {
                         (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
@@ -187,11 +208,14 @@ data class OpenId4VciModule(
             )
         }
 
-        private fun createClientAuthenticationServiceConfig(config: Issuer2ServiceConfig): ClientAuthenticationServiceConfig {
+        private fun createClientAuthenticationServiceConfig(
+            config: Issuer2ServiceConfig,
+            challengeService: AttestationChallengeService?,
+        ): ClientAuthenticationServiceConfig {
             val clientAuthenticationConfig = config.clientAuthenticationConfig
                 ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                clientAuthenticationConfig.toClientAuthenticationServiceConfig()
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService)
             }
         }
 

@@ -2,40 +2,40 @@
 
 This document lists third-party libraries used by :waltid-applications:waltid-cli.
 
-This distribution includes 278 third-party components, listed below with
+This distribution includes 284 third-party components, listed below with
 their license and copyright holder.
 
-* [at.asitplus.signum:indispensable 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-asn1 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-asn1 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-asn1-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-asn1-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-josef 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-josef 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-josef-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-josef-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-oids 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-oids 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:indispensable-oids-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:indispensable-oids-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:internals 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:internals 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:internals-jvm 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:internals-jvm 3.26.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:supreme 0.15.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:supreme 0.16.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
-* [at.asitplus.signum:supreme-jvm 0.15.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
+* [at.asitplus.signum:supreme-jvm 0.16.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/signum.
 * [at.asitplus:kmmresult 1.9.3](https://github.com/a-sit-plus/KmmResult). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/KmmResult.
 * [at.asitplus:kmmresult-jvm 1.9.3](https://github.com/a-sit-plus/KmmResult). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/KmmResult.
-* [at.asitplus:multibase 1.2.2](https://github.com/a-sit-plus/multibase). MIT License.
+* [at.asitplus:multibase 1.3.0](https://github.com/a-sit-plus/multibase). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/multibase.
-* [at.asitplus:multibase-jvm 1.2.2](https://github.com/a-sit-plus/multibase). MIT License.
+* [at.asitplus:multibase-jvm 1.3.0](https://github.com/a-sit-plus/multibase). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/a-sit-plus/multibase.
 * [co.touchlab:stately-common 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/touchlab/Stately.
@@ -57,6 +57,10 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/touchlab/Stately.
 * [co.touchlab:stately-strict-jvm 2.1.0](https://github.com/touchlab/Stately). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/touchlab/Stately.
+* [com.charleskorn.kaml:kaml 0.79.0](https://github.com/charleskorn/kaml). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/charleskorn/kaml.
+* [com.charleskorn.kaml:kaml-jvm 0.79.0](https://github.com/charleskorn/kaml). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/charleskorn/kaml.
 * [com.doist.x:normalize 1.3.3](https://github.com/Doist/doistx-normalize). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/Doist/doistx-normalize.
 * [com.doist.x:normalize-jvm 1.3.3](https://github.com/Doist/doistx-normalize). MIT License.
@@ -121,17 +125,17 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see http://findbugs.sourceforge.net/.
 * [com.google.code.gson:gson 2.13.2](https://github.com/google/gson). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/google/gson.
-* [com.google.crypto.tink:tink 1.21.0](http://github.com/tink-crypto/tink-java). Apache License, Version 2.0.
+* [com.google.crypto.tink:tink 1.23.0](http://github.com/tink-crypto/tink-java). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see http://github.com/tink-crypto/tink-java.
 * [com.google.errorprone:error_prone_annotations 2.41.0](https://errorprone.info/error_prone_annotations). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://errorprone.info/error_prone_annotations.
-* [com.google.protobuf:protobuf-java 4.33.0](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
+* [com.google.protobuf:protobuf-java 4.33.6](https://developers.google.com/protocol-buffers/). The 3-Clause BSD License.
   - Copyright holder not declared by the publisher; see https://developers.google.com/protocol-buffers/.
 * [com.ionspin.kotlin:bignum 0.3.10](https://github.com/ionspin/kotlin-multiplatform-bignum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ionspin/kotlin-multiplatform-bignum.
 * [com.ionspin.kotlin:bignum-jvm 0.3.10](https://github.com/ionspin/kotlin-multiplatform-bignum). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ionspin/kotlin-multiplatform-bignum.
-* [com.nimbusds:nimbus-jose-jwt 10.9.1](https://connect2id.com). Apache License, Version 2.0.
+* [com.nimbusds:nimbus-jose-jwt 10.10](https://connect2id.com). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://connect2id.com.
 * [com.soywiz:korlibs-annotations 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/korlibs/korge-korlibs.
@@ -237,14 +241,14 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/korlibs/korge-korlibs.
 * [com.soywiz:korlibs-time-jvm 6.0.0](https://github.com/korlibs/korge-korlibs). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/korlibs/korge-korlibs.
-* [com.squareup.okhttp3:okhttp 5.3.2](https://square.github.io/okhttp/). Apache License, Version 2.0.
-  - Copyright holder not declared by the publisher; see https://square.github.io/okhttp/.
-* [com.squareup.okhttp3:okhttp-jvm 5.3.2](https://square.github.io/okhttp/). Apache License, Version 2.0.
-  - Copyright holder not declared by the publisher; see https://square.github.io/okhttp/.
-* [com.squareup.okio:okio 3.17.0](https://github.com/square/okio/). Apache License, Version 2.0.
-  - Copyright holder not declared by the publisher; see https://github.com/square/okio/.
-* [com.squareup.okio:okio-jvm 3.17.0](https://github.com/square/okio/). Apache License, Version 2.0.
-  - Copyright holder not declared by the publisher; see https://github.com/square/okio/.
+* [com.squareup.okhttp3:okhttp 5.5.0](https://lysine.dev/okhttp/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://lysine.dev/okhttp/.
+* [com.squareup.okhttp3:okhttp-jvm 5.5.0](https://lysine.dev/okhttp/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://lysine.dev/okhttp/.
+* [com.squareup.okio:okio 3.18.2](https://github.com/lysine-dev/okio/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/lysine-dev/okio/.
+* [com.squareup.okio:okio-jvm 3.18.2](https://github.com/lysine-dev/okio/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/lysine-dev/okio/.
 * [com.upokecenter:cbor 5.0.0-alpha2](https://github.com/peteroupc/CBOR-Java). Creative Commons Legal Code.
   - Copyright holder not declared by the publisher; see https://github.com/peteroupc/CBOR-Java.
 * [de.cketti.unicode:kotlin-codepoints 0.11.0](https://github.com/cketti/kotlin-codepoints). MIT License.
@@ -311,97 +315,101 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/reactivecircus/cache4k.
 * [io.github.reactivecircus.cache4k:cache4k-jvm 0.14.0](https://github.com/reactivecircus/cache4k). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/reactivecircus/cache4k.
-* [io.ktor:ktor-client-apache5 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-apache5-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-apache5-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-cio 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-cio-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-cio-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-content-negotiation 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-content-negotiation-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-content-negotiation-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-core 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-core-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-core-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-encoding 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-encoding-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-encoding-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-java 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-java-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-java-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-json 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-json-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-json-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-logging 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-logging-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-logging-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-okhttp 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-okhttp-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-okhttp-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-client-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-client-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-events 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-events-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-events-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-http 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-http-cio 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-http-cio-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-cio-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-http-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-http-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-io 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-io-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-io-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-network 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-network-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-network-tls 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-network-tls-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-network-tls-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-openapi-schema 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-openapi-schema-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization-kotlinx 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization-kotlinx-json 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-serialization-kotlinx-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-sse 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-json-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-sse-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-serialization-kotlinx-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-utils 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-utils-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-sse-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-websocket-serialization 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-websocket-serialization-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-utils-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-websockets 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
-* [io.ktor:ktor-websockets-jvm 3.5.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+* [io.ktor:ktor-websocket-serialization-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
+* [io.ktor:ktor-websockets 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
+* [io.ktor:ktor-websockets-jvm 3.6.0](https://github.com/ktorio/ktor). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ktorio/ktor.
 * [io.matthewnelson.encoding:base16 2.4.0](https://github.com/05nelsonm/encoding/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/05nelsonm/encoding/.
@@ -419,13 +427,17 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/05nelsonm/encoding/.
 * [io.matthewnelson.encoding:core-jvm 2.4.0](https://github.com/05nelsonm/encoding/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/05nelsonm/encoding/.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [it.krzeminski:snakeyaml-engine-kmp 3.1.1](https://github.com/krzema12/snakeyaml-engine-kmp/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/krzema12/snakeyaml-engine-kmp/.
+* [it.krzeminski:snakeyaml-engine-kmp-jvm 3.1.1](https://github.com/krzema12/snakeyaml-engine-kmp/). Apache License, Version 2.0.
+  - Copyright holder not declared by the publisher; see https://github.com/krzema12/snakeyaml-engine-kmp/.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
 * [net.java.dev.jna:jna 5.14.0](https://github.com/java-native-access/jna). Apache License, Version 2.0 (elected; also offered under GNU LESSER GENERAL PUBLIC LICENSE, Version 2.1).
   - Copyright holder not declared by the publisher; see https://github.com/java-native-access/jna.
@@ -435,23 +447,23 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/ethauvin/urlencoder.
 * [net.thauvin.erik.urlencoder:urlencoder-lib-jvm 1.6.0](https://github.com/ethauvin/urlencoder). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/ethauvin/urlencoder.
-* org.apache.httpcomponents.client5:httpclient5 5.5.1. Apache License, Version 2.0.
+* org.apache.httpcomponents.client5:httpclient5 5.6.4. Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see the project's own distribution.
-* org.apache.httpcomponents.core5:httpcore5 5.3.6. Apache License, Version 2.0.
+* org.apache.httpcomponents.core5:httpcore5 5.4.3. Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see the project's own distribution.
-* org.apache.httpcomponents.core5:httpcore5-h2 5.3.6. Apache License, Version 2.0.
+* org.apache.httpcomponents.core5:httpcore5-h2 5.4.3. Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see the project's own distribution.
-* [org.bouncycastle:bcpkix-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
+* [org.bouncycastle:bcpkix-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
   - Copyright holder not declared by the publisher; see https://www.bouncycastle.org/download/bouncy-castle-java/.
-* [org.bouncycastle:bcprov-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
+* [org.bouncycastle:bcprov-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
   - Copyright holder not declared by the publisher; see https://www.bouncycastle.org/download/bouncy-castle-java/.
-* [org.bouncycastle:bcutil-jdk18on 1.84](https://www.bouncycastle.org/download/bouncy-castle-java/). Bouncy Castle Licence.
+* [org.bouncycastle:bcutil-jdk18on 1.86](https://www.bouncycastle.org/download/bouncy-castle-java/). MIT License.
   - Copyright holder not declared by the publisher; see https://www.bouncycastle.org/download/bouncy-castle-java/.
 * [org.cose:cose-java 1.1.1-WALT-SNAPSHOT](https://github.com/cose-wg/cose-java). BSD3.
   - Copyright holder not declared by the publisher; see https://github.com/cose-wg/cose-java.
-* [org.jetbrains.kotlin:kotlin-stdlib 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
-* [org.jetbrains.kotlin:kotlin-stdlib-common 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-common 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
 * [org.jetbrains.kotlin:kotlin-stdlib-jdk7 2.0.0](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
@@ -471,17 +483,17 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx.coroutines.
 * [org.jetbrains.kotlinx:kotlinx-coroutines-slf4j 1.11.0](https://github.com/Kotlin/kotlinx.coroutines). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx.coroutines.
-* [org.jetbrains.kotlinx:kotlinx-datetime 0.8.0](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-datetime 0.8.0-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-datetime.
-* [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.8.0](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-datetime-jvm 0.8.0-0.6.x-compat](https://github.com/Kotlin/kotlinx-datetime). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-datetime.
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-bytestring 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-io.
-* [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-bytestring-jvm 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-io.
-* [org.jetbrains.kotlinx:kotlinx-io-core 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-core 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-io.
-* [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.9.0](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
+* [org.jetbrains.kotlinx:kotlinx-io-core-jvm 0.9.1](https://github.com/Kotlin/kotlinx-io). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx-io.
 * [org.jetbrains.kotlinx:kotlinx-serialization-bom 1.11.1-waltid-20260811](https://github.com/Kotlin/kotlinx.serialization). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx.serialization.
@@ -559,5 +571,5 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://projectlombok.org.
 * [org.slf4j:slf4j-api 2.1.0-alpha1](http://www.slf4j.org). MIT License.
   - Copyright holder not declared by the publisher; see http://www.slf4j.org.
-* [org.slf4j:slf4j-simple 2.0.18](http://www.slf4j.org). MIT License.
+* [org.slf4j:slf4j-simple 2.0.20](http://www.slf4j.org). MIT License.
   - Copyright holder not declared by the publisher; see http://www.slf4j.org.

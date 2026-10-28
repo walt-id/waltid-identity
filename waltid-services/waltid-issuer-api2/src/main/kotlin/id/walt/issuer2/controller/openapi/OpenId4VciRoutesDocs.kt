@@ -1,14 +1,17 @@
 package id.walt.issuer2.controller.openapi
 
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.responses.challenge.AttestationChallengeResponse
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.JsonObject
 
 object OpenId4VciRoutesDocs {
@@ -45,7 +48,7 @@ object OpenId4VciRoutesDocs {
         summary = "Get Authorization Server metadata"
         description = "Returns OAuth Authorization Server metadata as JSON. When metadata signing is enabled, " +
                 "`signed_metadata` contains a signed JWT as defined by [RFC 8414 §2.1](https://www.rfc-editor.org/rfc/rfc8414.html#section-2.1). " +
-                "The field is omitted when signing is not configured."
+                "The field is omitted when signing is not configured. challenge_endpoint is included when attestation challenges are enabled."
         response {
             HttpStatusCode.OK to {
                 description = "OAuth Authorization Server metadata"
@@ -73,9 +76,11 @@ object OpenId4VciRoutesDocs {
     fun vctTypeMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC type metadata"
-        description = "Resolve configured self-hosted SD-JWT VC type metadata through " +
-                "`/.well-known/vct/{type}` or `/openid4vci/{type}`. Unknown types return 404. " +
-                "OpenID4VCI protocol path names are reserved and cannot be used for self-hosted VCT URLs."
+        description = "Look up type metadata this issuer stores. Self-hosted HTTPS vct values are served at " +
+                "`/.well-known/vct/{type}` and `/openid4vci/{type}`. A configured URN such as `urn:eudi:pid:1` " +
+                "is served from those same routes by identifier. SD-JWT VC retrieves HTTPS type metadata from the " +
+                "vct URL itself; this route is the issuer's lookup, not that resolution rule. Unknown types, " +
+                "external HTTPS vct values, and reserved OpenID4VCI path names return 404."
         request {
             pathParameter<String>("type")
         }
@@ -85,7 +90,7 @@ object OpenId4VciRoutesDocs {
                 body<JsonObject>()
             }
             HttpStatusCode.NotFound to {
-                description = "The type has no self-hosted metadata or uses a reserved protocol path name."
+                description = "The type is unknown, is an external HTTPS vct, or uses a reserved protocol path name."
             }
         }
     }
@@ -114,9 +119,38 @@ object OpenId4VciRoutesDocs {
         }
     }
 
+    private const val ATTESTATION_CHALLENGE_RETRY =
+        " When challenges are enabled, include the challenge in a freshly signed client attestation PoP JWT. " +
+        "HTTP 400 use_attestation_challenge returns a fresh value in OAuth-Client-Attestation-Challenge. " +
+        "Retry the same request with a newly signed PoP (new jti) containing that value in its challenge claim. " +
+        "A valid challenge is reusable across PAR, TOKEN and refresh until expiry; it is separate from c_nonce."
+
+    fun challenge(): RouteConfig.() -> Unit = {
+        summary = "Client attestation challenge"
+        description = "Unauthenticated endpoint accepting an empty POST body. Enabled by the client-attestation " +
+                "challenge configuration and advertised as challenge_endpoint in authorization server metadata."
+        response {
+            HttpStatusCode.OK to {
+                description = "Signed attestation_challenge; Cache-Control: no-store"
+                header<String>(HttpHeaders.CacheControl) { description = "no-store" }
+                body<AttestationChallengeResponse> {
+                    example("Attestation challenge") {
+                        value = AttestationChallengeResponse("<signed-challenge>")
+                    }
+                }
+            }
+            HttpStatusCode.NotFound to { description = "Attestation challenges are disabled" }
+            HttpStatusCode.InternalServerError to {
+                description = "Challenge issuance failed (server_error)"
+                body<OAuthError>()
+            }
+        }
+    }
+
     fun pushedAuthorizationRequest(): RouteConfig.() -> Unit = {
         summary = "Pushed Authorization Request (PAR)"
-        description = "RFC 9126 PAR endpoint: submit authorization parameters and receive a request_uri."
+        description = "RFC 9126 PAR endpoint: submit authorization parameters and receive a request_uri." +
+                ATTESTATION_CHALLENGE_RETRY
         request {
             body<Map<String, List<String>>> {
                 description = "Authorization request parameters (form-encoded)"
@@ -129,8 +163,15 @@ object OpenId4VciRoutesDocs {
                 body<PushedAuthorizationResponse>()
             }
             HttpStatusCode.BadRequest to {
-                description = "Invalid PAR request"
-                body<OAuthError>()
+                description = "Invalid PAR request, or use_attestation_challenge with OAuth-Client-Attestation-Challenge header"
+                header<String>(ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE) {
+                    description = "Fresh challenge for a retry with a newly signed attestation PoP"
+                }
+                body<OAuthError> {
+                    example("Retry with a fresh attestation PoP") {
+                        value = OAuthError("use_attestation_challenge", "A valid client attestation challenge is required")
+                    }
+                }
             }
             HttpStatusCode.InternalServerError to {
                 description = "PAR processing failed"
@@ -160,7 +201,8 @@ object OpenId4VciRoutesDocs {
 
     fun token(): RouteConfig.() -> Unit = {
         summary = "Token endpoint"
-        description = "The token endpoint. A DPoP proof binds the issued access token to the proof key."
+        description = "The token endpoint. A DPoP proof binds the issued access token to the proof key." +
+                ATTESTATION_CHALLENGE_RETRY
         request {
             headerParameter<String>("DPoP") {
                 required = false
@@ -173,8 +215,15 @@ object OpenId4VciRoutesDocs {
                 body<JsonObject>()
             }
             HttpStatusCode.BadRequest to {
-                description = "Invalid token request"
-                body<OAuthError>()
+                description = "Invalid token request, or use_attestation_challenge with OAuth-Client-Attestation-Challenge header"
+                header<String>(ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE) {
+                    description = "Fresh challenge for a retry with a newly signed attestation PoP"
+                }
+                body<OAuthError> {
+                    example("Retry with a fresh attestation PoP") {
+                        value = OAuthError("use_attestation_challenge", "A valid client attestation challenge is required")
+                    }
+                }
             }
             HttpStatusCode.Unauthorized to {
                 description = "Client authentication failed"

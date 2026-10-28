@@ -11,25 +11,25 @@ their license and copyright holder.
   - Copyright holder not declared by the publisher; see https://github.com/peteroupc/Numbers-Java.
 * [com.upokecenter:cbor 5.0.0-alpha2](https://github.com/peteroupc/CBOR-Java). Creative Commons Legal Code.
   - Copyright holder not declared by the publisher; see https://github.com/peteroupc/CBOR-Java.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation-js 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-js 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-annotation-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime-js 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-js 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
-* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.0-0.14.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
+* [love.forte.plugin.suspend-transform:suspend-transform-runtime-jvm 2.4.20-0.15.0](https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin). MIT License.
   - Copyright holder not declared by the publisher; see https://github.com/ForteScarlet/kotlin-suspend-transform-compiler-plugin.
 * [org.cose:cose-java 1.1.1-WALT-SNAPSHOT](https://github.com/cose-wg/cose-java). BSD3.
   - Copyright holder not declared by the publisher; see https://github.com/cose-wg/cose-java.
-* [org.jetbrains.kotlin:kotlin-dom-api-compat 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-dom-api-compat 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
-* [org.jetbrains.kotlin:kotlin-stdlib 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
-* [org.jetbrains.kotlin:kotlin-stdlib-js 2.4.10](https://kotlinlang.org/). Apache License, Version 2.0.
+* [org.jetbrains.kotlin:kotlin-stdlib-js 2.4.20](https://kotlinlang.org/). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://kotlinlang.org/.
 * [org.jetbrains.kotlinx:atomicfu 0.32.1](https://github.com/Kotlin/kotlinx.atomicfu). Apache License, Version 2.0.
   - Copyright holder not declared by the publisher; see https://github.com/Kotlin/kotlinx.atomicfu.

@@ -15,6 +15,7 @@ import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.SessionManager
 import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -121,7 +122,9 @@ fun Route.authFlows(
         }, config.functionAmendments[method])
     }
 
-    route("{sessionId}") {
+    route("{sessionId}", {
+        request { pathParameter<String>("sessionId") { description = "The auth session the step continues" } }
+    }) {
         methods.distinct().forEach { method ->
             registerAuthenticationMethod(method, {
                 AuthContext(

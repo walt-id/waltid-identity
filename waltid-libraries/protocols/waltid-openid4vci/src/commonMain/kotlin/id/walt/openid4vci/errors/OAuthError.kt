@@ -8,6 +8,8 @@ data class OAuthError(
     val error: String,
     @SerialName("error_description")
     val description: String? = null,
+    @kotlinx.serialization.Transient
+    val responseHeaders: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -21,6 +23,7 @@ object OAuthErrorCodes {
     const val INVALID_SCOPE = "invalid_scope"
     const val SERVER_ERROR = "server_error"
     const val TEMPORARILY_UNAVAILABLE = "temporarily_unavailable"
+    const val USE_ATTESTATION_CHALLENGE = "use_attestation_challenge"
     const val INVALID_CLIENT = "invalid_client"
     const val INVALID_GRANT = "invalid_grant"
     const val UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type"
