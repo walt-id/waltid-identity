@@ -1,6 +1,7 @@
 plugins {
     id("waltid.jvm.servicelib")
     id("waltid.publish.maven")
+    id("waltid.dependency-constraints")
 }
 
 group = "id.walt"
@@ -72,7 +73,8 @@ dependencies {
     implementation(identityLibs.kedis)
 
     // Passkeys (WebAuthn). It parses the CBOR browsers send with Jackson 3, whose BOM it lifts to 3.2.1 (vulnerable
-    // core, databind and CBOR). The forced versions below only hold in this build, so the BOM is also published.
+    // core, databind and CBOR, CVE-2026-68495). The Jackson 3 BOM stays published from this library. The patched
+    // catalog versions, including CBOR, are exported by waltid.dependency-constraints.
     implementation(identityLibs.webauthn4j.core)
     implementation(platform(identityLibs.jackson.bom.tools))
 
@@ -95,38 +97,11 @@ dependencies {
     testImplementation(identityLibs.webauthn4j.test)
 }
 
-// Force-pin vulnerable transitive dependencies.
-//
-// web3j:core → tools.jackson.core:jackson-core / jackson-databind
-//   Pin both to the jackson-core-3 catalog version.
-//
-// web3j:core / ktor-openapi → com.fasterxml.jackson.core:jackson-core / jackson-databind
-//   Pin both to the jackson-core catalog version.
-//
-// web3j:core → org.bouncycastle:bcprov-jdk18on:1.80
-//   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
-//   Snyk said "no supported fix" at 1.80; 1.84 is now available
-//
-// webauthn4j → tools.jackson.dataformat:jackson-dataformat-cbor:3.2.1, allocation without limits
-//   (CVE-2026-68495, fixed in 3.2.2), and through its BOM core and databind 3.2.1. Pinned to the jackson-core-3
-//   catalog version as well; users of this library get it through the published BOM (see the dependencies).
-//
-// ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
-// web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
+// web3j:core still requests bcprov-jdk18on 1.80. Keep this local: the 4.2 Netty
+// pins live in waltid.dependency-constraints and must not be mixed with Azure's
+// Netty 4.1 forces.
 configurations.all {
-    resolutionStrategy.force(
-        identityLibs.jackson.core.tools,
-        identityLibs.jackson.databind.tools,
-        identityLibs.jackson.dataformat.cbor.tools,
-        identityLibs.jackson.core,
-        identityLibs.jackson.databind,
-        identityLibs.bouncycastle.prov,
-        identityLibs.netty.codec.compression,
-        identityLibs.netty.codec.http.v2,
-        identityLibs.netty.transport.classes.epoll,
-        identityLibs.vertx.core,
-        identityLibs.rhino,
-    )
+    resolutionStrategy.force(identityLibs.bouncycastle.prov)
 }
 
 mavenPublishing {
