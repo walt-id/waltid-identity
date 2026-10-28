@@ -36,7 +36,10 @@ default cache policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
-afterwards to ensure the fixture build did not replace it. Consumers run in three
+afterwards to ensure the fixture build did not replace it. A separate cache retains
+the fixture outputs and the same Gradle history/ownership records, with the same
+toolchain and revision scoping. Gradle validates the fixture inputs on every run;
+Swift tests and result collection always execute. Consumers run in three
 independent jobs: native provider plus native demo, Compose provider plus Compose
 demo, and Swift bridge tests. Each provider stays with its demo to reuse the build.
 Bridge tests run whenever either native or Compose is selected. Matrix failures

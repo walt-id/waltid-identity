@@ -190,6 +190,8 @@ jobs:
     timeout-minutes: 70
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
+      revision-key: ${{ steps.revisions.outputs.revision-key }}
+      xcode-key: ${{ steps.revisions.outputs.xcode-key }}
       artifact-name: wallet-core-release-${{ github.run_attempt }}
     steps:
       - name: Checkout all repos with ref fallback
@@ -300,6 +302,21 @@ jobs:
       - name: Configure gradle
         if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+
+      - name: Cache the isolated bridge fixture and task history
+        if: ${{ matrix.consumer == 'bridge' }}
+        uses: actions/cache@v5
+        with:
+          # Reuse only compilation; the normal Gradle input checks and Swift tests still run.
+          # Keep the complete ownership record; exclude configuration-cache and test results.
+          path: |
+            waltid-identity/.gradle/*/executionHistory/*.bin
+            waltid-identity/.gradle/buildOutputCleanup
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/bridgeFixturesReleaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bridge-fixtures/XCFrameworks/release
+          key: wallet-bridge-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.wallet-core-framework.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ needs.wallet-core-framework.outputs.revision-key }}
+          restore-keys: |
+            wallet-bridge-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.wallet-core-framework.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
 
       - name: Run selected WalletCore consumer tests
         if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
