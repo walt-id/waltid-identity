@@ -411,6 +411,18 @@ object CredentialParser {
             availableDisclosures = mappedDisclosures.toList()
         }
 
+        if (header["typ"]?.jsonPrimitive?.content == "dc+sd-jwt" || "vct" in payload) {
+            // SD-JWT VC §2.2.2.3: these claims, including their descendants, must not be disclosed.
+            // Use the resolved root path so an ordinary nested claim named exp remains allowed.
+            val nonDisclosableClaims = setOf("iss", "nbf", "exp", "cnf", "vct", "vct#integrity", "aka_vcts", "status")
+            val forbiddenDisclosure = availableDisclosures.orEmpty().firstOrNull {
+                it.location?.firstOrNull()?.jsonPrimitive?.content in nonDisclosableClaims
+            }
+            require(forbiddenDisclosure == null) {
+                "SD-JWT VC claim '${forbiddenDisclosure?.location?.firstOrNull()?.jsonPrimitive?.content}' must not be selectively disclosed"
+            }
+        }
+
         val fullCredentialData =
             if (availableDisclosures?.isNotEmpty() == true ||
                 header.getValue("typ").jsonPrimitive.content.let { it == "vc+sd-jwt" || it == "dc+sd-jwt" }
