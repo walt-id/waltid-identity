@@ -155,7 +155,11 @@ class WalletDemoAppTestScenarios(
         waitUntil { prompts == 1 }
         onNodeWithTag(WalletUiTestTags.PinInput).assert(isFocused().not()).assertIsNotEnabled()
         gate.complete(DemoBiometricResult.Failed)
-        waitUntil { !controller.state.value.isAuthenticating }
+        waitUntil {
+            !controller.state.value.isAuthenticating &&
+                onAllNodes(hasTestTag(WalletUiTestTags.PinInput) and isEnabled() and isFocused())
+                    .fetchSemanticsNodes().size == 1
+        }
         waitForIdle()
         onNodeWithTag(WalletUiTestTags.PinInput).assertIsFocused().assertIsEnabled()
         controller.handleApplicationForegrounded()
