@@ -70,6 +70,8 @@ object Verifier2RequestUriPostHandler {
     ) {
         val call = this
 
+        verificationSession.requireAvailable()
+
         // Parse wallet_nonce and wallet_metadata from the URL-encoded POST body
         val bodyParams = call.receiveParameters()
         val walletNonce = bodyParams["wallet_nonce"]
@@ -144,9 +146,8 @@ object Verifier2RequestUriPostHandler {
             signRequestObject(requireNotNull(signingKey), newPayload, existingHeaders)
         }
 
-        updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
-            status = Verification2Session.VerificationSessionStatus.IN_USE
-        }
+        // Share availability checks and status updates with unsigned GET handling.
+        Verifier2AuthorizationRequestHandler.handleAuthorizationRequestRequest(verificationSession, updateSessionCallback)
 
         log.trace { "Re-signed request object with wallet_nonce for session ${verificationSession.id}" }
         call.respondText(freshJwt, ContentType.parse("application/oauth-authz-req+jwt"))

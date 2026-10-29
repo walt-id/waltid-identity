@@ -2,6 +2,10 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier2.data.Verifier2SessionUpdate
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonPrimitive
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -30,6 +34,7 @@ import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalSerializationApi::class)
 class Verifier2VPDirectPostHandlerParseTest {
@@ -138,6 +143,7 @@ class Verifier2VPDirectPostHandlerParseTest {
         val events = session.handleWalletError(state = "expected-state")
 
         assertEquals(listOf(SessionEvent.wallet_error_response_received), events)
+        assertNotNull(session.presentationId)
         assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
         assertEquals("Wallet returned OID4VP error: access_denied", session.statusReason)
 
@@ -169,6 +175,7 @@ class Verifier2VPDirectPostHandlerParseTest {
 
         // First POST flips session to FAILED with access_denied
         session.handleWalletError(state = "expected-state")
+        val presentationId = assertNotNull(session.presentationId)
         val failureAfterFirst = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
         assertEquals("access_denied", failureAfterFirst.error)
 
@@ -180,6 +187,7 @@ class Verifier2VPDirectPostHandlerParseTest {
         )
 
         assertEquals(emptyList(), events, "No events should fire for a terminal session")
+        assertEquals(presentationId, session.presentationId)
         assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
         assertEquals("Wallet returned OID4VP error: access_denied", session.statusReason)
 
@@ -198,6 +206,7 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertEquals(emptyList(), events)
         assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
         assertEquals(null, session.failure, "must not attach failure to a SUCCESSFUL session")
+        assertNull(session.presentationId)
     }
 
     @Test
@@ -212,6 +221,39 @@ class Verifier2VPDirectPostHandlerParseTest {
 
         assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
         assertEquals(null, session.failure, "invalid replay must not attach failure to terminal session")
+    }
+
+    @Test
+    fun `ID token validation failure carries the attempt id on every callback`() = runTest {
+        val original = directPostSession("expected-state")
+        val session = original.copy(authorizationRequest = original.authorizationRequest.copy(
+            responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+            scope = "openid",
+            idTokenType = "subject_signed",
+        ))
+        val events = mutableListOf<Pair<SessionEvent, String?>>()
+        assertFailsWith<Verifier2VPDirectPostHandler.PresentationRejectionException> {
+            handleDirectPost(
+                verificationSession = session,
+                responseData = CleartextDirectPostResponse("{}", "expected-state"),
+                updateSessionCallback = { current, event, block ->
+                    current.block()
+                    val payload = Verifier2SessionUpdate(current.id, event, current).toKtorSessionUpdate()
+                    events += event to payload.session["presentationId"]?.jsonPrimitive?.content
+                },
+                failSessionCallback = { current, event, update ->
+                    update(current, event) { status = Verification2Session.VerificationSessionStatus.FAILED }
+                },
+            )
+        }
+        assertEquals(listOf(
+            SessionEvent.attempted_presentation,
+            SessionEvent.presentation_validation_available,
+            SessionEvent.presentation_validation_failed,
+        ), events.map { it.first })
+        val presentationId = assertNotNull(session.presentationId)
+        assertEquals(setOf(presentationId), events.map { it.second }.toSet())
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
     }
 
     private fun directPostSession(

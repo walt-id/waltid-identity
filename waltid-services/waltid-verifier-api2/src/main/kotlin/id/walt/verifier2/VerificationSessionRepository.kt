@@ -36,12 +36,13 @@ interface VerificationSessionRepository {
     suspend fun claimForProcessingWithOriginal(sessionId: String): VerificationSessionProcessingClaim {
         val current = get(sessionId) ?: throw VerificationSessionNotFoundException(sessionId)
         val status = current.session.status
-        if (current.session.attempted || status.successful != null || status in setOf(
+        if ((!current.session.reattemptable && status == Verification2Session.VerificationSessionStatus.SUCCESSFUL) || status in setOf(
                 Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
                 Verification2Session.VerificationSessionStatus.PROCESSING_FLOW,
             )) {
             throw VerificationSessionAlreadyUsedException(sessionId)
         }
+        current.session.requireAvailable()
         val claimed = current.session.copyForStorage().apply {
             this.status = Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
         }
@@ -54,8 +55,7 @@ interface VerificationSessionRepository {
     suspend fun restoreProcessingClaim(claim: VerificationSessionProcessingClaim) {
         val current = get(claim.claimed.session.id) ?: return
         if (current.version != claim.claimed.version ||
-            current.session.status != Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST ||
-            current.session.attempted
+            current.session.status != Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
         ) {
             return
         }
