@@ -1,7 +1,7 @@
 package id.walt.webdatafetching
 
+import io.ktor.client.call.replaceResponse
 import io.ktor.client.plugins.api.createClientPlugin
-import io.ktor.client.plugins.observer.wrapWithContent
 import io.ktor.client.statement.HttpReceivePipeline
 import io.ktor.http.contentLength
 import io.ktor.util.pipeline.PipelinePhase
@@ -35,8 +35,8 @@ class ResponseSizeLimitConfig {
  * A declared Content-Length is refused immediately. A chunked body is capped while it is copied,
  * and the remainder is cancelled.
  *
- * `rawContent`, `wrapWithContent`, `copyTo`, `exhausted`, and `cancel` are Ktor 3.6 `@InternalAPI`.
- * Recheck this plugin when the Ktor version in `gradle/libs.versions.toml` changes.
+ * `rawContent`, `copyTo`, `exhausted`, and `cancel` are Ktor 3.6 `@InternalAPI`.
+ * `replaceResponse` is public. Recheck this plugin when the Ktor version in `gradle/libs.versions.toml` changes.
  */
 @OptIn(InternalAPI::class)
 val ResponseSizeLimit = createClientPlugin("ResponseSizeLimit", ::ResponseSizeLimitConfig) {
@@ -71,6 +71,6 @@ val ResponseSizeLimit = createClientPlugin("ResponseSizeLimit", ::ResponseSizeLi
                 if (error is CancellationException) throw error
             }
         }
-        proceedWith(response.call.wrapWithContent(limited).response)
+        proceedWith(response.call.replaceResponse { limited }.response)
     }
 }

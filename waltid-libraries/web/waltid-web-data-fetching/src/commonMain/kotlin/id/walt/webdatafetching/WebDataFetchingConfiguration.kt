@@ -12,15 +12,18 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Defaults apply to every [WebDataFetcher] that does not set its own configuration, including VCT
- * integrity, VICAL, and Wallet2 issuance and presentation. Redirects and retries are off. A deployment
- * that needs either sets [engine] or [retry] for that fetcher.
+ * integrity, VICAL, and Wallet2 issuance and presentation. Redirects and retries are off.
+ * [timeouts] stays null until a layer sets it, so an unset layer does not replace a lower one.
+ * [applyConfigurationToHttpClient] uses [DEFAULT_TIMEOUTS] when [timeouts] is null.
+ * An explicit [id.walt.webdatafetching.config.TimeoutConfiguration] with null fields turns timeouts off.
+ * A deployment that needs redirects or retries sets [engine] or [retry] for that fetcher.
  */
 @Serializable
 data class WebDataFetchingConfiguration(
     val http: HttpEngine = HttpEngine.Native,
     val url: UrlConfiguration? = null,
     val cache: CacheConfiguration? = null,
-    val timeouts: TimeoutConfiguration? = DEFAULT_TIMEOUTS,
+    val timeouts: TimeoutConfiguration? = null,
     val retry: RetryConfiguration? = null,
     /** A non-positive value disables the cap. */
     val maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES,
@@ -93,7 +96,8 @@ data class WebDataFetchingConfiguration(
             acceptHeaderMergeStrategy = ContentTypeMergeStrategy.SkipIfPresent
             json(json = decoding.json)
         }
-        timeouts?.run {
+        val effectiveTimeouts = timeouts ?: DEFAULT_TIMEOUTS
+        effectiveTimeouts.run {
             http.install(HttpTimeout) {
                 connectTimeout?.let { connectTimeoutMillis = it.inWholeMilliseconds }
                 requestTimeout?.let { requestTimeoutMillis = it.inWholeMilliseconds }

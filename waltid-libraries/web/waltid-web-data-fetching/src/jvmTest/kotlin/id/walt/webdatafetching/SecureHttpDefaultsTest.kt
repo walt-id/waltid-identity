@@ -2,6 +2,7 @@ package id.walt.webdatafetching
 
 import com.sun.net.httpserver.HttpServer
 import id.walt.webdatafetching.config.LoggingConfiguration
+import id.walt.webdatafetching.config.RequestEngineConfiguration
 import id.walt.webdatafetching.config.TimeoutConfiguration
 import id.walt.webdatafetching.config.headerIsSanitized
 import io.ktor.client.HttpClient
@@ -14,13 +15,26 @@ import kotlinx.coroutines.test.runTest
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class SecureHttpDefaultsTest {
+
+    @BeforeTest
+    fun allowLoopbackForLocalServers() {
+        System.setProperty("walt.ssrf.allowLoopback", "true")
+    }
+
+    @AfterTest
+    fun clearLoopbackProperty() {
+        System.clearProperty("walt.ssrf.allowLoopback")
+    }
 
     @Test
     fun `a declared content length over the cap is rejected`() = runTest {
@@ -208,6 +222,53 @@ class SecureHttpDefaultsTest {
         assertTrue(headerIsSanitized("authorization", names))
         assertTrue(headerIsSanitized("SET-COOKIE", names))
         assertTrue(!headerIsSanitized("X-Request-Id", names))
+    }
+
+    @Test
+    fun `a body that drips after the headers fails on the request timeout`() = runTest {
+        val server = localServer { exchange ->
+            exchange.sendResponseHeaders(200, 100)
+            val body = exchange.responseBody
+            repeat(20) {
+                body.write(byteArrayOf(1))
+                body.flush()
+                Thread.sleep(200)
+            }
+            exchange.close()
+        }
+        server.start()
+        val started = System.nanoTime()
+        try {
+            val error = assertFailsWith<DataFetchingException> {
+                WebDataFetcher(
+                    "drip",
+                    WebDataFetchingConfiguration(timeouts = TimeoutConfiguration(requestTimeout = 1.seconds)),
+                ).fetch<String>(server.url("/drip"))
+            }
+            val elapsedMs = (System.nanoTime() - started) / 1_000_000
+            assertTrue(elapsedMs < 3_000, "elapsed ${elapsedMs}ms")
+            assertTrue(error.causes().any { it.message?.contains("timeout", ignoreCase = true) == true }, error.toString())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `an unset timeout layer keeps a lower-layer timeout`() {
+        val longTimeout = TimeoutConfiguration(
+            connectTimeout = 120.seconds,
+            requestTimeout = 120.seconds,
+            socketTimeout = 120.seconds,
+        )
+        val withTimeout = WebDataFetchingConfiguration(timeouts = longTimeout)
+        assertEquals(null, WebDataFetchingConfiguration().timeouts)
+        assertEquals(120.seconds, withTimeout.mergeWith(WebDataFetchingConfiguration()).timeouts?.requestTimeout)
+        assertEquals(
+            120.seconds,
+            withTimeout.mergeWith(
+                WebDataFetchingConfiguration(engine = RequestEngineConfiguration(followRedirects = true)),
+            ).timeouts?.requestTimeout,
+        )
     }
 
     @Test

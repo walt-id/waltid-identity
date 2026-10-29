@@ -38,6 +38,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             // -- Multiplatform --
 
