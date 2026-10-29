@@ -14,6 +14,11 @@ workflow, including framework verification. Composite actions inherit that pin
 and the supplied simulator configuration. Keep the producer and SDK-docs toolchain pins
 aligned because framework reuse requires an exact Xcode match.
 
+The Kotlin simulator job saves compiled inputs and test executables in its Gradle
+cache on PRs. Kotlin/Native test execution is not cacheable: the job still runs the
+tests and validates their reports on every fresh runner. Visual-only selections
+retain the default cache policy.
+
 ## Shared release framework
 
 One producer assembles the full release `WalletCore.xcframework`, including device
@@ -31,7 +36,7 @@ OS, architecture, exact Xcode build and Gradle wrapper. Gradle still validates i
 and rebuilds changed outputs before the same-run manifest is packaged. Configuration
 cache and test outputs are excluded. The complete ownership record, including its
 clean-close marker, prevents Gradle from deleting the restored files as stale before
-validating them. All consumer checks still execute, and other jobs retain the
+validating them. All consumer checks still execute, and remaining jobs retain the
 default cache policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their

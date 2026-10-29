@@ -120,6 +120,9 @@ jobs:
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Preserve compiled simulator tests; Kotlin/Native test execution is not cacheable.
+          cache-read-only: ${{ !inputs.run-ios-simulator && github.event.repository != null && github.ref_name != github.event.repository.default_branch }}
 
       - name: Cache Kotlin Native dependencies
         if: ${{ !inputs.run-ios-simulator }}
