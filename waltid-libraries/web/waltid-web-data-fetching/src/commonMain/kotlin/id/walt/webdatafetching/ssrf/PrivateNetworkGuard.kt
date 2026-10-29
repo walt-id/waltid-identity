@@ -65,8 +65,11 @@ object PrivateNetworkGuardSettings {
  * Installs a guard that resolves the target host to its actual IP address(es) before connecting, and refuses
  * blocked targets - checked against the resolved address, not the hostname string, so a DNS name that merely
  * *looks* public cannot be used to reach an internal address. See [PrivateNetworkGuardSettings] for exactly what's
- * blocked and what's configurable. Re-validates on every redirect hop it follows, since the initial URL passing
- * validation says nothing about where a 3xx response then points.
+ * blocked and what's configurable. Redirects are followed only when this client's `followRedirects` is true,
+ * and then only for GET and HEAD. A 301, 302, or 303 is resent as GET with no body. `Authorization` is dropped
+ * when the next hop changes scheme, host, or port. Every hop is checked again. Clients that disable redirects
+ * (the webhook notifier, and WebDataFetcher's default) get the first response back and nothing else is requested.
+ * An unresolvable host is left as a DNS failure, not reported as a blocked address.
  *
  * This exists for server-side HTTP clients that fetch caller-supplied URLs (issuer metadata, `request_uri`,
  * `credential_offer_uri`, token/credential endpoints, ...) - i.e. clients where an SSRF turns "the server made a

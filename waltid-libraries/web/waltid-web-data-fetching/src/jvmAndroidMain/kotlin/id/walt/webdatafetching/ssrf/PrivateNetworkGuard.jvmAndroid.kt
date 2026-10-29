@@ -6,7 +6,9 @@ import io.ktor.client.engine.okhttp.OkHttpConfig
 import io.ktor.client.plugins.api.Send
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.setBody
 import io.ktor.client.request.url
+import io.ktor.client.utils.EmptyContent
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -81,11 +83,7 @@ private suspend fun requireAllowedTarget(url: Url) {
         "Refusing to fetch '${url.protocol.name}://...': only http/https are allowed"
     }
     val host = url.host
-    val addresses = try {
-        withContext(Dispatchers.IO) { InetAddress.getAllByName(host) }
-    } catch (e: UnknownHostException) {
-        throw BlockedAddressException("Could not resolve host '$host'")
-    }
+    val addresses = withContext(Dispatchers.IO) { InetAddress.getAllByName(host) }
     val trustedHost = isTrustedHost(host)
     val blocked = addresses.firstOrNull { isBlockedAddress(it, trustedHost) }
     if (blocked != null) {
@@ -130,6 +128,7 @@ internal object ConnectTimeDns : Dns {
 actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
     // OkHttp connects to the addresses its Dns returns. The engine type is not visible on HttpClientConfig<*>,
     // so this is a no-op for every other engine, which keeps the pre-connect check below.
+    val clientFollowsRedirects = this
     engine {
         if (this is OkHttpConfig) dns = ConnectTimeDns
     }
@@ -137,6 +136,10 @@ actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
         on(Send) { request ->
             requireAllowedTarget(request.url.build())
             var call = proceed(request)
+            val method = request.method
+            if (!clientFollowsRedirects.followRedirects || (method != HttpMethod.Get && method != HttpMethod.Head)) {
+                return@on call
+            }
             var currentRequest = request
             var hops = 0
             while (call.response.status in REDIRECT_STATUSES) {
@@ -149,10 +152,15 @@ actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
 
                 val nextRequest = HttpRequestBuilder().takeFrom(currentRequest).apply {
                     url(target)
+                    if (!sameAuthority(currentRequest.url.build(), target)) {
+                        headers.remove(HttpHeaders.Authorization)
+                    }
                     if (call.response.status in DOWNGRADE_TO_GET_STATUSES) {
-                        method = HttpMethod.Get
+                        this.method = HttpMethod.Get
+                        setBody(EmptyContent)
                         headers.remove(HttpHeaders.ContentLength)
                         headers.remove(HttpHeaders.ContentType)
+                        headers.remove(HttpHeaders.TransferEncoding)
                     }
                 }
                 currentRequest = nextRequest
@@ -162,3 +170,8 @@ actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
         }
     })
 }
+
+private fun sameAuthority(left: Url, right: Url): Boolean =
+    left.protocol == right.protocol &&
+        left.host.equals(right.host, ignoreCase = true) &&
+        left.port == right.port

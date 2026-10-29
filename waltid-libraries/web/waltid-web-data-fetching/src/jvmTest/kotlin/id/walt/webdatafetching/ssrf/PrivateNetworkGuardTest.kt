@@ -5,6 +5,9 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondOk
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -13,7 +16,9 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -231,5 +236,73 @@ class PrivateNetworkGuardTest {
 
         val response = client.get("http://8.8.8.8/redirect-me")
         assertTrue(response.status.isSuccess())
+    }
+
+    @Test
+    fun `a client that disables redirects gets the redirect and does not request the target`() = runTest {
+        var requests = 0
+        val engine = MockEngine {
+            requests++
+            respond(
+                content = "",
+                status = HttpStatusCode.TemporaryRedirect,
+                headers = headersOf(HttpHeaders.Location, "http://8.8.4.4/stolen"),
+            )
+        }
+        val client = HttpClient(engine) {
+            followRedirects = false
+            installPrivateNetworkGuard()
+        }
+        val response = client.post("http://8.8.8.8/hook") { setBody("payload") }
+        assertEquals(HttpStatusCode.TemporaryRedirect, response.status)
+        assertEquals(1, requests)
+    }
+
+    @Test
+    fun `a POST is not followed even when the client follows redirects`() = runTest {
+        var requests = 0
+        val engine = MockEngine {
+            requests++
+            respond(
+                content = "",
+                status = HttpStatusCode.Found,
+                headers = headersOf(HttpHeaders.Location, "http://8.8.4.4/next"),
+            )
+        }
+        val client = guardedClient(engine)
+        val response = client.post("http://8.8.8.8/hook") { setBody("payload") }
+        assertEquals(HttpStatusCode.Found, response.status)
+        assertEquals(1, requests)
+    }
+
+    @Test
+    fun `a cross-authority redirect drops Authorization`() = runTest {
+        val authorizations = mutableListOf<String?>()
+        val engine = MockEngine { request ->
+            authorizations += request.headers[HttpHeaders.Authorization]
+            if (request.url.host == "8.8.8.8") {
+                respond(
+                    content = "",
+                    status = HttpStatusCode.Found,
+                    headers = headersOf(HttpHeaders.Location, "http://1.1.1.1/next"),
+                )
+            } else {
+                respondOk("ok")
+            }
+        }
+        val client = guardedClient(engine)
+        client.get("http://8.8.8.8/start") {
+            header(HttpHeaders.Authorization, "Bearer secret")
+        }
+        assertEquals(listOf("Bearer secret", null), authorizations)
+    }
+
+    @Test
+    fun `an unknown host is a DNS failure and not a blocked address`() = runTest {
+        val engine = MockEngine { respondOk() }
+        val client = guardedClient(engine)
+        val error = runCatching { client.get("http://no-such-host.invalid/") }.exceptionOrNull()
+        assertNotNull(error)
+        assertTrue(generateSequence(error) { it.cause }.none { it is BlockedAddressException })
     }
 }
