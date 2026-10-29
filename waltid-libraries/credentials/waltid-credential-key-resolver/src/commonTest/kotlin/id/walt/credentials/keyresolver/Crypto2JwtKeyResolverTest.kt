@@ -105,6 +105,19 @@ class Crypto2JwtKeyResolverTest {
     }
 
     @Test
+    fun `strict did jwk resolution requires the verification method ID`() = runTest {
+        val resolver = resolver("$DID_JWK#0")
+
+        assertEquals(KeyId("$DID_JWK#0"), resolver.resolveFromDidStrict(DID_JWK, "$DID_JWK#0").id)
+        assertFailsWith<IllegalArgumentException> {
+            resolver.resolveFromDidStrict(DID_JWK, "$DID_JWK#legacy-thumbprint")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            resolver.resolveFromDidStrict(DID_JWK, DID_JWK)
+        }
+    }
+
+    @Test
     fun `did jwk resolution rejects multiple verification keys`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             resolver("$DID_JWK#0", "$DID_JWK#1").resolveFromDid(DID_JWK, "$DID_JWK#0")
