@@ -6,9 +6,8 @@ import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
 import kotlin.test.AfterTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class VicalFetchModeConfigTest {
 
@@ -23,32 +22,17 @@ class VicalFetchModeConfigTest {
     }
 
     @Test
-    fun `omitted mode is network-only and private networks stay refused`() {
+    fun `omitted settings enable fetch and refuse private networks`() {
         loadConfig("")
         val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
-        assertEquals(VicalFetchMode.NETWORK_ONLY, VicalFetchMode.parse(config.vicalFetchMode))
+        assertTrue(config.vicalFetchEnabled)
         assertFalse(config.allowPrivateNetworkVical)
     }
 
     @Test
-    fun `hyphenated and underscored mode names both load`() {
-        loadConfig("""vicalFetchMode = "filesystem-only" """)
-        assertEquals(VicalFetchMode.FILESYSTEM_ONLY, VicalFetchMode.parse(ConfigManager.getConfig<OSSVerifier2ServiceConfig>().vicalFetchMode))
-
-        ConfigManager.preclear()
-        loadConfig("""vicalFetchMode = network_only""")
-        assertEquals(VicalFetchMode.NETWORK_ONLY, VicalFetchMode.parse(ConfigManager.getConfig<OSSVerifier2ServiceConfig>().vicalFetchMode))
-    }
-
-    @Test
-    fun `an unknown mode fails configuration`() {
-        assertFailsWith<IllegalArgumentException> {
-            OSSVerifier2ServiceConfig(
-                urlPrefix = "http://localhost:7003/verification-session",
-                urlHost = "openid4vp://authorize",
-                vicalFetchMode = "anywhere",
-            )
-        }
+    fun `fetch can be turned off`() {
+        loadConfig("vicalFetchEnabled = false")
+        assertFalse(ConfigManager.getConfig<OSSVerifier2ServiceConfig>().vicalFetchEnabled)
     }
 
     private fun loadConfig(extraLines: String) {

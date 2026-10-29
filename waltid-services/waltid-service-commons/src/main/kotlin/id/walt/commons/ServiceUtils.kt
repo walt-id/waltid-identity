@@ -6,10 +6,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import java.net.InetAddress
-import java.net.URI
 import java.net.UnknownHostException
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 private const val MAX_FETCH_BYTES = 10L * 1024 * 1024
@@ -58,36 +55,24 @@ internal fun isBlockedFetchDestination(address: InetAddress, allowPrivateNetwork
 }
 
 /**
- * Same retrieval as [fetchBinaryFile], with the schemes and private-network opt-in chosen by the caller.
+ * Same retrieval as [fetchBinaryFile], with the private-network opt-in chosen by the caller.
  * Loopback, link-local and cloud-metadata destinations stay blocked even when [allowPrivateNetworks] is true.
- * A `file` URL is read only when [allowFileUrls] is true, and then only as a regular file under the size cap.
+ * Only `http` and `https` are accepted.
  */
 fun fetchBinaryFile(
     url: String,
-    allowHttpUrls: Boolean,
-    allowFileUrls: Boolean,
     allowPrivateNetworks: Boolean,
 ): ByteArray = fetchBinaryFile(
     url,
     { isBlockedFetchDestination(it, allowPrivateNetworks) },
     MAX_FETCH_BYTES,
-    allowFileUrls = allowFileUrls,
-    allowHttpUrls = allowHttpUrls,
 )
 
 internal fun fetchBinaryFile(
     url: String,
     isBlockedAddress: (InetAddress) -> Boolean,
     maxBytes: Long,
-    allowFileUrls: Boolean = false,
-    allowHttpUrls: Boolean = true,
 ): ByteArray {
-    val scheme = url.substringBefore(':', missingDelimiterValue = "").lowercase()
-    if (scheme == "file") {
-        if (!allowFileUrls) throw fetchFailed(url, "only http and https URLs are allowed")
-        return readLocalFile(url, maxBytes)
-    }
-    if (!allowHttpUrls) throw fetchFailed(url, "only file URLs are allowed")
     // OkHttp's parser accepts only http and https, and it is the parser the request is made with.
     val httpUrl = url.toHttpUrlOrNull() ?: throw fetchFailed(url, "only http and https URLs are allowed")
     val dns = DestinationCheckingDns(isBlockedAddress)
@@ -105,23 +90,6 @@ internal fun fetchBinaryFile(
         }
     } catch (e: BlockedDestinationException) {
         throw fetchFailed(url, "destination not allowed", e)
-    } catch (e: IOException) {
-        throw fetchFailed(url, "request failed", e)
-    }
-}
-
-private fun readLocalFile(url: String, maxBytes: Long): ByteArray {
-    val path = try {
-        Paths.get(URI(url))
-    } catch (e: Exception) {
-        throw fetchFailed(url, "invalid file URL", e)
-    }
-    return try {
-        if (!Files.isRegularFile(path)) throw fetchFailed(url, "not a file")
-        if (Files.size(path) > maxBytes) throw fetchFailed(url, "response too large")
-        Files.readAllBytes(path)
-    } catch (e: IllegalArgumentException) {
-        throw e
     } catch (e: IOException) {
         throw fetchFailed(url, "request failed", e)
     }

@@ -44,20 +44,16 @@ data class OSSVerifier2ServiceConfig(
      */
     val maxInMemoryBytes: Long? = null,
     /**
-     * Which URLs `POST /vical/fetch` may retrieve: `disabled`, `network-only` (the default),
-     * `filesystem-only`, or `both`. `network_only` is accepted as well. Filesystem modes read local files
-     * the process can read. This service does not authenticate callers; put access control in front of it.
+     * When false, `POST /vical/fetch` is not registered. `POST /vical/validate` stays available.
+     * Fetch accepts only `http` and `https`. This service does not authenticate callers.
      */
-    val vicalFetchMode: String = "network-only",
+    val vicalFetchEnabled: Boolean = true,
     /**
      * When true, network fetches may target RFC1918 and IPv6 unique-local addresses. Loopback, link-local
      * and cloud-metadata addresses stay blocked. Default false, including on the public demo.
      */
     val allowPrivateNetworkVical: Boolean = false,
 ) : WaltConfig() {
-    init {
-        VicalFetchMode.parse(vicalFetchMode)
-    }
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
         clientId: String?,
@@ -114,7 +110,7 @@ data class OSSVerifier2ServiceConfig(
         sessionRetention,
         maxInMemorySessions,
         maxInMemoryBytes,
-        "network-only",
+        true,
         false,
     )
 }

@@ -4,7 +4,6 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
@@ -96,25 +95,6 @@ class FetchBinaryFileTest {
         assertFalse(isBlockedFetchDestination(InetAddress.getByName("fd12::1"), allowPrivateNetworks = true))
         listOf("127.0.0.1", "169.254.169.254", "fd00:ec2::254", "0.0.0.0").forEach { host ->
             assertTrue(isBlockedFetchDestination(InetAddress.getByName(host), allowPrivateNetworks = true), host)
-        }
-    }
-
-    @Test
-    fun `file urls are read only when the caller allows that scheme`() {
-        val path = Files.createTempFile("vical-fetch", ".cbor")
-        try {
-            Files.write(path, payload)
-            val url = path.toUri().toString()
-            val rejected = assertFailsWith<IllegalArgumentException> { fetchBinaryFile(url) }
-            assertContains(rejected.message!!, "only http and https URLs are allowed")
-            assertContentEquals(payload, fetchBinaryFile(url, allowHttpUrls = false, allowFileUrls = true, allowPrivateNetworks = false))
-            val httpRejected = assertFailsWith<IllegalArgumentException> {
-                fetchBinaryFile("http://127.0.0.1:$port/vical", allowHttpUrls = false, allowFileUrls = true, allowPrivateNetworks = false)
-            }
-            assertContains(httpRejected.message!!, "only file URLs are allowed")
-            assertEquals(0, hits["/vical"]?.get() ?: 0)
-        } finally {
-            Files.deleteIfExists(path)
         }
     }
 
