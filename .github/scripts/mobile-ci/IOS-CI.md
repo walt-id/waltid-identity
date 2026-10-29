@@ -48,6 +48,10 @@ must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
 `platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
 running task dependencies. An existing simulator ID or `OS=latest` cannot select
 the fresh, runtime-pinned destinations that keep the two demos isolated.
+Enterprise runs both demos by default. `enterprise-demos: native` selects the
+native SDK and batch suites; `compose` selects only the Compose batch suite.
+The Gradle equivalent is `-Penterprise.ios.demos=native|compose|all`. Report gates
+require every selected suite; a focused run does not establish full demo coverage.
 
 ## Unattended coverage
 
