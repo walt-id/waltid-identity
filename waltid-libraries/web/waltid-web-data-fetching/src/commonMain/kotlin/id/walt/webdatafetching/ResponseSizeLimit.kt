@@ -34,6 +34,9 @@ class ResponseSizeLimitConfig {
  * Rejects an oversized body before Ktor's SaveBody plugin stores it.
  * A declared Content-Length is refused immediately. A chunked body is capped while it is copied,
  * and the remainder is cancelled.
+ *
+ * `rawContent`, `wrapWithContent`, `copyTo`, `exhausted`, and `cancel` are Ktor 3.6 `@InternalAPI`.
+ * Recheck this plugin when the Ktor version in `gradle/libs.versions.toml` changes.
  */
 @OptIn(InternalAPI::class)
 val ResponseSizeLimit = createClientPlugin("ResponseSizeLimit", ::ResponseSizeLimitConfig) {

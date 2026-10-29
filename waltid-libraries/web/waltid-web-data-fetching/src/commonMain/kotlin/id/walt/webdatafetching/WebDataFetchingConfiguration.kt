@@ -10,6 +10,11 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Defaults apply to every [WebDataFetcher] that does not set its own configuration, including VCT
+ * integrity, VICAL, and Wallet2 issuance and presentation. Redirects and retries are off. A deployment
+ * that needs either sets [engine] or [retry] for that fetcher.
+ */
 @Serializable
 data class WebDataFetchingConfiguration(
     val http: HttpEngine = HttpEngine.Native,
@@ -73,7 +78,10 @@ data class WebDataFetchingConfiguration(
     }
 
 
-    fun applyConfigurationToHttpClient(http: HttpClientConfig<*>) {
+    fun applyConfigurationToHttpClient(
+        http: HttpClientConfig<*>,
+        httpLogger: Logger = Logger.DEFAULT,
+    ) {
         http.engine {
             engine?.pipelining?.let { this.pipelining = it }
             engine?.proxy?.let { this.proxy = it.toKtorProxyConfig() }
@@ -94,11 +102,10 @@ data class WebDataFetchingConfiguration(
         }
         if (logging.enable) {
             http.install(Logging) {
+                logger = httpLogger
                 format = logging.format
                 level = logging.level
-                sanitizeHeader { name ->
-                    logging.sanitizedHeaders.any { it.equals(name, ignoreCase = true) }
-                }
+                sanitizeHeader { name -> headerIsSanitized(name, logging.sanitizedHeaders) }
             }
         }
         if (maxResponseBytes > 0) {

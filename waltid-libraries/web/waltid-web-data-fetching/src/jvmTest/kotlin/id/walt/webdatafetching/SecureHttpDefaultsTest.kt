@@ -1,7 +1,14 @@
 package id.walt.webdatafetching
 
 import com.sun.net.httpserver.HttpServer
+import id.walt.webdatafetching.config.LoggingConfiguration
 import id.walt.webdatafetching.config.TimeoutConfiguration
+import id.walt.webdatafetching.config.headerIsSanitized
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.java.Java
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import java.net.InetAddress
@@ -122,6 +129,99 @@ class SecureHttpDefaultsTest {
         } finally {
             server.stop(0)
         }
+    }
+
+    @Test
+    fun `a body of exactly the cap is accepted`() = runTest {
+        val body = ByteArray(16) { it.toByte() }
+        val server = localServer { exchange ->
+            exchange.responseHeaders.add("Content-Type", "text/plain")
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.write(body)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val result = fetcher(maxResponseBytes = 16).fetch<String>(server.url("/exact"))
+            assertEquals(16, result.body.length)
+            assertEquals(200, result.status)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `a non positive cap disables the limit`() = runTest {
+        val body = ByteArray(64)
+        val server = localServer { exchange ->
+            exchange.responseHeaders.add("Content-Type", "text/plain")
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.write(body)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val result = fetcher(maxResponseBytes = 0).fetch<String>(server.url("/uncapped"))
+            assertEquals(64, result.body.length)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `credential headers are redacted and a normal header is kept`() = runTest {
+        val logs = StringBuilder()
+        val server = localServer { exchange ->
+            exchange.sendResponseHeaders(204, -1)
+            exchange.close()
+        }
+        server.start()
+        val client = HttpClient(Java) {
+            WebDataFetchingConfiguration().applyConfigurationToHttpClient(
+                this,
+                object : Logger {
+                    override fun log(message: String) {
+                        logs.append(message).append('\n')
+                    }
+                },
+            )
+        }
+        try {
+            client.get(server.url("/log")) {
+                header("authorization", "Bearer secret-token")
+                header("Cookie", "session=secret-cookie")
+                header("X-Request-Id", "visible-id")
+            }
+            val text = logs.toString()
+            assertTrue(text.contains("visible-id"), text)
+            assertTrue(!text.contains("secret-token"), text)
+            assertTrue(!text.contains("secret-cookie"), text)
+        } finally {
+            client.close()
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `sanitized header matching ignores case`() {
+        val names = LoggingConfiguration.SENSITIVE_HEADERS
+        assertTrue(headerIsSanitized("authorization", names))
+        assertTrue(headerIsSanitized("SET-COOKIE", names))
+        assertTrue(!headerIsSanitized("X-Request-Id", names))
+    }
+
+    @Test
+    fun `an explicit default cap does not replace a custom lower layer`() {
+        val custom = WebDataFetchingConfiguration(maxResponseBytes = 100)
+        val unset = WebDataFetchingConfiguration()
+        assertEquals(100, custom.mergeWith(unset).maxResponseBytes)
+        assertEquals(50, custom.mergeWith(WebDataFetchingConfiguration(maxResponseBytes = 50)).maxResponseBytes)
+        assertEquals(
+            100,
+            custom.mergeWith(
+                WebDataFetchingConfiguration(maxResponseBytes = WebDataFetchingConfiguration.DEFAULT_MAX_RESPONSE_BYTES),
+            ).maxResponseBytes,
+        )
     }
 
     private fun Throwable.causes(): Sequence<Throwable> = generateSequence(this) { it.cause }

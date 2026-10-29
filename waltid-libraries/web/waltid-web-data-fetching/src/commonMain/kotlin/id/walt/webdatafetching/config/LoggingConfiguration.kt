@@ -21,3 +21,6 @@ data class LoggingConfiguration(
         )
     }
 }
+
+internal fun headerIsSanitized(name: String, sanitizedHeaders: Set<String>): Boolean =
+    sanitizedHeaders.any { it.equals(name, ignoreCase = true) }
