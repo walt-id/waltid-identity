@@ -494,12 +494,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(true, "Re-enable after EUDI issuer trust is restored: https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93")
         try await receiveAndPresentEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
     func testPreviewAndSubmitEudiEhicSdJwtAgainstEudi() async throws {
-        try XCTSkipIf(true, "Re-enable after EUDI issuer trust is restored: https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93")
         try await previewAndSubmitEudiCredential(credentialID: Self.eudiEhicSdJwtCredentialID)
     }
 
