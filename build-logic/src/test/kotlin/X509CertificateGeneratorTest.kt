@@ -124,6 +124,9 @@ class X509CertificateGeneratorTest {
             assertEquals((publicMembers + privateMembers + listOf("kid", "alg", "x5c")).toSet(), private.keys, algorithm.id)
             assertEquals(private - privateMembers, public, algorithm.id)
             assertEquals(algorithm.jwsAlgorithm, public["alg"], algorithm.id)
+            if (algorithm.isEc || algorithm == KeyAlgorithm.ED25519) {
+                assertEquals(algorithm.id, public["crv"], algorithm.id)
+            }
             assertEquals(generated.chain.map { Base64.getEncoder().encodeToString(it.encoded) }, public["x5c"], algorithm.id)
             assertEquals(thumbprint(public.filterKeys { it in publicMembers }.mapValues { it.value as String }), public["kid"], algorithm.id)
 
