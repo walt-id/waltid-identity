@@ -5,11 +5,17 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJwe
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JweContentEncryption
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwkObject
+import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.migration.v1.V1KeyMigration
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
@@ -24,16 +30,18 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.Parameters
 import io.ktor.http.contentType
+import io.ktor.http.formUrlEncode
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.*
 
 class Verifier2RequestUriPostCrypto2Test {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -41,69 +49,86 @@ class Verifier2RequestUriPostCrypto2Test {
 
     @Test
     fun `signed request URI POST returns a nonce-bound request object`() = runTest {
-        DidService.minimalInit()
-        val verifierKey = JWKKey.generate(KeyType.secp256r1)
-        val did = DidService.registerByKey("jwk", verifierKey).did
-        val clientId = "decentralized_identifier:$did"
-        val session = VerificationSessionCreator.createVerificationSession(
-            setup = CrossDeviceFlowSetup(
-                core = GeneralFlowConfig(
-                    signedRequest = true,
-                    clientId = clientId,
-                    key = DirectSerializedKey(verifierKey),
-                    dcqlQuery = DcqlQuery(
-                        credentials = listOf(
-                            CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+        for (encrypted in listOf(false, true)) {
+            DidService.minimalInit()
+            val verifierKey = JWKKey.generate(KeyType.secp256r1)
+            val did = DidService.registerByKey("jwk", verifierKey).did
+            val clientId = "decentralized_identifier:$did"
+            val session = VerificationSessionCreator.createVerificationSession(
+                setup = CrossDeviceFlowSetup(
+                    core = GeneralFlowConfig(
+                        signedRequest = !encrypted,
+                        encryptedRequest = encrypted,
+                        clientId = clientId,
+                        key = DirectSerializedKey(verifierKey),
+                        dcqlQuery = DcqlQuery(
+                            credentials = listOf(
+                                CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta)
+                            )
                         )
                     )
-                )
-            ),
-            clientId = clientId,
-            urlPrefix = "https://verifier.example.com/verification-session",
-            urlHost = "openid4vp://authorize",
-            key = verifierKey,
-        )
+                ),
+                clientId = clientId,
+                urlPrefix = "https://verifier.example.com/verification-session",
+                urlHost = "openid4vp://authorize",
+                key = verifierKey,
+            )
 
-        val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
-        assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
-        val originalRequestObject = assertNotNull(session.signedAuthorizationRequestJwt)
-        val originalKid = assertNotNull(
-            CompactJws.decodeUnverified(originalRequestObject).protectedHeader["kid"]?.jsonPrimitive?.content
-        )
+            val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
+            assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
+            val originalRequestObject = assertNotNull(session.signedAuthorizationRequestJwt)
+            val originalKid = assertNotNull(
+                CompactJws.decodeUnverified(originalRequestObject).protectedHeader["kid"]?.jsonPrimitive?.content
+            )
 
-        testApplication {
-            application {
-                routing {
-                    post("/request") {
-                        Verifier2RequestUriPostHandler.run {
-                            call.respondRequestUriPost(
-                                verificationSession = session,
-                                updateSessionCallback = { current, _, block -> current.apply(block) },
-                            )
+            val walletKey = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                id = KeyId("wallet-key"), spec = KeySpec.Ec(EcCurve.P256), usages = setOf(KeyUsage.KEY_AGREEMENT),
+            ))
+            val metadata = buildJsonObject {
+                put("jwks", buildJsonObject { put("keys", buildJsonArray { add(walletKey.exportPublicJwkObject()) }) })
+                put("request_object_encryption_alg_values_supported", buildJsonArray { add("ECDH-ES") })
+                put("request_object_encryption_enc_values_supported", buildJsonArray { add("A128GCM") })
+            }
+            if (encrypted) assertEquals(bootstrapUrl, session.authorizationRequestUrl)
+            testApplication {
+                application {
+                    routing {
+                        post("/request") {
+                            Verifier2RequestUriPostHandler.run {
+                                call.respondRequestUriPost(
+                                    verificationSession = session,
+                                    updateSessionCallback = { current, _, block -> current.apply(block) },
+                                )
+                            }
                         }
                     }
                 }
+
+                val response = client.post("/request") {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody(Parameters.build {
+                        append("wallet_nonce", "wallet-nonce")
+                        if (encrypted) append("wallet_metadata", metadata.toString())
+                    }.formUrlEncode())
+                }
+
+                assertEquals(200, response.status.value)
+                assertEquals("application/oauth-authz-req+jwt", response.contentType()?.withoutParameters()?.toString())
+                val body = response.bodyAsText()
+                val jwt = if (encrypted) CompactJwe.decrypt(body, walletKey, setOf(JweContentEncryption.A128GCM))
+                    .plaintext.decodeToString() else body
+                val decoded = CompactJws.decodeUnverified(jwt)
+                val kid = assertNotNull(decoded.protectedHeader["kid"]?.jsonPrimitive?.content)
+                assertEquals(originalKid, kid)
+                assertEquals(Verifier2RequestObjectKid.forClient(clientId, verifierKey), kid)
+                verifierKey.getPublicKey().verifyJws(jwt).getOrThrow()
+                val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+                assertEquals("wallet-nonce", payload["wallet_nonce"]?.jsonPrimitive?.content)
             }
 
-            val response = client.post("/request") {
-                contentType(ContentType.Application.FormUrlEncoded)
-                setBody("wallet_nonce=wallet-nonce&wallet_metadata=%7B%7D")
-            }
-
-            assertEquals(200, response.status.value)
-            assertEquals("application/oauth-authz-req+jwt", response.contentType()?.withoutParameters()?.toString())
-            val jwt = response.bodyAsText()
-            val decoded = CompactJws.decodeUnverified(jwt)
-            val kid = assertNotNull(decoded.protectedHeader["kid"]?.jsonPrimitive?.content)
-            assertEquals(originalKid, kid)
-            assertEquals(Verifier2RequestObjectKid.forClient(clientId, verifierKey), kid)
-            verifierKey.getPublicKey().verifyJws(jwt).getOrThrow()
-            val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
-            assertEquals("wallet-nonce", payload["wallet_nonce"]?.jsonPrimitive?.content)
+            assertEquals(Verification2Session.VerificationSessionStatus.IN_USE, session.status)
+            assertNotNull(session.signedAuthorizationRequestJwt)
         }
-
-        assertEquals(Verification2Session.VerificationSessionStatus.IN_USE, session.status)
-        assertNotNull(session.signedAuthorizationRequestJwt)
     }
 
     @Test

@@ -37,6 +37,8 @@ data class GeneralFlowConfig(
     val requestedElements: AnnexCDocTypeToRequestedElements? = null,
 
     @SerialName("signed_request") val signedRequest: Boolean = false,
+    /** Sign then encrypt the Request Object to the wallet's POST-supplied key. Requires a URL-based flow. */
+    @SerialName("encrypted_request") val encryptedRequest: Boolean = false,
     @SerialName("encrypted_response") val encryptedResponse: Boolean = false,
 
     val notifications: KtorSessionNotifications? = null,
