@@ -5,7 +5,7 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.NetworkFetchGuardConfig
-import id.walt.ktornotifications.applyNetworkFetchGuard
+import id.walt.commons.config.apply
 import id.walt.commons.web.WebService
 import id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker
 import id.walt.did.dids.DidService
@@ -32,12 +32,7 @@ suspend fun main(args: Array<String>) {
         ServiceConfiguration("verifier", version = BuildConfig.VERSION), ServiceInitialization(
             features = OSSVerifier2FeatureCatalog,
             init = {
-                val networkFetchGuard = ConfigManager.getConfig<NetworkFetchGuardConfig>()
-                applyNetworkFetchGuard(
-                    allowLoopback = networkFetchGuard.allowLoopback,
-                    allowPrivateNetworks = networkFetchGuard.allowPrivateNetworks,
-                    trustedHostSuffixes = networkFetchGuard.trustedHostSuffixes.toSet(),
-                )
+                ConfigManager.getConfig<NetworkFetchGuardConfig>().apply()
                 DidService.apply {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()

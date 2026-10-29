@@ -12,12 +12,14 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
+import java.net.UnknownHostException
+import java.nio.channels.UnresolvedAddressException
 
 object WebhookNotifier {
 
     private val webhookClient = HttpClient(OkHttp) {
-        // The guard follows redirects itself. OkHttp connects through the DNS the guard installs,
-        // so the addresses that were checked are the ones the webhook is posted to.
+        // Redirects stay off. The guard checks the address OkHttp connects to and follows a redirect
+        // only when this client has followRedirects enabled.
         followRedirects = false
         install(ContentNegotiation) {
             json()
@@ -74,10 +76,14 @@ object WebhookNotifier {
             }
         }.getOrElse { ex ->
             if (ex is CancellationException) throw ex
-            if (generateSequence(ex) { it.cause }.any { it is BlockedAddressException }) {
-                throw IllegalArgumentException("Webhook destination is not allowed", ex)
+            val causes = generateSequence(ex) { it.cause }
+            if (causes.any { it is BlockedAddressException }) {
+                throw IllegalArgumentException(
+                    "Webhook destination is not allowed (network-fetch-guard.conf)",
+                    ex,
+                )
             }
-            if (ex is ConnectTimeoutException) {
+            if (ex is ConnectTimeoutException || causes.any { it is UnknownHostException || it is UnresolvedAddressException }) {
                 throw IllegalArgumentException(
                     "Could not connect to configured webhook URL for session update: ${config.url.hostWithPortIfSpecified}",
                     ex

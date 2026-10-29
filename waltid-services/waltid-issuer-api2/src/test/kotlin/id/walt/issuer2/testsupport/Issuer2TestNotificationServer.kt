@@ -1,10 +1,10 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.commons.config.NetworkFetchGuardConfig
+import id.walt.commons.config.apply
 import id.walt.issuer2.notifications.IssuanceSessionEvent
-import id.walt.ktornotifications.NetworkFetchGuardState
-import id.walt.ktornotifications.applyNetworkFetchGuard
 import id.walt.ktornotifications.core.KtorSessionUpdate
-import id.walt.ktornotifications.currentNetworkFetchGuard
+import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class Issuer2TestNotificationServer {
     private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
     private var testServer: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
-    private var previousGuard: NetworkFetchGuardState? = null
+    private var previousGuard: GuardSnapshot? = null
 
     private fun Application.module() {
         install(ContentNegotiation) {
@@ -42,13 +42,13 @@ class Issuer2TestNotificationServer {
     }
 
     fun startServer() {
-        previousGuard = currentNetworkFetchGuard()
+        previousGuard = GuardSnapshot.capture()
         val previous = previousGuard!!
-        applyNetworkFetchGuard(
+        NetworkFetchGuardConfig(
             allowLoopback = true,
             allowPrivateNetworks = previous.allowPrivateNetworks,
-            trustedHostSuffixes = previous.trustedHostSuffixes,
-        )
+            trustedHostSuffixes = previous.trustedHostSuffixes.toList(),
+        ).apply()
         testServer = embeddedServer(
             CIO,
             host = "127.0.0.1",
@@ -60,9 +60,7 @@ class Issuer2TestNotificationServer {
     fun stopServer() {
         testServer?.stop(500, 500)
         testServer = null
-        previousGuard?.let {
-            applyNetworkFetchGuard(it.allowLoopback, it.allowPrivateNetworks, it.trustedHostSuffixes)
-        }
+        previousGuard?.restore()
         previousGuard = null
     }
 
@@ -101,5 +99,27 @@ class Issuer2TestNotificationServer {
     private suspend fun ApplicationCall.receiveUpdate() {
         receivedUpdates += receive<KtorSessionUpdate>()
         respond(HttpStatusCode.OK)
+    }
+
+    private data class GuardSnapshot(
+        val allowLoopback: Boolean,
+        val allowPrivateNetworks: Boolean,
+        val trustedHostSuffixes: Set<String>,
+    ) {
+        fun restore() {
+            NetworkFetchGuardConfig(
+                allowLoopback = allowLoopback,
+                allowPrivateNetworks = allowPrivateNetworks,
+                trustedHostSuffixes = trustedHostSuffixes.toList(),
+            ).apply()
+        }
+
+        companion object {
+            fun capture() = GuardSnapshot(
+                allowLoopback = PrivateNetworkGuardSettings.allowLoopback,
+                allowPrivateNetworks = PrivateNetworkGuardSettings.allowPrivateNetworks,
+                trustedHostSuffixes = PrivateNetworkGuardSettings.trustedHostSuffixes,
+            )
+        }
     }
 }
