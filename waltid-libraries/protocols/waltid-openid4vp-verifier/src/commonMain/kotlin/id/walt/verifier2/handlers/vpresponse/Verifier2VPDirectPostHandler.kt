@@ -337,6 +337,7 @@ object Verifier2VPDirectPostHandler {
         log.debug { "Handling direct post for received data: $responseData" }
 
         val session = verificationSession
+        session.requireAvailable()
         val responseMode = session.authorizationRequest.responseMode
         val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
@@ -355,6 +356,25 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
+        val vpTokenContents = parseVpToken(vpTokenString)
+        log.debug { "Parsed vp_token for state $receivedState: $vpTokenContents" }
+
+        // Start the attempt before validation can emit any callback.
+        session.updateSession(SessionEvent.attempted_presentation) {
+            presentationId = Uuid.random().toString()
+            attempted = true
+            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
+            statusReason = null
+            failure = null
+            policyResults = null
+            presentationValidationResults = null
+            presentedPresentations = null
+            presentedPresentationsList = null
+            presentedCredentials = null
+            responseCode = null
+            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
+        }
+
         // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
         // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
         if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
@@ -366,16 +386,6 @@ object Verifier2VPDirectPostHandler {
                 expectedAudience = session.authorizationRequest.clientId!!,
             )
             log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
-        }
-
-        // Parse vp_token
-        val vpTokenContents = parseVpToken(vpTokenString)
-        log.debug { "Parsed vp_token for state $receivedState: $vpTokenContents" }
-
-        session.updateSession(SessionEvent.attempted_presentation) {
-            attempted = true
-            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
-            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
         }
 
         // Process
@@ -462,6 +472,7 @@ object Verifier2VPDirectPostHandler {
         }
 
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
+            presentationId = Uuid.random().toString()
             attempted = true
             status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
