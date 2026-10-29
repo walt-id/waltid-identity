@@ -1,9 +1,9 @@
 package id.walt.verifier2.mdocs
 
-import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.defaultCoseSignatureAlgorithm
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
@@ -77,9 +77,10 @@ internal fun mdlFixtureCredential(credentialData: String): MdocsCredential = run
     val data = Json.decodeFromString<JsonObject>(credentialData)
     val docType = data.getValue("docType").jsonPrimitive.content
     val now = Clock.System.now()
+    val documentSignerKey = restoreCrypto2Key(MdlFixtureResources.read("private.jwk.json"), "mdl-fixture-ds")
     val issuerSigned = MdocIssuer.issueUniversal(
-        issuerKey = restoreCrypto2Key(MdlFixtureResources.read("private.jwk.json"), "mdl-fixture-ds"),
-        signatureAlgorithm = Cose.Algorithm.ES256,
+        issuerKey = documentSignerKey,
+        signatureAlgorithm = documentSignerKey.spec.defaultCoseSignatureAlgorithm(),
         issuerCertificate = listOf(CoseCertificate(MDL_FIXTURE_X5C.decodeFromBase64())),
         holderKey = (KeyManager.resolveSerializedKey(HOLDER_SERIALIZED_KEY) as JWKKey).getPublicKey().getCosePublicKey(),
         docType = docType,
