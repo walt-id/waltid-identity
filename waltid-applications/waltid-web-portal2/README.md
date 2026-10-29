@@ -132,7 +132,7 @@ NUXT_ES_DYOU_ISSUER_TARGET=
 
 `NUXT_ES_EMAIL` and `NUXT_ES_PASSWORD` stay on the portal2 server. It signs in at `{NUXT_ES_BASE_URL}/auth/account/emailpass` and sends the returned session token as `Authorization: Bearer`. Leave the Enterprise values empty until `scripts/provision-enterprise-demo.sh` has created the issuer services. That script reads `ES_ADMIN_TOKEN` and does not print it. On the public demo, organization creation is disabled, so the script creates a dedicated tenant in `ES_ORGANIZATION` (default `waltid`).
 
-Hosted portal2 reads the same six names from the `portal2-enterprise-secret` Kubernetes secret. Manual branch deploys and the test deployment both apply `PORTAL2_ENTERPRISE_ENV_TEST`. The demo deployment applies `PORTAL2_ENTERPRISE_ENV_PROD`. Each repository secret is a dotenv document and is not committed.
+Hosted portal2 reads the same six names from the `portal2-enterprise-secret` Kubernetes secret. Manual branch deploys create that secret from `PORTAL2_ENTERPRISE_ENV_TEST`, a dotenv document that is not committed. Test and demo deployments use the secret already present in the cluster, alongside `portal2-pid-secret`.
 
 ### Development
 

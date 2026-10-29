@@ -124,7 +124,7 @@ jobs:
           PORTAL2_ENTERPRISE_ENV: ${{ secrets.PORTAL2_ENTERPRISE_ENV_TEST }}
         run: |
           if [ -z "$PORTAL2_ENTERPRISE_ENV" ]; then
-            echo "::error::PORTAL2_ENTERPRISE_ENV_TEST is not set. Add it in repository secrets for manual and test portal2 deploys."
+            echo "::error::PORTAL2_ENTERPRISE_ENV_TEST is not set. Add it in repository secrets for manual branch portal2 deploys."
             echo "Deploy aborted: PORTAL2_ENTERPRISE_ENV_TEST is not set." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi

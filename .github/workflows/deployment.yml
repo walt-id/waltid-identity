@@ -116,35 +116,6 @@ jobs:
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
-      - name: Set up kubectl
-        if: matrix.services.name == 'portal2'
-        uses: azure/setup-kubectl@v4
-      - name: Create portal2 Enterprise secret
-        if: matrix.services.name == 'portal2' && inputs.deployment != 'prod'
-        env:
-          PORTAL2_ENTERPRISE_ENV: ${{ secrets.PORTAL2_ENTERPRISE_ENV_TEST }}
-        run: |
-          if [ -z "$PORTAL2_ENTERPRISE_ENV" ]; then
-            echo "::error::PORTAL2_ENTERPRISE_ENV_TEST is not set. Add it in repository secrets."
-            echo "Deploy aborted: PORTAL2_ENTERPRISE_ENV_TEST is not set." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > "${RUNNER_TEMP}/kubeconfig"
-          KUBECONFIG="${RUNNER_TEMP}/kubeconfig" bash .github/scripts/apply-portal2-enterprise-secret.sh "${{ matrix.services.namespace }}"
-          rm -f "${RUNNER_TEMP}/kubeconfig"
-      - name: Create portal2 Enterprise secret
-        if: matrix.services.name == 'portal2' && inputs.deployment == 'prod'
-        env:
-          PORTAL2_ENTERPRISE_ENV: ${{ secrets.PORTAL2_ENTERPRISE_ENV_PROD }}
-        run: |
-          if [ -z "$PORTAL2_ENTERPRISE_ENV" ]; then
-            echo "::error::PORTAL2_ENTERPRISE_ENV_PROD is not set. Add it in repository secrets."
-            echo "Deploy aborted: PORTAL2_ENTERPRISE_ENV_PROD is not set." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > "${RUNNER_TEMP}/kubeconfig"
-          KUBECONFIG="${RUNNER_TEMP}/kubeconfig" bash .github/scripts/apply-portal2-enterprise-secret.sh "${{ matrix.services.namespace }}"
-          rm -f "${RUNNER_TEMP}/kubeconfig"
       - name: Continuous deployment - ${{ matrix.services.name }}
         if: ${{ hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != '' }}
         uses: actions-hub/kubectl@master
