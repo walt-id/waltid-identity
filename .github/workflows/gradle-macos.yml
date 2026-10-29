@@ -107,6 +107,9 @@ jobs:
     if: ${{ inputs.run-ios-simulator || inputs.run-visual-compose }}
     runs-on: xcode-27
     timeout-minutes: 115
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
@@ -248,6 +251,9 @@ jobs:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-visual-native }}
     runs-on: xcode-27
     timeout-minutes: 210
+    permissions:
+      contents: read
+      checks: write
     strategy:
       fail-fast: false
       matrix:
@@ -352,6 +358,9 @@ jobs:
     timeout-minutes: 90
     if: ${{ inputs.run-enterprise }}
     runs-on: xcode-27
+    permissions:
+      contents: read
+      checks: write
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
