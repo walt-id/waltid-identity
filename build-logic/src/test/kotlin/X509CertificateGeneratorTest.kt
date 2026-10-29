@@ -1,7 +1,9 @@
+import id.walt.gradle.x509.KeyAlgorithm
 import id.walt.gradle.x509.X509CertificateGenerator
 import id.walt.gradle.x509.X509CertificateRequest
 import id.walt.gradle.x509.X509Profile
 import id.walt.gradle.x509.jwk
+import id.walt.gradle.x509.thumbprint
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage
@@ -12,13 +14,27 @@ import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.asn1.x509.SubjectKeyIdentifier
 import org.bouncycastle.cert.X509CertificateHolder
 import org.gradle.api.InvalidUserDataException
+import java.math.BigInteger
+import java.security.KeyFactory
+import java.security.KeyPair
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.Signature
 import java.security.cert.CertPathValidator
 import java.security.cert.CertificateFactory
 import java.security.cert.PKIXParameters
 import java.security.cert.TrustAnchor
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
+import java.security.spec.ECPoint
+import java.security.spec.ECPrivateKeySpec
+import java.security.spec.ECPublicKeySpec
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.RSAPrivateCrtKeySpec
+import java.security.spec.RSAPublicKeySpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
+import java.util.HexFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -91,21 +107,39 @@ class X509CertificateGeneratorTest {
     }
 
     @Test
-    fun `JWK carries the certificate key, chain and RFC 7638 kid`() {
-        val ds = X509CertificateGenerator.generate(listOf(iaca, documentSigner)).getValue("ds")
-        val private = jwk(ds, includePrivate = true)
-        val public = jwk(ds, includePrivate = false)
+    fun `JWK carries the certificate key, chain and RFC 7638 kid for every key algorithm`() {
+        for (algorithm in KeyAlgorithm.entries) {
+            val generated = X509CertificateGenerator.generate(listOf(
+                X509CertificateRequest("leaf", X509Profile.LEAF, "CN=Leaf", issuer = "root", keyAlgorithm = algorithm.id),
+                X509CertificateRequest("root", X509Profile.CA, "CN=Root", keyAlgorithm = algorithm.id),
+            )).getValue("leaf")
+            val private = jwk(generated, includePrivate = true)
+            val public = jwk(generated, includePrivate = false)
+            val (publicMembers, privateMembers) = when {
+                algorithm.isEc -> listOf("kty", "crv", "x", "y") to listOf("d")
+                algorithm == KeyAlgorithm.ED25519 -> listOf("kty", "crv", "x") to listOf("d")
+                else -> listOf("kty", "n", "e") to listOf("d", "p", "q", "dp", "dq", "qi")
+            }
 
-        assertEquals(setOf("kty", "crv", "x", "y", "d", "kid", "alg", "x5c"), private.keys)
-        assertEquals(private - "d", public)
-        assertEquals("ES256", public["alg"])
-        assertEquals(ds.chain.map { Base64.getEncoder().encodeToString(it.encoded) }, public["x5c"])
-        val point = (ds.keyPair.public as ECPublicKey).w
-        assertEquals(point.affineX, java.math.BigInteger(1, Base64.getUrlDecoder().decode(public["x"] as String)))
-        assertEquals(32, Base64.getUrlDecoder().decode(private["d"] as String).size)
+            assertEquals((publicMembers + privateMembers + listOf("kid", "alg", "x5c")).toSet(), private.keys, algorithm.id)
+            assertEquals(private - privateMembers, public, algorithm.id)
+            assertEquals(algorithm.jwsAlgorithm, public["alg"], algorithm.id)
+            assertEquals(generated.chain.map { Base64.getEncoder().encodeToString(it.encoded) }, public["x5c"], algorithm.id)
+            assertEquals(thumbprint(public.filterKeys { it in publicMembers }.mapValues { it.value as String }), public["kid"], algorithm.id)
+
+            // Rebuilding the JDK keys from the JWK members proves they encode the certificate's key pair.
+            val (rebuiltPublic, rebuiltPrivate) = rebuildKeys(algorithm, generated.keyPair, private)
+            assertEquals(generated.keyPair.public, rebuiltPublic, algorithm.id)
+            val signature = Signature.getInstance(algorithm.signatureAlgorithm).run {
+                initSign(rebuiltPrivate); update(generated.certificate.encoded); sign()
+            }
+            assertTrue(Signature.getInstance(algorithm.signatureAlgorithm).run {
+                initVerify(generated.keyPair.public); update(generated.certificate.encoded); verify(signature)
+            }, algorithm.id)
+        }
 
         // RFC 7638 section 3.1 example.
-        assertEquals("NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", id.walt.gradle.x509.thumbprint(mapOf(
+        assertEquals("NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", thumbprint(mapOf(
             "kty" to "RSA",
             "e" to "AQAB",
             "n" to "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
@@ -133,6 +167,33 @@ class X509CertificateGeneratorTest {
         rejects("unknown issuer", X509CertificateRequest("leaf", X509Profile.LEAF, "CN=a", issuer = "missing"))
         rejects("cycle", X509CertificateRequest("a", X509Profile.CA, "CN=a", issuer = "b"),
             X509CertificateRequest("b", X509Profile.CA, "CN=b", issuer = "a"))
+    }
+
+    /** Rebuilds the key pair from its JWK, checking EC members are padded to the field size (RFC 7518 section 6.2.1). */
+    private fun rebuildKeys(algorithm: KeyAlgorithm, keyPair: KeyPair, jwk: Map<String, Any>): Pair<PublicKey, PrivateKey> {
+        fun bytes(member: String) = Base64.getUrlDecoder().decode(jwk.getValue(member) as String)
+        fun integer(member: String) = BigInteger(1, bytes(member))
+        return when {
+            algorithm.isEc -> {
+                val params = (keyPair.public as ECPublicKey).params
+                val size = (params.curve.field.fieldSize + 7) / 8
+                for (member in listOf("x", "y", "d")) assertEquals(size, bytes(member).size, "${algorithm.id} $member")
+                KeyFactory.getInstance("EC").run {
+                    generatePublic(ECPublicKeySpec(ECPoint(integer("x"), integer("y")), params)) to
+                        generatePrivate(ECPrivateKeySpec(integer("d"), params))
+                }
+            }
+            algorithm == KeyAlgorithm.ED25519 -> KeyFactory.getInstance("Ed25519").run {
+                // Raw 32-byte keys wrapped in their fixed SubjectPublicKeyInfo / PKCS#8 DER prefixes (RFC 8410).
+                generatePublic(X509EncodedKeySpec(HexFormat.of().parseHex("302a300506032b6570032100") + bytes("x"))) to
+                    generatePrivate(PKCS8EncodedKeySpec(HexFormat.of().parseHex("302e020100300506032b657004220420") + bytes("d")))
+            }
+            else -> KeyFactory.getInstance("RSA").run {
+                generatePublic(RSAPublicKeySpec(integer("n"), integer("e"))) to generatePrivate(RSAPrivateCrtKeySpec(
+                    integer("n"), integer("e"), integer("d"), integer("p"), integer("q"), integer("dp"), integer("dq"), integer("qi"),
+                ))
+            }
+        }
     }
 
     private fun assertPkixValid(chain: List<X509CertificateHolder>) {
