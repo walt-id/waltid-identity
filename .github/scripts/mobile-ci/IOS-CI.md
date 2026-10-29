@@ -36,8 +36,12 @@ OS, architecture, exact Xcode build and Gradle wrapper. Gradle still validates i
 and rebuilds changed outputs before the same-run manifest is packaged. Configuration
 cache and test outputs are excluded. The complete ownership record, including its
 clean-close marker, prevents Gradle from deleting the restored files as stale before
-validating them. All consumer checks still execute, and remaining jobs retain the
-default cache policy.
+validating them. All consumer checks still execute.
+
+Compose and Enterprise jobs also save their Gradle caches on PRs, retaining their
+own compiled inputs in addition to the SDK producer's inputs. This does not cache
+Xcode test results or bypass either job's test and report commands. Compose framework
+links remain outside Gradle's build cache. Other consumers retain the default policy.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again

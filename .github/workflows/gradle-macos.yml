@@ -305,6 +305,9 @@ jobs:
       - name: Configure gradle
         if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Retain Compose compilation that is absent from the shared SDK producer's cache.
+          cache-read-only: ${{ matrix.consumer != 'compose' && github.event.repository != null && github.ref_name != github.event.repository.default_branch }}
 
       - name: Cache the isolated bridge fixture and task history
         if: ${{ matrix.consumer == 'bridge' }}
@@ -420,6 +423,9 @@ jobs:
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Preserve the fixture and Compose build inputs; the integration task still executes.
+          cache-read-only: false
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
