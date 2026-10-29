@@ -156,7 +156,7 @@ jobs:
     needs: [ version, source, enterprise-image-digests ]
     steps:
       - name: Dispatch enterprise-supply-chain.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: enterprise-supply-chain.yml
           repo: walt-id/waltid-identity-enterprise
@@ -174,7 +174,7 @@ jobs:
     if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Dispatch release-evidence.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: release-evidence.yml
           repo: walt-id/waltid-identity-enterprise
@@ -191,7 +191,7 @@ jobs:
     if: ${{ needs.source.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
-        uses: benc-uk/workflow-dispatch@v1.3.2
+        uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license
