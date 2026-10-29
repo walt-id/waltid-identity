@@ -12,7 +12,8 @@ runs:
       uses: actions/cache@v5
       with:
         path: ~/.konan
-        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+        # Generated Gradle files and unrelated build edits do not change the toolchain.
+        key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('waltid-identity/gradle/libs.versions.toml') }}
         restore-keys: |
           konan-${{ runner.os }}-${{ runner.arch }}-
           konan-${{ runner.os }}-
