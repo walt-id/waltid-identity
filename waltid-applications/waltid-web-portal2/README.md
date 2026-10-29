@@ -119,6 +119,21 @@ Simple PID wallet presets do **not** ship keys or certificates to the browser. P
 
 Keep those values in local `.env` or a Kubernetes secret. Do not commit live key material. `NUXT_VERIFIER_PROXY_TARGET` is optional; if unset, the PID create route forwards to `NUXT_PUBLIC_VERIFIER_BASE` when that value is an absolute URL.
 
+The header wallet selector chooses which issuer and verifier policy the portal uses. **walt.id** uses the community issuer and an unsigned verification request. **EUDI Reference Wallet**, **France Identité**, and **d-you** use separate Enterprise issuer services. Credential cards are loaded from that issuer’s metadata. Offer creation, issuance events, and verification creation go through portal2. The browser sends a wallet id and does not receive issuer keys, verifier keys, or the Enterprise API token.
+
+```text
+NUXT_ES_BASE_URL=
+NUXT_ES_EMAIL=
+NUXT_ES_PASSWORD=
+NUXT_ES_EUDI_REF_ISSUER_TARGET=
+NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET=
+NUXT_ES_DYOU_ISSUER_TARGET=
+```
+
+`NUXT_ES_EMAIL` and `NUXT_ES_PASSWORD` stay on the portal2 server. It signs in at `{NUXT_ES_BASE_URL}/auth/account/emailpass` and sends the returned session token as `Authorization: Bearer`. Leave the Enterprise values empty until `scripts/provision-enterprise-demo.sh` has created the issuer services. That script reads `ES_ADMIN_TOKEN` and does not print it. On the public demo, organization creation is disabled, so the script creates a dedicated tenant in `ES_ORGANIZATION` (default `waltid`).
+
+Hosted portal2 reads the same six names from the `portal2-enterprise-secret` Kubernetes secret. Manual branch deploys create that secret from `PORTAL2_ENTERPRISE_ENV_TEST`, a dotenv document that is not committed. Test and demo deployments use the secret already present in the cluster, alongside `portal2-pid-secret`.
+
 ### Development
 
 1. **Install dependencies**:

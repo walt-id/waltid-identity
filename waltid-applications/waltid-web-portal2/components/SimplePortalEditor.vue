@@ -2,7 +2,13 @@
 import type { useIssuerSession } from "~/composables/useIssuerSession";
 import type { useVerifierSession } from "~/composables/useVerifierSession";
 import type { useProfiles } from "~/composables/useProfiles";
-import { buildProfileCards } from "~/utils/profileCards";
+import {
+  buildCardsFromConfigurations,
+  buildProfileCards,
+  type ProfileCard,
+} from "~/utils/profileCards";
+import type { IssuerCredentialConfiguration } from "~/composables/useIssuerMetadata";
+import type { IssuerProfile } from "~/composables/useProfiles";
 
 type SimpleAction = "issue" | "verify";
 
@@ -17,20 +23,66 @@ const props = defineProps<{
   profiles: ReturnType<typeof useProfiles>;
 }>();
 
-const config = useRuntimeConfig();
-const issuerBase = config.public.issuerBase as string;
-const issuerMetadata = useIssuerMetadata(issuerBase);
+const { walletId, wallet } = useSelectedWallet();
+const issuanceSupported = computed(() => wallet.value.issuance);
 
-onMounted(() => {
-  issuerMetadata.load();
-});
+watch(issuanceSupported, (supported) => {
+  if (!supported) action.value = "verify";
+}, { immediate: true });
+const cards = ref<ProfileCard[]>([]);
+const cardsLoading = ref(false);
+const cardsError = ref<string | null>(null);
 
-const profileCards = computed(() =>
-  buildProfileCards(
-    props.profiles.profiles.value,
-    issuerMetadata.configurationFor,
-  ),
-);
+interface IssuerMetadataResponse {
+  issuerKind: "community" | "enterprise";
+  credentialIssuerMetadata?: {
+    credential_configurations_supported?: Record<string, IssuerCredentialConfiguration>;
+  };
+  profiles?: IssuerProfile[];
+}
+
+async function loadCards() {
+  cardsLoading.value = true;
+  cardsError.value = null;
+  try {
+    const response = await fetch(
+      `/api/issuer-metadata?walletId=${encodeURIComponent(walletId.value)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text || `HTTP ${response.status}`;
+      try {
+        const parsed = JSON.parse(text) as { statusMessage?: string; message?: string };
+        message = parsed.statusMessage || parsed.message || message;
+      } catch {
+        // Response is already plain text.
+      }
+      throw new Error(message);
+    }
+    const data = (await response.json()) as IssuerMetadataResponse;
+    const configurations =
+      data.credentialIssuerMetadata?.credential_configurations_supported ?? {};
+    const profiles = Array.isArray(data.profiles) ? data.profiles : [];
+    cards.value =
+      data.issuerKind === "community" && profiles.length > 0
+        ? buildProfileCards(profiles, (id) => (id ? configurations[id] : undefined))
+        : buildCardsFromConfigurations(configurations);
+  } catch (error) {
+    cards.value = [];
+    cardsError.value =
+      error instanceof Error ? error.message : "Failed to load issuer metadata";
+  } finally {
+    cardsLoading.value = false;
+  }
+}
+
+watch(walletId, () => {
+  selectedProfileId.value = null;
+  void loadCards();
+}, { immediate: true });
+
+const profileCards = computed(() => cards.value);
 
 const selectedCard = computed(
   () =>
@@ -51,16 +103,16 @@ function clearSelection() {
 <template>
   <div class="grid gap-5">
     <div
-      v-if="profiles.loading.value || issuerMetadata.loading.value"
+      v-if="cardsLoading"
       class="text-sm text-[--color-text-muted]"
     >
       Loading credential profiles…
     </div>
     <div
-      v-else-if="profiles.error.value || issuerMetadata.error.value"
+      v-else-if="cardsError"
       class="text-sm text-red-600"
     >
-      {{ profiles.error.value || issuerMetadata.error.value }}
+      {{ cardsError }}
     </div>
 
     <SimpleCredentialGrid
@@ -109,11 +161,14 @@ function clearSelection() {
                 >
                   <button
                     type="button"
-                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors disabled:cursor-not-allowed disabled:text-gray-300"
+                    :disabled="!issuanceSupported"
                     :class="
-                      action === 'issue'
-                        ? 'bg-slate-900 text-white'
-                        : 'text-[--color-text-muted] hover:text-[--color-text]'
+                      !issuanceSupported
+                        ? 'text-gray-300'
+                        : action === 'issue'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-[--color-text-muted] hover:text-[--color-text]'
                     "
                     @click="action = 'issue'"
                   >

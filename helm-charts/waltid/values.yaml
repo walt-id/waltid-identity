@@ -133,6 +133,7 @@ portal2:
     NUXT_PUBLIC_WALLET_URL: "https://wallet.test.waltid.cloud"
   envFromSecrets:
     - portal2-pid-secret
+    - portal2-enterprise-secret
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
