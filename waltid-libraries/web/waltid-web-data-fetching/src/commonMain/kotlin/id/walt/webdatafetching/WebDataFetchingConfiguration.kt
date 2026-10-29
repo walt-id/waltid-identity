@@ -8,14 +8,17 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 data class WebDataFetchingConfiguration(
     val http: HttpEngine = HttpEngine.Native,
     val url: UrlConfiguration? = null,
     val cache: CacheConfiguration? = null,
-    val timeouts: TimeoutConfiguration? = null,
-    val retry: RetryConfiguration? = RetryConfiguration(),
+    val timeouts: TimeoutConfiguration? = DEFAULT_TIMEOUTS,
+    val retry: RetryConfiguration? = null,
+    /** A non-positive value disables the cap. */
+    val maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES,
     val request: RequestConfiguration? = null,
     val engine: RequestEngineConfiguration? = null,
     val decoding: ResponseBodyDecodingConfiguration = ResponseBodyDecodingConfiguration(),
@@ -29,7 +32,7 @@ data class WebDataFetchingConfiguration(
      * Precedence: override > this > (implicit defaults)
      *
      * - Nullable fields: override value is used when non-null, otherwise this value is kept.
-     * - Non-nullable fields ([http], [decoding], [logging]): override value is used only when it
+     * - Non-nullable fields ([http], [decoding], [logging], [maxResponseBytes]): override value is used only when it
      *   differs from the class-level default, so a layer that was never explicitly set does not
      *   silently replace a lower-layer customisation.
      */
@@ -39,6 +42,7 @@ data class WebDataFetchingConfiguration(
         cache     = override.cache ?: cache,
         timeouts  = override.timeouts ?: timeouts,
         retry     = override.retry ?: retry,
+        maxResponseBytes = if (override.maxResponseBytes != Default.maxResponseBytes) override.maxResponseBytes else maxResponseBytes,
         request   = override.request ?: request,
         engine    = override.engine ?: engine,
         decoding  = if (override.decoding != Default.decoding) override.decoding else decoding,
@@ -46,6 +50,14 @@ data class WebDataFetchingConfiguration(
     )
 
     companion object {
+        const val DEFAULT_MAX_RESPONSE_BYTES = 10L * 1024 * 1024
+
+        val DEFAULT_TIMEOUTS = TimeoutConfiguration(
+            connectTimeout = 10.seconds,
+            requestTimeout = 30.seconds,
+            socketTimeout = 30.seconds,
+        )
+
         val Default = WebDataFetchingConfiguration()
 
         val Example = WebDataFetchingConfiguration(
@@ -66,7 +78,7 @@ data class WebDataFetchingConfiguration(
             engine?.pipelining?.let { this.pipelining = it }
             engine?.proxy?.let { this.proxy = it.toKtorProxyConfig() }
         }
-        engine?.followRedirects?.let { http.followRedirects = it }
+        http.followRedirects = engine?.followRedirects ?: false
 
         http.install(ContentNegotiation) {
             // Protocol requests own their Accept values; keep JSON as the implicit default.
@@ -84,6 +96,14 @@ data class WebDataFetchingConfiguration(
             http.install(Logging) {
                 format = logging.format
                 level = logging.level
+                sanitizeHeader { name ->
+                    logging.sanitizedHeaders.any { it.equals(name, ignoreCase = true) }
+                }
+            }
+        }
+        if (maxResponseBytes > 0) {
+            http.install(ResponseSizeLimit) {
+                maxBytes = maxResponseBytes
             }
         }
         //http.install(io.ktor.client.plugins.compression.ContentEncoding)

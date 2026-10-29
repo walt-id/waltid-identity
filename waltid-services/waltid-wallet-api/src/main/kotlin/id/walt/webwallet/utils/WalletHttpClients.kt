@@ -1,25 +1,22 @@
 package id.walt.webwallet.utils
 
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.serialization.kotlinx.json.*
 
 object WalletHttpClients {
 
+    /**
+     * Same limits as the shared web-data client: timeouts, a response-size cap, no redirects, and no
+     * retries. Header logging redacts credentials instead of recording the response body.
+     */
+    var defaultConfiguration = WebDataFetchingConfiguration()
+
     var defaultMethod = {
-        HttpClient {
-            install(ContentNegotiation) {
-                json()
-            }
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = LogLevel.ALL
-            }
-            followRedirects = false
-        }
+        WebDataFetcher(WebDataFetcherId.WALLET_API_HTTP_CLIENT, defaultConfiguration)
     }
 
-    fun getHttpClient(): HttpClient = defaultMethod()
+    fun getHttpClient(): HttpClient = defaultMethod().httpClient
 
 }
