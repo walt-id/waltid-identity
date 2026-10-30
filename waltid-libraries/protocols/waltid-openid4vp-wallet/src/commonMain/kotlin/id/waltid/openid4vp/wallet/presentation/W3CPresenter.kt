@@ -1,12 +1,10 @@
 package id.waltid.openid4vp.wallet.presentation
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.jose.selectJwsAlgorithm
-import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
@@ -85,18 +83,9 @@ object W3CPresenter {
         holderCrypto2Key: Crypto2Key?,
         holderBindingAudience: String? = null,
     ): JsonPrimitive {
-        val selectedClaimsMap = matchResult.selectedDisclosures
-
         if (digitalCredential is SelectivelyDisclosableVerifiableCredential && digitalCredential.disclosables != null && digitalCredential.disclosables?.isNotEmpty() == true) {
             // This W3C JWT VC uses SD-JWT mechanism internally
-            val disclosuresToPresent =
-                selectedClaimsMap?.values?.mapNotNull {
-                    when (it) {
-                        is SdJwtSelectiveDisclosure -> it
-                        is DcqlDisclosure -> digitalCredential.disclosures?.find { sdJwtDisclosure -> sdJwtDisclosure.name == it.name }
-                        else -> null
-                    }
-                } ?: emptyList()
+            val disclosuresToPresent = digitalCredential.disclosuresToPresent(matchResult)
             log.debug { "Handling W3C JWT VC (${digitalCredential} with claims $disclosuresToPresent) with SD mechanism" }
 
             val disclosed = digitalCredential.disclose(digitalCredential, disclosuresToPresent)
