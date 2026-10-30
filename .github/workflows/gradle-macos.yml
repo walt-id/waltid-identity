@@ -278,7 +278,8 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 45
     outputs:
-      artifact-attempt: ${{ steps.package.outputs.attempt }}
+      native-artifact: ${{ steps.package.outputs.native-artifact }}
+      compose-artifact: ${{ steps.package.outputs.compose-artifact }}
     strategy:
       fail-fast: false
       matrix:
@@ -338,7 +339,7 @@ jobs:
         run: |
           python3 waltid-identity/.github/scripts/mobile-ci/ios-test-products.py pack \
             --demo "$DEMO" --artifact-dir "$RUNNER_TEMP/wallet-app-tests/$DEMO"
-          echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          echo "$DEMO-artifact=wallet-app-tests-$DEMO-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: Publish app test products
         uses: actions/upload-artifact@v7
         with:
@@ -380,11 +381,13 @@ jobs:
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
 
       - name: Restore the shared release framework
+        if: ${{ matrix.consumer != 'compose' }}
         uses: actions/download-artifact@v8
         with:
           name: ${{ needs.wallet-core-framework.outputs.artifact-name }}
           path: ${{ runner.temp }}/wallet-core-artifact
       - name: Verify the shared release framework
+        if: ${{ matrix.consumer != 'compose' }}
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
@@ -392,7 +395,7 @@ jobs:
         if: ${{ matrix.consumer != 'bridge' }}
         uses: actions/download-artifact@v8
         with:
-          name: wallet-app-tests-${{ matrix.consumer }}-${{ needs.wallet-app-test-builds.outputs.artifact-attempt }}
+          name: ${{ needs.wallet-app-test-builds.outputs[format('{0}-artifact', matrix.consumer)] }}
           path: ${{ runner.temp }}/wallet-app-tests/${{ matrix.consumer }}
       - name: Verify and unpack app test products
         if: ${{ matrix.consumer != 'bridge' }}
@@ -523,13 +526,13 @@ jobs:
         if: ${{ inputs.enterprise-demos != 'compose' }}
         uses: actions/download-artifact@v8
         with:
-          name: wallet-app-tests-native-${{ needs.wallet-app-test-builds.outputs.artifact-attempt }}
+          name: ${{ needs.wallet-app-test-builds.outputs.native-artifact }}
           path: ${{ runner.temp }}/wallet-app-tests/native
       - name: Restore Compose app test products
         if: ${{ inputs.enterprise-demos != 'native' }}
         uses: actions/download-artifact@v8
         with:
-          name: wallet-app-tests-compose-${{ needs.wallet-app-test-builds.outputs.artifact-attempt }}
+          name: ${{ needs.wallet-app-test-builds.outputs.compose-artifact }}
           path: ${{ runner.temp }}/wallet-app-tests/compose
       - name: Verify and unpack selected app test products
         env:

@@ -61,12 +61,16 @@ Compose's generated framework symlink is materialized inside the bundle so it
 does not depend on the producer's build directory. The manifest binds all four
 repository revisions, exact Xcode version, configuration, expected test targets,
 file hashes and modes. Consumers verify the archive and its contents before use.
-Artifacts belong to one workflow attempt and are retained for one day.
+Artifacts are named for their producing job's attempt and retained for one day.
+Native and Compose publish separate artifact outputs so partial reruns can reuse
+the successful sibling's bundle from its original attempt.
 
 Native and Compose functional tests, Enterprise tests and SwiftUI visual comparisons
 use those bundles with `test-without-building`. Each suite keeps its own selectors,
 simulator, fixture lifetime and result checks. Local action/task callers without
-an app artifact retain their build path. The app build jobs have a 45-minute limit;
+an app artifact retain their build path. The Compose test job needs only its
+self-contained app bundle; native visual and bridge consumers also restore the
+release framework. The app build jobs have a 45-minute limit;
 the existing consumer limits below remain unchanged.
 
 Functional consumers run in three jobs: native demo, Compose demo and Swift bridge.

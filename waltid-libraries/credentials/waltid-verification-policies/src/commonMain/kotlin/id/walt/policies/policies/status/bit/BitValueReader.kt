@@ -1,7 +1,6 @@
 package id.walt.policies.policies.status.bit
 
 import id.walt.policies.policies.status.expansion.StatusListExpansionAlgorithm
-import io.github.oshai.kotlinlogging.KotlinLogging
 
 class BitValueReader(
     private val bitRepresentationStrategy: BitRepresentationStrategy,
@@ -9,8 +8,6 @@ class BitValueReader(
     companion object {
         private val BITS_PER_BYTE_UNSIGNED = 8u
     }
-
-    private val logger = KotlinLogging.logger {}
 
     suspend fun get(
         bitstring: String,
@@ -52,9 +49,4 @@ class BitValueReader(
         this.fold(emptySequence<Boolean>()) { acc, byte ->
             acc + bitRepresentationStrategy().map { i -> (byte.toUInt() shr i) and 1u == 1u }.asSequence()
         }
-
-    private fun bitmap(byteArray: ByteArray) = byteArray.map { byte ->
-        // Convert byte to binary string
-        byte.toUByte().toInt().toString(radix = 2).padStart(8, '0')
-    }
 }
