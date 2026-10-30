@@ -70,17 +70,25 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         captureHost("Nearby compact choices")
         ui.tapButton(identifier: "proximity-connection-options", fallbackLabel: "Connection options")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsProximityDefault"].waitForExistence(timeout: 10))
+        var observedTop: CGFloat?
         let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            sheet.frame.minY < compactTop - 40
+            let top = sheet.frame.minY
+            observedTop = top
+            return top < compactTop - 40
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed,
+                       "Connection options must expand: compact top=\(compactTop), observed top=\(String(describing: observedTop))")
         captureHost("Nearby connection options")
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        observedTop = nil
         let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            abs(sheet.frame.minY - compactTop) <= 2
+            let top = sheet.frame.minY
+            observedTop = top
+            return abs(top - compactTop) <= 2
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed,
+                       "Back must restore the content height: compact top=\(compactTop), observed top=\(String(describing: observedTop))")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Nearby options return")
         ui.tapButton(identifier: "wallet.proximityCancelButton", fallbackLabel: "Close nearby sharing")
