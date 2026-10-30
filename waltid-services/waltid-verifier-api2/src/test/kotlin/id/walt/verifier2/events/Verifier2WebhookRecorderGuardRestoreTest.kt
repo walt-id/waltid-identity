@@ -7,10 +7,16 @@ import kotlin.test.assertFalse
 
 class Verifier2WebhookRecorderGuardRestoreTest {
 
+    private val previousAllowLoopback = System.getProperty("walt.ssrf.allowLoopback")
+
     @AfterTest
     fun releaseLoopbackChoice() {
-        System.clearProperty("walt.ssrf.allowLoopback")
         PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+        if (previousAllowLoopback == null) {
+            System.clearProperty("walt.ssrf.allowLoopback")
+        } else {
+            System.setProperty("walt.ssrf.allowLoopback", previousAllowLoopback)
+        }
     }
 
     @Test
