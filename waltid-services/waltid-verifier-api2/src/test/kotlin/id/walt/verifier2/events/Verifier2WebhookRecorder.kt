@@ -112,20 +112,24 @@ class Verifier2WebhookRecorder : AutoCloseable {
 
     private data class GuardSnapshot(
         val allowLoopback: Boolean,
+        val allowLoopbackExplicit: Boolean,
         val allowPrivateNetworks: Boolean,
         val trustedHostSuffixes: Set<String>,
     ) {
         fun restore() {
-            NetworkFetchGuardConfig(
-                allowLoopback = allowLoopback,
-                allowPrivateNetworks = allowPrivateNetworks,
-                trustedHostSuffixes = trustedHostSuffixes.toList(),
-            ).apply()
+            if (allowLoopbackExplicit) {
+                PrivateNetworkGuardSettings.allowLoopback = allowLoopback
+            } else {
+                PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+            }
+            PrivateNetworkGuardSettings.allowPrivateNetworks = allowPrivateNetworks
+            PrivateNetworkGuardSettings.trustedHostSuffixes = trustedHostSuffixes
         }
 
         companion object {
             fun capture() = GuardSnapshot(
                 allowLoopback = PrivateNetworkGuardSettings.allowLoopback,
+                allowLoopbackExplicit = PrivateNetworkGuardSettings.allowLoopbackExplicit,
                 allowPrivateNetworks = PrivateNetworkGuardSettings.allowPrivateNetworks,
                 trustedHostSuffixes = PrivateNetworkGuardSettings.trustedHostSuffixes,
             )

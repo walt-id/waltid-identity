@@ -25,11 +25,17 @@ class WebhookNotifierTest {
     }
 
     @BeforeTest
-    @AfterTest
-    fun resetGuard() {
-        // JVM test tasks set this so ordinary suites can bind 127.0.0.1. These cases assert the default refusal.
+    fun denyLoopback() {
         System.clearProperty("walt.ssrf.allowLoopback")
         guard(allowLoopback = false)
+    }
+
+    @AfterTest
+    fun releaseLoopbackChoice() {
+        System.clearProperty("walt.ssrf.allowLoopback")
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+        PrivateNetworkGuardSettings.allowPrivateNetworks = false
+        PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
     }
 
     @Test
