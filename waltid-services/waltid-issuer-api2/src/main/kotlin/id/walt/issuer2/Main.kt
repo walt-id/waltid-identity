@@ -3,9 +3,7 @@ package id.walt.issuer2
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
-import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.NetworkFetchGuardConfig
-import id.walt.commons.config.apply
+import id.walt.commons.config.applyNetworkFetchGuardConfig
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.web.WebService
 import id.walt.crypto.keys.aws.WaltCryptoAws
@@ -33,7 +31,7 @@ suspend fun main(args: Array<String>) {
                 CommonsFeatureCatalog.authenticationServiceFeature to issuer2AuthenticationPluginAmendment
             ),
             init = {
-                ConfigManager.getConfig<NetworkFetchGuardConfig>().apply()
+                applyNetworkFetchGuardConfig()
                 DidService.minimalInit()
                 WaltCryptoAws.init()
                 WaltCryptoAzure.init()

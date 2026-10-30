@@ -3,6 +3,7 @@ package id.walt.wallet2
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
+import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.wallet2.persistence.Wallet2PersistenceConfig
@@ -32,7 +33,7 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
         default = true,
     )
 
-    override val baseFeatures = listOf(walletService)
+    override val baseFeatures = listOf(walletService, CommonsFeatureCatalog.networkFetchGuardFeature)
     override val optionalFeatures: List<OptionalFeature> = listOf(
         devModeFeature,
         authFeature,

@@ -4,8 +4,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.NetworkFetchGuardConfig
-import id.walt.commons.config.apply
+import id.walt.commons.config.applyNetworkFetchGuardConfig
 import id.walt.commons.web.WebService
 import id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker
 import id.walt.did.dids.DidService
@@ -32,7 +31,7 @@ suspend fun main(args: Array<String>) {
         ServiceConfiguration("verifier", version = BuildConfig.VERSION), ServiceInitialization(
             features = OSSVerifier2FeatureCatalog,
             init = {
-                ConfigManager.getConfig<NetworkFetchGuardConfig>().apply()
+                applyNetworkFetchGuardConfig()
                 DidService.apply {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()

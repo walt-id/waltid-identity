@@ -2,6 +2,7 @@ package id.walt.issuer
 
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
+import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.issuer.config.AuthenticationServiceConfig
@@ -32,7 +33,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
-    override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService)
+    override val baseFeatures =
+        listOf(credentialTypes, issuerService, authenticationService, CommonsFeatureCatalog.networkFetchGuardFeature)
     override val optionalFeatures = listOf(entra, devModeFeature)
 
 }
