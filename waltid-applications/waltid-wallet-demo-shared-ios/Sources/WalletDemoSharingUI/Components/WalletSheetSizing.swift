@@ -80,8 +80,10 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     private var height: CGFloat = 0
     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
     private weak var resizingSheet: UISheetPresentationController?
-    private var resizeID: UUID?
+    private var resizeLink: CADisplayLink?
     private var layoutCompletion: (id: UUID, action: () -> Void)?
+
+    deinit { resizeLink?.invalidate() }
 
     func afterLayout(id: UUID, _ completion: @escaping () -> Void) {
         layoutCompletion = (id, completion)
@@ -93,11 +95,11 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     }
 
     func isResizing(_ owner: UIViewController) -> Bool {
-        guard resizeID != nil, resizingSheet === owner.sheetPresentationController else { return false }
+        guard resizeLink != nil, resizingSheet === owner.sheetPresentationController else { return false }
         let layer = owner.view.layer
-        guard let rendered = layer.presentation() else { return false }
-        // A transaction completion can remain pending after the sheet has settled.
-        // Keep coalescing while its geometry is moving, then let the active page measure.
+        guard let rendered = layer.presentation() else { return true }
+        // A loading spinner can outlive the sheet's resize in the same transaction.
+        // Coalesce only while the sheet's own geometry is still moving.
         return rendered.bounds != layer.bounds || rendered.position != layer.position
     }
 
@@ -134,28 +136,43 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
             } else { presentation.invalidateDetents() }
         }
         if animated && !owner.isBeingPresented {
-            // The sheet owns this animation even when SwiftUI replaces its page.
-            // Coalesce updates until it finishes; a different presentation can resize
-            // independently, and its token cannot be released by the old completion.
-            let id = UUID()
-            resizeID = id
+            resizeLink?.invalidate()
+            let observer = WalletSheetResizeObserver(sizing: self, owner: owner)
+            let link = CADisplayLink(target: observer, selector: #selector(WalletSheetResizeObserver.frame(_:)))
+            resizeLink = link
             resizingSheet = presentation
-            CATransaction.begin()
-            CATransaction.setCompletionBlock { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, resizeID == id else { return }
-                    resizeID = nil
-                    resizingSheet = nil
-                    // Re-measure the current page, not a height captured before another update.
-                    activePage?.scheduleMeasurement()
-                }
-            }
             presentation.animateChanges(changes)
-            CATransaction.commit()
+            // Observe this sheet, not a transaction that can also contain a loading spinner.
+            link.add(to: .main, forMode: .common)
         } else {
             changes()
             page.scheduleMeasurement()
         }
+    }
+
+    func finishResize(_ link: CADisplayLink) {
+        link.invalidate()
+        guard resizeLink === link else { return }
+        resizeLink = nil
+        resizingSheet = nil
+        activePage?.scheduleMeasurement()
+    }
+}
+
+private final class WalletSheetResizeObserver: NSObject {
+    private weak var sizing: WalletSheetSizingCoordinator?
+    private weak var owner: UIViewController?
+
+    init(sizing: WalletSheetSizingCoordinator, owner: UIViewController) {
+        self.sizing = sizing
+        self.owner = owner
+    }
+
+    @objc func frame(_ link: CADisplayLink) {
+        guard let sizing else { link.invalidate(); return }
+        if let owner, owner.view.window != nil, owner.presentingViewController != nil,
+           sizing.isResizing(owner) { return }
+        sizing.finishResize(link)
     }
 }
 
@@ -228,7 +245,7 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
             guard owner.presentingViewController != nil else { return }
             // Even a measurement can mutate the sheet: layoutIfNeeded below flushes
             // the entire hosting hierarchy. Leave an active resize alone, including
-            // when its measurement controller has been replaced. Its completion
+            // when its measurement controller has been replaced. The resize observer
             // schedules the currently visible page with the latest content.
             guard !sizing.isResizing(owner) else { return }
             // A focus request can queue a measurement before SwiftUI has laid out the
