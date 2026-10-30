@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -85,6 +86,53 @@ class IosReportsTest(unittest.TestCase):
         self.assertIn("Failed to convert", result.stdout)
         self.assertEqual(outputs["has_report"], "true")
         self.assertEqual(count, 1)
+
+
+class EnterpriseSelectionTest(unittest.TestCase):
+    def verify(self, selection, *, sdk=True, batch=True, compose=False):
+        workflow = ACTION.parents[2] / "workflows/gradle-macos.yml"
+        step = workflow.read_text().split("      - name: Require selected Enterprise SDK and batch test execution\n", 1)[1]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            verifier = root / "waltid-identity/.github/scripts/mobile-ci/verify_test_results.py"
+            verifier.parent.mkdir(parents=True)
+            shutil.copyfile(Path(__file__).with_name("verify_test_results.py"), verifier)
+            reports = root / "waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/xcresult"
+            reports.mkdir(parents=True)
+            suites = []
+            if sdk:
+                suites.append('<testsuite name="iosAppEnterpriseTests.xctest"><testcase classname="EnterpriseTests" name="sdk"/></testsuite>')
+            if batch:
+                suites.append('<testsuite name="iosAppUITests.xctest"><testcase classname="BatchIssuanceE2ETests" name="batch"/></testsuite>')
+            (reports / "iosAppEnterpriseTests.xcresult.xml").write_text("<testsuites>" + "".join(suites) + "</testsuites>")
+            if compose:
+                (reports / "compose-batch.xcresult.xml").write_text(
+                    '<testsuite name="iosAppUITests.xctest"><testcase classname="BatchIssuanceE2ETests" name="batch"/></testsuite>')
+            return subprocess.run(["bash", "-euo", "pipefail", "-c", script], cwd=root,
+                                  env={**os.environ, "ENTERPRISE_IOS_DEMOS": selection},
+                                  capture_output=True, text=True, timeout=10)
+
+    def test_native_selection_requires_both_sdk_and_batch_suites(self):
+        result = self.verify("native")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for missing in ("sdk", "batch"):
+            with self.subTest(missing=missing):
+                result = self.verify("native", **{missing: False})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Expected suite did not execute", result.stderr)
+
+    def test_all_selection_still_requires_both_demos(self):
+        missing = self.verify("all")
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("No JUnit reports found", missing.stderr)
+        complete = self.verify("all", compose=True)
+        self.assertEqual(complete.returncode, 0, complete.stderr)
+
+    def test_unknown_selection_fails_closed(self):
+        result = self.verify("invalid", compose=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Enterprise demos must be all, native or compose", result.stdout)
 
 
 if __name__ == "__main__":

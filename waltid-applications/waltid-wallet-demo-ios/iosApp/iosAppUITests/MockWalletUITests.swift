@@ -650,6 +650,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: [
             "E2E_MOCK_WALLET": "1",
             "E2E_MOCK_TX_CODE_REQUIRED": "1",
+            "E2E_MOCK_WALLET_DELAY_MS": "150",
         ])
 
         XCTAssertEqual(
@@ -767,13 +768,12 @@ final class MockWalletUITests: XCTestCase {
         details.name = "rtl-credential-information"
         details.lifetime = .keepAlways
         add(details)
-        // Resolve the inset sheet's edge when the gesture executes, after XCTest waits for idle.
-        // A previously sampled screen coordinate can precede the sheet's final resize.
-        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-            .withOffset(CGVector(dx: -3, dy: 40))
-            .press(forDuration: 0.05, thenDragTo: navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 1))
-                .withOffset(CGVector(dx: 40, dy: 40)))
+        // Start on native Back and complete the pan across the bar before releasing.
+        back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
+                .withOffset(CGVector(dx: 3, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.2)
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(navigationBar.exists, "Swiping back must pop the detail page without closing the offer")
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
         ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))

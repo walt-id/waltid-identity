@@ -9,9 +9,6 @@ source "$script_dir/prepare-android-dc-api-device.sh"
 # that exact baseline and fail before Gradle if the restored device has drifted.
 validate_android_dc_api_device
 
-# These suites need Google Play services and run separately from ordinary Compose tests.
-test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
-IFS=',' read -r -a required_classes <<< "$test_classes"
 instrumentation_args=()
 if [[ -n "${ANDROID_TEST_NOT_CLASS:-}" ]]; then
   instrumentation_args+=("-Pandroid.testInstrumentationRunnerArguments.notClass=$ANDROID_TEST_NOT_CLASS")
@@ -21,16 +18,16 @@ test_status=0
 set +e
 "$identity_dir/gradlew" -p "$identity_dir" \
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest \
-  "-Pandroid.testInstrumentationRunnerArguments.class=$test_classes" \
+  -Pandroid.testInstrumentationRunnerArguments.annotation=id.walt.mobile.test.DigitalCredentialProviderTest \
   "${instrumentation_args[@]}" \
-  -Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest \
+  -Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest,id.walt.mobile.test.EnterpriseMobileTest \
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info
 test_status=$?
 set -e
 
 python3 "$script_dir/verify_test_results.py" \
-  --require-class "${required_classes[@]}" \
+  --require-class id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest \
   --reports "$identity_dir/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml" \
   || test_status=1
 

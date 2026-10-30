@@ -21,9 +21,28 @@ Release candidate Maven publish is a separate job that waits for the
 Gradle job and, when requested, the live verifier, wallet and issuer conformance jobs.
 
 The following labels add coverage beyond automatic path selection. `ci:macos`
-and `ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
+and `ci:mobile` select every macOS lane, subject to an explicit Compose deferral.
+`ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
 `ci:conformance` (or the older `ci:issuer-conformance` alias), and `ci:android`
 force those specific lanes.
+
+## Deferring Compose while preparing native changes
+
+`ci:compose-deferred` lets a PR leave draft without starting Compose consumers.
+It takes precedence over mobile opt-in labels on PR events. Native demo tests,
+Swift bridge tests, native visual comparisons and SDK documentation retain their
+normal selection; Enterprise iOS runs its native demo and SDK tests only.
+
+The deferral excludes Compose iOS, Android device/DC API groups, Android/Compose/
+browser visual comparisons, and the Kotlin simulator group that includes sharedUI
+tests. These groups are **skipped**, not passed. Eligibility logs name the deferral.
+Record the missing coverage in the PR's caveats; this label does not establish
+merge acceptance or repair earlier failures.
+
+The label does not opt drafts into native jobs. Removing it restores automatic
+path selection. Fork restrictions, main pushes, and explicit manual/workflow-call
+selection remain unchanged. A manual native-only run must still select its inputs
+explicitly; PR labels do not override a manual dispatch.
 
 ## Deferring live conformance
 
