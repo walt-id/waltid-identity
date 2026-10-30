@@ -43,11 +43,15 @@ def main():
     parser.add_argument("--derived-data", type=Path, default=ROOT / "build/wallet-visual-derived")
     parser.add_argument("--reuse-framework", type=Path,
                         help="Verified WalletCore artifact from the same checkout and Xcode; SwiftUI only")
+    parser.add_argument("--test-products-artifact", type=Path,
+                        help="Verified native app test-products artifact from the same checkout and Xcode")
     parser.add_argument("--gradle-root", type=Path, default=ROOT,
                         help="Identity checkout or unified build whose waltid-identity resolves to this checkout")
     args = parser.parse_args()
     if args.reuse_framework and "swiftui" not in args.renderers:
         parser.error("--reuse-framework requires the swiftui renderer")
+    if args.test_products_artifact and (not args.reuse_framework or "swiftui" not in args.renderers):
+        parser.error("--test-products-artifact requires --reuse-framework and the swiftui renderer")
     args.gradle_root = args.gradle_root.resolve()
     if args.gradle_root != ROOT and (args.gradle_root / "waltid-identity").resolve() != ROOT:
         parser.error("--gradle-root must build this Identity checkout")
@@ -87,6 +91,12 @@ def main():
         status = run(framework_command, "framework.log", cwd=ROOT if args.reuse_framework else args.gradle_root)
         if status:
             return status
+        if args.test_products_artifact:
+            status = run([sys.executable, str(ROOT / ".github/scripts/mobile-ci/ios-test-products.py"),
+                          "verify", "--demo", "native", "--artifact-dir",
+                          str(args.test_products_artifact.resolve())], "test-products.log", cwd=ROOT)
+            if status:
+                return status
     report_command = [sys.executable, str(HERE / "report.py")]
     subprocess.run(report_command + ["begin", "--output", str(args.output), "--gradle-root", str(args.gradle_root),
                                     "--renderers", *args.renderers], cwd=ROOT, check=True)
@@ -104,10 +114,13 @@ def main():
         # Explicitly forward CI detection so a child XCTest runner cannot accept references.
         test_env = report.runner_env(run_metadata)
         # Match the native phase to avoid recompiling for unused coverage instrumentation.
-        command = ["xcodebuildmcp", "simulator", "test", "--project-path",
-                   str(ROOT / "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj"),
-                   "--scheme", "iosApp", "--configuration", "Debug", "--simulator-id", args.simulator,
-                   "--derived-data-path", str(args.derived_data.resolve()), "--extra-args",
+        build_arguments = (["--test-products-path", str(args.test_products_artifact.resolve() / "native.xctestproducts")]
+                           if args.test_products_artifact else [
+                               "--project-path", str(ROOT / "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj"),
+                               "--scheme", "iosApp", "--configuration", "Debug",
+                               "--derived-data-path", str(args.derived_data.resolve())])
+        command = ["xcodebuildmcp", "simulator", "test", *build_arguments,
+                   "--simulator-id", args.simulator, "--extra-args",
                    "-only-testing:iosAppTests/WalletVisualTests", "-only-testing:iosAppTests/WalletVisualComparatorTests",
                    "-only-testing:iosAppTests/WalletVisualHostingTests",
                    "-parallel-testing-enabled", "NO",
