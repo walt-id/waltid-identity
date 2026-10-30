@@ -66,7 +66,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 
 class MsoMdocsTransactionDataVerifier2IntegrationTest {
 
@@ -144,7 +143,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             validityInfo = ValidityInfo(
                 signed = now,
                 validFrom = now,
-                validUntil = now + 365.days,
+                validUntil = now + MDL_FIXTURE_MSO_VALIDITY,
             ),
         )
 
