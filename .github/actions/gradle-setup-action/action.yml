@@ -9,6 +9,10 @@ inputs:
     description: "'generate-and-submit' needs contents: write access to the dependency graph. 'disabled' disables the dependency graph."
     required: false
     default: "disabled"
+  cache-read-only:
+    description: "Read existing Gradle cache entries without saving new ones. Defaults to setup-gradle's branch policy."
+    required: false
+    default: ${{ github.event.repository != null && github.ref_name != github.event.repository.default_branch }}
 
 runs:
   using: "composite"
@@ -22,6 +26,7 @@ runs:
       uses: gradle/actions/setup-gradle@v5
       with:
         cache-overwrite-existing: true
+        cache-read-only: ${{ inputs.cache-read-only }}
         dependency-graph: ${{ inputs.dependency-graph }}
     - name: Gradle wrapper validation
       uses: gradle/actions/wrapper-validation@v5

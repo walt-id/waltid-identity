@@ -180,12 +180,16 @@ class NfcV2ApduProcessorTest {
         val pending = assertIs<NfcV2ApduResult.Request>(
             processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 8)),
         )
+        val sessionResponse = ByteArray(32) { it.toByte() }
         val firstSessionResponse = NfcResponseApdu.decode(
-            processor.completeResponse(pending.identifier, ByteArray(32) { it.toByte() }).toByteArray(),
+            processor.completeResponse(pending.identifier, sessionResponse).toByteArray(),
         )
         assertEquals(8, firstSessionResponse.data.size)
         assertEquals(0x61, firstSessionResponse.statusByte1.toInt())
-        drainResponse(processor, firstSessionResponse, responseLength = 8)
+        assertContentEquals(
+            byteArrayOf(0x53, 0x20) + sessionResponse,
+            drainResponse(processor, firstSessionResponse, responseLength = 8),
+        )
         assertEquals(NfcV2State.AWAITING_PAYLOAD, processor.state)
     }
 

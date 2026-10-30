@@ -102,6 +102,12 @@ jobs:
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
+      # Restore compiler dependencies before the ABI checks populate .konan.
+      - name: Configure iOS build environment
+        uses: ./waltid-identity/.github/actions/ios-build-setup
+        with:
+          gradle-properties-path: waltid-identity/gradle.properties
+
       - name: Check mobile SDK API contract
         timeout-minutes: 60
         working-directory: waltid-identity

@@ -55,10 +55,6 @@ class WalletDemoSharingReviewAndroidTest {
         scenarios.disabledReviewCannotBeSubmittedTwice()
 
     @Test
-    fun reviewWithoutReaderAuthenticationShowsNoReaderSection() =
-        scenarios.reviewWithoutReaderAuthenticationShowsNoReaderSection()
-
-    @Test
     fun untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure() =
         scenarios.untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure()
 

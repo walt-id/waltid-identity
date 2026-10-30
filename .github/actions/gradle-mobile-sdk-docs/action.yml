@@ -20,11 +20,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure iOS build environment
-      uses: ./waltid-identity/.github/actions/ios-build-setup
-      with:
-        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
-
     - name: Check mobile wallet documentation snippets
       if: ${{ inputs.check-snippets == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}

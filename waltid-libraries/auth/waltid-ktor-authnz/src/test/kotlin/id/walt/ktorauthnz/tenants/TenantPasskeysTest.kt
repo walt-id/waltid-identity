@@ -93,13 +93,10 @@ class TenantPasskeysTest {
 
     @Test
     fun `each tenant is its own relying party`() = passkeyTest {
-        assertEquals("org1.example.com", options("org1")["rpId"]!!.jsonPrimitive.content)
+        val org1Options = options("org1")
+        assertEquals("org1.example.com", org1Options["rpId"]!!.jsonPrimitive.content)
+        assertEquals(HttpStatusCode.OK, login("org1", org1Device.get(org1Options)).status)
         assertEquals("org2.example.com", options("org2")["rpId"]!!.jsonPrimitive.content)
-    }
-
-    @Test
-    fun `a passkey logs in at its own tenant`() = passkeyTest {
-        assertEquals(HttpStatusCode.OK, login("org1", org1Device.get(options("org1"))).status)
     }
 
     @Test

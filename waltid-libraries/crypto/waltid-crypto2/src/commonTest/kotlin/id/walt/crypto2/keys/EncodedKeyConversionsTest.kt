@@ -7,9 +7,12 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class EncodedKeyConversionsTest {
@@ -60,10 +63,16 @@ class EncodedKeyConversionsTest {
                 usages = setOf(KeyUsage.KEY_AGREEMENT),
             )
         )
+        val originalJwk = assertIs<EncodedKey.Jwk>(key.storedKey.material)
+        val originalJson = Json.parseToJsonElement(originalJwk.data.toByteArray().decodeToString()).jsonObject
         val spki = key.storedKey.material.toSpkiDer(spec)
         val publicJwk = spki.toPublicJwk(spec)
 
         assertFalse(publicJwk.privateMaterial)
-        assertTrue(publicJwk.data.size > 0)
+        val publicJson = Json.parseToJsonElement(publicJwk.data.toByteArray().decodeToString()).jsonObject
+        assertEquals(originalJson.getValue("x"), publicJson["x"])
+        assertEquals(JsonPrimitive("OKP"), publicJson["kty"])
+        assertEquals(JsonPrimitive("X25519"), publicJson["crv"])
+        assertFalse("d" in publicJson)
     }
 }

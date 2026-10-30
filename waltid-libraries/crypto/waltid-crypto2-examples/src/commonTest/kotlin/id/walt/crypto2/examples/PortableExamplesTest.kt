@@ -2,6 +2,7 @@ package id.walt.crypto2.examples
 
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -18,6 +19,7 @@ class PortableExamplesTest {
             "x25519" to "secretsMatch=true",
         )
 
+        assertEquals(expectedResult.keys.toList(), portableExampleCommands.map(ExampleCommand::name))
         portableExampleCommands.forEach { command ->
             val lines = mutableListOf<String>()
             command.execute(lines::add)

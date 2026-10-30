@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.tenants
 
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -51,8 +52,10 @@ import kotlin.time.Duration.Companion.minutes
 /** What an [authnzTenant] scope keeps apart between tenants, beyond sessions and accounts. */
 class TenantScopeTest {
 
+    private val services = ExampleServiceScope()
+
     private val accounts = InMemoryAccountStore()
-    private val idp = ExampleIdentityProvider(clientId = "app")
+    private lateinit var idp: ExampleIdentityProvider
     private val sentResets = mutableMapOf<String, String>()
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -64,11 +67,27 @@ class TenantScopeTest {
         }
     }
 
-    @AfterTest
-    fun tearDown() {
-        idp.close()
-        KtorAuthnzManager.refreshTokens = null
+    @BeforeTest
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousAttemptLimits = KtorAuthnzManager.attemptLimits
+        val previousRefreshTokens = KtorAuthnzManager.refreshTokens
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.attemptLimits = previousAttemptLimits
+            KtorAuthnzManager.refreshTokens = previousRefreshTokens
+        }
+        idp = services.own(ExampleIdentityProvider(clientId = "app"))
     }
+
+    @AfterTest
+    fun tearDown() = services.close()
 
     private fun flowsOf(tenant: String) = listOf(
         AuthFlow.fromConfig("""{"method": "userpass", "success": true}"""),

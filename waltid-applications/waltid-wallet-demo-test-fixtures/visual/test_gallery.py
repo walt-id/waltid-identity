@@ -112,6 +112,9 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(result["counts"], {"renamed": 1})
         self.assertTrue(result["changes"][0]["beforeUrl"].endswith("wallet.empty.png"))
         self.assertTrue(result["changes"][0]["afterUrl"].endswith("wallet.new.png"))
+        body = gallery.markdown(result, limit=0)
+        self.assertIn(f"/{before}/{gallery.INDEX_PATH}#wallet-empty", body)
+        self.assertIn(f"/{self.head()}/{gallery.INDEX_PATH}#wallet-new", body)
 
     def test_stacked_target_excludes_its_existing_reference(self):
         self.add("wallet.parent")
@@ -238,16 +241,6 @@ class GalleryTests(unittest.TestCase):
         self.command("commit", "-m", "stale index")
         with self.assertRaisesRegex(ValueError, "catalogue is stale"):
             self.build()
-
-    def test_renamed_reference_keeps_the_old_index_anchor(self):
-        path = self.add("wallet.old")
-        before = self.checkpoint()
-        path.rename(path.with_name("wallet.new.png"))
-        self.data["states"][0]["id"] = "wallet.new"
-        self.checkpoint()
-        body = gallery.markdown(self.build(before), limit=0)
-        self.assertIn(f"/{before}/{gallery.INDEX_PATH}#wallet-old", body)
-        self.assertIn(f"/{self.head()}/{gallery.INDEX_PATH}#wallet-new", body)
 
     def test_preview_prioritizes_different_screen_families(self):
         for identifier in ("wallet.empty", "wallet.populated", "credential.details"):

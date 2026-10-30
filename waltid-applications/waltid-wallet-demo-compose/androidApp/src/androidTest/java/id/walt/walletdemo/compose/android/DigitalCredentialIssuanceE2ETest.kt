@@ -94,8 +94,6 @@ class DigitalCredentialIssuanceE2ETest {
         )
         val fixture = start()
         launchOffer(fixture, offerJson)
-        fixture.device.selectWalletCreateCandidate()
-        fixture.device.confirmSelectorIfAsked()
         assertNotNull(
             "Authorization offer review missing",
             waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
@@ -148,9 +146,6 @@ class DigitalCredentialIssuanceE2ETest {
 
         launchOffer(fixture, portalOffer.enrichedOfferJson)
 
-        fixture.device.selectWalletCreateCandidate()
-        fixture.device.confirmSelectorIfAsked()
-
         assertNotNull(
             "Wallet create offer review did not open for the portal-shaped offer",
             waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
@@ -173,19 +168,7 @@ class DigitalCredentialIssuanceE2ETest {
             "Demo offer URL did not carry an inline credential_offer"
         }
 
-        DigitalCredentialTestIssuer.reset(
-            requestJson = """
-                {"requests":[{"protocol":"openid4vci-v1","data":$offerJson}]}
-            """.trimIndent(),
-        )
-        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
-        fixture.context.startActivity(
-            Intent(fixture.context, DigitalCredentialTestIssuerActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-
-        fixture.device.selectWalletCreateCandidate()
-        fixture.device.confirmSelectorIfAsked()
+        launchOffer(fixture, offerJson)
 
         assertNotNull(
             "Wallet create offer review did not open",
@@ -216,19 +199,7 @@ class DigitalCredentialIssuanceE2ETest {
             "Demo offer URL did not carry an inline credential_offer"
         }
 
-        DigitalCredentialTestIssuer.reset(
-            requestJson = """
-                {"requests":[{"protocol":"openid4vci-v1","data":$offerJson}]}
-            """.trimIndent(),
-        )
-        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
-        fixture.context.startActivity(
-            Intent(fixture.context, DigitalCredentialTestIssuerActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-
-        fixture.device.selectWalletCreateCandidate()
-        fixture.device.confirmSelectorIfAsked()
+        launchOffer(fixture, offerJson)
 
         assertNotNull(
             "Wallet create offer review did not open",
@@ -282,6 +253,8 @@ class DigitalCredentialIssuanceE2ETest {
             Intent(fixture.context, DigitalCredentialTestIssuerActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+        fixture.device.selectWalletCreateCandidate()
+        fixture.device.confirmSelectorIfAsked()
     }
 
     /** Some builds add a confirmation step between candidate selection and the provider. */

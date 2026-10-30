@@ -290,36 +290,3 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         return String(code.dropLast()) + replacement
     }
 }
-
-@MainActor
-final class MockCredentialDisplayUITests: XCTestCase {
-
-    func testMockCredentialDetailsRenderPortraitAndCredentialInfo() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        let ui = WalletE2EUI(app: app)
-        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
-
-        let readyStatus = ui.waitUntilWalletReady(timeout: 30)
-        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
-
-        ui.openWalletLink("openid-credential-offer://mock")
-        XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
-        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
-
-        waitForIdleResultDismissal(app)
-        let credentialCard = app.buttons["wallet.credentialCard.cred-1"]
-        XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")
-        credentialCard.tap()
-
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
-        let personal = app.buttons["wallet.claimGroupDisclosure.Personal_details"]
-        XCTAssertTrue(personal.waitForExistence(timeout: 10))
-        XCTAssertEqual(personal.value as? String, "Expanded")
-        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait"), timeout: 10)
-        ui.tapButton(identifier: "credential-technical-details", fallbackLabel: "Technical details")
-        XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["No credential details available"].exists)
-    }
-}

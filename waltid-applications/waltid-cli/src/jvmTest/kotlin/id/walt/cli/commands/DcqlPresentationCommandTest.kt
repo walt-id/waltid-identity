@@ -48,7 +48,7 @@ class DcqlPresentationCommandTest {
     }
 
     @Test
-    fun `wrong VP signature nonce and algorithm validation fail`() {
+    fun `wrong VP signature and nonce fail validation`() {
         val directory = Files.createTempDirectory("cli-vp-invalid")
         val query = directory.resolve("query.json").also { it.writeText(dcqlQuery) }
         val vp = directory.resolve("vp.json")

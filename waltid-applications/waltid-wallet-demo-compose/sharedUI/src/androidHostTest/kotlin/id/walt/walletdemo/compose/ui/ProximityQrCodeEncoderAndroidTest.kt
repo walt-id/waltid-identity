@@ -8,6 +8,7 @@ import id.walt.walletdemo.compose.ui.components.encodeProximityQrCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -30,7 +31,12 @@ class ProximityQrCodeEncoderAndroidTest {
         for (control in listOf("\u0000", "\n", "\t", "\u007f")) assertFails { encodeProximityQrCode("mdoc:A${control}B") }
         assertFails { encodeProximityQrCode("https://example.com") }
         assertFails { encodeProximityQrCode("mdoc:é") }
-        assertFails { encodeProximityQrCode("mdoc:" + "A".repeat(4_000)) }
+        assertEquals(
+            "Device engagement QR payload exceeds the 2953-byte limit",
+            assertFailsWith<IllegalArgumentException> {
+                encodeProximityQrCode("mdoc:" + "A".repeat(4_000))
+            }.message,
+        )
     }
 
     private fun decode(image: ImageBitmap): DecoderResult {

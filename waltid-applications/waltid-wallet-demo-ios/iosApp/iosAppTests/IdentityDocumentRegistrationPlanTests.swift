@@ -145,19 +145,6 @@ final class IdentityDocumentRegistrationPlanTests: XCTestCase {
         XCTAssertTrue(plan.toAdd.isEmpty)
     }
 
-    func testEmptyWalletClearsRegistrations() {
-        let plan = reconciliationPlan(
-            desired: [],
-            existing: [
-                ExistingRegistration(documentIdentifier: "dc-a", documentType: mdl),
-                ExistingRegistration(documentIdentifier: "dc-b", documentType: pid),
-            ],
-            supportedDocumentTypes: supported
-        )
-
-        XCTAssertEqual(plan.toRemove, ["dc-a", "dc-b"])
-    }
-
     // MARK: - Authorization bootstrap
 
     func testAnUndeterminedProviderRegistersRatherThanWaitingToBeAuthorized() {

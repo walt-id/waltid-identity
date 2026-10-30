@@ -86,7 +86,6 @@ class IssuedCredentialConfigurationMatchTest {
         for (format in listOf(CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC_JSON_LD, CredentialFormat.JWT_VC)) {
             assertFormatMismatch(fixture, ldp, w3cConfiguration(format, degree))
             assertFormatMismatch(fixture, sdJwt, w3cConfiguration(format, degree))
-            assertFormatMismatch(fixture, jwt, CredentialConfiguration(format = CredentialFormat.MSO_MDOC, doctype = "org.iso.18013.5.1.mDL"))
             assertMessage(
                 fixture,
                 w3cJwtWithVcClaim(holderJwk, listOf("VerifiableCredential")),
@@ -94,6 +93,7 @@ class IssuedCredentialConfigurationMatchTest {
                 "types do not match",
             )
         }
+        assertFormatMismatch(fixture, jwt, CredentialConfiguration(format = CredentialFormat.MSO_MDOC, doctype = "org.iso.18013.5.1.mDL"))
 
         val storedLdp = fixture.prepare(ldp, w3cConfiguration(CredentialFormat.LDP_VC, degree))
         assertEquals("ldp_vc", storedLdp.credential.format)

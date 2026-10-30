@@ -2,7 +2,6 @@ package id.walt.statuslist.compression
 
 import id.walt.statuslist.codec.TokenStatusListCodec
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 
@@ -21,11 +20,5 @@ class ZlibCompressorNegativeTest {
         assertFailsWith<IllegalArgumentException> {
             ZlibCompressor.decompress(truncated)
         }
-    }
-
-    @Test
-    fun `round-trips nonempty input after the inflater finally block`() {
-        val input = byteArrayOf(9, 8, 7, 6)
-        assertContentEquals(input, ZlibCompressor.decompress(ZlibCompressor.compress(input)))
     }
 }

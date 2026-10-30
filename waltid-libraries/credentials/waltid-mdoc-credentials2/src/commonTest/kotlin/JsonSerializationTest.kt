@@ -6,6 +6,7 @@ import id.walt.mdoc.objects.serverretrieval.ServerRequest
 import id.walt.mdoc.objects.serverretrieval.ServerResponse
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
+import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -76,7 +77,19 @@ class JsonSerializationTest {
 
         val serialized = Json.encodeToString(mdl)
 
-        assertContains(serialized, "LPD Steiermark")
+        val portrait = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(requireNotNull(mdl.portrait))
+        val expected = Json.parseToJsonElement(
+            """{
+                "family_name": "Mustermann", "given_name": "Max", "birth_date": "1970-01-01",
+                "issue_date": "2018-08-09", "expiry_date": "2024-10-20", "issuing_country": "AT",
+                "issuing_authority": "LPD Steiermark", "document_number": "A/3f984/019",
+                "portrait": "$portrait", "un_distinguishing_sign": "AT",
+                "driving_privileges": [{
+                    "vehicle_category_code": "A", "issue_date": "2018-08-09", "expiry_date": "2024-10-20"
+                }]
+            }"""
+        )
+        assertEquals(expected, Json.parseToJsonElement(serialized))
     }
 
     @Test

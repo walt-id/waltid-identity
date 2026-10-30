@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import zxingcpp.Barcode
 import zxingcpp.BarcodeFormat
@@ -36,7 +37,12 @@ class ProximityQrCodeEncoderIosTest {
         for (control in listOf("\u0000", "\n", "\t", "\u007f")) assertFails { encodeProximityQrCodeRaster("mdoc:A${control}B") }
         assertFails { encodeProximityQrCodeRaster("https://example.com") }
         assertFails { encodeProximityQrCodeRaster("mdoc:é") }
-        assertFails { encodeProximityQrCodeRaster("mdoc:" + "A".repeat(4_000)) }
+        assertEquals(
+            "Device engagement QR payload exceeds the 2953-byte limit",
+            assertFailsWith<IllegalArgumentException> {
+                encodeProximityQrCodeRaster("mdoc:" + "A".repeat(4_000))
+            }.message,
+        )
     }
 
     @OptIn(NativeRuntimeApi::class)

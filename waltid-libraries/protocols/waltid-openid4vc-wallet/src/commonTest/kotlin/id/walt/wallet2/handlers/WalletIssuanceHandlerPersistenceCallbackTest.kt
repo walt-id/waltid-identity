@@ -78,51 +78,31 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
     }
 
     @Test
-    fun `callback reports first credential when second persistence fails`() = runTest {
-        val keys = InMemoryKeyStore()
-        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
-        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
-        val credentials = holders.map { batchTestCredential(it) }
-        val store = FailingCredentialStore(failAtAttempt = 2)
-        val callbacks = mutableListOf<String>()
+    fun `callback reports exactly the credentials committed before persistence fails`() = runTest {
+        for ((failAtAttempt, expectedStored) in listOf(1 to 0, 2 to 1)) {
+            val keys = InMemoryKeyStore()
+            val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
+            val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+            val credentials = holders.map { batchTestCredential(it) }
+            val store = FailingCredentialStore(failAtAttempt)
+            val callbacks = mutableListOf<String>()
 
-        val failure = assertFailsWith<CredentialStorageException> {
-            WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
-                request = deferredRequest().copy(holderBindings = bindings),
-                httpClient = credentialResponseClient(credentials),
-                onCredentialStored = { callbacks += it.id },
-            ).toList()
+            val failure = credentialResponseClient(credentials).use { client ->
+                assertFailsWith<CredentialStorageException> {
+                    WalletIssuanceHandler.pollDeferredFlow(
+                        wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
+                        request = deferredRequest().copy(holderBindings = bindings),
+                        httpClient = client,
+                        onCredentialStored = { callbacks += it.id },
+                    ).toList()
+                }
+            }
+
+            assertEquals(expectedStored, store.stored.size, "Failed write $failAtAttempt")
+            assertEquals(store.stored.map { it.id }, callbacks)
+            assertEquals(callbacks, failure.outcome.storedCredentialIds)
+            assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
         }
-
-        assertEquals(1, store.stored.size)
-        assertEquals(store.stored.map { it.id }, callbacks)
-        assertEquals(callbacks, failure.outcome.storedCredentialIds)
-        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
-    }
-
-    @Test
-    fun `callback reports nothing when persistence fails before first credential`() = runTest {
-        val keys = InMemoryKeyStore()
-        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
-        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
-        val credentials = holders.map { batchTestCredential(it) }
-        val store = FailingCredentialStore(failAtAttempt = 1)
-        var callbacks = 0
-
-        val failure = assertFailsWith<CredentialStorageException> {
-            WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
-                request = deferredRequest().copy(holderBindings = bindings),
-                httpClient = credentialResponseClient(credentials),
-                onCredentialStored = { callbacks++ },
-            ).toList()
-        }
-
-        assertEquals(0, store.stored.size)
-        assertEquals(0, callbacks)
-        assertEquals(emptyList(), failure.outcome.storedCredentialIds)
-        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
     }
 
     private fun deferredRequest() = PollDeferredRequest(

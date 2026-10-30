@@ -1,7 +1,12 @@
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType.W3CV2CredentialBuilder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.days
 
 class DataBuilderTest {
@@ -44,5 +49,33 @@ class DataBuilderTest {
         }.buildW3C()
 
         print(vc.toPrettyJson())
+
+        assertEquals(
+            listOf("https://www.w3.org/ns/credentials/v2", "https://www.w3.org/ns/credentials/examples/v2"),
+            vc.getValue("@context").jsonArray.map { it.jsonPrimitive.content }
+        )
+        assertEquals(listOf("VerifiableCredential", "MyCustomCredential"), vc.getType())
+        assertEquals(JsonPrimitive("did:key:abc"), vc["issuer"])
+        assertEquals(Json.parseToJsonElement("""
+            {
+              "id": "did:key:xyz",
+              "entityIdentification": "12345",
+              "issuingAuthority": "abc",
+              "issuingCircumstances": {
+                "proofType": "document",
+                "locationType": "physicalLocation",
+                "location": "Berlin-Brandenburg"
+              }
+            }
+        """), vc["credentialSubject"])
+        assertEquals(Json.parseToJsonElement("""
+            {
+              "id": "https://university.example/credentials/status/3#94567",
+              "type": "StatusList2021Entry",
+              "statusPurpose": "revocation",
+              "statusListIndex": "94567",
+              "statusListCredential": "https://university.example/credentials/status/3"
+            }
+        """), vc["credentialStatus"])
     }
 }

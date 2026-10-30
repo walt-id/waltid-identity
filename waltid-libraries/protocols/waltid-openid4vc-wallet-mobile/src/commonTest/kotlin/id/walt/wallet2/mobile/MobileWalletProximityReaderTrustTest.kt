@@ -341,15 +341,13 @@ class ProximityReaderTrustTest {
     }
 
     @Test
-    fun `configuration rejects duplicate anchors`() = runTest {
-        withCertificates { certificates ->
-            val anchor = ProximityReaderTrustAnchor(certificates.root.base64Url())
+    fun `configuration rejects duplicate anchors`() {
+        val anchor = ProximityReaderTrustAnchor(RICAL_PROVIDER_ROOT)
 
-            assertFailsWith<IllegalArgumentException> {
-                ProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(anchor, anchor)
-                )
-            }
+        assertFailsWith<IllegalArgumentException> {
+            ProximityReaderTrustConfiguration(
+                trustAnchors = listOf(anchor, anchor)
+            )
         }
     }
 

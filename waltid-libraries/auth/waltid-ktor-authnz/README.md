@@ -200,7 +200,11 @@ tests, so they follow the API.
 
 The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hook), `TotpEnrollmentTest`,
 `PasswordRoutesTest`, `PasskeyTest`, `RefreshTokensTest`, `OidcLoginTest` (mock IdP), `VerifiableCredentialLoginTest`
-(mock verifier2), `ExampleWeb` (an example app). `ValkeyStoresTest` runs against a Valkey given by `VALKEY_TEST_PORT`.
+(mock verifier2), `ExampleWeb` (an example app).
+
+`ValkeyStoresTest` and the Valkey case in `ExternalIdMappingTest` use a disposable local Valkey given by
+`VALKEY_TEST_PORT`. The ordinary CI build provisions it automatically. Locally, omitting the variable reports
+these cases as skipped; a configured value must be an integer in `1..65535`, and connection failures fail the tests.
 
 ## Further Documentation
 

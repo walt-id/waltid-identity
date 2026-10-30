@@ -77,7 +77,7 @@ dependencies {
     implementation(platform(identityLibs.jackson.bom.tools))
 
     /* --- Testing --- */
-    testImplementation(identityLibs.ktor.client.logging)
+    testImplementation(identityLibs.junit.jupiter.api)
     testImplementation(identityLibs.kotlinx.coroutines.test)
 
     // Ktor
@@ -93,6 +93,11 @@ dependencies {
     // Kotlin
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.webauthn4j.test)
+}
+
+tasks.test {
+    // A backend-free result must not stand in for a run against Valkey.
+    inputs.property("valkeyTestPort", providers.environmentVariable("VALKEY_TEST_PORT")).optional(true)
 }
 
 // Force-pin vulnerable transitive dependencies.

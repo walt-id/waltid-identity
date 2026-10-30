@@ -223,7 +223,6 @@ class CoseSign1TestVectors {
                 |Title:       ${vector.title}
                 |UUID:        ${vector.uuid}
                 |Description: ${vector.description}
-                |Key:         ${vector.jwkKey}: ${vector.jwkKey.exportJWKPretty().replace("\n", " ").replace("    ", "")}
                 |Alg:         ${vector.alg}
                 |${if (vector.verifyData != null) "Verify:" else "Sign:  "}      ${vector.verifyData ?: vector.signData}
                 |- - - - - - - - - - - - - -

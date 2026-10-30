@@ -7,6 +7,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class TransactionDataRequestValidatorTest {
     private val registry = TransactionDataTypeRegistry(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE)
@@ -21,6 +22,8 @@ class TransactionDataRequestValidatorTest {
             credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
         )
 
+        assertEquals(encoded, decoded.single().encoded)
+        assertFalse("require_cryptographic_holder_binding" in decoded.single().rawJson)
         assertEquals(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE, decoded.single().transactionData.type)
         assertEquals("42.00", decoded.single().details["amount"]?.toString()?.trim('"'))
     }
@@ -116,19 +119,6 @@ class TransactionDataRequestValidatorTest {
                 ),
             )
         }
-    }
-
-    @Test
-    fun `accepts missing transaction data holder binding requirement`() {
-        val encoded = TransactionDataTestFixtures.transactionDataWithoutHolderBindingRequirement()
-
-        val decoded = validateRequestTransactionData(
-            transactionData = listOf(encoded),
-            typeRegistry = registry,
-            credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
-        )
-
-        assertEquals(encoded, decoded.single().encoded)
     }
 
     @Test

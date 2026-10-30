@@ -48,7 +48,6 @@ class StatusPolicyTest {
         val sut = StatusPolicy(argument = attribute)
         val result = sut.verify(credential = credential)
         assertEquals(expected = context.valid, actual = result.isSuccess, message = result.exceptionOrNull()?.message)
-        assertEquals(expected = !context.valid, actual = result.isFailure, message = result.exceptionOrNull()?.message)
         context.exception?.run { assertTrue(actual = result.exceptionOrNull()!!.localizedMessage.contains(this)) }
     }
 

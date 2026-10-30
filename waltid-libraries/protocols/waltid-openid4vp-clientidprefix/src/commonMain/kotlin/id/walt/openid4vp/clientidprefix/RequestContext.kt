@@ -120,6 +120,7 @@ sealed class ClientIdError(val message: String) {
      * OpenID4VP 1.0 §8.5: the Wallet already has metadata for this Client Identifier and the
      * request also carried `client_metadata`. In-band metadata must not override registration.
      */
+    @Serializable
     object InvalidClient : ClientIdError(
         "client_metadata must not be present when the Wallet already has metadata for this Client Identifier.",
     )

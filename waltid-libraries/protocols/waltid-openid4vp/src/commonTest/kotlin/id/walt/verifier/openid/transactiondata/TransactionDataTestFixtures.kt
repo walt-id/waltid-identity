@@ -35,17 +35,6 @@ internal object TransactionDataTestFixtures {
         put("currency", "EUR")
     }.toString().encodeToByteArray().encodeToBase64Url()
 
-    fun transactionDataWithoutHolderBindingRequirement(
-        type: String = SUPPORTED_TRANSACTION_DATA_TYPE,
-        credentialId: String = "payment_credential",
-    ): String = buildJsonObject {
-        put("type", type)
-        put("credential_ids", buildJsonArray { add(JsonPrimitive(credentialId)) })
-        put("amount", "42.00")
-        put("payee", "ACME Corp")
-        put("currency", "EUR")
-    }.toString().encodeToByteArray().encodeToBase64Url()
-
     fun sdJwtCredentialQueries(requireCryptographicHolderBinding: Boolean = true): Map<String, CredentialQuery> = mapOf(
         "payment_credential" to CredentialQuery(
             id = "payment_credential",

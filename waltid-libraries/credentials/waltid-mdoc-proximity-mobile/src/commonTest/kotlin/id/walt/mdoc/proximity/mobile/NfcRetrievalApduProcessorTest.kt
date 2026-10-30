@@ -30,34 +30,30 @@ class NfcRetrievalApduProcessorTest {
 
         val first = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(9, 8, 7, 6, 5)).toByteArray())
         assertEquals(0x6103u, first.statusWord)
-        assertContentEquals(NfcDo53.encode(byteArrayOf(9, 8, 7, 6, 5)).copyOfRange(0, 4), first.data.toByteArray())
+        assertContentEquals(byteArrayOf(0x53, 5, 9, 8), first.data.toByteArray())
         val second = response(processor.process(getResponse(4)))
         assertEquals(NfcStatusWord.SUCCESS, second.statusWord)
+        assertContentEquals(byteArrayOf(7, 6, 5), second.data.toByteArray())
         assertEquals(NfcRetrievalState.READY, processor.state)
-    }
-
-    @Test
-    fun `a pending response is owned exactly once`() {
-        val processor = processor()
-        processor.process(selectDataTransferApplication())
-        val pending = assertIs<NfcRetrievalApduResult.Request>(
-            processor.process(envelope(NfcDo53.encode(byteArrayOf(1)), responseLength = 256)),
-        )
-        processor.completeResponse(pending.identifier, byteArrayOf(2))
-        assertFailsWith<IllegalStateException> { processor.completeResponse(pending.identifier, byteArrayOf(3)) }
     }
 
     @Test
     fun `multiple request response cycles reuse selection but not pending ownership`() {
         val processor = processor()
         processor.process(selectDataTransferApplication())
+        var previousIdentifier: ULong? = null
         repeat(2) { value ->
             val pending = assertIs<NfcRetrievalApduResult.Request>(
                 processor.process(envelope(NfcDo53.encode(byteArrayOf(value.toByte())), responseLength = 256)),
             )
+            previousIdentifier?.let { stale ->
+                assertFailsWith<IllegalStateException> { processor.completeResponse(stale, byteArrayOf(3)) }
+            }
             val response = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(value.toByte())).toByteArray())
             assertEquals(NfcStatusWord.SUCCESS, response.statusWord)
             assertEquals(NfcRetrievalState.READY, processor.state)
+            assertFailsWith<IllegalStateException> { processor.completeResponse(pending.identifier, byteArrayOf(3)) }
+            previousIdentifier = pending.identifier
         }
     }
 
@@ -101,9 +97,14 @@ class NfcRetrievalApduProcessorTest {
 
     @Test
     fun `do53 uses canonical boundaries and rejects trailing or non-minimal forms`() {
-        listOf(0, 0x7f, 0x80, 0xff, 0x100, 0xffff, 0x10000).forEach { size ->
+        listOf(
+            0 to "5300", 0x7f to "537f", 0x80 to "538180", 0xff to "5381ff",
+            0x100 to "53820100", 0xffff to "5382ffff", 0x10000 to "5383010000",
+        ).forEach { (size, header) ->
             val payload = ByteArray(size) { it.toByte() }
-            assertContentEquals(payload, NfcDo53.decode(NfcDo53.encode(payload), size))
+            val encoded = header.hexToByteArray() + payload
+            assertContentEquals(encoded, NfcDo53.encode(payload))
+            assertContentEquals(payload, NfcDo53.decode(encoded, size))
         }
         listOf(
             byteArrayOf(0x53, 0x81.toByte(), 0x01, 0),

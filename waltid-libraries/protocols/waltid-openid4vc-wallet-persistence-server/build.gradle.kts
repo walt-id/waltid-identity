@@ -40,9 +40,16 @@ dependencies {
     testImplementation(project(":waltid-libraries:crypto:waltid-jose"))
 }
 
-// Re-execute the lifecycle contract when switching between SQLite and the disposable PostgreSQL fixture.
+// Keep SQLite results reusable; PostgreSQL contracts depend on the configured database's live state.
 tasks.withType<Test>().configureEach {
-    inputs.property("wallet2TestPostgresUrl", providers.environmentVariable("WALLET2_TEST_POSTGRES_URL").orElse(""))
+    val lifecycleUrl = providers.environmentVariable("WALLET2_TEST_POSTGRES_URL")
+    val migrationUrl = providers.environmentVariable("WALLET2_TEST_POSTGRES_JDBC_URL")
+    inputs.property("wallet2TestPostgresUrl", lifecycleUrl.orElse(""))
+    inputs.property("wallet2TestPostgresMigrationConfigured", migrationUrl.isPresent)
+    outputs.upToDateWhen { !lifecycleUrl.isPresent && !migrationUrl.isPresent }
+    outputs.doNotCacheIf("PostgreSQL contracts require the configured database") {
+        lifecycleUrl.isPresent || migrationUrl.isPresent
+    }
 }
 
 mavenPublishing {

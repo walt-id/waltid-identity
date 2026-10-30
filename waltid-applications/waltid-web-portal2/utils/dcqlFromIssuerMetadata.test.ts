@@ -71,6 +71,8 @@ test("builds SD-JWT identity DCQL from the published vct", () => {
   const claims = claimsFromIssuerMetadata(configuration);
   const query = dcqlFromIssuerMetadata("identity_credential", configuration, claims);
 
+  assert.equal(query.id, "identity_credential");
+  assert.equal(query.format, "dc+sd-jwt");
   assert.deepEqual(query.meta, {
     vct_values: ["https://issuer.example/openid4vci/identity_credential"],
   });

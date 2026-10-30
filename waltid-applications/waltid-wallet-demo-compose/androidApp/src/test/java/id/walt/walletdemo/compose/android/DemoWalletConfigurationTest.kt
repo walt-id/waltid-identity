@@ -63,6 +63,7 @@ class DemoWalletConfigurationTest {
         assertEquals(WalletDemoSigningProtection.Biometric, required.selectedSigningProtection(context))
 
         val disabled = required.copy(signingProtectionMode = WalletDemoSigningProtectionMode.Disabled)
+        disabled.signingProtectionStore(context).save(WalletDemoSigningProtection.Biometric)
         assertEquals(WalletDemoSigningProtection.None, disabled.selectedSigningProtection(context))
     }
 }

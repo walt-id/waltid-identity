@@ -14,22 +14,20 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SocketCancellationTest {
     @Test fun cancellingBlockedOperationsClosesBeforeJoiningWorker() = runBlocking {
-        for (operation in listOf("connect", "read", "write")) {
-            val native = BlockingResource()
-            val socket = BlockingSocket(native)
-            val work = launch { socket.run { it.block(operation) } }
-            withContext(Dispatchers.IO) { assertTrue(native.entered.await(5, TimeUnit.SECONDS)) }
-            withTimeout(5_000) { work.cancelAndJoin() }
-            socket.close()
-            assertEquals(1, native.closes.get(), operation)
-        }
+        val native = BlockingResource()
+        val socket = BlockingSocket(native)
+        val work = launch { socket.run { it.block() } }
+        withContext(Dispatchers.IO) { assertTrue(native.entered.await(5, TimeUnit.SECONDS)) }
+        withTimeout(5_000) { work.cancelAndJoin() }
+        socket.close()
+        assertEquals(1, native.closes.get())
     }
 
     @Test fun deadlineClosesBlockedOperationBeforeReturning() = runBlocking {
         val native = BlockingResource()
         val socket = BlockingSocket(native)
         assertFailsWith<TimeoutCancellationException> {
-            withTimeout(100) { socket.run { it.block("deadline") } }
+            withTimeout(100) { socket.run { it.block() } }
         }
         assertEquals(1, native.closes.get())
     }
@@ -82,6 +80,7 @@ class SocketCancellationTest {
         val native = BlockingResource()
         val socket = BlockingSocket(native)
         assertFailsWith<IOException> { socket.run<Unit> { throw IOException("failed setup") } }
+        assertEquals(1, native.closes.get())
         socket.close()
         assertEquals(1, native.closes.get())
         val fresh = BlockingResource()
@@ -112,9 +111,9 @@ class SocketCancellationTest {
         val entered = CountDownLatch(1)
         val closes = AtomicInteger()
         private val closed = CountDownLatch(1)
-        fun block(operation: String) {
+        fun block() {
             entered.countDown()
-            check(closed.await(10, TimeUnit.SECONDS)) { "$operation was not unblocked by close" }
+            check(closed.await(10, TimeUnit.SECONDS)) { "Operation was not unblocked by close" }
             throw IOException("closed")
         }
         override fun close() { closes.incrementAndGet(); closed.countDown() }

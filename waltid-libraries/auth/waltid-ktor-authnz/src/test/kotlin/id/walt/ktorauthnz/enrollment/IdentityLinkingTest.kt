@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.enrollment
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.errors.HttpStatusError
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.accounts.InMemoryAccountStore
@@ -39,23 +41,45 @@ import kotlin.test.*
 
 class IdentityLinkingTest {
 
-    private val idp = ExampleIdentityProvider(clientId = "app")
-    private val directory = ExampleDirectory(mapOf("alice" to "ldap-secret", "bob" to "bob-ldap"))
+    private val services = ExampleServiceScope()
+
+    private lateinit var idp: ExampleIdentityProvider
+    private lateinit var directory: ExampleDirectory
     private val accounts = InMemoryAccountStore()
     private val json = Json { ignoreUnknownKeys = true }
     private val alice = runBlocking { accounts.addAccount(UsernameIdentifier("alice"), identifierData = mapOf(UserPass.id to UserPassStoredData("alice-password"))) }
-    private val bob = runBlocking { accounts.addAccount(LDAPIdentifier(directory.url, "bob")) }
+    private lateinit var bob: String
+    private lateinit var oidcFlow: AuthFlow
+    private lateinit var ldapFlow: AuthFlow
+
+    @BeforeTest
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousAttemptLimits = KtorAuthnzManager.attemptLimits
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.attemptLimits = previousAttemptLimits
+        }
+        idp = services.own(ExampleIdentityProvider(clientId = "app"))
+        directory = services.own(ExampleDirectory(mapOf("alice" to "ldap-secret", "bob" to "bob-ldap")))
+        bob = runBlocking { accounts.addAccount(LDAPIdentifier(directory.url, "bob")) }
+        oidcFlow = AuthFlow.fromConfig(
+            """{"method": "oidc", "success": true, "config": {"openIdConfigurationUrl": "${idp.discoveryUrl}",
+                "clientId": "app", "clientSecret": "s", "callbackUri": "http://localhost/auth/oidc/callback"}}"""
+        )
+        ldapFlow = AuthFlow.fromConfig(
+            """{"method": "ldap", "success": true, "config": {"ldapServerUrl": "${directory.url}", "userDNFormat": "uid=%s,ou=people,dc=org3"}}"""
+        )
+    }
 
     @AfterTest
-    fun stop() { idp.close(); directory.close() }
-
-    private val oidcFlow = AuthFlow.fromConfig(
-        """{"method": "oidc", "success": true, "config": {"openIdConfigurationUrl": "${idp.discoveryUrl}",
-            "clientId": "app", "clientSecret": "s", "callbackUri": "http://localhost/auth/oidc/callback"}}"""
-    )
-    private val ldapFlow = AuthFlow.fromConfig(
-        """{"method": "ldap", "success": true, "config": {"ldapServerUrl": "${directory.url}", "userDNFormat": "uid=%s,ou=people,dc=org3"}}"""
-    )
+    fun stop() = services.close()
 
     private fun linkTest(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         application {

@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 class WalletDemoBrandingTest {
     @Test
     fun overlayReplacesTitleAndHexColors() {
-        val branded = WalletDemoBranding().overlay(
+        val branded = WalletDemoBranding(onPrimary = Color.Black).overlay(
             appTitle = "Acme Wallet",
             primary = "#112233",
             onPrimary = "ffffff",
@@ -36,17 +36,26 @@ class WalletDemoBrandingTest {
             {
               "appTitle": "Acme Wallet",
               "primary": "#010203",
-              "onPrimary": "#FFFFFF",
-              "secondary": "#ADC6FF",
-              "onSecondary": "#002E69",
-              "primaryContainer": "#D8E2FF",
-              "onPrimaryContainer": "#002E69"
+              "onPrimary": "#102030",
+              "secondary": "#213243",
+              "onSecondary": "#324354",
+              "primaryContainer": "#435465",
+              "onPrimaryContainer": "#546576"
             }
             """.trimIndent(),
         )
-        assertEquals("Acme Wallet", branded.appTitle)
-        assertEquals(Color(0xFF010203), branded.primary)
-        assertEquals(Color.White, branded.onPrimary)
+        assertEquals(
+            WalletDemoBranding(
+                appTitle = "Acme Wallet",
+                primary = Color(0xFF010203),
+                onPrimary = Color(0xFF102030),
+                secondary = Color(0xFF213243),
+                onSecondary = Color(0xFF324354),
+                primaryContainer = Color(0xFF435465),
+                onPrimaryContainer = Color(0xFF546576),
+            ),
+            branded,
+        )
     }
 
     @Test

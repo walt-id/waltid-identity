@@ -38,12 +38,14 @@ class CryptoRuntimeTest {
     fun `automatic selection uses the first compatible provider`() = runTest {
         val first = FakeSoftwareProvider("first", supports = false)
         val second = FakeSoftwareProvider("second", supports = true)
-        val runtime = CryptoRuntime(listOf(first, second))
+        val third = FakeSoftwareProvider("third", supports = true)
+        val runtime = CryptoRuntime(listOf(first, second, third))
 
         runtime.generateSoftwareKey(request())
 
         assertEquals(0, first.generateCalls)
         assertEquals(1, second.generateCalls)
+        assertEquals(0, third.generateCalls)
     }
 
     @Test
@@ -62,14 +64,16 @@ class CryptoRuntimeTest {
     fun `ordered fallback is explicit`() = runTest {
         val unsupported = FakeSoftwareProvider("unsupported", supports = false)
         val selected = FakeSoftwareProvider("selected", supports = true)
-        val runtime = CryptoRuntime(listOf(selected, unsupported))
+        val other = FakeSoftwareProvider("other", supports = true)
+        val runtime = CryptoRuntime(listOf(other, selected, unsupported))
 
         runtime.generateSoftwareKey(
             request(),
-            ProviderSelection.FirstAvailable(listOf(unsupported.id, selected.id)),
+            ProviderSelection.FirstAvailable(listOf(unsupported.id, selected.id, other.id)),
         )
 
         assertEquals(1, selected.generateCalls)
+        assertEquals(0, other.generateCalls)
     }
 
     @Test

@@ -47,7 +47,7 @@ import java.security.cert.X509Certificate
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
-/** Production coordinator, APDU router, consent and signer against Multipaz 0.100.0. No radio. */
+/** Production coordinator, APDU router, consent and signer against the documented Multipaz peer. No radio. */
 class IndependentNfcReaderTest {
     private var previousLogger: Logger.LogPrinter? = null
 

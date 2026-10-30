@@ -120,13 +120,16 @@ jobs:
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Preserve compiled simulator tests; Kotlin/Native test execution is not cacheable.
+          cache-read-only: ${{ !inputs.run-ios-simulator && github.event.repository != null && github.ref_name != github.event.repository.default_branch }}
 
       - name: Cache Kotlin Native dependencies
         if: ${{ !inputs.run-ios-simulator }}
         uses: actions/cache@v5
         with:
           path: ~/.konan
-          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('waltid-identity/gradle/libs.versions.toml') }}
           restore-keys: |
             konan-${{ runner.os }}-${{ runner.arch }}-
 
@@ -190,6 +193,8 @@ jobs:
     timeout-minutes: 70
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
+      revision-key: ${{ steps.revisions.outputs.revision-key }}
+      xcode-key: ${{ steps.revisions.outputs.xcode-key }}
       artifact-name: wallet-core-release-${{ github.run_attempt }}
     steps:
       - name: Checkout all repos with ref fallback
@@ -202,22 +207,42 @@ jobs:
         id: revisions
         run: |
           python3 - <<'PYTHON'
-          import json, os, subprocess
+          import hashlib, json, os, subprocess
           paths = {"unified": ".", "identity": "waltid-identity", "enterprise": "waltid-identity-enterprise", "enterprise_license": "waltid-identity-enterprise-license"}
           refs = {key: subprocess.check_output(["git", "-C", path, "rev-parse", "HEAD"], text=True).strip() for key, path in paths.items()}
           print(json.dumps(refs, indent=2))
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write("refs=" + json.dumps(refs) + "\n")
+              output.write("revision-key=" + hashlib.sha256(json.dumps(refs, sort_keys=True).encode()).hexdigest() + "\n")
+              output.write("xcode-key=" + hashlib.sha256(subprocess.check_output(["xcodebuild", "-version"])).hexdigest() + "\n")
           PYTHON
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Retain compiled inputs; Kotlin excludes framework links from Gradle's build cache.
+          cache-read-only: false
       - name: Cache Kotlin Native dependencies
         uses: actions/cache@v5
         with:
           path: ~/.konan
-          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('waltid-identity/gradle/libs.versions.toml') }}
           restore-keys: |
             konan-${{ runner.os }}-${{ runner.arch }}-
+      - name: Cache release framework outputs and task history
+        uses: actions/cache@v5
+        with:
+          # Tar preserves framework symlinks. The build still validates every task's inputs.
+          # Keep the ownership directory intact, including its clean-close marker.
+          # Exclude configuration-cache state and all test outputs.
+          path: |
+            waltid-identity/.gradle/*/executionHistory/*.bin
+            waltid-identity/.gradle/buildOutputCleanup
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosArm64/releaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/releaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release
+          key: wallet-core-state-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ steps.revisions.outputs.revision-key }}
+          restore-keys: |
+            wallet-core-state-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.revisions.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
       # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
         timeout-minutes: 60
@@ -225,7 +250,7 @@ jobs:
         run: |
           exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1 --profile
       - name: Package the framework and its build identity
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
@@ -236,18 +261,106 @@ jobs:
           path: ${{ runner.temp }}/wallet-core-artifact/
           if-no-files-found: error
           retention-days: 1
-      - name: Retain failed framework build logs
-        if: failure() || cancelled()
+      - name: Retain framework build logs and timings
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: wallet-core-framework-failure-logs
+          name: wallet-core-framework-build-reports-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/wallet-core-build/
+            waltid-identity/build/reports/profile/
+          retention-days: 7
+
+  wallet-app-test-builds:
+    name: wallet-app-test-builds (${{ matrix.demo }})
+    needs: wallet-core-framework
+    if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-visual-native }}
+    runs-on: xcode-27
+    timeout-minutes: 45
+    outputs:
+      native-artifact: ${{ steps.package.outputs.native-artifact }}
+      compose-artifact: ${{ steps.package.outputs.compose-artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        demo: ${{ fromJSON((inputs.run-native || inputs.run-visual-native || (inputs.run-enterprise && inputs.enterprise-demos != 'compose')) && (inputs.run-compose || (inputs.run-enterprise && inputs.enterprise-demos != 'native')) && '["native","compose"]' || (inputs.run-native || inputs.run-visual-native || (inputs.run-enterprise && inputs.enterprise-demos != 'compose')) && '["native"]' || '["compose"]') }}
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
+      - name: Restore the shared release framework
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.wallet-core-framework.outputs.artifact-name }}
+          path: ${{ runner.temp }}/wallet-core-artifact
+      - name: Verify the shared release framework
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          cache-read-only: true
+      - name: Configure iOS build environment
+        uses: ./waltid-identity/.github/actions/ios-build-setup
+        with:
+          gradle-properties-path: waltid-identity/gradle.properties
+      - name: Build all app test targets and verify the document provider
+        env:
+          DEMO: ${{ matrix.demo }}
+        run: |
+          set -euo pipefail
+          if [[ "$DEMO" == native ]]; then
+            project=ios
+            settings=(OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES)
+          else
+            project=compose
+            settings=("GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false")
+          fi
+          mkdir -p "$RUNNER_TEMP/wallet-app-tests/$DEMO"
+          exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
+            --output-dir "$RUNNER_TEMP/wallet-app-build" "$DEMO" \
+            waltid-identity/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh \
+            --project-dir "waltid-identity/waltid-applications/waltid-wallet-demo-$project/iosApp" \
+            --destination "$IOS_SIMULATOR_DESTINATION" \
+            --derived-data "$RUNNER_TEMP/wallet-app-derived" \
+            --test-products "$RUNNER_TEMP/wallet-app-tests/$DEMO/$DEMO.xctestproducts" \
+            --app-group "group.id.walt.wallet.$DEMO" \
+            --keychain-group-suffix "id.walt.wallet.$DEMO.shared" \
+            --app-bundle-id "id.walt.wallet.$DEMO" \
+            --appex-bundle-id "id.walt.wallet.$DEMO.identitydocumentprovider" \
+            --development-team 9BB78CFW7Y \
+            --build-setting "${settings[0]}"
+      - name: Package the app test products and build identity
+        id: package
+        env:
+          DEMO: ${{ matrix.demo }}
+        run: |
+          python3 waltid-identity/.github/scripts/mobile-ci/ios-test-products.py pack \
+            --demo "$DEMO" --artifact-dir "$RUNNER_TEMP/wallet-app-tests/$DEMO"
+          echo "$DEMO-artifact=wallet-app-tests-$DEMO-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Publish app test products
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-app-tests-${{ matrix.demo }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/wallet-app-tests/${{ matrix.demo }}/*.tar.gz
+            ${{ runner.temp }}/wallet-app-tests/${{ matrix.demo }}/*.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Retain app build logs and timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-app-test-build-reports-${{ matrix.demo }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/wallet-app-build/
           retention-days: 7
 
   wallet-core-consumer-tests:
     name: wallet-core-consumer-tests (${{ matrix.consumer }})
-    needs: wallet-core-framework
+    needs: [wallet-core-framework, wallet-app-test-builds]
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-visual-native }}
     runs-on: xcode-27
     timeout-minutes: 210
@@ -257,7 +370,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Keep each provider with its demo to reuse the build. Native visual-only
+        # App products are built once for these suites and Enterprise. Native visual-only
         # selection needs one native job; bridge tests accompany functional consumers.
         consumer: ${{ fromJSON((inputs.run-native || inputs.run-visual-native) && inputs.run-compose && '["native","compose","bridge"]' || inputs.run-native && '["native","bridge"]' || inputs.run-compose && '["compose","bridge"]' || '["native"]') }}
     steps:
@@ -268,17 +381,48 @@ jobs:
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
 
       - name: Restore the shared release framework
+        if: ${{ matrix.consumer != 'compose' }}
         uses: actions/download-artifact@v8
         with:
           name: ${{ needs.wallet-core-framework.outputs.artifact-name }}
           path: ${{ runner.temp }}/wallet-core-artifact
       - name: Verify the shared release framework
+        if: ${{ matrix.consumer != 'compose' }}
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
+      - name: Restore app test products
+        if: ${{ matrix.consumer != 'bridge' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.wallet-app-test-builds.outputs[format('{0}-artifact', matrix.consumer)] }}
+          path: ${{ runner.temp }}/wallet-app-tests/${{ matrix.consumer }}
+      - name: Verify and unpack app test products
+        if: ${{ matrix.consumer != 'bridge' }}
+        env:
+          DEMO: ${{ matrix.consumer }}
+        run: |
+          python3 waltid-identity/.github/scripts/mobile-ci/ios-test-products.py restore \
+            --demo "$DEMO" --artifact-dir "$RUNNER_TEMP/wallet-app-tests/$DEMO"
+
       - name: Configure gradle
-        if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
+        if: ${{ matrix.consumer == 'bridge' }}
         uses: ./waltid-identity/.github/actions/gradle-setup-action
+
+      - name: Cache the isolated bridge fixture and task history
+        if: ${{ matrix.consumer == 'bridge' }}
+        uses: actions/cache@v5
+        with:
+          # Reuse only compilation; the normal Gradle input checks and Swift tests still run.
+          # Keep the complete ownership record; exclude configuration-cache and test results.
+          path: |
+            waltid-identity/.gradle/*/executionHistory/*.bin
+            waltid-identity/.gradle/buildOutputCleanup
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/bridgeFixturesReleaseFramework
+            waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/bridge-fixtures/XCFrameworks/release
+          key: wallet-bridge-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.wallet-core-framework.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-${{ needs.wallet-core-framework.outputs.revision-key }}
+          restore-keys: |
+            wallet-bridge-state-v1-${{ runner.os }}-${{ runner.arch }}-${{ needs.wallet-core-framework.outputs.xcode-key }}-${{ hashFiles('waltid-identity/gradle/wrapper/gradle-wrapper.properties') }}-
 
       - name: Run selected WalletCore consumer tests
         if: ${{ (matrix.consumer == 'native' && inputs.run-native) || (matrix.consumer == 'compose' && inputs.run-compose) || matrix.consumer == 'bridge' }}
@@ -291,11 +435,12 @@ jobs:
           run-ios-simulator-tests: 'false'
           run-wallet-sdk-tests: ${{ matrix.consumer == 'bridge' && 'true' || 'false' }}
           wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
+          test-products-artifact: ${{ matrix.consumer != 'bridge' && format('{0}/wallet-app-tests/{1}', runner.temp, matrix.consumer) || '' }}
           collect-test-diagnostics: ${{ inputs.collect-test-diagnostics }}
           run-native-demo-tests: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
-          run-native-identity-document-provider-checks: ${{ matrix.consumer == 'native' && 'true' || 'false' }}
+          run-native-identity-document-provider-checks: 'false'
           run-compose-demo-tests: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
-          run-compose-identity-document-provider-checks: ${{ matrix.consumer == 'compose' && 'true' || 'false' }}
+          run-compose-identity-document-provider-checks: 'false'
           collect-test-reports: 'false'
           test-result-artifact-name: wallet-core-${{ matrix.consumer }}-test-results
 
@@ -351,10 +496,10 @@ jobs:
         with:
           renderer: swiftui
           framework-artifact: ${{ runner.temp }}/wallet-core-artifact
-          derived-data: /tmp/xcode-derived
+          test-products-artifact: ${{ runner.temp }}/wallet-app-tests/native
 
   enterprise-ios-mobile-tests:
-    needs: wallet-core-framework
+    needs: [wallet-core-framework, wallet-app-test-builds]
     timeout-minutes: 90
     if: ${{ inputs.run-enterprise }}
     runs-on: xcode-27
@@ -377,13 +522,39 @@ jobs:
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
+      - name: Restore native app test products
+        if: ${{ inputs.enterprise-demos != 'compose' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.wallet-app-test-builds.outputs.native-artifact }}
+          path: ${{ runner.temp }}/wallet-app-tests/native
+      - name: Restore Compose app test products
+        if: ${{ inputs.enterprise-demos != 'native' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.wallet-app-test-builds.outputs.compose-artifact }}
+          path: ${{ runner.temp }}/wallet-app-tests/compose
+      - name: Verify and unpack selected app test products
+        env:
+          ENTERPRISE_IOS_DEMOS: ${{ inputs.enterprise-demos }}
+        run: |
+          case "$ENTERPRISE_IOS_DEMOS" in
+            all) demos=(native compose) ;;
+            native|compose) demos=("$ENTERPRISE_IOS_DEMOS") ;;
+            *) echo "::error::Enterprise demos must be all, native or compose"; exit 1 ;;
+          esac
+          for demo in "${demos[@]}"; do
+            python3 waltid-identity/.github/scripts/mobile-ci/ios-test-products.py restore \
+              --demo "$demo" --artifact-dir "$RUNNER_TEMP/wallet-app-tests/$demo"
+          done
+
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        # Native SDK/UI and Compose UI each build and finalize their own result bundle.
+        # Native SDK/UI and Compose UI keep separate fresh simulators and result bundles.
         timeout-minutes: 75
         run: |
           exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
@@ -393,7 +564,8 @@ jobs:
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}" \
             -Penterprise.ios.collectTestDiagnostics="${XCODE_TEST_DIAGNOSTICS}" \
             -Penterprise.ios.demos="${ENTERPRISE_IOS_DEMOS}" \
-            -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact"
+            -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact" \
+            -Penterprise.ios.testProductsArtifacts="$RUNNER_TEMP/wallet-app-tests"
         env:
           XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
           ENTERPRISE_IOS_DEMOS: ${{ inputs.enterprise-demos }}
@@ -493,11 +665,11 @@ jobs:
             waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-results/**
           retention-days: 7
 
-      - name: Retain failed Enterprise iOS logs
-        if: failure() || cancelled() || steps.enterprise_ios_mobile_tests.outcome == 'failure'
+      - name: Retain Enterprise iOS phase logs
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: enterprise-ios-failure-logs
+          name: enterprise-ios-phase-logs-${{ github.run_attempt }}
           path: |
             ios-ci-logs/**
           retention-days: 7

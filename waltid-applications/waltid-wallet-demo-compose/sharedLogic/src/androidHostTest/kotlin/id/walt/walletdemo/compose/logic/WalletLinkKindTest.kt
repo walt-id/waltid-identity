@@ -73,11 +73,18 @@ class WalletLinkResolverTest {
     }
 
     @Test fun rejectsRedirectLoopsDowngradesOversizeAndErrors() = kotlinx.coroutines.test.runTest {
+        val offer = """{"credential_issuer":"https://issuer.example","credential_configuration_ids":[]}"""
         for (document in listOf(WalletLinkDocument(302, location = "/link"),
-            WalletLinkDocument(302, location = "http://example.test/link"), WalletLinkDocument(503))) {
-            kotlin.test.assertFailsWith<WalletLinkException> { resolveWalletLink("https://example.test/link") { document } }
+            WalletLinkDocument(302, location = "http://example.test/link"), WalletLinkDocument(503, body = offer))) {
+            val fetched = mutableListOf<String>()
+            kotlin.test.assertFailsWith<WalletLinkException> {
+                resolveWalletLink("https://example.test/link") { url -> fetched += url; document }
+            }
+            assertEquals(listOf("https://example.test/link"), fetched)
         }
-        kotlin.test.assertFailsWith<WalletLinkException> { routeWalletLinkDocument("https://example.test/link", "x".repeat(262_145)) }
+        val atLimit = offer + " ".repeat(262_144 - offer.encodeToByteArray().size)
+        assertEquals(WalletLinkKind.Offer, routeWalletLinkDocument("https://example.test/link", atLimit).kind)
+        kotlin.test.assertFailsWith<WalletLinkException> { routeWalletLinkDocument("https://example.test/link", atLimit + " ") }
         kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> {
             resolveWalletLink("https://example.test/link") { throw kotlinx.coroutines.CancellationException() }
         }

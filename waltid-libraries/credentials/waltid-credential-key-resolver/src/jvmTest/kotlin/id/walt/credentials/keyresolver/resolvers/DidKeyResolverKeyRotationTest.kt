@@ -85,9 +85,10 @@ class DidKeyResolverKeyRotationTest {
 
     @Test
     fun `fails instead of falling back to first key when supplied kid is unknown`() = runTest {
-        assertFailsWith<NoSuchElementException> {
+        val failure = assertFailsWith<NoSuchElementException> {
             DidKeyResolver.resolveKeyFromDid(KEY_ROTATION_DID, "https://vault.azure.net/keys/missing")
         }
+        assertEquals("No key with kid 'https://vault.azure.net/keys/missing' found in DID document for $KEY_ROTATION_DID", failure.message)
     }
 
     @Test

@@ -204,6 +204,7 @@ class SigningIdentityManagerTest {
             val pending = assertIs<SigningIdentityOperationResult.Pending>(fixture.wallet.signingIdentity.create(option))
             assertNull(fixture.queries.selectActiveIdentity("default").executeAsOneOrNull())
             assertNull(SqlDelightKeyStore(NoNative, fixture.queries, "default").getDefaultCrypto2Key())
+            assertNull(SqlDelightKeyStore(NoNative, fixture.queries, "default").getDefaultKeyMaterial())
             val restarted = fixture.reopen()
             assertEquals(pending.identityId, assertIs<SigningIdentityState.Pending>(restarted.signingIdentity.state()).identityId)
             fixture.provider.failStore = false
@@ -312,15 +313,6 @@ class SigningIdentityManagerTest {
             assertEquals(SigningIdentityFailure.KeyUnavailable, assertIs<SigningIdentityState.Unavailable>(fixture.wallet.signingIdentity.state()).reason)
             assertIs<SigningIdentityOperationResult.Failed>(fixture.wallet.signingIdentity.initialize())
             assertEquals(created.keyId, fixture.queries.selectAll().executeAsList().single().key_id)
-        }
-    }
-
-    @Test fun `pending default cannot be resolved by issuance key material path`() = runTest {
-        Fixture().use { fixture ->
-            fixture.provider.failStore = true
-            val option = assertIs<SigningIdentityCreationOptions.Available>(fixture.wallet.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable)).recommended
-            assertIs<SigningIdentityOperationResult.Pending>(fixture.wallet.signingIdentity.create(option))
-            assertNull(SqlDelightKeyStore(NoNative, fixture.queries, "default").getDefaultKeyMaterial())
         }
     }
 

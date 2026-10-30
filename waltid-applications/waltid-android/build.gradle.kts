@@ -69,11 +69,6 @@ dependencies {
     implementation(identityLibs.androidx.lifecycle.runtime.compose)
 
     // Testing
-    testImplementation(kotlin("test"))
-    testImplementation(identityLibs.kotlinx.coroutines.test)
-    testImplementation(identityLibs.junit)
-    testImplementation(identityLibs.androidx.test.ext.junit)
-    testImplementation(identityLibs.androidx.test.espresso)
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.espresso)
     androidTestImplementation(platform(identityLibs.androidx.compose.bom))

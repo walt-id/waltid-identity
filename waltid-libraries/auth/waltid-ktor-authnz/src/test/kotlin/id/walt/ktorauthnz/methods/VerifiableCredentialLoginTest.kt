@@ -1,5 +1,9 @@
 package id.walt.ktorauthnz.methods
 
+import kotlinx.coroutines.runBlocking
+import kotlin.test.BeforeTest
+import id.walt.ktorauthnz.examples.services.startAndGetPort
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.ExampleAccountStore
@@ -37,6 +41,8 @@ import kotlin.uuid.Uuid
 /** VC login against a mock verifier2 on a local port. */
 class VerifiableCredentialLoginTest {
 
+    private val services = ExampleServiceScope()
+
     private val json = Json { ignoreUnknownKeys = true }
 
     /** The mock verifier2: one session, whose status and presented subject the test sets. */
@@ -46,8 +52,7 @@ class VerifiableCredentialLoginTest {
     private var presentedSubject = "did:key:holder-${Uuid.random()}"
     private var createdWith: JsonObject? = null
 
-    private val port = java.net.ServerSocket(0).use { it.localPort }
-    private val verifier = embeddedServer(CIO, port = port) {
+    private val verifier = embeddedServer(CIO, host = "127.0.0.1", port = 0) {
         install(ContentNegotiation) { json() }
         routing {
             post("/verification-session/create") {
@@ -73,14 +78,38 @@ class VerifiableCredentialLoginTest {
                 })
             }
         }
-    }.start(wait = false)
+    }
+
+    private lateinit var flow: AuthFlow
+
+    @BeforeTest
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousAttemptLimits = KtorAuthnzManager.attemptLimits
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.attemptLimits = previousAttemptLimits
+        }
+        services.onClose {
+            runBlocking {
+                ExampleAccountStore.removeAccountIdentifierFromAccount(VerifiableCredentialIdentifier("credentialSubject/id", presentedSubject))
+            }
+        }
+        val port = verifier.startAndGetPort()
+        services.onClose { verifier.stop(0, 1_000) }
+        flow = AuthFlow.fromConfig(
+            """{"method": "vc", "success": true, "config": {"verifierUrl": "http://127.0.0.1:$port", "setup": {"flow_type": "cross_device"}}}"""
+        )
+    }
 
     @AfterTest
-    fun stop() = verifier.stop()
-
-    private val flow = AuthFlow.fromConfig(
-        """{"method": "vc", "success": true, "config": {"verifierUrl": "http://127.0.0.1:$port", "setup": {"flow_type": "cross_device"}}}"""
-    )
+    fun stop() = services.close()
 
     private fun vcTest(register: Boolean, block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
         application {

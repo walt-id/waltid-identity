@@ -48,8 +48,12 @@ object BitPacker {
             }
 
             StatusBitLayout.W3cHexBinary -> {
-                val binaryString = status.value.toInt().toString(2)
-                binaryString.indices.filter { binaryString[it] != '0' }
+                val binaryString = status.value.toString(2)
+                require(binaryString.length <= statusSize) {
+                    "Status value 0x${status.value.toString(16)} does not fit into $statusSize bits"
+                }
+                val padded = binaryString.padStart(statusSize, '0')
+                padded.indices.filter { padded[it] == '1' }
             }
         }
 }

@@ -16,9 +16,10 @@ data class E2ETestWebService(
             host = host,
             port = port,
             module = webServiceModule
-        ).start(wait = false)
+        )
 
         try {
+            server.start(wait = false)
             block.invoke()
         } finally {
             server.stop(gracePeriodMillis = 1000, timeoutMillis = 5000)

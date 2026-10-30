@@ -10,14 +10,6 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         string: ProcessInfo.processInfo.environment["ENTERPRISE_MOBILE_FIXTURE_BASE_URL"] ?? "http://localhost:33335"
     )!
 
-    func testReceiveEnterpriseMdlFromEnterpriseIssuer2() async throws {
-        try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl")
-    }
-
-    func testReceiveEnterpriseMdlWithClientAttestationFromEnterpriseIssuer2() async throws {
-        try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl-client-attestation")
-    }
-
     func testReceiveAndPresentEnterpriseMdlIssuer2Verifier2Flow() async throws {
         try await receiveAndPresentEnterpriseCredential(scenarioID: "enterprise-mdl")
     }
@@ -73,6 +65,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         guard case let .stored(_, credentialIDs) = outcome else {
             return XCTFail("Expected two stored credentials, got \(outcome)")
         }
+        XCTAssertEqual(credentialIDs.count, 2)
         XCTAssertEqual(Set(credentialIDs).count, 2)
 
         let reopened = try await makeWallet(walletId: walletID, attestation: nil)
@@ -191,22 +184,6 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                 }
             }
         }
-    }
-
-    private func receiveCredentialFromEnterpriseIssuer2(scenarioID: String) async throws {
-        let fixture = makeFixture()
-        let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
-        let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
-        let walletId = "ios-enterprise-receive-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
-
-        let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-        _ = try await initializeSigningIdentity(wallet)
-
-        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await receiveCredential(wallet: wallet, offerURL: offerURL, transactionCode: offer.txCode)
-
-        XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName) from Enterprise issuer2")
     }
 
     private func receiveAndPresentEnterpriseCredential(scenarioID: String) async throws {

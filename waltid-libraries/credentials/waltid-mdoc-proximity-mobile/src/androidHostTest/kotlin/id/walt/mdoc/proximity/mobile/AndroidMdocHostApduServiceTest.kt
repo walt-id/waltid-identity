@@ -95,6 +95,20 @@ class AndroidMdocHostApduServiceTest {
         eventually { router.closeReasons == listOf(ProximityCloseReason.PEER_DISCONNECTED) }
         router.release.complete(Unit)
         assertTrue(service.responses.isEmpty())
+
+        val nextResponse = byteArrayOf(2, 0x90.toByte(), 0)
+        val nextGeneration = AndroidNfcSessionRegistry.arm(
+            object : RecordingRouter() {
+                override suspend fun process(command: ByteArray): ByteString = ByteString(nextResponse)
+            },
+            Job(),
+        )
+        assertNull(service.processCommandApdu(byteArrayOf(2), null))
+        // The same worker must finish the old command before it can send this response.
+        eventually { service.responses.any { it.contentEquals(nextResponse) } }
+        assertEquals(1, service.responses.size)
+        assertContentEquals(nextResponse, service.responses.single())
+        AndroidNfcSessionRegistry.disarm(nextGeneration, ProximityCloseReason.COMPLETED)
     }
 
     @Test

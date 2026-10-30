@@ -39,56 +39,42 @@ import kotlin.test.assertNotNull
 /** JVM-only coverage for private legacy JWK import and signing. */
 class WalletIssuanceCrypto2ProofJvmTest {
     @Test
-    fun `local JWK wallet proof signs through crypto2`() = runTest {
+    fun `local JWK wallet proofs preserve anonymous and client-bound claims`() = runTest {
         val legacyKey = JWKKey.generate(KeyType.secp256r1)
-        val proof = WalletIssuanceHandler.signProof(
-            wallet = Wallet(id = "wallet", staticKey = legacyKey),
-            request = SignProofRequest(
-                issuerUrl = Url(ISSUER),
-                credentialConfigurationId = CONFIG_ID,
-                nonce = "nonce",
-            ),
-            httpClient = issuerMetadataClient(),
-        ).proofJwt
-        val decoded = CompactJws.decodeUnverified(proof)
-        val bindingJwk = assertNotNull(decoded.protectedHeader["jwk"]).jsonObject
-        val verificationKey = runtime.restore(
-            V1KeyMigration().migrate(
-                recordId = KeyId("proof-verification"),
-                serialized = buildJsonObject {
-                    put("type", "jwk")
-                    put("jwk", bindingJwk)
-                },
-                usages = setOf(KeyUsage.VERIFY),
-            )
+        val wallet = Wallet(id = "wallet", staticKey = legacyKey)
+        val anonymousRequest = SignProofRequest(
+            issuerUrl = Url(ISSUER),
+            credentialConfigurationId = CONFIG_ID,
+            nonce = "nonce",
         )
-        val verified = CompactJws.verify(proof, verificationKey, JwsAlgorithm.ES256)
-        val payload = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
+        for (clientId in listOf(null, "eudiw-abca")) {
+            val proof = WalletIssuanceHandler.signProof(
+                wallet = wallet,
+                request = if (clientId == null) anonymousRequest else anonymousRequest.copy(clientId = clientId),
+                httpClient = issuerMetadataClient(),
+            ).proofJwt
+            val decoded = CompactJws.decodeUnverified(proof)
+            val bindingJwk = assertNotNull(decoded.protectedHeader["jwk"]).jsonObject
+            val verificationKey = runtime.restore(
+                V1KeyMigration().migrate(
+                    recordId = KeyId("proof-verification"),
+                    serialized = buildJsonObject {
+                        put("type", "jwk")
+                        put("jwk", bindingJwk)
+                    },
+                    usages = setOf(KeyUsage.VERIFY),
+                )
+            )
+            val verified = CompactJws.verify(proof, verificationKey, JwsAlgorithm.ES256)
+            val payload = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
 
-        assertEquals("openid4vci-proof+jwt", verified.protectedHeader["typ"]?.jsonPrimitive?.content)
-        assertFalse("d" in bindingJwk)
-        assertEquals(ISSUER, payload["aud"]?.jsonPrimitive?.content)
-        assertEquals("nonce", payload["nonce"]?.jsonPrimitive?.content)
-        assertFalse("iss" in payload)
-    }
-
-    @Test
-    fun `sign-proof writes client_id as iss when supplied`() = runTest {
-        val legacyKey = JWKKey.generate(KeyType.secp256r1)
-        val proof = WalletIssuanceHandler.signProof(
-            wallet = Wallet(id = "wallet", staticKey = legacyKey),
-            request = SignProofRequest(
-                issuerUrl = Url(ISSUER),
-                credentialConfigurationId = CONFIG_ID,
-                nonce = "nonce",
-                clientId = "eudiw-abca",
-            ),
-            httpClient = issuerMetadataClient(),
-        ).proofJwt
-        val payload = Json.parseToJsonElement(
-            CompactJws.decodeUnverified(proof).payload.decodeToString()
-        ).jsonObject
-        assertEquals("eudiw-abca", payload["iss"]?.jsonPrimitive?.content)
+            assertEquals("openid4vci-proof+jwt", verified.protectedHeader["typ"]?.jsonPrimitive?.content)
+            assertFalse("d" in bindingJwk)
+            assertEquals(ISSUER, payload["aud"]?.jsonPrimitive?.content)
+            assertEquals("nonce", payload["nonce"]?.jsonPrimitive?.content)
+            if (clientId == null) assertFalse("iss" in payload)
+            else assertEquals("eudiw-abca", payload["iss"]?.jsonPrimitive?.content)
+        }
     }
 
     @Test
@@ -153,49 +139,35 @@ class WalletIssuanceCrypto2ProofJvmTest {
     }
 
     @Test
-    fun `DID-bound wallet proof uses exact authentication method kid`() = runTest {
+    fun `wallet proof selects DID or JWK binding from issuer metadata`() = runTest {
         DidService.minimalInit()
         val key = JWKKey.generate(KeyType.Ed25519)
         val did = DidService.registerByKey("key", key).did
-        val proof = WalletIssuanceHandler.signProof(
-            wallet = Wallet(id = "wallet", staticKey = key),
-            request = SignProofRequest(
-                issuerUrl = Url(ISSUER),
-                credentialConfigurationId = CONFIG_ID,
-                nonce = "nonce",
-                did = did,
-            ),
-            httpClient = issuerMetadataClient(
-                proofAlgorithms = setOf("ES256", "EdDSA"),
-                bindingMethods = setOf("did:key"),
-            ),
-        ).proofJwt
-
-        assertEquals(
-            "$did#${did.removePrefix("did:key:")}",
-            CompactJws.decodeUnverified(proof).protectedHeader["kid"]?.jsonPrimitive?.content,
+        val wallet = Wallet(id = "wallet", staticKey = key)
+        val request = SignProofRequest(
+            issuerUrl = Url(ISSUER),
+            credentialConfigurationId = CONFIG_ID,
+            nonce = "nonce",
+            did = did,
         )
-    }
+        for (bindingMethod in listOf("did:key", "jwk")) {
+            val proof = WalletIssuanceHandler.signProof(
+                wallet = wallet,
+                request = request,
+                httpClient = issuerMetadataClient(
+                    proofAlgorithms = setOf("ES256", "EdDSA"),
+                    bindingMethods = setOf(bindingMethod),
+                ),
+            ).proofJwt
+            val header = CompactJws.decodeUnverified(proof).protectedHeader
 
-    @Test
-    fun `wallet drops caller-supplied DID when issuer only advertises JWK binding`() = runTest {
-        DidService.minimalInit()
-        val key = JWKKey.generate(KeyType.Ed25519)
-        val did = DidService.registerByKey("key", key).did
-        val proof = WalletIssuanceHandler.signProof(
-            wallet = Wallet(id = "wallet", staticKey = key),
-            request = SignProofRequest(
-                issuerUrl = Url(ISSUER),
-                credentialConfigurationId = CONFIG_ID,
-                nonce = "nonce",
-                did = did,
-            ),
-            httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
-        ).proofJwt
-
-        val header = CompactJws.decodeUnverified(proof).protectedHeader
-        assertNotNull(header["jwk"], "JWK-only issuers require an inline jwk header")
-        assertFalse("kid" in header, "Wallet must not send did:...#kid to a JWK-only issuer")
+            if (bindingMethod == "did:key") {
+                assertEquals("$did#${did.removePrefix("did:key:")}", header["kid"]?.jsonPrimitive?.content)
+            } else {
+                assertNotNull(header["jwk"], "JWK-only issuers require an inline jwk header")
+                assertFalse("kid" in header, "Wallet must not send did:...#kid to a JWK-only issuer")
+            }
+        }
     }
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())

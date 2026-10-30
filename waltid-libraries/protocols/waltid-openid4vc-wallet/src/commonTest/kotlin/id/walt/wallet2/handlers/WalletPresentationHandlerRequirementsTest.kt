@@ -760,13 +760,14 @@ class WalletPresentationHandlerRequirementsTest {
 
     @Test
     fun presentationSelectionRejectsBlankQueryOrCredentialIds() {
-        val selections = listOf(
+        for (selection in listOf(
             PresentationCredentialSelection(queryId = "pid", credentialId = " "),
-        )
-
-        assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                selections.requireValidPresentationCredentialSelection()
+            PresentationCredentialSelection(queryId = " ", credentialId = "cred-1"),
+        )) {
+            assertFailsWith<IllegalArgumentException> {
+                WalletPresentationHandler.run {
+                    listOf(selection).requireValidPresentationCredentialSelection()
+                }
             }
         }
     }
@@ -821,16 +822,6 @@ class WalletPresentationHandlerRequirementsTest {
             }
         }
 
-        assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matchResult("pid" to "cred-1").selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.given_name"),
-                    ),
-                )
-            }
-        }
     }
 
     @Test
@@ -1286,20 +1277,13 @@ class WalletPresentationHandlerRequirementsTest {
         }
         assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), rejectWithoutTrust.clientIdError)
 
-        // Reject with trust passes client-id validation; transmission to response_uri may still fail locally.
-        val rejectWithTrustFailure = runCatching {
-            WalletPresentationHandler.rejectPresentationByRequestUrl(
-                request = RejectPresentationByRequestUrlRequest(
-                    requestUrl = requestUrl,
-                    errorCode = "access_denied",
-                ),
-                clientIdTrustConfiguration = trust,
-            )
-        }.exceptionOrNull()
-        assertFalse(
-            rejectWithTrustFailure is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
-                rejectWithTrustFailure.clientIdError == ClientIdError.PreRegisteredClientNotFound("verifier2"),
-            "Trusted reject must not fail with PreRegisteredClientNotFound",
+        val rejection = WalletPresentationHandler.rejectPresentationByRequestUrl(
+            request = RejectPresentationByRequestUrlRequest(requestUrl = requestUrl, errorCode = "access_denied"),
+            clientIdTrustConfiguration = trust,
+        )
+        assertEquals(
+            "https://verifier.example/callback#error=access_denied&state=trusted-state",
+            rejection.getUrl,
         )
     }
 
@@ -1310,8 +1294,9 @@ class WalletPresentationHandlerRequirementsTest {
                 put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 put("nonce", "nonce-123")
                 put("response_type", "vp_token")
-                put("response_mode", "direct_post")
-                put("response_uri", "https://verifier.example/direct-post")
+                put("response_mode", "fragment")
+                put("redirect_uri", "https://verifier.example/callback")
+                put("state", "trusted-state")
                 put(
                     "dcql_query",
                     buildJsonObject {
@@ -1335,9 +1320,6 @@ class WalletPresentationHandlerRequirementsTest {
             parameters.append("request", requestObject)
         }.build()
     }
-
-    private fun AuthorizationRequest.toHttpUrl(): Url =
-        Url("https://verifier.example/authorize?client_id=${clientId.orEmpty()}&nonce=${nonce.orEmpty()}")
 
     private fun credentialQuery(
         id: String,

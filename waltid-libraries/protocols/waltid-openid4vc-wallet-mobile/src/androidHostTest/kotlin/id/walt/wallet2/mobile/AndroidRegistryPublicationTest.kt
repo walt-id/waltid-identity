@@ -21,19 +21,29 @@ class AndroidRegistryPublicationTest {
         runCurrent()
         old.cancelAndJoin()
         val writes = mutableListOf<String>()
+        lateinit var nextCallback: CredentialManagerCallback<String, Exception>
         val next = async { gate.publish<String, Exception> {
             writes += "new"
-            it.onResult("new")
+            nextCallback = it
         } }
         runCurrent()
         assertFalse(next.isCompleted)
         writes += "old"
         callback.onResult("old")
-        assertEquals("new", next.await())
+        runCurrent()
         assertEquals(listOf("old", "new"), writes)
         // Duplicate completion must not release the next request's gate or resume twice.
         callback.onError(IllegalStateException("late duplicate"))
-        assertEquals("third", gate.publish<String, Exception> { it.onResult("third") })
+        val third = async { gate.publish<String, Exception> {
+            writes += "third"
+            it.onResult("third")
+        } }
+        runCurrent()
+        assertFalse(third.isCompleted)
+        assertEquals(listOf("old", "new"), writes)
+        nextCallback.onResult("new")
+        assertEquals("new", next.await())
+        assertEquals("third", third.await())
     }
 
     @Test

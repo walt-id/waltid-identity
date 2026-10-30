@@ -662,9 +662,12 @@ class MobileWalletTest {
 
     @Test
     fun presentationResultCarriesVerifierResponseAsJsonString() {
-        val result = MobileWalletPresentationResult.Transmitted.Succeeded(
-            verifierResponseJson = """{"accepted":true}""",
-            redirectUrl = "wallet://return",
+        val result = assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+            WalletPresentResult(
+                transmissionSuccess = true,
+                verifierResponse = buildJsonObject { put("accepted", true) },
+                redirectTo = "wallet://return",
+            ).toMobilePresentationResult(),
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
@@ -1015,6 +1018,8 @@ class MobileWalletTest {
         val registry = RecordingMetadataRegistry()
         val (_, credential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
         val sdJwt = assertIs<SdJwtCredential>(credential)
+        // Disclosure resolution removes `_sd`, but the registry must exclude its `_sd_alg` sibling.
+        assertTrue(sdJwt.credentialData.containsKey("_sd_alg"))
         val selectivelyDisclosablePaths = requireNotNull(sdJwt.disclosures)
             .mapNotNull { disclosure ->
                 disclosure.location?.mapNotNull { component -> component.jsonPrimitive.contentOrNull }
@@ -1039,6 +1044,7 @@ class MobileWalletTest {
         wallet.refreshDigitalCredentialRegistration()
 
         val fields = registry.replacements.single().second.single().fields
+        assertFalse(fields.any { "_sd_alg" in it.path || "_sd" in it.path })
         assertTrue(fields.any { it.selectivelyDisclosable })
         fields.forEach { field ->
             assertEquals(field.path in selectivelyDisclosablePaths, field.selectivelyDisclosable)
@@ -1049,30 +1055,6 @@ class MobileWalletTest {
             setOf(listOf("sub"), listOf("given_name"), listOf("family_name"), listOf("birthdate")),
             fields.map { it.path }.toSet(),
         )
-    }
-
-    @Test
-    fun digitalCredentialRegistryExcludesSdJwtHashAlgorithmDeclaration() = runTest {
-        val registry = RecordingMetadataRegistry()
-        val (_, credential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
-        // Disclosure resolution strips `_sd` but not its sibling `_sd_alg`, so the raw claims still
-        // carry it and the registry has to exclude it explicitly.
-        assertTrue(assertIs<SdJwtCredential>(credential).credentialData.containsKey("_sd_alg"))
-        val wallet = MobileWallet(
-            walletId = "registry-sd-alg-wallet",
-            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
-            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
-            credentialStore = RecordingCredentialStore(
-                StoredCredential(id = "pid-1", credential = credential, label = "PID"),
-            ),
-
-            credentialRegistry = registry,
-        )
-
-        wallet.refreshDigitalCredentialRegistration()
-
-        val fields = registry.replacements.single().second.single().fields
-        assertFalse(fields.any { "_sd_alg" in it.path || "_sd" in it.path })
     }
 
     @Test
@@ -1406,7 +1388,7 @@ class MobileWalletTest {
 
         assertEquals("org.iso.18013.5.1.mDL", parsed.documents.single().docType)
         assertEquals(listOf("family_name", "given_name"), parsed.documents.single().namespaces.values.single())
-        assertFailsWith<IllegalArgumentException> {
+        val failure = assertFailsWith<IllegalArgumentException> {
             wallet.previewAnnexCPresentation(
                 MobileWalletAnnexCRequest(
                     parsedRequest = MobileWalletAnnexCParsedRequest(
@@ -1418,6 +1400,7 @@ class MobileWalletTest {
                 )
             )
         }
+        assertEquals("Parsed and raw Annex C requests are inconsistent", failure.message)
     }
 
     @Test
@@ -1696,7 +1679,7 @@ class MobileWalletTest {
     @Test
     fun annexCAnswersOnlyTheExactRawRequestConsentWasGivenFor() = runTest {
         val origin = "https://verifier.example"
-        val wallet = annexCWalletWithMdlAndHolderKey("annex-c-consent-binding-wallet")
+        val wallet = annexCWalletWithMdl("annex-c-consent-binding-wallet")
         val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
         val docRequest = signedRequest.docRequests.single()
         val transcript = AnnexCTranscriptBuilder.buildSessionTranscript(READER_ENCRYPTION_INFO, origin)
@@ -2283,11 +2266,7 @@ class MobileWalletTest {
     )
 
     /** A wallet holding one bound mDL, for Annex C tests that must reach reader-authentication checks. */
-    private suspend fun annexCWalletWithMdl(walletId: String): MobileWallet =
-        annexCWalletWithMdlAndHolderKey(walletId)
-
-    /** [annexCWalletWithMdl] with a signing key, for Annex C tests that build a response. */
-    private suspend fun annexCWalletWithMdlAndHolderKey(walletId: String): MobileWallet {
+    private suspend fun annexCWalletWithMdl(walletId: String): MobileWallet {
         // A managed crypto2 key, not an imported private JWK: Android's software provider only
         // accepts RSA private JWK material, so importing this Ed25519 key would fail there.
         val holderSigner = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
@@ -2431,22 +2410,13 @@ class MobileWalletTest {
         private val keyInfo: WalletKeyInfo,
         private val key: Key? = null,
         private val managedKey: ManagedKeyMaterial? = null,
-        private val failIfLegacyKeyRequested: Boolean = false,
-        private val authorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
     ) : MobileWalletKeyStore {
-        var listKeysCalls = 0
-        var managedKeyLookupCalls = 0
         val removedKeyIds = mutableListOf<String>()
 
-        override suspend fun getKey(keyId: String): Key? {
-            check(!failIfLegacyKeyRequested) { "Managed-key bootstrap must not load a legacy key" }
-            return key.takeIf { keyId == keyInfo.keyId }
-        }
+        override suspend fun getKey(keyId: String): Key? = key.takeIf { keyId == keyInfo.keyId }
 
-        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): ManagedKeyMaterial? {
-            managedKeyLookupCalls++
-            return managedKey.takeIf { keyId == keyInfo.keyId }
-        }
+        override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): ManagedKeyMaterial? =
+            managedKey.takeIf { keyId == keyInfo.keyId }
 
         override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? {
             val matchingKey = managedKey.takeIf { keyId == keyInfo.keyId } ?: return null
@@ -2456,13 +2426,10 @@ class MobileWalletTest {
             return WalletPublicKeyMaterial(publicJwk)
         }
 
-        override suspend fun listKeys(): Flow<WalletKeyInfo> {
-            listKeysCalls++
-            return listOf(keyInfo).asFlow()
-        }
+        override suspend fun listKeys(): Flow<WalletKeyInfo> = listOf(keyInfo).asFlow()
 
         override suspend fun keyUseAuthorizationPolicy(keyId: String): KeyUseAuthorizationPolicy? =
-            authorizationPolicy.takeIf { keyId == keyInfo.keyId }
+            KeyUseAuthorizationPolicy.None.takeIf { keyId == keyInfo.keyId }
 
         override suspend fun addKey(key: Key): String =
             error("Preloaded test key store should not add keys")
@@ -2474,15 +2441,11 @@ class MobileWalletTest {
     }
 
     private class PreloadedDidStore(private val did: WalletDidEntry) : WalletDidStore {
-        var listDidsCalls = 0
         val removedDids = mutableListOf<String>()
 
         override suspend fun getDid(did: String): WalletDidEntry? = this.did.takeIf { it.did == did }
 
-        override suspend fun listDids(): Flow<WalletDidEntry> {
-            listDidsCalls++
-            return listOf(did).asFlow()
-        }
+        override suspend fun listDids(): Flow<WalletDidEntry> = listOf(did).asFlow()
 
         override suspend fun addDid(entry: WalletDidEntry) =
             error("Preloaded test DID store should not add DIDs")

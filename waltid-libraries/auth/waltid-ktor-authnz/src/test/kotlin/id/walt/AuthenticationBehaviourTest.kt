@@ -100,7 +100,9 @@ class AuthenticationBehaviourTest {
     @Test
     fun `wrong TOTP codes use up the session`() = test {
         val sessionId = sessionAwaitingTotp()
-        val statuses = (1..5).map { totp(sessionId, "000000").status }
+        val statuses = withIncorrectTotp("JBSWY3DPEHPK3PXP") { incorrect ->
+            (1..5).map { totp(sessionId, incorrect).status }
+        }
         assertEquals(List(5) { HttpStatusCode.Unauthorized }, statuses)
 
         assertEquals(HttpStatusCode.TooManyRequests, totp(sessionId, currentTotp()).status, "the right code comes too late")

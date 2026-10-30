@@ -102,15 +102,20 @@ class DcqlQueryInvariantTest {
 
     @Test
     fun `dcql precheck rejects empty and duplicate claim set alternatives`() {
-        val query = DcqlQuery(
-            credentials = listOf(
-                credential(
-                    "pid",
-                    claims = listOf(ClaimsQuery(id = "name", pathStrings = listOf("name"))),
-                ).copy(claimSets = listOf(listOf("name"), listOf("name")))
+        for (alternatives in listOf(
+            listOf(listOf("name"), listOf("name")),
+            listOf(emptyList()),
+        )) {
+            val query = DcqlQuery(
+                credentials = listOf(
+                    credential(
+                        "pid",
+                        claims = listOf(ClaimsQuery(id = "name", pathStrings = listOf("name"))),
+                    ).copy(claimSets = alternatives)
+                )
             )
-        )
-        assertFailsWith<IllegalArgumentException> { query.precheck() }
+            assertFailsWith<IllegalArgumentException> { query.precheck() }
+        }
     }
 
     @Test

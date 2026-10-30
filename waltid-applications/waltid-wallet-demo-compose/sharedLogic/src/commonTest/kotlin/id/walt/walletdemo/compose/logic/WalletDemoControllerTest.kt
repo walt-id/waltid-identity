@@ -34,6 +34,66 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun skipPinStartsUnlockedAndBootstraps() = runTest {
+        val wallet = FakeDemoWallet().apply { reportedSigningProtection = WalletDemoSigningProtection.None }
+        val controller = WalletDemoController(
+            wallet = wallet,
+            pinStore = InMemoryDemoPinStore(),
+            skipPin = true,
+            scope = backgroundScope,
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        runCurrent()
+
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertFalse(controller.state.value.pinLockEnabled)
+        assertEquals(1, wallet.bootstrapCalls)
+        assertIs<WalletSessionState.Ready>(controller.state.value.session)
+    }
+
+    @Test
+    fun authorizationCallbackWaitsForBootstrapThenContinues() = runTest {
+        val bootstrapGate = CompletableDeferred<Unit>()
+        val delegate = FakeDemoWallet(authorizationOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1")))
+            .apply { reportedSigningProtection = WalletDemoSigningProtection.None }
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
+                bootstrapGate.await()
+                return delegate.bootstrap(signingProtection)
+            }
+
+            override fun pendingAuthorizationIssuance() = WalletDemoIssuanceSession(
+                id = "pending-auth",
+                grant = WalletDemoIssuanceGrant.AuthorizationCode,
+                preview = offerPreview().copy(offeredCredentials = emptyList(), requiresIssuerAuthentication = true),
+            )
+
+            override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String): WalletDemoIssuanceOutcome =
+                delegate.continueAuthorizationIssuance(sessionId, callbackUri).also {
+                    delegate.credentials = listOf(sampleCredential.copy(id = "cred-1"))
+                }
+        }
+        val controller = WalletDemoController(
+            wallet = wallet,
+            pinStore = InMemoryDemoPinStore(),
+            skipPin = true,
+            scope = backgroundScope,
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val callback = "http://localhost:8080/?code=auth-code"
+        controller.handleDeepLink(callback)
+        runCurrent()
+
+        assertIs<WalletSessionState.Bootstrapping>(controller.state.value.session)
+        assertTrue(delegate.authorizationCallbackUris.isEmpty())
+        bootstrapGate.complete(Unit)
+        runCurrent()
+
+        assertEquals(listOf(callback), delegate.authorizationCallbackUris)
+        assertEquals(listOf("cred-1"), assertIs<WalletSessionState.Ready>(controller.state.value.session).credentials.map { it.id })
+    }
+
+    @Test
     fun localCardsAreReadyWhileRegistrationWaitsAndForegroundRefreshesCoalesce() = runTest {
         var calls = 0
         var completed = false
@@ -265,7 +325,7 @@ class WalletDemoControllerTest {
                 saved.setProximityApprovalMode(mode)
             }
         }
-        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), sharingSettings = store)
+        val controller = controllerWith(FakeDemoWallet(), this, sharingSettings = store)
         controller.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
         assertEquals(WalletDemoProximityApprovalMode.AskEachTime, controller.state.value.proximityApprovalMode)
         assertEquals(WalletDemoProximityApprovalMode.AskEachTime, saved.proximityApprovalMode())
@@ -707,25 +767,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun biometricUnlockOpensWalletWithoutPin() = runTest {
-        val pinStore = InMemoryDemoPinStore()
-        pinStore.setPin("1234")
-        pinStore.setBiometricUnlockEnabled(true)
-        val wallet = FakeDemoWallet()
-        val biometrics = FakeDemoBiometricAuthenticator()
-        val controller = controllerWith(wallet, this, pinStore, biometrics)
-
-        assertTrue(controller.state.value.auth is WalletAuthState.Login)
-        controller.unlockWithBiometrics()
-        runCurrent()
-
-        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
-        assertEquals(1, biometrics.authenticateCalls)
-        assertEquals(1, wallet.bootstrapCalls)
-    }
-
-    @Test
-    fun cancelledBiometricsLeavesPinFallback() = runTest {
+    fun failedBiometricsLeavesPinFallback() = runTest {
         val pinStore = InMemoryDemoPinStore()
         pinStore.setPin("1234")
         pinStore.setBiometricUnlockEnabled(true)
@@ -761,10 +803,12 @@ class WalletDemoControllerTest {
         val biometrics = FakeDemoBiometricAuthenticator()
         val controller = controllerWith(wallet, this, pinStore, biometrics)
 
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
         controller.unlockWithBiometrics()
         runCurrent()
         assertEquals(1, biometrics.authenticateCalls)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertEquals(1, wallet.bootstrapCalls)
 
         controller.lock()
         val login = controller.state.value.auth as WalletAuthState.Login
@@ -1583,31 +1627,6 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun receiveRefreshesCredentialsAndStatus() = runTest {
-        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
-        val controller = unlockedControllerWith(wallet, this)
-
-        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
-        controller.selectTab(WalletDemoTab.Receive)
-        controller.updateOfferUrl("openid-credential-offer://example")
-        controller.previewOffer()
-        runCurrent()
-        controller.acceptOffer()
-        runCurrent()
-
-        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
-        assertEquals(1, wallet.receiveCalls)
-        assertEquals(
-            WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive),
-            controller.state.value.operation,
-        )
-        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
-        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
-        val session = controller.state.value.session as WalletSessionState.Ready
-        assertEquals(wallet.credentials, session.credentials)
-    }
-
-    @Test
     fun receiveIgnoresBlankOfferUrl() = runTest {
         val wallet = FakeDemoWallet()
         val controller = unlockedControllerWith(wallet, this)
@@ -2287,19 +2306,9 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSubmitRejectAndDismissUseSelectedHandle() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = "{}",
+                samplePresentationCredential.copy(
                     disclosures = listOf(
                         WalletDemoPresentationDisclosure(
                             label = "given_name",
@@ -2518,19 +2527,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationDisclosureSelectionDefaultsOffAndSubmitsSelectedPaths() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
+                samplePresentationCredential.copy(
                     label = "PID",
-                    issuer = "Example Issuer",
                     format = "vc+sd-jwt",
-                    credentialDataJson = "{}",
                     disclosures = listOf(
                         WalletDemoPresentationDisclosure(
                             label = "Given name",
@@ -2603,21 +2604,12 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCredentialOptionsWithSameCredentialIdToggleIndependently() = runTest {
-        val first = WalletDemoPresentationCredentialOption(
+        val first = samplePresentationCredential.copy(
             queryId = "identity",
-            credentialId = "cred-1",
             label = "PID identity",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val second = first.copy(queryId = "age", label = "PID age")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("identity", "age")))
@@ -2658,21 +2650,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSelectsOneCredentialOptionPerQuery() = runTest {
-        val first = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
+        val first = samplePresentationCredential.copy(
             label = "PID one",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val second = first.copy(credentialId = "cred-2", label = "PID two")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -2704,14 +2686,10 @@ class WalletDemoControllerTest {
     fun presentationPreviewCanSelectMultipleCredentialsForOneQueryWhenAllowed() = runTest {
         val firstDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.given_name")
         val secondDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-2", "$.given_name")
-        val first = WalletDemoPresentationCredentialOption(
-            queryId = "pid",
-            credentialId = "cred-1",
+        val first = samplePresentationCredential.copy(
             multiple = true,
             label = "PID one",
-            issuer = "Example Issuer",
             format = "vc+sd-jwt",
-            credentialDataJson = "{}",
             disclosures = listOf(
                 WalletDemoPresentationDisclosure(
                     label = "Given name",
@@ -2735,11 +2713,7 @@ class WalletDemoControllerTest {
                 )
             ),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(first, second),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -2780,21 +2754,13 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationPreviewSelectsFirstSatisfiableRequirementAlternativeOnly() = runTest {
-        val mdl = WalletDemoPresentationCredentialOption(
+        val mdl = samplePresentationCredential.copy(
             queryId = "mdl-id",
-            credentialId = "cred-1",
             label = "mDL",
-            issuer = "Example Issuer",
             format = "mso_mdoc",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
         val photoId = mdl.copy(queryId = "photo-id", credentialId = "cred-2", label = "Photo ID")
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(mdl, photoId),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("mdl-id"), listOf("photo-id")))
@@ -2813,20 +2779,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationSelectionRequiresNonEmptySelectionWhenRequirementsAreEmpty() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
+        val option = samplePresentationCredential.copy(
             queryId = "optional-address",
-            credentialId = "cred-1",
             label = "Address",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(option),
             credentialRequirements = emptyList(),
         )
@@ -2860,20 +2817,11 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCredentialSelectionRequiresQueriesWithoutVisibleOptions() = runTest {
-        val option = WalletDemoPresentationCredentialOption(
+        val option = samplePresentationCredential.copy(
             queryId = "identity",
-            credentialId = "cred-1",
             label = "PID identity",
-            issuer = "Example Issuer",
-            format = "jwt_vc_json",
-            credentialDataJson = "{}",
-            disclosures = emptyList(),
         )
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(option),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(
@@ -3068,21 +3016,9 @@ class WalletDemoControllerTest {
         val presentationUrl = "openid4vp://example"
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
-            presentationPreview = WalletDemoPresentationPreview(
-                previewHandle = presentationPreviewHandle,
-                responseEncryption = WalletDemoResponseEncryption.NotRequired,
-                verifierMetadata = verifierMetadata("Example Verifier"),
-                clientId = "https://verifier.example",
+            presentationPreview = samplePresentationPreview.copy(
                 credentialOptions = listOf(
-                    WalletDemoPresentationCredentialOption(
-                        queryId = "pid",
-                        credentialId = "cred-1",
-                        label = "Example Credential",
-                        issuer = "Example Issuer",
-                        format = "jwt_vc_json",
-                        credentialDataJson = "{}",
-                        disclosures = emptyList(),
-                    )
+                    samplePresentationCredential
                 ),
                 credentialRequirements = listOf(
                     WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -3147,7 +3083,7 @@ class WalletDemoControllerTest {
 
     @Test
     fun receiveCompletionTracksReceivedCredentialsAndCanStartNewFlow() = runTest {
-        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1"))
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
         val controller = unlockedControllerWith(wallet, this)
 
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
@@ -3157,20 +3093,28 @@ class WalletDemoControllerTest {
         controller.updateOfferUrl("openid-credential-offer://example")
         assertTrue(controller.state.value.receiveActionEnabled)
 
-        wallet.credentials = listOf(sampleCredential)
+        wallet.credentials = listOf(sampleCredential, sampleCredential.copy(id = "cred-2"))
         controller.previewOffer()
         runCurrent()
         controller.acceptOffer()
         runCurrent()
 
+        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(
+            WalletOperationState.Succeeded("Received 2 credential(s)", WalletDemoTab.Receive),
+            controller.state.value.operation,
+        )
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(wallet.credentials, session.credentials)
         assertTrue(controller.state.value.receiveCompleted)
         assertNotNull(controller.state.value.issuanceReceipt)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
         assertFalse(controller.state.value.receiveActionEnabled)
-        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
 
         controller.selectTab(WalletDemoTab.Receive)
         assertTrue(controller.state.value.receiveUrlEntryEnabled)
@@ -3311,21 +3255,9 @@ class WalletDemoControllerTest {
 
     @Test
     fun presentationCompletionKeepsItsResultUntilANewFlow() = runTest {
-        val preview = WalletDemoPresentationPreview(
-            previewHandle = presentationPreviewHandle,
-            responseEncryption = WalletDemoResponseEncryption.NotRequired,
-            verifierMetadata = verifierMetadata("Example Verifier"),
-            clientId = "https://verifier.example",
+        val preview = samplePresentationPreview.copy(
             credentialOptions = listOf(
-                WalletDemoPresentationCredentialOption(
-                    queryId = "pid",
-                    credentialId = "cred-1",
-                    label = "Example Credential",
-                    issuer = "Example Issuer",
-                    format = "jwt_vc_json",
-                    credentialDataJson = "{}",
-                    disclosures = emptyList(),
-                )
+                samplePresentationCredential
             ),
             credentialRequirements = listOf(
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
@@ -3677,6 +3609,24 @@ class WalletDemoControllerTest {
     }
 
     private companion object {
+        val samplePresentationCredential = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            label = "Example Credential",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+
+        val samplePresentationPreview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle,
+            responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = verifierMetadata("Example Verifier"),
+            clientId = "https://verifier.example",
+            credentialOptions = emptyList(),
+        )
+
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
             format = "jwt_vc_json",

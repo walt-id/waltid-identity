@@ -9,7 +9,8 @@ import kotlin.test.assertFailsWith
 
 class NdefTest {
     @Test
-    fun `short long and identified records round trip exactly`() {
+    fun `short long and identified records match independent wire encoding`() {
+        val payload = ByteArray(256) { it.toByte() }
         val message = NdefMessage(
             listOf(
                 NdefRecord(
@@ -21,13 +22,14 @@ class NdefTest {
                     NdefTypeNameFormat.EXTERNAL,
                     ByteString("example:type".encodeToByteArray()),
                     ByteString("id".encodeToByteArray()),
-                    ByteString(ByteArray(256) { it.toByte() }),
+                    ByteString(payload),
                 ),
             )
         )
-        val encoded = message.encode()
+        // Cross-checked with Android's NdefMessage encoding for these same records.
+        val encoded = "91020348730102034c0c00000100026578616d706c653a747970656964".hexToByteArray() + payload
+        assertContentEquals(encoded, message.encode())
         assertEquals(message, NdefMessage.decode(encoded))
-        assertContentEquals(encoded, NdefMessage.decode(encoded).encode())
     }
 
     @Test
@@ -74,10 +76,11 @@ class NdefTest {
 
     @Test
     fun `configured bounds are enforced before allocation`() {
-        val longHeader = byteArrayOf(0xc1.toByte(), 0, 0, 0, 1, 0)
-        assertFailsWith<IllegalArgumentException> {
+        val longHeader = byteArrayOf(0xc1.toByte(), 1, 0, 0, 1, 0)
+        val failure = assertFailsWith<IllegalArgumentException> {
             NdefMessage.decode(longHeader, NdefLimits(maximumMessageBytes = 32, maximumRecordPayloadBytes = 255))
         }
+        assertEquals("NDEF record payload exceeds the configured limit", failure.message)
         val twoRecords = NdefMessage(
             listOf(
                 NdefRecord(NdefTypeNameFormat.EMPTY),

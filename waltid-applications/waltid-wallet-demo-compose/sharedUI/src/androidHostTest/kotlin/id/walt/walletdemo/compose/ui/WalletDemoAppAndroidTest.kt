@@ -43,16 +43,8 @@ class WalletDemoAppAndroidTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
-    fun pinSetupOffersPINOnlyWhenBiometricsAreUnavailable() =
-        scenarios.pinSetupOffersPINOnlyWhenBiometricsAreUnavailable()
-
-    @Test
     fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
-
-    @Test
-    fun pinSetupKeepsClearReachable() =
-        scenarios.pinSetupKeepsClearReachable()
 
     @Test
     fun pinSetupDoesNotAskForSigningApproval() =

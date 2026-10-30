@@ -156,7 +156,14 @@ class PaymentConsentTest {
             "transaction_title" to 50, "security_hint" to 250)) {
             val permitted = "😀".repeat(limit)
             val document = JsonObject(catalogue() + (name to translations(permitted, permitted)))
-            render(document)
+            val consent = render(document)
+            assertEquals(permitted, when (name) {
+                "affirmative_action_label" -> consent.affirmativeAction
+                "denial_action_label" -> consent.denialAction
+                "transaction_title" -> consent.title
+                "security_hint" -> consent.securityHint
+                else -> error("Unexpected catalogue label: $name")
+            })
             failure(PaymentConsentFailure.INVALID_METADATA) {
                 render(JsonObject(document + (name to translations(permitted + "x", permitted))))
             }

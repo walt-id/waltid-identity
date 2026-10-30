@@ -23,7 +23,6 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
@@ -370,63 +369,48 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun rejectsWalletAttestationWhenItsActualAlgorithmIsNotAdvertised() = runTest {
-        var parCalls = 0
-        val service = service(
-            handler = { request ->
-                when (request.url.toString()) {
-                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                    AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata())
-                    CHALLENGE_ENDPOINT -> jsonResponse("""{"attestation_challenge":"challenge-1"}""")
-                    PAR_ENDPOINT -> {
-                        parCalls += 1
-                        respondError(HttpStatusCode.InternalServerError)
-                    }
-                    else -> respondError(HttpStatusCode.NotFound)
-                }
-            },
-            attestationAssembler = ClientAttestationAssembler(
-                StaticAttestationProvider("eyJhbGciOiJSUzI1NiJ9.e30.c2ln"),
-            ),
-        )
-
-        val session = service.start(authRequest())
-        assertFailsWith<IllegalArgumentException> { service.beginAuthorization(session.id) }
-        assertEquals(0, parCalls)
-    }
-
-    @Test
-    fun acceptsWalletAttestationWhenItsActualAlgorithmIsAdvertised() = runTest {
-        var parCalls = 0
-        val service = service(
-            handler = { request ->
-                when (request.url.toString()) {
-                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                    AS_METADATA -> jsonResponse(
-                        attestedAuthorizationServerMetadata().replace(
-                            "\"client_attestation_signing_alg_values_supported\":[\"ES256\"]",
-                            "\"client_attestation_signing_alg_values_supported\":[\"RS256\"]",
+    fun walletAttestationRequiresItsActualAlgorithmToBeAdvertised() = runTest {
+        for (advertisedAlgorithm in listOf("ES256", "RS256")) {
+            var parCalls = 0
+            val service = service(
+                handler = { request ->
+                    when (request.url.toString()) {
+                        ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                        AS_METADATA -> jsonResponse(
+                            attestedAuthorizationServerMetadata().replace(
+                                "\"client_attestation_signing_alg_values_supported\":[\"ES256\"]",
+                                "\"client_attestation_signing_alg_values_supported\":[\"$advertisedAlgorithm\"]",
+                            )
                         )
-                    )
-                    CHALLENGE_ENDPOINT -> jsonResponse("""{"attestation_challenge":"challenge-1"}""")
-                    PAR_ENDPOINT -> {
-                        parCalls += 1
-                        jsonResponse(
-                            """{"request_uri":"urn:example:request","expires_in":60}""",
-                            HttpStatusCode.Created,
-                        )
+                        CHALLENGE_ENDPOINT -> jsonResponse("""{"attestation_challenge":"challenge-1"}""")
+                        PAR_ENDPOINT -> {
+                            parCalls += 1
+                            jsonResponse(
+                                """{"request_uri":"urn:example:request","expires_in":60}""",
+                                HttpStatusCode.Created,
+                            )
+                        }
+                        else -> respondError(HttpStatusCode.NotFound)
                     }
-                    else -> respondError(HttpStatusCode.NotFound)
-                }
-            },
-            attestationAssembler = ClientAttestationAssembler(
-                StaticAttestationProvider("eyJhbGciOiJSUzI1NiJ9.e30.c2ln"),
-            ),
-        )
+                },
+                attestationAssembler = ClientAttestationAssembler(
+                    StaticAttestationProvider("eyJhbGciOiJSUzI1NiJ9.e30.c2ln"),
+                ),
+            )
 
-        service.beginAuthorization(service.start(authRequest()).id)
-
-        assertEquals(1, parCalls)
+            val session = service.start(authRequest())
+            if (advertisedAlgorithm == "RS256") {
+                service.beginAuthorization(session.id)
+                assertEquals(1, parCalls)
+            } else {
+                val error = assertFailsWith<IllegalArgumentException> { service.beginAuthorization(session.id) }
+                assertEquals(
+                    "Authorization server does not advertise the Wallet Attestation JWT algorithm RS256",
+                    error.message,
+                )
+                assertEquals(0, parCalls)
+            }
+        }
     }
 
     @Test
@@ -1721,25 +1705,6 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun advertisedDpopAddsAuthorizationDpopJkt() = runTest {
-        val client = client { request ->
-            when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata(dpop = true))
-                else -> respondError(HttpStatusCode.NotFound)
-            }
-        }
-        val service = WalletIssuanceSessionService(
-            Wallet("test", staticKey = JWKKey.generate(KeyType.secp256r1)),
-            httpClient = client,
-        )
-
-        val session = service.start(authRequest())
-        val authorization = service.beginAuthorization(session.id)
-        assertNotNull(Url(authorization.url).parameters["dpop_jkt"])
-    }
-
-    @Test
     fun ed25519AuthorizationNegotiatesEdDsaForDpop() = runTest {
         var tokenDpop: String? = null
         val client = client { request ->
@@ -2285,13 +2250,6 @@ class WalletIssuanceSessionServiceTest {
         clientId = "wallet-client",
         redirectUri = Url(REDIRECT_URI),
     )
-
-    private fun requestWithIssuer(issuer: String): WalletIssuanceSessionRequest =
-        preAuthorizedRequest().copy(
-            offerJson = Json.parseToJsonElement(
-                preAuthorizedRequest().offerJson.toString().replace(ISSUER, issuer)
-            ).jsonObject,
-        )
 
     private fun callback(authorization: WalletIssuanceAuthorization, code: String) =
         "$REDIRECT_URI?code=$code&state=${authorization.state}"

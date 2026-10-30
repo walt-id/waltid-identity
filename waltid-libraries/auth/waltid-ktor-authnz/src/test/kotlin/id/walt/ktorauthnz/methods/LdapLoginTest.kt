@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import id.walt.errors.HttpStatusError
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.accounts.InMemoryAccountStore
@@ -28,11 +30,30 @@ import kotlin.uuid.Uuid
 
 class LdapLoginTest {
 
-    private val directory = ExampleDirectory(mapOf("carol" to "ldap-secret", "dave" to "dave-secret"))
+    private val services = ExampleServiceScope()
+
+    private lateinit var directory: ExampleDirectory
     private val accounts = InMemoryAccountStore()
 
+    @BeforeTest
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousAttemptLimits = KtorAuthnzManager.attemptLimits
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.attemptLimits = previousAttemptLimits
+        }
+        directory = services.own(ExampleDirectory(mapOf("carol" to "ldap-secret", "dave" to "dave-secret")))
+    }
+
     @AfterTest
-    fun stop() = directory.close()
+    fun stop() = services.close()
 
     private fun config(url: String = directory.url) = LDAPConfiguration(url, "uid=%s,ou=people,dc=org3")
 

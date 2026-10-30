@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.examples.identifierfirst
 
+import id.walt.ktorauthnz.examples.services.ExampleServiceScope
 import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -41,9 +42,11 @@ import kotlin.test.*
 /** Runs [identifierFirstApp]: each account is offered the ways it set up, and can only log in to itself. */
 class IdentifierFirstAppTest {
 
-    private val idp = ExampleIdentityProvider(clientId = "app")
-    private val verifier = ExampleVerifier()
-    private val directory = ExampleDirectory(mapOf("user3@example.org" to "directory-password"), domain = "example", nameAttribute = "mail")
+    private val services = ExampleServiceScope()
+
+    private lateinit var idp: ExampleIdentityProvider
+    private lateinit var verifier: ExampleVerifier
+    private lateinit var directory: ExampleDirectory
     private val passkeySettings = PasskeySettings(rpId = "example.org", rpName = "Example", origins = setOf("https://app.example.org"))
     private val authenticator = ExampleAuthenticator("https://app.example.org")
     /** Another user's device, with the passkey of [other]. */
@@ -62,42 +65,58 @@ class IdentifierFirstAppTest {
 
     /** The accounts, with the methods their users set up. */
     @BeforeTest
-    fun setUp() = runBlocking {
-        KtorAuthnzManager.sessionStore = InMemorySessionStore()
-        KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
-        KtorAuthnzManager.tokenHandler = KtorAuthNzTokenHandler()
-        KtorAuthnzManager.passkeys = passkeySettings
+    fun setUp() = services.setUp {
+        val previousAccountStore = if (KtorAuthnzManager.isAccountStoreConfigured) KtorAuthnzManager.accountStore else null
+        val previousSessionStore = KtorAuthnzManager.sessionStore
+        val previousTokenHandler = KtorAuthnzManager.tokenHandler
+        val previousExpiringStore = KtorAuthnzManager.expiringStore
+        val previousPasskeys = KtorAuthnzManager.passkeys
+        val previousEmailCodes = KtorAuthnzManager.emailCodes
+        services.onClose {
+            previousAccountStore?.let { KtorAuthnzManager.accountStore = it }
+            KtorAuthnzManager.sessionStore = previousSessionStore
+            KtorAuthnzManager.tokenHandler = previousTokenHandler
+            KtorAuthnzManager.expiringStore = previousExpiringStore
+            KtorAuthnzManager.passkeys = previousPasskeys
+            KtorAuthnzManager.emailCodes = previousEmailCodes
+        }
+        idp = services.own(ExampleIdentityProvider(clientId = "app"))
+        verifier = services.own(ExampleVerifier())
+        directory = services.own(ExampleDirectory(mapOf("user3@example.org" to "directory-password"), domain = "example", nameAttribute = "mail"))
+        runBlocking {
+            KtorAuthnzManager.sessionStore = InMemorySessionStore()
+            KtorAuthnzManager.expiringStore = InMemoryExpiringStore()
+            KtorAuthnzManager.tokenHandler = KtorAuthNzTokenHandler()
+            KtorAuthnzManager.passkeys = passkeySettings
 
-        user1 = accounts.addAccount(
-            EmailIdentifier("user1@example.org"),
-            identifierData = mapOf(EmailPass.id to EmailPassStoredData(password = "user1-password")),
-            accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret), Identify.id to IdentifyStoredData(AccountFlows.passwordAndTotpOrEmailCode)),
-        )
-        user2 = accounts.addAccount(
-            EmailIdentifier("user2@example.org"),
-            VerifiableCredentialIdentifier("credentialSubject/id", "did:key:user2"),
-            accountData = mapOf(Identify.id to IdentifyStoredData(AccountFlows.passkeyOrWallet)),
-        )
-        registerPasskey(user2, authenticator)
-        user3 = accounts.addAccount(
-            EmailIdentifier("user3@example.org"),
-            OIDCIdentifier(idp.issuer, "idp-user3"),
-            LDAPIdentifier(directory.url, "user3@example.org"),
-            accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret), Identify.id to IdentifyStoredData(AccountFlows.identityProviderOrDirectoryAndTotp)),
-        )
-        user4 = accounts.addAccount(
-            EmailIdentifier("user4@example.org"),
-            identifierData = mapOf(EmailPass.id to EmailPassStoredData(password = "user4-password")),
-        )
-        other = accounts.addAccount(EmailIdentifier("other@example.org"))
-        registerPasskey(other, otherAuthenticator)
+            user1 = accounts.addAccount(
+                EmailIdentifier("user1@example.org"),
+                identifierData = mapOf(EmailPass.id to EmailPassStoredData(password = "user1-password")),
+                accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret), Identify.id to IdentifyStoredData(AccountFlows.passwordAndTotpOrEmailCode)),
+            )
+            user2 = accounts.addAccount(
+                EmailIdentifier("user2@example.org"),
+                VerifiableCredentialIdentifier("credentialSubject/id", "did:key:user2"),
+                accountData = mapOf(Identify.id to IdentifyStoredData(AccountFlows.passkeyOrWallet)),
+            )
+            registerPasskey(user2, authenticator)
+            user3 = accounts.addAccount(
+                EmailIdentifier("user3@example.org"),
+                OIDCIdentifier(idp.issuer, "idp-user3"),
+                LDAPIdentifier(directory.url, "user3@example.org"),
+                accountData = mapOf(TOTP.id to TOTPStoredData(totpSecret), Identify.id to IdentifyStoredData(AccountFlows.identityProviderOrDirectoryAndTotp)),
+            )
+            user4 = accounts.addAccount(
+                EmailIdentifier("user4@example.org"),
+                identifierData = mapOf(EmailPass.id to EmailPassStoredData(password = "user4-password")),
+            )
+            other = accounts.addAccount(EmailIdentifier("other@example.org"))
+            registerPasskey(other, otherAuthenticator)
+        }
     }
 
     @AfterTest
-    fun tearDown() {
-        idp.close(); verifier.close(); directory.close()
-        KtorAuthnzManager.passkeys = null
-    }
+    fun tearDown() = services.close()
 
     /** What the application's "add a passkey" page does, done directly: registers a passkey of [accountId]. */
     private suspend fun registerPasskey(accountId: String, device: ExampleAuthenticator) {
