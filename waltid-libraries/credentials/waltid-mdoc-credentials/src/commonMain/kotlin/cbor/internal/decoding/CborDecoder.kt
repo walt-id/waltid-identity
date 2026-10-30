@@ -377,9 +377,8 @@ internal class CborDecoder(private val input: ByteArrayInput) {
     fun skipElement() {
         val lengthStack = mutableListOf<Int>()
 
-        skipOverTags()
-
         do {
+            skipOverTags()
             if (isEof()) throw CborDecodingException("Unexpected EOF while skipping element")
 
             if (isIndefinite()) {
@@ -392,8 +391,7 @@ internal class CborDecoder(private val input: ByteArrayInput) {
                 val header = curByte and 0b111_00000
                 val length = elementLength()
                 if (header == HEADER_ARRAY || header == HEADER_MAP) {
-                    if (length > 0) lengthStack.add(length)
-                    skipOverTags()
+                    if (length > 0) lengthStack.add(length) else prune(lengthStack)
                 } else {
                     input.skip(length)
                     prune(lengthStack)
