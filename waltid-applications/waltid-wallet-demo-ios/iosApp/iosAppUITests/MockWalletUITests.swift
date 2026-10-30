@@ -650,6 +650,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: [
             "E2E_MOCK_WALLET": "1",
             "E2E_MOCK_TX_CODE_REQUIRED": "1",
+            "E2E_MOCK_WALLET_DELAY_MS": "1500",
         ])
 
         XCTAssertEqual(
