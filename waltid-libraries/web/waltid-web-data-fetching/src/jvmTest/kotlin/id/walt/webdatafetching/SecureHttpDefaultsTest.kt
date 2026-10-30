@@ -5,6 +5,7 @@ import id.walt.webdatafetching.config.LoggingConfiguration
 import id.walt.webdatafetching.config.RequestEngineConfiguration
 import id.walt.webdatafetching.config.TimeoutConfiguration
 import id.walt.webdatafetching.config.headerIsSanitized
+import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.java.Java
 import io.ktor.client.plugins.logging.Logger
@@ -26,14 +27,16 @@ import kotlin.time.Duration.Companion.seconds
 
 class SecureHttpDefaultsTest {
 
+    // An assigned allowLoopback wins over walt.ssrf.allowLoopback, so a property alone would depend on which
+    // guard test ran last in this JVM.
     @BeforeTest
     fun allowLoopbackForLocalServers() {
-        System.setProperty("walt.ssrf.allowLoopback", "true")
+        PrivateNetworkGuardSettings.allowLoopback = true
     }
 
     @AfterTest
-    fun clearLoopbackProperty() {
-        System.clearProperty("walt.ssrf.allowLoopback")
+    fun restoreLoopbackChoice() {
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
     }
 
     @Test

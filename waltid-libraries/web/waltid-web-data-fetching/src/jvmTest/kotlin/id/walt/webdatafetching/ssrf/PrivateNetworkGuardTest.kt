@@ -34,7 +34,7 @@ class PrivateNetworkGuardTest {
     @AfterTest
     fun resetSettings() {
         System.clearProperty("walt.ssrf.allowLoopback")
-        PrivateNetworkGuardSettings.allowLoopback = false
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
         PrivateNetworkGuardSettings.allowPrivateNetworks = false
         PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
     }
