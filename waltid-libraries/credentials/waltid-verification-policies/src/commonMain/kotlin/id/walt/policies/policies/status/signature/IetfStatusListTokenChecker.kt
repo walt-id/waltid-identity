@@ -14,7 +14,11 @@ import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
 
 internal const val RAW_CREDENTIAL_CONTEXT_KEY = "id.walt.policies.status.raw-credential"
 
-internal const val STATUS_LIST_SIGNER_AUTHORIZER_CONTEXT_KEY = "id.walt.policies.status.signer-authorizer"
+/**
+ * Policy-context key for a [id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer].
+ * Enterprise Verifier 1 registers the deployment's status-list signer authorizer under this key.
+ */
+const val STATUS_LIST_SIGNER_AUTHORIZER_CONTEXT_KEY = "id.walt.policies.status.signer-authorizer"
 
 /**
  * Verifies an IETF status-list JWT or hex-encoded CWT before its status bits are read.
