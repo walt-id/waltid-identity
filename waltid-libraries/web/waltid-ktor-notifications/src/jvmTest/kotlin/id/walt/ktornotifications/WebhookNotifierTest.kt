@@ -43,7 +43,7 @@ class WebhookNotifierTest {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val failure = assertFailsWith<IllegalArgumentException> {
+            val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
                 WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             }
             assertEquals(BLOCKED, failure.message)
@@ -55,7 +55,7 @@ class WebhookNotifierTest {
 
     @Test
     fun `a private address is refused`() = runTest {
-        val failure = assertFailsWith<IllegalArgumentException> {
+        val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
             WebhookNotifier.notify(update, webhook("http://10.0.0.5/hook"))
         }
         assertEquals(BLOCKED, failure.message)
@@ -64,7 +64,7 @@ class WebhookNotifierTest {
     @Test
     fun `cloud metadata stays refused when loopback and private networks are allowed`() = runTest {
         guard(allowLoopback = true, allowPrivateNetworks = true)
-        val failure = assertFailsWith<IllegalArgumentException> {
+        val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
             WebhookNotifier.notify(update, webhook("http://169.254.169.254/latest/meta-data/"))
         }
         assertEquals(BLOCKED, failure.message)
@@ -110,7 +110,7 @@ class WebhookNotifierTest {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val failure = assertFailsWith<IllegalArgumentException> {
+            val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
                 WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             }
             assertEquals(BLOCKED, failure.message)

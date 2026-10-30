@@ -15,6 +15,10 @@ import io.ktor.utils.io.*
 import java.net.UnknownHostException
 import java.nio.channels.UnresolvedAddressException
 
+/** The private-network guard refused the webhook URL; the guard has already logged the destination. */
+class WebhookDestinationNotAllowedException(cause: Throwable) :
+    IllegalArgumentException("Webhook destination is not allowed (network-fetch-guard.conf)", cause)
+
 object WebhookNotifier {
 
     private val webhookClient = HttpClient(OkHttp) {
@@ -78,10 +82,7 @@ object WebhookNotifier {
             if (ex is CancellationException) throw ex
             val causes = generateSequence(ex) { it.cause }
             if (causes.any { it is BlockedAddressException }) {
-                throw IllegalArgumentException(
-                    "Webhook destination is not allowed (network-fetch-guard.conf)",
-                    ex,
-                )
+                throw WebhookDestinationNotAllowedException(ex)
             }
             if (ex is ConnectTimeoutException || causes.any { it is UnknownHostException || it is UnresolvedAddressException }) {
                 throw IllegalArgumentException(
