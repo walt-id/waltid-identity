@@ -3,6 +3,8 @@ package id.walt.issuer2.repository
 import id.walt.issuer2.domain.IssuanceSession
 
 interface IssuanceSessionRepository {
+    suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+        throw UnsupportedOperationException("Atomic issuance session update is not implemented")
     suspend fun save(session: IssuanceSession): IssuanceSession
     suspend fun get(sessionId: String): IssuanceSession?
     suspend fun list(): List<IssuanceSession>

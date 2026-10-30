@@ -27,6 +27,7 @@ data class Issuer2ServiceConfig(
     val keyAttestationConfig: KeyAttestationConfig? = null,
     /** Optional dedicated metadata signer, separate from token and credential signing. */
     val signedMetadata: SignedMetadataConfig? = null,
+    val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(
