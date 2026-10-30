@@ -560,14 +560,31 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
-        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
         let savedPrefix = "issuance-saved-"
-        let savedCredentials = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", savedPrefix))
-        XCTAssertTrue(savedCredentials.firstMatch.waitForExistence(timeout: 10))
-        let savedCredentialIDs = Set(savedCredentials.allElementsBoundByIndex.map {
-            String($0.identifier.dropFirst(savedPrefix.count))
-        })
+        var savedCredentialIDs = Set<String>()
+        func captureReceipt() -> Bool {
+            guard let snapshot = try? app.snapshot() else { return false }
+            var remaining = [snapshot]
+            var done = false
+            var capturedIDs = Set<String>()
+            while let element = remaining.popLast() {
+                done = done || (element.elementType == .button && element.identifier == "issuance-done")
+                if element.identifier.hasPrefix(savedPrefix) {
+                    capturedIDs.insert(String(element.identifier.dropFirst(savedPrefix.count)))
+                }
+                remaining.append(contentsOf: element.children)
+            }
+            // Keep the receipt's IDs from one snapshot before automatic dismissal removes its rows.
+            if done && !capturedIDs.isEmpty { savedCredentialIDs = capturedIDs }
+            return done
+        }
+        let receipt = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in captureReceipt() }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [receipt], timeout: credentialOperationTimeout), .completed, app.debugDescription)
+        let saved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            if savedCredentialIDs.isEmpty { _ = captureReceipt() }
+            return !savedCredentialIDs.isEmpty
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [saved], timeout: 10), .completed, app.debugDescription)
         XCTAssertFalse(savedCredentialIDs.isEmpty)
 
         app.terminate()
