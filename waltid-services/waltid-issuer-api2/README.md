@@ -409,8 +409,8 @@ profile snapshot. The array receipt contains only the common flat receipt fields
 has no `profileId`, selection array, or configuration inventory, even for one entry.
 The wallet resolves the returned offer to obtain its OpenID4VCI configuration IDs.
 
-`AUTHORIZED` offers default to `issuerStateMode = OMIT`, matching Enterprise. Missing
-or null `issuerStateMode` omits `issuer_state` for both single and multi-credential
+`AUTHORIZED` immediate offers default to `issuerStateMode = OMIT`, matching Enterprise. Missing
+or null `issuerStateMode` omits `issuer_state` for both single and multi-credential immediate
 requests, by reference or by value. Runtime overrides require an explicit
 `"issuerStateMode": "INCLUDE"`; missing, null, or `OMIT` with overrides returns Bad Request.
 Without `issuer_state`, authorization creates a profile-derived session rather than
@@ -640,3 +640,70 @@ OAuth errors, and explicitly configured anonymous pre-authorized requests remain
 
 Attestation challenges are separate from credential proof `c_nonce` values from `/nonce`;
 neither can substitute for the other.
+
+
+## Deferred issuance
+
+Set `"deferred": true` on either single-profile or multi-credential offer requests.
+The existing `offerId` identifies the approval decision; credential data and mappings
+still come from the profile and offer overrides. Existing offers remain immediate.
+
+```json
+{
+  "profileId": "your-profile",
+  "authMethod": "PRE_AUTHORIZED",
+  "deferred": true
+}
+```
+
+Approve the entire offer with a bodyless `POST /issuer2/credential-offers/{offerId}/deferred/complete`,
+or deny it with `POST /issuer2/credential-offers/{offerId}/deferred/deny`.
+Both return `204`. Repeating the same decision succeeds; reversing it or using an
+ordinary offer returns `409`. Unknown or expired offers return `404`.
+Completion leaves the session `ACTIVE` and performs no signing or issuance accounting.
+
+Existing session inspection includes `deferredStatus`: `PENDING`, `READY`, or `DENIED`.
+Successful collection of all selected credentials changes the session to `SUCCESSFUL`
+while preserving `READY`. Denial changes it to `UNSUCCESSFUL` and preserves the denial
+until the deferred deadline. The private transaction and holder-binding records are
+excluded from session inspection.
+
+The wallet sends its normal Credential Request with valid proofs. A pending offer
+returns HTTP `202` with `transaction_id` and `interval` (seconds). Poll the advertised
+`deferred_credential_endpoint` (`/openid4vci/deferred_credential`) with:
+
+```json
+{"transaction_id": "the-transaction-id"}
+```
+
+Every poll requires a valid access token authorizing that transaction's credentials,
+plus a fresh DPoP proof bound to the deferred endpoint when the token is DPoP-bound.
+Refreshed tokens work without resubmitting the original holder proof. Encrypted polls
+use the same `application/jwt` request encryption and response encryption parameters
+as the Credential Endpoint. Ready collection returns HTTP `200` with credentials;
+pending collection returns `202`. Denial returns `credential_request_denied`; unknown,
+expired, consumed, or unauthorized transactions return `invalid_transaction_id`.
+Each transaction can be collected once. One offer can contain multiple transactions,
+including a batch of holder proofs for a selected credential. Completing an offer
+before its first Credential Request allows immediate issuance from that request.
+
+Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
+in the issuer service configuration):
+
+```hocon
+deferredIssuance {
+  pollingIntervalSeconds = 30
+  lifetimeSeconds = 604800
+}
+```
+
+The existing offer start deadline still applies. After the first successful token
+issuance, the deferred session and refresh authorization have a fixed seven-day
+deadline by default. Polling, approval, and refresh never extend it. Deferred
+`AUTHORIZED` offers default an omitted `issuerStateMode` to `INCLUDE`; explicit
+`OMIT` is rejected so that authorization retains the original offer association.
+
+Use Redis for persistence across OSS restarts. Atomic claims serialize collection;
+verified public holder bindings, allocated progress, and prepared credential responses
+are retained for recovery. A live worker renews its processing lease; an abandoned
+claim becomes recoverable after five minutes, without extending the offer deadline.
