@@ -3,6 +3,7 @@ package id.walt.policies2.vc.policies.status.validator
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.policies.status.CredentialFetcher
 import id.walt.policies2.vc.policies.status.StatusListContent
+import id.walt.policies2.vc.policies.status.runStatusCheck
 import id.walt.policies2.vc.policies.status.model.StatusContent
 import id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.StatusRetrievalError
@@ -12,12 +13,12 @@ import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
+import id.walt.policies2.vc.policies.status.signature.IetfStatusListTokenClaims
 import id.walt.policies2.vc.policies.status.signature.VerifiedStatusList
 import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.policies.status.model.StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
@@ -34,7 +35,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         attribute: T,
         referencedCredential: DigitalCredential?,
         signerAuthorizer: StatusListSignerAuthorizer?,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = runStatusCheck {
         logger.debug { "Credential URL: ${entry.uri}" }
         val statusListContent = fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
@@ -51,10 +52,8 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
                 ),
                 signerAuthorizer,
             )
-            if (entry is IETFEntry && verified.payload is JsonObject) {
-                require(verified.payload["sub"]?.jsonPrimitive?.contentOrNull == entry.uri) {
-                    "IETF status-list token subject does not match referenced status-list URI"
-                }
+            if (entry is IETFEntry) {
+                validateIetfClaims(verified, entry.uri)
             }
         }
         
@@ -94,6 +93,15 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         
         logger.debug { "Status list signature verified successfully" }
         return verified
+    }
+
+    private fun validateIetfClaims(verified: VerifiedStatusList<*>, statusListUri: String) {
+        val now = Clock.System.now().epochSeconds
+        when (val payload = verified.payload) {
+            is JsonObject -> IetfStatusListTokenClaims.validate(payload, statusListUri, now)
+            is ByteArray -> IetfStatusListTokenClaims.validate(payload, statusListUri, now)
+            else -> throw StatusVerificationError("Unsupported verified status-list payload")
+        }
     }
     
     private fun isJwt(content: String): Boolean {

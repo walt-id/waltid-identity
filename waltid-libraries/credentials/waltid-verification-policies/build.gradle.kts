@@ -29,6 +29,9 @@ kotlin {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
             implementation(project(":waltid-libraries:credentials:waltid-status-list"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+            implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))//for Base64Utils
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
 
@@ -53,6 +56,8 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.slf4j.simple)
+            implementation(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.ktor.server.test.host)
             implementation(identityLibs.ktor.server.content.negotiation)
