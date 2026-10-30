@@ -58,6 +58,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1983,31 +1984,31 @@ object WalletPresentationHandler {
         selectedPaths: Set<String>,
     ): DcqlMatcher.DcqlMatchResult {
         val plan = originalQuery.claimSelectionPlan()
-        val disclosures = availablePresentationDisclosures(plan) ?: run {
+        val claims = availablePresentationClaims(plan) ?: run {
             require(selectedPaths.isEmpty()) {
                 "Selected disclosure option does not match the presentation preview"
             }
             return this
         }
-        val selectivelyDisclosablePaths = disclosures
-            .filterValues { value -> value is DcqlDisclosure }
+        val selectivelyDisclosablePaths = claims
+            .filterValues { claim -> claim.selectivelyDisclosable }
             .keys
         val unknownPaths = selectedPaths - selectivelyDisclosablePaths
         require(unknownPaths.isEmpty()) {
             "Selected disclosure option does not match a selectively disclosable presentation claim"
         }
         val retainedPaths = plan.requiredPaths + selectedPaths
-        val retainedClaimPaths = retainedPaths + disclosures
-            .filterValues { value -> value !is DcqlDisclosure }
+        val retainedClaimPaths = retainedPaths + claims
+            .filterValues { claim -> !claim.selectivelyDisclosable }
             .keys
         require(plan.satisfiedBy(retainedClaimPaths)) {
             "Selected disclosure option(s) do not satisfy required presentation claim constraints"
         }
 
+        val retainedClaims = claims.filter { (path, claim) -> !claim.selectivelyDisclosable || path in retainedPaths }
         return copy(
-            selectedDisclosures = disclosures.filter { (path, value) ->
-                value !is DcqlDisclosure || path in retainedPaths
-            }
+            selectedDisclosures = retainedClaims.mapValues { (_, claim) -> claim.value },
+            disclosuresByPath = retainedClaims.mapValues { (_, claim) -> claim.disclosures },
         )
     }
 
@@ -2119,19 +2120,19 @@ object WalletPresentationHandler {
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()
-        val requested = availablePresentationDisclosures(plan).orEmpty().map { (path, value) ->
+        val requested = availablePresentationClaims(plan).orEmpty().map { (path, claim) ->
             val required = plan.isRequired(path)
-            val selectable = plan.isSelectable(path, value)
-            when (value) {
-                is DcqlDisclosure -> PresentationDisclosure(
+            val value = claim.value
+            when {
+                claim.selectivelyDisclosable -> PresentationDisclosure(
                     path = path,
-                    name = value.name,
-                    value = value.value,
+                    name = (value as? DcqlDisclosure)?.name ?: claimName(path) ?: path.substringAfterLast('.', path),
+                    value = disclosedValue(path, claim),
                     selectivelyDisclosable = true,
                     required = required,
-                    selectable = selectable,
+                    selectable = plan.isSelectable(path, claim),
                 )
-                is JsonElement -> PresentationDisclosure(
+                value is JsonElement -> PresentationDisclosure(
                     path = path,
                     name = path.substringAfterLast('.', path),
                     value = value,
@@ -2142,7 +2143,7 @@ object WalletPresentationHandler {
                 else -> PresentationDisclosure(
                     path = path,
                     name = path.substringAfterLast('.', path),
-                    value = JsonPrimitive(value.toString()),
+                    value = (value as? DcqlDisclosure)?.value ?: JsonPrimitive(value.toString()),
                     selectivelyDisclosable = false,
                     required = required,
                     selectable = false,
@@ -2185,36 +2186,91 @@ object WalletPresentationHandler {
         return claims
     }
 
-    private fun DcqlMatcher.DcqlMatchResult.availablePresentationDisclosures(
-        plan: ClaimSelectionPlan,
-    ): Map<String, Any>? {
-        val selected = selectedDisclosures ?: return null
-        if (plan.optionalPaths.isEmpty()) return selected
+    /**
+     * The last claim name in the requested path, e.g. `nationalities` for `["nationalities", 1]`.
+     * Array elements have no name of their own, so rows for them are labelled after their array.
+     */
+    private fun DcqlMatcher.DcqlMatchResult.claimName(path: String): String? =
+        originalQuery.claims.orEmpty().firstOrNull { it.pathKey() == path }?.path
+            ?.lastOrNull { segment -> segment is JsonPrimitive && segment.isString }
+            ?.jsonPrimitive?.content
 
-        val expanded = linkedMapOf<String, Any>()
+    /** A requested claim with the disclosures presenting it; none when it is visible without disclosures. */
+    private class PresentationClaim(val value: Any, val disclosures: List<DcqlDisclosure>) {
+        val selectivelyDisclosable: Boolean get() = disclosures.isNotEmpty()
+    }
+
+    private fun DcqlMatcher.DcqlMatchResult.availablePresentationClaims(
+        plan: ClaimSelectionPlan,
+    ): Map<String, PresentationClaim>? {
+        val selected = selectedDisclosures ?: return null
+        fun claim(path: String, value: Any) = PresentationClaim(value, disclosuresByPath[path] ?: listOfNotNull(value as? DcqlDisclosure))
+        if (plan.optionalPaths.isEmpty()) return selected.mapValues { (path, value) -> claim(path, value) }
+
+        val expanded = linkedMapOf<String, PresentationClaim>()
         val selectedByPath = selected.toMutableMap()
         originalQuery.claims.orEmpty().forEach { claim ->
             val path = claim.pathKey()
             val selectedValue = selectedByPath.remove(path)
             when {
-                selectedValue != null -> expanded[path] = selectedValue
-                path in plan.optionalPaths -> findMatchingDisclosure(claim)?.let { expanded[path] = it }
+                selectedValue != null -> expanded[path] = claim(path, selectedValue)
+                path in plan.optionalPaths -> matchOptionalClaim(claim)?.let { expanded[path] = it }
             }
         }
-        selectedByPath.forEach { (path, value) -> expanded[path] = value }
+        selectedByPath.forEach { (path, value) -> expanded[path] = claim(path, value) }
         return expanded
     }
 
-    private fun DcqlMatcher.DcqlMatchResult.findMatchingDisclosure(claim: ClaimsQuery): DcqlDisclosure? {
+    /** An optional claim outside the claim set the matcher chose, offered only if it can be withheld. */
+    private fun DcqlMatcher.DcqlMatchResult.matchOptionalClaim(claim: ClaimsQuery): PresentationClaim? {
+        DcqlMatcher.matchClaim(credential, claim).getOrNull()
+            ?.takeIf { match -> match.disclosures.isNotEmpty() }
+            ?.let { match -> return PresentationClaim(match.value ?: JsonArray(emptyList()), match.disclosures) }
+
+        // Disclosures without a location can only be found by claim name
         val claimName = claim.path
             .lastOrNull { pathPart -> pathPart is JsonPrimitive && pathPart.isString }
             ?.jsonPrimitive?.content
             ?: return null
         val allowedValues = claim.values.orEmpty()
-
         return credential.disclosures?.firstOrNull { disclosure ->
-            disclosure.name == claimName && (allowedValues.isEmpty() || disclosure.value in allowedValues)
+            disclosure.location == null && disclosure.name == claimName &&
+                (allowedValues.isEmpty() || disclosure.value in allowedValues)
+        }?.let { PresentationClaim(it, listOf(it)) }
+    }
+
+    /**
+     * What the verifier sees at [path] once [claim]'s disclosures are presented: claims and array elements
+     * with a disclosure of their own that is not presented are left out, so consent matches the presentation.
+     */
+    private fun DcqlMatcher.DcqlMatchResult.disclosedValue(path: String, claim: PresentationClaim): JsonElement {
+        val fallback = (claim.value as? DcqlDisclosure)?.value ?: claim.value as? JsonElement ?: JsonPrimitive(claim.value.toString())
+        val claimPath = originalQuery.claims.orEmpty().firstOrNull { it.pathKey() == path }?.path ?: return fallback
+        val presentedLocations = claim.disclosures.map { it.location ?: return fallback }.toSet()
+        val withheldLocations = credential.disclosures.orEmpty().mapNotNull { it.location }.filterNot { it in presentedLocations }.toSet()
+
+        fun isWithheld(location: List<JsonElement>) =
+            withheldLocations.any { it.size <= location.size && it == location.subList(0, it.size) }
+
+        // Only the selected claim's own subtree is walked; a leaf is returned as is
+        fun withoutWithheld(element: JsonElement, location: List<JsonElement>): JsonElement = when (element) {
+            is JsonObject -> JsonObject(element.mapNotNull { (key, value) ->
+                val child = location + JsonPrimitive(key)
+                if (child in withheldLocations) null else key to withoutWithheld(value, child)
+            }.toMap())
+            is JsonArray -> JsonArray(element.mapIndexedNotNull { index, value ->
+                val child = location + JsonPrimitive(index)
+                if (child in withheldLocations) null else withoutWithheld(value, child)
+            })
+            else -> element
         }
+
+        val root = (credential.data["vc"] as? JsonObject) ?: credential.data
+        val selectedValues = DcqlMatcher.processClaimsPath(root, claimPath).getOrElse { return fallback }
+            // A selected claim is withheld only when `values` filtered it out
+            .filterNot { (location, _) -> isWithheld(location) }
+            .map { (location, value) -> withoutWithheld(value, location) }
+        return selectedValues.singleOrNull()?.takeIf { claimPath.lastOrNull() !is JsonNull } ?: JsonArray(selectedValues)
     }
 
     private data class ClaimSelectionPlan(
@@ -2225,7 +2281,7 @@ object WalletPresentationHandler {
     ) {
         fun isRequired(path: String): Boolean = path in requiredPaths
 
-        fun isSelectable(path: String, value: Any): Boolean = path in optionalPaths && value is DcqlDisclosure
+        fun isSelectable(path: String, claim: PresentationClaim): Boolean = path in optionalPaths && claim.selectivelyDisclosable
 
         fun satisfiedBy(selectedPathKeys: Set<String>): Boolean =
             claimSetOptions
