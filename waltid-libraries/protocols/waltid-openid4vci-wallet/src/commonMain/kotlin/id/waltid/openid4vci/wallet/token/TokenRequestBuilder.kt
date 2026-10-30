@@ -588,6 +588,20 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
     }
     }
 
+    /**
+     * `additionalHeaders`/`tokenRequestHeaders` is caller-controlled (an enterprise API caller supplies it for
+     * client authentication against their own token endpoint - overriding `Host` for tenant/virtual-host
+     * routing is a deliberately supported use of it too, see [TokenRequestBuilderTest]). Block only headers
+     * that could corrupt the request at the wire level; the actual SSRF surface (reaching an internal
+     * target at all) is closed by the private-network guard on the underlying client, not by header
+     * filtering, so this stays narrow rather than a general allowlist.
+     */
+    private fun isBlockedTokenRequestHeader(name: String): Boolean {
+        if (name.equals(HttpHeaders.ContentLength, ignoreCase = true)) return true
+        if (name.equals(HttpHeaders.TransferEncoding, ignoreCase = true)) return true
+        return false
+    }
+
     private fun isSameOrigin(source: String, target: String): Boolean {
         val sourceUrl = Url(source)
         val targetUrl = Url(target)
@@ -601,7 +615,12 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
         attestationHeaders: ClientAttestationHeaders?,
         dpopProof: String? = null,
     ) {
-        additionalHeaders.forEach { (name, value) -> header(name, value) }
+        additionalHeaders.forEach { (name, value) ->
+            require(!isBlockedTokenRequestHeader(name)) {
+                "'$name' cannot be set via additionalHeaders/tokenRequestHeaders"
+            }
+            header(name, value)
+        }
         attestationHeaders?.let {
             header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
             header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)

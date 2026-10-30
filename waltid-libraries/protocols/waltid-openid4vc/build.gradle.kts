@@ -30,6 +30,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             // walt.id
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
@@ -38,7 +39,6 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
-            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             // -- Multiplatform --
 
@@ -58,6 +58,7 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(identityLibs.ktor.client.java)
+            implementation(identityLibs.ktor.client.okhttp)
             implementation(identityLibs.java.cose)
             implementation(identityLibs.nimbus.jose.jwt)
         }

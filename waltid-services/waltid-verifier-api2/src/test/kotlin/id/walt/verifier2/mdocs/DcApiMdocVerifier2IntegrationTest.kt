@@ -3,12 +3,6 @@ package id.walt.verifier2.mdocs
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.verifier2.freePort
-import id.walt.credentials.formats.MdocsCredential
-import id.walt.credentials.representations.X5CCertificateString
-import id.walt.credentials.representations.X5CList
-import id.walt.credentials.signatures.CoseCredentialSignature
-import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -37,7 +31,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
@@ -97,33 +90,23 @@ class DcApiMdocVerifier2IntegrationTest {
      * here is attributable to the DC API path rather than to the credential.
      */
     private val walletCredentials = listOf(
-        MdocsCredential(
-            credentialData = Json.decodeFromString(
-                """
-                {
-                    "org.iso.18013.5.1": {
-                        "family_name": "Doe",
-                        "given_name": "John",
-                        "birth_date": "1986-03-22",
-                        "issue_date": "2019-10-20",
-                        "expiry_date": "2024-10-20",
-                        "issuing_country": "AT",
-                        "issuing_authority": "AT DMV",
-                        "document_number": 123456789,
-                        "un_distinguishing_sign": "AT"
-                    },
-                    "docType": "org.iso.18013.5.1.mDL"
-                }
-                """
-            ),
-            signed = MDL_FIXTURE_SIGNED_HEX,
-            docType = "org.iso.18013.5.1.mDL",
-            signature = CoseCredentialSignature(
-                x5cList = X5CList(listOf(X5CCertificateString(MDL_FIXTURE_X5C))),
-                signerKey = DirectSerializedKey(
-                    runBlocking { KeyManager.resolveSerializedKey(MDL_FIXTURE_SIGNER_JWK) }
-                ),
-            ),
+        mdlFixtureCredential(
+            """
+            {
+                "org.iso.18013.5.1": {
+                    "family_name": "Doe",
+                    "given_name": "John",
+                    "birth_date": "1986-03-22",
+                    "issue_date": "2019-10-20",
+                    "expiry_date": "2024-10-20",
+                    "issuing_country": "AT",
+                    "issuing_authority": "AT DMV",
+                    "document_number": 123456789,
+                    "un_distinguishing_sign": "AT"
+                },
+                "docType": "org.iso.18013.5.1.mDL"
+            }
+            """
         )
     )
 
