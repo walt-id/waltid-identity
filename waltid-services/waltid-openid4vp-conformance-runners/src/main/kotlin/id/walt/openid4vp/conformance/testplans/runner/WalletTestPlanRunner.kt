@@ -2,6 +2,7 @@ package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.http.SuiteReachedTerminalBeforeReady
 import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletModuleApplicability
@@ -178,15 +179,47 @@ class WalletTestPlanRunner(
         var attempt = 0
         while (true) {
             attempt++
-            val result = runModule(testPlanId, module)
-            val reset = result.conformanceResult == "ERROR" &&
-                result.errorMessage?.contains("connection reset", ignoreCase = true) == true
-            if (attempt == 1 && reset) {
-                println("   Retrying ${module.testModule} once after a connection reset")
-                continue
+            try {
+                val result = runModule(testPlanId, module)
+                val reset = result.conformanceResult == "ERROR" &&
+                    result.errorMessage?.contains("connection reset", ignoreCase = true) == true
+                if (attempt == 1 && reset) {
+                    println("   Retrying ${module.testModule} once after a connection reset")
+                    continue
+                }
+                return result
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: SuiteReachedTerminalBeforeReady) {
+                if (attempt == 1 && interruptedBeforeReadyByGateway(e)) {
+                    println(
+                        "   Retrying ${module.testModule} once: the suite interrupted it before " +
+                            "WAITING after a gateway status from the tunnel",
+                    )
+                    continue
+                }
+                return TestPlanResult(
+                    testName = "${testPlan.producerId}/${module.testModule}",
+                    conformanceTestId = e.testId,
+                    conformanceStatus = e.status,
+                    conformanceResult = "ERROR",
+                    walletStatus = "ERROR",
+                    errorMessage = e.message ?: "Unknown error",
+                )
             }
-            return result
         }
+    }
+
+    private suspend fun interruptedBeforeReadyByGateway(error: SuiteReachedTerminalBeforeReady): Boolean {
+        val log = try {
+            conformance.getTestLog(error.testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("   Could not read the suite log before a tunnel retry (${e::class.simpleName})")
+            return false
+        }
+        return ConformanceTransportRetry.interruptedBeforeReadyByGateway(error, log)
     }
 
     /**
@@ -264,6 +297,18 @@ class WalletTestPlanRunner(
             )
 
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: SuiteReachedTerminalBeforeReady) {
+            val id = testId
+            if (id != null) {
+                try {
+                    conformance.cancelTest(id)
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (cancel: Exception) {
+                    println("   Could not cancel test before retry (${cancel::class.simpleName})")
+                }
+            }
             throw e
         } catch (e: Exception) {
             val id = testId

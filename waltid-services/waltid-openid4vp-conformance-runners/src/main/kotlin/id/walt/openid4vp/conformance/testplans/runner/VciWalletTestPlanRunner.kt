@@ -10,6 +10,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -147,9 +148,24 @@ class VciWalletTestPlanRunner(
         testPlanId: String,
         module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module
     ): TestPlanResult {
+        val first = runModuleOnce(testPlanId, module)
+        if (!interruptedByGateway(first)) return first
+        cancelQuietly(first.conformanceTestId)
+        println(
+            "   Retrying ${module.testModule} once: the suite interrupted it after a gateway status from the tunnel",
+        )
+        return runModuleOnce(testPlanId, module)
+    }
+
+    private suspend fun runModuleOnce(
+        testPlanId: String,
+        module: id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse.Module
+    ): TestPlanResult {
         var testId: String? = null
         try {
             return runModuleAttempt(testPlanId, module) { testId = it }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return TestPlanResult(
                 testName = "${testPlan.producerId}/${module.testModule}",
@@ -158,6 +174,31 @@ class VciWalletTestPlanRunner(
                 walletStatus = "ERROR",
                 errorMessage = e.message ?: e.toString(),
             )
+        }
+    }
+
+    private suspend fun interruptedByGateway(result: TestPlanResult): Boolean {
+        if (!result.conformanceStatus.equals("INTERRUPTED", ignoreCase = true)) return false
+        val testId = result.conformanceTestId.takeIf { it.isNotBlank() } ?: return false
+        val log = try {
+            conformance.getTestLog(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("   Could not read the suite log before a tunnel retry (${e::class.simpleName})")
+            return false
+        }
+        return ConformanceTransportRetry.interruptedByGateway(result.conformanceStatus, log)
+    }
+
+    private suspend fun cancelQuietly(testId: String) {
+        if (testId.isBlank()) return
+        try {
+            conformance.cancelTest(testId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("   Could not cancel test before retry (${e::class.simpleName})")
         }
     }
 
