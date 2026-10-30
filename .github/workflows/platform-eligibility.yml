@@ -143,7 +143,7 @@ jobs:
               fi
 
               if [[ -n "${PR_EXCLUDE_LABEL:-}" ]]; then
-                excluded="$(jq -r --arg label "$PR_EXCLUDE_LABEL" 'index($label) != null' <<< "$PR_LABELS")"
+                excluded="$(jq -r --arg deferred_label "$PR_EXCLUDE_LABEL" 'index($deferred_label) != null' <<< "$PR_LABELS")"
                 if [[ "$excluded" == "true" ]]; then
                   set_decision false "$PR_EXCLUDE_LABEL defers the ${PLATFORM_NAME} group"
                   exit 0
