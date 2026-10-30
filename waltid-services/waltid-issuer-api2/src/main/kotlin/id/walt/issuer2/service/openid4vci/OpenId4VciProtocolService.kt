@@ -1,5 +1,8 @@
 package id.walt.issuer2.service.openid4vci
 
+import kotlin.time.Duration.Companion.seconds
+import id.walt.openid4vci.deferred.*
+import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
@@ -135,11 +138,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     private val keyAttestation: KeyAttestationVerificationOptions? = null,
     private val attestationChallengeService: AttestationChallengeService? = null,
+    private val deferredConfig: DeferredIssuanceConfig = DeferredIssuanceConfig(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
+    private val deferredIssuance = DeferredIssuance(sessionService.deferredStore, deferredConfig)
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun processChallengeRequest(requestId: String): AttestationChallengeResponseHttp {
@@ -737,6 +742,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     return response
                 }
 
+                result.credentialAuthorization?.issuanceDeadline?.let { deferredIssuance.start(sessionId, it) }
                 val authorizedSession = establishIssuanceSelection(
                     session,
                     requireNotNull(result.credentialAuthorization).credentialIdentifiers
@@ -760,7 +766,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             "Token request has no issuance session"
         }
         val session = sessionService.getSession(sessionId)
-        if (session.isClosed) {
+        if (session.isClosed && !(session.deferredStatus == DeferredStatus.DENIED && refreshGrant != null)) {
             throw InvalidTokenCredentialAuthorization(
                 accessTokenRequest,
                 "Issuance session is closed; restart authorization"
@@ -788,7 +794,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             establishedSelection = session.authorizedCredentialIdentifiers,
             refreshGrant = refreshGrant,
             includeInResponse = includeDetails,
-        )
+        ).copy(issuanceDeadline = session.deferredState?.let {
+            it.deadline ?: (Clock.System.now() + deferredConfig.lifetimeSeconds.seconds)
+        })
     }
 
     private suspend fun establishIssuanceSelection(
@@ -799,6 +807,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
             return session
         }
+        if (session.deferredState != null) return sessionService.saveDeferredProgress(
+            session.copy(authorizedCredentialIdentifiers = identifiers)
+        )
         val current =
             requireNotNull(sessionService.claimSession(session.sessionId)) { "Issuance session is being processed" }
         try {
@@ -855,6 +866,66 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
     }
 
+    suspend fun processDeferredCredentialRequest(
+        authorizationHeaders: List<String>, dpopProofHeaderValues: List<String>,
+        parameters: JsonObject? = null, encryptedRequest: String? = null, requestId: String,
+    ): CredentialResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders)
+            ?: return invalidCredentialAuthorization(requestId)
+        val context = CredentialAccessTokenContext(
+            authorization = authorization, expectedIssuer = metadataService.issuerBaseUrl(),
+            dpopProofHeaderValues = dpopProofHeaderValues,
+            credentialEndpointUri = endpointUri("deferred_credential"),
+        )
+        val result = if (encryptedRequest != null) oauth2Provider.createDeferredCredentialRequest(encryptedRequest, context)
+            else oauth2Provider.createDeferredCredentialRequest(requireNotNull(parameters).toParametersMap(), context)
+        val request = when (result) {
+            is DeferredCredentialRequestResult.Success -> result.request
+            is DeferredCredentialRequestResult.Failure -> return oauth2Provider.writeDeferredCredentialError(result.error)
+            is DeferredCredentialRequestResult.OAuthFailure -> return oauth2Provider.writeDeferredCredentialError(result.error)
+        }
+        val claims = authorization.token.decodeJws().payload
+        val session = claims.stringClaim("sub")?.let { sessionService.getSessionOrNull(it) }
+            ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
+        return try {
+            collectDeferredCredential(authorization.token, session, request, claims, requestId)
+        } catch (e: DeferredProtocolException) {
+            oauth2Provider.writeDeferredCredentialError(e.error)
+        }
+    }
+
+    private suspend fun collectDeferredCredential(
+        accessToken: String, session: IssuanceSession, request: DeferredCredentialRequest,
+        tokenClaims: JsonObject, requestId: String,
+    ): CredentialResponseHttp {
+        val authorized = session.issuanceRequests.map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
+            tokenClaims, session.authorizedCredentialIdentifiers,
+            metadataService.credentialConfigurationIdsForScopes(tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()),
+        ).map { it.credentialIdentifier }.toSet()
+        return when (val collection = deferredIssuance.collect(session.sessionId, request.transactionId, authorized, tokenClaims.stringClaim("client_id")?.takeIf(String::isNotBlank))) {
+            is DeferredIssuance.Collection.Pending -> oauth2Provider.writeDeferredCredentialResponse(request, collection.response)
+            is DeferredIssuance.Collection.Claimed -> {
+                val claim = collection.transaction
+                try {
+                    val prepared = claim.accepted.restore(request.credentialResponseEncryption)
+                    val response = deferredIssuance.withClaim(session.sessionId, claim) {
+                        if (claim.response != null && claim.accepted.credentialIdentifier in sessionService.getSession(session.sessionId).issuanceResults) {
+                            oauth2Provider.writeCredentialResponse(prepared, requireNotNull(claim.response))
+                        } else processCredentialRequest(accessToken, requestId, claim) { CredentialRequestResult.Success(prepared) }
+                    }
+                    withContext(NonCancellable) {
+                        if (response.status == 200) deferredIssuance.consume(session.sessionId, claim)
+                        else deferredIssuance.release(session.sessionId, claim)
+                    }
+                    response
+                } catch (e: Throwable) {
+                    withContext(NonCancellable) { runCatching { deferredIssuance.release(session.sessionId, claim) } }
+                    throw e
+                }
+            }
+        }
+    }
+
     private fun parseCredentialAuthorization(authorizationHeaders: List<String>) =
         runCatching { parseAccessTokenAuthorization(authorizationHeaders) }.getOrNull()
 
@@ -877,6 +948,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private suspend fun processCredentialRequest(
         accessToken: String,
         requestId: String,
+        deferredClaim: DeferredTransaction? = null,
         createCredentialRequest: suspend () -> CredentialRequestResult,
     ): CredentialResponseHttp {
         val credentialRequest = when (
@@ -1003,6 +1075,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             observedIssuanceRequest.credentialConfigurationId
         )
 
+        if (observedSession.deferredStatus == DeferredStatus.DENIED) {
+            return oauth2Provider.writeCredentialError(CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential issuance denied"))
+        }
+        if (observedSession.expiresAt <= Clock.System.now()) {
+            return oauth2Provider.writeCredentialError(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Issuance session expired"))
+        }
         if (
             observedSession.isClosed ||
             observedSession.status !in setOf(IssuanceSessionStatus.ACTIVE, IssuanceSessionStatus.SUCCESSFUL)
@@ -1031,11 +1109,45 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         val nonceBinding = credentialNonceBinding()
 
+        if (observedSession.deferredState != null && deferredClaim == null) {
+            try {
+                val accepted = oauth2Provider.acceptCredentialRequest(
+                    requestWithSession, configuration, authorization.credentialIdentifier,
+                    authorization.credentialConfigurationId,
+                    CredentialProofValidationContext(
+                        keyAttestation = keyAttestation,
+                        credentialIssuer = nonceBinding.credentialIssuer,
+                        clientId = requestWithSession.accessTokenClientId,
+                        anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                        nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
+                        batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
+                    ),
+                )
+                validateExpectedCredentialProofKeys(accepted.bindings.map { it.publicJwk }, observedIssuanceRequest)?.let {
+                    return oauth2Provider.writeCredentialError(it)
+                }
+                credentialProofKeyAcceptance?.let {
+                    if (!it.accept(observedSession, accepted.bindings.map { binding -> binding.publicJwk })) {
+                        return oauth2Provider.writeCredentialError(CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof key was not accepted"))
+                    }
+                }
+                val transaction = deferredIssuance.accept(sessionId, accepted)
+                return collectDeferredCredential(
+                    accessToken, observedSession, DeferredCredentialRequest(transaction.id, requestWithSession.credentialResponseEncryption),
+                    tokenClaims, requestId,
+                )
+            } catch (e: CredentialProofValidationException) {
+                return oauth2Provider.writeCredentialError(CredentialError(e.errorCode, e.message))
+            } catch (e: DeferredProtocolException) {
+                return oauth2Provider.writeDeferredCredentialError(e.error)
+            }
+        }
+
         // The provider validates proofs authoritatively while building the credential response. Sessions
         // pinned to an expected holder key, and deployments hooking into proof-key acceptance, need that
         // key before the session is claimed, so resolve it up front for those cases only. Nonces stay
         // valid until they expire, so validating them here as well never consumes anything.
-        val proofPublicKeyJwks = if (requiresCredentialProofKeys(observedIssuanceRequest)) {
+        val proofPublicKeyJwks = if (deferredClaim != null) deferredClaim.accepted.bindings.map { it.publicJwk } else if (requiresCredentialProofKeys(observedIssuanceRequest)) {
             try {
                 resolveCredentialProofPublicKeyJwks(requestWithSession, configuration, nonceBinding)
             } catch (e: CancellationException) {
@@ -1083,7 +1195,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
 
         // Claiming removes the session, so every later exit has to either close or restore it.
-        val session = sessionService.claimSession(sessionId)
+        val session = (if (deferredClaim != null) observedSession else sessionService.claimSession(sessionId))
             ?: return rejectCredentialRequest(
                 requestWithSession,
                 observedSession,
@@ -1236,7 +1348,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             }
-            val credentialResponseResult = withContext(IssuanceClock(issuedAt)) {
+            val credentialResponseResult = deferredClaim?.response?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {
                 if (crypto2IssuerKey != null) {
                     oauth2Provider.createCredentialResponse(
                         request = requestWithSession,
@@ -1298,6 +1410,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
+            if (deferredClaim != null && deferredClaim.response == null) {
+                deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
+            }
+
             credentialProofKeyCommitment?.let { commitment ->
                 val committed = try {
                     commitment.commit(session, requireNotNull(proofPublicKeyJwks))
@@ -1351,6 +1467,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
 
             val response = oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
+            if (deferredClaim != null && response.status != 200) {
+                // Keep the signed checkpoint for a later poll with valid response encryption.
+                claimFinalized = true
+                return response
+            }
             val issuanceResults = session.issuanceResults + (
                     issuanceRequest.credentialIdentifier to IssuanceResult(
                         issuedCredentialFormat = configuration.format.value,
@@ -1367,7 +1488,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 establishedSelection.isNotEmpty() && establishedSelection.all { it in issuanceResults }
             val updatedSession = try {
                 withContext(NonCancellable) {
-                    sessionService.saveSession(
+                    val save: suspend (IssuanceSession) -> IssuanceSession =
+                        if (deferredClaim != null) sessionService::saveDeferredProgress else sessionService::saveSession
+                    save(
                         session.copy(
                             issuanceResults = issuanceResults,
                             authorizedCredentialIdentifiers = establishedSelection,
@@ -1866,7 +1989,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private suspend fun restoreClaimedSession(session: IssuanceSession) {
         withContext(NonCancellable) {
-            sessionService.saveSession(session)
+            if (session.deferredState != null) sessionService.saveDeferredProgress(session)
+            else sessionService.saveSession(session)
         }
     }
 
