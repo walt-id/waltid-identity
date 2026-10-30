@@ -13,11 +13,9 @@ class MDocEntryExtractor : EntryExtractor {
         private val json = Json
     }
 
-    override fun extract(data: DigitalCredential): JsonElement {
-        val mDoc = data as? MdocsCredential
-        requireNotNull(mDoc) { "Expecting MdocsCredential, but couldn't cast." }
-        val statusListInfo = mDoc.documentMso.status?.statusList
-        requireNotNull(statusListInfo) { "Expecting statusListInfo, but found none." }
+    override fun extract(data: DigitalCredential): JsonElement? {
+        val mDoc = data as? MdocsCredential ?: return null
+        val statusListInfo = mDoc.documentMso.status?.statusList ?: return null
         return json.encodeToJsonElement(createEntry(statusListInfo))
     }
 
