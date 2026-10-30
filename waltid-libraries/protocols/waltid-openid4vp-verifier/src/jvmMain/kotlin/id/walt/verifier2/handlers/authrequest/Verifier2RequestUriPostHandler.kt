@@ -6,10 +6,13 @@ import id.walt.crypto.keys.PublicKeyIds
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJwe
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JweContentEncryption
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.verifier2.data.SessionEvent
@@ -19,12 +22,12 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import id.walt.crypto2.keys.Key as Crypto2Key
+import kotlinx.serialization.json.*
+import java.security.GeneralSecurityException
 
 /**
- * Handles the `request_uri_method=post` flow per OID4VP 1.0 §5.6.
+ * Handles the `request_uri_method=post` flow per OID4VP 1.0 §5.10.
  *
  * When the wallet sends an HTTP POST to the request URI endpoint (instead of the default GET),
  * it MAY include:
@@ -34,7 +37,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
  * The verifier MUST include any received `wallet_nonce` in the signed request object payload.
  * This prevents an attacker from replaying a captured request object to a different wallet.
  *
- * Per spec §5.6: "When received, the Verifier MUST use it as the `wallet_nonce` value in
+ * Per spec §5.10: "When received, the Verifier MUST use it as the `wallet_nonce` value in
  * the signed authorization request object."
  */
 object Verifier2RequestUriPostHandler {
@@ -57,7 +60,7 @@ object Verifier2RequestUriPostHandler {
      * Handles a POST to `/{sessionId}/request`.
      *
      * Parses `wallet_nonce` from the POST body, re-signs the request object with it injected,
-     * and returns the fresh JWT with Content-Type `application/oauth-authz-req+jwt`.
+     * optionally encrypts it to the wallet metadata key, and returns it with Content-Type `application/oauth-authz-req+jwt`.
      *
      * If the session uses an unsigned request, the POST body is ignored and the normal
      * unsigned authorization request is returned as JSON (same behaviour as GET).
@@ -91,7 +94,7 @@ object Verifier2RequestUriPostHandler {
             return
         }
 
-        // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.6
+        // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.10
         val crypto2SigningKey = resolveCrypto2SigningKey(verificationSession)
         val signingKey = if (crypto2SigningKey == null) resolveSigningKey(verificationSession) else null
         require(crypto2SigningKey != null || signingKey != null) {
@@ -127,7 +130,7 @@ object Verifier2RequestUriPostHandler {
             "Existing signed request kid does not match session client_id / signing key"
         }
 
-        // Inject wallet_nonce into the payload (per spec §5.6 §response §wallet_nonce)
+        // Inject wallet_nonce into the payload (per spec §5.10 §response §wallet_nonce)
         val newPayload = buildJsonObject {
             existingPayload.forEach { (k, v) -> put(k, v) }
             if (walletNonce != null) {
@@ -144,12 +147,53 @@ object Verifier2RequestUriPostHandler {
             signRequestObject(requireNotNull(signingKey), newPayload, existingHeaders)
         }
 
+        val responseJwt = if (verificationSession.setup.core.encryptedRequest) {
+            encryptRequestObject(freshJwt, walletMetadataJson)
+        } else freshJwt
+
         updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
             status = Verification2Session.VerificationSessionStatus.IN_USE
         }
 
         log.trace { "Re-signed request object with wallet_nonce for session ${verificationSession.id}" }
-        call.respondText(freshJwt, ContentType.parse("application/oauth-authz-req+jwt"))
+        call.respondText(responseJwt, ContentType.parse("application/oauth-authz-req+jwt"))
+    }
+
+    /** RFC 9101: encrypt the signed JWT, never the unsigned authorization parameters. */
+    internal suspend fun encryptRequestObject(signedRequest: String, walletMetadata: String?): String {
+        val metadata = Json.parseToJsonElement(requireNotNull(walletMetadata) {
+            "encrypted_request requires wallet_metadata with a usable encryption jwks key"
+        }).jsonObject
+        require(metadata["request_object_encryption_alg_values_supported"]?.jsonArray
+            ?.any { it.jsonPrimitive.content == "ECDH-ES" } == true) {
+            "Wallet must support Request Object encryption with ECDH-ES"
+        }
+        val supportedEnc = metadata["request_object_encryption_enc_values_supported"]?.jsonArray
+            ?.map { it.jsonPrimitive.content }.orEmpty()
+        val encryption = requireNotNull(JweContentEncryption.entries.firstOrNull { it.identifier in supportedEnc }) {
+            "Wallet must support Request Object encryption with A128GCM or A256GCM"
+        }
+        val keys = metadata["jwks"]?.jsonObject?.get("keys")?.jsonArray.orEmpty()
+        for (element in keys) {
+            val jwk = element as? JsonObject ?: continue
+            if ("d" in jwk || jwk["kty"]?.jsonPrimitive?.content != "EC") continue
+            try {
+                return CompactJwe.encrypt(
+                    plaintext = signedRequest.encodeToByteArray(),
+                    recipientPublicKey = EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false),
+                    contentEncryption = encryption,
+                    protectedHeader = buildJsonObject {
+                        put("cty", "JWT")
+                        jwk["kid"]?.let { put("kid", it) }
+                    },
+                )
+            } catch (_: IllegalArgumentException) {
+                // A JWKS may also contain signing keys or unsupported curves. Try its next key.
+            } catch (_: GeneralSecurityException) {
+                // The JVM provider rejects invalid EC points during agreement.
+            }
+        }
+        throw IllegalArgumentException("encrypted_request requires wallet_metadata with a usable ECDH-ES encryption jwks key")
     }
 
     @Deprecated("Use the Crypto2Key overload")

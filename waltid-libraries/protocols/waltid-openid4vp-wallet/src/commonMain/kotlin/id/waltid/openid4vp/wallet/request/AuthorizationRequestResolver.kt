@@ -481,7 +481,9 @@ object AuthorizationRequestResolver {
         val requestUriMethod = requestUriMethod?.let(::parseRequestUriMethod)
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = fetchRequestUri(requestUri, requestUriMethod)
-        response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
+        require(response.status.isSuccess()) {
+            "AuthorizationRequest cannot be retrieved (${response.status}) from $requestUri: ${response.body}"
+        }
 
         if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
             requireNotNull(response.walletNonce) {

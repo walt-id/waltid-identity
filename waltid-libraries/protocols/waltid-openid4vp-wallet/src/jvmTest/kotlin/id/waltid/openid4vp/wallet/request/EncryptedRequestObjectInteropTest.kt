@@ -98,8 +98,8 @@ class EncryptedRequestObjectInteropTest {
 
     @Test
     fun `rejects tampered ciphertext wrong keys and unsupported encrypted wrappers`() = runBlocking<Unit> {
-        assertFails { exchange { nonce, recipient -> tamper(encrypt(sign(nonce), recipient)) } }
-        assertFails {
+        assertFailsWith<IllegalArgumentException> { exchange { nonce, recipient -> tamper(encrypt(sign(nonce), recipient)) } }
+        assertFailsWith<IllegalArgumentException> {
             exchange { nonce, _ -> encrypt(sign(nonce), ECKeyGenerator(Curve.P_256).generate().toPublicJWK()) }
         }
         for (contentType in listOf(null, "json", "application/jwt")) {
