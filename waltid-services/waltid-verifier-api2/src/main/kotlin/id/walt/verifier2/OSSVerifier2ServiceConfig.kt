@@ -43,6 +43,16 @@ data class OSSVerifier2ServiceConfig(
      * the only thing on it.
      */
     val maxInMemoryBytes: Long? = null,
+    /**
+     * When false, `POST /vical/fetch` is not registered. `POST /vical/validate` stays available.
+     * Fetch accepts only `http` and `https`. This service does not authenticate callers.
+     */
+    val vicalFetchEnabled: Boolean = true,
+    /**
+     * When true, network fetches may target RFC1918 and IPv6 unique-local addresses. Loopback, link-local
+     * and cloud-metadata addresses stay blocked. Default false, including on the public demo.
+     */
+    val allowPrivateNetworkVical: Boolean = false,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
@@ -76,4 +86,31 @@ data class OSSVerifier2ServiceConfig(
         requestSigningStoredKey: String?,
         sessionRetention: Duration?,
     ) : this(clientId, clientMetadata, urlPrefix, urlHost, key, x5c, requestSigningStoredKey, sessionRetention, null, null)
+
+    /** Preserves the JVM constructor descriptor from before VICAL fetch mode became configurable. */
+    constructor(
+        clientId: String?,
+        clientMetadata: ClientMetadata?,
+        urlPrefix: String,
+        urlHost: String,
+        key: JsonObject?,
+        x5c: List<String>?,
+        requestSigningStoredKey: String?,
+        sessionRetention: Duration?,
+        maxInMemorySessions: Int?,
+        maxInMemoryBytes: Long?,
+    ) : this(
+        clientId,
+        clientMetadata,
+        urlPrefix,
+        urlHost,
+        key,
+        x5c,
+        requestSigningStoredKey,
+        sessionRetention,
+        maxInMemorySessions,
+        maxInMemoryBytes,
+        true,
+        false,
+    )
 }

@@ -83,8 +83,8 @@ class FetchBinaryFileTest {
             "http://192.168.1.1/vical",
             "http://[fd12::1]/vical",
         ).forEach { url ->
-            val error = assertFailsWith<IllegalArgumentException>(url) { fetchBinaryFile(url) }
-            assertContains(error.message!!, "destination not allowed")
+            val e = assertFailsWith<IllegalArgumentException>(url) { fetchBinaryFile(url) }
+            assertContains(e.message!!, "destination not allowed")
         }
     }
 

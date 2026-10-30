@@ -25,8 +25,8 @@ private val fetchClient = OkHttpClient.Builder()
 /**
  * Fetches a binary file (e.g. a VICAL) from an `http` or `https` URL supplied by an API caller.
  *
- * Other schemes are rejected before any I/O. Redirects are not followed, the response is capped
- * at 10 MiB, and loopback, link-local (including cloud metadata), private (RFC1918 and IPv6 unique-local),
+ * Other schemes, including `file`, are rejected before any I/O. Redirects are not followed, the response is
+ * capped at 10 MiB, and loopback, link-local (including cloud metadata), private (RFC1918 and IPv6 unique-local),
  * wildcard and multicast destinations are refused inside OkHttp's [Dns], so the checked addresses are the
  * ones connected to.
  *
@@ -37,14 +37,13 @@ fun fetchBinaryFile(vicalUrl: String): ByteArray? =
 
 /**
  * Loopback, link-local (including cloud metadata), wildcard and multicast addresses are always blocked.
- * RFC1918 and IPv6 unique-local addresses are blocked unless [allowPrivateNetworks] is set.
+ * RFC1918 and IPv6 unique-local addresses are blocked unless [allowPrivateNetworks] is set, which is the
+ * opt-in for a deployment whose VICAL host is on its own private network.
  */
 internal fun isBlockedFetchDestination(address: InetAddress, allowPrivateNetworks: Boolean = false): Boolean {
     if (address.isLoopbackAddress || address.isLinkLocalAddress || address.isAnyLocalAddress ||
         address.isMulticastAddress || address == AWS_METADATA_IPV6
-    ) {
-        return true
-    }
+    ) return true
     if (allowPrivateNetworks) return false
     if (address.isSiteLocalAddress) return true
     val bytes = address.address
@@ -55,7 +54,25 @@ internal fun isBlockedFetchDestination(address: InetAddress, allowPrivateNetwork
     return false
 }
 
-internal fun fetchBinaryFile(url: String, isBlockedAddress: (InetAddress) -> Boolean, maxBytes: Long): ByteArray {
+/**
+ * Same retrieval as [fetchBinaryFile], with the private-network opt-in chosen by the caller.
+ * Loopback, link-local and cloud-metadata destinations stay blocked even when [allowPrivateNetworks] is true.
+ * Only `http` and `https` are accepted.
+ */
+fun fetchBinaryFile(
+    url: String,
+    allowPrivateNetworks: Boolean,
+): ByteArray = fetchBinaryFile(
+    url,
+    { isBlockedFetchDestination(it, allowPrivateNetworks) },
+    MAX_FETCH_BYTES,
+)
+
+internal fun fetchBinaryFile(
+    url: String,
+    isBlockedAddress: (InetAddress) -> Boolean,
+    maxBytes: Long,
+): ByteArray {
     // OkHttp's parser accepts only http and https, and it is the parser the request is made with.
     val httpUrl = url.toHttpUrlOrNull() ?: throw fetchFailed(url, "only http and https URLs are allowed")
     val dns = DestinationCheckingDns(isBlockedAddress)
