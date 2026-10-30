@@ -7,7 +7,7 @@ do not need it. Linux docs and Kotlin simulator tests can start independently.
 
 The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.0
 on GitHub's [`xcode-27` arm64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md).
-The image currently uses macOS 27 and remains in public preview. Demo, bridge and
+The image currently uses macOS 27 and remains in public preview. Demo, bridge,
 Enterprise and recovery tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
 there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the whole
 workflow, including framework verification. Composite actions inherit that pin
@@ -38,19 +38,38 @@ cache and test outputs are excluded. The complete ownership record, including it
 clean-close marker, prevents Gradle from deleting the restored files as stale before
 validating them. All consumer checks still execute.
 
-Compose and Enterprise jobs also save their Gradle caches on PRs, retaining their
-own compiled inputs in addition to the SDK producer's inputs. This does not cache
-Xcode test results or bypass either job's test and report commands. Compose framework
-links remain outside Gradle's build cache. Other consumers retain the default policy.
+The full release producer and Kotlin simulator job are the two Gradle cache writers
+on full PR runs. App build jobs restore Gradle caches read-only; Enterprise, bridge
+and SDK-docs jobs retain the default read-only policy on PRs. Native and Compose
+test consumers need no Gradle setup when using the shared app bundles. Kotlin/Native
+dependencies use the dependency-catalogue cache key, restored before SDK-docs checks;
+generated Gradle files do not create additional toolchain-cache keys.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
 afterwards to ensure the fixture build did not replace it. A separate cache retains
 the fixture outputs and the same Gradle history/ownership records, with the same
 toolchain and revision scoping. Gradle validates the fixture inputs on every run;
-Swift tests and result collection always execute. Consumers run in three
-independent jobs: native provider plus native demo, Compose provider plus Compose
-demo, and Swift bridge tests. Each provider stays with its demo to reuse the build.
+Swift tests and result collection always execute.
+
+## Shared app test products
+
+Two build jobs prepare the selected native and Compose Debug test targets with
+`build-for-testing`. Each job retains its app's document-provider signing,
+entitlement and embedding checks, then packages an `.xctestproducts` bundle.
+Compose's generated framework symlink is materialized inside the bundle so it
+does not depend on the producer's build directory. The manifest binds all four
+repository revisions, exact Xcode version, configuration, expected test targets,
+file hashes and modes. Consumers verify the archive and its contents before use.
+Artifacts belong to one workflow attempt and are retained for one day.
+
+Native and Compose functional tests, Enterprise tests and SwiftUI visual comparisons
+use those bundles with `test-without-building`. Each suite keeps its own selectors,
+simulator, fixture lifetime and result checks. Local action/task callers without
+an app artifact retain their build path. The app build jobs have a 45-minute limit;
+the existing consumer limits below remain unchanged.
+
+Functional consumers run in three jobs: native demo, Compose demo and Swift bridge.
 Bridge tests run whenever either native or Compose is selected. Matrix failures
 do not cancel siblings; every selected job must succeed for the reusable workflow
 and `ci-gate` to succeed. Reports and logs have distinct names for each consumer.
@@ -63,8 +82,11 @@ These limits bound failures; successful runs finish as soon as their suites comp
 
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
-framework itself. In both paths, its fixture starts only after framework
-preparation succeeds and is stopped after XCTest.
+framework itself. CI also supplies `-Penterprise.ios.testProductsArtifacts=<directory>`
+with the `native/` and `compose/` artifact directories. The task verifies each
+selected app bundle before starting its fixture; without that property, it builds
+each app itself. In both paths, the fixture starts after build preparation succeeds
+and is stopped after XCTest.
 The task's `enterprise.ios.destination` property (or `IOS_SIMULATOR_DESTINATION`)
 must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
 `platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
@@ -145,7 +167,8 @@ process group on cancellation. Failed or cancelled consumer executions retain ra
 result bundles and phase logs for seven days, including when a bundle cannot be
 converted to JUnit. Converted consumer reports are also retained on success.
 The framework producer retains its phase log and Gradle timing report on success
-as well as failure. There is no periodic resource sampling.
+as well as failure. App producers and Enterprise retain phase logs and timings on
+success too. There is no periodic resource sampling.
 Missing required test reports fail the affected lane and the aggregate CI gate.
 
 Run the local helper checks with:
