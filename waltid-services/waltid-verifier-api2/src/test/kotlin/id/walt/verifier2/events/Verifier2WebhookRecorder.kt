@@ -1,9 +1,12 @@
 package id.walt.verifier2.events
 
 import com.sun.net.httpserver.HttpServer
+import id.walt.commons.config.NetworkFetchGuardConfig
+import id.walt.commons.config.apply
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.verifier2.data.SessionEvent
+import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
 import java.net.InetSocketAddress
@@ -18,8 +21,16 @@ import kotlin.test.assertTrue
 class Verifier2WebhookRecorder : AutoCloseable {
     private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
     private var server: HttpServer? = null
+    private var previousGuard: GuardSnapshot? = null
 
-    fun start(): Verifier2WebhookRecorder {
+    fun start(allowLoopback: Boolean = true): Verifier2WebhookRecorder {
+        previousGuard = GuardSnapshot.capture()
+        val previous = previousGuard!!
+        NetworkFetchGuardConfig(
+            allowLoopback = allowLoopback,
+            allowPrivateNetworks = previous.allowPrivateNetworks,
+            trustedHostSuffixes = previous.trustedHostSuffixes.toList(),
+        ).apply()
         val httpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         httpServer.createContext("/webhook") { exchange ->
             val body = exchange.requestBody.readBytes().decodeToString()
@@ -95,6 +106,34 @@ class Verifier2WebhookRecorder : AutoCloseable {
         server?.stop(0)
         server = null
         receivedUpdates.clear()
+        previousGuard?.restore()
+        previousGuard = null
+    }
+
+    private data class GuardSnapshot(
+        val allowLoopback: Boolean,
+        val allowLoopbackExplicit: Boolean,
+        val allowPrivateNetworks: Boolean,
+        val trustedHostSuffixes: Set<String>,
+    ) {
+        fun restore() {
+            if (allowLoopbackExplicit) {
+                PrivateNetworkGuardSettings.allowLoopback = allowLoopback
+            } else {
+                PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+            }
+            PrivateNetworkGuardSettings.allowPrivateNetworks = allowPrivateNetworks
+            PrivateNetworkGuardSettings.trustedHostSuffixes = trustedHostSuffixes
+        }
+
+        companion object {
+            fun capture() = GuardSnapshot(
+                allowLoopback = PrivateNetworkGuardSettings.allowLoopback,
+                allowLoopbackExplicit = PrivateNetworkGuardSettings.allowLoopbackExplicit,
+                allowPrivateNetworks = PrivateNetworkGuardSettings.allowPrivateNetworks,
+                trustedHostSuffixes = PrivateNetworkGuardSettings.trustedHostSuffixes,
+            )
+        }
     }
 
     companion object {

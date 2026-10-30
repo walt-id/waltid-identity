@@ -1,6 +1,7 @@
 package id.walt.commons.featureflag
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.list.WebConfig
 import id.walt.commons.http.ServiceWebDataFetcherConfiguration
 import id.walt.commons.persistence.PersistenceConfiguration
@@ -43,6 +44,16 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
     val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)
 
     val authenticationServiceFeature = OptionalFeature("authservice", "Enables user authentication", default = true)
+
+    /**
+     * Loads `network-fetch-guard.conf`. Not one of this catalog's [baseFeatures]: the Enterprise stack registers
+     * its own feature under the same name, and a feature name can only be enabled once per process.
+     */
+    val networkFetchGuardFeature = BaseFeature(
+        "network-fetch-guard",
+        "Private-network guard for outbound requests",
+        NetworkFetchGuardConfig::class,
+    )
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =

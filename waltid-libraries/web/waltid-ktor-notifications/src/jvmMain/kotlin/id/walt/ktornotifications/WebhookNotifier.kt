@@ -2,20 +2,33 @@ package id.walt.ktornotifications
 
 import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessionWebhookNotification
 import id.walt.ktornotifications.core.KtorSessionUpdate
+import id.walt.webdatafetching.ssrf.BlockedAddressException
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.network.sockets.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.*
+import java.net.UnknownHostException
+import java.nio.channels.UnresolvedAddressException
+
+/** The private-network guard refused the webhook URL; the guard has already logged the destination. */
+class WebhookDestinationNotAllowedException(cause: Throwable) :
+    IllegalArgumentException("Webhook destination is not allowed (network-fetch-guard.conf)", cause)
 
 object WebhookNotifier {
 
-    private val webhookClient = HttpClient {
+    private val webhookClient = HttpClient(OkHttp) {
+        // Redirects stay off. The guard checks the address OkHttp connects to and follows a redirect
+        // only when this client has followRedirects enabled.
+        followRedirects = false
         install(ContentNegotiation) {
             json()
         }
+        installPrivateNetworkGuard()
     }
 
     /*
@@ -67,7 +80,11 @@ object WebhookNotifier {
             }
         }.getOrElse { ex ->
             if (ex is CancellationException) throw ex
-            if (ex is ConnectTimeoutException) {
+            val causes = generateSequence(ex) { it.cause }
+            if (causes.any { it is BlockedAddressException }) {
+                throw WebhookDestinationNotAllowedException(ex)
+            }
+            if (ex is ConnectTimeoutException || causes.any { it is UnknownHostException || it is UnresolvedAddressException }) {
                 throw IllegalArgumentException(
                     "Could not connect to configured webhook URL for session update: ${config.url.hostWithPortIfSpecified}",
                     ex

@@ -1,6 +1,7 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.applyNetworkFetchGuardConfig
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
@@ -39,6 +40,7 @@ suspend fun main(args: Array<String>) {
         ServiceInitialization(
             features = OSSWallet2FeatureCatalog,
             init = {
+                applyNetworkFetchGuardConfig()
                 DidService.minimalInit()
                 // If persistence is enabled, swap in the Exposed-backed wallet store
                 if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.persistenceFeature)) {
