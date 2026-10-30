@@ -129,6 +129,26 @@ class SecureHttpDefaultsTest {
     }
 
     @Test
+    fun `an invalid json body is not echoed in the error`() = runTest {
+        val server = localServer { exchange ->
+            val body = "upstream-secret".toByteArray()
+            exchange.responseHeaders.add("Content-Type", "text/plain")
+            exchange.sendResponseHeaders(200, body.size.toLong())
+            exchange.responseBody.write(body)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val error = assertFailsWith<DataFetchingException> {
+                fetcher(maxResponseBytes = 1024).fetch<Map<String, String>>(server.url("/text"))
+            }
+            assertTrue("upstream-secret" !in error.message.orEmpty(), error.message)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `a request that exceeds the configured timeout fails`() = runTest {
         val server = localServer { exchange ->
             Thread.sleep(2_000)
