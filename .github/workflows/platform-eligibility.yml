@@ -53,6 +53,11 @@ on:
         required: false
         type: boolean
         default: false
+      pr-exclude-label:
+        description: "PR label that defers this entire CI group, including opt-ins"
+        required: false
+        type: string
+        default: ""
     outputs:
       should-run:
         description: "Whether platform jobs should run"
@@ -86,6 +91,7 @@ jobs:
           PR_LABELS: ${{ inputs.pr-labels }}
           PR_NUMBER: ${{ inputs.pr-number }}
           PR_REQUIRE_LABEL: ${{ inputs.pr-require-label }}
+          PR_EXCLUDE_LABEL: ${{ inputs.pr-exclude-label }}
           REF: ${{ inputs.ref }}
         shell: bash
         run: |
@@ -134,6 +140,14 @@ jobs:
               if [[ "$PR_HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
                 set_decision false "fork PR requires manual dispatch by maintainer"
                 exit 0
+              fi
+
+              if [[ -n "${PR_EXCLUDE_LABEL:-}" ]]; then
+                excluded="$(jq -r --arg label "$PR_EXCLUDE_LABEL" 'index($label) != null' <<< "$PR_LABELS")"
+                if [[ "$excluded" == "true" ]]; then
+                  set_decision false "$PR_EXCLUDE_LABEL defers the ${PLATFORM_NAME} group"
+                  exit 0
+                fi
               fi
 
               label_match="$(

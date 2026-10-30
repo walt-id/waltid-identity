@@ -251,6 +251,7 @@ jobs:
       run-native: ${{ needs.macos-eligibility.outputs.run-native == 'true' }}
       run-compose: ${{ needs.macos-eligibility.outputs.run-compose == 'true' }}
       run-enterprise: ${{ needs.macos-eligibility.outputs.run-enterprise == 'true' }}
+      enterprise-demos: ${{ needs.macos-eligibility.outputs.enterprise-demos }}
       run-sdk-docs: ${{ needs.macos-eligibility.outputs.run-sdk-docs == 'true' }}
       run-visual-compose: ${{ needs.macos-eligibility.outputs.run-visual-compose == 'true' }}
       run-visual-native: ${{ needs.macos-eligibility.outputs.run-visual-native == 'true' }}
@@ -310,6 +311,17 @@ jobs:
       - crypto2-platform-tests
     runs-on: ubuntu-22.04
     steps:
+      - name: Summarize deferred Compose coverage
+        if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:compose-deferred') }}
+        run: |
+          {
+            echo '## Compose coverage'
+            echo
+            echo 'Compose consumers and the mixed Kotlin simulator group are explicitly deferred by `ci:compose-deferred`.'
+            echo 'This includes Android device/DC API jobs and Android, Compose iOS and browser visual comparisons.'
+            echo 'Enterprise iOS selects the native demo and SDK tests. Other native jobs retain normal selection.'
+            echo 'Deferred coverage is skipped, not passed; a successful `ci-gate` does not establish full mobile acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Summarize live conformance selection
         env:
           SELECTED: ${{ needs.conformance-eligibility.outputs.should-run }}
