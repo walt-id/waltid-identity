@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RequestEngineConfiguration(
-    val followRedirects: Boolean = true,
+    val followRedirects: Boolean = false,
     val pipelining: Boolean = false,
     val proxy: ProxyConfiguration? = null,
 ) {
