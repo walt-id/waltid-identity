@@ -44,6 +44,9 @@ on:
       run-enterprise:
         description: "Whether Enterprise iOS jobs should run"
         value: ${{ jobs.decide.outputs.run-enterprise }}
+      enterprise-demos:
+        description: "Enterprise demos selected after applying PR coverage deferrals"
+        value: ${{ jobs.decide.outputs.enterprise-demos }}
       run-sdk-docs:
         description: "Whether mobile SDK docs / ABI / DocC jobs should run"
         value: ${{ jobs.decide.outputs.run-sdk-docs }}
@@ -78,6 +81,7 @@ jobs:
       run-native: ${{ steps.decide.outputs.run-native }}
       run-compose: ${{ steps.decide.outputs.run-compose }}
       run-enterprise: ${{ steps.decide.outputs.run-enterprise }}
+      enterprise-demos: ${{ steps.decide.outputs.enterprise-demos }}
       run-sdk-docs: ${{ steps.decide.outputs.run-sdk-docs }}
       run-visual-android: ${{ steps.decide.outputs.run-visual-android }}
       run-visual-compose: ${{ steps.decide.outputs.run-visual-compose }}

@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   android-dc-api-tests:
-    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci:mobile-dc-api') }}
+    if: ${{ github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'ci:mobile-dc-api') && !contains(github.event.pull_request.labels.*.name, 'ci:compose-deferred')) }}
     uses: ./.github/workflows/android-device-tests.yml
     secrets: inherit
     with:

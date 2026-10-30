@@ -11,10 +11,23 @@ DOCS_LABEL="${DOCS_LABEL:-ci:sdk-docs}"
 
 write_outputs() {
   local should_run="false"
+  local enterprise_demos="all"
+  if [[ "$DEFER_COMPOSE" == "true" ]]; then
+    # The simulator group includes sharedUI tests, and Enterprise normally runs
+    # both demos. A Compose deferral must cover these mixed consumers too.
+    RUN_IOS_SIMULATOR="false"
+    RUN_COMPOSE="false"
+    RUN_VISUAL_ANDROID="false"
+    RUN_VISUAL_COMPOSE="false"
+    RUN_VISUAL_BROWSER="false"
+    enterprise_demos="native"
+    REASON="$REASON; ci:compose-deferred excludes Compose consumers and the mixed Kotlin simulator group"
+  fi
   echo "run-ios-simulator=${RUN_IOS_SIMULATOR}" >> "$GITHUB_OUTPUT"
   echo "run-native=${RUN_NATIVE}" >> "$GITHUB_OUTPUT"
   echo "run-compose=${RUN_COMPOSE}" >> "$GITHUB_OUTPUT"
   echo "run-enterprise=${RUN_ENTERPRISE}" >> "$GITHUB_OUTPUT"
+  echo "enterprise-demos=${enterprise_demos}" >> "$GITHUB_OUTPUT"
   echo "run-sdk-docs=${RUN_SDK_DOCS}" >> "$GITHUB_OUTPUT"
 
   if [[ "$RUN_IOS_SIMULATOR" == "true" || "$RUN_NATIVE" == "true" || "$RUN_COMPOSE" == "true" || "$RUN_ENTERPRISE" == "true" || "$RUN_SDK_DOCS" == "true" || "$RUN_VISUAL_COMPOSE" == "true" || "$RUN_VISUAL_NATIVE" == "true" ]]; then
@@ -70,6 +83,7 @@ RUN_VISUAL_ANDROID="false"
 RUN_VISUAL_COMPOSE="false"
 RUN_VISUAL_NATIVE="false"
 RUN_VISUAL_BROWSER="false"
+DEFER_COMPOSE="false"
 REASON=""
 
 case "$EVENT_NAME" in
@@ -106,6 +120,7 @@ case "$EVENT_NAME" in
 
     # Keep parsing outside the case expression so errexit propagates jq errors.
     matched_labels="$(label_match)"
+    DEFER_COMPOSE="$(jq -r 'index("ci:compose-deferred") != null' <<< "$PR_LABELS")"
     case "$matched_labels" in
       force_all)
         set_all_lanes true
