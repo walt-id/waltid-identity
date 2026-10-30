@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-2.cbor"/>
+  <Documentation>This test case tests validation of a CB-AdES-B-B signature that does not contain the mandatory claimed signing time. In CB-AdES, the claimed signing time shall be conveyed by the iat claim in the protected CWT Claims header parameter.</Documentation>
+</SignatureRequest>

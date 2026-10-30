@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-5.cbor"/>
+  <Documentation>This is a negative test case for checking the CB-AdES x5t protected header parameter. The digest value carried by x5t does not match the digest of the signing certificate identified for validation.</Documentation>
+</SignatureRequest>

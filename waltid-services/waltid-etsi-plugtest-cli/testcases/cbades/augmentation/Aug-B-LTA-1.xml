@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+  <Augmentation>
+	  <InitialSignature>CB-B-LT-1</InitialSignature>
+	  <AugmentedSignature>CB-B-LTA-1</AugmentedSignature>
+  </Augmentation>
+  <Documentation>
+    This test case is for testing the augmentation from a CB-AdES-B-LT to a CB-AdES-B-LTA, more specifically the augmentation of a CB-AdES-B-lT signature as specified in CB-B-LT-1.xml test definition file, to a CB-AdES signature as specified in CB-B-LTA-1.xml. 
+  </Documentation>
+</Signature>
