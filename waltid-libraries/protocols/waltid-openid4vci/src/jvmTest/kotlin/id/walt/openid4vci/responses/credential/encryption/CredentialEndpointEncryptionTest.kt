@@ -234,6 +234,38 @@ class CredentialEndpointEncryptionTest {
         assertEquals(response.toJsonObject(), JsonObject(http.payload))
     }
 
+    @Test
+    fun `deferred endpoint decrypts polls and encrypts pending and issued responses`() = runBlocking {
+        val issuerKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("issuer-key"))
+        val walletKey = JWKKey.generate(KeyType.secp256r1, JwkKeyMeta("wallet-key"))
+        val provider = buildOAuth2Provider(createTestConfig(
+            credentialRequestDecryptor = JweCredentialRequestDecryptor(issuerKey.exportJWK()),
+            accessTokenVerifier = object : id.walt.openid4vci.tokens.access.AccessTokenVerifier {
+                override suspend fun verify(token: String, expectedIssuer: String?, expectedAudience: String?) = buildJsonObject { put("sub", "offer") }
+            },
+        ))
+        val context = id.walt.openid4vci.tokens.access.CredentialAccessTokenContext(
+            id.walt.openid4vci.tokens.access.AccessTokenAuthorization(id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme.BEARER, "token"),
+            expectedIssuer = "https://issuer.example",
+        )
+        val encrypted = encryptCredentialRequest(buildJsonObject {
+            put("transaction_id", "transaction")
+            put("credential_response_encryption", responseEncryptionRequest(walletKey))
+        }, issuerKey)
+        val request = kotlin.test.assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Success>(provider.createDeferredCredentialRequest(encrypted, context)).request
+        for (response in listOf(CredentialResponse(transactionId = "transaction", interval = 30), CredentialResponse(credentials = listOf(IssuedCredential(JsonPrimitive("issued")))))) {
+            val http = provider.writeDeferredCredentialResponse(request, response)
+            assertEquals(if (response.transactionId == null) 200 else 202, http.status)
+            assertEquals("no-store", http.headers["Cache-Control"])
+            val jwt = kotlin.test.assertIs<CredentialResponseBody.EncryptedJwt>(http.body).value
+            assertNotNull(jwt)
+            assertEquals(response.toJsonObject(), JweUtils.parseJWE(jwt, walletKey.exportJWK()).payload)
+        }
+        kotlin.test.assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Failure>(provider.createDeferredCredentialRequest(
+            mapOf("transaction_id" to listOf("transaction"), "credential_response_encryption" to listOf(responseEncryptionRequest(walletKey).toString())), context,
+        ))
+    }
+
     private suspend fun encryptCredentialRequest(
         payload: JsonObject,
         issuerKey: JWKKey,
