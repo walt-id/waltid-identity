@@ -15,6 +15,9 @@ interface RefreshTokenRecord {
     val grantedAudience: Set<String>
     val session: Session
     val expiresAt: Instant
+    /** Verified binding for refresh tokens issued to public clients. */
+    val dpopJwkThumbprint: String?
+        get() = null
     val grantedAuthorizationDetails: List<AuthorizationDetail>?
         get() = null
 }
@@ -30,4 +33,5 @@ data class DefaultRefreshTokenRecord(
     override val session: Session,
     override val expiresAt: Instant,
     override val grantedAuthorizationDetails: List<AuthorizationDetail>? = null,
+    override val dpopJwkThumbprint: String? = null,
 ) : RefreshTokenRecord

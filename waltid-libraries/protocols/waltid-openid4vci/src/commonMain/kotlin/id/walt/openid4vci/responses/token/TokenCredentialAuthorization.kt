@@ -15,6 +15,8 @@ import kotlinx.serialization.json.encodeToJsonElement
 data class TokenCredentialAuthorization(
     val authorizationDetails: List<AuthorizationDetail>,
     val includeInResponse: Boolean,
+    /** Fixed deferred authorization deadline, supplied only by the resolved issuance session. */
+    val issuanceDeadline: kotlin.time.Instant? = null,
 ) {
     val credentialIdentifiers: List<String>
         get() = authorizationDetails.flatMap { it.credentialIdentifiers.orEmpty() }

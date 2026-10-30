@@ -209,6 +209,39 @@ class DPoPProviderTest {
         assertIs<CredentialRequestResult.Success>(result)
     }
 
+    @Test
+    fun `deferred polling verifies the current access token and deferred endpoint DPoP binding`() = runTest {
+        val walletKey = JWKKey.generate(KeyType.secp256r1)
+        val otherKey = JWKKey.generate(KeyType.secp256r1)
+        var verified = 0
+        val provider = buildOAuth2Provider(createTestConfig(
+            accessTokenVerifier = object : AccessTokenVerifier {
+                override suspend fun verify(token: String, expectedIssuer: String?, expectedAudience: String?): JsonObject {
+                    verified++
+                    require(token in setOf(ACCESS_TOKEN, "refreshed-token"))
+                    return buildJsonObject {
+                        put(JwtPayloadClaims.CONFIRMATION, buildJsonObject {
+                            put(JwtConfirmationClaims.JWK_THUMBPRINT, walletKey.getPublicKey().getThumbprint())
+                        })
+                    }
+                }
+            }, dpopProofVerifier = dpopVerifier,
+        ))
+        val endpoint = "$ISSUER/deferred_credential"
+        suspend fun poll(token: String, proof: String) = provider.createDeferredCredentialRequest(
+            mapOf("transaction_id" to listOf("transaction")),
+            CredentialAccessTokenContext(AccessTokenAuthorization(AccessTokenAuthorizationScheme.DPOP, token),
+                expectedIssuer = ISSUER, dpopProofHeaderValues = listOf(proof), credentialEndpointUri = endpoint),
+        )
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Success>(poll(ACCESS_TOKEN, createProof(walletKey, endpoint, ACCESS_TOKEN)))
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Success>(poll("refreshed-token", createProof(walletKey, endpoint, "refreshed-token")))
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.OAuthFailure>(poll("invalid", createProof(walletKey, endpoint, "invalid")))
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.OAuthFailure>(poll(ACCESS_TOKEN, createProof(otherKey, endpoint, ACCESS_TOKEN)))
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.OAuthFailure>(poll(ACCESS_TOKEN, createProof(walletKey, CREDENTIAL_ENDPOINT_URI, ACCESS_TOKEN)))
+        assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.OAuthFailure>(poll("refreshed-token", createProof(walletKey, endpoint, ACCESS_TOKEN)))
+        assertEquals(6, verified)
+    }
+
     private suspend fun assertDPoPToken(
         tokenType: String,
         claims: Map<String, Any?>,
