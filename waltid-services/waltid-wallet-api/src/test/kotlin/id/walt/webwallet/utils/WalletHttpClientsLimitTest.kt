@@ -2,6 +2,8 @@ package id.walt.webwallet.utils
 
 import com.sun.net.httpserver.HttpServer
 import id.walt.webdatafetching.ResponseBodyTooLargeException
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -16,13 +18,20 @@ import kotlin.test.assertTrue
 
 class WalletHttpClientsLimitTest {
 
+    private var previousClientFactory = WalletHttpClients.defaultMethod
+
     @BeforeTest
-    fun allowLoopbackForLocalServers() {
+    fun useProductionClient() {
         System.setProperty("walt.ssrf.allowLoopback", "true")
+        previousClientFactory = WalletHttpClients.defaultMethod
+        WalletHttpClients.defaultMethod = {
+            WebDataFetcher(WebDataFetcherId.WALLET_API_HTTP_CLIENT, WebDataFetchingConfiguration())
+        }
     }
 
     @AfterTest
-    fun clearLoopbackProperty() {
+    fun restoreClientFactory() {
+        WalletHttpClients.defaultMethod = previousClientFactory
         System.clearProperty("walt.ssrf.allowLoopback")
     }
 
@@ -39,7 +48,10 @@ class WalletHttpClientsLimitTest {
             val error = assertFails {
                 client.get("http://127.0.0.1:${server.address.port}/big").bodyAsText()
             }
-            assertTrue(generateSequence(error) { it.cause }.any { it is ResponseBodyTooLargeException })
+            assertTrue(
+                generateSequence(error) { it.cause }.any { it is ResponseBodyTooLargeException },
+                error.stackTraceToString(),
+            )
         } finally {
             server.stop(0)
             client.close()
