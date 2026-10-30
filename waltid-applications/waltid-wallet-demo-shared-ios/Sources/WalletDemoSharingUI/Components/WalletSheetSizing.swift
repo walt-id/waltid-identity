@@ -93,7 +93,12 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     }
 
     func isResizing(_ owner: UIViewController) -> Bool {
-        resizeID != nil && resizingSheet === owner.sheetPresentationController
+        guard resizeID != nil, resizingSheet === owner.sheetPresentationController else { return false }
+        let layer = owner.view.layer
+        guard let rendered = layer.presentation() else { return false }
+        // A transaction completion can remain pending after the sheet has settled.
+        // Keep coalescing while its geometry is moving, then let the active page measure.
+        return rendered.bounds != layer.bounds || rendered.position != layer.position
     }
 
     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
