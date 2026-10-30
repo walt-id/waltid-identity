@@ -13,6 +13,15 @@
 - Kotlin source that constructed or copied `DcqlDisclosure` with two arguments remains valid via the default parameter.
 - JVM binary consumers compiled against published `waltid-dcql-jvm` 1.0.0 must rebuild against this identity head. The descriptors for `<init>` and `copy` change from `(String, JsonElement)` to three-argument forms. There is no `@JvmOverloads` / synthetic two-arg compatibility shim.
 
+## waltid-dcql SD-JWT claim selection
+
+- SD-JWT claims paths are processed per OpenID4VP §7.1.1. A path selects only the claim it ends on, never its selectively disclosable children: `["nationalities"]` releases the array without its element disclosures; use `["nationalities", null]` or an index for the elements.
+- `null` selects every array element instead of the first match. A path component that does not fit the selected element (for example a key on a string) fails the claim, so the credential no longer matches.
+- `DcqlMatchResult.disclosuresByPath` lists, per claims path, the disclosures to present: those of the selected claims plus the disclosures containing them (RFC 9901 §4.2.6). Presenters now attach these by location instead of looking disclosures up by claim name.
+- JVM ABI: `DcqlMatchResult` gained `disclosuresByPath`. Kotlin source stays valid through the defaults; JVM binary consumers must rebuild, as the `<init>` and `copy` descriptors change.
+- Wallet2 presentation preview: rows for array elements now carry their array's claim name in `name` (for example `nationalities`) instead of `null`.
+- Wallet2 presentation preview: rows for requested clear-text claims now carry the plain claim name in `name` (for example `address`, previously `"address"` with quotes, or the index for array elements), and their `value` leaves out selectively disclosable children that are not presented, matching what the verifier receives.
+
 ## Configuration:
 
 #### Feature system
