@@ -23,7 +23,13 @@ object DcqlMatcher {
          * - non-emptyMap(): If claims were selected.
          */
         val selectedDisclosures: Map<String, Any>?, // JsonElement or DcqlDisclosure
-        val originalQuery: CredentialQuery
+        val originalQuery: CredentialQuery,
+        /**
+         * Disclosures to present per claims path: the disclosures of the selected claims and of every
+         * selectively disclosable claim containing them (RFC 9901 §4.2.6), never their descendants.
+         * Empty for a path whose selected claims are all visible without disclosures.
+         */
+        val disclosuresByPath: Map<String, List<DcqlDisclosure>> = emptyMap(),
     )
 
     /**
@@ -81,10 +87,16 @@ object DcqlMatcher {
                 val claimsMatchResult = matchesClaimsAndGetSelected(credential, credentialQuery.claims, credentialQuery.claimSets)
 
                 if (claimsMatchResult.isSuccess) {
+                    val claimsSelection = claimsMatchResult.getOrThrow()
                     successfullyMatchedCredentialsForThisQuery.add(
-                        DcqlMatchResult(credential, claimsMatchResult.getOrThrow(), originalQuery = credentialQuery)
+                        DcqlMatchResult(
+                            credential = credential,
+                            selectedDisclosures = claimsSelection.selectedDisclosures,
+                            originalQuery = credentialQuery,
+                            disclosuresByPath = claimsSelection.disclosuresByPath,
+                        )
                     )
-                    log.trace { "Credential ${credential.id} processed for claims for query ${credentialQuery.id}. Selected: ${claimsMatchResult.getOrThrow()}" }
+                    log.trace { "Credential ${credential.id} processed for claims for query ${credentialQuery.id}. Selected: ${claimsSelection.selectedDisclosures}" }
                 } else {
                     log.trace { "Credential ${credential.id} failed claims processing for query ${credentialQuery.id}: ${claimsMatchResult.exceptionOrNull()?.message}" }
                 }
@@ -196,6 +208,26 @@ object DcqlMatcher {
 
     // --- Helper Functions ---
 
+    private class ClaimsSelection(
+        val selectedDisclosures: Map<String, Any>?,
+        val disclosuresByPath: Map<String, List<DcqlDisclosure>>,
+    )
+
+    /**
+     * One claims query matched against a credential.
+     *
+     * @property value the value [DcqlMatchResult.selectedDisclosures] holds for the claim
+     * @property disclosures the disclosures to present for it, as in [DcqlMatchResult.disclosuresByPath]
+     */
+    data class ClaimMatch(
+        val value: Any?,
+        val disclosures: List<DcqlDisclosure>,
+    )
+
+    /** Matches a single claims query, e.g. an optional claim outside the claim set [match] chose. */
+    fun matchClaim(credential: DcqlCredential, claimQuery: ClaimsQuery): Result<ClaimMatch> =
+        claimExistsAndMatchesValue(credential, claimQuery, credential.disclosures?.isNotEmpty() == true)
+
     /**
      * Checks if a credential satisfies the claims constraints and returns the selected claims.
      * Returns a Result: Success with Map<String (path), Any (JsonElement or SdJwtSelectiveDisclosure)>?
@@ -205,7 +237,7 @@ object DcqlMatcher {
         credential: DcqlCredential,
         claimsQueries: List<ClaimsQuery>?,
         claimSets: List<List<String>>?,
-    ): Result<Map<String, Any>?> { // Map can be null now
+    ): Result<ClaimsSelection> {
 
         // Determine if this credential format inherently supports SD based on our model
         // A credential uses SD if it has 'disclosables' or 'disclosures'
@@ -214,21 +246,24 @@ object DcqlMatcher {
         if (claimsQueries.isNullOrEmpty()) {
             log.trace { "No specific claims requested for credential ${credential.id}" }
             // If no claims are queried, return emptyMap if it's an SD cred, null otherwise
-            return Result.success(if (isPotentiallySelectivelyDisclosable) emptyMap() else null)
+            return Result.success(ClaimsSelection(if (isPotentiallySelectivelyDisclosable) emptyMap() else null, emptyMap()))
         }
 
         val claimsQueriesMapById = claimsQueries.associateBy { it.id }
         val collectedSelectedClaims = mutableMapOf<String, Any>()
+        val collectedDisclosures = mutableMapOf<String, List<DcqlDisclosure>>()
 
         val overallMatchLogic = { claimsToEvaluate: List<ClaimsQuery> ->
             var allCurrentSetMatch = true
             val currentSetSelectedClaims = mutableMapOf<String, Any>()
+            val currentSetDisclosures = mutableMapOf<String, List<DcqlDisclosure>>()
             for (cq in claimsToEvaluate) {
                 val matchResult = claimExistsAndMatchesValue(credential, cq, isPotentiallySelectivelyDisclosable)
                 if (matchResult.isSuccess) {
-                    matchResult.getOrNull()?.let { // getOrNull because success can be with null value (existence check)
-                        currentSetSelectedClaims[cq.path.joinToString(".")] = it
-                    }
+                    val claimMatch = matchResult.getOrThrow()
+                    val pathKey = cq.path.joinToString(".")
+                    claimMatch.value?.let { currentSetSelectedClaims[pathKey] = it }
+                    if (isPotentiallySelectivelyDisclosable) currentSetDisclosures[pathKey] = claimMatch.disclosures
                 } else {
                     allCurrentSetMatch = false
                     break // Stop checking this set/list of claims
@@ -236,6 +271,7 @@ object DcqlMatcher {
             }
             if (allCurrentSetMatch) {
                 collectedSelectedClaims.putAll(currentSetSelectedClaims)
+                collectedDisclosures.putAll(currentSetDisclosures)
                 true
             } else {
                 false
@@ -269,12 +305,12 @@ object DcqlMatcher {
             // If not SD and no claimsQueries, it would have returned null earlier.
             // If not SD and claimsQueries were present, collectedSelectedClaims would contain JsonElements.
             if (isPotentiallySelectivelyDisclosable) {
-                Result.success(collectedSelectedClaims)
+                Result.success(ClaimsSelection(collectedSelectedClaims, collectedDisclosures))
             } else {
                 // If not SD, but we matched claims, return them. If no claims were queried,
                 // it would have returned success(null) earlier.
                 // If claims were queried but none matched, finalMatchSuccessful would be false.
-                Result.success(collectedSelectedClaims.ifEmpty { null })
+                Result.success(ClaimsSelection(collectedSelectedClaims.ifEmpty { null }, emptyMap()))
             }
         } else {
             Result.failure(DcqlMatchException("Claims requirements not met for credential ${credential.id}"))
@@ -292,33 +328,15 @@ object DcqlMatcher {
         credential: DcqlCredential,
         claimQuery: ClaimsQuery,
         isCredentialPotentiallySD: Boolean // Pass this info
-    ): Result<Any?> {
+    ): Result<ClaimMatch> {
 
-        // If the credential has disclosures and is JWT-based (where SD mechanism applies)
+        // Selectively disclosable credential: select by claims path (OpenID4VP §7.1.1) and release the
+        // disclosures of the selected claims plus those containing them (RFC 9901 §4.2.6).
         if (isCredentialPotentiallySD && credential.disclosures != null) {
-            val matchingDisclosure = credential.disclosures?.find { disclosure ->
-                disclosure.matchesPath(claimQuery.path)
-            }
-
-            if (matchingDisclosure != null) {
-                if (!claimQuery.values.isNullOrEmpty()) {
-                    val disclosureValueJson = matchingDisclosure.value
-                    val matchesValue = claimQuery.values.any { queryValue -> queryValue == disclosureValueJson }
-                    if (!matchesValue) {
-                        log.trace { "SD Disclosure at '${matchingDisclosure.location}' value '${disclosureValueJson}' does not match required values ${claimQuery.values} in ${credential.id}" }
-                        return Result.failure(DcqlMatchException("SD Disclosure value mismatch for ${claimQuery.path}"))
-                    }
-                }
-                log.trace { "SD Disclosure at '${matchingDisclosure.location}' found and matches criteria in ${credential.id}" }
-                return Result.success(matchingDisclosure) // Return the disclosure object
-            } else {
-                // If path not found as a disclosure, it might be an always-visible claim in the SD-JWT core.
-                // Fall through to generic path resolution for such cases.
-                log.trace { "Claim path ${claimQuery.path.joinToString(".")} not found among SD disclosures for ${credential.id}. Checking core JWT." }
-            }
+            return matchSelectivelyDisclosableClaim(credential, claimQuery)
         }
 
-        // Generic path resolution for non-SD claims or core claims of an SD-JWT
+        // Generic path resolution for credentials without selective disclosure
         val claimJsonElement = resolveClaimPath(credential.data, claimQuery.path)
             ?: return Result.failure(DcqlMatchException("Claim path ${claimQuery.path.joinToString(".")} not found in ${credential.id}"))
 
@@ -331,24 +349,98 @@ object DcqlMatcher {
         }
         log.trace { "Claim path ${claimQuery.path.joinToString(".")} exists and matches criteria in ${credential.id}" }
         // If values were specified and matched, or if no values were specified (existence check), return the element.
-        return Result.success(claimJsonElement)
+        return Result.success(ClaimMatch(claimJsonElement, emptyList()))
     }
 
-    /** Match a Claims Path Pointer against the disclosure's complete resolved location. */
-    private fun DcqlDisclosure.matchesPath(queryPath: List<JsonElement>): Boolean {
-        val disclosurePath = location ?: name
-            ?.takeIf { queryPath.size == 1 }
-            ?.let { listOf(JsonPrimitive(it)) }
-            ?: return false
-        if (queryPath.size != disclosurePath.size) return false
-        return queryPath.zip(disclosurePath).all { (querySegment, actualSegment) ->
-            when (querySegment) {
-                is JsonNull -> actualSegment is JsonPrimitive &&
-                    !actualSegment.isString &&
-                    actualSegment.intOrNull?.let { it >= 0 } == true
-                else -> querySegment == actualSegment
-            }
+    private fun matchSelectivelyDisclosableClaim(credential: DcqlCredential, claimQuery: ClaimsQuery): Result<ClaimMatch> {
+        val vcObject = credential.data["vc"] as? JsonObject
+        val root = vcObject ?: credential.data
+        val selectedClaims = processClaimsPath(root, claimQuery.path).getOrElse { error ->
+            // Callers may pass disclosures without the claims they reveal in data; select by disclosure location then
+            if (error !is ClaimNotFoundException) return Result.failure(error)
+            credential.disclosures.orEmpty().mapNotNull { disclosure ->
+                disclosure.location?.takeIf { it.matchesClaimsPath(claimQuery.path) }?.let { it to disclosure.value }
+            }.ifEmpty { return Result.failure(error) }
+        }.filter { (_, value) -> claimQuery.values.isNullOrEmpty() || claimQuery.values.any { it == value } }
+        if (selectedClaims.isEmpty()) {
+            return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path.joinToString(".")}"))
         }
+
+        // Disclosure locations are relative to the issuer-signed payload, which may wrap the claims in "vc".
+        val selectedLocations = selectedClaims.flatMap { (location, _) -> listOfNotNull(location, vcObject?.let { listOf(JsonPrimitive("vc")) + location }) }
+        val disclosures = credential.disclosures.orEmpty().filter { disclosure ->
+            val location = disclosure.location ?: disclosure.name?.let { listOf(JsonPrimitive(it)) } ?: return@filter false
+            selectedLocations.any { selected -> location.isSameOrAncestorOf(selected) }
+        }
+        log.trace { "Claim path ${claimQuery.path.joinToString(".")} selects ${selectedClaims.size} claim(s) and ${disclosures.size} disclosure(s) in ${credential.id}" }
+
+        // selectedDisclosures keeps its shape: the disclosure for a single disclosed claim, otherwise the selected value(s)
+        val (_, value) = selectedClaims.singleOrNull() ?: return Result.success(ClaimMatch(JsonArray(selectedClaims.map { it.second }), disclosures))
+        val exactDisclosure = disclosures.singleOrNull { disclosure ->
+            val location = disclosure.location ?: disclosure.name?.let { listOf(JsonPrimitive(it)) }
+            location != null && selectedLocations.any { it.size == location.size && location.isSameOrAncestorOf(it) }
+        }
+        return Result.success(ClaimMatch(exactDisclosure ?: value, disclosures))
+    }
+
+    /**
+     * Processes a claims path pointer against [root] (OpenID4VP §7.1.1) and returns each selected claim
+     * with its concrete path (array indexes resolved). Fails when a component does not apply to a
+     * selected element or the selection becomes empty.
+     */
+    fun processClaimsPath(
+        root: JsonObject,
+        path: List<JsonElement>,
+    ): Result<List<Pair<List<JsonElement>, JsonElement>>> {
+        var selected: List<Pair<List<JsonElement>, JsonElement>> = listOf(emptyList<JsonElement>() to root)
+        for (component in path) {
+            val next = mutableListOf<Pair<List<JsonElement>, JsonElement>>()
+            for ((location, element) in selected) {
+                when {
+                    component is JsonPrimitive && component.isString -> {
+                        val jsonObject = element as? JsonObject
+                            ?: return Result.failure(DcqlMatchException("Claims path component \"${component.content}\" applied to a non-object element"))
+                        jsonObject[component.content]?.let { next += (location + component) to it }
+                    }
+                    component is JsonNull -> {
+                        val array = element as? JsonArray
+                            ?: return Result.failure(DcqlMatchException("Claims path component null applied to a non-array element"))
+                        array.forEachIndexed { index, item -> next += (location + JsonPrimitive(index)) to item }
+                    }
+                    component is JsonPrimitive && component.intOrNull?.let { it >= 0 } == true -> {
+                        val array = element as? JsonArray
+                            ?: return Result.failure(DcqlMatchException("Claims path index ${component.content} applied to a non-array element"))
+                        array.getOrNull(component.int)?.let { next += (location + JsonPrimitive(component.int)) to it }
+                    }
+                    else -> return Result.failure(DcqlMatchException("Invalid claims path component: $component"))
+                }
+            }
+            if (next.isEmpty()) {
+                return Result.failure(ClaimNotFoundException("Claims path ${path.joinToString(".")} selects no claim"))
+            }
+            selected = next
+        }
+        return Result.success(selected)
+    }
+
+    private class ClaimNotFoundException(message: String) : DcqlMatchException(message)
+
+    /** True if this concrete claims path is matched by the claims path pointer [pointer] (null matches any index). */
+    private fun List<JsonElement>.matchesClaimsPath(pointer: List<JsonElement>): Boolean =
+        size == pointer.size && indices.all { i ->
+            val segment = this[i]
+            if (pointer[i] is JsonNull) segment is JsonPrimitive && !segment.isString && segment.intOrNull?.let { it >= 0 } == true
+            else isSameSegment(pointer[i], segment)
+        }
+
+    /** True if this claims path equals [other] or is one of its ancestors; indexes compare by number. */
+    private fun List<JsonElement>.isSameOrAncestorOf(other: List<JsonElement>): Boolean =
+        size <= other.size && indices.all { i -> isSameSegment(this[i], other[i]) }
+
+    private fun isSameSegment(a: JsonElement, b: JsonElement): Boolean {
+        if (a !is JsonPrimitive || b !is JsonPrimitive) return a == b
+        if (a.isString != b.isString) return false
+        return if (a.isString) a.content == b.content else a.intOrNull != null && a.intOrNull == b.intOrNull
     }
 
     private fun matchesMeta(

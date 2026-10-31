@@ -1,11 +1,9 @@
 package id.waltid.openid4vp.wallet.presentation
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
@@ -104,17 +102,7 @@ object SdJwtVcPresenter {
             ?: error("Mismatch: Expected SelectivelyDisclosableVerifiableCredential for DC_SD_JWT format for $digitalCredential")
 
         log.trace { "Selected claims: ${selectedClaimsMap?.values?.map { it.toString() + " (${it::class.simpleName})" }}" }
-        val disclosuresToPresent =
-            selectedClaimsMap?.values?.mapNotNull {
-                when (it) {
-                    is SdJwtSelectiveDisclosure -> it
-                    is DcqlDisclosure -> {
-                        sdJwtCredential.disclosures?.find { sdJwtDisclosure -> sdJwtDisclosure.name == it.name }
-                    }
-
-                    else -> null
-                }
-            } ?: emptyList()
+        val disclosuresToPresent = sdJwtCredential.disclosuresToPresent(matchResult)
 
         log.debug { "Handling IETF SD-JWT VC (${digitalCredential} with disclosures $disclosuresToPresent)" }
 
