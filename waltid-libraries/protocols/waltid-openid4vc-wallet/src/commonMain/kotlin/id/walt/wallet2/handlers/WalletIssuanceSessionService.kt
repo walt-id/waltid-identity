@@ -61,8 +61,9 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
+import id.waltid.openid4vci.wallet.credential.CredentialEncryption
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -938,7 +939,7 @@ class WalletIssuanceSessionService(
                 stage = WalletIssuanceErrorCode.PROTOCOL
                 val legacyPending = response.response.status == HttpStatusCode.BadRequest && response.oauthError == "issuance_pending"
                 if (response.response.status == HttpStatusCode.Accepted || legacyPending) {
-                    val pendingBody = response.response.body<CredentialResponse>()
+                    val pendingBody = response.response.credentialResponse(request.responseDecryptionKey, legacyPending)
                     val pending = if (legacyPending) pendingBody.validateLegacyDeferredPendingResponse(request.transactionId)
                         else pendingBody.validateCredentialResponse(response.response.status.value, request.transactionId)
                     record = record.copy(
@@ -958,7 +959,7 @@ class WalletIssuanceSessionService(
                     return failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_RESPONSE,
                         deferredCredentials = if (terminal) emptyList() else listOf(record.public))
                 }
-                val issued = response.response.body<CredentialResponse>()
+                val issued = response.response.credentialResponse(request.responseDecryptionKey, legacyPending = false)
                     .validateCredentialResponse(response.response.status.value, request.transactionId)
                 val credentials = requireNotNull(issued.credentials)
                 val configured = request.validation as? DeferredResponseValidation.Configured
@@ -1544,6 +1545,25 @@ class WalletIssuanceSessionService(
         error("DPoP nonce retry exhausted")
     }
 
+    private suspend fun HttpResponse.credentialResponse(
+        responseDecryptionKey: String?,
+        legacyPending: Boolean,
+    ): CredentialResponse {
+        if (responseDecryptionKey != null && !legacyPending && status.isSuccess()) {
+            val mediaType = contentType()?.withoutParameters()
+            require(mediaType?.contentType == "application" && mediaType.contentSubtype == "jwt") {
+                "Encrypted deferred credential response must use application/jwt"
+            }
+            return json.decodeFromString(
+                CredentialEncryption.decryptResponse(
+                    bodyAsText(),
+                    CredentialEncryption.importResponseDecryptionKey(responseDecryptionKey),
+                ),
+            )
+        }
+        return body()
+    }
+
     private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
         val metadata = active.resolved.authorizationServerMetadata
         val assembler = attestationAssembler ?: return null
@@ -1910,6 +1930,7 @@ class WalletIssuanceSessionService(
                             label = request.label,
                             metadata = request.metadata,
                             nextPollAtEpochMilliseconds = request.nextPollAtEpochMilliseconds,
+                            responseDecryptionKey = request.responseDecryptionKey,
                         ))
                     }
                 },
@@ -1987,6 +2008,7 @@ class WalletIssuanceSessionService(
         metadata: JsonObject?,
         sessionId: String = public.id,
         dpopNonce: String? = null,
+        responseDecryptionKey: String? = null,
     ) {
         retainDeferred(DeferredRecord(
             public = public,
@@ -2007,6 +2029,7 @@ class WalletIssuanceSessionService(
                 label = label,
                 metadata = metadata,
                 nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(public.intervalSeconds)),
+                responseDecryptionKey = responseDecryptionKey,
             )),
         ))
     }
@@ -2053,6 +2076,7 @@ class WalletIssuanceSessionService(
                     keyMaterial = senderKey,
                     keyId = it.keyId, selectedPublicJwk = it.selectedPublicJwk, label = it.label, metadata = it.metadata,
                     nextPollAtEpochMilliseconds = it.nextPollAtEpochMilliseconds,
+                    responseDecryptionKey = it.responseDecryptionKey,
                 ))
             }
         }
@@ -2276,6 +2300,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val responseDecryptionKey: String? = null,
     )
 
     private data class ProtectedResponse(
@@ -2403,6 +2428,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val responseDecryptionKey: String? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(

@@ -5,6 +5,7 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.waltid.openid4vci.wallet.credential.CredentialEncryption
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
@@ -51,7 +52,7 @@ internal suspend fun executeCredentialTargets(
             val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
             val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.hasKeyAttestationProvider())
             stage = CredentialIssuanceStage.REQUEST
-            val response = WalletIssuanceHandler.requestCredentialWithNonceRetry(
+            val exchange = WalletIssuanceHandler.exchangeCredentialWithNonceRetry(
                 FetchCredentialRequest(Url(issuerMetadata.credentialEndpoint), access.accessToken,
                     target.credentialConfigurationId, credentialIdentifier = target.credentialIdentifier),
                 issuerMetadata.nonceEndpoint, httpClient,
@@ -61,8 +62,10 @@ internal suspend fun executeCredentialTargets(
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
+                issuerMetadata = issuerMetadata,
                 onStage = { stage = it },
             )
+            val response = exchange.response
             ensureOwned()
             stage = CredentialIssuanceStage.RESPONSE
             val label = labelFor(target.credentialConfigurationId)
@@ -85,7 +88,8 @@ internal suspend fun executeCredentialTargets(
                         sessions.retainDeferredCredential(public, configuration, selected, transaction.proofRequired,
                             endpoint, transaction.transactionId, access.accessToken, access.tokenType,
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
-                            sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce)
+                            sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
+                            responseDecryptionKey = exchange.responseDecryptionKey?.let(CredentialEncryption::exportResponseDecryptionKey))
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()
