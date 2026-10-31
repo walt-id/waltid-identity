@@ -2,9 +2,14 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.DcqlParser
 import id.walt.sdjwt.SDJwt
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -12,6 +17,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
@@ -152,7 +158,16 @@ class WalletNestedSdJwtPresentationTest {
     private suspend fun wallet(sdJwt: String): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
         val store = InMemoryCredentialStore().also { it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = credential)) }
-        return Wallet(id = "wallet", staticKey = JWKKey.generate(KeyType.secp256r1), credentialStores = listOf(store))
+        // The legacy P-256 generator uses the iOS Keychain; these tests need only software signing.
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("holder"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) }
+        return Wallet(id = "wallet", keyStores = listOf(keyStore), credentialStores = listOf(store))
     }
 
     /** A request for [claims] (DCQL claims queries as JSON), with optional `claim_sets`. */
