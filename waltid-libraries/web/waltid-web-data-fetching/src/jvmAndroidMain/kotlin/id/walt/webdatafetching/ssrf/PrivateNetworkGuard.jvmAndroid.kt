@@ -1,0 +1,177 @@
+package id.walt.webdatafetching.ssrf
+
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClientConfig
+import io.ktor.client.engine.okhttp.OkHttpConfig
+import io.ktor.client.plugins.api.Send
+import io.ktor.client.plugins.api.createClientPlugin
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.setBody
+import io.ktor.client.request.url
+import io.ktor.client.utils.EmptyContent
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Dns
+import java.net.InetAddress
+import java.net.UnknownHostException
+
+private val log = KotlinLogging.logger("PrivateNetworkGuard")
+
+private const val MAX_REDIRECTS = 5
+private val ALLOWED_SCHEMES = setOf("http", "https")
+private val REDIRECT_STATUSES = setOf(
+    HttpStatusCode.MovedPermanently, HttpStatusCode.Found, HttpStatusCode.SeeOther,
+    HttpStatusCode.TemporaryRedirect, HttpStatusCode.PermanentRedirect,
+)
+private val DOWNGRADE_TO_GET_STATUSES = setOf(
+    HttpStatusCode.MovedPermanently, HttpStatusCode.Found, HttpStatusCode.SeeOther,
+)
+
+/** True if [host] equals, or is a subdomain of, one of [PrivateNetworkGuardSettings.trustedHostSuffixes]. */
+private fun isTrustedHost(host: String): Boolean =
+    PrivateNetworkGuardSettings.trustedHostSuffixes.any { suffix ->
+        host.equals(suffix, ignoreCase = true) || host.endsWith(".$suffix", ignoreCase = true)
+    }
+
+private fun loopbackAllowed(): Boolean = when {
+    PrivateNetworkGuardSettings.allowLoopbackExplicit -> PrivateNetworkGuardSettings.allowLoopback
+    else -> System.getProperty("walt.ssrf.allowLoopback") == "true"
+}
+
+/** IPv4 address embedded in an IPv4-mapped IPv6 address (`::ffff:0:0/96`), or null. */
+private fun embeddedIpv4(address: InetAddress): InetAddress? {
+    val bytes = address.address
+    if (bytes.size != 16) return null
+    val mapped = (0 until 10).all { bytes[it] == 0.toByte() } &&
+        bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
+    if (!mapped) return null
+    return InetAddress.getByAddress(bytes.copyOfRange(12, 16))
+}
+
+private fun isBlockedAddress(address: InetAddress, trustedHost: Boolean): Boolean {
+    embeddedIpv4(address)?.let { return isBlockedAddress(it, trustedHost) }
+    // Never legitimate for a server-side fetch, regardless of host trust - no opt-out.
+    if (address.isLinkLocalAddress) return true // covers 169.254.0.0/16, including the cloud-metadata address
+    if (address.isMulticastAddress) return true
+    if (address.isAnyLocalAddress) return true
+
+    // A trusted host skips only the loopback/private-network checks below - see the doc comment on
+    // PrivateNetworkGuardSettings.trustedHostSuffixes for why this is narrower than the allow* flags.
+    if (trustedHost) return false
+
+    // Tests set walt.ssrf.allowLoopback. Production does not, so the settings default still refuses loopback.
+    if (!loopbackAllowed() && address.isLoopbackAddress) return true
+
+    if (!PrivateNetworkGuardSettings.allowPrivateNetworks) {
+        if (address.isSiteLocalAddress) return true // RFC1918 IPv4
+        val bytes = address.address
+        if (bytes.size == 16) {
+            // IPv6 unique local (fc00::/7): isSiteLocalAddress() only recognizes the deprecated fec0::/10 range.
+            val first = bytes[0].toInt() and 0xff
+            if (first == 0xfc || first == 0xfd) return true
+        }
+    }
+    return false
+}
+
+private suspend fun requireAllowedTarget(url: Url) {
+    require(url.protocol.name in ALLOWED_SCHEMES) {
+        "Refusing to fetch '${url.protocol.name}://...': only http/https are allowed"
+    }
+    val host = url.host
+    val addresses = withContext(Dispatchers.IO) { InetAddress.getAllByName(host) }
+    val trustedHost = isTrustedHost(host)
+    val blocked = addresses.firstOrNull { isBlockedAddress(it, trustedHost) }
+    if (blocked != null) {
+        log.warn { "Refusing to fetch $url: '$host' resolves to ${blocked.hostAddress}, which is a blocked address" }
+        throw BlockedAddressException("Refusing to fetch '$host': resolves to a blocked (private/loopback/link-local) address")
+    }
+}
+
+/**
+ * Resolves a Location header against the request it came from. Only absolute URLs are supported - real-world
+ * OAuth/issuer redirects always send one. A relative Location is refused as unsupported, not as a blocked
+ * address - it's a protocol edge case this guard doesn't implement RFC 3986 resolution for, not a security hit.
+ */
+internal class UnsupportedRedirectException(message: String) : Exception(message)
+
+private val ABSOLUTE_URL_SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+private fun resolveRedirectTarget(base: Url, location: String): Url {
+    // Url(String) defaults a missing host to "localhost" rather than leaving it blank, so a relative Location
+    // like "/relative-path" would otherwise be misparsed as pointing at localhost. Require an explicit scheme.
+    if (ABSOLUTE_URL_SCHEME.containsMatchIn(location)) {
+        runCatching { Url(location) }.getOrNull()?.let { return it }
+    }
+    throw UnsupportedRedirectException("Refusing to follow relative redirect Location '$location' from $base")
+}
+
+/**
+ * OkHttp calls this while connecting, and connects to the addresses it returns, so a second DNS answer
+ * cannot swap in a blocked address after the earlier check.
+ */
+internal object ConnectTimeDns : Dns {
+    override fun lookup(hostname: String): List<InetAddress> {
+        val addresses = Dns.SYSTEM.lookup(hostname)
+        val trustedHost = isTrustedHost(hostname)
+        if (addresses.any { isBlockedAddress(it, trustedHost) }) {
+            throw UnknownHostException("Destination not allowed: $hostname")
+        }
+        return addresses
+    }
+}
+
+actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
+    // OkHttp connects to the addresses its Dns returns. The engine type is not visible on HttpClientConfig<*>,
+    // so this is a no-op for every other engine, which keeps the pre-connect check below.
+    val clientFollowsRedirects = this
+    engine {
+        if (this is OkHttpConfig) dns = ConnectTimeDns
+    }
+    install(createClientPlugin("PrivateNetworkGuard") {
+        on(Send) { request ->
+            requireAllowedTarget(request.url.build())
+            var call = proceed(request)
+            val method = request.method
+            if (!clientFollowsRedirects.followRedirects || (method != HttpMethod.Get && method != HttpMethod.Head)) {
+                return@on call
+            }
+            var currentRequest = request
+            var hops = 0
+            while (call.response.status in REDIRECT_STATUSES) {
+                val location = call.response.headers[HttpHeaders.Location] ?: break
+                check(hops < MAX_REDIRECTS) { "Refusing to follow more than $MAX_REDIRECTS redirects" }
+                hops++
+
+                val target = resolveRedirectTarget(currentRequest.url.build(), location)
+                requireAllowedTarget(target)
+
+                val nextRequest = HttpRequestBuilder().takeFrom(currentRequest).apply {
+                    url(target)
+                    if (!sameAuthority(currentRequest.url.build(), target)) {
+                        headers.remove(HttpHeaders.Authorization)
+                    }
+                    if (call.response.status in DOWNGRADE_TO_GET_STATUSES) {
+                        this.method = HttpMethod.Get
+                        setBody(EmptyContent)
+                        headers.remove(HttpHeaders.ContentLength)
+                        headers.remove(HttpHeaders.ContentType)
+                        headers.remove(HttpHeaders.TransferEncoding)
+                    }
+                }
+                currentRequest = nextRequest
+                call = proceed(currentRequest)
+            }
+            call
+        }
+    })
+}
+
+private fun sameAuthority(left: Url, right: Url): Boolean =
+    left.protocol == right.protocol &&
+        left.host.equals(right.host, ignoreCase = true) &&
+        left.port == right.port
