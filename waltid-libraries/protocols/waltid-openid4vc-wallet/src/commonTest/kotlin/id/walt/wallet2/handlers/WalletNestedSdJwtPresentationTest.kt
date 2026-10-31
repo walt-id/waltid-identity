@@ -152,7 +152,7 @@ class WalletNestedSdJwtPresentationTest {
     private suspend fun wallet(sdJwt: String): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
         val store = InMemoryCredentialStore().also { it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = credential)) }
-        return Wallet(id = "wallet", staticKey = JWKKey.generate(KeyType.Ed25519), credentialStores = listOf(store))
+        return Wallet(id = "wallet", staticKey = JWKKey.generate(KeyType.secp256r1), credentialStores = listOf(store))
     }
 
     /** A request for [claims] (DCQL claims queries as JSON), with optional `claim_sets`. */
