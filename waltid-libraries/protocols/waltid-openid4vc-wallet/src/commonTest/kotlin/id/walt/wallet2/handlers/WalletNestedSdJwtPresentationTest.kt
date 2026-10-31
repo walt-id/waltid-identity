@@ -40,66 +40,103 @@ class WalletNestedSdJwtPresentationTest {
     //   matrix:        [["a", "b"], ["c"]]
     // ---------------------------------------------------------------------------------------------------------
 
-    private val disclosures = mutableListOf<SdJwtSelectiveDisclosure>()
-
-    private fun property(name: String, value: JsonElement): String =
-        SdJwtSelectiveDisclosure("salt-$name-${disclosures.size}", name, value).also { disclosures += it }.asHashedFromEncoded()
-
-    private fun element(value: JsonElement): JsonObject =
-        SdJwtSelectiveDisclosure("salt-element-${disclosures.size}", null, value).also { disclosures += it }
-            .let { buildJsonObject { put("...", it.asHashedFromEncoded()) } }
-
-    private fun element(value: String) = element(JsonPrimitive(value))
-
-    private val nationalities = buildJsonArray {
-        add(element("IN"))
-        add(element(buildJsonObject {
-            put("kind", "residency")
-            putJsonArray("_sd") {
-                add(property("country", JsonPrimitive("DE")))
-                add(property("since", JsonPrimitive(2015)))
-                add(property("documents", buildJsonArray { add(element("passport")); add(element("visa")) }))
-            }
-        }))
-        add(element("FR"))
-    }
-
-    private val address = buildJsonObject {
-        putJsonArray("_sd") {
-            add(property("street", JsonPrimitive("Main St 1")))
-            add(property("locality", JsonPrimitive("Vienna")))
-            add(property("geo", buildJsonObject {
+    private val sdJwt = sdJwt {
+        val nationalities = buildJsonArray {
+            add(element("IN"))
+            add(element(buildJsonObject {
+                put("kind", "residency")
                 putJsonArray("_sd") {
-                    add(property("lat", JsonPrimitive(48.2)))
-                    add(property("lng", JsonPrimitive(16.37)))
+                    add(property("country", JsonPrimitive("DE")))
+                    add(property("since", JsonPrimitive(2015)))
+                    add(property("documents", buildJsonArray { add(element("passport")); add(element("visa")) }))
                 }
             }))
+            add(element("FR"))
+        }
+        val address = buildJsonObject {
+            putJsonArray("_sd") {
+                add(property("street", JsonPrimitive("Main St 1")))
+                add(property("locality", JsonPrimitive("Vienna")))
+                add(property("geo", buildJsonObject {
+                    putJsonArray("_sd") {
+                        add(property("lat", JsonPrimitive(48.2)))
+                        add(property("lng", JsonPrimitive(16.37)))
+                    }
+                }))
+            }
+        }
+        val matrix = buildJsonArray {
+            add(element(buildJsonArray { add(element("a")); add(element("b")) }))
+            add(element(buildJsonArray { add(element("c")) }))
+        }
+        payload {
+            putJsonArray("_sd") {
+                add(property("nationalities", nationalities))
+                add(property("address", address))
+                add(property("matrix", matrix))
+            }
         }
     }
 
-    private val matrix = buildJsonArray {
-        add(element(buildJsonArray { add(element("a")); add(element("b")) }))
-        add(element(buildJsonArray { add(element("c")) }))
-    }
+    // ---------------------------------------------------------------------------------------------------------
+    // Credential with clear-text parents: only the leaves are selectively disclosable
+    //
+    //   nationalities: ["IN", "FR"]
+    //   address:       {street: "Main St 1", geo: {lat: 48.2}}
+    //   degrees:       [{type: "BSc"}, {type: "MSc"}]
+    //   matrix:        [["a"], ["c"]]
+    // ---------------------------------------------------------------------------------------------------------
 
-    private val issuerSignedPayload = buildJsonObject {
-        put("iss", "https://issuer.example")
-        put("vct", VCT)
-        put("_sd_alg", "sha-256")
-        put("given_name", "John")
-        put("family_name", "Doe")
-        putJsonArray("_sd") {
-            add(property("nationalities", nationalities))
-            add(property("address", address))
-            add(property("matrix", matrix))
+    private val clearParentsSdJwt = sdJwt {
+        payload {
+            putJsonArray("nationalities") { add(element("IN")); add(element("FR")) }
+            putJsonObject("address") {
+                putJsonArray("_sd") { add(property("street", JsonPrimitive("Main St 1"))) }
+                putJsonObject("geo") { putJsonArray("_sd") { add(property("lat", JsonPrimitive(48.2))) } }
+            }
+            putJsonArray("degrees") {
+                listOf("BSc", "MSc").forEach { type ->
+                    addJsonObject { putJsonArray("_sd") { add(property("type", JsonPrimitive(type))) } }
+                }
+            }
+            putJsonArray("matrix") {
+                addJsonArray { add(element("a")) }
+                addJsonArray { add(element("c")) }
+            }
         }
     }
 
-    private val sdJwt: String = run {
+    /** Collects the disclosures of an SD-JWT while its issuer-signed payload is built. */
+    private class SdJwtBuilder {
+        val disclosures = mutableListOf<SdJwtSelectiveDisclosure>()
+
+        fun property(name: String, value: JsonElement): String =
+            SdJwtSelectiveDisclosure("salt-$name-${disclosures.size}", name, value).also { disclosures += it }.asHashedFromEncoded()
+
+        fun element(value: JsonElement): JsonObject =
+            SdJwtSelectiveDisclosure("salt-element-${disclosures.size}", null, value).also { disclosures += it }
+                .let { buildJsonObject { put("...", it.asHashedFromEncoded()) } }
+
+        fun element(value: String) = element(JsonPrimitive(value))
+
+        /** The payload claims shared by both credentials, plus [claims]. */
+        fun payload(claims: JsonObjectBuilder.() -> Unit) = buildJsonObject {
+            put("iss", "https://issuer.example")
+            put("vct", VCT)
+            put("_sd_alg", "sha-256")
+            put("given_name", "John")
+            put("family_name", "Doe")
+            claims()
+        }
+    }
+
+    private fun sdJwt(issuerSignedPayload: SdJwtBuilder.() -> JsonObject): String {
+        val builder = SdJwtBuilder()
+        val payload = builder.issuerSignedPayload()
         fun encode(json: JsonObject) = json.toString().encodeToByteArray().encodeToBase64Url()
         val header = buildJsonObject { put("alg", "ES256"); put("typ", "dc+sd-jwt") }
         // The wallet does not verify the issuer signature when presenting
-        "${encode(header)}.${encode(issuerSignedPayload)}.c2lnbmF0dXJl~${disclosures.joinToString("~") { it.encoded }}~"
+        return "${encode(header)}.${encode(payload)}.c2lnbmF0dXJl~${builder.disclosures.joinToString("~") { it.encoded }}~"
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -112,7 +149,7 @@ class WalletNestedSdJwtPresentationTest {
         fun previewName(path: String): String? = preview.single { it.path == path }.name
     }
 
-    private suspend fun wallet(): Wallet {
+    private suspend fun wallet(sdJwt: String): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
         val store = InMemoryCredentialStore().also { it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = credential)) }
         return Wallet(id = "wallet", staticKey = JWKKey.generate(KeyType.Ed25519), credentialStores = listOf(store))
@@ -135,10 +172,14 @@ class WalletNestedSdJwtPresentationTest {
 
     /**
      * Previews and presents [request] as a consent UI would: with [selectedOptionalPaths] the user's choice of
-     * optional claims (`null` keeps the matcher's choice).
+     * optional claims (`null` keeps the matcher's choice), from [credential].
      */
-    private suspend fun present(request: AuthorizationRequest, selectedOptionalPaths: List<String>? = null): Presented {
-        val wallet = wallet()
+    private suspend fun present(
+        request: AuthorizationRequest,
+        selectedOptionalPaths: List<String>? = null,
+        credential: String = sdJwt,
+    ): Presented {
+        val wallet = wallet(credential)
         val preview = WalletPresentationHandler.previewPresentationStateless(
             wallet = wallet,
             request = PreviewPresentationRequest(REQUEST_URL),
@@ -165,7 +206,7 @@ class WalletNestedSdJwtPresentationTest {
 
     private suspend fun isRejected(request: AuthorizationRequest): Boolean =
         WalletPresentationHandler.previewPresentationStateless(
-            wallet = wallet(),
+            wallet = wallet(sdJwt),
             request = PreviewPresentationRequest(REQUEST_URL),
             transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
             resolveAuthorizationRequest = resolverFor(request),
@@ -300,9 +341,54 @@ class WalletNestedSdJwtPresentationTest {
         // sees:    given_name = "John", and no nationalities, address or matrix
         val givenName = present(request(claim("given_name")))
         assertEquals(json(""""John""""), givenName.verifierView["given_name"])
+        assertEquals("given_name", givenName.previewName(""""given_name""""))
         assertFalse("nationalities" in givenName.verifierView)
         assertFalse("address" in givenName.verifierView)
         assertFalse("matrix" in givenName.verifierView)
+    }
+
+    @Test
+    fun clearTextContainerIsPreviewedWithoutItsUnpresentedDisclosures() = runTest {
+        // credential: clear-text parents, selectively disclosable leaves
+
+        // request: ["nationalities"]
+        // sent:    no disclosures
+        // sees:    nationalities = []
+        val nationalities = present(request(claim("nationalities")), credential = clearParentsSdJwt)
+        assertEquals(json("[]"), nationalities.verifierView["nationalities"])
+        assertEquals(json("[]"), nationalities.previewValue(""""nationalities""""))
+        assertEquals("nationalities", nationalities.previewName(""""nationalities""""))
+
+        // request: ["address"]
+        // sent:    no disclosures
+        // sees:    address = {geo: {}}
+        val address = present(request(claim("address")), credential = clearParentsSdJwt)
+        assertEquals(json("""{"geo": {}}"""), address.verifierView["address"])
+        assertEquals(json("""{"geo": {}}"""), address.previewValue(""""address""""))
+        assertEquals("address", address.previewName(""""address""""))
+
+        // request: ["degrees", 0]
+        // sent:    no disclosures
+        // sees:    degrees = [{}, {}]
+        val firstDegree = present(request(claim("degrees", 0)), credential = clearParentsSdJwt)
+        assertEquals(json("[{}, {}]"), firstDegree.verifierView["degrees"])
+        assertEquals(json("{}"), firstDegree.previewValue(""""degrees".0"""))
+        assertEquals("degrees", firstDegree.previewName(""""degrees".0"""))
+
+        // request: ["matrix", 1]
+        // sent:    no disclosures
+        // sees:    matrix = [[], []]
+        val secondRow = present(request(claim("matrix", 1)), credential = clearParentsSdJwt)
+        assertEquals(json("[[], []]"), secondRow.verifierView["matrix"])
+        assertEquals(json("[]"), secondRow.previewValue(""""matrix".1"""))
+        assertEquals("matrix", secondRow.previewName(""""matrix".1"""))
+
+        // request: ["matrix", 1, 0]
+        // sent:    cell "c"
+        // sees:    matrix = [[], ["c"]]
+        val cell = present(request(claim("matrix", 1, 0)), credential = clearParentsSdJwt)
+        assertEquals(json("""[[], ["c"]]"""), cell.verifierView["matrix"])
+        assertEquals(json(""""c""""), cell.previewValue(""""matrix".1.0"""))
     }
 
     @Test
