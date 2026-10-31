@@ -2132,10 +2132,11 @@ object WalletPresentationHandler {
                     required = required,
                     selectable = plan.isSelectable(path, claim),
                 )
+                // Clear text, but its own children may be disclosures that are not presented
                 value is JsonElement -> PresentationDisclosure(
                     path = path,
-                    name = path.substringAfterLast('.', path),
-                    value = value,
+                    name = claimName(path) ?: path.substringAfterLast('.', path),
+                    value = disclosedValue(path, claim),
                     selectivelyDisclosable = false,
                     required = required,
                     selectable = false,
