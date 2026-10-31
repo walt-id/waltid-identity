@@ -21,6 +21,7 @@ import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.accessTokenType
+import id.walt.openid4vci.tokens.access.refreshTokenDpopBinding
 import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
@@ -154,7 +155,9 @@ class PreAuthorizedCodeTokenEndpoint(
         }
         val clientRequest = updatedRequest.withClient(clientToUse)
 
-        val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]
+        val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(clientRequest, null)
+        val deadline = credentialAuthorization?.issuanceDeadline
+        val sessionExpiresAt = deadline?.let { minOf(it, Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds) } ?: session.expiresAt[TokenType.ACCESS_TOKEN]
         val expiresAt = sessionExpiresAt ?: (Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
@@ -163,7 +166,6 @@ class PreAuthorizedCodeTokenEndpoint(
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "subject is required in session"),
             )
 
-        val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(clientRequest, null)
 
         val claims = defaultAccessTokenClaims(
             subject = subject,
@@ -187,7 +189,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 request = clientRequest,
                 credentialAuthorization = credentialAuthorization,
                 accessToken = accessToken,
-                session = session,
+                session = deadline?.let { session.withExpiresAt(TokenType.REFRESH_TOKEN, it).withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt) } ?: session,
                 subject = subject,
                 issuer = issuer,
                 clientId = clientId.takeIf { it.isNotBlank() },
@@ -256,6 +258,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 session = refreshSession,
                 expiresAt = refreshTokenExpiresAt,
                 grantedAuthorizationDetails = credentialAuthorization?.authorizationDetails,
+                dpopJwkThumbprint = request.refreshTokenDpopBinding(),
             ),
         )
 

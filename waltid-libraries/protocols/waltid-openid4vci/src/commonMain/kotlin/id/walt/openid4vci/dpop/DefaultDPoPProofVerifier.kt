@@ -13,6 +13,8 @@ import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import io.ktor.http.*
 import kotlinx.serialization.json.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -22,6 +24,11 @@ class DefaultDPoPProofVerifier(
     private val clockSkewSeconds: Long = DEFAULT_CLOCK_SKEW_SECONDS,
     private val now: () -> Instant = { Clock.System.now() },
 ) : DPoPProofVerifier {
+
+    // Token proofs must not be reusable for another refresh in the same verifier lifetime.
+    // Keep identifiers until the proof can no longer pass the age check (including skew).
+    private val tokenProofMutex = Mutex()
+    private val tokenProofs = mutableMapOf<Pair<String, String>, Long>()
 
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
@@ -126,6 +133,14 @@ class DefaultDPoPProofVerifier(
             }
         }
 
+        if (request.accessToken == null) {
+            tokenProofMutex.withLock {
+                tokenProofs.entries.removeAll { it.value < currentTime }
+                val proofId = thumbprint to jti
+                require(proofId !in tokenProofs) { "DPoP token proof has already been used" }
+                tokenProofs[proofId] = issuedAt + proofMaxAgeSeconds + clockSkewSeconds
+            }
+        }
         return VerifiedDPoPProof(thumbprint)
     }
 

@@ -15,13 +15,22 @@ import kotlinx.serialization.json.*
 @Serializable(with = PublicIssuanceSessionSerializer::class)
 data class PublicIssuanceSession(val session: IssuanceSession)
 
+val multiIssuanceSessionDescriptor: SerialDescriptor =
+    buildClassSerialDescriptor("id.walt.issuer2.models.MultiIssuanceSession") {
+        val session = IssuanceSession.serializer().descriptor
+        for (index in 0 until session.elementsCount) {
+            val name = session.getElementName(index)
+            if (name != "deferredState") element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
+        }
+    }
+
 /** Describes the flat public view without introducing a second persistence model. */
 val singleIssuanceSessionDescriptor: SerialDescriptor =
     buildClassSerialDescriptor("id.walt.issuer2.models.SingleIssuanceSession") {
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers"))
+            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
         val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
@@ -49,11 +58,14 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 }
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
-    val encoded = json.encodeToJsonElement(this).jsonObject
+    val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
+        add("deferredState")
+        if (deferredStatus == null) add("deferredStatus")
+    })
     if (issuanceRequests.size != 1) return encoded
     val request = issuanceRequests.single()
     val fields = encoded.toMutableMap()
-    fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers"))
+    fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
     fields.putAll(
         json.encodeToJsonElement(request).jsonObject - setOf(
             "credentialIdentifier",

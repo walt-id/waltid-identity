@@ -117,6 +117,7 @@ class ConfiguredRefreshTokenRepositoryTest {
         )
 
         return DefaultRefreshTokenRecord(
+            dpopJwkThumbprint = "verified-wallet-thumbprint",
             tokenSignature = "refresh-token-signature-$suffix",
             active = true,
             accessTokenRequest = accessTokenRequest,

@@ -26,6 +26,17 @@ class ConfiguredIssuanceSessionRepository(
         decoding = { it },
     ),
 ) : IssuanceSessionRepository {
+    override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean {
+        require(expected.sessionId == replacement.sessionId)
+        // Deferred changes never replace credential keys. Keep the immutable sidecar through the deadline.
+        val current = sessions[expected.sessionId] ?: return false
+        if (Json.encodeToString(current) != Json.encodeToString(expected)) return false
+        val ttl = ttlUntil(replacement.expiresAt)
+        val sidecar = crypto2Keys[expected.sessionId]
+        if (sidecar != null) check(crypto2Keys.retainForAtLeast(expected.sessionId, ttl)) { "Credential key retention expired" }
+        return sessions.compareAndSet(expected.sessionId, current, replacement, ttl)
+    }
+
     override suspend fun save(session: IssuanceSession): IssuanceSession {
         val ttl = ttlUntil(session.expiresAt)
         val existingSidecar = crypto2Keys[session.sessionId]

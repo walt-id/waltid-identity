@@ -357,6 +357,13 @@ object OpenId4VciRoutesDocs {
                     mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
                 }
             }
+            HttpStatusCode.Accepted to {
+                description = "Deferred issuance accepted; poll deferred_credential_endpoint using transaction_id after interval seconds"
+                body<id.walt.openid4vci.responses.credential.CredentialResponse>()
+                body<String> {
+                    mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+                }
+            }
             HttpStatusCode.BadRequest to {
                 description = "Invalid credential request"
                 body<CredentialError>()

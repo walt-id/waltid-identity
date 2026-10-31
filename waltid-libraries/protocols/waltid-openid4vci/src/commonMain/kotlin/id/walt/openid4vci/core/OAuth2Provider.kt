@@ -120,6 +120,33 @@ interface OAuth2Provider {
 
     fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp
 
+    /** Validates the initial holder proofs without signing or allocating issuance inputs. */
+    suspend fun acceptCredentialRequest(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        credentialIdentifier: String,
+        credentialConfigurationId: String,
+        proofValidationContext: CredentialProofValidationContext,
+    ): id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
+
+    suspend fun createDeferredCredentialRequest(
+        parameters: Map<String, List<String>>,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): id.walt.openid4vci.deferred.DeferredCredentialRequestResult
+
+    suspend fun createDeferredCredentialRequest(
+        encryptedRequest: String,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): id.walt.openid4vci.deferred.DeferredCredentialRequestResult
+
+    suspend fun writeDeferredCredentialResponse(
+        request: id.walt.openid4vci.deferred.DeferredCredentialRequest,
+        response: CredentialResponse,
+    ): CredentialResponseHttp
+
+    fun writeDeferredCredentialError(error: CredentialError): CredentialResponseHttp = writeCredentialError(error)
+    fun writeDeferredCredentialError(error: OAuthError): CredentialResponseHttp = writeCredentialError(error)
+
     // Issuer API - Credential Endpoint
     suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,

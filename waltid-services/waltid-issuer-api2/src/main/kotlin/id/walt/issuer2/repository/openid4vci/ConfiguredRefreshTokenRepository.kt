@@ -73,6 +73,7 @@ private data class StoredRefreshTokenRecord(
     val session: StoredSession,
     val expiresAt: Long,
     val grantedAuthorizationDetails: List<AuthorizationDetail>? = null,
+    val dpopJwkThumbprint: String? = null,
 )
 
 @Serializable
@@ -121,6 +122,7 @@ private fun RefreshTokenRecord.toStoredRecord(): StoredRefreshTokenRecord =
         session = session.toStoredSession(),
         expiresAt = expiresAt.toEpochMilliseconds(),
         grantedAuthorizationDetails = grantedAuthorizationDetails,
+        dpopJwkThumbprint = dpopJwkThumbprint,
     )
 
 private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecord =
@@ -135,6 +137,7 @@ private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecor
         session = session.toSession(),
         expiresAt = Instant.fromEpochMilliseconds(expiresAt),
         grantedAuthorizationDetails = grantedAuthorizationDetails,
+        dpopJwkThumbprint = dpopJwkThumbprint,
     )
 
 private fun AccessTokenRequest.toStoredRequest(): StoredAccessTokenRequest =

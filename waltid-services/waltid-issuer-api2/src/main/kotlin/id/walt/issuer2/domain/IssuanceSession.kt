@@ -67,6 +67,8 @@ data class IssuanceSession(
     val failure: IssuanceSessionFailure? = null,
     /** Established issuance selection; independent of any later token narrowing. */
     val authorizedCredentialIdentifiers: List<String>? = null,
+    val deferredStatus: id.walt.openid4vci.deferred.DeferredStatus? = null,
+    val deferredState: id.walt.openid4vci.deferred.DeferredIssuanceState? = null,
 ) {
     init {
         require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }

@@ -1,5 +1,19 @@
 package id.walt.issuer2.repository
 
+import id.walt.openid4vci.deferred.*
+import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
+import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.IssuedCredential
+import id.walt.issuer2.service.IssuanceSessionService
+import kotlinx.coroutines.*
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
+import kotlin.time.Duration.Companion.days
+import kotlinx.serialization.json.JsonPrimitive
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
@@ -42,6 +56,23 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 @Tag("redis")
 @EnabledIfEnvironmentVariable(named = "ISSUER2_REDIS_HOST", matches = ".+")
 class ConfiguredRedisRepositoryTest {
+
+    @Test
+    fun redisRetentionDoesNotShortenExistingDeadline() = runTest {
+        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
+        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
+        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+            val namespace = "deferred-retention-${java.util.UUID.randomUUID()}"
+            val persistence = id.walt.commons.persistence.RedisPersistence<String>(namespace, 5.minutes, { it }, { it }, redis)
+            try {
+                persistence.set("key", "private-key", 1.minutes)
+                kotlin.test.assertTrue(persistence.retainForAtLeast("key", 7.days))
+                kotlin.test.assertTrue(persistence.retainForAtLeast("key", 1.minutes))
+                kotlin.test.assertTrue(redis.pttl("$namespace:key") > 6.days.inWholeMilliseconds)
+                assertFalse(persistence.retainForAtLeast("missing", 1.minutes))
+            } finally { persistence.remove("key") }
+        }
+    }
 
     @Test
     fun configuredRepositoriesCanUseRedisPersistence() = runTest {
@@ -100,6 +131,53 @@ class ConfiguredRedisRepositoryTest {
             preAuthorizedCodeRepository.consume(preAuthorizedCode.code)
             parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now())
         }
+    }
+
+    @Test
+    fun deferredTransactionsKeepBindingsAndResponseAcrossRestartAndConcurrentPolling() = runTest {
+        configureRedisPersistence()
+        val repository = ConfiguredIssuanceSessionRepository()
+        val original = testSession("deferred-${java.util.UUID.randomUUID()}").copy(
+            deferredStatus = DeferredStatus.PENDING, deferredState = DeferredIssuanceState(),
+        )
+        repository.save(original)
+        try {
+            val first = DeferredIssuance(IssuanceSessionService(repository).deferredStore)
+            first.start(original.sessionId, Clock.System.now() + 7.days)
+            val selected = original.issuanceRequests.single()
+            val accepted = AcceptedCredentialRequest(
+                DefaultCredentialRequest(
+                    client = DefaultClient("client", emptyList(), emptySet(), emptySet()),
+                    credentialIdentifier = selected.credentialIdentifier, credentialConfigurationId = null,
+                    proofs = null, credentialResponseEncryption = null, accessTokenClientId = "client",
+                ), selected.credentialIdentifier, selected.credentialConfigurationId,
+                CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "https://example.com/type"), emptyList(),
+            )
+            val transactions = coroutineScope {
+                (1..12).map { async(Dispatchers.IO) { first.accept(original.sessionId, accepted) } }.awaitAll()
+            }
+            val transaction = transactions.first()
+            assertEquals(1, transactions.map { it.id }.distinct().size)
+            first.decide(original.sessionId, DeferredStatus.READY)
+            val restartedRepository = ConfiguredIssuanceSessionRepository()
+            val restarted = DeferredIssuance(IssuanceSessionService(restartedRepository).deferredStore)
+            assertEquals(transaction, restarted.accept(original.sessionId, accepted))
+            val claims = coroutineScope { (1..12).map { index -> async(Dispatchers.IO) {
+                (if (index % 2 == 0) first else restarted).collect(original.sessionId, transaction.id, setOf(selected.credentialIdentifier), "client")
+            } }.awaitAll() }
+            val claim = claims.filterIsInstance<DeferredIssuance.Collection.Claimed>().single().transaction
+            val response = CredentialResponse(listOf(IssuedCredential(JsonPrimitive("signed-once"))))
+            first.checkpoint(original.sessionId, claim, response)
+            first.release(original.sessionId, claim)
+            val recovered = assertIs<DeferredIssuance.Collection.Claimed>(restarted.collect(original.sessionId, transaction.id, setOf(selected.credentialIdentifier), "client")).transaction
+            assertEquals(response, recovered.response)
+            assertEquals(accepted, recovered.accepted)
+            assertNotNull(restartedRepository.get(original.sessionId)!!.issuanceRequests.single().crypto2IssuerStoredKey)
+            restarted.consume(original.sessionId, recovered)
+            assertEquals("invalid_transaction_id", assertFailsWith<DeferredProtocolException> {
+                first.collect(original.sessionId, transaction.id, setOf(selected.credentialIdentifier), "client")
+            }.error.error)
+        } finally { repository.remove(original.sessionId) }
     }
 
     private fun configureRedisPersistence() {
@@ -222,6 +300,7 @@ class ConfiguredRedisRepositoryTest {
         )
 
         return DefaultRefreshTokenRecord(
+            dpopJwkThumbprint = "verified-wallet-thumbprint",
             tokenSignature = "redis-refresh-token-$suffix",
             active = true,
             accessTokenRequest = accessTokenRequest,

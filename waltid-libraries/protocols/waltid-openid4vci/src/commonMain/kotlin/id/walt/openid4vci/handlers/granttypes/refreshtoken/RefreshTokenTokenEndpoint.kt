@@ -4,7 +4,9 @@ import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.TokenType
-import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
+import id.walt.openid4vci.tokens.access.accessTokenType
+import id.walt.openid4vci.tokens.access.dpopAccessTokenClaims
+import id.walt.openid4vci.tokens.access.refreshTokenDpopBinding
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
@@ -121,6 +123,19 @@ class RefreshTokenTokenEndpoint(
                 )
             }
 
+            if (record.dpopJwkThumbprint != null) {
+                if (request.dpopJwkThumbprint == null) {
+                    return AccessTokenResponseResult.Failure(
+                        resolvedRequest, OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, "DPoP proof is required for this refresh token"),
+                    )
+                }
+                if (request.dpopJwkThumbprint != record.dpopJwkThumbprint) {
+                    return AccessTokenResponseResult.Failure(
+                        resolvedRequest, OAuthError(OAuthErrorCodes.INVALID_GRANT, "DPoP key does not match refresh token"),
+                    )
+                }
+            }
+
             val requestedScope = request.requestedScopes.ifEmpty { record.grantedScopes }
             if (!record.grantedScopes.containsAll(requestedScope)) {
                 return AccessTokenResponseResult.Failure(
@@ -166,8 +181,14 @@ class RefreshTokenTokenEndpoint(
             val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(updatedRequest, record.grantedAuthorizationDetails)
 
             val now = Clock.System.now()
+            if (credentialAuthorization?.issuanceDeadline?.let { it <= now } == true) {
+                return AccessTokenResponseResult.Failure(
+                    resolvedRequest, OAuthError(OAuthErrorCodes.INVALID_GRANT, "Issuance deadline has expired"),
+                )
+            }
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
-            val accessTokenExpiresAt = sessionExpiresAt ?: (now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
+            val accessTokenExpiresAt = credentialAuthorization?.issuanceDeadline?.let { minOf(it, now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds) }
+                ?: (sessionExpiresAt ?: (now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds))
             val issuer = updatedRequest.issClaim ?: verifiedRefreshToken.issuer
             val accessToken = accessTokenIssuer.issue(
                 defaultAccessTokenClaims(
@@ -178,6 +199,7 @@ class RefreshTokenTokenEndpoint(
                     issuedAt = now,
                     expiresAt = accessTokenExpiresAt,
                     additional = buildMap {
+                        putAll(updatedRequest.dpopAccessTokenClaims())
                         credentialAuthorization?.let { putAll(it.tokenClaims()) }
                         effectiveClientId?.let { put("client_id", it) }
                         session.customAttributes["issuance_session_id"]?.let {
@@ -208,6 +230,7 @@ class RefreshTokenTokenEndpoint(
                 session = session,
                 expiresAt = record.expiresAt,
                 grantedAuthorizationDetails = record.grantedAuthorizationDetails,
+                dpopJwkThumbprint = record.dpopJwkThumbprint ?: updatedRequest.refreshTokenDpopBinding(),
             )
 
             if (refreshTokenRepository.rotate(refreshTokenSignature, newRecord) == null) {
@@ -217,11 +240,7 @@ class RefreshTokenTokenEndpoint(
                 )
             }
 
-            val expiresIn = if (sessionExpiresAt == null) {
-                DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
-            } else {
-                computeRemainingSeconds(accessTokenExpiresAt)
-            }
+            val expiresIn = computeRemainingSeconds(accessTokenExpiresAt)
             val scope = grantedScopes.takeIf { it.isNotEmpty() }?.joinToString(" ")
 
             AccessTokenResponseResult.Success(
@@ -229,7 +248,7 @@ class RefreshTokenTokenEndpoint(
                 credentialAuthorization = credentialAuthorization,
                 response = AccessTokenResponse(
                     accessToken = accessToken,
-                    tokenType = TOKEN_TYPE_BEARER,
+                    tokenType = updatedRequest.accessTokenType(),
                     expiresIn = expiresIn,
                     refreshToken = newRefreshToken,
                     scope = scope,
@@ -252,8 +271,7 @@ class RefreshTokenTokenEndpoint(
         }
     }
 
-    private fun computeRemainingSeconds(expiresAt: Instant): Long {
-        val remaining = expiresAt - Clock.System.now()
-        return if (remaining.isNegative()) 0 else remaining.inWholeSeconds
-    }
+    private fun computeRemainingSeconds(expiresAt: Instant): Long =
+        (expiresAt.epochSeconds - Clock.System.now().epochSeconds).coerceAtLeast(0)
+
 }

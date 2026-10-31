@@ -49,8 +49,12 @@ data class CredentialOfferCreateRequest(
     val txCodeValue: String? = null,
     val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
     val sessionId: String? = null,
+    val deferred: Boolean = false,
 ) : CredentialOfferRequestBody {
     init {
+        require(!deferred || authMethod != AuthenticationMethod.AUTHORIZED || issuerStateMode != IssuerStateMode.OMIT) {
+            "Deferred AUTHORIZED offers require issuerStateMode INCLUDE"
+        }
         require(profileId.isNotBlank()) { "profileId must not be blank" }
         require(expiresInSeconds == -1L || expiresInSeconds > 0) {
             "expiresInSeconds must be positive, or -1 for no expiry"
@@ -66,7 +70,7 @@ data class CredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                    (issuerStateMode ?: IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
+                    (issuerStateMode ?: if (deferred) IssuerStateMode.INCLUDE else IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
                     runtimeOverrides == null
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
@@ -106,8 +110,12 @@ data class MultiCredentialOfferCreateRequest(
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
     val sessionId: String? = null,
+    val deferred: Boolean = false,
 ) : CredentialOfferRequestBody {
     init {
+        require(!deferred || authMethod != AuthenticationMethod.AUTHORIZED || issuerStateMode != IssuerStateMode.OMIT) {
+            "Deferred AUTHORIZED offers require issuerStateMode INCLUDE"
+        }
         require(credentials.isNotEmpty()) { "credentials must not be empty" }
         require(expiresInSeconds == -1L || expiresInSeconds > 0) {
             "expiresInSeconds must be positive, or -1 for no expiry"
@@ -123,7 +131,7 @@ data class MultiCredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                    (issuerStateMode ?: IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
+                    (issuerStateMode ?: if (deferred) IssuerStateMode.INCLUDE else IssuerStateMode.OMIT) != IssuerStateMode.OMIT ||
                     credentials.none { it.runtimeOverrides != null }
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
@@ -176,4 +184,5 @@ internal fun CredentialOfferCreateRequest.asMultiCredentialOfferRequest() = Mult
     txCode = txCode,
     txCodeValue = txCodeValue,
     sessionId = sessionId,
+    deferred = deferred,
 )

@@ -101,7 +101,7 @@ class CredentialOfferService(
 
         val issuerStateMode = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> null
-            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.OMIT
+            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: if (request.deferred) IssuerStateMode.INCLUDE else IssuerStateMode.OMIT
         }
         var resolvedTxCodeValue: String? = null
         val credentialConfigurationIds = resolvedCredentials
@@ -145,6 +145,8 @@ class CredentialOfferService(
             credentialOffer = credentialOffer,
             expiresAt = expiresAt,
             notifications = notifications,
+            deferredStatus = if (request.deferred) id.walt.openid4vci.deferred.DeferredStatus.PENDING else null,
+            deferredState = if (request.deferred) id.walt.openid4vci.deferred.DeferredIssuanceState() else null,
         )
         sessionService.createSession(session)
         // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.

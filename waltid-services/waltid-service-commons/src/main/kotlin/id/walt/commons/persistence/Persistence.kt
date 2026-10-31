@@ -28,6 +28,14 @@ abstract class Persistence<V>(
     fun put(id: String, value: V, ttl: Duration? = null) = set(id, value, ttl)
     abstract fun remove(id: String)
     abstract fun getAndRemove(id: String): V?
+
+    /** Atomic compare-and-replace; a null expected value means insert only if absent. */
+    open fun compareAndSet(id: String, expected: V?, replacement: V, ttl: Duration? = null): Boolean =
+        throw UnsupportedOperationException("Atomic compareAndSet is not implemented")
+    /** Extend an existing record's retention atomically, without shortening a longer TTL. */
+    open fun retainForAtLeast(id: String, ttl: Duration): Boolean =
+        throw UnsupportedOperationException("Atomic retention is not implemented")
+
     fun mutate(id: String, mutation: (V) -> V, ttl: Duration? = null) {
         set(id, mutation.invoke(get(id) ?: error("Not found in $discriminator: $id")), ttl)
     }
