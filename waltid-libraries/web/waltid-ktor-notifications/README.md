@@ -102,6 +102,69 @@ Notes:
 - SSE uses a per‑target `SharedFlow` with small replay to catch recent events
 - Webhook delivery supports Basic and Bearer auth
 
+## Reliable webhook delivery
+
+Webhook events use at-least-once delivery. Calling `notifySessionUpdate` first writes the exact serialized JSON
+payload to a local durable outbox and then returns; a background worker performs the HTTP request. Pending records
+are resumed when the service starts again. Exhausted and permanently rejected deliveries are retained under the
+outbox's `dead-letter` directory. The library exposes `WebhookNotifier.deadLetters()` and
+`WebhookNotifier.redrive(deliveryId)` as programmatic hooks for integration into authenticated operator tooling;
+it does not expose an HTTP management endpoint.
+
+The default retry policy is five attempts with exponential backoff from 1 to 60 seconds and jitter. Network
+failures, HTTP 408, 429, and 5xx responses are retried. The worker honors `Retry-After`. Other non-2xx responses
+are dead-lettered immediately. The policy can be overridden per webhook:
+
+```json
+{
+  "url": "https://example.com/webhook",
+  "retry_policy": {
+    "max_attempts": 8,
+    "initial_backoff_seconds": 2,
+    "max_backoff_seconds": 120,
+    "backoff_multiplier": 2.0
+  }
+}
+```
+
+The default file-backed outbox root defaults to the operating system's temporary directory and logs a warning when that fallback is
+used. Production deployments must set the JVM property `waltid.webhook.delivery.directory` or environment variable
+`WALTID_WEBHOOK_DELIVERY_DIRECTORY` to put it on a durable volume. Issuer2 and Verifier2 use separate
+subdirectories. The file store is intended for a single service process per directory; replicas must not share an
+outbox directory. Unreadable records are moved to the outbox's `corrupt` directory so they cannot block healthy
+deliveries. Delivery requests run with bounded concurrency, preventing one slow receiver from serially blocking
+the entire outbox. When a poll claims a full batch, the worker polls again immediately, so a backlog drains at
+that concurrency limit instead of one batch per poll interval.
+
+Services that run multiple replicas can provide a distributed implementation of `WebhookDeliveryStore` through
+`WebhookNotifier.start(store)`. Claims, completion, rescheduling, and dead-letter transitions are lease-fenced so a
+stale worker cannot overwrite a delivery reclaimed by another replica.
+
+Outbox records contain the callback URL, payload, and configured Basic/Bearer credentials so they can be delivered
+after a restart. Directory and files are owner-only on POSIX file systems. Restrict access to the configured volume,
+encrypt it at rest, and do not expose or back it up as public application data. Define retention and cleanup policies
+for both `dead-letter` and `corrupt` records because neither is deleted automatically.
+
+### Receiver contract
+
+Every attempt sends the following headers:
+
+| Header | Meaning |
+| --- | --- |
+| `Webhook-Id` | Stable unique ID for the logical delivery |
+| `Idempotency-Key` | Same value as `Webhook-Id`, for deduplication |
+| `Webhook-Timestamp` | Attempt time as Unix epoch seconds |
+| `Webhook-Attempt` | One-based attempt number |
+| `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
+
+A receiver should atomically record `Idempotency-Key` with its business update. If the key is already present, it
+must return success without applying the update again. The receiver should also recompute `Content-Digest` before
+processing. The digest detects body changes; request authentication and signed callbacks are a separate concern
+from delivery idempotency and should be used together with HTTPS.
+
+Events raised by one request are enqueued in order. A failed delivery is retried independently, so receivers must
+not assume global ordering between different events or sessions.
+
 ## Related Libraries
 
 - `waltid-ktor-notifications-core` — transport‑agnostic models used here

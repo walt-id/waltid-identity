@@ -157,6 +157,25 @@ object Issuer2RequestExamples {
         ),
     )
 
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE = mapOf(
+        "profileId" to W3C_PROFILE_ID,
+        "authMethod" to "PRE_AUTHORIZED",
+        "valueMode" to "BY_REFERENCE",
+        "runtimeOverrides" to mapOf(
+            "notifications" to mapOf(
+                "webhook" to mapOf(
+                    "url" to "https://example.com/webhook/issuance-status",
+                    "retry_policy" to mapOf(
+                        "max_attempts" to 8,
+                        "initial_backoff_seconds" to 2,
+                        "max_backoff_seconds" to 120,
+                        "backoff_multiplier" to 2.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         profileId = W3C_PROFILE_ID,
@@ -547,6 +566,7 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][by-reference][expires in 2 minutes]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY,
         "[pre-authorized][single][by-reference][no expiry]" to PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
         "[pre-authorized][single][by-reference][credentialData override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][webhook runtime override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE,
         "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
         "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
         "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
