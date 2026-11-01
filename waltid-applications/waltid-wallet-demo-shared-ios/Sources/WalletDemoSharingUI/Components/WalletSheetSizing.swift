@@ -43,11 +43,31 @@ private struct WalletSheetAutofocusModifier: ViewModifier {
 
 private struct WalletSheetSizingModifier: ViewModifier {
     @StateObject private var sizing = WalletSheetSizingCoordinator()
-    func body(content: Content) -> some View { content.environment(\.walletSheetSizing, sizing) }
+    func body(content: Content) -> some View {
+        content.environment(\.walletSheetSizing, sizing)
+            .environment(\.walletSheetLayoutReady, layoutReady)
+    }
+
+    private var layoutReady: Bool {
+        if #available(iOS 16, *) { return sizing.layoutReady }
+        return true
+    }
 }
 
 private struct WalletSheetSizingKey: EnvironmentKey {
     static let defaultValue: WalletSheetSizingCoordinator? = nil
+}
+
+private struct WalletSheetLayoutReadyKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// The current page has been measured after its sheet and navigation animations finished.
+    public internal(set) var walletSheetLayoutReady: Bool {
+        get { self[WalletSheetLayoutReadyKey.self] }
+        set { self[WalletSheetLayoutReadyKey.self] = newValue }
+    }
 }
 
 private extension EnvironmentValues {
@@ -75,7 +95,19 @@ public struct WalletSheetScrollView<Content: View>: View {
 }
 
 private final class WalletSheetSizingCoordinator: ObservableObject {
-    weak var activePage: WalletSheetPageMeasurement.Controller?
+    weak var activePage: WalletSheetPageMeasurement.Controller? {
+        didSet {
+            guard activePage !== oldValue else { return }
+            // Appearance callbacks can run inside a SwiftUI update. Invalidate before
+            // the queued measurement, without publishing from that update itself.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if layoutReady { layoutReady = false }
+                activePage?.scheduleMeasurement()
+            }
+        }
+    }
+    @Published private(set) var layoutReady = false
     private weak var sheet: UISheetPresentationController?
     private var height: CGFloat = 0
     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
@@ -123,15 +155,17 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
             || presentation.detents.map(\.identifier) != [identifier]
         guard needsConfiguration || self.height != rounded else {
             // Layout can finish before the sheet's presentation does.
-            if let transition = owner.transitionCoordinator, layoutCompletion != nil {
+            if let transition = owner.transitionCoordinator {
                 transition.animate(alongsideTransition: nil) { [weak page] _ in page?.scheduleMeasurement() }
                 return
             }
+            if !layoutReady { layoutReady = true }
             let completion = layoutCompletion
             layoutCompletion = nil
             completion?.action()
             return
         }
+        if layoutReady { layoutReady = false }
         self.height = rounded
         let changes = { [self] in
             if needsConfiguration {

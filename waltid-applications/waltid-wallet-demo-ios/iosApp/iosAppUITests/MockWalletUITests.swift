@@ -72,7 +72,7 @@ final class MockWalletUITests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         receiveMockCredential(app: app, ui: ui)
-        ui.tapElement(identifierPrefix: "issuance-saved-")
+        ui.tapElement(identifierPrefix: "issuance-saved-", in: app.otherElements["issuance-receipt-ready"])
         XCTAssertTrue(app.navigationBars["Credential information"].waitForExistence(timeout: 5))
         ui.tapNavigationBack()
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 5))
