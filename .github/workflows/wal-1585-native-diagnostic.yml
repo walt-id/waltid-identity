@@ -1,4 +1,4 @@
-name: WAL-1585 bounded native sequence diagnostic
+name: WAL-1585 bounded native window diagnostic
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          resolved-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"c54758c3726e1b6888aa73103cecaff9cd5ecd30","enterprise":"bf29266831d94fa0bc3eb2dcdcadf7c2e60b9ae9","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+          resolved-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"d234f152a91568b6585aa504edeeb0972184873d","enterprise":"f855ef79f41cb8d85786bb4fbc072c9072969b32","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
       - name: Checkout diagnostic instrumentation separately
         uses: actions/checkout@v4
         with:
@@ -32,15 +32,15 @@ jobs:
       - name: Restore existing release framework
         uses: actions/download-artifact@v8
         with:
-          artifact-ids: '13079374124'
-          run-id: '41295010099'
+          artifact-ids: '13097044488'
+          run-id: '41339075557'
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/wallet-core-artifact
           merge-multiple: true
       - name: Verify producer identity and framework bytes
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
-      - name: Apply geometry logging and bounded case selection
+      - name: Apply window logging and bounded case selection
         working-directory: waltid-identity
         run: |
           git apply ../native-diagnostic/.github/scripts/ci/native-animation-diagnostic.patch
@@ -48,7 +48,7 @@ jobs:
           git diff --stat
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Diagnose the native mock suite in its ordinary order
+      - name: Diagnose the native unit and mock suites in their ordinary order
         timeout-minutes: 75
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
