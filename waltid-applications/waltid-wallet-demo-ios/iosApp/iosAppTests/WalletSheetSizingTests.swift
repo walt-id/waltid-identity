@@ -11,14 +11,24 @@ final class WalletSheetSizingTests: XCTestCase {
         let model = SheetModel()
         model.acceptsFocus = false
         let presentation = try SheetPresentation(model: model)
-        defer { presentation.host.didLayout = nil; presentation.close() }
+        defer { presentation.host.didLayout = nil; model.didSettle = nil; presentation.close() }
         let host = presentation.host
         let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            host.view.bounds.height > 400 && host.view.bounds.height < 600
+            model.layoutReady && host.view.bounds.height > 400 && host.view.bounds.height < 600
         }, object: nil)
         await fulfillment(of: [initialSize], timeout: 5)
 
         let replaced = expectation(description: "Replacement page receives its live content height")
+        let settled = expectation(description: "Replacement page becomes ready after its own resize")
+        model.didSettle = {
+            guard model.replacement else { return }
+            let rendered = host.view.layer.presentation()
+            XCTAssertNotNil(rendered)
+            XCTAssertEqual(rendered?.bounds.height ?? 0, host.view.bounds.height, accuracy: 1,
+                "Readiness must wait for the replacement page's resize, not the previous page's")
+            XCTAssertEqual(rendered?.position.y ?? 0, host.view.layer.position.y, accuracy: 1)
+            settled.fulfill()
+        }
         host.didLayout = { [weak host] in
             guard let host, model.manual, host.view.bounds.height < 400 else { return }
             let firstTarget = host.view.bounds.height
@@ -26,6 +36,7 @@ final class WalletSheetSizingTests: XCTestCase {
             XCTAssertNotNil(rendered)
             XCTAssertGreaterThan(rendered?.bounds.height ?? 0, firstTarget + 1,
                 "Replace the page during the real shrink animation, not after it")
+            XCTAssertFalse(model.layoutReady)
             host.didLayout = { [weak host] in
                 guard let host, model.replacement, host.view.bounds.height > firstTarget + 20 else { return }
                 host.didLayout = nil
@@ -33,13 +44,14 @@ final class WalletSheetSizingTests: XCTestCase {
                 XCTAssertNotNil(rendered)
                 XCTAssertEqual(rendered?.bounds.height ?? 0, firstTarget, accuracy: 1,
                     "A new page must not interrupt the sheet's unfinished resize")
+                XCTAssertFalse(model.layoutReady)
                 replaced.fulfill()
             }
             // Let SwiftUI replace the measurement controller on its next update.
             DispatchQueue.main.async { model.replacement = true }
         }
         model.manual = true
-        await fulfillment(of: [replaced], timeout: 5)
+        await fulfillment(of: [replaced, settled], timeout: 5, enforceOrder: true)
     }
 
     func testWithdrawnAutofocusCannotRunAfterTheResize() async throws {
@@ -133,6 +145,8 @@ private final class SheetModel: ObservableObject {
     @Published var replacement = false
     var acceptsFocus = true
     var didFocus: (() -> Void)?
+    var layoutReady = false
+    var didSettle: (() -> Void)?
 }
 
 @MainActor
@@ -189,6 +203,10 @@ private struct SheetContent: View {
                 Button("Continue") {}.frame(height: 44)
             }
             .id(model.replacement)
+            .background(SheetReadiness { ready in
+                model.layoutReady = ready
+                if ready { model.didSettle?() }
+            })
             .navigationTitle(model.manual ? "Enter a link" : "Scan QR code")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -196,5 +214,14 @@ private struct SheetContent: View {
         .walletSheetAutofocus($focused, when: model.manual && model.acceptsFocus)
         .onChange(of: focused) { if $0 { model.didFocus?() } }
         .walletSheetSizing()
+    }
+}
+
+private struct SheetReadiness: View {
+    @Environment(\.walletSheetLayoutReady) private var ready
+    let changed: (Bool) -> Void
+
+    var body: some View {
+        Color.clear.onAppear { changed(ready) }.onChange(of: ready, perform: changed)
     }
 }
