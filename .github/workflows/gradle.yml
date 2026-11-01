@@ -89,6 +89,14 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           resolved-refs: ${{ inputs.checkout-refs }}
 
+      - name: Checkout temporary diagnostic observer
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: .wal-1585-diagnostic
+          sparse-checkout: .github/scripts/ci/trace-enterprise-port.py
+          sparse-checkout-cone-mode: false
+
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
 
@@ -163,7 +171,10 @@ jobs:
         if: ${{ !inputs.cacheless }}
         run: |
           set -o pipefail
-          ./gradlew build allTests -PskipLiveConformance=true --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
+          python3 .wal-1585-diagnostic/.github/scripts/ci/trace-enterprise-port.py &
+          observer=$!
+          trap 'kill "$observer" 2>/dev/null || true' EXIT
+          timeout --signal=TERM --kill-after=30s 70m ./gradlew build allTests -PskipLiveConformance=true --continue --console=plain --warning-mode=summary 2>&1 | tee "$RUNNER_TEMP/gradle-build.log"
         env:
           CI: "true"
           SKIP_LIVE_CONFORMANCE: "true"
@@ -171,6 +182,14 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Retain socket ownership and thread diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: enterprise-startup-diagnostic
+          path: ${{ runner.temp }}/enterprise-startup-diagnostic
+          retention-days: 7
 
       - name: Clean and build with all tests
         if: ${{ inputs.cacheless }}

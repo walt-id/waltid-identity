@@ -1,0 +1,19 @@
+name: WAL-1585 bounded Linux startup diagnostic
+
+on:
+  push:
+    branches: [chore/wal-1585-linux-startup-diagnostic-20261101]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  linux:
+    uses: ./.github/workflows/gradle.yml
+    secrets: inherit
+    with:
+      checkout-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"86f51dd808f67b0ce62187ac638d87397e624c92","enterprise":"01d3468228f21a12299d50bc41de6cb6a27e58a5","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+      report-check-name: WAL-1585 diagnostic Linux
+      enable-android-build: true
+      upload-test-results: true
