@@ -82,6 +82,7 @@ final class WalletSheetSizingTests: XCTestCase {
         let focused = expectation(description: "Manual input automatically receives focus")
         let keyboardShown = expectation(description: "Manual input's keyboard finishes appearing")
         let context = SheetDetentContext(traits: host.traitCollection)
+        let container = try XCTUnwrap(host.view.superview).layer
         var manualHeight: CGFloat?
         let keyboardObserver = NotificationCenter.default.addObserver(
             forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main
@@ -98,9 +99,17 @@ final class WalletSheetSizingTests: XCTestCase {
                 XCTAssertEqual(presentation.position.y, layer.position.y, accuracy: 1,
                     "Autofocus must not compete with the sheet's position animation")
             }
+            XCTAssertEqual(container.presentation()?.position.y ?? 0, container.position.y, accuracy: 1,
+                "Autofocus must wait for the containing sheet, not only its content view")
             manualHeight = host.sheetPresentationController?.detents.first?.resolvedValue(in: context)
             focused.fulfill()
         }
+        // UIKit can animate the enclosing sheet after its content bounds have settled.
+        let settling = CABasicAnimation(keyPath: "position.y")
+        settling.fromValue = container.position.y + 40
+        settling.toValue = container.position.y
+        settling.duration = 2
+        container.add(settling, forKey: "sheet-container-settling")
         model.manual = true
         await fulfillment(of: [focused, keyboardShown], timeout: 5, enforceOrder: true)
         let heightBeforeKeyboard = try XCTUnwrap(manualHeight)

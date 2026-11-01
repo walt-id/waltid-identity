@@ -96,11 +96,20 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
 
     func isResizing(_ owner: UIViewController) -> Bool {
         guard resizeLink != nil, resizingSheet === owner.sheetPresentationController else { return false }
-        let layer = owner.view.layer
-        guard let rendered = layer.presentation() else { return true }
-        // A loading spinner can outlive the sheet's resize in the same transaction.
-        // Coalesce only while the sheet's own geometry is still moving.
-        return rendered.bounds != layer.bounds || rendered.position != layer.position
+        // UIKit also animates containers above the content host. Its bounds can settle
+        // before those containers finish moving or scaling, so focus must wait for both.
+        // Observe only the sheet's ancestor chain, excluding content such as loading spinners.
+        let container = owner.sheetPresentationController?.containerView?.layer
+        var layer: CALayer? = owner.view.layer
+        while let current = layer {
+            guard let rendered = current.presentation() else { return true }
+            if !(current.animationKeys() ?? []).isEmpty || rendered.bounds != current.bounds
+                || rendered.position != current.position
+                || !CATransform3DEqualToTransform(rendered.transform, current.transform) { return true }
+            if current === container { break }
+            layer = current.superlayer
+        }
+        return false
     }
 
     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
