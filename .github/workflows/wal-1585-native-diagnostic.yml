@@ -1,4 +1,4 @@
-name: WAL-1585 bounded native animation diagnostic
+name: WAL-1585 bounded native sequence diagnostic
 
 on:
   push:
@@ -15,7 +15,7 @@ env:
 jobs:
   native:
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - name: Checkout exact failing source tuple
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
@@ -48,8 +48,8 @@ jobs:
           git diff --stat
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Diagnose the two native scanner scenarios
-        timeout-minutes: 35
+      - name: Diagnose the native mock suite in its ordinary order
+        timeout-minutes: 75
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: waltid-identity

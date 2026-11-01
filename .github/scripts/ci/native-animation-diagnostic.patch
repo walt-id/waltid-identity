@@ -1,5 +1,5 @@
 diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
-index 6a3acd1435..a0f09070d7 100644
+index 6a3acd1435..4242050fda 100644
 --- a/.github/actions/gradle-ios/action.yml
 +++ b/.github/actions/gradle-ios/action.yml
 @@ -184,6 +184,7 @@ runs:
@@ -10,7 +10,7 @@ index 6a3acd1435..a0f09070d7 100644
            xcrun simctl delete "$simulator" || {
              cleanup_status=$?
              echo "::error::Failed to remove native test simulator"
-@@ -197,11 +198,19 @@ runs:
+@@ -197,11 +198,17 @@ runs:
          # Finish cold startup before XCTest starts its application-launch deadline.
          xcrun simctl bootstatus "$simulator" -b
  
@@ -24,14 +24,12 @@ index 6a3acd1435..a0f09070d7 100644
            -scheme iosApp \
            -configuration Debug \
            -destination "platform=iOS Simulator,id=$simulator" \
-+          -only-testing:iosAppUITests/MockWalletUITests/testPresentationDeclineSendsProtocolRejection \
-+          -only-testing:iosAppUITests/MockWalletUITests/testPresentationDisclosureImagesRenderAsImages \
-+          -test-iterations 10 -run-tests-until-failure \
++          -only-testing:iosAppUITests/MockWalletUITests \
            -skip-testing:iosAppEnterpriseTests \
            -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
            -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
 diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
-index 76b87eeaff..a790e1d29b 100644
+index 76b87eeaff..abf0e969e2 100644
 --- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
 +++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
 @@ -1,6 +1,21 @@
@@ -47,7 +45,7 @@ index 76b87eeaff..a790e1d29b 100644
 +        for key in layer.animationKeys() ?? [] {
 +            guard let animation = layer.animation(forKey: key) else { continue }
 +            count += 1
-+            NSLog("SHEET_TRACE %@ %.6f layer=%@ key=%@ duration=%.6f repeat=%.2f repeatDuration=%.2f begin=%.6f", phase, CACurrentMediaTime(), String(describing: type(of: layer.delegate)), key, animation.duration, animation.repeatCount, animation.repeatDuration, animation.beginTime)
++            NSLog("SHEET_TRACE %@ %.6f layer=%@ key=%@ duration=%.6f repeat=%.2f repeatDuration=%.2f begin=%.6f", phase, CACurrentMediaTime(), layer.delegate.map { String(describing: type(of: $0)) } ?? "nil", key, animation.duration, animation.repeatCount, animation.repeatDuration, animation.beginTime)
 +        }
 +    }
 +    NSLog("SHEET_TRACE %@ %.6f animationCount=%d", phase, CACurrentMediaTime(), count)
@@ -64,14 +62,16 @@ index 76b87eeaff..a790e1d29b 100644
                  focus.wrappedValue = true
              }
          }.onDisappear(perform: cancelRequest)
-@@ -129,9 +145,16 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+@@ -129,9 +145,18 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
              }
              let completion = layoutCompletion
              layoutCompletion = nil
 +            if completion != nil, let root = owner.view.window?.layer {
 +                traceSheetAnimations(root, phase: "before-focus")
-+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak root] in
-+                    if let root { traceSheetAnimations(root, phase: "after-focus") }
++                for delay in [1.0, 10.0, 65.0] {
++                    DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak root] in
++                        if let root { traceSheetAnimations(root, phase: "after-focus-\(Int(delay))s") }
++                    }
 +                }
 +            }
              completion?.action()
@@ -81,7 +81,7 @@ index 76b87eeaff..a790e1d29b 100644
          self.height = rounded
          let changes = { [self] in
              if needsConfiguration {
-@@ -151,6 +174,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+@@ -151,6 +176,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
              resizeLink = link
              resizingSheet = presentation
              presentation.animateChanges(changes)
@@ -89,7 +89,7 @@ index 76b87eeaff..a790e1d29b 100644
              // Observe this sheet, not a transaction that can also contain a loading spinner.
              link.add(to: .main, forMode: .common)
          } else {
-@@ -160,6 +184,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+@@ -160,6 +186,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
      }
  
      func finishResize(_ link: CADisplayLink) {
