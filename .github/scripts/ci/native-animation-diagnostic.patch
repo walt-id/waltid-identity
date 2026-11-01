@@ -1,0 +1,99 @@
+diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
+index 6a3acd1435..a0f09070d7 100644
+--- a/.github/actions/gradle-ios/action.yml
++++ b/.github/actions/gradle-ios/action.yml
+@@ -184,6 +184,7 @@ runs:
+         simulator=$(xcrun simctl create 'Native wallet CI' "${device#name=}" "iOS ${os#OS=}")
+         cleanup() {
+           test_status=$?
++          if [[ -n "${trace_pid:-}" ]]; then kill "$trace_pid" 2>/dev/null || true; wait "$trace_pid" 2>/dev/null || true; fi
+           xcrun simctl delete "$simulator" || {
+             cleanup_status=$?
+             echo "::error::Failed to remove native test simulator"
+@@ -197,11 +198,19 @@ runs:
+         # Finish cold startup before XCTest starts its application-launch deadline.
+         xcrun simctl bootstatus "$simulator" -b
+ 
++        xcrun simctl spawn "$simulator" log stream --style compact --level debug \
++          --predicate 'eventMessage BEGINSWITH "SHEET_TRACE"' \
++          > "${{ github.workspace }}/ios-ci-logs/sheet-animations.log" 2>&1 &
++        trace_pid=$!
++
+         xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
+           -project iosApp.xcodeproj \
+           -scheme iosApp \
+           -configuration Debug \
+           -destination "platform=iOS Simulator,id=$simulator" \
++          -only-testing:iosAppUITests/MockWalletUITests/testPresentationDeclineSendsProtocolRejection \
++          -only-testing:iosAppUITests/MockWalletUITests/testPresentationDisclosureImagesRenderAsImages \
++          -test-iterations 10 -run-tests-until-failure \
+           -skip-testing:iosAppEnterpriseTests \
+           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+index 76b87eeaff..a790e1d29b 100644
+--- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
++++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+@@ -1,6 +1,21 @@
+ import SwiftUI
+ import UIKit
+ 
++// Temporary diagnostic: record animation metadata, never text or request contents.
++private func traceSheetAnimations(_ root: CALayer, phase: String) {
++    var pending = [root]
++    var count = 0
++    while let layer = pending.popLast() {
++        pending.append(contentsOf: layer.sublayers ?? [])
++        for key in layer.animationKeys() ?? [] {
++            guard let animation = layer.animation(forKey: key) else { continue }
++            count += 1
++            NSLog("SHEET_TRACE %@ %.6f layer=%@ key=%@ duration=%.6f repeat=%.2f repeatDuration=%.2f begin=%.6f", phase, CACurrentMediaTime(), String(describing: type(of: layer.delegate)), key, animation.duration, animation.repeatCount, animation.repeatDuration, animation.beginTime)
++        }
++    }
++    NSLog("SHEET_TRACE %@ %.6f animationCount=%d", phase, CACurrentMediaTime(), count)
++}
++
+ extension View {
+     /// Fit the active page, capped by the system's available presentation height.
+     public func walletSheetSizing() -> some View { modifier(WalletSheetSizingModifier()) }
+@@ -30,6 +45,7 @@ private struct WalletSheetAutofocusModifier: ViewModifier {
+                 request.wrappedValue = nil
+                 // Closing or submitting can precede SwiftUI's next onChange/onDisappear.
+                 guard isRequested() else { return }
++                NSLog("SHEET_TRACE autofocus %.6f", CACurrentMediaTime())
+                 focus.wrappedValue = true
+             }
+         }.onDisappear(perform: cancelRequest)
+@@ -129,9 +145,16 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+             }
+             let completion = layoutCompletion
+             layoutCompletion = nil
++            if completion != nil, let root = owner.view.window?.layer {
++                traceSheetAnimations(root, phase: "before-focus")
++                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak root] in
++                    if let root { traceSheetAnimations(root, phase: "after-focus") }
++                }
++            }
+             completion?.action()
+             return
+         }
++        NSLog("SHEET_TRACE update %.6f old=%.2f new=%.2f config=%d presented=%d safeBottom=%.2f", CACurrentMediaTime(), self.height, rounded, needsConfiguration ? 1 : 0, owner.isBeingPresented ? 1 : 0, owner.view.safeAreaInsets.bottom)
+         self.height = rounded
+         let changes = { [self] in
+             if needsConfiguration {
+@@ -151,6 +174,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+             resizeLink = link
+             resizingSheet = presentation
+             presentation.animateChanges(changes)
++            NSLog("SHEET_TRACE animateChanges returned %.6f", CACurrentMediaTime())
+             // Observe this sheet, not a transaction that can also contain a loading spinner.
+             link.add(to: .main, forMode: .common)
+         } else {
+@@ -160,6 +184,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     }
+ 
+     func finishResize(_ link: CADisplayLink) {
++        NSLog("SHEET_TRACE finish %.6f", CACurrentMediaTime())
+         link.invalidate()
+         guard resizeLink === link else { return }
+         resizeLink = nil
