@@ -47,9 +47,9 @@ class JsonStringConversionTest {
         )
         val dataElement = mappingConfig.executeMapping(JsonPrimitive(base64Str))
         val byteStringElement = assertIs<ByteStringElement>(dataElement)
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
     }
 
     @Test
@@ -61,9 +61,9 @@ class JsonStringConversionTest {
         )
         val dataElement = mappingConfig.executeMapping(JsonPrimitive(base64UrlStr))
         val byteStringElement = assertIs<ByteStringElement>(dataElement)
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
     }
 
     @Test

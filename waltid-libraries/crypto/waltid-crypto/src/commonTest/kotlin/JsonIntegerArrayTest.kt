@@ -1,5 +1,6 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborElement
@@ -13,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * A CBOR array of whole numbers must reach JSON without an object per element.

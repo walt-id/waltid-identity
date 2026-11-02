@@ -1,8 +1,8 @@
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.tse.TSEAuth
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.keys.tse.TSEKeyMetadata
-import io.ktor.util.*
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import kotlinx.coroutines.test.runTest
 
@@ -17,7 +17,7 @@ class TseAuthTest {
 
         val signed = tseKey.signRaw(plaintext).encodeToBase64()
 
-        val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
+        val verified = tseKey.verifyRaw(signed.decodeFromBase64(), plaintext)
 
         println("TSEKey: ${tseKey.getEncodedPublicKey()}")
         println("Plaintext: ${plaintext.decodeToString()}")

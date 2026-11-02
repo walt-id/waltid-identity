@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.conformance.wallet
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -40,6 +42,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Mints the SD-JWT VC that the wallet under test presents during wallet conformance runs.

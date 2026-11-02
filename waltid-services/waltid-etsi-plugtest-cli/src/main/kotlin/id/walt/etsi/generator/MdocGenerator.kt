@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package id.walt.etsi.generator
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseCertHash
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey

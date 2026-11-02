@@ -46,9 +46,9 @@ class StringToCborElementConverterTest {
             conversionHint = StringToCborTypeConversion.BASE64_STRING_TO_BYTE_STRING,
         )
         val byteStringElement = assertIs<ByteStringElement>(dataElement)
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
     }
 
     @Test
@@ -60,9 +60,9 @@ class StringToCborElementConverterTest {
             conversionHint = StringToCborTypeConversion.BASE64URL_STRING_TO_BYTE_STRING,
         )
         val byteStringElement = assertIs<ByteStringElement>(dataElement)
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
     }
 
     @Test
