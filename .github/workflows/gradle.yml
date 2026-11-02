@@ -92,6 +92,73 @@ jobs:
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
 
+      - name: Observe fixture socket ownership
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/observe-fixture-port.py" <<'PY'
+          import datetime, json, os, pathlib, re, time
+
+          output = pathlib.Path(os.environ["RUNNER_TEMP"]) / "fixture-port.jsonl"
+          stop = output.with_suffix(".stop")
+          deadline = time.monotonic() + 90 * 60
+
+          def sockets():
+              result = {}
+              for table in ("tcp", "tcp6"):
+                  for line in pathlib.Path("/proc/net", table).read_text().splitlines()[1:]:
+                      fields = line.split()
+                      if int(fields[1].split(":")[1], 16) not in (33334, 33335):
+                          continue
+                      key = (table, fields[1], fields[2], fields[3], fields[9])
+                      result[key] = dict(table=table, local=fields[1], remote=fields[2],
+                                         state=fields[3], inode=fields[9], uid=fields[7])
+              return result
+
+          def owners(inodes):
+              result = {}
+              for process in pathlib.Path("/proc").glob("[0-9]*"):
+                  try:
+                      held = set()
+                      for fd in (process / "fd").iterdir():
+                          try:
+                              target = os.readlink(fd)
+                              if target.startswith("socket:["):
+                                  held.add(target[8:-1])
+                          except OSError:
+                              continue
+                      held &= inodes
+                      if not held:
+                          continue
+                      args = (process / "cmdline").read_bytes().decode(errors="replace")
+                      worker = re.search(r"Gradle Test Executor [0-9]+", args)
+                      info = dict(pid=int(process.name), comm=(process / "comm").read_text().strip(),
+                                  cwd=os.readlink(process / "cwd"), exe=os.readlink(process / "exe"),
+                                  test_executor=worker.group() if worker else None)
+                      for inode in held:
+                          result.setdefault(inode, []).append(info)
+                  except (OSError, ValueError):
+                      continue
+              return result
+
+          previous = {}
+          with output.open("w", buffering=1) as log:
+              def emit(kind, **data):
+                  log.write(json.dumps(dict(kind=kind, utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                                            monotonic=time.monotonic(), **data)) + "\n")
+              emit("start", pid=os.getpid(), interval_seconds=0.1)
+              while time.monotonic() < deadline and not stop.exists():
+                  current = sockets()
+                  if current != previous:
+                      added = current.keys() - previous.keys()
+                      found = owners({current[k]["inode"] for k in added} - {"0"})
+                      emit("change", added=[dict(current[k], owners=found.get(current[k]["inode"], [])) for k in added],
+                           removed=[previous[k] for k in previous.keys() - current.keys()])
+                      previous = current
+                  time.sleep(0.1)
+              emit("stop", reason="job finished" if stop.exists() else "90-minute bound")
+          PY
+          nohup sudo --preserve-env=RUNNER_TEMP python3 "$RUNNER_TEMP/observe-fixture-port.py" > "$RUNNER_TEMP/fixture-port-observer.log" 2>&1 &
+
       - name: Configure gradle
         id: gradle-setup
         uses: ./waltid-identity/.github/actions/gradle-setup-action
@@ -183,6 +250,24 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Finish fixture socket trace
+        if: always()
+        run: |
+          touch "$RUNNER_TEMP/fixture-port.stop"
+          sleep 1
+
+      - name: Retain fixture socket ownership and build log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fixture-port-diagnostic
+          path: |
+            ${{ runner.temp }}/fixture-port.jsonl
+            ${{ runner.temp }}/fixture-port-observer.log
+            ${{ runner.temp }}/gradle-build.log
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Require public SD-JWT payment acceptance
         if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}

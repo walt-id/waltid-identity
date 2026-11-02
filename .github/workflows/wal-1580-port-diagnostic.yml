@@ -1,0 +1,19 @@
+name: WAL-1580 fixture port diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+
+jobs:
+  linux:
+    uses: ./.github/workflows/gradle.yml
+    secrets: inherit
+    with:
+      checkout-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"538e852df3a7802b3a1f6e612c5ecac69da2ee6b","enterprise":"df458234939db17f470c5d6e25dae71d57c9ec42","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+      report-check-name: Fixture port diagnostic
+      enable-android-build: true
+      upload-test-results: true
