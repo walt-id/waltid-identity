@@ -29,6 +29,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
@@ -44,6 +45,7 @@ import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -470,7 +472,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Given name").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Ada").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag("wallet-detail-back").performClick()
-        onNodeWithTag("issuance-done").performClick()
+        awaitClickableTaggedNode("issuance-done").performClick()
         onNodeWithText("Pending · 1").assertIsDisplayed()
         assertEquals(listOf("local"), wallet.resumedContinuations)
     }
@@ -617,6 +619,7 @@ class WalletDemoAppTestScenarios(
         mainClock.autoAdvance = false
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.receiveCompleted }
+        awaitClickableTaggedNode("issuance-done")
         mainClock.advanceTimeBy(500)
         onNodeWithText("Saved · 1").assertIsDisplayed()
         onNodeWithTag("issuance-done").assertIsDisplayed().performClick()
@@ -653,7 +656,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").performClick()
+        awaitClickableTaggedNode("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -677,7 +680,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").performClick()
+        awaitClickableTaggedNode("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -717,7 +720,7 @@ class WalletDemoAppTestScenarios(
 
         receiveGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").performClick()
+        awaitClickableTaggedNode("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -1327,7 +1330,7 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.offerInput").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").assertIsDisplayed().performClick()
+        awaitClickableTaggedNode("issuance-done").assertIsDisplayed().performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
@@ -1390,7 +1393,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollToContent(this).performTextReplacement("123456")
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").assertIsDisplayed()
+        awaitClickableTaggedNode("issuance-done").assertIsDisplayed()
     }
 
     fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() = runComposeUiTest {
@@ -1434,7 +1437,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.issuanceReceipt != null }
-        onNodeWithTag("issuance-done").performClick()
+        awaitClickableTaggedNode("issuance-done").performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollToContent(this).assertIsDisplayed()
 
@@ -2098,6 +2101,18 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    // Controller state is readable before Compose has collected it, so wait for the node the click
+    // will hit. waitUntil only pumps frames while the clock auto-advances; a paused clock still needs them.
+    private fun ComposeUiTest.awaitClickableTaggedNode(tag: String): SemanticsNodeInteraction {
+        val clickable = hasTestTag(tag) and hasClickAction() and isEnabled()
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(clickable).fetchSemanticsNodes().isNotEmpty().also { found ->
+                if (!found && !mainClock.autoAdvance) mainClock.advanceTimeByFrame()
+            }
+        }
+        return onNodeWithTag(tag)
     }
 
     private fun ComposeUiTest.beginPinConfirmation() {
