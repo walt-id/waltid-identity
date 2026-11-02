@@ -10,10 +10,12 @@ import id.walt.ades.model.CommitmentType
 import id.walt.ades.model.SignaturePolicyIdentifier
 import id.walt.ades.model.SignatureProductionPlace
 import id.walt.ades.test.TestPki
-import id.walt.ades.tsp.TimeStampToken
+import id.walt.ades.transport.AdesTransport
 import id.walt.ades.tsp.Rfc3161TimestampClient
+import id.walt.ades.tsp.TimeStampToken
 import id.walt.ades.validation.AdesLevel
 import id.walt.ades.validation.AdesValidationPolicy
+import id.walt.ades.validation.CheckStatus
 import id.walt.ades.validation.DocumentValidationResult
 import id.walt.ades.validation.Indication
 import id.walt.ades.validation.SubIndication
@@ -22,6 +24,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.test.runTest
 
@@ -251,6 +254,45 @@ class CbAdesTest {
         assertTrue(brokenResult.signatures.single().timestamps.none { it.passed }, brokenResult.describe())
         val strict = CbAdesValidator(AdesValidationPolicy(listOf(pki.root.certificate), transport = pki.transport, strictTimestamps = true)).validate(brokenTs.encode())
         assertEquals(SubIndication.HASH_FAILURE, strict.subIndication, strict.describe())
+    }
+
+    @Test
+    fun timestampOrderUsesAccuracy() = runTest {
+        // CORUH CB-B-LTA-4 pattern: sigTst at T with accuracy 1s, first arcTst 0.5s earlier from a TSA without accuracy
+        val now = Clock.System.now()
+        val orderPki = TestPki(tsaClock = { now }, tsaAccuracySeconds = 1)
+        val ctx = CbAdesSigningContext(Rfc3161TimestampClient(orderPki.tsaUrl, orderPki.transport), transport = orderPki.transport, trustAnchors = listOf(orderPki.root.certificate))
+        val bt = CbAdesSigner(ctx).signSign1(payload, orderPki.credentials(), CbAdesSignatureParameters(level = AdesLevel.B_T))
+        orderPki.tsaClock = { now - 500.milliseconds }
+        orderPki.tsaAccuracySeconds = null
+        val lta = CbAdesSigner(ctx).augment(bt, AdesLevel.B_LTA)
+        val orderValidator = CbAdesValidator(AdesValidationPolicy(listOf(orderPki.root.certificate), transport = orderPki.transport))
+        orderValidator.validate(lta.encode()).assertPassed(AdesLevel.B_LTA)
+
+        // without accuracy on the sigTst the archive time-stamp is provably earlier
+        orderPki.tsaClock = { now }
+        val btExact = CbAdesSigner(ctx).signSign1(payload, orderPki.credentials(), CbAdesSignatureParameters(level = AdesLevel.B_T))
+        orderPki.tsaClock = { now - 500.milliseconds }
+        val bad = orderValidator.validate(CbAdesSigner(ctx).augment(btExact, AdesLevel.B_LTA).encode())
+        assertEquals(SubIndication.TIMESTAMP_ORDER_FAILURE, bad.subIndication, bad.describe())
+    }
+
+    @Test
+    fun signaturePolicyFetchedFromIdUrl() = runTest {
+        // ETSI CB-B-BN-7 pattern: sigPId.id is the policy URL and there is no spURI qualifier
+        val policyUrl = "http://pki.test.walt.id/policy.der"
+        val policyDoc = "policy document".encodeToByteArray()
+        fun transportServing(doc: ByteArray) = object : AdesTransport by pki.transport {
+            override suspend fun get(url: String) = if (url == policyUrl) doc else pki.transport.get(url)
+        }
+        val msg = signer.signSign1(payload, pki.credentials(), CbAdesSignatureParameters(signaturePolicy = SignaturePolicyIdentifier.forDocument(policyUrl, policyDoc)))
+
+        val ok = CbAdesValidator(AdesValidationPolicy(listOf(pki.root.certificate), transport = transportServing(policyDoc))).validate(msg.encode())
+        ok.assertPassed()
+        assertTrue(ok.signatures.single().checks.any { it.id == "policy:sigPId" && it.status == CheckStatus.PASSED }, ok.describe())
+
+        val wrong = CbAdesValidator(AdesValidationPolicy(listOf(pki.root.certificate), transport = transportServing("other".encodeToByteArray()))).validate(msg.encode())
+        assertEquals(SubIndication.POLICY_PROCESSING_ERROR, wrong.subIndication, wrong.describe())
     }
 
     @Test

@@ -77,6 +77,8 @@ class TestEntity(val name: String, val keyPair: KeyPair, val holder: X509Certifi
 class TestPki(
     /** Time-stamp generation time; defaults to the system clock. */
     var tsaClock: () -> Instant = { Clock.System.now() },
+    /** TSTInfo accuracy in seconds of issued time-stamps; null omits the accuracy field. */
+    var tsaAccuracySeconds: Int? = null,
     private val keyType: KeyType = KeyType.EC_P256,
 ) {
     enum class KeyType { EC_P256, RSA_2048 }
@@ -224,6 +226,7 @@ class TestPki(
             .generateCertificate(authority.der.inputStream()) as X509Certificate)
         val gen = TimeStampTokenGenerator(signerInfo, JcaDigestCalculatorProviderBuilder().build().get(AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256)), ASN1ObjectIdentifier("1.2.3.4.1"))
         gen.addCertificates(JcaCertStore(listOf(CertificateFactory.getInstance("X.509").generateCertificate(authority.der.inputStream()))))
+        tsaAccuracySeconds?.let(gen::setAccuracySeconds)
         val responder = TimeStampResponseGenerator(gen, TSPAlgorithms.ALLOWED)
         return responder.generate(request, BigInteger.valueOf(serial.incrementAndGet()), Date.from(tsaClock().toJavaInstant())).encoded
     }

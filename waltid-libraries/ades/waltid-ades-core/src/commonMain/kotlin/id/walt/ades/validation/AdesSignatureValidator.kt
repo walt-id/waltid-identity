@@ -165,11 +165,11 @@ class AdesSignatureValidator(private val policy: AdesValidationPolicy) {
             else -> return result(Indication.INDETERMINATE, x509.subIndication, x509.chain, best)
         }
 
-        // 4e: time-stamp ordering (content <= signature <= archive; equal times are accepted)
-        val contentMax = contentTs.filter { it.passed }.mapNotNull { it.genTime }.maxOrNull()
-        val sigTimes = sigTs.filter { it.passed }.mapNotNull { it.genTime }
-        val arcMin = arcTs.filter { it.passed }.mapNotNull { it.genTime }.minOrNull()
-        if ((contentMax != null && sigTimes.any { it < contentMax }) || (arcMin != null && sigTimes.any { it > arcMin })) {
+        // 4e: time-stamp ordering (content <= signature <= archive), compared per RFC 3161 2.4.2 using the TSTInfo accuracy
+        val passedContent = contentTs.filter { it.passed }
+        val passedSig = sigTs.filter { it.passed }
+        val passedArc = arcTs.filter { it.passed }
+        if (passedSig.any { s -> passedContent.any { it.isProvablyAfter(s) } } || passedSig.any { s -> passedArc.any { s.isProvablyAfter(it) } }) {
             return result(Indication.INDETERMINATE, SubIndication.TIMESTAMP_ORDER_FAILURE, x509.chain, best)
         }
         if (evidence.claimedSigningTime != null && evidence.claimedSigningTime > best + CLOCK_SKEW && best < now) {

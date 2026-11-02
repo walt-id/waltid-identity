@@ -7,6 +7,10 @@ import id.walt.ades.cms.CmsSignedData
 import id.walt.ades.cms.SignerInfo
 import id.walt.ades.crypto.AdesDigestAlgorithm
 import id.walt.ades.x509.X509Certificate
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /** RFC 3161 TSTInfo. */
@@ -17,6 +21,17 @@ class TstInfo(val encoded: ByteArray) {
     val messageImprint: ByteArray = e.child(2).child(1).asOctetString()
     val serialNumber: ByteArray = e.child(3).asIntegerBytes()
     val genTime: Instant = e.child(4).asTime()
+    /** RFC 3161 Accuracy ::= SEQUENCE { seconds INTEGER OPTIONAL, millis [0] OPTIONAL, micros [1] OPTIONAL }, zero if absent. */
+    val accuracy: Duration = e.children.drop(5).firstOrNull { it.isUniversal(Der.SEQUENCE) }?.let { acc ->
+        acc.children.fold(Duration.ZERO) { total, part ->
+            total + when {
+                part.isUniversal(Der.INTEGER) -> part.asLong().seconds
+                part.isContext(0) -> part.asLong().milliseconds
+                part.isContext(1) -> part.asLong().microseconds
+                else -> Duration.ZERO
+            }
+        }
+    } ?: Duration.ZERO
     val nonce: ByteArray? = e.children.drop(5).firstOrNull { it.isUniversal(Der.INTEGER) }?.asIntegerBytes()
     val tsaName: DerElement? = e.contextChild(0)
 }

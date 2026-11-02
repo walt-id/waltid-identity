@@ -1,6 +1,7 @@
 package id.walt.ades.validation
 
 import id.walt.ades.x509.X509Certificate
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /** Main indications of ETSI EN 319 102-1 clause 5.1.3 (TOTAL-* for the overall result, PASSED/FAILED for building blocks). */
@@ -49,8 +50,17 @@ data class TimestampValidationResult(
     val genTime: Instant?,
     val tsaCertificate: X509Certificate?,
     val problems: List<String>,
+    /** TSTInfo accuracy; [genTime] +/- accuracy is the interval in which the time-stamp was generated. */
+    val accuracy: Duration = Duration.ZERO,
 ) {
     val passed: Boolean get() = indication == Indication.PASSED
+
+    /** RFC 3161 2.4.2: this time-stamp is provably later than [other] only if their accuracy intervals do not overlap. */
+    fun isProvablyAfter(other: TimestampValidationResult): Boolean {
+        val mine = genTime ?: return false
+        val theirs = other.genTime ?: return false
+        return mine - accuracy > theirs + other.accuracy
+    }
 }
 
 enum class TimestampType { CONTENT, SIGNATURE, VALIDATION_DATA_REFS, ARCHIVE }

@@ -374,7 +374,9 @@ class CbAdesValidator(
             return null
         }
         val stored = headers.uHeaders.firstOrNull { it.label == CbAdesLabels.SIG_P_ST }?.value?.asMap?.get(1)?.asMap?.get(1)?.asBytes
+        // spURI qualifier, else the policy identifier itself when it is a URL
         val uri = sigPId[4]?.asArray?.firstNotNullOfOrNull { it.asMap?.get(1)?.asUri }
+            ?: id.takeIf { it.startsWith("https://") || it.startsWith("http://") }
         val document = stored ?: if (fetchSignaturePolicies && uri != null) runCatching { policy.transport!!.get(uri) }.getOrNull() else null
         if (document == null) {
             checks += ValidationCheck("policy:sigPId", CheckStatus.WARNING, "signature policy $id document not available; digest not checked", "EN 319 102-1 5.2.4")

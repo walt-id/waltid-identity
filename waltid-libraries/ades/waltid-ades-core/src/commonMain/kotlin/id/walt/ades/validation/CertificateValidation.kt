@@ -170,10 +170,10 @@ class TimestampValidator(
         val chain = chainValidator.validate(tsa, genTime, fresh = { it !is RevocationStatus.Unknown })
         val problems = v.problems + listOfNotNull(chain.message.takeIf { !chain.passed })
         return when {
-            chain.passed -> TimestampValidationResult(evidence.type, Indication.PASSED, null, genTime, tsa, problems)
+            chain.passed -> TimestampValidationResult(evidence.type, Indication.PASSED, null, genTime, tsa, problems, token.tstInfo.accuracy)
             chain.subIndication == SubIndication.REVOKED_NO_POE ->
-                TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.REVOKED, genTime, tsa, problems)
-            else -> TimestampValidationResult(evidence.type, Indication.INDETERMINATE, chain.subIndication, genTime, tsa, problems)
+                TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.REVOKED, genTime, tsa, problems, token.tstInfo.accuracy)
+            else -> TimestampValidationResult(evidence.type, Indication.INDETERMINATE, chain.subIndication, genTime, tsa, problems, token.tstInfo.accuracy)
         }
     }
 }

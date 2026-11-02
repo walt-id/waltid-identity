@@ -28,11 +28,13 @@ import id.walt.ades.x509.X509Certificate
 import id.walt.ades.x509.X509Crl
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.java.Java
+import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import kotlin.time.Duration.Companion.seconds
 
 private const val VALIDATOR_NAME = "walt.id waltid-cbades (ETSI TS 119 152-1 V1.1.1, EN 319 102-1 V1.4.1 processes)"
 
@@ -87,7 +89,7 @@ class CbAdesGenerateCommand : CliktCommand(name = "generate") {
     private val zip by option("--zip", help = "Also write a flat upload zip").flag()
 
     override fun run() = runBlocking {
-        HttpClient(Java).use { http ->
+        plugtestHttpClient().use { http ->
             val transport = KtorAdesTransport(http)
             val pki = LocalPlugtestPki(signing.pkiDir, signing.participant)
             val extraChain = signing.chain.flatMap { Pem.certificates(it.readBytes()) }
@@ -143,7 +145,7 @@ class CbAdesVerifyCommand : CliktCommand(name = "verify") {
         val dir = extractIfZip(packageFile)
         val (anchorsData, extraData) = loadTrust(listOfNotNull(File(dir, "Data").takeIf { it.isDirectory }, File(dir, "trust").takeIf { it.isDirectory }) + trust)
         echo("Trust anchors: ${anchorsData.joinToString { it.subject.commonName ?: it.subject.toString() }}")
-        HttpClient(Java).use { http ->
+        plugtestHttpClient().use { http ->
             val transport = if (offline) null else KtorAdesTransport(http)
             val validator = CbAdesValidator(AdesValidationPolicy(trustAnchors = anchorsData, transport = transport, additionalValidationData = extraData))
             val outDir = File(output, participant).apply { mkdirs() }
@@ -178,7 +180,7 @@ class CbAdesAugmentCommand : CliktCommand(name = "augment") {
 
     override fun run() = runBlocking {
         val dir = extractIfZip(packageFile)
-        HttpClient(Java).use { http ->
+        plugtestHttpClient().use { http ->
             val transport = KtorAdesTransport(http)
             val pki = LocalPlugtestPki(signing.pkiDir, signing.participant)
             val (anchors, extra) = loadTrust(listOfNotNull(File(dir, "Data").takeIf { it.isDirectory }, File(dir, "trust").takeIf { it.isDirectory }) + signing.trust)
@@ -214,6 +216,14 @@ class CbAdesAugmentCommand : CliktCommand(name = "augment") {
             }
             if (zip) writeZip(File(output, "${signing.participant}-augmented.zip"), written)
         }
+    }
+}
+
+/** Bounded timeouts: a single unresponsive OCSP/CRL/TSA endpoint must not stall a whole plugtest run. */
+internal fun plugtestHttpClient() = HttpClient(Java) {
+    install(HttpTimeout) {
+        connectTimeoutMillis = 10.seconds.inWholeMilliseconds
+        requestTimeoutMillis = 30.seconds.inWholeMilliseconds
     }
 }
 
