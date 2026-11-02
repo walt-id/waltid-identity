@@ -71,7 +71,8 @@ class OSSVerifier2RequestUriPostIntegrationTest {
             useBoundVerifierAddress()
             val http = testHttpClient()
             assertEquals(HttpStatusCode.NotFound, http.get("/verification-session/missing-session/request").status)
-            for (encrypted in listOf(false, true)) {
+            for (mode in listOf("unsigned", "signed", "encrypted")) {
+                val encrypted = mode == "encrypted"
                 val setup: VerificationSessionSetup = CrossDeviceFlowSetup(
                     core = GeneralFlowConfig(
                         dcqlQuery = DcqlQuery(
@@ -83,7 +84,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                                 )
                             )
                         ),
-                        signedRequest = !encrypted,
+                        signedRequest = mode == "signed",
                         encryptedRequest = encrypted,
                     )
                 )
@@ -93,13 +94,19 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                 val requestUri = Url(created.bootstrapAuthorizationRequestUrl.toString()).parameters["request_uri"]
                     ?: error("Missing request_uri in bootstrap authorization request")
 
+                if (mode == "unsigned") {
+                    assertEquals(HttpStatusCode.OK, http.get(requestUri).status)
+                    assertEquals(HttpStatusCode.BadRequest, http.submitForm(
+                        url = requestUri, formParameters = Parameters.build { append("wallet_nonce", "nonce") },
+                    ).status)
+                    continue
+                }
+
                 val walletKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
                     id = KeyId("wallet-key"), spec = KeySpec.Ec(EcCurve.P256), usages = setOf(KeyUsage.KEY_AGREEMENT),
                 ))
                 val metadata = buildJsonObject {
                     put("jwks", buildJsonObject { put("keys", buildJsonArray { add(walletKey.exportPublicJwkObject()) }) })
-                    put("request_object_encryption_alg_values_supported", buildJsonArray { add("ECDH-ES") })
-                    put("request_object_encryption_enc_values_supported", buildJsonArray { add("A128GCM") })
                 }
                 if (encrypted) {
                     val dcApiSetup: VerificationSessionSetup = DcApiAnnexDFlowSetup(
