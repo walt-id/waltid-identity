@@ -165,6 +165,14 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
+    /** Request retrieval only transitions an idle session; it never resets an attempt's outcome. */
+    val needsInUseTransition: Boolean
+        get() = status.successful == null && status !in setOf(
+            VerificationSessionStatus.IN_USE,
+            VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
+            VerificationSessionStatus.PROCESSING_FLOW,
+        )
+
     fun requireAvailable(now: Instant = Clock.System.now()) {
         require(expirationDate?.let { now < it } != false) { "This verification session is expired." }
         require(reattemptable || status != VerificationSessionStatus.SUCCESSFUL) {
