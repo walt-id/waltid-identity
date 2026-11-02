@@ -19,7 +19,6 @@ dependencies {
     implementation(kotlin("test"))
     implementation(identityLibs.kotlinx.coroutines.service.test)
     implementation(identityLibs.ktor.client.java)
-    implementation(identityLibs.ktor.server.cio)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.ktor.client.logging)
