@@ -1,0 +1,481 @@
+diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
+index 6a3acd1435..8f6df3595f 100644
+--- a/.github/actions/gradle-ios/action.yml
++++ b/.github/actions/gradle-ios/action.yml
+@@ -184,6 +184,18 @@ runs:
+         simulator=$(xcrun simctl create 'Native wallet CI' "${device#name=}" "iOS ${os#OS=}")
+         cleanup() {
+           test_status=$?
++          if container=$(xcrun simctl get_app_container "$simulator" id.walt.wallet.native data 2>/dev/null); then
++            trace_directory="${{ github.workspace }}/ios-ci-logs/sheet-readiness"
++            if mkdir -p "$trace_directory"; then
++              for trace in "$container"/tmp/sheet-readiness-*.jsonl; do
++                if [[ -f "$trace" ]]; then
++                  cp "$trace" "$trace_directory/" || echo '::warning::Could not retain sheet readiness metadata'
++                fi
++              done
++            else
++              echo '::warning::Could not create sheet readiness metadata directory'
++            fi
++          fi
+           xcrun simctl delete "$simulator" || {
+             cleanup_status=$?
+             echo "::error::Failed to remove native test simulator"
+@@ -202,6 +214,10 @@ runs:
+           -scheme iosApp \
+           -configuration Debug \
+           -destination "platform=iOS Simulator,id=$simulator" \
++          -only-testing:iosAppUITests/MockWalletUITests/testClosingSharingReturnsToWalletBeforeANewRequest \
++          -only-testing:iosAppUITests/MockWalletUITests/testCredentialImageOpensAndClosesFullScreenViewer \
++          -only-testing:iosAppUITests/MockWalletUITests/testExternalOfferUnlocksIntoSheetAndWarmSharingKeepsItsReview \
++          -only-testing:iosAppUITests/MockWalletUITests/testIdleReceiveAndShareSuccessReturnsToHomeAutomatically \
+           -skip-testing:iosAppEnterpriseTests \
+           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetReadinessTrace.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetReadinessTrace.swift
+new file mode 100644
+index 0000000000..5d8d151f62
+--- /dev/null
++++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetReadinessTrace.swift
+@@ -0,0 +1,139 @@
++import Foundation
++import UIKit
++
++// Temporary diagnostic only. No content, accessibility text, URLs or credential values.
++enum WalletSheetReadinessTrace {
++    private static let queue = DispatchQueue(label: "wallet.sheet-readiness-trace")
++    private static let lock = NSLock()
++    private static var reserved = 0
++    private static var writtenBytes = 0
++    private static var outputClosed = false
++    private static let maximumRecords = 512
++    private static let maximumBytes = 4 * 1024 * 1024
++    private static let output: FileHandle? = {
++        let name = "sheet-readiness-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString).jsonl"
++        let path = FileManager.default.temporaryDirectory.appendingPathComponent(name).path
++        FileManager.default.createFile(atPath: path, contents: nil)
++        return FileHandle(forWritingAtPath: path)
++    }()
++
++    static func identity(_ object: AnyObject?) -> String {
++        guard let object else { return "nil" }
++        return String(describing: Unmanaged.passUnretained(object).toOpaque())
++    }
++
++    static func root(of page: UIViewController?) -> UIViewController? {
++        var owner = page
++        while let parent = owner?.parent { owner = parent }
++        return owner
++    }
++
++    static func transition(_ value: UIViewControllerTransitionCoordinator?) -> [String: Any] {
++        guard let value else { return ["present": false] }
++        return ["present": true, "id": identity(value as AnyObject),
++                "class": String(describing: type(of: value)), "animated": value.isAnimated,
++                "interactive": value.isInteractive, "cancelled": value.isCancelled,
++                "duration": String(value.transitionDuration), "percent": String(Double(value.percentComplete)),
++                "presentationStyle": value.presentationStyle.rawValue]
++    }
++
++    static func controllers(page: UIViewController?, owner suppliedOwner: UIViewController? = nil) -> [String: Any] {
++        let owner = suppliedOwner ?? root(of: page)
++        return ["page": identity(page), "pageParent": identity(page?.parent),
++                "pageClass": page.map { String(describing: type(of: $0)) } ?? "nil",
++                "pageWindow": identity(page?.viewIfLoaded?.window),
++                "owner": identity(owner), "ownerClass": owner.map { String(describing: type(of: $0)) } ?? "nil",
++                "ownerWindow": identity(owner?.viewIfLoaded?.window),
++                "ownerHasPresenter": owner?.presentingViewController != nil,
++                "ownerBeingPresented": owner?.isBeingPresented ?? false,
++                "ownerBeingDismissed": owner?.isBeingDismissed ?? false,
++                "pageTransition": transition(page?.transitionCoordinator),
++                "navigationTransition": transition(page?.navigationController?.transitionCoordinator),
++                "ownerTransition": transition(owner?.transitionCoordinator)]
++    }
++
++    static func rect(_ value: CGRect) -> [String] {
++        [value.origin.x, value.origin.y, value.width, value.height].map { String(Double($0)) }
++    }
++
++    private static func geometry(_ layer: CALayer) -> [String: Any] {
++        let t = layer.transform
++        return ["bounds": rect(layer.bounds),
++                "position": [String(Double(layer.position.x)), String(Double(layer.position.y))],
++                "transform": [t.m11, t.m12, t.m13, t.m14, t.m21, t.m22, t.m23, t.m24,
++                              t.m31, t.m32, t.m33, t.m34, t.m41, t.m42, t.m43, t.m44].map { String(Double($0)) }]
++    }
++
++    static func layers(from root: CALayer?, through container: CALayer?,
++        blocked: CALayer, renderedAtPredicate: CALayer?) -> [String: Any] {
++        var rows: [[String: Any]] = []
++        var layer = root
++        while let current = layer, rows.count < 24 {
++            // Reuse the presentation object from the actual failing predicate for its layer.
++            let rendered = current === blocked ? renderedAtPredicate : current.presentation()
++            rows.append(["id": identity(current), "class": String(describing: type(of: current)),
++                         "delegateClass": current.delegate.map { String(describing: type(of: $0)) } ?? "nil",
++                         "blockingLayer": current === blocked, "isContainer": current === container,
++                         "animationKeys": (current.animationKeys() ?? []).prefix(16).map { String($0.prefix(128)) },
++                         "model": geometry(current), "presentationNil": rendered == nil,
++                         "presentation": rendered.map { geometry($0) } ?? [:]])
++            if current === container { layer = nil; break }
++            layer = current.superlayer
++        }
++        return ["ancestors": rows, "ancestorsTruncated": layer != nil, "blockingLayer": identity(blocked)]
++    }
++
++    static func emit(_ event: String, _ fields: @autoclosure () -> [String: Any]) {
++        lock.lock()
++        guard reserved < maximumRecords else { lock.unlock(); return }
++        reserved += 1
++        let sequence = reserved
++        lock.unlock()
++        // Snapshot only value metadata here. The writer never captures UIKit owners/layers.
++        var row: [String: Any] = sequence == maximumRecords ? ["limit": "records"] : fields()
++        row["event"] = sequence == maximumRecords ? "trace_limit" : event
++        row["schema"] = 1; row["sequence"] = sequence
++        row["pid"] = ProcessInfo.processInfo.processIdentifier
++        row["time"] = String(CACurrentMediaTime()); row["unixTime"] = String(Date().timeIntervalSince1970)
++        row["mainThread"] = Thread.isMainThread
++        let record = row
++        queue.async {
++            guard !outputClosed else { return }
++            guard var data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) else { return }
++            if data.count > 64 * 1024 {
++                data = Data("{\"event\":\"record_too_large\",\"sequence\":\(sequence)}".utf8)
++            }
++            if writtenBytes + data.count + 1 > maximumBytes - 128 {
++                data = Data("{\"event\":\"trace_limit\",\"limit\":\"bytes\"}".utf8)
++                outputClosed = true
++            }
++            data.append(10)
++            if let output {
++                do { try output.write(contentsOf: data) }
++                catch { outputClosed = true; NSLog("SHEET_READINESS_TRACE write-failed") }
++            } else { outputClosed = true; NSLog("SHEET_READINESS_TRACE output-unavailable") }
++            writtenBytes += data.count
++        }
++    }
++}
++
++// Per-owner metadata only: first observation, then at 1/5/30 seconds on repeated observations.
++// No timer or additional callback is installed; sampling occurs only on existing calls.
++final class WalletSheetReadinessSamples {
++    private var samples: [String: (first: CFTimeInterval, next: Int)] = [:]
++    private let offsets: [CFTimeInterval] = [0, 1, 5, 30]
++
++    func reset() { samples.removeAll(keepingCapacity: true) }
++
++    func emit(_ event: String, key: String, _ fields: @autoclosure () -> [String: Any]) {
++        let now = CACurrentMediaTime()
++        if samples[key] == nil && samples.count >= 64 { return }
++        var sample = samples[key] ?? (first: now, next: 0)
++        guard sample.next < offsets.count, now - sample.first >= offsets[sample.next] else { return }
++        sample.next += 1
++        samples[key] = sample
++        WalletSheetReadinessTrace.emit(event, fields().merging([
++            "elapsedSinceFirstObservationSeconds": String(now - sample.first), "sample": sample.next
++        ]) { _, new in new })
++    }
++}
+diff --git a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+index f05ab335de..22d08808fe 100644
+--- a/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
++++ b/waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components/WalletSheetSizing.swift
+@@ -98,11 +98,21 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     weak var activePage: WalletSheetPageMeasurement.Controller? {
+         didSet {
+             guard activePage !== oldValue else { return }
++            traceSamples.reset()
++            traceFirstFalseCause = nil
++            let traceChangedTo = WalletSheetReadinessTrace.identity(activePage)
++            WalletSheetReadinessTrace.emit("active_page_changed", traceMetadata().merging([
++                "oldPage": WalletSheetReadinessTrace.identity(oldValue), "newPage": traceChangedTo
++            ]) { _, new in new })
+             // Appearance callbacks can run inside a SwiftUI update. Invalidate before
+             // the queued measurement, without publishing from that update itself.
+             DispatchQueue.main.async { [weak self] in
+                 guard let self else { return }
++                WalletSheetReadinessTrace.emit("active_page_invalidation", traceMetadata().merging([
++                    "requestedPage": traceChangedTo, "willChangeReady": layoutReady
++                ]) { _, new in new })
+                 if layoutReady { layoutReady = false }
++                if activePage == nil { traceBlocked("active_page_missing_after_invalidation") }
+                 activePage?.scheduleMeasurement()
+             }
+         }
+@@ -114,8 +124,37 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     private weak var resizingSheet: UISheetPresentationController?
+     private var resizeLink: CADisplayLink?
+     private var layoutCompletion: (id: UUID, action: () -> Void)?
++    private let traceSamples = WalletSheetReadinessSamples()
++    private var traceFirstFalseCause: String?
+ 
+-    deinit { resizeLink?.invalidate() }
++    deinit {
++        WalletSheetReadinessTrace.emit("coordinator_deinit", ["coordinator": WalletSheetReadinessTrace.identity(self),
++            "resizeLink": WalletSheetReadinessTrace.identity(resizeLink)])
++        resizeLink?.invalidate()
++    }
++
++    private func traceMetadata(page: WalletSheetPageMeasurement.Controller? = nil,
++        owner: UIViewController? = nil) -> [String: Any] {
++        WalletSheetReadinessTrace.controllers(page: page ?? activePage, owner: owner).merging([
++            "coordinator": WalletSheetReadinessTrace.identity(self), "layoutReady": layoutReady,
++            "activePage": WalletSheetReadinessTrace.identity(activePage), "targetHeight": String(Double(height)),
++            "resizeLink": WalletSheetReadinessTrace.identity(resizeLink),
++            "resizingSheet": WalletSheetReadinessTrace.identity(resizingSheet)
++        ]) { _, new in new }
++    }
++
++    func traceBlocked(_ cause: String, page: WalletSheetPageMeasurement.Controller? = nil,
++        owner: UIViewController? = nil, fields: @autoclosure () -> [String: Any] = [:]) {
++        let first = !layoutReady && traceFirstFalseCause == nil
++        if first { traceFirstFalseCause = cause }
++        let key = cause + ":" + WalletSheetReadinessTrace.identity(page ?? activePage)
++            + ":" + WalletSheetReadinessTrace.identity(owner) + ":" + String(layoutReady)
++        traceSamples.emit("blocked", key: key,
++            traceMetadata(page: page, owner: owner).merging(fields()) { _, new in new }.merging([
++                "cause": cause, "firstBlockedSinceReadinessReset": first,
++                "firstFalseCause": traceFirstFalseCause ?? "none"
++            ]) { _, new in new })
++    }
+ 
+     func afterLayout(id: UUID, _ completion: @escaping () -> Void) {
+         layoutCompletion = (id, completion)
+@@ -126,7 +165,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+         if layoutCompletion?.id == id { layoutCompletion = nil }
+     }
+ 
+-    func isResizing(_ owner: UIViewController) -> Bool {
++    func isResizing(_ owner: UIViewController, traceSite: String) -> Bool {
+         guard resizeLink != nil, resizingSheet === owner.sheetPresentationController else { return false }
+         // UIKit also animates containers above the content host. Its bounds can settle
+         // before those containers finish moving or scaling, so focus must wait for both.
+@@ -134,10 +173,29 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+         let container = owner.sheetPresentationController?.containerView?.layer
+         var layer: CALayer? = owner.view.layer
+         while let current = layer {
+-            guard let rendered = current.presentation() else { return true }
+-            if !(current.animationKeys() ?? []).isEmpty || rendered.bounds != current.bounds
+-                || rendered.position != current.position
+-                || !CATransform3DEqualToTransform(rendered.transform, current.transform) { return true }
++            guard let rendered = current.presentation() else {
++                traceBlocked("resize_presentation_nil", owner: owner,
++                    fields: WalletSheetReadinessTrace.layers(from: owner.viewIfLoaded?.layer,
++                        through: container, blocked: current, renderedAtPredicate: nil).merging([
++                            "site": traceSite, "predicatePresentationNil": true
++                        ]) { _, new in new })
++                return true
++            }
++            // Keep the original short-circuit predicate order; log only the first blocker.
++            let cause: String?
++            if !(current.animationKeys() ?? []).isEmpty { cause = "resize_animation_keys" }
++            else if rendered.bounds != current.bounds { cause = "resize_bounds_mismatch" }
++            else if rendered.position != current.position { cause = "resize_position_mismatch" }
++            else if !CATransform3DEqualToTransform(rendered.transform, current.transform) { cause = "resize_transform_mismatch" }
++            else { cause = nil }
++            if let cause {
++                traceBlocked(cause, owner: owner,
++                    fields: WalletSheetReadinessTrace.layers(from: owner.viewIfLoaded?.layer,
++                        through: container, blocked: current, renderedAtPredicate: rendered).merging([
++                            "site": traceSite, "predicatePresentationNil": false
++                        ]) { _, new in new })
++                return true
++            }
+             if current === container { break }
+             layer = current.superlayer
+         }
+@@ -145,9 +203,18 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     }
+ 
+     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
+-        guard #available(iOS 16, *), activePage === page,
+-              !isResizing(owner), height.isFinite, height > 0,
+-              let presentation = owner.sheetPresentationController else { return }
++        guard #available(iOS 16, *) else { traceBlocked("unsupported_os", page: page, owner: owner); return }
++        guard activePage === page else { traceBlocked("update_inactive_page", page: page, owner: owner); return }
++        guard !isResizing(owner, traceSite: "update") else { return }
++        guard height.isFinite else {
++            traceBlocked("height_nonfinite", page: page, owner: owner, fields: ["measuredHeight": String(Double(height))]); return
++        }
++        guard height > 0 else {
++            traceBlocked("height_nonpositive", page: page, owner: owner, fields: ["measuredHeight": String(Double(height))]); return
++        }
++        guard let presentation = owner.sheetPresentationController else {
++            traceBlocked("sheet_presentation_missing", page: page, owner: owner); return
++        }
+         let rounded = ceil(height)
+         // SwiftUI can reset the same presentation controller when the task root changes.
+         // Reinstall our detent after scanner/loading/review transitions, not only for a new host.
+@@ -156,16 +223,43 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+         guard needsConfiguration || self.height != rounded else {
+             // Layout can finish before the sheet's presentation does.
+             if let transition = owner.transitionCoordinator {
+-                transition.animate(alongsideTransition: nil) { [weak page] _ in page?.scheduleMeasurement() }
++                traceBlocked("owner_transition_present", page: page, owner: owner,
++                    fields: ["transition": WalletSheetReadinessTrace.transition(transition)])
++                let registration = UUID().uuidString
++                let tracePage = WalletSheetReadinessTrace.identity(page)
++                let traceOwner = WalletSheetReadinessTrace.identity(owner)
++                let accepted = transition.animate(alongsideTransition: nil) { [weak page] context in
++                    WalletSheetReadinessTrace.emit("owner_transition_completion", ["registration": registration,
++                        "pageAtRegistration": tracePage, "ownerAtRegistration": traceOwner, "pageAlive": page != nil,
++                        "activePage": WalletSheetReadinessTrace.identity(page?.sizing?.activePage),
++                        "cancelled": context.isCancelled])
++                    page?.scheduleMeasurement()
++                }
++                WalletSheetReadinessTrace.emit("owner_transition_registered", ["registration": registration,
++                    "page": tracePage, "owner": traceOwner, "accepted": accepted,
++                    "transition": WalletSheetReadinessTrace.identity(transition as AnyObject)])
+                 return
+             }
+-            if !layoutReady { layoutReady = true }
++            if !layoutReady {
++                WalletSheetReadinessTrace.emit("ready_true", traceMetadata(page: page, owner: owner))
++                layoutReady = true
++                traceFirstFalseCause = nil
++                traceSamples.reset()
++            }
+             let completion = layoutCompletion
+             layoutCompletion = nil
+             completion?.action()
+             return
+         }
+-        if layoutReady { layoutReady = false }
++        WalletSheetReadinessTrace.emit("resize_requested", traceMetadata(page: page, owner: owner).merging([
++            "newTargetHeight": String(Double(rounded)), "needsConfiguration": needsConfiguration,
++            "animated": animated, "willChangeReady": layoutReady
++        ]) { _, new in new })
++        if layoutReady {
++            layoutReady = false
++            traceFirstFalseCause = nil
++            traceSamples.reset()
++        }
+         self.height = rounded
+         let changes = { [self] in
+             if needsConfiguration {
+@@ -194,6 +288,9 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
+     }
+ 
+     func finishResize(_ link: CADisplayLink) {
++        WalletSheetReadinessTrace.emit("resize_finished", traceMetadata().merging([
++            "finishedLink": WalletSheetReadinessTrace.identity(link), "currentLink": resizeLink === link
++        ]) { _, new in new })
+         link.invalidate()
+         guard resizeLink === link else { return }
+         resizeLink = nil
+@@ -214,7 +311,9 @@ private final class WalletSheetResizeObserver: NSObject {
+     @objc func frame(_ link: CADisplayLink) {
+         guard let sizing else { link.invalidate(); return }
+         if let owner, owner.view.window != nil, owner.presentingViewController != nil,
+-           sizing.isResizing(owner) { return }
++           sizing.isResizing(owner, traceSite: "display_link") { return }
++        WalletSheetReadinessTrace.emit("resize_observer_released", WalletSheetReadinessTrace.controllers(
++            page: sizing.activePage, owner: owner).merging(["link": WalletSheetReadinessTrace.identity(link)]) { _, new in new })
+         sizing.finishResize(link)
+     }
+ }
+@@ -237,15 +336,24 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
+         var animated = true
+         private var measurementScheduled = false
+         private var waitingForNavigation = false
++        private let traceSamples = WalletSheetReadinessSamples()
++
++        deinit {
++            WalletSheetReadinessTrace.emit("page_deinit", ["page": WalletSheetReadinessTrace.identity(self)])
++        }
+ 
+         override func loadView() { view = UIView(); view.isUserInteractionEnabled = false }
+         override func viewWillAppear(_ animated: Bool) {
+             super.viewWillAppear(animated)
++            WalletSheetReadinessTrace.emit("page_will_appear", WalletSheetReadinessTrace.controllers(page: self))
+             sizing?.activePage = self
+             scheduleMeasurement()
+         }
+         override func viewWillDisappear(_ animated: Bool) {
+             super.viewWillDisappear(animated)
++            WalletSheetReadinessTrace.emit("page_will_disappear", WalletSheetReadinessTrace.controllers(page: self).merging([
++                "wasActive": sizing?.activePage === self
++            ]) { _, new in new })
+             if sizing?.activePage === self { sizing?.activePage = nil }
+         }
+         override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); scheduleMeasurement() }
+@@ -262,46 +370,71 @@ private struct WalletSheetPageMeasurement: UIViewControllerRepresentable {
+         }
+ 
+         private func measure() {
+-            guard let sizing, sizing.activePage === self, view.window != nil else { return }
++            guard let sizing else {
++                traceSamples.emit("blocked", key: "coordinator_missing", WalletSheetReadinessTrace.controllers(page: self)
++                    .merging(["cause": "coordinator_missing"]) { _, new in new }); return
++            }
++            guard sizing.activePage === self else { sizing.traceBlocked("measure_inactive_page", page: self); return }
++            guard view.window != nil else { sizing.traceBlocked("measure_page_detached", page: self); return }
+             if let transition = navigationController?.transitionCoordinator,
+                transition.presentationStyle == .none {
++                sizing.traceBlocked(waitingForNavigation ? "navigation_wait_latched" : "navigation_transition_present",
++                    page: self, fields: ["waitingForNavigation": waitingForNavigation,
++                        "transition": WalletSheetReadinessTrace.transition(transition)])
+                 guard !waitingForNavigation else { return }
+                 waitingForNavigation = true
+                 // Native navigation holds the page's old viewport while it animates.
+                 // Resize after it releases that layout, so content and pinned actions
+                 // move with the sheet instead of jumping at the end of the push/pop.
+-                transition.animate(alongsideTransition: nil) { [weak self] _ in
++                let registration = UUID().uuidString
++                let tracePage = WalletSheetReadinessTrace.identity(self)
++                let accepted = transition.animate(alongsideTransition: nil) { [weak self] context in
++                    WalletSheetReadinessTrace.emit("navigation_completion", ["registration": registration,
++                        "pageAtRegistration": tracePage, "pageAlive": self != nil, "cancelled": context.isCancelled,
++                        "activePage": WalletSheetReadinessTrace.identity(self?.sizing?.activePage),
++                        "waitingBeforeCompletion": self?.waitingForNavigation ?? false])
+                     self?.waitingForNavigation = false
+                     self?.scheduleMeasurement()
+                 }
++                WalletSheetReadinessTrace.emit("navigation_registered", ["registration": registration,
++                    "page": tracePage, "accepted": accepted,
++                    "transition": WalletSheetReadinessTrace.identity(transition as AnyObject)])
+                 return
+             }
+             var ancestor = view.superview
+             while ancestor != nil && !(ancestor is UIScrollView) { ancestor = ancestor?.superview }
+-            guard let scroll = ancestor as? UIScrollView else { return }
++            guard let scroll = ancestor as? UIScrollView else { sizing.traceBlocked("scroll_ancestor_missing", page: self); return }
+             // The navigation page can retain its previous height during a native push.
+             // Measure its chrome in that page's coordinates, not the resizing sheet's.
+             var page: UIViewController = self
+             while let parent = page.parent, !(parent is UINavigationController) { page = parent }
+             var owner = page
+             while let parent = owner.parent { owner = parent }
+-            guard owner.presentingViewController != nil else { return }
++            guard owner.presentingViewController != nil else {
++                sizing.traceBlocked("owner_presenter_missing", page: self, owner: owner); return
++            }
+             // Even a measurement can mutate the sheet: layoutIfNeeded below flushes
+             // the entire hosting hierarchy. Leave an active resize alone, including
+             // when its measurement controller has been replaced. The resize observer
+             // schedules the currently visible page with the latest content.
+-            guard !sizing.isResizing(owner) else { return }
++            guard !sizing.isResizing(owner, traceSite: "measure_before_layout") else { return }
+             // A focus request can queue a measurement before SwiftUI has laid out the
+             // replacement content. Flush the owning hierarchy before reading its geometry.
+             owner.view.layoutIfNeeded()
+-            guard sizing.activePage === self, view.window != nil else { return }
++            guard sizing.activePage === self else { sizing.traceBlocked("page_changed_during_layout", page: self, owner: owner); return }
++            guard view.window != nil else { sizing.traceBlocked("page_detached_during_layout", page: self, owner: owner); return }
+             let viewport = scroll.convert(scroll.bounds, to: page.view)
+             let insets = scroll.adjustedContentInset
+             // Include navigation chrome, outer padding, and pinned actions. UIKit adds the
+             // bottom safe area to custom detents itself, so exclude it from our target.
+             let chrome = max(0, viewport.minY) + max(0, page.view.bounds.height - viewport.maxY)
+                 + insets.top + insets.bottom - page.view.safeAreaInsets.bottom
+-            sizing.update(page: self, height: view.bounds.height + chrome, owner: owner, animated: animated)
++            let measuredHeight = view.bounds.height + chrome
++            traceSamples.emit("measurement", key: "measurement", WalletSheetReadinessTrace.controllers(page: self, owner: owner)
++                .merging(["layoutReady": sizing.layoutReady, "waitingForNavigation": waitingForNavigation,
++                    "viewport": WalletSheetReadinessTrace.rect(viewport), "contentHeight": String(Double(view.bounds.height)),
++                    "chrome": String(Double(chrome)), "measuredHeight": String(Double(measuredHeight))]) { _, new in new })
++            sizing.update(page: self, height: measuredHeight, owner: owner, animated: animated)
+         }
+     }
+ }

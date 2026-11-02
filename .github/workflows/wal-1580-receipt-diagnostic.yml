@@ -1,0 +1,74 @@
+name: WAL-1580 bounded receipt readiness diagnostic
+
+on:
+  push:
+    branches: [chore/wal-1580-receipt-readiness-20261102]
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+
+jobs:
+  native:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact failing source tuple
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          resolved-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"b49a1733e0f9f5f8659d88715e20155b02bceb07","enterprise":"d029b96f8f26fbdbfec32cd40aefe8aaeb9c03d5","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+      - name: Checkout observation patch separately
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: receipt-diagnostic
+          sparse-checkout: .github/scripts/ci/receipt-readiness.patch
+          sparse-checkout-cone-mode: false
+      - name: Restore existing release framework
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: '13150862038'
+          run-id: '41459666772'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/wallet-core-artifact
+          merge-multiple: true
+      - name: Verify producer identity and framework bytes
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
+      - name: Apply observation and focused selection
+        working-directory: waltid-identity
+        run: |
+          git apply ../receipt-diagnostic/.github/scripts/ci/receipt-readiness.patch
+          git diff --check
+          git diff --stat
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+      - name: Observe four receipt journeys once
+        timeout-minutes: 25
+        uses: ./waltid-identity/.github/actions/gradle-ios
+        with:
+          waltid-directory: waltid-identity
+          simulator-destination: platform=iOS Simulator,name=iPhone 17,OS=27.0
+          wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
+          run-ios-simulator-tests: 'false'
+          run-wallet-sdk-tests: 'false'
+          run-native-demo-tests: 'true'
+          run-compose-demo-tests: 'false'
+          collect-test-diagnostics: on-failure
+          collect-test-reports: 'false'
+          test-result-artifact-name: receipt-readiness-results
+      - name: Preserve observations and results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: receipt-readiness-diagnostic
+          path: |
+            ios-ci-logs/
+            waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult/
+          retention-days: 7
+          if-no-files-found: error
