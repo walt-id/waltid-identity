@@ -22,7 +22,7 @@
 
 Production‑ready utilities to deliver session updates via:
 - **Server‑Sent Events (SSE)** — in‑app streaming of `KtorSessionUpdate` per session/target
-- **Webhooks** — push JSON payloads to external systems with optional Basic/Bearer authentication
+- **Webhooks** — push JSON payloads to external systems with optional Basic/Bearer or HMAC authentication
 
 Built on top of the core models from `waltid-ktor-notifications-core`.
 
@@ -100,7 +100,7 @@ routing {
 
 Notes:
 - SSE uses a per‑target `SharedFlow` with small replay to catch recent events
-- Webhook delivery supports Basic and Bearer auth
+- Webhook delivery supports Basic, Bearer, and signed HMAC requests
 
 ## Reliable webhook delivery
 
@@ -140,7 +140,7 @@ Services that run multiple replicas can provide a distributed implementation of 
 `WebhookNotifier.start(store)`. Claims, completion, rescheduling, and dead-letter transitions are lease-fenced so a
 stale worker cannot overwrite a delivery reclaimed by another replica.
 
-Outbox records contain the callback URL, payload, and configured Basic/Bearer credentials so they can be delivered
+Outbox records contain the callback URL, payload, and configured Basic/Bearer/HMAC credentials so they can be delivered
 after a restart. Directory and files are owner-only on POSIX file systems. Restrict access to the configured volume,
 encrypt it at rest, and do not expose or back it up as public application data. Define retention and cleanup policies
 for both `dead-letter` and `corrupt` records because neither is deleted automatically.
@@ -157,11 +157,46 @@ Every attempt sends the following headers:
 | `Webhook-Timestamp` | Attempt time as Unix epoch seconds |
 | `Webhook-Attempt` | One-based attempt number |
 | `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
+| `X-Webhook-Signature` | `v1=` followed by Base64 HMAC-SHA256 when `signing_secret` is configured |
 
 A receiver should atomically record `Idempotency-Key` with its business update. If the key is already present, it
 must return success without applying the update again. The receiver should also recompute `Content-Digest` before
-processing. The digest detects body changes; request authentication and signed callbacks are a separate concern
-from delivery idempotency and should be used together with HTTPS.
+processing. The digest detects body changes but does not authenticate the sender. Enable signed callbacks for
+authentication and use HTTPS.
+
+### Signed callbacks
+
+Set `signing_secret` on the webhook notification for Issuer2 or Verifier2. Use a unique, randomly generated secret
+of at least 32 bytes per receiver, store it as a secret, and share it with that receiver through a secure channel.
+Basic or Bearer authentication may remain configured during migration. Existing callbacks without `signing_secret`
+continue to be delivered without `X-Webhook-Signature`.
+
+```json
+{
+  "url": "https://example.com/webhook",
+  "signing_secret": "replace-with-a-random-secret"
+}
+```
+
+For every attempt, the sender signs this UTF-8 string, with no trailing newline:
+
+```text
+POST
+<configured callback URL>
+<Webhook-Id>
+<Webhook-Timestamp>
+<Webhook-Attempt>
+<Content-Digest>
+```
+
+The signature is `v1=` plus standard Base64 of `HMAC-SHA256(signing_secret, canonical string)`.
+The callback URL is the exact configured URL, including its query string. A receiver behind a proxy should use the
+agreed configured URL, not an internal rewritten URL. To verify, calculate SHA-256 over the raw request body and
+compare its RFC 9530-style value with `Content-Digest`; then compute the HMAC and compare decoded bytes in constant
+time. Reject missing or invalid signatures, timestamps outside a short window (for example five minutes), and
+previously processed `Webhook-Id` values. Retries keep the same ID and body but get a new timestamp and signature.
+The `WebhookSignature.verify` JVM helper performs only the constant-time signature comparison; callers must also
+check body digest, timestamp freshness, and delivery ID replay protection.
 
 Events raised by one request are enqueued in order. A failed delivery is retried independently, and concurrent
 delivery means HTTP arrival order can differ from enqueue order. Receivers that need that order sort by

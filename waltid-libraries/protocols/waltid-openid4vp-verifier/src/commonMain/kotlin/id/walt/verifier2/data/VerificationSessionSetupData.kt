@@ -150,6 +150,7 @@ internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = c
         basicAuthUser = null,
         basicAuthPass = null,
         bearerToken = null,
+        signingSecret = null,
     )
 )
 
