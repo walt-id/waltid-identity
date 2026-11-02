@@ -62,8 +62,8 @@ object Verifier2RequestUriPostHandler {
      * Parses `wallet_nonce` from the POST body, re-signs the request object with it injected,
      * optionally encrypts it to the wallet metadata key, and returns it with Content-Type `application/oauth-authz-req+jwt`.
      *
-     * If the session uses an unsigned request, the POST body is ignored and the normal
-     * unsigned authorization request is returned as JSON (same behaviour as GET).
+     * POST requires a signed Request Object per OpenID4VP 1.0 section 5.10.1.
+     * Unsigned sessions remain available through GET.
      */
     suspend fun RoutingCall.respondRequestUriPost(
         verificationSession: Verification2Session,
@@ -88,12 +88,8 @@ object Verifier2RequestUriPostHandler {
         val isSigned = verificationSession.requestMode == Verification2Session.RequestMode.REQUEST_URI_SIGNED
         val existingJwt = verificationSession.signedAuthorizationRequestJwt
 
-        if (!isSigned || existingJwt == null) {
-            // Unsigned session: fall back to normal GET handling
-            Verifier2AuthorizationRequestHandler.run {
-                respondAuthorizationRequest(verificationSession, updateSessionCallback)
-            }
-            return
+        require(isSigned && existingJwt != null) {
+            "request_uri_method=post requires a signed Request Object"
         }
 
         // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.10
@@ -170,15 +166,18 @@ object Verifier2RequestUriPostHandler {
         val metadata = Json.parseToJsonElement(requireNotNull(walletMetadata) {
             "encrypted_request requires wallet_metadata with a usable encryption jwks key"
         }).jsonObject
-        require(metadata["request_object_encryption_alg_values_supported"]?.jsonArray
-            ?.any { it.jsonPrimitive.content == "ECDH-ES" } == true) {
-            "Wallet must support Request Object encryption with ECDH-ES"
+        // Section 5.10 allows wallet JWKS without these optional discovery metadata lists.
+        // Our request-encryption profile defaults to ECDH-ES / A128GCM, not a response-encryption default.
+        metadata["request_object_encryption_alg_values_supported"]?.jsonArray?.let { algorithms ->
+            require(algorithms.any { it.jsonPrimitive.content == "ECDH-ES" }) {
+                "Wallet must support Request Object encryption with ECDH-ES"
+            }
         }
-        val supportedEnc = metadata["request_object_encryption_enc_values_supported"]?.jsonArray
-            ?.map { it.jsonPrimitive.content }.orEmpty()
-        val encryption = requireNotNull(JweContentEncryption.entries.firstOrNull { it.identifier in supportedEnc }) {
-            "Wallet must support Request Object encryption with A128GCM or A256GCM"
-        }
+        val encryption = metadata["request_object_encryption_enc_values_supported"]?.jsonArray?.let { methods ->
+            requireNotNull(JweContentEncryption.entries.firstOrNull { encryption ->
+                methods.any { it.jsonPrimitive.content == encryption.identifier }
+            }) { "Wallet must support Request Object encryption with A128GCM or A256GCM" }
+        } ?: JweContentEncryption.A128GCM
         val keys = metadata["jwks"]?.jsonObject?.get("keys")?.jsonArray.orEmpty()
         for (element in keys) {
             val jwk = element as? JsonObject ?: continue
