@@ -2,7 +2,9 @@ package id.walt.verifier2.verification2
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.verifier2.data.DcqlFulfillmentFailure
 import id.walt.verifier2.data.SessionFailure
+import id.walt.verifier2.data.UnsatisfiedSet
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL
@@ -100,6 +102,9 @@ class DcqlQueryBindingTest {
         assertTrue(failure.isInstance(this.failure), "expected ${failure.simpleName}, got ${this.failure}")
     }
 
+    private val Verification2Session.dcqlFailure: DcqlFulfillmentFailure
+        get() = assertIs<SessionFailure.DcqlFulfillment>(failure).failure
+
     // language=JSON
     private val administratorQuery = """
         {"credentials": [{"id": "admin", "format": "jwt_vc_json", "meta": {"type_values": [["AdministratorCredential"]]}}]}
@@ -110,6 +115,7 @@ class DcqlQueryBindingTest {
         val session = verify(administratorQuery, mapOf("admin" to listOf(presentation(credential("MembershipCredential")))))
 
         session.assertFailedWith(SessionFailure.DcqlFulfillment::class)
+        assertEquals(setOf("admin"), session.dcqlFailure.missingQueryIds)
         assertNull(session.policyResults, "credential policies must not run for an unmatched credential")
     }
 
@@ -239,6 +245,8 @@ class DcqlQueryBindingTest {
     fun `a credential set option is satisfied only by credentials matching its queries`() = runTest {
         val relabelled = verify(alternativesQuery, mapOf("admin" to listOf(presentation(credential("MembershipCredential")))))
         relabelled.assertFailedWith(SessionFailure.DcqlFulfillment::class)
+        assertEquals(setOf("admin"), relabelled.dcqlFailure.missingQueryIds)
+        assertEquals(listOf(UnsatisfiedSet(listOf(listOf("admin"), listOf("member")))), relabelled.dcqlFailure.unsatisfiedSets)
 
         val matching = verify(alternativesQuery, mapOf("member" to listOf(presentation(credential("MembershipCredential")))))
         assertEquals(SUCCESSFUL, matching.status, matching.failure.toString())

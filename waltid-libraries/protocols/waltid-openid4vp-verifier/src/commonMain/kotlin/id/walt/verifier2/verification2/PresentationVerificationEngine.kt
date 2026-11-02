@@ -340,11 +340,19 @@ object PresentationVerificationEngine {
         }.toMap()
         val matched = credentialsByQuery.keys - mismatches.keys
         if (mismatches.isEmpty()) return Result.success(matched)
+        // A query whose credentials do not match is reported as missing, together with whatever the matched
+        // queries leave unfulfilled, so the structured failure names it and not only the reason text.
+        val unfulfilled = (DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matched).exceptionOrNull()
+            as? DcqlFulfillmentChecker.DcqlFulfillmentException)?.details
         return Result.failure(
             DcqlFulfillmentChecker.DcqlFulfillmentException(
                 message = "Presented credentials do not satisfy their Credential Query: " +
                     mismatches.entries.joinToString("; ") { (queryId, reason) -> "'$queryId': $reason" },
-                details = DcqlFulfillmentFailure(successfullyValidatedQueryIds = matched),
+                details = DcqlFulfillmentFailure(
+                    missingQueryIds = mismatches.keys + unfulfilled?.missingQueryIds.orEmpty(),
+                    unsatisfiedSets = unfulfilled?.unsatisfiedSets.orEmpty(),
+                    successfullyValidatedQueryIds = matched,
+                ),
             )
         )
     }
