@@ -1,6 +1,8 @@
 
 package id.walt.verifier2
 
+import id.walt.commons.web.WebException
+
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
@@ -42,6 +44,19 @@ private const val VICAL = "vical"
 private const val ENVELOPE_QUERY_PARAM = "envelope"
 
 object Verifier2Service {
+    private val processingSessions = ConcurrentHashMap.newKeySet<String>()
+
+    internal suspend fun withProcessingClaim(sessionId: String, block: suspend () -> Unit) {
+        if (!synchronized(processingSessions) { processingSessions.add(sessionId) }) {
+            throw WebException(409, "Verification session '$sessionId' is already being processed")
+        }
+        try {
+            block()
+        } finally {
+            synchronized(processingSessions) { processingSessions.remove(sessionId) }
+        }
+    }
+
 
     val sessions = ConcurrentHashMap<String, Verification2Session>()
 
@@ -54,8 +69,11 @@ object Verifier2Service {
         block: Verification2Session.() -> Unit
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
-        val newSession = session.apply {
-            block.invoke(this)
+        // A fetch cannot change a session while a presentation owns it, even before its first update.
+        val newSession = synchronized(processingSessions) {
+            if (event == SessionEvent.authorization_request_requested && session.id in processingSessions) {
+                session
+            } else session.apply(block)
         }
         sessions[newSession.id] = newSession
 
@@ -175,13 +193,16 @@ object Verifier2Service {
                         }) { body ->
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
                         log.trace { "Received verification session response to session: $sessionId" }
-                        val verificationSession = sessions[sessionId]
-
-                        call.respondHandleDirectPostResponse(
-                            verificationSession = verificationSession,
-                            updateSessionCallback = updateSessionCallback,
-                            failSessionCallback = failSessionCallback
-                        )
+                        withProcessingClaim(sessionId) {
+                            val verificationSession = sessions[sessionId]
+                                ?: throw WebException(404, "Unknown session id")
+                            verificationSession.requireAvailable()
+                            call.respondHandleDirectPostResponse(
+                                verificationSession = verificationSession,
+                                updateSessionCallback = updateSessionCallback,
+                                failSessionCallback = failSessionCallback
+                            )
+                        }
                     }
                 }
             }
