@@ -23,12 +23,6 @@
 - Wallet2 presentation preview: rows for requested clear-text claims now carry the plain claim name in `name` (for example `address`, previously `"address"` with quotes, or the index for array elements), and their `value` leaves out selectively disclosable children that are not presented, matching what the verifier receives.
 - Wallet2 presentation preview: `required` now means the value is presented whatever the user selects. An optional claim whose disclosures are all needed by a required claim (for example clear text inside a required claim's parent element) is reported as `required = true, selectable = false` instead of offered as a choice.
 
-## SD-JWT array disclosure locations
-
-- Disclosure locations now use indices in the processed credential: unmatched digest placeholders (decoys or unavailable disclosures) do not consume array positions. Clear-text elements still count.
-- Wallet2 matching, preview and presentation recompute locations from the original issuer payload and the complete stored disclosure set. Previously stored credentials do not require reimport or a persistence migration.
-- Repeated digest references are rejected explicitly, including unmatched decoys (RFC 9901 §7.1 step 4). Unreachable disclosures remain invalid. No existing constructor or serialized field changes.
-
 ## Configuration:
 
 #### Feature system
