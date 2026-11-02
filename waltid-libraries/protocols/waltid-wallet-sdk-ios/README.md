@@ -575,3 +575,8 @@ missing issuer labels with a generic payment confirmation. Reprepare after a
 selection change, and discard abandoned previews. A failed URL submission requires
 a new preview and confirmation. The direct `present` shortcut cannot authorize
 these payments. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
+
+
+### Client attestation challenges
+
+The Swift facade uses the shared Wallet2 client attestation challenge implementation through the real KMP bridge. Existing `WalletAttestationConfiguration` is sufficient for both pre-authorized and authorization-code issuance, including PAR. Challenge state is part of the persisted issuance session; recreate the wallet with its attester configuration before resuming. There are no Swift challenge-specific arguments. The enterprise integration test `testClientAttestationChallengesForBothGrantsAcrossWalletRecreation` exercises native signing and both endpoint-discovery and response-only negotiation against ES issuer2. See the [mobile fixture instructions](../waltid-openid4vc-wallet-mobile/README.md#client-attestation-challenge-interoperability) for ports and scenarios.

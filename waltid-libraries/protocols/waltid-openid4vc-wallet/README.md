@@ -312,3 +312,16 @@ when `proofRequired=true`, non-default `holderBindings`, `credentialIdentifier` 
 DPoP context is supplied. A legacy poll success remains `ReceiveCredentialResult`.
 Legacy pending results return HTTP 409 and local-save failures HTTP 500, with full
 progress; detailed requests retain HTTP 200 pending and HTTP 207 partial progress.
+
+
+## Client attestation challenge support
+
+Wallet2 uses the shared [client attestation challenge implementation](../waltid-openid4vci-wallet/README.md#client-attestation-challenges) for pre-authorized token exchange and authorization-code issuance, including PAR and the later code exchange. Existing attester configuration enables this behavior; no new REST request fields are required. Both OSS and ES Wallet2 inherit it through this library.
+
+Isolated wallet operations retain freshness in the wallet runtime, scoped by authorization server issuer, OAuth client ID and instance-key thumbprint. A different wallet, client, issuer or rotated key receives an independent context. Session-based issuance shares the same scope across sessions and persists freshness in a `CLIENT_ATTESTATION_FRESHNESS` record in the wallet’s existing protected issuance store. The record survives completion of an individual session, so reopening an older session uses the latest challenge and authorization-server DPoP nonce. Older per-session snapshots only seed missing state. Store adapters must preserve this additional record kind; the built-in SQL and MongoDB adapters use the existing opaque payload format. Older session records without the nonce field remain readable. The attestation JWT is reused during a retry; only the signed PoP is rebuilt.
+
+The OSS and ES `Wallet2ClientAttestationChallengeIntegrationTest` suites each cover both grants through credential storage, with endpoint discovery and with real issuer2 challenge errors. Their forwarding fixture hides unsigned `challenge_endpoint` metadata for response-only cases and injects an invalid remembered challenge after successful PAR. Issuer2 itself produces the challenge errors and validates the retried proofs. The tests check preserved grant parameters, fresh proofs, replacement challenges, and stored credentials. A local test identity provider supplies login for the real authorization-code/PKCE flow.
+
+Freshness headers from validated authorization-server metadata responses are retained before the first proof. A restored preview cannot overwrite a newer challenge. Clearing issuance state also clears its freshness records.
+
+The built-in in-memory, server SQL, mobile SQLDelight and ES stores atomically create shared freshness records. Concurrent updates merge only the received fields; storage conflicts retry the local update without resending the OAuth request. Custom stores can implement `AtomicWalletIssuanceSessionCreationStore` for the same coordination across runtimes. Older store interfaces remain supported with their existing coordination within one wallet runtime.

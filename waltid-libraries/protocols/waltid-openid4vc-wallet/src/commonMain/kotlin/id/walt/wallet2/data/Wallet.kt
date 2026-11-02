@@ -106,6 +106,15 @@ data class Wallet(
         issuanceSessionState = state
     }
 
+    internal suspend fun clientAttestationChallenges(issuer: String, clientId: String, key: Crypto2Key):
+            id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeContext {
+        val publicKey = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
+        val state = issuanceSessionMutex.withLock {
+            issuanceSessionState ?: WalletIssuanceSessionState(id).also { issuanceSessionState = it }
+        }
+        return state.challengeContext(issuer, clientId, Jwk.sha256Thumbprint(publicKey))
+    }
+
     /** Shared retained engine for full REST issuance and opaque deferred handles. */
     suspend fun issuanceSessions(httpClient: HttpClient? = null): WalletIssuanceSessionService = issuanceSessionMutex.withLock {
         issuanceSessionService ?: WalletIssuanceSessionService(this, runtimeState = issuanceSessionState, httpClient = httpClient)

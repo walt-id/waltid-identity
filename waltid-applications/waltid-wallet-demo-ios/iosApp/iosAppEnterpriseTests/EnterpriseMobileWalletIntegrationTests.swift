@@ -10,6 +10,59 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         string: ProcessInfo.processInfo.environment["ENTERPRISE_MOBILE_FIXTURE_BASE_URL"] ?? "http://localhost:33335"
     )!
 
+    func testClientAttestationChallengesForBothGrantsAcrossWalletRecreation() async throws {
+        let fixture = makeFixture()
+        for mode in ["endpoint", "response"] {
+            for authorized in [false, true] {
+                let scenarioID = "enterprise-mdl-challenge-\(mode)" + (authorized ? "-authorized" : "")
+                let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
+                let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+                let walletID = "ios-challenge-\(UUID().uuidString)"
+                let wallet = try await makeWallet(walletId: walletID, attestation: offer.attestation)
+                _ = try await initializeSigningIdentity(wallet)
+                let redirect = URL(string: "walbatchtest://callback")!
+                let session = try await wallet.startIssuance(IssuanceRequest(
+                    offer: try XCTUnwrap(URL(string: offer.offerUrl)), clientID: "wallet-client", redirectURI: redirect))
+                let outcome: IssuanceOutcome
+                if authorized {
+                    let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
+                    XCTAssertTrue(authorization.pushedAuthorizationRequestUsed)
+                    // Recreate the Swift facade and real KMP wallet before code exchange.
+                    let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
+                    _ = try await initializeSigningIdentity(reopened)
+                    let callback = try await followChallengeAuthorization(authorization.url, redirect: redirect)
+                    outcome = try await reopened.continueAuthorizationIssuance(sessionID: session.id, callbackURI: callback)
+                } else {
+                    outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
+                }
+                guard case let .stored(_, credentialIDs) = outcome else {
+                    return XCTFail("Challenge issuance failed for \(scenarioID): \(outcome)")
+                }
+                XCTAssertEqual(credentialIDs.count, 1)
+                let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
+                let stored = try await reopened.credentials()
+                XCTAssertEqual(Set(credentialIDs), Set(stored.map { $0.id }))
+                let trace = try await fixture.challengeTrace(id: XCTUnwrap(offer.challengeTraceID))
+                XCTAssertEqual(trace["verified"], 1, "Actual issuer challenge exchange: \(trace)")
+                await clearTestData(walletId: walletID)
+            }
+        }
+    }
+
+    private func followChallengeAuthorization(_ start: URL, redirect: URL) async throws -> URL {
+        let transport = URLSession(configuration: .ephemeral, delegate: ChallengeRedirectDelegate(), delegateQueue: nil)
+        defer { transport.invalidateAndCancel() }
+        var next = start
+        for _ in 0..<8 {
+            if next.absoluteString.hasPrefix(redirect.absoluteString + "?") { return next }
+            let (_, response) = try await transport.data(from: next)
+            let http = try XCTUnwrap(response as? HTTPURLResponse)
+            XCTAssertTrue([302, 303].contains(http.statusCode))
+            next = try XCTUnwrap(URL(string: XCTUnwrap(http.value(forHTTPHeaderField: "Location")), relativeTo: next))
+        }
+        throw EnterpriseIssuanceError.unexpectedOutcome
+    }
+
     func testReceiveEnterpriseMdlFromEnterpriseIssuer2() async throws {
         try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl")
     }
@@ -272,4 +325,13 @@ private func initializeSigningIdentity(_ wallet: Wallet) async throws -> Signing
         throw WalletError.invalidInput("Expected an active test identity")
     }
     return identity
+}
+
+// Observe the issuer's callback instead of asking URLSession to load a custom URL scheme.
+private final class ChallengeRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
 }

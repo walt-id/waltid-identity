@@ -5,10 +5,14 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.metadata.oidc.OpenIDProviderMetadata
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.crypto2.jose.CompactJws
+import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.plugins.retry
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -23,6 +27,9 @@ import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 
 private val log = KotlinLogging.logger {}
+
+/** Validated metadata and final response headers, retaining the latest freshness across discovery fallback. */
+data class ResolvedAuthorizationServerMetadata(val metadata: AuthorizationServerMetadata, val headers: io.ktor.http.Headers)
 
 /**
  * Resolves unsigned or signed Credential Issuer Metadata from its well-known endpoint.
@@ -231,7 +238,10 @@ class IssuerMetadataResolver(
      * @return AuthorizationServerMetadata
      * @throws Exception if metadata cannot be fetched or parsed
      */
-    suspend fun resolveAuthorizationServerMetadata(authorizationServerUrl: String): AuthorizationServerMetadata {
+    suspend fun resolveAuthorizationServerMetadata(authorizationServerUrl: String): AuthorizationServerMetadata =
+        resolveAuthorizationServerMetadataDetailed(authorizationServerUrl).metadata
+
+    suspend fun resolveAuthorizationServerMetadataDetailed(authorizationServerUrl: String): ResolvedAuthorizationServerMetadata {
         require(authorizationServerUrl.isNotBlank()) { "Authorization server URL cannot be blank" }
 
         val urlsToTry = if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
@@ -250,10 +260,16 @@ class IssuerMetadataResolver(
         }.distinct()
 
         val failures = mutableListOf<ResolveFailure>()
+        var attestationChallenge: String? = null
+        var dpopNonce: String? = null
         for (metadataUrl in urlsToTry) {
             log.debug { "Fetching authorization server metadata from: $metadataUrl" }
             val response: HttpResponse = try {
-                httpClient.get(metadataUrl)
+                httpClient.get(metadataUrl) {
+                    // Keep every fallback response visible, including its freshness headers.
+                    expectSuccess = false
+                    retry { noRetry() }
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 log.warn(e) { "Network error fetching authorization server metadata from: $metadataUrl" }
@@ -261,9 +277,24 @@ class IssuerMetadataResolver(
                 continue
             }
 
+            attestationChallenge = response.headers[CLIENT_ATTESTATION_CHALLENGE]
+                ?.takeIf(String::isNotBlank) ?: attestationChallenge
+            dpopNonce = response.headers[DPOP_NONCE_HEADER]?.takeIf(String::isNotBlank) ?: dpopNonce
+
             if (response.status.isSuccess()) {
                 try {
-                    return response.body<AuthorizationServerMetadata>()
+                    val metadata = response.body<AuthorizationServerMetadata>()
+                    // Publish discovery freshness only after validating the selected AS identity.
+                    require(metadata.issuer == authorizationServerUrl ||
+                        (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH) &&
+                            metadataUrl == buildMetadataUrl(metadata.issuer, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))) {
+                        "Authorization server metadata issuer does not match the selected server"
+                    }
+                    return ResolvedAuthorizationServerMetadata(metadata, Headers.build {
+                        appendAll(response.headers)
+                        attestationChallenge?.let { set(CLIENT_ATTESTATION_CHALLENGE, it) }
+                        dpopNonce?.let { set(DPOP_NONCE_HEADER, it) }
+                    })
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
@@ -358,7 +389,11 @@ class IssuerMetadataResolver(
      */
     suspend fun resolveAuthorizationServerMetadataWithFallback(
         credentialIssuerMetadata: CredentialIssuerMetadata,
-    ): AuthorizationServerMetadata {
+    ): AuthorizationServerMetadata = resolveAuthorizationServerMetadataWithFallbackDetailed(credentialIssuerMetadata).metadata
+
+    suspend fun resolveAuthorizationServerMetadataWithFallbackDetailed(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ): ResolvedAuthorizationServerMetadata {
         log.info { "Resolving authorization server metadata" }
 
         // firstOrNull, not first: defence in depth only - the metadata model refuses to deserialize
@@ -367,7 +402,7 @@ class IssuerMetadataResolver(
             ?: credentialIssuerMetadata.credentialIssuer
         log.info { "Attempting to use authorization server from issuer metadata: $authServerUrl" }
 
-        return resolveAuthorizationServerMetadata(authServerUrl)
+        return resolveAuthorizationServerMetadataDetailed(authServerUrl)
     }
 
     /**

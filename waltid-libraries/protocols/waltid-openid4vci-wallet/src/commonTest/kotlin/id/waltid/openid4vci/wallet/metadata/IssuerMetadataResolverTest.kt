@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.metadata
 
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -284,6 +285,68 @@ class IssuerMetadataResolverTest {
         assertEquals(2, requested.size, "both well-known endpoints should be attempted, in order")
         assertTrue(requested[0].contains("oauth-authorization-server"))
         assertTrue(requested[1].contains("openid-configuration"))
+    }
+
+    @Test
+    fun `fallback retains independent freshness and uses the latest nonblank headers`() = runTest {
+        val issuer = "https://issuer.example.org"
+        val challengeHeader = "OAuth-Client-Attestation-Challenge"
+        for (firstStatus in listOf(HttpStatusCode.NotFound, HttpStatusCode.ServiceUnavailable)) {
+            for ((nextChallenge, nextNonce) in listOf(null to null, "new-challenge" to null,
+                null to "new-nonce", "new-challenge" to "new-nonce", " " to " ")) {
+                val requested = mutableListOf<String>()
+                val client = HttpClient(MockEngine) {
+                    expectSuccess = true
+                    install(ContentNegotiation) { json(json) }
+                    install(HttpRequestRetry) { retryOnServerErrors(maxRetries = 2); delayMillis { 0L } }
+                    engine { addHandler { request ->
+                        requested += request.url.encodedPath
+                        when (request.url.encodedPath) {
+                            "/.well-known/oauth-authorization-server" -> respond("{}", firstStatus, Headers.build {
+                                append(challengeHeader, "first-challenge")
+                                append("DPoP-Nonce", "first-nonce")
+                                append("X-Error-Only", "do-not-forward")
+                            })
+                            "/.well-known/openid-configuration" -> respond(
+                                """{"issuer":"$issuer","authorization_endpoint":"$issuer/authorize","token_endpoint":"$issuer/token","response_types_supported":["code"]}""",
+                                HttpStatusCode.OK, Headers.build {
+                                    append(HttpHeaders.ContentType, "application/json")
+                                    append("X-Metadata", "retained")
+                                    nextChallenge?.let { append(challengeHeader, it) }
+                                    nextNonce?.let { append("DPoP-Nonce", it) }
+                                })
+                            else -> error("Unexpected metadata request ${request.url}")
+                        }
+                    } }
+                }
+                try {
+                    val resolved = IssuerMetadataResolver(client).resolveAuthorizationServerMetadataDetailed(issuer)
+                    assertEquals(issuer, resolved.metadata.issuer)
+                    assertEquals(nextChallenge?.takeIf(String::isNotBlank) ?: "first-challenge", resolved.headers[challengeHeader])
+                    assertEquals(nextNonce?.takeIf(String::isNotBlank) ?: "first-nonce", resolved.headers["DPoP-Nonce"])
+                    assertEquals("retained", resolved.headers["X-Metadata"])
+                    assertNull(resolved.headers["X-Error-Only"])
+                    assertEquals(listOf("/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"), requested)
+                } finally { client.close() }
+            }
+        }
+    }
+
+    @Test
+    fun `fallback freshness is not returned for mismatched issuer metadata`() = runTest {
+        val client = createMockClient { request ->
+            if (request.url.encodedPath.contains("oauth-authorization-server")) {
+                respond("{}", HttpStatusCode.NotFound, headersOf("OAuth-Client-Attestation-Challenge", "challenge"))
+            } else {
+                respond("""{"issuer":"https://other.example","authorization_endpoint":"https://other.example/authorize","token_endpoint":"https://other.example/token","response_types_supported":["code"]}""",
+                    HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+        }
+        try {
+            assertFailsWith<Exception> {
+                IssuerMetadataResolver(client).resolveAuthorizationServerMetadataDetailed("https://issuer.example.org")
+            }
+        } finally { client.close() }
     }
 
     @Test

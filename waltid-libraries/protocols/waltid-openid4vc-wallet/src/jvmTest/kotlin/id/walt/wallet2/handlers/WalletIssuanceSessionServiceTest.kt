@@ -78,6 +78,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertNull
+import kotlin.test.assertNotEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -199,7 +201,7 @@ class WalletIssuanceSessionServiceTest {
 
         assertEquals(listOf(CHALLENGE_ENDPOINT), challengeRequests)
         assertEquals("challenge-1", parPopChallenge)
-        assertTrue(sessionStore.records.values.single().payload.contains("challenge-2"))
+        assertTrue(sessionStore.records.values.single { it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION }.payload.contains("challenge-2"))
 
         val outcome = service.continueAuthorization(
             WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "auth-code")),
@@ -207,6 +209,85 @@ class WalletIssuanceSessionServiceTest {
 
         assertIs<WalletIssuanceOutcome.Deferred>(outcome)
         assertEquals("challenge-2", tokenPopChallenge)
+    }
+
+
+    @Test
+    fun challengeEndpointDpopNonceIsUsedByTheFirstTokenProof() = runTest {
+        var tokenCalls = 0
+        val service = service(attestationAssembler = ClientAttestationAssembler(StaticAttestationProvider())) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(JsonObject(Json.parseToJsonElement(attestedAuthorizationServerMetadata()).jsonObject +
+                    ("dpop_signing_alg_values_supported" to Json.parseToJsonElement("[\"ES256\"]"))).toString())
+                CHALLENGE_ENDPOINT -> respond("""{"attestation_challenge":"attestation-only"}""", HttpStatusCode.OK,
+                    headersOf(HttpHeaders.ContentType to listOf("application/json"), "DPoP-Nonce" to listOf("dpop-only")))
+                TOKEN_ENDPOINT -> {
+                    tokenCalls++
+                    assertEquals("dpop-only", jwtPart(requireNotNull(request.headers["DPoP"]), 1)["nonce"]?.jsonPrimitive?.content)
+                    assertEquals("attestation-only", jwtPart(requireNotNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]), 1)["challenge"]?.jsonPrimitive?.content)
+                    jsonResponse("""{"access_token":"access","token_type":"DPoP"}""")
+                }
+                CREDENTIAL_ENDPOINT -> jsonResponse("""{"transaction_id":"transaction-1","interval":5}""", HttpStatusCode.Accepted)
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(service.start(preAuthorizedRequest()).id))
+        assertEquals(1, tokenCalls)
+    }
+
+    @Test
+    fun parRecoveryAndFreshnessSurviveReopeningBeforeTokenExchange() = runTest {
+        val records = RecordingSessionStore()
+        val wallet = Wallet("restored-challenge", staticKey = JWKKey.generate(KeyType.secp256r1))
+        val parBodies = mutableListOf<String>()
+        val pops = mutableListOf<JsonObject>()
+        var tokens = 0
+        val http = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata().replace(
+                    "\"challenge_endpoint\":\"$CHALLENGE_ENDPOINT\",", ""))
+                PAR_ENDPOINT -> {
+                    parBodies += request.bodyText()
+                    pops += jwtPart(requireNotNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]), 1)
+                    if (parBodies.size == 1) respond("""{"error":"use_attestation_challenge"}""",
+                        HttpStatusCode.BadRequest, headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                            CLIENT_ATTESTATION_CHALLENGE to listOf("retry-challenge")))
+                    else respond("""{"request_uri":"urn:example:request","expires_in":60}""",
+                        HttpStatusCode.Created, headersOf(
+                            HttpHeaders.ContentType to listOf("application/json"),
+                            CLIENT_ATTESTATION_CHALLENGE to listOf("persisted-challenge"),
+                            "DPoP-Nonce" to listOf("independent-nonce")))
+                }
+                TOKEN_ENDPOINT -> {
+                    tokens++
+                    val claims = jwtPart(requireNotNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]), 1)
+                    assertEquals("persisted-challenge", claims["challenge"]?.jsonPrimitive?.content)
+                    jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                }
+                CREDENTIAL_ENDPOINT -> jsonResponse("""{"transaction_id":"transaction-1","interval":5}""", HttpStatusCode.Accepted)
+                else -> error("Unexpected request: ${request.url}")
+            }
+        }
+        fun reopen() = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = http,
+            attestationAssembler = ClientAttestationAssembler(StaticAttestationProvider()))
+        val initial = reopen()
+        val session = initial.start(authRequest())
+        val authorization = initial.beginAuthorization(session.id)
+        assertEquals(2, parBodies.size)
+        assertEquals(1, parBodies.distinct().size)
+        assertNull(pops[0]["challenge"])
+        assertEquals("retry-challenge", pops[1]["challenge"]?.jsonPrimitive?.content)
+        assertNotEquals(pops[0]["jti"], pops[1]["jti"])
+        val persisted = records.records.values.single { it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION }.payload
+        assertTrue(persisted.contains("persisted-challenge"))
+        assertTrue(persisted.contains("independent-nonce"))
+        val resumed = reopen().continueAuthorization(WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "code")))
+        assertIs<WalletIssuanceOutcome.Deferred>(resumed)
+        assertEquals(1, tokens)
+        http.close()
     }
 
     @Test

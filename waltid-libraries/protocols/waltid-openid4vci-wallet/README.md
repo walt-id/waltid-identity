@@ -185,3 +185,22 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+
+## Client attestation challenges
+
+The challenge behavior follows the [OAuth Attestation-Based Client Authentication specification](https://datatracker.ietf.org/doc/draft-ietf-oauth-attestation-based-client-auth/).
+
+`ClientAttestationChallengeContext` retains an opaque attestation challenge and a separate authorization-server DPoP nonce. Scope a context to one wallet instance, authorization server, client ID and attestation key. Call `prepare(httpClient, metadata.challengeEndpoint)` before building the first PoP. It sends an empty POST with `Accept: application/json` when an endpoint is advertised and no challenge is remembered. An absent endpoint allows response-only negotiation. `requestChallengeDetailed` also exposes an optional `DPoP-Nonce`; the original `requestChallenge` response API remains available.
+
+For PAR and token requests, supply a `ClientAttestationHeadersFactory` that signs a fresh PoP using `context.challenge`, and pass `context::observe` as `onResponseHeaders`. Keep the reusable client-attestation JWT outside the factory. The callback observes successful and error responses before another proof is signed. The PoP audience is the authorization server issuer identifier. Challenges are not decoded, expired locally, or assumed to be single-use.
+
+An HTTP 400 `use_attestation_challenge` with a nonblank `OAuth-Client-Attestation-Challenge` permits one retry with a new PoP. OAuth parameters (including the grant, PKCE verifier and transaction code) remain unchanged. Missing/blank challenge headers, unrelated/malformed errors, cancellation and transport failures do not trigger this recovery. The existing static-header overloads remain available and cannot regenerate a proof, so they do not perform challenge recovery.
+
+Token requests independently allow one existing DPoP nonce recovery and one attestation recovery, in either order: at most three logical attempts. Redirect handling retains its existing restrictions. Authorization-server DPoP nonces and credential-server nonces remain separate. Resource-server attestation and additional authentication methods are outside this feature.
+
+The common tests cover discovery, header updates, signed PAR proofs, bounded recovery, both DPoP/attestation orders, cancellation and static-header compatibility. Wallet and native SDK end-to-end coverage is described in the Wallet2 and mobile READMEs.
+
+PAR, token and challenge-endpoint requests explicitly disable generic HTTP retries and Ktor `expectSuccess`, so error responses reach the protocol handler even with a caller-supplied client. Each authenticated retry is controlled by the protocol layer.
+
+The detailed challenge endpoint API accepts a DPoP-only response only with `allowDpopOnly = true` (`useDpop = true` on the context). Missing, blank or incorrectly typed required freshness remains an error. The released `requestChallenge` API continues to require an attestation challenge. `resolveAuthorizationServerMetadataDetailed` exposes final response headers after issuer validation, retaining the latest nonblank challenge and DPoP nonce across OAuth-to-OIDC metadata fallback. Authorization-server discovery disables generic HTTP retries and `expectSuccess` so error responses remain visible to this fallback handling.
