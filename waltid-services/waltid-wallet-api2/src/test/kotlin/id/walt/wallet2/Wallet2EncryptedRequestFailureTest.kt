@@ -115,7 +115,7 @@ class Wallet2EncryptedRequestFailureTest {
                                 rejected -> "AuthorizationRequest cannot be retrieved"
                                 else -> "Could not decrypt encrypted Request Object"
                             },
-                        ))
+                        ), response.bodyAsText())
                     }
                 }
             }
