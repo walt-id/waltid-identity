@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.wallet2.consent.*
 
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
@@ -2356,7 +2357,7 @@ object WalletPresentationHandler {
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
+            disclosures = sdvc?.locatedDisclosures()?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }

@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
@@ -156,9 +157,16 @@ class WalletNestedSdJwtPresentationTest {
         fun previewName(path: String): String? = preview.single { it.path == path }.name
     }
 
-    private suspend fun wallet(sdJwt: String): Wallet {
+    private suspend fun wallet(sdJwt: String, staleLocations: Boolean = false): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
-        val store = InMemoryCredentialStore().also { it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = credential)) }
+        val storedCredential = if (staleLocations) {
+            // Simulate a credential persisted before decoy-aware indexing, without reimporting it.
+            val sd = assertIs<SdJwtCredential>(credential)
+            sd.copy(disclosures = sd.disclosures!!.map { it.copy(location = listOf(JsonPrimitive("outdated"))) })
+        } else credential
+        val store = InMemoryCredentialStore().also {
+            it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = storedCredential))
+        }
         // The legacy P-256 generator uses the iOS Keychain; these tests need only software signing.
         val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(
@@ -196,8 +204,9 @@ class WalletNestedSdJwtPresentationTest {
         selectedOptionalPaths: List<String>? = null,
         credential: String = sdJwt,
         did: String? = null,
+        staleLocations: Boolean = false,
     ): Presented {
-        val wallet = wallet(credential)
+        val wallet = wallet(credential, staleLocations)
         val preview = WalletPresentationHandler.previewPresentationStateless(
             wallet = wallet,
             request = PreviewPresentationRequest(REQUEST_URL),
@@ -609,6 +618,46 @@ class WalletNestedSdJwtPresentationTest {
     }
 
     private fun String.withId(id: String) = Json.parseToJsonElement(this).jsonObject.let { JsonObject(it + ("id" to JsonPrimitive(id))) }.toString()
+
+    private val decoySdJwt = sdJwt {
+        val documents = buildJsonArray {
+            addJsonObject { put("...", "decoy-document") }
+            add(element("passport"))
+            add(JsonPrimitive("clear-document"))
+            add(element("visa"))
+        }
+        val nationalities = buildJsonArray {
+            addJsonObject { put("...", "decoy-first") }
+            add(element("IN"))
+            addJsonObject { put("...", "decoy-middle") }
+            add(element(buildJsonObject {
+                putJsonArray("_sd") { add(property("documents", documents)) }
+            }))
+            addJsonObject { put("...", "decoy-last") }
+        }
+        payload { putJsonArray("_sd") { add(property("nationalities", nationalities)) } }
+    }
+
+    @Test
+    fun decoysDoNotShiftRequestedIndicesInPreviewOrPresentation() = runTest {
+        val result = present(request(claim("nationalities", 1, "documents", 2)), credential = decoySdJwt)
+        assertEquals(json("\"visa\""), result.previewValue("\"nationalities\".1.\"documents\".2"))
+        assertEquals(json("""[{"documents": ["clear-document", "visa"]}]"""), result.verifierView["nationalities"])
+    }
+
+    @Test
+    fun wildcardAfterDecoysIncludesAllElementsAndTheirAncestors() = runTest {
+        val result = present(request(claim("nationalities", 1, "documents", null)), credential = decoySdJwt)
+        assertEquals(json("""["passport", "clear-document", "visa"]"""), result.previewValue("\"nationalities\".1.\"documents\".null"))
+        assertEquals(json("""[{"documents": ["passport", "clear-document", "visa"]}]"""), result.verifierView["nationalities"])
+    }
+
+    @Test
+    fun persistedLocationsAreRecomputedWithoutReimportingTheCredential() = runTest {
+        val result = present(request(claim("nationalities", 1, "documents", 2)), credential = decoySdJwt, staleLocations = true)
+        assertEquals(json("\"visa\""), result.previewValue("\"nationalities\".1.\"documents\".2"))
+        assertEquals(json("""[{"documents": ["clear-document", "visa"]}]"""), result.verifierView["nationalities"])
+    }
 
     private companion object {
         const val VCT = "https://issuer.example/pid"
