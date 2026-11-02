@@ -717,6 +717,7 @@ class WalletDemoAppTestScenarios(
 
         receiveGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        awaitTaggedNode("issuance-done")
         onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
