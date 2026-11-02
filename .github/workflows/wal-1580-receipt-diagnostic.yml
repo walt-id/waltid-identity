@@ -1,8 +1,8 @@
-name: WAL-1580 bounded receipt readiness diagnostic
+name: WAL-1580 bounded external-offer readiness diagnostic
 
 on:
   push:
-    branches: [chore/wal-1580-receipt-readiness-20261102]
+    branches: [chore/wal-1580-receipt-only-20261102]
 
 permissions:
   contents: read
@@ -48,7 +48,7 @@ jobs:
           git diff --stat
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Observe four receipt journeys once
+      - name: Observe the external-offer receipt once
         timeout-minutes: 25
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
@@ -62,6 +62,26 @@ jobs:
           collect-test-diagnostics: on-failure
           collect-test-reports: 'false'
           test-result-artifact-name: receipt-readiness-results
+      - name: Collect readiness metadata
+        if: always()
+        run: |
+          set -euo pipefail
+          id_file="$RUNNER_TEMP/wal1580-receipt-simulator"
+          [[ -f "$id_file" ]] || { echo '::error::No diagnostic simulator was created'; exit 1; }
+          simulator=$(cat "$id_file")
+          [[ "$simulator" =~ ^[0-9A-Fa-f-]{36}$ ]] || { echo '::error::Invalid diagnostic simulator ID'; exit 1; }
+          trace_directory="$GITHUB_WORKSPACE/ios-ci-logs/sheet-readiness"
+          mkdir -p "$trace_directory"
+          count=0
+          # Read only observer files from this job's owned simulator. Direct container access also
+          # works after cancellation shuts it down, when get_app_container can fail.
+          for trace in "$HOME/Library/Developer/CoreSimulator/Devices/$simulator/data/Containers/Data/Application/"*/tmp/sheet-readiness-*.jsonl; do
+            [[ -f "$trace" ]] || continue
+            cp "$trace" "$trace_directory/"
+            count=$((count + 1))
+          done
+          printf 'Retained %s readiness trace files\n' "$count"
+          (( count > 0 )) || { echo '::error::No readiness metadata was retained'; exit 1; }
       - name: Preserve observations and results
         if: always()
         uses: actions/upload-artifact@v7
@@ -72,3 +92,11 @@ jobs:
             waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult/
           retention-days: 7
           if-no-files-found: error
+      - name: Remove the diagnostic simulator
+        if: always()
+        run: |
+          id_file="$RUNNER_TEMP/wal1580-receipt-simulator"
+          [[ -f "$id_file" ]] || exit 0
+          simulator=$(cat "$id_file")
+          [[ "$simulator" =~ ^[0-9A-Fa-f-]{36}$ ]] || exit 1
+          xcrun simctl delete "$simulator"

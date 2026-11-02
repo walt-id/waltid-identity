@@ -1,34 +1,32 @@
 diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
-index 6a3acd1435..8f6df3595f 100644
+index 6a3acd1435..2666080abe 100644
 --- a/.github/actions/gradle-ios/action.yml
 +++ b/.github/actions/gradle-ios/action.yml
-@@ -184,6 +184,18 @@ runs:
+@@ -182,15 +182,10 @@ runs:
+           exit 1
+         fi
          simulator=$(xcrun simctl create 'Native wallet CI' "${device#name=}" "iOS ${os#OS=}")
-         cleanup() {
-           test_status=$?
-+          if container=$(xcrun simctl get_app_container "$simulator" id.walt.wallet.native data 2>/dev/null); then
-+            trace_directory="${{ github.workspace }}/ios-ci-logs/sheet-readiness"
-+            if mkdir -p "$trace_directory"; then
-+              for trace in "$container"/tmp/sheet-readiness-*.jsonl; do
-+                if [[ -f "$trace" ]]; then
-+                  cp "$trace" "$trace_directory/" || echo '::warning::Could not retain sheet readiness metadata'
-+                fi
-+              done
-+            else
-+              echo '::warning::Could not create sheet readiness metadata directory'
-+            fi
-+          fi
-           xcrun simctl delete "$simulator" || {
-             cleanup_status=$?
-             echo "::error::Failed to remove native test simulator"
-@@ -202,6 +214,10 @@ runs:
+-        cleanup() {
+-          test_status=$?
+-          xcrun simctl delete "$simulator" || {
+-            cleanup_status=$?
+-            echo "::error::Failed to remove native test simulator"
+-            (( test_status != 0 )) || test_status=$cleanup_status
+-          }
+-          exit "$test_status"
+-        }
++        printf '%s\n' "$simulator" > "$RUNNER_TEMP/wal1580-receipt-simulator"
++        # The outer always-step retains metadata and deletes this owned simulator even if
++        # the timed action is interrupted before its shell cleanup can copy app files.
++        cleanup() { exit "$?"; }
+         trap cleanup EXIT
+         trap 'exit 130' INT
+         trap 'exit 143' TERM
+@@ -202,6 +197,7 @@ runs:
            -scheme iosApp \
            -configuration Debug \
            -destination "platform=iOS Simulator,id=$simulator" \
-+          -only-testing:iosAppUITests/MockWalletUITests/testClosingSharingReturnsToWalletBeforeANewRequest \
-+          -only-testing:iosAppUITests/MockWalletUITests/testCredentialImageOpensAndClosesFullScreenViewer \
 +          -only-testing:iosAppUITests/MockWalletUITests/testExternalOfferUnlocksIntoSheetAndWarmSharingKeepsItsReview \
-+          -only-testing:iosAppUITests/MockWalletUITests/testIdleReceiveAndShareSuccessReturnsToHomeAutomatically \
            -skip-testing:iosAppEnterpriseTests \
            -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
            -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
