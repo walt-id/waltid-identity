@@ -19,7 +19,9 @@
 
 ## What is walt.id?
 
-walt.id provides open-source digital ID and wallet infrastructure for issuing, holding and verifying digital identity credentials — standards-based (OpenID4VCI 1.0, OpenID4VP 1.0, HAIP, W3C Verifiable Credentials, SD-JWT VCs, mdoc/mDL) and designed to run entirely on your own infrastructure (on-prem), with no vendor lock-in.
+walt.id is a Vienna-based digital identity and wallet infrastructure company whose open-source and enterprise software lets governments and businesses worldwide issue, hold and verify digital credentials, including for eIDAS 2 and the EU Digital Identity (EUDI) Wallet. walt.id's software is used by more than 70,000 developers and organizations, including the European Union (EUDI Wallet reference implementation), governments (EMEA, APAC, Americas), hundreds of banks and global enterprises in technology, telco, payments, identity, security, trust services, travel, education among others.
+
+walt.id's solutions build on open standards, including OpenID4VCI 1.0, OpenID4VP 1.0, HAIP 1.0, the Digital Credentials API, SD-JWT VC, ISO mdoc/mDL (ISO/IEC 18013-5) and W3C Verifiable Credentials:
 
 
 | Issuer                                                 | Wallet                                          | Verifier                                         |
@@ -28,7 +30,9 @@ walt.id provides open-source digital ID and wallet infrastructure for issuing, h
 
 
 This repository — the **Community Stack** — is the free, open-source edition of the walt.id product
-line. See [Product Editions](#product-editions) below for how it compares to the commercial **Enterprise Stack**.
+line. Like the Enterprise Stack, it is self-managed and runs entirely on-premises or in a private cloud,
+with no vendor lock-in. See [Product Editions](#product-editions) below for how it compares to the
+commercial **Enterprise Stack**.
 
 ## Architecture
 
@@ -46,7 +50,7 @@ line. See [Product Editions](#product-editions) below for how it compares to the
 <td align="center" width="50%">
 <img src="assets/Product-Editions3-enterprise.png" alt="Enterprise Stack: compliance and scale features for regulated deployments" width="100%" />
 <br />
-<strong><a href="https://walt.id/pricing">Learn more about the Enterprise Stack</a></strong>
+<strong><a href="https://walt.id/enterprise-stack">Learn more about the Enterprise Stack</a></strong>
 </td>
 </tr>
 </table>
@@ -59,7 +63,8 @@ usage guides, see the [docs site](https://docs.walt.id).
 
 ### Test out the walt.id products
 
-All of our APIs are hosted at demo.walt.id. Depending on the service you are interested in, you can visit the following links:
+Public demo instances of all APIs are available at demo.walt.id, for testing only. For production
+use, the services are self-managed, on-premises or in a private cloud. Depending on the service you are interested in, you can visit the following links:
 
 > The links below point to our current v2 APIs (`issuer-api2`, `verifier-api2`, `wallet-api2`). If
 > you come across an older `waltid-*-api` service elsewhere in this repo, that's the legacy v1
@@ -67,12 +72,10 @@ All of our APIs are hosted at demo.walt.id. Depending on the service you are int
 
 - **Issuer API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://issuer2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/issuer2/getting-started)  | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api2)) - enable apps to issue credentials (W3C VCs, SD-JWT VCs, mdoc/mDL) via OID4VCI 1.0.
 - **Verifier API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://verifier2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/verifier2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api2)) - enable apps to verify credentials (W3C VCs, SD-JWT VCs, mdoc/mDL) via OID4VP 1.0.
-- **Wallet API** - ([Web App (coming soon)] | [Swagger](https://wallet-api2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/wallet2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2)) - extend apps with wallet capabilities to collect, store, manage and share credentials.
-- **Wallet SDK** - ([Docs (coming soon)] | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
+- **Wallet API** - ([Web App](https://wallet2.demo.walt.id) | [Swagger](https://wallet-api2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/wallet2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2)) - extend apps with wallet capabilities to collect, store, manage and share credentials.
+- **Wallet SDK** - ([Docs](https://docs.walt.id/community-stack/mobile-wallet/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0, for non-custodial or hybrid wallets in native Android and iOS apps.
   - **Compose Wallet** - ([Android via APK](https://github.com/walt-id/waltid-identity/releases) | [Android via Firebase](https://appdistribution.firebase.dev/i/c44f974707e7c1be) | [iOS Testflight](https://testflight.apple.com/join/QUyV6wT2) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-compose))
   - **iOS Wallet** - ([iOS Testflight](https://testflight.apple.com/join/Ug3kRbQX) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
-
-We are still in the process of building new open source portals as well as the new web wallet app to allow you to quickly test out the products!
 
 Use the [walt.id identity package](https://github.com/walt-id/waltid-identity/tree/main/docker-compose) to run all APIs and Apps with docker:
 
@@ -104,7 +107,7 @@ Some popular libraries you may want to look at are:
 - **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) - issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials2)) - issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) - create and verify Selective Disclosure JWTs.
-- **OpenID4VCI** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci)) - implementation of the OID4VCI 1.0 protocol. Results from [OpenID Foundation's Conformance Suite (coming soon)]
+- **OpenID4VCI** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci)) - implementation of the OID4VCI 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) - implementation of the OpenID4VP 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **Core Wallet** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - implementation of the Core Wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
 
@@ -120,4 +123,4 @@ Some popular libraries you may want to look at are:
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-LLM? Read [llms.txt](./llms.txt).
+LLM? Read [llms.txt](./llms.txt) and the [walt.id facts page](https://walt.id/facts).
