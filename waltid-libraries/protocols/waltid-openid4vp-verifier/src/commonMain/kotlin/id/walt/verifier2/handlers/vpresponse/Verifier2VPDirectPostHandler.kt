@@ -28,6 +28,7 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToHexString
@@ -378,13 +379,24 @@ object Verifier2VPDirectPostHandler {
         // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
         // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
         if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
-            val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
-                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
-            SelfIssuedIdTokenValidator.validate(
-                idToken = idToken,
-                expectedNonce = session.authorizationRequest.nonce!!,
-                expectedAudience = session.authorizationRequest.clientId!!,
-            )
+            try {
+                val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
+                    ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+                SelfIssuedIdTokenValidator.validate(
+                    idToken = idToken,
+                    expectedNonce = session.authorizationRequest.nonce!!,
+                    expectedAudience = session.authorizationRequest.clientId!!,
+                )
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Throwable) {
+                val reason = "Self-Issued ID Token validation failed: ${cause.message}"
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason, emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason, cause)
+            }
             log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 

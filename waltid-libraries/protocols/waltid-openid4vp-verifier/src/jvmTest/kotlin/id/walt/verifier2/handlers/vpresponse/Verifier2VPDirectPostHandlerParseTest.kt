@@ -2,6 +2,7 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -11,6 +12,7 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJ
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DirectPostResponse
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.EncryptedResponseStringDirectPostResponse
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.ErrorResponseDirectPost
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.handleDirectPost
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.parseHttpRequestToDirectPostResponse
 import io.ktor.client.request.post
@@ -29,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
@@ -226,6 +229,60 @@ class Verifier2VPDirectPostHandlerParseTest {
 
         assertEquals("already-accepted", session.presentationId)
         assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
+    }
+
+    @Test
+    fun missingIdToken_failsTheAttemptInsteadOfLeavingItInProgress() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state").copy(
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            presentationId = "previous-attempt",
+            authorizationRequest = AuthorizationRequest(
+                state = "expected-state",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce",
+                clientId = "https://verifier.example",
+            ),
+        )
+        val events = mutableListOf<SessionEvent>()
+
+        val rejection = assertFailsWith<PresentationRejectionException> {
+            handleDirectPost(
+                verificationSession = session,
+                responseData = CleartextDirectPostResponse(
+                    vpToken = """{"identity":["not-a-credential"]}""",
+                    state = "expected-state",
+                ),
+                updateSessionCallback = { current, event, block ->
+                    events += event
+                    current.block()
+                },
+                failSessionCallback = { current, event, updateSession ->
+                    updateSession(current, event) {
+                        status = Verification2Session.VerificationSessionStatus.FAILED
+                    }
+                },
+            )
+        }
+
+        assertEquals(
+            listOf(
+                SessionEvent.attempted_presentation,
+                SessionEvent.presentation_validation_available,
+                SessionEvent.presentation_validation_failed,
+            ),
+            events,
+        )
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+        assertNotEquals("previous-attempt", session.presentationId)
+        assertNotNull(session.presentationId)
+        val failure = assertIs<SessionFailure.PresentationValidation>(session.failure)
+        assertEquals(
+            "Self-Issued ID Token validation failed: id_token is required for response_type=vp_token id_token but was absent",
+            failure.reason,
+        )
+        assertEquals(failure.reason, rejection.message)
     }
 
     @Test
