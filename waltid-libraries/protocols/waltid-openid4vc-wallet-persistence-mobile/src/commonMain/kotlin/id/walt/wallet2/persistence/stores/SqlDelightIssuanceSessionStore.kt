@@ -44,6 +44,10 @@ public class SqlDelightIssuanceSessionStore(
         )
     }
 
+    /**
+     * Atomically inserts the encrypted continuation [record] if its ID is absent.
+     * Returns `true` when inserted, or `false` when an existing record was preserved.
+     */
     override suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean = queries.transactionWithResult {
         queries.insertIssuanceSessionRecordIfAbsent(record.id, record.sessionId, record.kind.name,
             record.payload, record.updatedAtEpochMilliseconds)
