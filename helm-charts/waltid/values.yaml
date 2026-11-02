@@ -30,13 +30,13 @@ issuer2:
       tag: latest
       imagePullPolicy: Always
   configMountPath: /waltid-issuer-api2/config
+  env:
+    ISSUER2_BASE_URL: "https://{{ .Values.ingress.host }}"
   configFiles:
     _features.conf: |-
       enabledFeatures = [
           entra
       ]
-    issuer-service.conf: |-
-      baseUrl = "https://{{ .Values.ingress.host }}"
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
