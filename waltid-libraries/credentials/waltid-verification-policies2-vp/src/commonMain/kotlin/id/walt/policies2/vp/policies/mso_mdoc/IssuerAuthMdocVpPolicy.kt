@@ -37,7 +37,7 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
 
         val verification = verifyIssuerAuthentication(
             document,
-            verificationContext?.verificationTime ?: Clock.System.now(),
+            verificationContext?.verificationTime,
         )
         val encodedChain = verification.certificateChain.map { Base64.Default.encode(it.encodedDer.toByteArray()) }
         addResult("certificate_chain", encodedChain)
