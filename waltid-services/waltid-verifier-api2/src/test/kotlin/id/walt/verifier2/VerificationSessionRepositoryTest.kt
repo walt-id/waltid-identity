@@ -110,6 +110,35 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `concurrent request fetches leave an in-flight processing claim unchanged`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("fetch-during-processing"))
+        val claim = repository.claimForProcessingWithOriginal("fetch-during-processing")
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        coroutineScope {
+            repeat(8) {
+                launch {
+                    assertEquals(HttpStatusCode.OK, client.get("/verification-session/fetch-during-processing/request").status)
+                    assertEquals(HttpStatusCode.OK, client.post("/verification-session/fetch-during-processing/request") {
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("wallet_nonce=request-nonce")
+                    }.status)
+                }
+            }
+        }
+        assertEquals(claim.claimed.version, repository.get("fetch-during-processing")!!.version)
+        assertEquals(Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
+            repository.get("fetch-during-processing")!!.session.status)
+        repository.restoreProcessingClaim(claim)
+        assertEquals(claim.original.session.status, repository.get("fetch-during-processing")!!.session.status)
+    }
+
+    @Test
     fun `failed attempts can be retried in both modes and success consumes only single use sessions`() = runTest {
         for (reattemptable in listOf(false, true)) {
             val repository = InMemoryVerificationSessionRepository()
@@ -119,7 +148,7 @@ class VerificationSessionRepositoryTest {
                 status = Verification2Session.VerificationSessionStatus.FAILED
             }
             val claim = repository.claimForProcessingWithOriginal("retry")
-            // An ignored wallet error leaves the terminal state and presentation ID intact.
+            // Releasing a claim before an attempt is admitted leaves the stored outcome intact.
             repository.restoreProcessingClaim(claim)
             assertEquals(Verification2Session.VerificationSessionStatus.FAILED, repository.get("retry")!!.session.status)
             repository.claimForProcessing("retry")
