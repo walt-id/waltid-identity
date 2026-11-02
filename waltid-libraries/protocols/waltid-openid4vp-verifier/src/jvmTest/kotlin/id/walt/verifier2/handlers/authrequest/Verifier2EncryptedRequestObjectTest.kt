@@ -85,6 +85,27 @@ class Verifier2EncryptedRequestObjectTest {
     }
 
     @Test
+    fun `designated agreement key is chosen ahead of an earlier unmarked key`() = runTest {
+        val unmarked = ECKeyGenerator(Curve.P_256).keyID("signing-key").generate().toPublicJWK()
+        val unmarkedJwk = Json.parseToJsonElement(unmarked.toJSONString()).jsonObject
+        val recipient = ECKeyGenerator(Curve.P_256).keyID("wallet-enc").generate()
+        val recipientPublic = Json.parseToJsonElement(recipient.toPublicJWK().toJSONString()).jsonObject
+        for (designation in listOf(
+            mapOf("use" to JsonPrimitive("enc")),
+            mapOf("key_ops" to buildJsonArray { add("deriveKey") }),
+        )) {
+            val recipientJwk = JsonObject(recipientPublic + designation + ("kid" to JsonPrimitive("wallet-enc")))
+            val encrypted = Verifier2RequestUriPostHandler.encryptRequestObject(
+                "signed.request.object",
+                metadata(listOf(unmarkedJwk, recipientJwk)),
+            )
+            val decrypted = JWEObject.parse(encrypted).apply { decrypt(ECDHDecrypter(recipient)) }
+            assertEquals("signed.request.object", decrypted.payload.toString())
+            assertEquals("wallet-enc", decrypted.header.keyID)
+        }
+    }
+
+    @Test
     fun `wallet jwks alone uses the documented request encryption profile`() = runTest {
         val recipient = ECKeyGenerator(Curve.P_256).keyID("wallet-key").generate()
         val publicJwk = Json.parseToJsonElement(recipient.toPublicJWK().toJSONString()).jsonObject

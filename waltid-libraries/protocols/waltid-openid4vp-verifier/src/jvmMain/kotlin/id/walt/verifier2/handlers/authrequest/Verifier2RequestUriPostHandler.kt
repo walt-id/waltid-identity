@@ -179,9 +179,12 @@ object Verifier2RequestUriPostHandler {
             }) { "Wallet must support Request Object encryption with A128GCM or A256GCM" }
         } ?: JweContentEncryption.A128GCM
         val keys = metadata["jwks"]?.jsonObject?.get("keys")?.jsonArray.orEmpty()
-        for (element in keys) {
-            val jwk = element as? JsonObject ?: continue
-            if ("d" in jwk || jwk["kty"]?.jsonPrimitive?.content != "EC") continue
+            .mapNotNull { it as? JsonObject }
+            .filter { "d" !in it && it["kty"]?.jsonPrimitive?.content == "EC" }
+            // An unmarked EC key can also complete ECDH. Try keys the wallet designated for
+            // agreement first so a signing key listed earlier is not selected.
+            .sortedWith(compareByDescending { it.isDesignatedAgreementKey() })
+        for (jwk in keys) {
             try {
                 return CompactJwe.encrypt(
                     plaintext = signedRequest.encodeToByteArray(),
@@ -199,6 +202,15 @@ object Verifier2RequestUriPostHandler {
             }
         }
         throw IllegalArgumentException("encrypted_request requires wallet_metadata with a usable ECDH-ES encryption jwks key")
+    }
+
+    private fun JsonObject.isDesignatedAgreementKey(): Boolean {
+        if (this["use"]?.jsonPrimitive?.contentOrNull == "enc") return true
+        val operations = this["key_ops"] as? JsonArray ?: return false
+        return operations.any {
+            val operation = it.jsonPrimitive.contentOrNull
+            operation == "deriveKey" || operation == "deriveBits"
+        }
     }
 
     @Deprecated("Use the Crypto2Key overload")
