@@ -71,9 +71,7 @@ object Verifier2AuthorizationRequestHandler {
 
         verificationSession.requireAvailable()
         verificationSession.updateSession(SessionEvent.authorization_request_requested) {
-            if (status.successful == null && status != Verification2Session.VerificationSessionStatus.PROCESSING_FLOW &&
-                status != Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
-            ) {
+            if (needsInUseTransition) {
                 status = Verification2Session.VerificationSessionStatus.IN_USE
             }
         }
