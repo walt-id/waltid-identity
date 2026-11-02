@@ -73,7 +73,6 @@ object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
 
-    private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
     private val webPostToken = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_POST_TOKEN)
 
     private fun mdocPresentationKeyResolver(
@@ -930,14 +929,17 @@ object WalletPresentFunctionality2 {
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = webResolveAuthReq,
-                    requestUri = requestUri,
-                    requestUriMethod = requestUriMethod,
-                    requestUriPostWalletMetadata = requestUriPostWalletMetadata,
-                    sendWalletMetadata = true,
-                    expectedRequestObjectAudience = expectedRequestObjectAudience,
-                )
+                // Create and close each fetch client using the current startup configuration.
+                WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST).use { fetcher ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = fetcher,
+                        requestUri = requestUri,
+                        requestUriMethod = requestUriMethod,
+                        requestUriPostWalletMetadata = requestUriPostWalletMetadata,
+                        sendWalletMetadata = true,
+                        expectedRequestObjectAudience = expectedRequestObjectAudience,
+                    )
+                }
             },
         )
 
