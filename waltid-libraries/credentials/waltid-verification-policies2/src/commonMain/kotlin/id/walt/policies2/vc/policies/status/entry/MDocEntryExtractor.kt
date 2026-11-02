@@ -15,7 +15,8 @@ class MDocEntryExtractor : EntryExtractor {
 
     override fun extract(data: DigitalCredential): JsonElement? {
         val mDoc = data as? MdocsCredential ?: return null
-        val statusListInfo = mDoc.documentMso.status?.statusList ?: return null
+        val statusListInfo = mDoc.documentMso.status.requireEvaluableStatusList(mDoc.statusAudience())
+            ?: return null
         return json.encodeToJsonElement(createEntry(statusListInfo))
     }
 
