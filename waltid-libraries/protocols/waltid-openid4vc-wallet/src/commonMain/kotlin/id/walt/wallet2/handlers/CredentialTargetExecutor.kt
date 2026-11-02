@@ -88,7 +88,8 @@ internal suspend fun executeCredentialTargets(
                             endpoint, transaction.transactionId, access.accessToken, access.tokenType,
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
                             sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
-                            credentialIssuer = issuerMetadata.credentialIssuer)
+                            credentialIssuer = issuerMetadata.credentialIssuer,
+                            issuerMetadataSnapshot = issuerMetadata)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()

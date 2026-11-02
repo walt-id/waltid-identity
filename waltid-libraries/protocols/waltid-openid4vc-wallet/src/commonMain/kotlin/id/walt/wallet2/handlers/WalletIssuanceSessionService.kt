@@ -932,7 +932,11 @@ class WalletIssuanceSessionService(
                 retainDeferred(claimed, preserveOnFailure = false)
                 record = claimed
                 val deferredPayload = buildJsonObject { put("transaction_id", request.transactionId) }
-                val issuerMetadata = request.credentialIssuer?.let { issuer ->
+                // Reuse the metadata resolved when the session started. A fresh fetch would drop the
+                // original Accept-Language and can change the negotiated encryption profile.
+                val issuerMetadata = request.issuerMetadataJson?.let { encoded ->
+                    json.decodeFromString<CredentialIssuerMetadata>(encoded)
+                } ?: request.credentialIssuer?.let { issuer ->
                     IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer).metadata
                 }
                 val preparedRequest = try {
@@ -1943,6 +1947,7 @@ class WalletIssuanceSessionService(
                             metadata = request.metadata,
                             nextPollAtEpochMilliseconds = request.nextPollAtEpochMilliseconds,
                             credentialIssuer = request.credentialIssuer,
+                            issuerMetadataJson = request.issuerMetadataJson,
                         ))
                     }
                 },
@@ -2021,6 +2026,8 @@ class WalletIssuanceSessionService(
         sessionId: String = public.id,
         dpopNonce: String? = null,
         credentialIssuer: String? = null,
+        /** Issuer metadata resolved for this issuance, including its encryption profile. */
+        issuerMetadataSnapshot: CredentialIssuerMetadata? = null,
     ) {
         retainDeferred(DeferredRecord(
             public = public,
@@ -2042,6 +2049,7 @@ class WalletIssuanceSessionService(
                 metadata = metadata,
                 nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(public.intervalSeconds)),
                 credentialIssuer = credentialIssuer,
+                issuerMetadataJson = issuerMetadataSnapshot?.let { json.encodeToString(it) },
             )),
         ))
     }
@@ -2089,6 +2097,7 @@ class WalletIssuanceSessionService(
                     keyId = it.keyId, selectedPublicJwk = it.selectedPublicJwk, label = it.label, metadata = it.metadata,
                     nextPollAtEpochMilliseconds = it.nextPollAtEpochMilliseconds,
                     credentialIssuer = it.credentialIssuer,
+                    issuerMetadataJson = it.issuerMetadataJson,
                 ))
             }
         }
@@ -2313,6 +2322,7 @@ class WalletIssuanceSessionService(
         val label: String?,
         val metadata: JsonObject? = null,
         val credentialIssuer: String? = null,
+        val issuerMetadataJson: String? = null,
     )
 
     private data class ProtectedResponse(
@@ -2441,6 +2451,7 @@ class WalletIssuanceSessionService(
         val label: String?,
         val metadata: JsonObject? = null,
         val credentialIssuer: String? = null,
+        val issuerMetadataJson: String? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(
