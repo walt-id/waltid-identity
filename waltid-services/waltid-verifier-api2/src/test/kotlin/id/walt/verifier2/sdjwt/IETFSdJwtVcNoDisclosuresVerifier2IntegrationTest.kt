@@ -50,8 +50,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Instant
 
 /**
  * A presentation without disclosures passes VP checks but fails issuer signature verification.
@@ -253,11 +251,13 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             val walletCredentials = walletCredentials()
 
             // Create the verification session
+            val creationStarted = Clock.System.now()
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
                     setBody(verificationSessionSetup(webhook.notifications()))
                 }.body<VerificationSessionCreationResponse>()
             }
+            val creationCompleted = Clock.System.now()
             println("Verification Session Response: $verificationSessionResponse")
 
             // Check verification session
@@ -278,7 +278,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             // Check created session
             test("Check Verification Session") {
                 assertTrue {
-                    info1.creationDate.wasWithinLastSeconds()
+                    info1.creationDate in creationStarted..creationCompleted
                 }
             }
 
@@ -354,9 +354,4 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
         }
     }
 
-    // Utils:
-    private fun Instant.wasWithinLastSeconds(): Boolean {
-        val now = Clock.System.now()
-        return this <= now && (now - this) <= 1500.milliseconds
-    }
 }
