@@ -65,6 +65,10 @@ class Verifier2EncryptedRequestObjectTest {
         val publicJwk = key("wallet-key").exportPublicJwkObject()
         for (metadata in listOf(null, "{}", metadata(emptyList()),
             metadata(listOf(publicJwk), alg = "RSA-OAEP"), metadata(listOf(publicJwk), enc = "A128CBC-HS256"),
+            JsonObject(Json.parseToJsonElement(metadata(listOf(publicJwk))).jsonObject +
+                    ("request_object_encryption_alg_values_supported" to JsonArray(emptyList()))).toString(),
+            JsonObject(Json.parseToJsonElement(metadata(listOf(publicJwk))).jsonObject +
+                    ("request_object_encryption_enc_values_supported" to JsonArray(emptyList()))).toString(),
             metadata(listOf(JsonObject(publicJwk + ("use" to JsonPrimitive("sig"))))),
             metadata(listOf(JsonObject(publicJwk + ("d" to JsonPrimitive("private"))))),
             metadata(listOf(JsonObject(publicJwk + ("key_ops" to buildJsonArray { add("sign") })))),
@@ -77,6 +81,26 @@ class Verifier2EncryptedRequestObjectTest {
             assertFailsWith<IllegalArgumentException> {
                 Verifier2RequestUriPostHandler.encryptRequestObject("signed.request.object", metadata)
             }
+        }
+    }
+
+    @Test
+    fun `wallet jwks alone uses the documented request encryption profile`() = runTest {
+        val recipient = ECKeyGenerator(Curve.P_256).keyID("wallet-key").generate()
+        val publicJwk = Json.parseToJsonElement(recipient.toPublicJWK().toJSONString()).jsonObject
+        val complete = Json.parseToJsonElement(metadata(listOf(publicJwk))).jsonObject
+        for (omitted in listOf(
+            setOf("request_object_encryption_alg_values_supported", "request_object_encryption_enc_values_supported"),
+            setOf("request_object_encryption_alg_values_supported"),
+            setOf("request_object_encryption_enc_values_supported"),
+        )) {
+            val encrypted = Verifier2RequestUriPostHandler.encryptRequestObject(
+                "signed.request.object", JsonObject(complete.filterKeys { it !in omitted }).toString(),
+            )
+            val decrypted = JWEObject.parse(encrypted).apply { decrypt(ECDHDecrypter(recipient)) }
+            assertEquals("signed.request.object", decrypted.payload.toString())
+            assertEquals("ECDH-ES", decrypted.header.algorithm.name)
+            assertEquals("A128GCM", decrypted.header.encryptionMethod.name)
         }
     }
 
