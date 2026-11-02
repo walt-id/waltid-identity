@@ -132,6 +132,79 @@ class CredentialRequestEncryptionTest {
         assertTrue(absent.message.orEmpty().contains("no supported EC P-256 key"))
     }
 
+    @Test
+    fun `optional unsupported request encryption stays plaintext when the response profile is supported`() = runTest {
+        val issuerKey = agreementKey("issuer-request-enc")
+        val payload = buildJsonObject { put("credential_configuration_id", "identity") }
+        val metadata = splitEncryptionMetadata(issuerKey, requestEnc = "A256GCM", requestRequired = false)
+
+        val prepared = CredentialEncryption.prepare(payload, metadata)
+
+        assertEquals(ContentType.Application.Json, prepared.contentType)
+        assertEquals(payload.toString(), prepared.body)
+        assertNull(prepared.responseDecryptionKey)
+    }
+
+    @Test
+    fun `required unsupported request encryption fails before a request is sent`() = runTest {
+        val issuerKey = agreementKey("issuer-request-enc-required")
+        val payload = buildJsonObject { put("credential_configuration_id", "identity") }
+        val metadata = splitEncryptionMetadata(issuerKey, requestEnc = "A256GCM", requestRequired = true)
+
+        val failure = assertFailsWith<IllegalArgumentException> { CredentialEncryption.prepare(payload, metadata) }
+
+        assertTrue(failure.message.orEmpty().contains("credential_request_encryption.enc_values_supported"))
+    }
+
+    @Test
+    fun `required request encryption omits an unsupported response encryption parameter`() = runTest {
+        val issuerKey = agreementKey("issuer-request-required")
+        val payload = buildJsonObject { put("credential_configuration_id", "identity") }
+        val metadata = CredentialIssuerMetadata.fromBaseUrl(
+            baseUrl = "https://issuer.example",
+            credentialConfigurationsSupported = mapOf(
+                "identity" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC, vct = "identity"),
+            ),
+            credentialRequestEncryption = requestEncryption(issuerKey).copy(encryptionRequired = true),
+            credentialResponseEncryption = CredentialResponseEncryption(
+                algValuesSupported = setOf(CredentialEncryptionProfile.ALG_ECDH_ES),
+                encValuesSupported = setOf("A256GCM"),
+                encryptionRequired = false,
+            ),
+        )
+
+        val prepared = CredentialEncryption.prepare(payload, metadata)
+
+        assertEquals("jwt", prepared.contentType.contentSubtype)
+        assertNull(prepared.responseDecryptionKey)
+        val request = Crypto2JweCredentialRequestDecryptor(issuerKey).decrypt(prepared.body)
+        assertEquals(null, request["credential_response_encryption"])
+    }
+
+    @Test
+    fun `application jwt comparison ignores capitalization`() {
+        assertTrue(ContentType.parse("Application/JWT").isApplicationJwt())
+        assertTrue(ContentType.parse("application/jwt; charset=UTF-8").isApplicationJwt())
+        assertEquals(false, ContentType.Application.Json.isApplicationJwt())
+    }
+
+    private suspend fun splitEncryptionMetadata(issuerKey: Key, requestEnc: String, requestRequired: Boolean) =
+        CredentialIssuerMetadata.fromBaseUrl(
+            baseUrl = "https://issuer.example",
+            credentialConfigurationsSupported = mapOf(
+                "identity" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC, vct = "identity"),
+            ),
+            credentialRequestEncryption = requestEncryption(issuerKey).copy(
+                encValuesSupported = setOf(requestEnc),
+                encryptionRequired = requestRequired,
+            ),
+            credentialResponseEncryption = CredentialResponseEncryption(
+                algValuesSupported = setOf(CredentialEncryptionProfile.ALG_ECDH_ES),
+                encValuesSupported = setOf(CredentialEncryptionProfile.ENC_A128GCM),
+                encryptionRequired = false,
+            ),
+        )
+
     private suspend fun issuerMetadata(encryption: CredentialRequestEncryption?): CredentialIssuerMetadata =
         CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = "https://issuer.example",

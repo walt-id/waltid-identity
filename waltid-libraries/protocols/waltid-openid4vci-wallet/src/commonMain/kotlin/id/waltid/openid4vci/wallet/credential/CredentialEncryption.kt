@@ -10,15 +10,16 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.CredentialResponseEncryption
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.header
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -44,10 +45,13 @@ object CredentialEncryption {
         payload: JsonObject,
         metadata: CredentialIssuerMetadata?,
     ): PreparedCredentialRequest {
-        val recipient = metadata?.credentialRequestEncryption?.jwks?.supportedRecipient()
+        val requestEncryption = metadata?.credentialRequestEncryption
+        val recipient = requestEncryption?.jwks?.supportedRecipient()
         val response = metadata?.credentialResponseEncryption
+        val requestEncSupported = requestEncryption?.encValuesSupported
+            ?.contains(CredentialEncryptionProfile.ENC_A128GCM) == true
         val responseSupported = response?.supportsWalletProfile() == true
-        val requestRequired = metadata?.credentialRequestEncryption?.encryptionRequired == true
+        val requestRequired = requestEncryption?.encryptionRequired == true
         val responseRequired = response?.encryptionRequired == true
 
         if (responseRequired && !responseSupported) {
@@ -60,7 +64,12 @@ object CredentialEncryption {
                 "Issuer requires credential encryption, but credential_request_encryption.jwks contains no supported EC P-256 key",
             )
         }
-        if (recipient == null || (!requestRequired && !responseSupported)) {
+        if ((requestRequired || responseRequired) && !requestEncSupported) {
+            throw IllegalArgumentException(
+                "Issuer requires credential encryption, but credential_request_encryption.enc_values_supported does not include ${CredentialEncryptionProfile.ENC_A128GCM}",
+            )
+        }
+        if (recipient == null || !requestEncSupported || (!requestRequired && !responseSupported)) {
             return PreparedCredentialRequest(payload.toString(), ContentType.Application.Json)
         }
 
@@ -120,16 +129,6 @@ object CredentialEncryption {
         return payload
     }
 
-    /** Retains the wallet's response key so a later encrypted Deferred Credential Response can be opened. */
-    fun exportResponseDecryptionKey(key: Key): String {
-        val stored = (key as? StorableKey)?.storedKey
-            ?: throw IllegalArgumentException("Credential response decryption key cannot be retained")
-        return StoredKeyCodec.encodeToString(stored)
-    }
-
-    suspend fun importResponseDecryptionKey(encoded: String): Key =
-        runtime.restore(StoredKeyCodec.decodeFromString(encoded))
-
     private suspend fun responseEncryptionKey(): Key = runtime.generateSoftwareKey(
         GenerateSoftwareKeyRequest(
             id = KeyId("credential-response-${Uuid.random()}"),
@@ -156,6 +155,20 @@ class PreparedCredentialRequest(
 ) {
     override fun toString(): String =
         "PreparedCredentialRequest(contentType=$contentType, encryptedResponse=${responseDecryptionKey != null})"
+}
+
+/** HTTP media type and subtype tokens are case-insensitive. */
+fun ContentType?.isApplicationJwt(): Boolean =
+    this?.withoutParameters()?.let { mediaType ->
+        ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT).match(mediaType)
+    } == true
+
+/** Accept an encrypted credential response and a JSON protocol error. */
+fun HttpRequestBuilder.acceptCredentialResponse() {
+    header(
+        HttpHeaders.Accept,
+        "${CredentialEncryptionProfile.MEDIA_TYPE_JWT}, ${ContentType.Application.Json}",
+    )
 }
 
 private fun CredentialResponseEncryption.supportsWalletProfile(): Boolean =

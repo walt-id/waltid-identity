@@ -40,10 +40,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 
 /**
  * The Compose demo and iOS demo call [MobileWallet]. This checks that path, not only Wallet API.
@@ -112,6 +114,7 @@ class MobileWalletCredentialEncryptionTest {
                             val body = request.body as OutgoingContent.ByteArrayContent
                             val type = body.contentType?.withoutParameters()?.toString()?.lowercase() ?: "missing"
                             requestTypes += type
+                            assertAcceptsJwtAndJson(request.headers[HttpHeaders.Accept])
                             val compactJwe = body.bytes().decodeToString()
                             check(type == "application/jwt") { "Credential request was $type: ${compactJwe.take(180)}" }
                             val credentialRequest = Crypto2JweCredentialRequestDecryptor(issuerKey).decrypt(compactJwe)
@@ -184,7 +187,8 @@ class MobileWalletCredentialEncryptionTest {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             ),
         )
-        var responseEncryption: CredentialResponseEncryptionParameters? = null
+        var initialResponseKid: String? = null
+        var deferredResponseKid: String? = null
         val pollTypes = mutableListOf<String>()
         val metadata = encryptedIssuerMetadata(issuerKey.metadataJwk(), deferred = true)
         val client = HttpClient(MockEngine) {
@@ -198,33 +202,43 @@ class MobileWalletCredentialEncryptionTest {
                         path.endsWith("/token") -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
                         path.endsWith("/credential") -> {
                             val body = request.body as OutgoingContent.ByteArrayContent
+                            assertAcceptsJwtAndJson(request.headers[HttpHeaders.Accept])
                             val compactJwe = body.bytes().decodeToString()
-                            responseEncryption = CredentialResponseEncryptionParameters.fromJsonObject(
+                            val initialEncryption = CredentialResponseEncryptionParameters.fromJsonObject(
                                 Crypto2JweCredentialRequestDecryptor(issuerKey).decrypt(compactJwe)
                                     .getValue("credential_response_encryption").jsonObject,
                             )
+                            initialResponseKid = initialEncryption.jwk.getValue("kid").jsonPrimitive.content
                             encryptedResponse(
                                 buildJsonObject {
                                     put("transaction_id", "deferred-tx")
                                     put("interval", 1)
                                 },
-                                requireNotNull(responseEncryption),
+                                initialEncryption,
                                 HttpStatusCode.Accepted,
                             )
                         }
                         path.endsWith("/deferred") -> {
                             val body = request.body as OutgoingContent.ByteArrayContent
                             pollTypes += body.contentType?.withoutParameters()?.toString()?.lowercase() ?: "missing"
-                            val poll = body.bytes().decodeToString()
-                            check(poll.contains("deferred-tx")) { "Deferred request was not the transaction id: $poll" }
+                            assertAcceptsJwtAndJson(request.headers[HttpHeaders.Accept])
+                            val decrypted = Crypto2JweCredentialRequestDecryptor(issuerKey).decrypt(body.bytes().decodeToString())
+                            check(decrypted.getValue("transaction_id").jsonPrimitive.content == "deferred-tx") {
+                                "Deferred request was not the transaction id: $decrypted"
+                            }
+                            val pollEncryption = CredentialResponseEncryptionParameters.fromJsonObject(
+                                decrypted.getValue("credential_response_encryption").jsonObject,
+                            )
+                            deferredResponseKid = pollEncryption.jwk.getValue("kid").jsonPrimitive.content
                             encryptedResponse(
                                 buildJsonObject {
                                     put("credentials", buildJsonArray {
                                         add(buildJsonObject { put("credential", SdJwtExamples.sdJwtVcSignedExample2) })
                                     })
                                 },
-                                requireNotNull(responseEncryption),
+                                pollEncryption,
                                 HttpStatusCode.OK,
+                                contentType = "Application/JWT",
                             )
                         }
                         else -> error("Unexpected issuer request: ${request.url}")
@@ -258,7 +272,8 @@ class MobileWalletCredentialEncryptionTest {
         )
         val stored = requireNotNull(credentials.getCredential(outcome.credentialIds.single()))
 
-        assertEquals(listOf("application/json"), pollTypes)
+        assertEquals(listOf("application/jwt"), pollTypes)
+        assertNotEquals(initialResponseKid, deferredResponseKid)
         assertEquals(
             CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
             stored.credential,
@@ -282,11 +297,19 @@ class MobileWalletCredentialEncryptionTest {
         payload: kotlinx.serialization.json.JsonObject,
         encryption: CredentialResponseEncryptionParameters,
         status: HttpStatusCode,
+        contentType: String = "application/jwt",
     ) = respond(
         content = Crypto2JweCredentialResponseEncryptor.encrypt(payload, encryption),
         status = status,
-        headers = headersOf(HttpHeaders.ContentType, "application/jwt"),
+        headers = headersOf(HttpHeaders.ContentType, contentType),
     )
+
+    private fun assertAcceptsJwtAndJson(accept: String?) {
+        val value = accept.orEmpty().lowercase()
+        check("application/jwt" in value && "application/json" in value) {
+            "Encrypted credential exchange did not accept jwt and json: $accept"
+        }
+    }
 
     private suspend fun encryptedIssuerMetadata(issuerJwk: kotlinx.serialization.json.JsonObject, deferred: Boolean) = buildJsonObject {
         put("credential_issuer", ISSUER)

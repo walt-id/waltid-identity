@@ -5,7 +5,6 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
-import id.waltid.openid4vci.wallet.credential.CredentialEncryption
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
@@ -89,7 +88,7 @@ internal suspend fun executeCredentialTargets(
                             endpoint, transaction.transactionId, access.accessToken, access.tokenType,
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
                             sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
-                            responseDecryptionKey = exchange.responseDecryptionKey?.let(CredentialEncryption::exportResponseDecryptionKey))
+                            credentialIssuer = issuerMetadata.credentialIssuer)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()
