@@ -1,5 +1,6 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseMac0
 import id.walt.cose.CoseSign1
@@ -24,6 +25,7 @@ import id.walt.mdoc.objects.edition2.document.Document as Edition2Document
 import id.walt.mdoc.objects.edition2.document.IssuerSigned as Edition2IssuerSigned
 import id.walt.mdoc.objects.edition2.elements.IssuerSignedItem as Edition2IssuerSignedItem
 import id.walt.mdoc.objects.edition2.elements.IssuerSignedList as Edition2IssuerSignedList
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class Edition2CompatibilityTest {
     private val issuerAuth = CoseSign1(byteArrayOf(), CoseHeaders(), null, byteArrayOf())

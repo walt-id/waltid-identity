@@ -1,3 +1,4 @@
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
@@ -7,7 +8,6 @@ import id.walt.crypto.keys.tse.TSEKey
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.util.*
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -121,17 +121,17 @@ class TestJvm {
         val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
-        assertTrue { key.hasPrivateKey }
+        assertTrue(key.hasPrivateKey)
 
         println("  Checking for private key on a public key...")
-        assertFalse { key.getPublicKey().hasPrivateKey }
+        assertFalse(key.getPublicKey().hasPrivateKey)
 
         println("  Key id: " + key.getKeyId())
 
         println("  Exporting JWK...")
         val exportedJwk = key.exportJWK()
         println("  JWK: $exportedJwk")
-        assertTrue { exportedJwk.startsWith("{") }
+        assertTrue(exportedJwk.startsWith("{"))
 
         println("  Signing...")
         val signed = key.signJws(Json.encodeToString(plaintext).encodeToByteArray())
@@ -195,7 +195,7 @@ class TestJvm {
             val signed = key.signRaw(plaintext).encodeToBase64()
             println("Signed: $signed")
 
-            val verified = key.verifyRaw(signed.decodeBase64Bytes(), plaintext)
+            val verified = key.verifyRaw(signed.decodeFromBase64(), plaintext)
             println("Verified signature success: ${verified.isSuccess}")
             println("Verified plaintext: ${verified.getOrNull()!!.decodeToString()}")
         } finally {
