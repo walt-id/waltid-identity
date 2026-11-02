@@ -109,17 +109,17 @@ object Verifier2Service {
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
         val notificationConfig = session.notifications
-        val current = repository.get(session.id) ?: throw VerificationSessionNotFoundException(session.id)
-        if (event == SessionEvent.authorization_request_requested) {
-            current.session.requireAvailable()
-            if (current.session.status in setOf(
-                    Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
-                    Verification2Session.VerificationSessionStatus.PROCESSING_FLOW,
-                )) throw VerificationSessionAlreadyUsedException(session.id)
+        // Request retrieval retries only a real status transition and never changes a processing claim's version.
+        val updated = if (event == SessionEvent.authorization_request_requested) {
+            repository.update(session.id, shouldUpdate = {
+                requireAvailable()
+                needsInUseTransition
+            }, transform = block).session
+        } else {
+            val current = repository.get(session.id) ?: throw VerificationSessionNotFoundException(session.id)
+            // The verification engine reads this same instance between updates.
+            repository.compareAndSet(session.id, current.version, session.apply(block)).session
         }
-        // The verification engine reads this same instance between updates.
-        val updateTarget = if (event == SessionEvent.authorization_request_requested) current.session else session
-        val updated = repository.compareAndSet(session.id, current.version, updateTarget.apply(block)).session
 
         try {
             // publicView() keeps the ephemeral decryption keys and internal policy detail out of
