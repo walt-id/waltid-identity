@@ -1,7 +1,9 @@
 name: WAL-1580 fixture port diagnostic
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [chore/wal-1580-port-owner-20261102]
+    paths: [.github/workflows/wal-1580-port-diagnostic.yml]
 
 permissions:
   contents: read
