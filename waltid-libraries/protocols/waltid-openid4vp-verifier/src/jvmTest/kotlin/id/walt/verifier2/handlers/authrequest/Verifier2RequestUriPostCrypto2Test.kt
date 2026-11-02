@@ -76,6 +76,8 @@ class Verifier2RequestUriPostCrypto2Test {
 
             val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
             assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
+            val bootstrapMetadata = Json.parseToJsonElement(assertNotNull(bootstrapUrl.parameters["client_metadata"])).jsonObject
+            assertNotNull(bootstrapMetadata["vp_formats_supported"])
             val originalRequestObject = assertNotNull(session.signedAuthorizationRequestJwt)
             val originalKid = assertNotNull(
                 CompactJws.decodeUnverified(originalRequestObject).protectedHeader["kid"]?.jsonPrimitive?.content
