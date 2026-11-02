@@ -69,7 +69,6 @@ private suspend fun validateDocumentSignerCertificateChain(
         ?: systemClockAuthenticationCertificateUtil
     val validationResult = certificateUtil.validateCertificateChain(certificateChain)
     if (validationResult.hasErrors) {
-        val bcExt = certificateChain.first().data.extensionBasicConstraints
         throw IllegalArgumentException(
             "Document signer certificate chain contains errors: ${
                 validationResult.errorLog.joinToString("\n") { "${it.subjectDn}: ${it.message}" }
