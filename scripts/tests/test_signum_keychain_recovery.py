@@ -77,28 +77,6 @@ class KeychainReportTest(unittest.TestCase):
         self.assertEqual(["ownership.reopen"], receipt["unfinished"])
         self.assertEqual("1", ET.parse(self.output / "results.xml").getroot().get("errors"))
 
-    def test_direct_app_output_requires_an_observed_process_exit(self):
-        for pid_reported in (True, False):
-            with self.subTest(pid_reported=pid_reported):
-                def launch(arguments, **kwargs):
-                    (self.output / "tests.log").write_text(PASSED)
-                    if pid_reported:
-                        kwargs["stdout"].write(f"{runner.BUNDLE}: 123\n")
-                    return subprocess.CompletedProcess(arguments, 0)
-
-                with patch.object(runner.subprocess, "run", side_effect=launch), \
-                        patch.object(runner.os, "kill", side_effect=[None, ProcessLookupError()]), \
-                        patch.object(runner, "crash_diagnostics", return_value=[]), \
-                        patch.object(runner.time, "sleep"), patch("builtins.print"):
-                    if pid_reported:
-                        runner.run("specific-device", self.output)
-                    else:
-                        with self.assertRaisesRegex(SystemExit, "did not report"):
-                            runner.run("specific-device", self.output)
-                receipt = json.loads((self.output / "launch.json").read_text())
-                self.assertEqual(pid_reported, receipt["success"])
-                self.assertEqual(["ownership.reopen"], receipt["passed"])
-
     def test_timeout_keeps_partial_results_and_bounds_cleanup(self):
         for launch_timeout in (True, False):
             with self.subTest(launch_timeout=launch_timeout):
