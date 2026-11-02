@@ -12,6 +12,9 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.config.url.UrlProtocols
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.http.*
@@ -57,6 +60,61 @@ class EncryptedRequestObjectInteropTest {
         assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(exchange { nonce, recipient ->
             encrypt(sign(nonce), recipient, contentType = "jwt", keyId = null)
         })
+    }
+
+    @Test
+    fun `POST rejects unsigned JSON and unsigned JWT even with the correct nonce`() = runBlocking<Unit> {
+        assertFailsWith<IllegalArgumentException> {
+            exchange(responseContentType = "application/json") { nonce, _ ->
+                buildJsonObject {
+                    put("client_id", "verifier")
+                    put("wallet_nonce", nonce)
+                }.toString()
+            }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            exchange { nonce, _ ->
+                val base64 = Base64.getUrlEncoder().withoutPadding()
+                val payload = buildJsonObject {
+                    put("client_id", "verifier")
+                    put("wallet_nonce", nonce)
+                }.toString()
+                base64.encodeToString("{\"alg\":\"none\",\"typ\":\"oauth-authz-req+jwt\"}".toByteArray()) + "." +
+                        base64.encodeToString(payload.toByteArray()) + "."
+            }
+        }
+    }
+
+    @Test
+    fun `POST requires HTTPS unless HTTP is explicitly enabled for development`() = runBlocking<Unit> {
+        var calls = 0
+        HttpClient(MockEngine {
+            calls++
+            respond("signed-request", headers = headersOf(HttpHeaders.ContentType, "application/oauth-authz-req+jwt"))
+        }).use { client ->
+            for (allowHttp in listOf(null, false, true)) {
+                val config = allowHttp?.let {
+                    WebDataFetchingConfiguration(url = UrlConfiguration(protocols = UrlProtocols(allowHttp = it)))
+                }
+                val fetcher = WebDataFetcher.wrapping(client, "request-uri-https-test", config)
+                if (allowHttp == true) {
+                    assertEquals("signed-request", AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        fetcher, "http://localhost/request", RequestUriHttpMethod.POST,
+                    ).body)
+                } else {
+                    val before = calls
+                    assertFailsWith<IllegalArgumentException> {
+                        AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                            fetcher, "http://localhost/request", RequestUriHttpMethod.POST,
+                        )
+                    }
+                    assertEquals(before, calls)
+                }
+                assertEquals("signed-request", AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request", RequestUriHttpMethod.POST,
+                ).body)
+            }
+        }
     }
 
     @Test
@@ -190,6 +248,7 @@ class EncryptedRequestObjectInteropTest {
     private suspend fun exchange(
         configuration: ClientIdTrustConfiguration = trust,
         expectedAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        responseContentType: String = "application/oauth-authz-req+jwt",
         response: suspend (String, ECKey) -> String,
     ): ResolvedAuthorizationRequest = HttpClient(MockEngine { request ->
         val form = parseQueryString((request.body as TextContent).text)
@@ -206,7 +265,7 @@ class EncryptedRequestObjectInteropTest {
         assertEquals("enc", publicJwk.getValue("use").jsonPrimitive.content)
         assertEquals("ECDH-ES", publicJwk.getValue("alg").jsonPrimitive.content)
         respond(response(requireNotNull(form["wallet_nonce"]), ECKey.parse(publicJwk.toString())),
-            headers = headersOf(HttpHeaders.ContentType, "application/oauth-authz-req+jwt"))
+            headers = headersOf(HttpHeaders.ContentType, responseContentType))
     }).use { client ->
         AuthorizationRequestResolver.resolve(requestUrl, trustConfiguration = configuration,
             expectedRequestObjectAudience = expectedAudience, fetchRequestUri = { uri, method ->
