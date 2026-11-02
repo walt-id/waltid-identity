@@ -3,9 +3,43 @@ import SwiftUI
 import UIKit
 import WalletDemoSharingUI
 import XCTest
+@testable import iosApp
 
 @MainActor
 final class WalletSheetSizingTests: XCTestCase {
+    func testSuccessDismissalAllowsFiveSecondsAfterTheSheetSettles() async throws {
+        guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
+        let model = SheetModel()
+        model.acceptsFocus = false
+        let presentation = try SheetPresentation(model: model)
+        defer { model.didSettle = nil; model.didDismiss = nil; presentation.close() }
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in model.layoutReady }, object: nil)
+        await fulfillment(of: [ready], timeout: 5)
+
+        let dismissed = expectation(description: "Idle success dismisses after its readable interval")
+        var settledAt: TimeInterval?
+        model.didSettle = { settledAt = ProcessInfo.processInfo.systemUptime }
+        model.didDismiss = {
+            XCTAssertTrue(model.layoutReady, "A success must not disappear while its sheet is still resizing")
+            XCTAssertNotNil(settledAt)
+            if let settledAt {
+                // Readiness notification and timer scheduling can occur on adjacent run-loop turns.
+                XCTAssertGreaterThanOrEqual(ProcessInfo.processInfo.systemUptime - settledAt, 4.9,
+                    "The five-second reading interval starts after the receipt becomes usable")
+            }
+            dismissed.fulfill()
+        }
+        let container = try XCTUnwrap(presentation.host.view.superview).layer
+        let settling = CABasicAnimation(keyPath: "position.y")
+        settling.fromValue = container.position.y + 40
+        settling.toValue = container.position.y
+        settling.duration = 6
+        container.add(settling, forKey: "sheet-container-settling")
+        model.replacement = true
+        model.dismissSuccess = true
+        await fulfillment(of: [dismissed], timeout: 15)
+    }
+
     func testReplacingThePageWaitsForTheCurrentSheetResize() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
@@ -143,10 +177,12 @@ private final class SheetDetentContext: NSObject, UISheetPresentationControllerD
 private final class SheetModel: ObservableObject {
     @Published var manual = false
     @Published var replacement = false
+    @Published var dismissSuccess = false
     var acceptsFocus = true
     var didFocus: (() -> Void)?
     var layoutReady = false
     var didSettle: (() -> Void)?
+    var didDismiss: (() -> Void)?
 }
 
 @MainActor
@@ -207,6 +243,8 @@ private struct SheetContent: View {
                 model.layoutReady = ready
                 if ready { model.didSettle?() }
             })
+            .walletSuccessDismissal(key: 0, enabled: model.dismissSuccess) { model.didDismiss?() }
+            .environment(\.scenePhase, .active)
             .navigationTitle(model.manual ? "Enter a link" : "Scan QR code")
             .navigationBarTitleDisplayMode(.inline)
         }
