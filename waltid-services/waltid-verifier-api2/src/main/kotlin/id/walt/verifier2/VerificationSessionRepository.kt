@@ -68,10 +68,12 @@ interface VerificationSessionRepository {
 
     suspend fun update(
         sessionId: String,
+        shouldUpdate: Verification2Session.() -> Boolean = { true },
         transform: Verification2Session.() -> Unit,
     ): VerificationSessionSnapshot {
         repeat(5) {
             val current = get(sessionId) ?: throw VerificationSessionNotFoundException(sessionId)
+            if (!current.session.shouldUpdate()) return current
             val updated = current.session.copyForStorage().apply(transform)
             try {
                 return compareAndSet(sessionId, current.version, updated)
