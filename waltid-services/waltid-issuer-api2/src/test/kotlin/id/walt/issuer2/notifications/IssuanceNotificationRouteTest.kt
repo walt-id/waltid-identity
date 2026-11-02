@@ -83,6 +83,10 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 class IssuanceNotificationRouteTest {
+    private fun assertReceivedEventsInOrder(expected: List<IssuanceSessionEvent>, received: List<String>) {
+        assertEquals(expected.map { it.value }, received)
+    }
+
     private fun CredentialOfferCreateRequest.withRuntimeOverrides(
         runtimeOverrides: CredentialOfferRuntimeOverrides,
     ): CredentialOfferCreateRequest = copy(
@@ -137,7 +141,7 @@ class IssuanceNotificationRouteTest {
 
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
+            assertReceivedEventsInOrder(expectedEvents, receivedUpdates.map { it.event })
 
             val tokenRequest = assertNotNull(
                 receivedUpdates.first { it.event == IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED.value }
@@ -215,7 +219,7 @@ class IssuanceNotificationRouteTest {
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
+            assertReceivedEventsInOrder(expectedEvents, receivedUpdates.map { it.event })
 
             // ACTIVE is the default and therefore omitted: the session is still usable for a retry.
             val failure = receivedUpdates.single {
@@ -289,19 +293,20 @@ class IssuanceNotificationRouteTest {
             assertEquals(errorBody["error"]?.jsonPrimitive?.contentOrNull, failure.error)
             assertEquals(errorBody["error_description"]?.jsonPrimitive?.contentOrNull, failure.errorDescription)
 
-            notificationServer.awaitEvent(
-                createdOffer.offerId,
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
                 IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED,
-            )
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val events = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
                 .map { it.event }
-            assertEquals(
+            assertReceivedEventsInOrder(
                 listOf(
                     IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
                     IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
                     IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED,
-                ).map { it.value },
+                ),
                 events,
             )
         } finally {
@@ -365,8 +370,8 @@ class IssuanceNotificationRouteTest {
             )
 
             expectedEvents.distinct().forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
-            assertEquals(
-                expectedEvents.map { it.value },
+            assertReceivedEventsInOrder(
+                expectedEvents,
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
@@ -413,7 +418,7 @@ class IssuanceNotificationRouteTest {
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val receivedUpdates = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
-            assertEquals(expectedEvents.map { it.value }, receivedUpdates.map { it.event })
+            assertReceivedEventsInOrder(expectedEvents, receivedUpdates.map { it.event })
             // invalid_proof is retryable: the grant stays usable, so the session is not concluded.
             assertNull(
                 receivedUpdates.singleOrNull { it.event == IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED.value },
@@ -570,8 +575,8 @@ class IssuanceNotificationRouteTest {
                 IssuanceSessionEvent.PUSHED_AUTHORIZATION_REQUEST_SUCCEEDED,
             )
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
-            assertEquals(
-                expectedEvents.map { it.value },
+            assertReceivedEventsInOrder(
+                expectedEvents,
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
@@ -638,11 +643,16 @@ class IssuanceNotificationRouteTest {
                 parResponse.body<JsonObject>()["error"]?.jsonPrimitive?.content,
             )
 
-            assertEquals(
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
+
+            assertReceivedEventsInOrder(
                 listOf(
                     IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
                     IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
-                ).map { it.value },
+                ),
                 notificationServer.getReceivedUpdates()
                     .filter { it.target == createdOffer.offerId }
                     .map { it.event },
