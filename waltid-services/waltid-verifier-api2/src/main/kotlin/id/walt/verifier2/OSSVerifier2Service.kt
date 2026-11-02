@@ -7,6 +7,7 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.WebhookDestinationNotAllowedException
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataProfile
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
@@ -119,6 +120,8 @@ object Verifier2Service {
             Verifier2SessionUpdate(publicSession.id, event, publicSession)
                 .toKtorSessionUpdate()
                 .notifySessionUpdate(publicSession.id, notificationConfig)
+        } catch (exception: WebhookDestinationNotAllowedException) {
+            log.warn { "Could not deliver verification session notification for ${updated.id}: ${exception.message}" }
         } catch (exception: Exception) {
             log.warn(exception) { "Could not deliver verification session notification for ${updated.id}" }
         }
