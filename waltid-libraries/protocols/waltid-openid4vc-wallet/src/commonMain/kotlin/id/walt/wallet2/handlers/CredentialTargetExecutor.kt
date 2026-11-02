@@ -51,7 +51,7 @@ internal suspend fun executeCredentialTargets(
             val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
             val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.hasKeyAttestationProvider())
             stage = CredentialIssuanceStage.REQUEST
-            val response = WalletIssuanceHandler.requestCredentialWithNonceRetry(
+            val exchange = WalletIssuanceHandler.exchangeCredentialWithNonceRetry(
                 FetchCredentialRequest(Url(issuerMetadata.credentialEndpoint), access.accessToken,
                     target.credentialConfigurationId, credentialIdentifier = target.credentialIdentifier),
                 issuerMetadata.nonceEndpoint, httpClient,
@@ -61,8 +61,10 @@ internal suspend fun executeCredentialTargets(
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
+                issuerMetadata = issuerMetadata,
                 onStage = { stage = it },
             )
+            val response = exchange.response
             ensureOwned()
             stage = CredentialIssuanceStage.RESPONSE
             val label = labelFor(target.credentialConfigurationId)
@@ -85,7 +87,9 @@ internal suspend fun executeCredentialTargets(
                         sessions.retainDeferredCredential(public, configuration, selected, transaction.proofRequired,
                             endpoint, transaction.transactionId, access.accessToken, access.tokenType,
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
-                            sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce)
+                            sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
+                            credentialIssuer = issuerMetadata.credentialIssuer,
+                            issuerMetadataSnapshot = issuerMetadata)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()
