@@ -223,7 +223,7 @@ final class WalletE2EUI {
         let tagged = app.buttons.matching(identifier: identifier)
         if tagged.firstMatch.waitForExistence(timeout: 20) {
             // Navigation 3 retains both pages during motion; wait for the active page.
-            guard WalletButtonSnapshotGuard.wait(identifier: identifier, snapshot: { try self.app.snapshot() }) else {
+            guard waitForUniqueButton(identifier: identifier) else {
                 XCTFail("Button remained ambiguous after navigation: \(identifier)")
                 return
             }
@@ -394,36 +394,27 @@ final class WalletE2EUI {
         }
         return elements[0]
     }
-}
-
-@MainActor
-private enum WalletButtonSnapshotGuard {
-    static func wait(
-        identifier: String,
-        snapshot: @escaping () throws -> any XCUIElementSnapshot,
-        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
-    ) -> Bool {
-        let deadline = now() + 5
+    private func waitForUniqueButton(identifier: String) -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
         let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard now() < deadline, let root = try? snapshot(), now() < deadline else { return false }
-            return count(identifier: identifier, in: root) == 1
-        }, object: nil)
-        return XCTWaiter.wait(for: [unique], timeout: 5) == .completed && now() < deadline
-    }
-
-    static func count(identifier: String, in root: any XCUIElementSnapshot) -> Int {
-        var pending = root.children
-        var matches = 0
-        while let element = pending.popLast() {
-            // Match the identifying properties used by XCUIElementQuery.matching(identifier:).
-            let properties: [String?] = [element.identifier, element.title, element.label,
-                                         element.value as? String, element.placeholderValue]
-            if element.elementType == .button && properties.contains(where: { $0 == identifier }) {
-                matches += 1
-                if matches > 1 { return matches }
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  let root = try? self.app.snapshot(),
+                  ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            var pending = root.children
+            var matches = 0
+            while let element = pending.popLast() {
+                // Match the identifying properties used by XCUIElementQuery.matching(identifier:).
+                let properties: [String?] = [element.identifier, element.title, element.label,
+                                             element.value as? String, element.placeholderValue]
+                if element.elementType == .button && properties.contains(where: { $0 == identifier }) {
+                    matches += 1
+                    if matches > 1 { return false }
+                }
+                pending.append(contentsOf: element.children)
             }
-            pending.append(contentsOf: element.children)
-        }
-        return matches
+            return matches == 1
+        }, object: nil)
+        return XCTWaiter.wait(for: [unique], timeout: 5) == .completed
+            && ProcessInfo.processInfo.systemUptime < deadline
     }
 }

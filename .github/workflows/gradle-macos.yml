@@ -19,11 +19,6 @@ on:
         description: 'Run Enterprise mobile tests'
         type: boolean
         default: true
-      enterprise-demos:
-        description: 'Enterprise iOS demos to verify (native includes SDK tests)'
-        type: choice
-        options: [all, native, compose]
-        default: all
       run-visual-compose:
         description: 'Compare the complete Compose iOS catalogue'
         type: boolean
@@ -73,11 +68,6 @@ on:
         type: boolean
         required: false
         default: false
-      enterprise-demos:
-        description: 'Enterprise iOS demos: all, native or compose'
-        type: string
-        required: false
-        default: all
       collect-test-diagnostics:
         description: 'Verbose consumer diagnostics: never or on-failure'
         type: string
@@ -392,11 +382,9 @@ jobs:
             --no-configuration-cache \
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}" \
             -Penterprise.ios.collectTestDiagnostics="${XCODE_TEST_DIAGNOSTICS}" \
-            -Penterprise.ios.demos="${ENTERPRISE_IOS_DEMOS}" \
             -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact"
         env:
           XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
-          ENTERPRISE_IOS_DEMOS: ${{ inputs.enterprise-demos }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
@@ -446,17 +434,10 @@ jobs:
 
           echo "has_report=true" >> "$GITHUB_OUTPUT"
 
-      - name: Require selected Enterprise SDK and batch test execution
+      - name: Require native and Compose Enterprise SDK and batch test execution
         if: always() && steps.enterprise_ios_mobile_tests.outcome != 'skipped'
-        env:
-          ENTERPRISE_IOS_DEMOS: ${{ inputs.enterprise-demos }}
         run: |
-          case "$ENTERPRISE_IOS_DEMOS" in
-            all) demos=(native compose) ;;
-            native|compose) demos=("$ENTERPRISE_IOS_DEMOS") ;;
-            *) echo "::error::Enterprise demos must be all, native or compose"; exit 1 ;;
-          esac
-          for demo in "${demos[@]}"; do
+          for demo in native compose; do
             if [[ "$demo" == native ]]; then
               report='*iosAppEnterpriseTests.xcresult.xml'
               targets=(iosAppEnterpriseTests.xctest iosAppUITests.xctest)
