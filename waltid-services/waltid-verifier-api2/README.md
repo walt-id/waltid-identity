@@ -94,8 +94,10 @@ Base path: `/verification-session`
 Session webhooks are sent by the service to a caller-supplied URL. `config/network-fetch-guard.conf` refuses loopback and private destinations for webhooks and for the service's other outbound requests, such as DID resolution and policy fetches, unless that deployment opts in. Link-local and cloud-metadata addresses stay refused. The other API services read the same file. The Docker Compose configs allow private networks so the services can reach each other.
 
 VICAL utilities:
-- `POST /vical/fetch` — Fetch a VICAL over HTTP(S) and return Base64
+- `POST /vical/fetch` — Fetch an http(s) VICAL and return Base64. `vicalFetchEnabled` in `verifier-service.conf` defaults to true. `file` URLs and loopback, link-local, and private destinations are refused. Set it to false to remove the route. `allowPrivateNetworkVical` opts network fetches into RFC1918 and IPv6 unique-local addresses. `POST /vical/validate` accepts a Base64 VICAL and stays available when fetch is disabled.
 - `POST /vical/validate` — Validate VICAL with provided verification key
+
+Verifier API 2 does not authenticate callers. Deployments, including the public demo, are expected to put their own access control in front of the service.
 
 ## Quick start
 
