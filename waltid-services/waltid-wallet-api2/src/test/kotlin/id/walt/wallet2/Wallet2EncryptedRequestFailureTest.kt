@@ -2,6 +2,7 @@ package id.walt.wallet2
 
 import com.sun.net.httpserver.HttpServer
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.http.ServiceWebDataFetcherConfiguration
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -13,6 +14,11 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.wallet2.handlers.ResolveVpRequestRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.config.url.UrlProtocols
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -34,7 +40,14 @@ import kotlinx.serialization.json.put
 
 class Wallet2EncryptedRequestFailureTest {
     @Test
-    fun `invalid encryption and rejected retrieval return 400 through the wallet API`() {
+    fun `invalid encryption and rejected retrieval return 400 through the wallet API`() = checkHttpConfiguration(true)
+
+    @Test
+    fun `configured HTTP restriction returns 400 before fetching the request`() = checkHttpConfiguration(false)
+
+    private fun checkHttpConfiguration(allowHttp: Boolean) {
+        val fetcherId = WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST.name
+        val previousConfig = WebDataFetcherManager.getConfigurationForId(fetcherId, null)
         val host = "127.0.0.1"
         val requestPort = freePort()
         val walletKey = runBlocking {
@@ -65,6 +78,11 @@ class Wallet2EncryptedRequestFailureTest {
             E2ETest(host, walletPort, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
                 preload = {
+                    ConfigManager.preloadConfig("httpclient", ServiceWebDataFetcherConfiguration(
+                        service = mapOf(fetcherId to WebDataFetchingConfiguration(
+                            url = UrlConfiguration(protocols = UrlProtocols(allowHttp = allowHttp)),
+                        )),
+                    ))
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(
                         publicBaseUrl = Url("http://$host:$walletPort"),
                     ))
@@ -92,12 +110,17 @@ class Wallet2EncryptedRequestFailureTest {
                         }
                         assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
                         assertTrue(response.bodyAsText().contains(
-                            if (rejected) "AuthorizationRequest cannot be retrieved" else "Could not decrypt encrypted Request Object",
+                            when {
+                                !allowHttp -> "request_uri_method=post requires HTTPS"
+                                rejected -> "AuthorizationRequest cannot be retrieved"
+                                else -> "Could not decrypt encrypted Request Object"
+                            },
                         ))
                     }
                 }
             }
         } finally {
+            WebDataFetcherManager.appendConfiguration(fetcherId, previousConfig)
             verifier.stop(0)
         }
     }
