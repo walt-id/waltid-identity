@@ -213,9 +213,12 @@ sign and encrypt its Request Object. This defaults to `false` and requires a sig
 key and a client identifier that permits signed requests. Both returned URLs use
 `request_uri_method=post`; GET retrieval and DC API encryption are rejected.
 
-The wallet must POST `wallet_metadata` containing inline encryption `jwks`,
-`request_object_encryption_alg_values_supported: ["ECDH-ES"]`, and
-`request_object_encryption_enc_values_supported` containing `A128GCM` or `A256GCM`.
+The wallet must POST `wallet_metadata` containing inline encryption `jwks`. The
+`request_object_encryption_alg_values_supported` and
+`request_object_encryption_enc_values_supported` lists are optional. When absent,
+this implementation uses its `ECDH-ES` / `A128GCM` request-encryption profile.
+Explicit lists must permit `ECDH-ES` and either `A128GCM` or `A256GCM`.
+The bootstrap includes verifier capabilities unless supplied out of band.
 Verifier2 returns a JWE wrapping the signed JWT, echoes `wallet_nonce`, and fails
 if no usable encryption key exists. Wallet2's shared backend/mobile resolver
 already supplies an ephemeral key and validates the decrypted inner JWS.
@@ -223,3 +226,8 @@ already supplies an ephemeral key and validates the decrypted inner JWS.
 Set `core_flow.encrypted_response: true` separately for encrypted presentation
 responses (`direct_post.jwt`). Request encryption is recommended when
 `openid.transactionData` contains personal information.
+
+Request URI POST responses must be signed JWTs, optionally encrypted; unsigned
+sessions use GET. Wallet2 requires HTTPS for POST retrieval. Local development can
+explicitly permit HTTP through the `OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST`
+fetcher's `url.protocols.allowHttp` configuration; production should not enable it.
