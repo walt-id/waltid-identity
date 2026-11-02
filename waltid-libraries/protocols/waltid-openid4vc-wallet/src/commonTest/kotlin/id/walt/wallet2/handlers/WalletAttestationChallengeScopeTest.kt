@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import io.ktor.client.engine.mock.respond
 import io.ktor.http.headersOf
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -36,4 +37,55 @@ class WalletAttestationChallengeScopeTest {
             .challengeContext("https://legacy.example", "client", "key").challenge)
     }
 
+    @Test fun newFlowsFetchWhileReopenedFlowsKeepResponseChallenges() = runTest {
+        val store = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        var fetches = 0
+        val http = io.ktor.client.HttpClient(io.ktor.client.engine.mock.MockEngine) {
+            engine { addHandler {
+                fetches++
+                respond("""{"attestation_challenge":"fetch-$fetches"}""")
+            } }
+        }
+        try {
+            val runtime = WalletIssuanceSessionState("wallet", store)
+            val first = runtime.challengeContext("https://as.example", "client", "key", "old", flowId = "first")
+            first.prepare(http, "https://as.example/challenge")
+            assertEquals("fetch-1", first.challenge)
+            first.observe(headersOf("OAuth-Client-Attestation-Challenge", "par-response"))
+            val second = runtime.challengeContext("https://as.example", "client", "key", flowId = "second")
+            second.prepare(http, "https://as.example/challenge")
+            assertEquals("fetch-2", second.challenge)
+            val reopened = WalletIssuanceSessionState("wallet", store)
+                .challengeContext("https://as.example", "client", "key", "stale", flowId = "first")
+            reopened.prepare(http, "https://as.example/challenge")
+            assertEquals("par-response", reopened.challenge)
+            assertEquals(2, fetches)
+        } finally { http.close() }
+    }
+
+    @Test fun expiredLegacyCorrelationFetchesAgainWithoutExpiringRetainedSessions() = runTest {
+        val store = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        var fetches = 0
+        val http = io.ktor.client.HttpClient(io.ktor.client.engine.mock.MockEngine) {
+            engine { addHandler {
+                fetches++
+                respond("""{"attestation_challenge":"fetch-$fetches"}""")
+            } }
+        }
+        try {
+            val runtime = WalletIssuanceSessionState("wallet", store)
+            for (flow in listOf("pkce:correlation", "retained-session")) {
+                runtime.challengeContext("https://as.example", "client", "key", flowId = flow)
+                    .prepare(http, "https://as.example/challenge")
+            }
+            store.list().forEach { store.put(it.copy(updatedAtEpochMilliseconds = 0)) }
+            val reopened = WalletIssuanceSessionState("wallet", store)
+            reopened.challengeContext("https://as.example", "client", "key", flowId = "retained-session")
+                .prepare(http, "https://as.example/challenge")
+            assertEquals(2, fetches, "Retained flows use their session lifecycle")
+            reopened.challengeContext("https://as.example", "client", "key", flowId = "pkce:correlation")
+                .prepare(http, "https://as.example/challenge")
+            assertEquals(3, fetches, "Expired legacy correlation must prepare again")
+        } finally { http.close() }
+    }
 }

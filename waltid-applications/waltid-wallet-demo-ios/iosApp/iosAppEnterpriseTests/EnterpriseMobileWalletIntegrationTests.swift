@@ -16,34 +16,38 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
             for authorized in [false, true] {
                 let scenarioID = "enterprise-mdl-challenge-\(mode)" + (authorized ? "-authorized" : "")
                 let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
-                let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
                 let walletID = "ios-challenge-\(UUID().uuidString)"
-                let wallet = try await makeWallet(walletId: walletID, attestation: offer.attestation)
-                _ = try await initializeSigningIdentity(wallet)
-                let redirect = URL(string: "walbatchtest://callback")!
-                let session = try await wallet.startIssuance(IssuanceRequest(
-                    offer: try XCTUnwrap(URL(string: offer.offerUrl)), clientID: "wallet-client", redirectURI: redirect))
-                let outcome: IssuanceOutcome
-                if authorized {
-                    let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
-                    XCTAssertTrue(authorization.pushedAuthorizationRequestUsed)
-                    // Recreate the Swift facade and real KMP wallet before code exchange.
+                var expectedIDs = Set<String>()
+                for _ in 0..<2 {
+                    let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+                    let wallet = try await makeWallet(walletId: walletID, attestation: offer.attestation)
+                    _ = try await initializeSigningIdentity(wallet)
+                    let redirect = URL(string: "walbatchtest://callback")!
+                    let session = try await wallet.startIssuance(IssuanceRequest(
+                        offer: try XCTUnwrap(URL(string: offer.offerUrl)), clientID: "wallet-client", redirectURI: redirect))
+                    let outcome: IssuanceOutcome
+                    if authorized {
+                        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
+                        XCTAssertTrue(authorization.pushedAuthorizationRequestUsed)
+                        // Recreate the Swift facade and real KMP wallet before code exchange.
+                        let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
+                        _ = try await initializeSigningIdentity(reopened)
+                        let callback = try await followChallengeAuthorization(authorization.url, redirect: redirect)
+                        outcome = try await reopened.continueAuthorizationIssuance(sessionID: session.id, callbackURI: callback)
+                    } else {
+                        outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
+                    }
+                    guard case let .stored(_, credentialIDs) = outcome else {
+                        return XCTFail("Challenge issuance failed for \(scenarioID): \(outcome)")
+                    }
+                    XCTAssertEqual(credentialIDs.count, 1)
                     let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
-                    _ = try await initializeSigningIdentity(reopened)
-                    let callback = try await followChallengeAuthorization(authorization.url, redirect: redirect)
-                    outcome = try await reopened.continueAuthorizationIssuance(sessionID: session.id, callbackURI: callback)
-                } else {
-                    outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
+                    let stored = try await reopened.credentials()
+                    expectedIDs.formUnion(credentialIDs)
+                    XCTAssertEqual(expectedIDs, Set(stored.map { $0.id }))
+                    let trace = try await fixture.challengeTrace(id: XCTUnwrap(offer.challengeTraceID))
+                    XCTAssertEqual(trace["verified"], 1, "Actual issuer challenge exchange: \(trace)")
                 }
-                guard case let .stored(_, credentialIDs) = outcome else {
-                    return XCTFail("Challenge issuance failed for \(scenarioID): \(outcome)")
-                }
-                XCTAssertEqual(credentialIDs.count, 1)
-                let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
-                let stored = try await reopened.credentials()
-                XCTAssertEqual(Set(credentialIDs), Set(stored.map { $0.id }))
-                let trace = try await fixture.challengeTrace(id: XCTUnwrap(offer.challengeTraceID))
-                XCTAssertEqual(trace["verified"], 1, "Actual issuer challenge exchange: \(trace)")
                 await clearTestData(walletId: walletID)
             }
         }

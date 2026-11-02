@@ -49,6 +49,7 @@ data class WalletAttestationChallengeResponse(
 data class WalletAttestationChallengeResult(
     val attestationChallenge: String?,
     val dpopNonce: String?,
+    val prepared: Boolean = false,
 ) {
     override fun toString(): String = "WalletAttestationChallengeResult(<redacted>)"
 }
@@ -62,7 +63,7 @@ class WalletAttestationChallengeRequestBuilder(
     suspend fun requestChallenge(endpoint: String): WalletAttestationChallengeResponse =
         WalletAttestationChallengeResponse(requireNotNull(requestChallengeDetailed(endpoint).attestationChallenge))
 
-    suspend fun requestChallengeDetailed(endpoint: String, allowDpopOnly: Boolean = false): WalletAttestationChallengeResult {
+    suspend fun requestChallengeDetailed(endpoint: String): WalletAttestationChallengeResult {
         validateEndpoint(endpoint)
         val response = send(endpoint)
         if (response.status != HttpStatusCode.OK) {
@@ -92,7 +93,7 @@ class WalletAttestationChallengeRequestBuilder(
         } catch (_: Exception) {
             throw WalletAttestationChallengeRequestException(WalletAttestationChallengeRequestError.INVALID_RESPONSE)
         }
-        if (challenge == null && (!allowDpopOnly || nonce == null)) {
+        if (challenge == null) {
             throw WalletAttestationChallengeRequestException(WalletAttestationChallengeRequestError.INVALID_RESPONSE)
         }
         return WalletAttestationChallengeResult(challenge, nonce)

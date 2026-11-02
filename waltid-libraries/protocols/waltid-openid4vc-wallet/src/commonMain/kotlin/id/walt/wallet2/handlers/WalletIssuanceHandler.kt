@@ -1288,7 +1288,6 @@ object WalletIssuanceHandler {
             wallet = wallet,
             asMetadata = asMetadata,
             discoveryHeaders = effectiveResolvedOffer.authorizationServerHeaders,
-            useDpop = usableDpopAlgorithms(asMetadata, keyMaterial) != null,
             restoredDiscovery = resolvedOffer != null,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
@@ -2040,10 +2039,10 @@ object WalletIssuanceHandler {
         // offer: the authorization server advertises attest_jwt_client_auth alone and requires PAR, so
         // without this the flow cannot authenticate at all and the suite answers 401.
         val parAttestation = clientAttestationForRequest(
+            flowId = attestationFlowId(pushed.pkceData?.codeVerifier),
             wallet = wallet,
             asMetadata = asMetadata,
             discoveryHeaders = discoveryHeaders,
-            useDpop = dpopJkt != null,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = { keyMaterial?.crypto2AttestationKey() },
@@ -2157,6 +2156,13 @@ object WalletIssuanceHandler {
         }
     }
 
+    // Correlate split PAR/token calls without persisting the PKCE verifier itself.
+    private fun attestationFlowId(verifier: String?): String? = verifier?.let {
+        "pkce:" + org.kotlincrypto.hash.sha2.SHA256().digest(it.encodeToByteArray()).joinToString("") { byte ->
+            (byte.toInt() and 255).toString(16).padStart(2, '0')
+        }
+    }
+
     /**
      * PAR/token client attestation that can be rebuilt per HTTP attempt.
      *
@@ -2179,8 +2185,8 @@ object WalletIssuanceHandler {
         onAttestationObtained: suspend () -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         discoveryHeaders: io.ktor.http.Headers = io.ktor.http.Headers.Empty,
-        useDpop: Boolean = false,
         restoredDiscovery: Boolean = false,
+        flowId: String? = null,
     ): RequestClientAttestation? {
         val assembler = attestationAssembler ?: return null
         if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
@@ -2188,17 +2194,16 @@ object WalletIssuanceHandler {
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
             ?: error("No key available for client attestation")
-        val context = wallet?.clientAttestationChallenges(asMetadata.issuer, clientId, key)
+        val context = flowId?.let { wallet?.clientAttestationChallenges(asMetadata.issuer, clientId, key, it) }
             ?: ClientAttestationChallengeContext()
         if (restoredDiscovery) context.restore(
             discoveryHeaders["OAuth-Client-Attestation-Challenge"], discoveryHeaders["DPoP-Nonce"])
         else context.observe(discoveryHeaders)
         val attestationJwt = assembler.obtainAttestationJwt(key, clientId)
         onAttestationObtained()
-        val dpop = useDpop && !asMetadata.dpopSigningAlgValuesSupported.isNullOrEmpty()
         return RequestClientAttestation(
             factory = {
-                context.prepare(httpClient, asMetadata.challengeEndpoint, dpop)
+                context.prepare(httpClient, asMetadata.challengeEndpoint)
                 ClientAttestationHeaders(
                     attestationJwt = attestationJwt,
                     popJwt = assembler.buildPopJwt(key, clientId, asMetadata.issuer, context.challenge),
@@ -2483,10 +2488,10 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         val resolvedKeyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
         val tokenAttestation = clientAttestationForRequest(
+            flowId = attestationFlowId(request.codeVerifier),
             wallet = wallet,
             asMetadata = asMetadata,
             discoveryHeaders = asResolution.headers,
-            useDpop = useDpop,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
             resolveInstanceKey = {
@@ -2496,7 +2501,7 @@ object WalletIssuanceHandler {
             onAttestationObtained = onAttestationObtained,
             httpClient = httpClient,
         )
-        return exchangeCodeDetailed(
+        val tokenResult = exchangeCodeDetailed(
             request = request,
             tokenEndpoint = tokenEndpoint,
             tokenAttestation = tokenAttestation,
@@ -2505,6 +2510,14 @@ object WalletIssuanceHandler {
             keyMaterial = resolvedKeyMaterial,
             useDpop = useDpop,
         )
+        try {
+            attestationFlowId(request.codeVerifier)?.let { wallet.removeClientAttestationFlow(it) }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            log.warn { "Could not remove completed attestation flow; expiry will clean it up" }
+        }
+        return tokenResult
     }
 
     private suspend fun exchangeCodeDetailed(

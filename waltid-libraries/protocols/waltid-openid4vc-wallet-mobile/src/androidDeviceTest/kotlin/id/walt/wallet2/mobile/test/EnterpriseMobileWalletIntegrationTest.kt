@@ -68,37 +68,41 @@ class EnterpriseMobileWalletIntegrationTest {
         for (mode in listOf("endpoint", "response")) for (authorized in listOf(false, true)) {
             val scenarioId = "enterprise-mdl-challenge-$mode" + if (authorized) "-authorized" else ""
             val scenario = enterpriseScenario(fixture, scenarioId)
-            val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
             val walletId = "android-challenge-${UUID.randomUUID()}"
-            val wallet = createWallet(walletId, offer.attestation)
-            wallet.signingIdentity.initialize().activeIdentity()
-            val redirect = "walbatchtest://callback"
-            val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-                MobileWalletCredentialOffer.Uri(offer.offerUrl), clientId = "wallet-client", redirectUri = redirect))
-            val outcome = if (authorized) {
-                val authorization = wallet.beginAuthorizationIssuance(session.id)
-                assertNotNull(Url(authorization.url).parameters["request_uri"])
-                val reopened = createWallet(walletId, offer.attestation)
-                reopened.signingIdentity.initialize().activeIdentity()
-                var callback = authorization.url
-                HttpClient { followRedirects = false }.use { browser ->
-                    repeat(8) {
-                        if (!callback.startsWith("$redirect?")) {
-                            val response = browser.get(callback)
-                            assertTrue(response.status in listOf(HttpStatusCode.Found, HttpStatusCode.SeeOther))
-                            callback = assertNotNull(response.headers[HttpHeaders.Location])
+            val expectedIds = mutableSetOf<String>()
+            repeat(2) {
+                val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
+                val wallet = createWallet(walletId, offer.attestation)
+                wallet.signingIdentity.initialize().activeIdentity()
+                val redirect = "walbatchtest://callback"
+                val session = wallet.startIssuance(MobileWalletIssuanceRequest(
+                    MobileWalletCredentialOffer.Uri(offer.offerUrl), clientId = "wallet-client", redirectUri = redirect))
+                val outcome = if (authorized) {
+                    val authorization = wallet.beginAuthorizationIssuance(session.id)
+                    assertNotNull(Url(authorization.url).parameters["request_uri"])
+                    val reopened = createWallet(walletId, offer.attestation)
+                    reopened.signingIdentity.initialize().activeIdentity()
+                    var callback = authorization.url
+                    HttpClient { followRedirects = false }.use { browser ->
+                        repeat(8) {
+                            if (!callback.startsWith("$redirect?")) {
+                                val response = browser.get(callback)
+                                assertTrue(response.status in listOf(HttpStatusCode.Found, HttpStatusCode.SeeOther))
+                                callback = assertNotNull(response.headers[HttpHeaders.Location])
+                            }
                         }
                     }
-                }
-                assertTrue(callback.startsWith("$redirect?"))
-                reopened.continueAuthorizationIssuance(session.id, callback)
-            } else wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)
-            val stored = assertIs<WalletIssuanceOutcome.Stored>(outcome)
-            assertEquals(1, stored.credentialIds.size)
-            val reopened = createWallet(walletId, offer.attestation)
-            assertEquals(stored.credentialIds.toSet(), reopened.credentials().map { it.id }.toSet())
-            val trace = fixture.challengeTrace(assertNotNull(offer.challengeTraceId))
-            assertEquals(1, trace["verified"], "Real issuer challenge exchange did not match $scenarioId: $trace")
+                    assertTrue(callback.startsWith("$redirect?"))
+                    reopened.continueAuthorizationIssuance(session.id, callback)
+                } else wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)
+                val stored = assertIs<WalletIssuanceOutcome.Stored>(outcome)
+                assertEquals(1, stored.credentialIds.size)
+                val reopened = createWallet(walletId, offer.attestation)
+                expectedIds.addAll(stored.credentialIds)
+                assertEquals(expectedIds, reopened.credentials().map { it.id }.toSet())
+                val trace = fixture.challengeTrace(assertNotNull(offer.challengeTraceId))
+                assertEquals(1, trace["verified"], "Real issuer challenge exchange did not match $scenarioId: $trace")
+            }
         }
     }
 

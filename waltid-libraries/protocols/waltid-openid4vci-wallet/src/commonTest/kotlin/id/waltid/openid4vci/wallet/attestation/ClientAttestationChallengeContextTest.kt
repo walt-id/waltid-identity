@@ -40,10 +40,10 @@ class ClientAttestationChallengeContextTest {
     }
 
     @Test
-    fun restoredChallengeDoesNotRequireDiscoveryAndCancellationPropagates() = runTest {
+    fun restoredChallengeCannotSuppressDiscoveryAndCancellationPropagates() = runTest {
         val client = HttpClient(MockEngine) { engine { addHandler { throw CancellationException("cancelled") } } }
         val restored = ClientAttestationChallengeContext("restored", "nonce")
-        restored.prepare(client, "https://as.example/challenge")
+        assertFailsWith<CancellationException> { restored.prepare(client, "https://as.example/challenge") }
         assertEquals("restored", restored.challenge)
         assertFailsWith<CancellationException> { ClientAttestationChallengeContext().prepare(client, "https://as.example/challenge") }
         client.close()

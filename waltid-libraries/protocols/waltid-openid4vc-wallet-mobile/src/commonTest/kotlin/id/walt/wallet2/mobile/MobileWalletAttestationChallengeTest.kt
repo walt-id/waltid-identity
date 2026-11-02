@@ -101,25 +101,29 @@ class MobileWalletAttestationChallengeTest {
             }
             fun openWallet() = MobileWallet(walletId = "challenge", keyStore = keys, didStore = dids,
                 credentialStore = credentials, issuanceSessionStore = records, issuanceHttpClient = http, attestationProvider = provider)
-            val wallet = openWallet()
-            val grants = if (authorized) """{"authorization_code":{}}""" else
-                """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"single-use-code"}}"""
-            val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":$grants}"""),
-                clientId = "wallet", redirectUri = "openid://callback", keyId = "instance"))
-            val outcome = if (authorized) {
-                val authorization = wallet.beginAuthorizationIssuance(session.id)
-                assertNotNull(Url(authorization.url).parameters["request_uri"])
-                // A new SDK object must recover freshness and PKCE from the persisted session.
-                openWallet().continueAuthorizationIssuance(session.id, "openid://callback?code=code&state=${authorization.state}")
-            } else wallet.continuePreAuthorizedIssuance(session.id)
-            assertIs<WalletIssuanceOutcome.Deferred>(outcome)
-            assertEquals(if (discovery) 1 else 0, discoveries)
-            assertEquals(if (authorized) 2 else 1, attesterCalls)
-            forms.forEach { (path, requests) ->
-                assertEquals(if (discovery) 1 else 2, requests.size)
-                assertEquals(1, requests.distinct().size)
-                assertEquals(requests.size, pops.getValue(path).map { it["jti"] }.distinct().size)
+            repeat(2) { iteration ->
+                forms.clear()
+                pops.clear()
+                val wallet = openWallet()
+                val grants = if (authorized) """{"authorization_code":{}}""" else
+                    """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"single-use-code"}}"""
+                val session = wallet.startIssuance(MobileWalletIssuanceRequest(
+                    offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":$grants}"""),
+                    clientId = "wallet", redirectUri = "openid://callback", keyId = "instance"))
+                val outcome = if (authorized) {
+                    val authorization = wallet.beginAuthorizationIssuance(session.id)
+                    assertNotNull(Url(authorization.url).parameters["request_uri"])
+                    // A new SDK object must recover freshness and PKCE from the persisted session.
+                    openWallet().continueAuthorizationIssuance(session.id, "openid://callback?code=code&state=${authorization.state}")
+                } else wallet.continuePreAuthorizedIssuance(session.id)
+                assertIs<WalletIssuanceOutcome.Deferred>(outcome)
+                assertEquals(if (discovery) iteration + 1 else 0, discoveries)
+                assertEquals((if (authorized) 2 else 1) * (iteration + 1), attesterCalls)
+                forms.forEach { (path, requests) ->
+                    assertEquals(if (discovery) 1 else 2, requests.size)
+                    assertEquals(1, requests.distinct().size)
+                    assertEquals(requests.size, pops.getValue(path).map { it["jti"] }.distinct().size)
+                }
             }
             http.close()
         }

@@ -91,27 +91,19 @@ class ClientAttestationTransportTest {
         }
     }
 
-    @Test fun challengeEndpointCanReturnOnlyDpopNonce() = runTest {
-        val context = ClientAttestationChallengeContext()
-        var discoveries = 0
+    @Test fun challengeEndpointRequiresAttestationEvenWithDpop() = runTest {
         val client = HttpClient(MockEngine) { engine { addHandler {
-            discoveries++
             respond("{}", HttpStatusCode.OK, headersOf("DPoP-Nonce", "dpop-only"))
         } } }
         try {
-            context.prepare(client, "https://as.example/challenge", useDpop = true)
-            // Discovery happens once even when this server only provides DPoP freshness.
-            context.prepare(client, "https://as.example/challenge", useDpop = true)
-            assertNull(context.challenge)
-            assertEquals("dpop-only", context.dpopNonce)
-            assertEquals(1, discoveries)
-            assertFailsWith<WalletAttestationChallengeRequestException> {
+            val error = assertFailsWith<WalletAttestationChallengeRequestException> {
                 ClientAttestationChallengeContext().prepare(client, "https://as.example/challenge")
             }
+            assertEquals(WalletAttestationChallengeRequestError.INVALID_RESPONSE, error.error)
         } finally { client.close() }
     }
 
-    @Test fun dpopOnlyModeStillRejectsMissingOrMalformedFreshness() = runTest {
+    @Test fun challengeEndpointRejectsMissingOrMalformedAttestation() = runTest {
         for ((body, nonce) in listOf("{}" to "", "{}" to " ",
             """{"attestation_challenge":null}""" to "nonce",
             """{"attestation_challenge":5}""" to "nonce",
@@ -121,7 +113,7 @@ class ClientAttestationTransportTest {
             } } }
             try {
                 assertFailsWith<WalletAttestationChallengeRequestException> {
-                    ClientAttestationChallengeContext().prepare(client, "https://as.example/challenge", useDpop = true)
+                    ClientAttestationChallengeContext().prepare(client, "https://as.example/challenge")
                 }
             } finally { client.close() }
         }

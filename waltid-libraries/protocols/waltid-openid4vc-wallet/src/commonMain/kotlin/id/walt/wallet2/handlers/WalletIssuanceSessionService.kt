@@ -490,6 +490,8 @@ class WalletIssuanceSessionService(
             keyId = selectedKeyId,
             did = request.did ?: wallet.defaultDid(),
             authorization = null,
+            attestationChallenge = resolved.discoveryHeaders["OAuth-Client-Attestation-Challenge"],
+            authorizationServerDpopNonce = resolved.discoveryHeaders["DPoP-Nonce"],
             state = SessionState.AWAITING_ACCEPTANCE,
             expiresAtEpochMilliseconds = nowEpochMilliseconds() +
                     sessionPolicy.reviewTtl.inWholeMilliseconds,
@@ -1399,14 +1401,13 @@ class WalletIssuanceSessionService(
         require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
             "Authorization server metadata issuer does not match the selected server"
         }
-        runtime.challengeContext(selectedAuthorizationServer, request.clientId,
-            keyMaterial.jwkThumbprint()).observe(asResolution.headers)
+
         val offered = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
             else requireNotNull(request.credentialConfigurationIds).map {
                 OfferedCredentialResolver.ResolvedCredentialOffer(it, issuerMetadata.metadata.credentialConfigurationsSupported.getValue(it))
             }
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
-        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered)
+        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered, asResolution.headers)
     }
 
     private fun selectAuthorizationServer(
@@ -1579,7 +1580,7 @@ class WalletIssuanceSessionService(
         val metadata = active.resolved.authorizationServerMetadata
         val context = challengeContext(active)
         try {
-            context.prepare(httpClient, metadata.challengeEndpoint, active.dpopAlgorithms() != null)
+            context.prepare(httpClient, metadata.challengeEndpoint)
             syncFreshness(active, context)
         } catch (error: CancellationException) {
             throw error
@@ -1615,7 +1616,7 @@ class WalletIssuanceSessionService(
         active.challengeContext ?: runtime.challengeContext(
             active.resolved.authorizationServerMetadata.issuer, active.request.clientId,
             active.keyMaterial.jwkThumbprint(),
-            active.attestationChallenge, active.authorizationServerDpopNonce,
+            active.attestationChallenge, active.authorizationServerDpopNonce, flowId = active.public.id,
         ).also { active.challengeContext = it }
 
     private suspend fun syncFreshness(active: ActiveSession, context: ClientAttestationChallengeContext) {
@@ -1868,9 +1869,20 @@ class WalletIssuanceSessionService(
     }
 
     private suspend fun removePersistedActive(active: ActiveSession) {
-        active.persistedSnapshot?.let { expected ->
-            runtime.compareAndSet(expected, null)
+        val expected = active.persistedSnapshot
+        if (expected == null || runtime.compareAndSet(expected, null)) {
             active.persistedSnapshot = null
+            removeFlowFreshnessBestEffort(active.public.id)
+        }
+    }
+
+    private suspend fun removeFlowFreshnessBestEffort(sessionId: String) {
+        try {
+            runtime.removeChallengeFlow(sessionId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            log.warn { "Could not clean up completed issuance freshness" }
         }
     }
 
@@ -2096,7 +2108,10 @@ class WalletIssuanceSessionService(
         if (!runtime.compareAndSet(record, null)) return false
         when (record.kind) {
             WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS -> Unit
-            WalletIssuanceSessionRecordKind.ACTIVE_SESSION -> sessions.remove(record.sessionId)
+            WalletIssuanceSessionRecordKind.ACTIVE_SESSION -> {
+                sessions.remove(record.sessionId)
+                removeFlowFreshnessBestEffort(record.sessionId)
+            }
             WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL ->
                 deferred.entries.removeAll { deferredRecordId(it.key) == record.id }
         }
@@ -2221,6 +2236,7 @@ class WalletIssuanceSessionService(
         val issuerMetadata: ResolvedCredentialIssuerMetadata,
         val authorizationServerMetadata: AuthorizationServerMetadata,
         val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+        val discoveryHeaders: io.ktor.http.Headers = io.ktor.http.Headers.Empty,
     ) {
         val grantType: GrantType? get() = if (offer == null) GrantType.AuthorizationCode else offer.getGrantType()
     }

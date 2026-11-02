@@ -10,8 +10,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * Client attestation freshness state for one client instance and authorization server.
- * The owner scopes this context to its wallet, server, client ID and instance key. Challenges are
+ * Client attestation freshness and preparation for one issuance flow.
+ * The owner scopes this context to its flow, wallet, server, client ID and instance key. Challenges are
  * opaque: their lifetime and reuse policy belong to the server, not to the wallet.
  */
 class ClientAttestationChallengeContext(
@@ -20,7 +20,7 @@ class ClientAttestationChallengeContext(
     private val onUpdate: suspend (challenge: String?, dpopNonce: String?) -> Unit = { _, _ -> },
     private val load: suspend () -> WalletAttestationChallengeResult? = { null },
     /** Atomically merges supplied fields and returns authoritative state; true means seed missing fields only. */
-    private val persist: (suspend (challenge: String?, dpopNonce: String?, onlyIfAbsent: Boolean) -> WalletAttestationChallengeResult)? = null,
+    private val persist: (suspend (challenge: String?, dpopNonce: String?, onlyIfAbsent: Boolean, prepared: Boolean) -> WalletAttestationChallengeResult)? = null,
 ) {
     private val mutex = Mutex()
     private data class Freshness(val challenge: String?, val dpopNonce: String?)
@@ -30,13 +30,13 @@ class ClientAttestationChallengeContext(
     val challenge: String? get() = freshness.value.challenge
     val dpopNonce: String? get() = freshness.value.dpopNonce
 
-    /** Discover freshness only when this context does not already hold a challenge. */
-    suspend fun prepare(httpClient: HttpClient, challengeEndpoint: String?, useDpop: Boolean = false) = mutex.withLock {
+    /** Prepare this issuance flow once, regardless of previously observed freshness. */
+    suspend fun prepare(httpClient: HttpClient, challengeEndpoint: String?) = mutex.withLock {
         reload()
-        if (challenge == null && !discovered && challengeEndpoint != null) {
-            val result = WalletAttestationChallengeRequestBuilder(httpClient).requestChallengeDetailed(challengeEndpoint, useDpop)
+        if (!discovered && challengeEndpoint != null) {
+            val result = WalletAttestationChallengeRequestBuilder(httpClient).requestChallengeDetailed(challengeEndpoint)
             reload()
-            update(result.attestationChallenge, result.dpopNonce)
+            update(result.attestationChallenge, result.dpopNonce, prepared = true)
             discovered = true
         }
     }
@@ -54,14 +54,17 @@ class ClientAttestationChallengeContext(
     }
 
     private suspend fun reload() {
-        load()?.let { freshness.value = Freshness(it.attestationChallenge, it.dpopNonce) }
+        load()?.let {
+            freshness.value = Freshness(it.attestationChallenge, it.dpopNonce)
+            discovered = discovered || it.prepared
+        }
     }
 
-    private suspend fun update(nextChallenge: String?, nextDpopNonce: String?, onlyIfAbsent: Boolean = false) {
+    private suspend fun update(nextChallenge: String?, nextDpopNonce: String?, onlyIfAbsent: Boolean = false, prepared: Boolean = false) {
         val suppliedChallenge = nextChallenge?.takeIf(String::isNotBlank)
         val suppliedNonce = nextDpopNonce?.takeIf(String::isNotBlank)
         if (suppliedChallenge == null && suppliedNonce == null) return
-        val saved = persist?.invoke(suppliedChallenge, suppliedNonce, onlyIfAbsent)
+        val saved = persist?.invoke(suppliedChallenge, suppliedNonce, onlyIfAbsent, prepared)
         val next = saved?.let { Freshness(it.attestationChallenge, it.dpopNonce) } ?: Freshness(
             if (onlyIfAbsent) challenge ?: suppliedChallenge else suppliedChallenge ?: challenge,
             if (onlyIfAbsent) dpopNonce ?: suppliedNonce else suppliedNonce ?: dpopNonce,

@@ -70,14 +70,15 @@ class WalletAttestationFreshnessTest {
                         Json.parseToJsonElement(metadata).jsonObject + mapOf(
                             "challenge_endpoint" to JsonPrimitive("$issuer/challenge"),
                             "dpop_signing_alg_values_supported" to buildJsonArray { add("ES256") })).toString())
+                    "/challenge" -> jsonResponse("""{"attestation_challenge":"endpoint-challenge"}""")
                     "/par" -> {
                         parRequests++
-                        assertEquals("fallback-challenge", claims(request)["challenge"]?.jsonPrimitive?.content)
+                        assertEquals("endpoint-challenge", claims(request)["challenge"]?.jsonPrimitive?.content)
                         jsonResponse("""{"request_uri":"urn:par:fallback","expires_in":60}""", HttpStatusCode.Created)
                     }
                     "/token" -> {
                         tokenRequests++
-                        assertEquals("fallback-challenge", claims(request)["challenge"]?.jsonPrimitive?.content)
+                        assertEquals("endpoint-challenge", claims(request)["challenge"]?.jsonPrimitive?.content)
                         val dpop = Json.parseToJsonElement(CompactJws.decodeUnverified(
                             requireNotNull(request.headers["DPoP"])).payload.decodeToString()).jsonObject
                         assertEquals("fallback-nonce", dpop["nonce"]?.jsonPrimitive?.content)
@@ -102,7 +103,7 @@ class WalletAttestationFreshnessTest {
         }
     }
 
-    @Test fun latestChallengeIsSharedBetweenSessionsOfSameClientInstance() = runTest {
+    @Test fun challengeHeadersRemainIsolatedBetweenIssuanceFlows() = runTest {
         val parChallenges = mutableListOf<String?>()
         var tokenChallenge: String? = null
         val http = client { request ->
@@ -128,11 +129,11 @@ class WalletAttestationFreshnessTest {
             engine.beginAuthorization(second.id)
             assertIs<WalletIssuanceOutcome.Deferred>(service(http, wallet, store).continueAuthorization(WalletIssuanceAuthorizationCallback(
                 first.id, "openid://callback?code=code&state=${auth.state}")))
-            assertEquals(listOf(null, "challenge-1", "challenge-2"), parChallenges + tokenChallenge)
+            assertEquals(listOf(null, null, "challenge-1"), parChallenges + tokenChallenge)
         } finally { http.close() }
     }
 
-    @Test fun nonceOnlyDiscoveryIsUsedByTheFirstDpopProof() = runTest {
+    @Test fun nonceOnlyDiscoveryCannotReplaceAttestationChallenge() = runTest {
         var discoveries = 0
         val http = client { request ->
             when (request.url.encodedPath) {
@@ -158,9 +159,56 @@ class WalletAttestationFreshnessTest {
         }
         try {
             val engine = service(http)
-            assertIs<WalletIssuanceOutcome.Deferred>(engine.continuePreAuthorized(engine.start(request(false)).id))
+            assertIs<WalletIssuanceOutcome.Failed>(engine.continuePreAuthorized(engine.start(request(false)).id))
             assertEquals(1, discoveries)
         } finally { http.close() }
+    }
+
+    @Test fun repeatedIssuanceFetchesPerFlowWithAndWithoutPar() = runTest {
+        for (authorized in listOf(false, true)) for (par in listOf(false, true)) {
+            var fetches = 0
+            var tokenRequests = 0
+            val flowMetadata = JsonObject(Json.parseToJsonElement(metadata).jsonObject.toMutableMap().apply {
+                put("challenge_endpoint", JsonPrimitive("$issuer/challenge"))
+                if (!par) remove("pushed_authorization_request_endpoint")
+            }).toString()
+            val http = client { request ->
+                when (request.url.encodedPath) {
+                    "/.well-known/openid-credential-issuer" -> jsonResponse(issuerMetadata)
+                    "/.well-known/oauth-authorization-server" -> jsonResponse(flowMetadata, challenge = "old-metadata")
+                    "/challenge" -> { fetches++; jsonResponse("""{"attestation_challenge":"endpoint-$fetches"}""") }
+                    "/par" -> {
+                        assertEquals("endpoint-$fetches", claims(request)["challenge"]?.jsonPrimitive?.content)
+                        jsonResponse("""{"request_uri":"urn:par:$fetches","expires_in":60}""", HttpStatusCode.Created, "par-$fetches")
+                    }
+                    "/token" -> {
+                        tokenRequests++
+                        assertEquals(if (authorized && par) "par-$fetches" else "endpoint-$fetches",
+                            claims(request)["challenge"]?.jsonPrimitive?.content)
+                        jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                    }
+                    "/credential" -> jsonResponse("""{"transaction_id":"tx-$tokenRequests","interval":5}""", HttpStatusCode.Accepted)
+                    else -> error("Unexpected request ${request.url}")
+                }
+            }
+            try {
+                val wallet = Wallet("wallet", staticKey = JWKKey.generate(KeyType.secp256r1))
+                val store = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+                val engine = service(http, wallet, store)
+                repeat(2) { iteration ->
+                    val session = engine.start(request(authorized))
+                    assertEquals(iteration, fetches, "Preview must not fetch")
+                    val outcome = if (authorized) {
+                        val authorization = engine.beginAuthorization(session.id)
+                        service(http, wallet, store).continueAuthorization(WalletIssuanceAuthorizationCallback(
+                            session.id, "openid://callback?code=code-$iteration&state=${authorization.state}"))
+                    } else engine.continuePreAuthorized(session.id)
+                    assertIs<WalletIssuanceOutcome.Deferred>(outcome)
+                    assertEquals(iteration + 1, fetches)
+                    assertTrue(store.list().none { it.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS })
+                }
+            } finally { http.close() }
+        }
     }
 
 }
