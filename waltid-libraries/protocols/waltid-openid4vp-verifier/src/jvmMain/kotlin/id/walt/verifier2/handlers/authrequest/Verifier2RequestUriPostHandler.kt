@@ -109,10 +109,7 @@ object Verifier2RequestUriPostHandler {
         // wallet_nonce is ephemeral per request. Share the GET handler's status rule so a signed
         // fetch does not move a finished or in-progress session back to IN_USE.
         updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
-            if (status.successful == null &&
-                status != Verification2Session.VerificationSessionStatus.PROCESSING_FLOW &&
-                status != Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
-            ) {
+            if (needsInUseTransition) {
                 status = Verification2Session.VerificationSessionStatus.IN_USE
             }
         }
