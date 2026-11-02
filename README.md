@@ -107,7 +107,7 @@ Some popular libraries you may want to look at are:
 - **W3C Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-w3c-credentials)) - issue and verify W3C credentials as JWTs and SD-JWTs.
 - **mdoc Credentials** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-mdoc-credentials2)) - issue and verify mdoc credentials (mDL ISO/IEC 18013-5).
 - **SD-JWT** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt)) - create and verify Selective Disclosure JWTs.
-- **OpenID4VCI** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci)) - implementation of the OID4VCI 1.0 protocol. Passes the OpenID Foundation conformance tests (results to be published).
+- **OpenID4VCI** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci)) - implementation of the OID4VCI 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) - implementation of the OpenID4VP 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **Core Wallet** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - implementation of the Core Wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
 
