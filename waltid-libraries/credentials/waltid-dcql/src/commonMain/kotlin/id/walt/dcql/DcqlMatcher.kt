@@ -66,28 +66,12 @@ object DcqlMatcher {
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
             for (credential in potentialMatchesByFormat) {
-                val metaCheck = matchesMeta(credential, credentialQuery.meta, credentialQuery.format, contextDocuments)
-                if (!metaCheck) {
-                    log.trace { "Credential ${credential.id} failed meta check for query ${credentialQuery.id}" }
-                    continue
-                }
-
-                val authoritiesCheck = matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities, trustedAuthoritiesChecker)
-                if (!authoritiesCheck) {
-                    log.trace { "Credential ${credential.id} failed trusted authorities check for query ${credentialQuery.id}" }
-                    continue
-                }
-
-                val claimsMatchResult = matchesClaimsAndGetSelected(credential, credentialQuery.claims, credentialQuery.claimSets)
-
-                if (claimsMatchResult.isSuccess) {
-                    successfullyMatchedCredentialsForThisQuery.add(
-                        DcqlMatchResult(credential, claimsMatchResult.getOrThrow(), originalQuery = credentialQuery)
-                    )
-                    log.trace { "Credential ${credential.id} processed for claims for query ${credentialQuery.id}. Selected: ${claimsMatchResult.getOrThrow()}" }
-                } else {
-                    log.trace { "Credential ${credential.id} failed claims processing for query ${credentialQuery.id}: ${claimsMatchResult.exceptionOrNull()?.message}" }
-                }
+                matchCredential(credentialQuery, credential, contextDocuments, trustedAuthoritiesChecker)
+                    .onSuccess {
+                        successfullyMatchedCredentialsForThisQuery.add(it)
+                        log.trace { "Credential ${credential.id} matches query ${credentialQuery.id}. Selected: ${it.selectedDisclosures}" }
+                    }
+                    .onFailure { log.trace { "Credential ${credential.id} does not match query ${credentialQuery.id}: ${it.message}" } }
             }
 
             if (successfullyMatchedCredentialsForThisQuery.isNotEmpty()) {
@@ -108,6 +92,40 @@ object DcqlMatcher {
 
         log.debug { "Individual matches found: ${finalIndividualMatches.mapValues { entry -> entry.value.map { it.credential.id } }}" }
         return Result.success(finalIndividualMatches)
+    }
+
+    /**
+     * Checks one credential against one Credential Query: `format`, `meta`, `trusted_authorities`, `claims`
+     * and `claim_sets`. A verifier uses it to validate that a returned credential meets the criteria of the
+     * query it was returned for (OpenID4VP 1.0 §8.6, step 2).
+     *
+     * Fails with a [DcqlMatchException] naming the constraint that is not met. As in [findMatches],
+     * `trusted_authorities` fails closed without a [trustedAuthoritiesChecker].
+     */
+    fun matchCredential(
+        credentialQuery: CredentialQuery,
+        credential: DcqlCredential,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<DcqlMatchResult> {
+        if (credential.format !in credentialQuery.format.id) {
+            return Result.failure(DcqlMatchException("format '${credential.format}' is not '${credentialQuery.format.id.first()}'"))
+        }
+        if (!matchesMeta(credential, credentialQuery.meta, credentialQuery.format, contextDocuments)) {
+            return Result.failure(DcqlMatchException("meta ${credentialQuery.meta.constraintName()} is not satisfied"))
+        }
+        if (!matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities, trustedAuthoritiesChecker)) {
+            return Result.failure(DcqlMatchException("trusted_authorities is not satisfied"))
+        }
+        return matchesClaimsAndGetSelected(credential, credentialQuery.claims, credentialQuery.claimSets)
+            .map { DcqlMatchResult(credential, it, originalQuery = credentialQuery) }
+    }
+
+    private fun CredentialQueryMeta.constraintName(): String = when (this) {
+        is JwtVcJsonMeta -> "type_values"
+        is SdJwtVcMeta -> "vct_values"
+        is MsoMdocMeta -> "doctype_value"
+        else -> "constraint"
     }
 
     /**
