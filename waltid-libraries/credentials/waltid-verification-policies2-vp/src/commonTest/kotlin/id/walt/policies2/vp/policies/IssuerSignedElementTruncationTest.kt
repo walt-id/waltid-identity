@@ -1,7 +1,8 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class, kotlinx.serialization.cbor.DelicateCborApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, DelicateCborApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.policies2.vp.policies
 
+import kotlin.ExperimentalUnsignedTypes
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborString
@@ -10,6 +11,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.DelicateCborApi
 
 /**
  * Element values belong in a policy result, a portrait does not.

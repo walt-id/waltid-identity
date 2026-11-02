@@ -1,5 +1,6 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import id.walt.mdoc.encoding.MdocTDateMode
@@ -19,6 +20,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class MdocTDateFormatTest {
 

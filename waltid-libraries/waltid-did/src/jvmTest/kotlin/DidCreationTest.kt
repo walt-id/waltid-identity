@@ -50,7 +50,7 @@ class DidCreationTest {
         val didDoc2 = result.didDocument.toJsonObject()
         assertNotNull(didDoc2["@context"])
         assertNotNull(didDoc2["@context"]?.jsonArray)
-        assertTrue { didDoc2["@context"]!!.jsonArray.isNotEmpty() }
+        assertTrue(didDoc2["@context"]!!.jsonArray.isNotEmpty())
     }
 
     @Test

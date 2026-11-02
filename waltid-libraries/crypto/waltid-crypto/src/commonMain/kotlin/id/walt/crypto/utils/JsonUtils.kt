@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.crypto.utils
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url

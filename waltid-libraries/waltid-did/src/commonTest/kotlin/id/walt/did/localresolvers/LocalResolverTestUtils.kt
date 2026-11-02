@@ -11,10 +11,10 @@ object LocalResolverTestUtils {
         results.forEach { (did, result) ->
             println("$did -> $result")
         }
-        assertTrue { results.all { it.value.isSuccess } }
+        assertTrue(results.all { it.value.isSuccess })
 
         val keyTypes = results.map { it.value.getOrThrow().keyType }
-        assertTrue { keyTypes.all { it == expectedKeyType } }
+        assertTrue(keyTypes.all { it == expectedKeyType })
 
         return results
 

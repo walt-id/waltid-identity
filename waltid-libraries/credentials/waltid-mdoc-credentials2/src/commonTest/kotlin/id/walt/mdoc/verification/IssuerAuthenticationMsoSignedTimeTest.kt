@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.verification
 
 import id.walt.certificate.x509.X509Certificate
@@ -25,6 +27,7 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class IssuerAuthenticationMsoSignedTimeTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())

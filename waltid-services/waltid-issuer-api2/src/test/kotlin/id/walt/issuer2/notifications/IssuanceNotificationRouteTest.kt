@@ -74,7 +74,7 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readUTF8Line
+import io.ktor.utils.io.readLine
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
@@ -841,7 +841,7 @@ class IssuanceNotificationRouteTest {
 
     private suspend fun readNextSseData(channel: ByteReadChannel): String {
         while (true) {
-            val line = channel.readUTF8Line()
+            val line = channel.readLine()
                 ?: error("SSE stream closed before an event was received")
             if (line.startsWith("data:")) {
                 return line.removePrefix("data:").trim()
