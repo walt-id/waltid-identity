@@ -225,6 +225,15 @@ object AuthorizationRequestResolver {
         sendWalletMetadata: Boolean,
         audienceOverride: String?,
     ): RequestUriFetchResponse {
+        if (requestUriMethod == RequestUriHttpMethod.POST) {
+            val url = Url(requestUri)
+            // Section 5.10 mandates HTTPS. Explicit fetcher HTTP configuration is for development only.
+            require(url.protocol == URLProtocol.HTTPS ||
+                    (url.protocol == URLProtocol.HTTP &&
+                            webResolveAuthReq.dataFetcherConfiguration.url?.protocols?.allowHttp == true)) {
+                "request_uri_method=post requires HTTPS"
+            }
+        }
         val walletNonce = requestUriMethod
             .takeIf { it == RequestUriHttpMethod.POST }
             ?.let { UuidUtils.randomUUIDString().replace("-", "") }
@@ -485,21 +494,28 @@ object AuthorizationRequestResolver {
             "AuthorizationRequest cannot be retrieved (${response.status}) from $requestUri: ${response.body}"
         }
 
-        if (enforceFinalRequestObject && requestUriMethod == RequestUriHttpMethod.POST) {
+        if (requestUriMethod == RequestUriHttpMethod.POST) {
             requireNotNull(response.walletNonce) {
                 "request_uri_method=post response is missing the wallet_nonce binding"
             }
         }
 
         val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
+        if (requestUriMethod == RequestUriHttpMethod.POST) {
+            require(contentType.match("application/oauth-authz-req+jwt")) {
+                "request_uri_method=post requires application/oauth-authz-req+jwt"
+            }
+        }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
                 outerClientId = outerClientId,
-                enforceFinalRequestObject = enforceFinalRequestObject,
-                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                enforceFinalRequestObject = enforceFinalRequestObject || requestUriMethod == RequestUriHttpMethod.POST,
+                unsignedRequestObjectPolicy = if (requestUriMethod == RequestUriHttpMethod.POST) {
+                    UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+                } else unsignedRequestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
                 trustConfiguration = trustConfiguration,
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
