@@ -123,4 +123,4 @@ Some popular libraries you may want to look at are:
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
-LLM? Read [llms.txt](./llms.txt).
+LLM? Read [llms.txt](./llms.txt) and the [walt.id facts page](https://walt.id/facts).
