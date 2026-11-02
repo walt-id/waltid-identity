@@ -45,7 +45,15 @@ data class KtorSessionNotifications(
         @SerialName("bearer_token")
         val bearerToken: String? = null,
 
+        /** Shared secret used to authenticate each outbound attempt with HMAC-SHA256. */
+        @SerialName("signing_secret")
+        val signingSecret: String? = null,
+
         @SerialName("retry_policy")
         val retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy(),
-    )
+    ) {
+        init {
+            require(signingSecret == null || signingSecret.isNotBlank()) { "signing_secret must not be blank" }
+        }
+    }
 }

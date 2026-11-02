@@ -38,6 +38,8 @@ data class WebhookDelivery(
     val lastError: String? = null,
     val leaseId: String? = null,
     val leaseUntilEpochMilliseconds: Long? = null,
+    /** Nullable for outbox records written before outbound signing was supported. */
+    val signingSecret: String? = null,
 ) {
     fun deadLetter(): WebhookDeadLetter = WebhookDeadLetter(
         deliveryId = deliveryId,
