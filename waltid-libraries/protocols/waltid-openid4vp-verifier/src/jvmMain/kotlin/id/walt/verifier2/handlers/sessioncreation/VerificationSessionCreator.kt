@@ -390,8 +390,6 @@ object VerificationSessionCreator {
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
             clientId = effectiveClientId,
-            // Section 5.1: advertise verifier capabilities before the wallet's POST exchange.
-            clientMetadata = effectiveClientMetadata.takeIf { isSignedRequest },
 
             nonce = null, // not required in the initial request yet
             responseType = null

@@ -40,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 
@@ -76,8 +77,10 @@ class Verifier2RequestUriPostCrypto2Test {
 
             val bootstrapUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
             assertEquals("post", bootstrapUrl.parameters["request_uri_method"])
-            val bootstrapMetadata = Json.parseToJsonElement(assertNotNull(bootstrapUrl.parameters["client_metadata"])).jsonObject
-            assertNotNull(bootstrapMetadata["vp_formats_supported"])
+            // The request_uri front channel is only client_id, request_uri, and request_uri_method.
+            // client_metadata stays in the fetched Request Object. Putting it on the bootstrap makes
+            // the OpenID conformance suite return WARNING and fail negative tests.
+            assertNull(bootstrapUrl.parameters["client_metadata"])
             val originalRequestObject = assertNotNull(session.signedAuthorizationRequestJwt)
             val originalKid = assertNotNull(
                 CompactJws.decodeUnverified(originalRequestObject).protectedHeader["kid"]?.jsonPrimitive?.content

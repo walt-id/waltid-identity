@@ -218,7 +218,8 @@ The wallet must POST `wallet_metadata` containing inline encryption `jwks`. The
 `request_object_encryption_enc_values_supported` lists are optional. When absent,
 this implementation uses its `ECDH-ES` / `A128GCM` request-encryption profile.
 Explicit lists must permit `ECDH-ES` and either `A128GCM` or `A256GCM`.
-The bootstrap includes verifier capabilities unless supplied out of band.
+The bootstrap URL carries only `client_id`, `request_uri`, and `request_uri_method`.
+Verifier capabilities stay in the fetched Request Object.
 Verifier2 returns a JWE wrapping the signed JWT, echoes `wallet_nonce`, and fails
 if no usable encryption key exists. Wallet2's shared backend/mobile resolver
 already supplies an ephemeral key and validates the decrypted inner JWS.
