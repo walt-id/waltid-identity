@@ -313,3 +313,7 @@ $CLI cbades augment --package all.zip --tsa-url https://tsa.example/tsr --partic
   participants (forum) so they can build the chains, as CORUH did.
 - `--trust` accepts extra self-signed roots (trust anchors), intermediate certificates and CRLs, for example the roots
   of other participants' test PKIs.
+- `testcases/cbades/trust/` holds the public roots and CRLs other participants published (CORUH test PKI, InfoCert RSA
+  "CA 3 CL" for ESS second signers) and our own test-PKI root; pass it with `--trust testcases/cbades/trust`.
+- `scripts/cbades-portal.sh` downloads the package, uploads zips, lists registered signatures and runs the online
+  conformance checker (`ETSI_USER` / `ETSI_PASSWORD` from the environment).
