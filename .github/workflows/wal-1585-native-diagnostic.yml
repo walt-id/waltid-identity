@@ -1,0 +1,89 @@
+name: WAL-1585 bounded native animation lifecycle diagnostic
+
+on:
+  push:
+    branches: [chore/wal-1585-animation-lifecycle-20261102]
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+
+jobs:
+  native:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact failing source tuple
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          resolved-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"bdaa07ff9fce01be07e48ac73bd5b795eddfa481","enterprise":"d029b96f8f26fbdbfec32cd40aefe8aaeb9c03d5","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+      - name: Checkout diagnostic instrumentation separately
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: native-diagnostic
+          sparse-checkout: .github/scripts/ci/native-animation-lifecycle.patch
+          sparse-checkout-cone-mode: false
+      - name: Restore existing release framework
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: '13136130199'
+          run-id: '41429791118'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/wallet-core-artifact
+          merge-multiple: true
+      - name: Verify producer identity and framework bytes
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
+      - name: Apply temporary lifecycle logging and bounded case selection
+        working-directory: waltid-identity
+        run: |
+          git apply ../native-diagnostic/.github/scripts/ci/native-animation-lifecycle.patch
+          git diff --check
+          git diff --stat
+      - name: Verify the hosted XCTest animation monitor boundary
+        shell: bash
+        run: |
+          mkdir -p ios-ci-logs
+          monitor="$DEVELOPER_DIR/Platforms/iPhoneSimulator.platform/Developer/Library/PrivateFrameworks/XCTAutomationSupport.framework/XCTAutomationSupport"
+          xcodebuild -version > ios-ci-logs/xct-monitor-toolchain.txt
+          shasum -a 256 "$monitor" >> ios-ci-logs/xct-monitor-toolchain.txt
+          nm -arch arm64 "$monitor" > ios-ci-logs/xct-monitor-symbols.txt
+          for symbol in _XCTAnimationDidStart _XCTAnimationDidStop _XCTActiveAnimationsCount; do
+            grep -F "$symbol" ios-ci-logs/xct-monitor-symbols.txt
+          done
+          strings "$monitor" | grep -F UIViewAnimationState > ios-ci-logs/xct-monitor-classes.txt
+          xcrun llvm-objdump --macho --arch=arm64 --disassemble "$monitor" > "$RUNNER_TEMP/xct-monitor-disassembly.txt"
+          awk '/^_XCTAnimationDidStart:$/ { printing=1 } printing { print } /^\+\[XCTAnimationsIdleNotifier handleAnimationsIdle\]:$/ { exit }' "$RUNNER_TEMP/xct-monitor-disassembly.txt" > ios-ci-logs/xct-monitor-callbacks.asm
+          test -s ios-ci-logs/xct-monitor-callbacks.asm
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+      - name: Diagnose the native unit and mock suites in their ordinary order
+        timeout-minutes: 75
+        uses: ./waltid-identity/.github/actions/gradle-ios
+        with:
+          waltid-directory: waltid-identity
+          simulator-destination: platform=iOS Simulator,name=iPhone 17,OS=27.0
+          wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
+          run-ios-simulator-tests: 'false'
+          run-wallet-sdk-tests: 'false'
+          run-native-demo-tests: 'true'
+          run-compose-demo-tests: 'false'
+          collect-test-diagnostics: on-failure
+          collect-test-reports: 'false'
+          test-result-artifact-name: native-animation-lifecycle-results
+      - name: Preserve diagnostic logs and results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-animation-lifecycle-diagnostic
+          path: |
+            ios-ci-logs/
+            waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult/
+          retention-days: 7
+          if-no-files-found: error

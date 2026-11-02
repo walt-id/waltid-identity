@@ -1,0 +1,178 @@
+diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
+index 6a3acd1435..a60471c53b 100644
+--- a/.github/actions/gradle-ios/action.yml
++++ b/.github/actions/gradle-ios/action.yml
+@@ -184,6 +184,15 @@ runs:
+         simulator=$(xcrun simctl create 'Native wallet CI' "${device#name=}" "iOS ${os#OS=}")
+         cleanup() {
+           test_status=$?
++          if container=$(xcrun simctl get_app_container "$simulator" id.walt.wallet.native data 2>/dev/null); then
++            mkdir -p "${{ github.workspace }}/ios-ci-logs/animation-lifecycle"
++            for trace in "$container"/tmp/animation-lifecycle-*.jsonl; do
++              if [[ -f "$trace" ]]; then
++                cp "$trace" "${{ github.workspace }}/ios-ci-logs/animation-lifecycle/" || echo '::warning::Could not retain animation metadata'
++              fi
++            done
++          fi
++          if [[ -n "${trace_pid:-}" ]]; then kill "$trace_pid" 2>/dev/null || true; wait "$trace_pid" 2>/dev/null || true; fi
+           xcrun simctl delete "$simulator" || {
+             cleanup_status=$?
+             echo "::error::Failed to remove native test simulator"
+@@ -197,11 +206,18 @@ runs:
+         # Finish cold startup before XCTest starts its application-launch deadline.
+         xcrun simctl bootstatus "$simulator" -b
+ 
++        xcrun simctl spawn "$simulator" log stream --style compact --level debug \
++          --predicate 'eventMessage BEGINSWITH "ANIMATION_LIFECYCLE"' \
++          > "${{ github.workspace }}/ios-ci-logs/animation-lifecycle.log" 2>&1 &
++        trace_pid=$!
++
+         xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
+           -project iosApp.xcodeproj \
+           -scheme iosApp \
+           -configuration Debug \
+           -destination "platform=iOS Simulator,id=$simulator" \
++          -only-testing:iosAppTests \
++          -only-testing:iosAppUITests/MockWalletUITests \
+           -skip-testing:iosAppEnterpriseTests \
+           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+diff --git a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Components/WalletSuccessDismissal.swift b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Components/WalletSuccessDismissal.swift
+index f190fd78c9..cd7f1c41ba 100644
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Components/WalletSuccessDismissal.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Components/WalletSuccessDismissal.swift
+@@ -1,5 +1,6 @@
+ import SwiftUI
+ import UIKit
++import ObjectiveC
+ 
+ /// A success stays visible after interaction, with VoiceOver, or while the app is inactive.
+ private struct WalletSuccessDismissal: ViewModifier {
+@@ -37,3 +38,114 @@ extension View {
+         modifier(WalletSuccessDismissal(key: key, enabled: enabled, onDone: onDone))
+     }
+ }
++
++// Temporary diagnostic only. Preserve every callback and log metadata, never app values.
++func installNativeAnimationLifecycleTrace() { _ = NativeAnimationLifecycleTrace.installed }
++
++private enum NativeAnimationLifecycleTrace {
++    private static let queue = DispatchQueue(label: "wallet.animation-lifecycle-trace")
++    private static var sequence = 0
++    private static var timer: DispatchSourceTimer?
++    private static let output: FileHandle? = {
++        let path = NSTemporaryDirectory() + "animation-lifecycle-\(ProcessInfo.processInfo.processIdentifier).jsonl"
++        FileManager.default.createFile(atPath: path, contents: nil)
++        return FileHandle(forWritingAtPath: path)
++    }()
++
++    private static func identity(_ object: AnyObject?) -> String {
++        guard let object else { return "nil" }
++        return String(describing: Unmanaged.passUnretained(object).toOpaque())
++    }
++
++    private static func className(_ object: AnyObject?) -> String {
++        guard let object else { return "nil" }
++        return String(cString: object_getClassName(object))
++    }
++
++    private static func metadata(_ animation: CAAnimation?) -> [String: Any] {
++        guard let animation else { return [:] }
++        return ["animation": identity(animation), "animationClass": className(animation),
++                "delegate": identity(animation.delegate),
++                "delegateClass": className(animation.delegate),
++                "duration": String(animation.duration), "repeat": String(animation.repeatCount),
++                "keyPath": (animation as? CAPropertyAnimation)?.keyPath ?? ""]
++    }
++
++    private static func emit(_ event: String, _ fields: [String: Any] = [:]) {
++        let time = CACurrentMediaTime()
++        let main = Thread.isMainThread
++        queue.async {
++            sequence += 1
++            var record = fields
++            record["event"] = event; record["time"] = time; record["main"] = main
++            record["sequence"] = sequence; record["pid"] = ProcessInfo.processInfo.processIdentifier
++            guard let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),
++                  let json = String(data: data, encoding: .utf8) else { return }
++            if let output {
++                output.write(data); output.write(Data([10]))
++            } else { NSLog("ANIMATION_LIFECYCLE output-unavailable") }
++            if event == "installed" || event == "unsupported" || event == "monitor" {
++                NSLog("ANIMATION_LIFECYCLE %@", json)
++            }
++        }
++    }
++
++    static let installed: Void = {
++        guard let state = NSClassFromString("UIViewAnimationState"),
++              let start = class_getInstanceMethod(state, NSSelectorFromString("animationDidStart:")),
++              let stop = class_getInstanceMethod(state, NSSelectorFromString("animationDidStop:finished:")),
++              let add = class_getInstanceMethod(CALayer.self, #selector(CALayer.add(_:forKey:))) else {
++            emit("unsupported"); return
++        }
++        typealias Start = @convention(c) (AnyObject, Selector, CAAnimation?) -> Void
++        typealias Stop = @convention(c) (AnyObject, Selector, CAAnimation?, Bool) -> Void
++        typealias Add = @convention(c) (AnyObject, Selector, CAAnimation, NSString?) -> Void
++        let originalStart = unsafeBitCast(method_getImplementation(start), to: Start.self)
++        let originalStop = unsafeBitCast(method_getImplementation(stop), to: Stop.self)
++        let originalAdd = unsafeBitCast(method_getImplementation(add), to: Add.self)
++        let startBlock: @convention(block) (AnyObject, CAAnimation?) -> Void = { owner, animation in
++            var fields = metadata(animation); fields["owner"] = identity(owner)
++            fields["ownerClass"] = className(owner)
++            emit("start", fields)
++            originalStart(owner, NSSelectorFromString("animationDidStart:"), animation)
++        }
++        let stopBlock: @convention(block) (AnyObject, CAAnimation?, Bool) -> Void = { owner, animation, finished in
++            var fields = metadata(animation); fields["owner"] = identity(owner); fields["finished"] = finished
++            emit("stop", fields)
++            originalStop(owner, NSSelectorFromString("animationDidStop:finished:"), animation, finished)
++        }
++        let addBlock: @convention(block) (AnyObject, CAAnimation, NSString?) -> Void = { object, animation, key in
++            var fields = metadata(animation)
++            fields["layer"] = identity(object); fields["key"] = key as String? ?? ""
++            if let layer = object as? CALayer {
++                fields["layerDelegate"] = className(layer.delegate)
++                var ancestors: [String] = []; var ancestor = layer.superlayer
++                while let current = ancestor, ancestors.count < 6 {
++                    ancestors.append(current.delegate.map { className($0) } ?? className(current))
++                    ancestor = current.superlayer
++                }
++                fields["ancestors"] = ancestors
++            }
++            fields["stack"] = Thread.callStackReturnAddresses.prefix(24).map { String(format: "0x%llx", $0.uint64Value) }
++            emit("add", fields)
++            originalAdd(object, #selector(CALayer.add(_:forKey:)), animation, key)
++        }
++        method_setImplementation(start, imp_implementationWithBlock(startBlock))
++        method_setImplementation(stop, imp_implementationWithBlock(stopBlock))
++        method_setImplementation(add, imp_implementationWithBlock(addBlock))
++        emit("installed", ["startEncoding": String(cString: method_getTypeEncoding(start)!),
++                           "stopEncoding": String(cString: method_getTypeEncoding(stop)!)])
++        let source = DispatchSource.makeTimerSource(queue: queue)
++        source.schedule(deadline: .now() + 5, repeating: 5)
++        source.setEventHandler {
++            guard let notifier = NSClassFromString("XCTAnimationsIdleNotifier"),
++                  let method = class_getClassMethod(notifier, NSSelectorFromString("isAnimationInProgress")) else {
++                emit("monitor-unavailable"); return
++            }
++            typealias Active = @convention(c) (AnyObject, Selector) -> Bool
++            let active = unsafeBitCast(method_getImplementation(method), to: Active.self)
++            emit("monitor", ["active": active(notifier, NSSelectorFromString("isAnimationInProgress"))])
++        }
++        timer = source; source.resume()
++    }()
++}
+diff --git a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift
+index 7e11ea9570..ea0fbd9e10 100644
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/WalletDemoApp.swift
+@@ -4,6 +4,8 @@ import WalletDemoSharingUI
+ 
+ @main
+ struct WalletDemoApp: App {
++    init() { installNativeAnimationLifecycleTrace() }
++
+     #if DEBUG
+     @MainActor private static let initialCredentialReadGate = MockInitialCredentialReadGate()
+     #endif
