@@ -39,7 +39,7 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
             document,
             verificationContext?.verificationTime ?: Clock.System.now(),
         )
-        val encodedChain = verification.certificateChain.map { Base64.Default.encode(it.bytes.toByteArray()) }
+        val encodedChain = verification.certificateChain.map { Base64.Default.encode(it.encodedDer.toByteArray()) }
         addResult("certificate_chain", encodedChain)
 
         val issuerKey = verification.signerKey
@@ -49,7 +49,7 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
             Jwk.parse(publicKey.toPublicJwk(issuerKey.spec))
         }
 
-        val firstCertDer = verification.certificateChain.first().bytes.toByteArray()
+        val firstCertDer = verification.certificateChain.first().encodedDer.toByteArray()
         addOptionalResult("signer_pem") { convertDerCertificateToPemCertificate(firstCertDer) }
         addResult("cose_algorithm", verification.coseAlgorithm)
         // Trust anchors are enforced separately by VICAL or trusted-list policies.

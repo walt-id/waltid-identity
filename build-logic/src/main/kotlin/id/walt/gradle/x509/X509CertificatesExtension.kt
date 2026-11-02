@@ -26,6 +26,9 @@ enum class X509Profile(val defaultValidityDays: Int) {
 
     /** ISO/IEC 18013-5 Document Signer; must be issued by an [IACA], EC keys only. */
     DOCUMENT_SIGNER(365),
+
+    /** ISO/IEC 18013-5 mdoc reader authentication (Annex B.1.7); issued by an EC [CA] or [IACA], EC or Ed25519 keys. */
+    MDOC_READER_AUTHENTICATION(365),
 }
 
 /**
@@ -51,6 +54,12 @@ enum class X509Profile(val defaultValidityDays: Int) {
  *         certificateFile = layout.projectDirectory.file("src/test/resources/ds.pem")
  *         privateJwkFile = layout.projectDirectory.file("src/test/resources/ds.jwk.json")
  *     }
+ *     ca("reader-ca") { subject = "C=US,CN=Test Reader CA" }
+ *     mdocReaderAuthentication("reader") {
+ *         issuer = "reader-ca"
+ *         subject = "CN=Test Reader"
+ *         crlDistributionPointUri = "https://reader.example.com/crl"
+ *     }
  * }
  * ```
  */
@@ -72,6 +81,8 @@ abstract class X509CertificatesExtension @Inject constructor(objects: ObjectFact
     fun iaca(name: String, action: Action<X509CertificateSpec>) = register(name, X509Profile.IACA, action)
     fun documentSigner(name: String, action: Action<X509CertificateSpec>) =
         register(name, X509Profile.DOCUMENT_SIGNER, action)
+    fun mdocReaderAuthentication(name: String, action: Action<X509CertificateSpec>) =
+        register(name, X509Profile.MDOC_READER_AUTHENTICATION, action)
 
     private fun register(name: String, profile: X509Profile, action: Action<X509CertificateSpec>) =
         certificates.register(name) {
@@ -114,7 +125,7 @@ abstract class X509CertificateSpec @Inject constructor(private val name: String)
     abstract val issuerAlternativeNameUri: Property<String>
     abstract val issuerAlternativeNameEmail: Property<String>
 
-    /** CRLDistributionPoints URI; required for Document Signers. */
+    /** CRLDistributionPoints URI; required for Document Signers and mdoc reader authentication. */
     abstract val crlDistributionPointUri: Property<String>
 
     /** Output files; default to `<outputDirectory>/<name>/<file name of [X509OutputFile]>`. */
