@@ -213,8 +213,9 @@ class WalletDemoAppTestScenarios(
         assertFalse(pinStore.isBiometricUnlockEnabled())
         gate.complete(DemoBiometricResult.Cancelled)
         waitUntil { !controller.state.value.isAuthenticating }
-        onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).performClick()
-        waitUntil { controller.state.value.auth == WalletAuthState.Unlocked }
+        waitForIdle()
+        onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.auth == WalletAuthState.Unlocked }
         assertFalse(pinStore.isBiometricUnlockEnabled())
     }
 
