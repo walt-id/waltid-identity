@@ -10,10 +10,11 @@ internal object Issuer2EndpointPaths {
     const val EXTERNAL_CALLBACK = "external/oauth/callback"
     const val TOKEN = "token"
     const val NONCE = "nonce"
+    const val CHALLENGE = "challenge"
     const val CREDENTIAL = "credential"
 
     // Reserve the entire protocol namespace, including groups a deployment does not expose.
     val reservedVctNames: Set<String> = setOf(
-        JWKS, CREDENTIAL_OFFER, PAR, AUTHORIZE, EXTERNAL_LOGIN, EXTERNAL_CALLBACK, TOKEN, NONCE, CREDENTIAL,
+        JWKS, CREDENTIAL_OFFER, PAR, AUTHORIZE, EXTERNAL_LOGIN, EXTERNAL_CALLBACK, TOKEN, NONCE, CHALLENGE, CREDENTIAL,
     ).map { it.substringBefore('/') }.toSet()
 }

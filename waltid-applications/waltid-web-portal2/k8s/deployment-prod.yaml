@@ -42,6 +42,9 @@ spec:
             - secretRef:
                 name: portal2-pid-secret
                 optional: true
+            - secretRef:
+                name: portal2-enterprise-secret
+                optional: true
           ports:
             - containerPort: 7105
               name: http-portal2

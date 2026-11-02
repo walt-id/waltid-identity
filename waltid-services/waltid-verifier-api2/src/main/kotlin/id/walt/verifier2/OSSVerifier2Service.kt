@@ -31,6 +31,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.util.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -62,7 +63,7 @@ enum class Verifier2RouteSurface {
     /** `GET transaction-data-profiles` - discloses the configured transaction data profiles. */
     TRANSACTION_DATA_PROFILES,
 
-    /** `POST vical/fetch` (fetches an arbitrary URL) and `POST vical/validate`. */
+    /** `POST vical/fetch` (fetches a caller-supplied http(s) URL) and `POST vical/validate`. */
     VICAL,
     ;
 
@@ -323,7 +324,7 @@ object Verifier2Service {
                 tags("VICAL")
             }) {
                 post("fetch", {
-                    summary = "Fetches a VICAL from a remote host or from the file system and converts it to Base64"
+                    summary = "Fetches a VICAL over HTTP(S) and returns it Base64-encoded"
                     request {
                         body<VicalFetchRequest> {
                             example("Remote VICAL") {
@@ -334,7 +335,7 @@ object Verifier2Service {
                     response { HttpStatusCode.OK to { body<VicalFetchResponse>() } }
                 }) {
                     val vicalFetchRequest = call.receive<VicalFetchRequest>()
-                    val vicalCbor = fetchBinaryFile(vicalFetchRequest.vicalUrl)
+                    val vicalCbor = withContext(Dispatchers.IO) { fetchBinaryFile(vicalFetchRequest.vicalUrl) }
                     call.respond(VicalFetchResponse(vicalCbor?.encodeToBase64()))
                 }
 

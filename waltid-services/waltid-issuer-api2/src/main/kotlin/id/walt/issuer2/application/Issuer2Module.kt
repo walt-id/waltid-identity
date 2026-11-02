@@ -95,6 +95,7 @@ class Issuer2Module @JvmOverloads constructor(
         credentialNonceService = openId4VciModule.credentialNonceService,
         credentialProofVerifier = credentialProofVerifier,
         keyAttestation = openId4VciModule.keyAttestation,
+        attestationChallengeService = openId4VciModule.attestationChallengeService,
     )
 
     val managementController = Issuer2ManagementController(

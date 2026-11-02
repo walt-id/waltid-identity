@@ -1,5 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
+import id.walt.openid4vci.clientauth.attestation.verifier.KeyBasedClientAttestationVerifier
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
@@ -81,10 +83,68 @@ class AttestationBasedClientAuthenticationMethodTest {
         )
     }
 
+    private val challenges = object : AttestationChallengeService {
+        override suspend fun issue(authorizationServerIssuer: String): String = "fresh-challenge"
+        override suspend fun validate(challenge: String, authorizationServerIssuer: String): Boolean = challenge == "valid"
+    }
+
+    @Test
+    fun `required missing malformed and invalid challenges return replacement headers`() = runTest {
+        for (challenge in listOf(null, JsonPrimitive(""), JsonPrimitive("expired"), JsonPrimitive(123), JsonArray(emptyList()))) {
+            val failure = assertIs<ClientAuthenticationResult.Failure>(authenticate(
+                null, "wallet-client", JsonPrimitive(issuer), challenges, challenge,
+            ))
+            assertEquals("use_attestation_challenge", failure.error.error)
+            assertEquals("fresh-challenge", failure.error.responseHeaders[ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE])
+        }
+        assertIs<ClientAuthenticationResult.Authenticated>(authenticate(
+            null, "wallet-client", JsonPrimitive(issuer), challenges, JsonPrimitive("valid"),
+        ))
+    }
+
+    @Test
+    fun `invalid signatures remain authentication failures even with missing challenges`() = runTest {
+        val failure = assertIs<ClientAuthenticationResult.Failure>(authenticate(
+            null, "wallet-client", JsonPrimitive(issuer), challenges, invalidSignature = true,
+        ))
+        assertEquals("invalid_client", failure.error.error)
+        assertEquals(emptyMap(), failure.error.responseHeaders)
+    }
+
+    @Test
+    fun `challenge service failures are server errors`() = runTest {
+        val unavailable = object : AttestationChallengeService {
+            override suspend fun issue(authorizationServerIssuer: String): String = error("Signing unavailable")
+            override suspend fun validate(challenge: String, authorizationServerIssuer: String) = false
+        }
+        for (service in listOf(unavailable)) {
+            val failure = assertIs<ClientAuthenticationResult.Failure>(authenticate(
+                null, "wallet-client", JsonPrimitive(issuer), service,
+            ))
+            assertEquals("server_error", failure.error.error)
+        }
+    }
+
+    @Test
+    fun `explicit expected challenge validation remains available when enforcement is disabled`() = runTest {
+        val failure = assertIs<ClientAuthenticationResult.Failure>(authenticate(
+            null, "wallet-client", JsonPrimitive(issuer), expectedChallenge = "expected",
+        ))
+        assertEquals("invalid_client", failure.error.error)
+        assertIs<ClientAuthenticationResult.Authenticated>(authenticate(
+            null, "wallet-client", JsonPrimitive(issuer), challenge = JsonPrimitive("expected"), expectedChallenge = "expected",
+        ))
+    }
+
     private suspend fun authenticate(
         requestClientId: String?,
         attestationSubject: String,
         popAudience: JsonElement,
+        challengeService: AttestationChallengeService? = null,
+        challenge: JsonElement? = null,
+        invalidSignature: Boolean = false,
+        expectedChallenge: String? = null,
+
     ): ClientAuthenticationResult {
         val attesterKey = JWKKey.generate(KeyType.Ed25519)
         val clientInstanceKey = JWKKey.generate(KeyType.Ed25519)
@@ -102,8 +162,9 @@ class AttestationBasedClientAuthenticationMethodTest {
                 "typ" to JsonPrimitive(ClientAttestationJwtTypes.CLIENT_ATTESTATION),
             ),
         )
-        val popJwt = clientInstanceKey.signJws(
+        val popJwt = (if (invalidSignature) JWKKey.generate(KeyType.Ed25519) else clientInstanceKey).signJws(
             buildJsonObject {
+                challenge?.let { put("challenge", it) }
                 put("aud", popAudience)
                 put("iat", now)
                 put("jti", "proof-$now")
@@ -113,7 +174,8 @@ class AttestationBasedClientAuthenticationMethodTest {
             ),
         )
         val method = AttestationBasedClientAuthenticationMethod(
-            trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
+            attestationVerifier = KeyBasedClientAttestationVerifier { _, _ -> listOf(attesterKey.getPublicKey()) },
+            challengeService = challengeService,
         )
 
         return method.authenticate(
@@ -123,7 +185,7 @@ class AttestationBasedClientAuthenticationMethodTest {
                 ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(attestationJwt),
                 ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(popJwt),
             ),
-            context = ClientAuthenticationContext(authorizationServerIssuer = issuer),
+            context = ClientAuthenticationContext(authorizationServerIssuer = issuer, challenge = expectedChallenge),
         )
     }
 

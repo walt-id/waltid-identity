@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 // carry it as their type, and must stay readable.
 @Serializable
 @SerialName("id.walt.commons.events.CredentialWalletEvent")
+@Deprecated("Not written by any service: wallet activity is a UsageEvent (CREDENTIAL_RECEIVED, CREDENTIAL_PRESENTED, WALLET_CREATED). Kept so stored events stay readable.")
 class CredentialWalletEvent(
     override val originator: String? = null,
     override val organization: String,

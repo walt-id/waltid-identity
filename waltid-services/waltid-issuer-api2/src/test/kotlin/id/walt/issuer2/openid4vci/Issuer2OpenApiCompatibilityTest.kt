@@ -55,6 +55,18 @@ class Issuer2OpenApiCompatibilityTest {
         fun body(operation: JsonObject) = operation.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("schema")
         val paths = specification.getValue("paths").jsonObject
+        val challenge = paths.getValue("/openid4vci/challenge").jsonObject.getValue("post").jsonObject
+        assertFalse(challenge.containsKey("requestBody"), "Challenge endpoint accepts an empty body")
+        val challengeResponses = challenge.getValue("responses").jsonObject
+        assertTrue(challengeResponses.keys.containsAll(setOf("200", "404", "500")))
+        val challengeBody = resolve(body(challengeResponses.getValue("200").jsonObject))
+        assertTrue("attestation_challenge" in challengeBody.getValue("properties").jsonObject)
+        for (endpoint in listOf("par", "token")) {
+            val badRequest = paths.getValue("/openid4vci/$endpoint").jsonObject.getValue("post").jsonObject
+                .getValue("responses").jsonObject.getValue("400").jsonObject
+            assertTrue("OAuth-Client-Attestation-Challenge" in badRequest.getValue("headers").jsonObject)
+            assertTrue(badRequest.toString().contains("use_attestation_challenge"))
+        }
         val offer = paths.getValue("/issuer2/credential-offers").jsonObject.getValue("post").jsonObject
         val requests = resolve(body(offer.getValue("requestBody").jsonObject)).getValue("anyOf").jsonArray.map(::resolve)
         assertEquals(2, requests.size)

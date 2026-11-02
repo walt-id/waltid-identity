@@ -2,6 +2,8 @@
 
 package id.walt.openid4vci.clientauth
 
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeConfig
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationKeyReferenceResolver
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
@@ -39,12 +41,18 @@ data class ClientAuthenticationConfig(
     suspend fun toClientAuthenticationServiceConfig(
         keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
         crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
+        challengeService: AttestationChallengeService? = null,
     ): ClientAuthenticationServiceConfig {
-        val attestationMethod = clientAttestationMethod()
-            ?.config
-            ?.toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver)
-            ?.toAuthenticationMethod()
-            ?: return ClientAuthenticationServiceConfig()
+        val methodConfig = clientAttestationMethod()
+        require((methodConfig?.challenge != null) == (challengeService != null)) {
+            "Client attestation challenge configuration and service must both be present or both be absent"
+        }
+        if (methodConfig == null) return ClientAuthenticationServiceConfig()
+        val attestationMethod = methodConfig.config
+            .toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver)
+            .toAuthenticationMethod(
+                challengeService = challengeService,
+            )
 
         return ClientAuthenticationServiceConfig(
             methods = listOf(attestationMethod),
@@ -75,6 +83,7 @@ sealed class ClientAuthenticationMethodConfig {
     @SerialName("client-attestation")
     data class ClientAttestation(
         val config: ClientAttestationVerifierConfig,
+        val challenge: AttestationChallengeConfig? = null,
     ) : ClientAuthenticationMethodConfig()
 }
 

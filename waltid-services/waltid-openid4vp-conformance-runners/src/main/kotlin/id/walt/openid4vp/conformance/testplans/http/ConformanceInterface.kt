@@ -18,6 +18,19 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * The suite reached `INTERRUPTED` or `FINISHED` while a runner was still waiting for `WAITING`.
+ *
+ * The message matches the previous [IllegalStateException] so existing logs stay readable. Runners
+ * retry only [status] `INTERRUPTED` when the suite log shows a gateway status.
+ */
+internal class SuiteReachedTerminalBeforeReady(
+    val testId: String,
+    val status: String,
+) : IllegalStateException(
+    "Test $testId reached terminal status $status before it was ready for presentation",
+)
+
 class ConformanceInterface(
     val conformanceHost: String,
     val conformancePort: Int
@@ -296,10 +309,7 @@ class ConformanceInterface(
                 // then blames the wrong thing ("not ready for presentation"). Fail immediately and
                 // name the status actually reached.
                 if (testRunInfo.status in TERMINAL_STATUSES) {
-                    throw IllegalStateException(
-                        "Test $testId reached terminal status ${testRunInfo.status} before it was " +
-                                "ready for presentation"
-                    )
+                    throw SuiteReachedTerminalBeforeReady(testId, testRunInfo.status)
                 }
             } else {
                 if (testRunInfo.status != "WAITING") {

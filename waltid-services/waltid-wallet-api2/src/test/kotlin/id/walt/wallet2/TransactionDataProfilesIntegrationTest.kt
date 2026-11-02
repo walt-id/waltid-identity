@@ -187,8 +187,9 @@ class TransactionDataProfilesIntegrationTest {
 
     @Test
     fun `disabled feature yields empty registry and no discovery route`() {
+        val disabledPort = freePort()
         try {
-            E2ETest(host, port + 1, failEarly = true).testBlock(
+            E2ETest(host, disabledPort, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig(
@@ -197,7 +198,7 @@ class TransactionDataProfilesIntegrationTest {
                     )
                     ConfigManager.preloadConfig(
                         "wallet-service",
-                        OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:${port + 1}")),
+                        OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$disabledPort")),
                     )
                     ConfigManager.preloadConfig(
                         "transaction-data-profiles",

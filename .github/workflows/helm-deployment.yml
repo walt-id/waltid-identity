@@ -80,7 +80,7 @@ jobs:
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
       - uses: azure/setup-kubectl@v4
-      - uses: azure/setup-helm@v5.0.0
+      - uses: azure/setup-helm@v5.0.1
       - name: Create kubeconfig file
         run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
       - name: Create portal2 PID secret
@@ -118,6 +118,17 @@ jobs:
             --from-env-file="$ENV_FILE" \
             --dry-run=client -o yaml | kubectl apply -f -
           rm -f "$ENV_FILE"
+      - name: Create portal2 Enterprise secret
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          PORTAL2_ENTERPRISE_ENV: ${{ secrets.PORTAL2_ENTERPRISE_ENV_TEST }}
+        run: |
+          if [ -z "$PORTAL2_ENTERPRISE_ENV" ]; then
+            echo "::error::PORTAL2_ENTERPRISE_ENV_TEST is not set. Add it in repository secrets for manual branch portal2 deploys."
+            echo "Deploy aborted: PORTAL2_ENTERPRISE_ENV_TEST is not set." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          bash .github/scripts/apply-portal2-enterprise-secret.sh "${{ inputs.namespace }}"
       - name: Helm Dependency Build
         run: |
           helm dependency build ./helm-charts/waltid

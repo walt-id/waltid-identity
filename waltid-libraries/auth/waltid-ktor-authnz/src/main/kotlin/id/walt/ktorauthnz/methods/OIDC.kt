@@ -293,6 +293,13 @@ object OIDC : AuthenticationMethod("oidc") {
             // They should not be used as the primary user-triggered logout endpoints in client apps.
             post("logout/backchannel") {
                 log.trace { "OIDC: Backchannel-logout" }
+                // Back-Channel Logout 1.0, 2.5: the logout token is form-posted; other bodies are not parsed at all.
+                if (!call.request.contentType().match(ContentType.Application.FormUrlEncoded)) {
+                    return@post call.respond(
+                        HttpStatusCode.UnsupportedMediaType,
+                        "Logout token must be posted as ${ContentType.Application.FormUrlEncoded}",
+                    )
+                }
                 val logoutTokenStr = call.receiveParameters()["logout_token"]
                     ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing logout_token")
 

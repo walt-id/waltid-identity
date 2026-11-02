@@ -46,6 +46,12 @@ import kotlin.test.assertTrue
 @EnterpriseMobileTest
 class EnterpriseMobileWalletIntegrationTest {
 
+    init {
+        // The fixture is reached through adb reverse on 127.0.0.1. Android device tests do not get the
+        // JVM walt.ssrf.allowLoopback property that Gradle sets for host tests.
+        System.setProperty("walt.ssrf.allowLoopback", "true")
+    }
+
     private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 

@@ -92,7 +92,7 @@ Base path: `/verification-session`
   - Streams live session updates (`event`, `session`)
 
 VICAL utilities:
-- `POST /vical/fetch` — Fetch remote/file VICAL and return Base64
+- `POST /vical/fetch` — Fetch a VICAL over HTTP(S) and return Base64
 - `POST /vical/validate` — Validate VICAL with provided verification key
 
 ## Quick start

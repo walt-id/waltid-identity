@@ -30,10 +30,10 @@ import kotlin.test.assertTrue
 class Wallet2IntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = freePort()
 
     @Test
     fun testWalletLifecycle() {
+        val port = freePort()
         E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
@@ -151,12 +151,13 @@ class Wallet2IntegrationTest {
 
     @Test
     fun testNamedStores() {
-        E2ETest(host, port + 1, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:${port + 1}"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = {},

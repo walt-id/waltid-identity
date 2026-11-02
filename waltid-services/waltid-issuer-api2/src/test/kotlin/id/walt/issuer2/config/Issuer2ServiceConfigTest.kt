@@ -259,6 +259,41 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
+    fun `attestation challenge config supports omitted null defaults and custom lifetime`() {
+        for ((block, lifetime) in listOf(
+            "" to null,
+            "challenge = null" to null,
+            "challenge = {}" to 300L,
+            "challenge { lifetimeSeconds = 42 }" to 42L,
+        )) {
+            clearIssuer2TestEnvironment()
+            assertEquals(lifetime, loadServiceConfig(challengeServiceConfig(block)).attestationChallengeConfig()?.lifetimeSeconds)
+        }
+    }
+
+    @Test
+    fun `attestation challenge config rejects non-positive lifetime at startup`() {
+        for (lifetime in listOf(0, -1)) {
+            clearIssuer2TestEnvironment()
+            assertFails { loadServiceConfig(challengeServiceConfig("challenge { lifetimeSeconds = $lifetime }")) }
+        }
+    }
+
+    private fun challengeServiceConfig(block: String) = """
+        baseUrl = "http://localhost:7002"
+        clientAuthenticationConfig {
+            supportedMethods = [{
+                type = "client-attestation"
+                $block
+                config { verificationMethod {
+                    type = "static-jwk"
+                    jwk { kty = "EC", crv = "P-256", x = "x", y = "y" }
+                } }
+            }]
+        }
+    """.trimIndent()
+
+    @Test
     fun `service config decodes static jwk client attestation from client authentication config`() {
         val config = loadServiceConfig(
             """

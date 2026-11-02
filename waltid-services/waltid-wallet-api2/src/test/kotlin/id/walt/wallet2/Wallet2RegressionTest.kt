@@ -15,6 +15,7 @@ import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.MatchCredentialsResult
+import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
@@ -24,6 +25,9 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -412,6 +416,60 @@ class Wallet2RegressionTest {
                         )
                     }
                     result
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // WAL-1597: legacy "vc+sd-jwt" DCQL format is rejected with a descriptive 400
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `presentation preview with legacy vc+sd-jwt DCQL format returns descriptive 400`() {
+        OSSWallet2Service.walletStore = InMemoryWalletStore()
+
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
+            features = listOf(OSSWallet2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
+                )
+            },
+            init = { DidService.minimalInit() },
+            module = { wallet2Module(withPlugins = false) }
+        ) {
+            val http = testHttpClient()
+
+            val walletId = testAndReturn("Create wallet") {
+                http.post("/wallet") {
+                    contentType(ContentType.Application.Json)
+                    setBody(CreateWalletRequest())
+                }.body<WalletCreatedResponse>().walletId
+            }
+
+            // Plain (by-value) request from a third-party verifier still using the pre-1.0 media type.
+            val responseUri = "https://verifier.example/response"
+            val dcqlQuery = """{"credentials":[{"id":"pid","format":"vc+sd-jwt","meta":{"vct_values":["https://example.com/pid"]}}]}"""
+            val requestUrl = Url(
+                "openid4vp://?client_id=${"redirect_uri:$responseUri".encodeURLParameter()}" +
+                        "&response_type=vp_token&response_mode=direct_post" +
+                        "&response_uri=${responseUri.encodeURLParameter()}" +
+                        "&nonce=n-1597&dcql_query=${dcqlQuery.encodeURLParameter()}"
+            )
+
+            testAndReturn("Preview with vc+sd-jwt -> 400 naming the format, not a generic enum error") {
+                http.post("/wallet/$walletId/credentials/present/preview") {
+                    contentType(ContentType.Application.Json)
+                    setBody(PreviewPresentationRequest(requestUrl = requestUrl))
+                }.also {
+                    val body = it.bodyAsText()
+                    assertEquals(HttpStatusCode.BadRequest, it.status, "Expected 400, got ${it.status}: $body")
+                    val message = Json.parseToJsonElement(body).jsonObject["message"]?.jsonPrimitive?.content.orEmpty()
+                    assertTrue("Unsupported DCQL credential format \"vc+sd-jwt\"" in message, message)
+                    assertTrue("must use \"dc+sd-jwt\"" in message, message)
                 }
             }
         }

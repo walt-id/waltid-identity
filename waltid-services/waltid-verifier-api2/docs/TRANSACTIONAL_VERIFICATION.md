@@ -206,10 +206,12 @@ When a webhook is configured, you'll receive the full session object including c
       ]
     },
     "presentedPresentations": {
-      "my_credential": {
-        "type": "VerifiablePresentation",
-        "verifiableCredential": [...]
-      }
+      "my_credential": [
+        {
+          "type": "VerifiablePresentation",
+          "verifiableCredential": [...]
+        }
+      ]
     },
     "policyResults": {
       "overallSuccess": true,

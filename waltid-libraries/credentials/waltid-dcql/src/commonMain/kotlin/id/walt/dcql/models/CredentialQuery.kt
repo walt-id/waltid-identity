@@ -19,6 +19,7 @@ data class CredentialQuery(
      * REQUIRED. A string that specifies the format of the requested Credential.
      * Valid Credential Format Identifier values are defined in Appendix B.
      */
+    @Serializable(with = DcqlCredentialFormatSerializer::class)
     val format: CredentialFormat,
 
     /* Can multiple credentials match this query? */

@@ -278,7 +278,7 @@ class DefaultOAuth2Provider(
         PushedAuthorizationResponseHttp(
             status = oauthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = noStoreHeaders(),
+            headers = error.responseHeaders + noStoreHeaders(),
         )
 
     override fun writePushedAuthorizationError(
@@ -487,7 +487,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = oauthJsonErrorStatus(error),
-            headers = TOKEN_RESPONSE_HEADERS,
+            headers = error.responseHeaders + TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }

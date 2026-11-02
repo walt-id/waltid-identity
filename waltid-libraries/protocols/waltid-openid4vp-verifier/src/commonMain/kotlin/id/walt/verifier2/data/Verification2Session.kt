@@ -127,8 +127,14 @@ data class Verification2Session(
     @SerialName("presented_raw_data")
     var presentedRawData: PresentedRawData? = null,
 
+    /**
+     * Every presentation per query id, in the order they were received.
+     * A query with `multiple: true` keeps each presentation, not only the last.
+     * A presentation object stored by an older version is read back as a one-element list.
+     */
+    @Serializable(with = PresentedPresentationsSerializer::class)
     @SerialName("presented_presentations")
-    var presentedPresentations: Map<String, VerifiablePresentation>? = null,
+    var presentedPresentations: Map<String, List<VerifiablePresentation>>? = null,
 
     @SerialName("presented_credentials")
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
