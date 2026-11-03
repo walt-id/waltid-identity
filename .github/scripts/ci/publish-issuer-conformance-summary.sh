@@ -73,4 +73,17 @@ CONFORMANCE_TEST_OUTCOME=$(jq -r 'map("\(.proofType)=\(.testOutcome)") | join(",
     fi
   fi
   echo
+  if [ -f "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json" ]; then
+    echo '## Deferred issuance'
+    echo
+    echo 'VCI single-request happy-flow (without notification) and batch modules only. Both proof modes require initial 202, approval 204, deferred collection 200, and suite proof evidence.'
+    echo
+    echo '| Proof mode | Variants | Passed |'
+    echo '|------------|----------|--------|'
+    jq -r 'group_by(.proofType)[] | "| \(.[0].proofType | @html) | \(length) | \([.[] | select(.status == "PASSED")] | length) |"' \
+      "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json"
+    echo
+    echo 'Expected: 12 deferred variants per proof mode. Deferred uses the generic VCI plan for both Basic/HAIP profiles, including encrypted HAIP batch. Repeated issuance, pending polling and lifecycle recovery are not covered here.'
+  fi
+  echo
 } >> "$GITHUB_STEP_SUMMARY"

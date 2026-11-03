@@ -52,6 +52,63 @@ class IssuerConformanceReportsTest(unittest.TestCase):
             _, errors = self.make_shard(proof)
             self.assertEqual(errors, [])
 
+    def make_deferred(self, proof, mutate=None, outcome="success"):
+        destination, _ = self.make_shard(proof)
+        raw, matrix = [], []
+        for index, values in enumerate(sorted(reports.expected_deferred_variants(proof))):
+            variant = dict(zip(reports.DEFERRED_VARIANT_KEYS, values))
+            identifier = f"variant-{index}-deferred-proof-{proof}"
+            names = [reports.DEFERRED_HAPPY, reports.DEFERRED_BATCH]
+            raw.append(dict(
+                variantId=identifier, variant=variant, status="PASSED", planId=f"deferred-plan-{index}",
+                credentials="PRIVATE", modules=[dict(
+                    testModule=name, testId=f"deferred-test-{index}-{name}", status="FINISHED", result="PASSED", accepted=True,
+                    deferredEvidence=dict(offers=1, initial202=1, approved204=1, collected200=1, completeOffers=1, failures=0, proofVerified=True),
+                ) for name in names],
+            ))
+            matrix.append(dict(variantId=identifier, batchCoverage="PASSED"))
+        if mutate:
+            mutate(raw, matrix)
+        source = self.root / "deferred-raw" / proof
+        reports.write_json(source / "results.json", raw)
+        reports.write_json(source / "matrix.json", matrix)
+        errors = reports.prepare_deferred(source, destination / "deferred", proof, "success", outcome)
+        status = reports.read_json(destination / "shard.json", {})
+        status.update(deferredTestOutcome=outcome, reportErrors=errors)
+        reports.write_json(destination / "shard.json", status)
+        return errors
+
+    def test_deferred_runs_require_both_proofs_and_preserve_immediate_results(self):
+        for proof in reports.PROOFS:
+            self.assertEqual([], self.make_deferred(proof))
+        self.assertEqual([], reports.merge(self.shards, self.output, require_deferred=True))
+        self.assertEqual(40, len(reports.read_json(self.output / "results.json", [])))
+        self.assertEqual(24, len(reports.read_json(self.output / "deferred/results.json", [])))
+        for path in self.output.rglob("*.json"):
+            self.assertNotIn("PRIVATE", path.read_text())
+        shutil.rmtree(self.shards / "issuer-conformance-proof-attestation/deferred")
+        self.assertTrue(reports.merge(self.shards, self.output, require_deferred=True))
+        self.assertEqual(12, len(reports.read_json(self.output / "deferred/jwt/results.json", [])))
+
+    def test_deferred_skips_missing_evidence_wrong_matrix_and_missing_batch_fail(self):
+        mutations = {
+            "skipped": lambda rows, matrix: rows[0]["modules"][0].update(result="SKIPPED"),
+            "missing approval": lambda rows, matrix: rows[0]["modules"][0]["deferredEvidence"].update(approved204=0),
+            "incomplete offer": lambda rows, matrix: rows[0]["modules"][0]["deferredEvidence"].update(completeOffers=0),
+            "missing proof evidence": lambda rows, matrix: rows[0]["modules"][0]["deferredEvidence"].update(proofVerified=False),
+            "proxy failure": lambda rows, matrix: rows[0]["modules"][0]["deferredEvidence"].update(failures=1),
+            "missing matrix": lambda rows, matrix: matrix.clear(),
+            "duplicate variant": lambda rows, matrix: rows.__setitem__(1, copy.deepcopy(rows[0])),
+            "wallet initiated": lambda rows, matrix: rows[0]["variant"].update(vci_authorization_code_flow_variant="wallet_initiated"),
+            "wrong proof": lambda rows, matrix: rows[0]["variant"].update(credential_proof_type="attestation"),
+            "missing batch": lambda rows, matrix: next(row for row in rows if len(row["modules"]) == 2)["modules"].pop(),
+            "fapi module": lambda rows, matrix: rows[0]["modules"].append(dict(testModule="fapi2-security-profile-final-test")),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                self.assertTrue(self.make_deferred("jwt", mutate))
+        self.assertTrue(self.make_deferred("jwt", outcome="failure"))
+
     def test_full_results_keep_artifact_schema_and_coverage(self):
         self.make_both()
         self.assertEqual(reports.merge(self.shards, self.output), [])
