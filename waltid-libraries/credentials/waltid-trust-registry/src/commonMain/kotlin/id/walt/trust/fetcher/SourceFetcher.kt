@@ -25,7 +25,8 @@ data class FetcherSecurityConfig(
     val blockLinkLocal: Boolean = true,
 
     /**
-     * Block requests to loopback addresses (127.x.x.x, ::1).
+     * Block requests to loopback addresses (127.x.x.x, ::1) and the unspecified addresses
+     * (0.0.0.0, ::), which reach the local host on Linux.
      * Enabled by default to prevent SSRF attacks against localhost services.
      */
     val blockLoopback: Boolean = true,
