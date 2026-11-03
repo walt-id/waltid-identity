@@ -366,6 +366,109 @@ class DcqlMatcherTest {
     }
 
     @Test
+    fun w3cSdJwtClaimsPathDoesNotSelectANestedVcExtension() {
+        // Wrapped W3C credential: clear-text vc.credentialSubject.given_name and a disclosable
+        // vc.vc.credentialSubject.given_name extension, located relative to the credential root as the parser does
+        val secret = DcqlDisclosure(
+            name = "given_name",
+            value = JsonPrimitive("Secret"),
+            location = listOf(JsonPrimitive("vc"), JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")),
+        )
+        val credential = RawDcqlCredential(
+            id = "wrapped-w3c",
+            format = "jwt_vc_json",
+            data = buildJsonObject {
+                putJsonObject("vc") {
+                    putJsonObject("credentialSubject") { put("given_name", "Alice") }
+                    putJsonObject("vc") { putJsonObject("credentialSubject") { put("given_name", "Secret") } }
+                }
+            },
+            disclosures = listOf(secret),
+        )
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [{
+                "id": "w3c",
+                "format": "jwt_vc_json",
+                "meta": {},
+                "claims": [{ "path": ["credentialSubject", "given_name"] }]
+              }]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val result = DcqlMatcher.match(query, listOf(credential)).getOrThrow().getValue("w3c").single()
+        assertEquals(JsonPrimitive("Alice"), result.selectedDisclosures.orEmpty().values.single())
+        assertTrue(result.disclosuresByPath.values.flatten().isEmpty())
+    }
+
+    @Test
+    fun sdJwtNamedDisclosureWithoutLocationMatchesOnlyItsTopLevelClaim() {
+        // Callers may build disclosures from name and value only, with data leaving the disclosed claims out
+        val givenName = DcqlDisclosure("given_name", JsonPrimitive("Alice"))
+        val credential = RawDcqlCredential(
+            id = "core-only",
+            format = "dc+sd-jwt",
+            data = buildJsonObject { put("vct", "https://issuer.example/pid") },
+            disclosures = listOf(givenName, DcqlDisclosure(null, JsonPrimitive("FR")), DcqlDisclosure("street", JsonPrimitive("Main St 1"))),
+        )
+        fun match(path: String) = DcqlMatcher.match(
+            DcqlParser.parse(
+                """
+                {
+                  "credentials": [{
+                    "id": "pid",
+                    "format": "dc+sd-jwt",
+                    "meta": { "vct_values": ["https://issuer.example/pid"] },
+                    "claims": [{ "path": $path }]
+                  }]
+                }
+                """.trimIndent()
+            ).getOrThrow(),
+            listOf(credential),
+        )
+
+        val result = match("""["given_name"]""").getOrThrow().getValue("pid").single()
+        assertEquals(givenName, result.selectedDisclosures.orEmpty().values.single())
+        assertEquals(listOf(givenName), result.disclosuresByPath.values.flatten())
+
+        // A name alone places a disclosure at the top level only, and an array element has no name
+        assertTrue(match("""["address", "street"]""").isFailure)
+        assertTrue(match("""["nationalities", 0]""").isFailure)
+    }
+
+    @Test
+    fun sdJwtNamedDisclosureWithoutLocationIsNotGuessedAsAParent() {
+        // Data carries the claims, but the disclosures have no location: a name cannot tell how deep they sit
+        val data = buildJsonObject {
+            put("vct", "https://issuer.example/pid")
+            putJsonObject("address") { put("street", "Main St 1"); put("country", "AT") }
+        }
+        val credential = RawDcqlCredential(
+            id = "no-locations",
+            format = "dc+sd-jwt",
+            data = data,
+            disclosures = listOf(DcqlDisclosure("address", data.getValue("address")), DcqlDisclosure("street", JsonPrimitive("Main St 1"))),
+        )
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [{
+                "id": "pid",
+                "format": "dc+sd-jwt",
+                "meta": { "vct_values": ["https://issuer.example/pid"] },
+                "claims": [{ "path": ["address", "street"] }]
+              }]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val result = DcqlMatcher.match(query, listOf(credential)).getOrThrow().getValue("pid").single()
+        assertTrue(result.disclosuresByPath.values.flatten().isEmpty())
+    }
+
+    @Test
     fun trustedAuthoritiesFailsClosedWithoutChecker() {
         val query = DcqlParser.parse(
             """

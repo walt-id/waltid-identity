@@ -2120,7 +2120,10 @@ object WalletPresentationHandler {
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()
-        val requested = availablePresentationClaims(plan).orEmpty().map { (path, claim) ->
+        val claims = availablePresentationClaims(plan).orEmpty()
+        // Disclosures presented whatever the user selects; an optional claim needing only these cannot be withheld
+        val requiredDisclosures = claims.filterKeys(plan::isRequired).values.flatMapTo(mutableSetOf()) { it.disclosures }
+        val requested = claims.map { (path, claim) ->
             val required = plan.isRequired(path)
             val value = claim.value
             when {
@@ -2130,7 +2133,7 @@ object WalletPresentationHandler {
                     value = disclosedValue(path, claim),
                     selectivelyDisclosable = true,
                     required = required,
-                    selectable = plan.isSelectable(path, claim),
+                    selectable = plan.isSelectable(path, claim) && claim.disclosures.any { it !in requiredDisclosures },
                 )
                 // Clear text, but its own children may be disclosures that are not presented
                 value is JsonElement -> PresentationDisclosure(
