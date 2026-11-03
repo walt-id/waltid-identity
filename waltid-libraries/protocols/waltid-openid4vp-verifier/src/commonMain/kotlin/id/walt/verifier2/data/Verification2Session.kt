@@ -194,7 +194,7 @@ data class Verification2Session(
 
     fun deletePII() {
         setup = setup.publicView()
-        notifications = notifications?.publicView()
+        notifications = notifications?.withoutCredentials()
         ephemeralDecryptionKey = null
         crypto2EphemeralDecryptionKey = null
         policies = policies.publicView()
@@ -227,7 +227,7 @@ data class Verification2Session(
 
     fun publicView(): Verification2Session = copy(
         setup = setup.publicView(),
-        notifications = notifications?.publicView(),
+        notifications = notifications?.withoutCredentials(),
         policies = policies.publicView(),
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,
