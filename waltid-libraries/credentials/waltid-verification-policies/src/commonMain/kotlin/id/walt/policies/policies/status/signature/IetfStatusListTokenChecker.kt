@@ -16,7 +16,7 @@ internal const val RAW_CREDENTIAL_CONTEXT_KEY = "id.walt.policies.status.raw-cre
 
 /**
  * Policy-context key for a [id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer].
- * Enterprise Verifier 1 registers the deployment's status-list signer authorizer under this key.
+ * A relying party can register its own signer policy. Serving the status URL is not authorization.
  */
 const val STATUS_LIST_SIGNER_AUTHORIZER_CONTEXT_KEY = "id.walt.policies.status.signer-authorizer"
 
