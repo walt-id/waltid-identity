@@ -63,6 +63,7 @@ class WalletVisualAndroidTest {
     @Test fun externalUnavailableCallback() = scenario(sheetHost = true) { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario(sheetHost = true) { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario(sheetHost = true) { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario(sheetHost = true) { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario(sheetHost = true) { sharingInformation(multiple = true) }
     @Test

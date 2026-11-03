@@ -50,6 +50,7 @@ import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.ClaimItemPath
 import id.walt.walletdemo.compose.logic.DisplayValue
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.walletInstantText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,6 +65,7 @@ internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
 internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier,
                         textStyle: TextStyle = MaterialTheme.typography.bodyLarge) {
     when (value) {
+        is DisplayValue.InstantValue -> Text(walletInstantText(value.value), modifier = modifier, style = textStyle)
         is DisplayValue.BooleanValue -> Text(
             if (value.value) "Yes" else "No",
             modifier = modifier,

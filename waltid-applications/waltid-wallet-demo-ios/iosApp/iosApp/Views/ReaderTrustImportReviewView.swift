@@ -94,7 +94,7 @@ struct ReaderTrustImportReviewView: View {
     private func reviewDate(_ label: String, _ value: Date) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value, style: .date).font(.footnote)
+            WalletInstantText(value).font(.footnote)
         }
     }
 }

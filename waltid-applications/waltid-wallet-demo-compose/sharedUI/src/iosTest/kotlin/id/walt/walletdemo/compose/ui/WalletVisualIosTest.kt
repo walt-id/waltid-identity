@@ -64,6 +64,7 @@ class WalletVisualIosTest {
     @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario { sharingInformation(multiple = true) }
     @Test

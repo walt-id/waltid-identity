@@ -637,8 +637,8 @@ internal class WalletVisualScenarios(
         capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
     }
 
-    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false) = with(test) {
-        val options = WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
+    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false, dates: Boolean = false) = with(test) {
+        val options = if (dates) WalletVisualFixtures.dateCredentials else WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
         val review = id.walt.walletdemo.compose.logic.WalletDemoSharingReview(
             id.walt.walletdemo.compose.logic.WalletDemoSharingRequest(
                 id.walt.walletdemo.compose.logic.WalletDemoSharingRequester(
@@ -655,13 +655,14 @@ internal class WalletVisualScenarios(
         options.mapNotNull { it.issuer }.distinct().forEach { issuer ->
             onAllNodesWithText(issuer).assertCountEquals(1)
         }
-        val heading = if (alternative) "City ID" else "National ID"
+        val heading = if (dates) "PID (SD-JWT VC)" else if (alternative) "City ID" else "National ID"
         onAllNodes(hasText(heading) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(1)
-        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada")
+        if (dates) onNodeWithText("Oct 30, 2026", substring = true).assertIsDisplayed()
+        onNodeWithText(if (dates) "Jan 28, 2027" else if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada", substring = dates)
             .performScrollToContent(this).assertIsDisplayed()
         if (alternative) onNodeWithText("Always included by this credential").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
-        capture("sharing.information." + if (multiple) "multiple" else if (alternative) "alternative" else "selected")
+        capture("sharing.information." + if (dates) "dates" else if (multiple) "multiple" else if (alternative) "alternative" else "selected")
     }
 
     fun providerOfferReview() = with(test) {

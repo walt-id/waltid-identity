@@ -132,7 +132,7 @@ private fun CredentialOption(
         } else {
             Text(credential.label ?: stringResource(Res.string.proximity_generic_credential))
             credential.issuer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            Text(stringResource(Res.string.proximity_valid_until, credential.validUntil.toString()),
+            Text(stringResource(Res.string.proximity_valid_until, walletInstantText(credential.validUntil)),
                 style = MaterialTheme.typography.bodySmall)
         }
     }

@@ -371,12 +371,14 @@ final class WalletVisualTests: XCTestCase {
     }
 
     func testProviderSharingReview() async throws { try await providerSharingReview() }
+    func testSharingInformationDates() async throws { try await sharingInformation(dates: true) }
     func testSharingInformationSelected() async throws { try await sharingInformation() }
     func testSharingInformationAlternative() async throws { try await sharingInformation(alternative: true) }
     func testSharingInformationMultiple() async throws { try await sharingInformation(multiple: true) }
 
-    private func sharingInformation(alternative: Bool = false, multiple: Bool = false) async throws {
-        let review = try WalletVisualFixtures().informationReview(multiple: multiple)
+    private func sharingInformation(alternative: Bool = false, multiple: Bool = false, dates: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let review = try dates ? fixtures.dateReview() : fixtures.informationReview(multiple: multiple)
         var credentials = review.defaultCredentialSelection()
         if alternative { credentials = [review.credentialOptions[1].selection] }
         let selection = SharingSelection(credentials: credentials)
@@ -385,9 +387,13 @@ final class WalletVisualTests: XCTestCase {
         let groups = review.informationToShare(selection: selection, details: details)
         XCTAssertEqual(groups.count, multiple ? 2 : 1)
         if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }
+        if dates {
+            XCTAssertEqual(groups[0].fields.map { $0.item.value }, [.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)), .instant(WalletInstant(epochSeconds: 1801094400, nanoseconds: 0))])
+            XCTAssertTrue(groups[0].fields.allSatisfy { $0.alwaysIncluded })
+        }
         let screen = SharingReviewScreen(title: "Share credentials", review: review, selection: selection,
             selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
-        try await captureReview(screen, id: "sharing.information." + (multiple ? "multiple" : alternative ? "alternative" : "selected"),
+        try await captureReview(screen, id: "sharing.information." + (dates ? "dates" : multiple ? "multiple" : alternative ? "alternative" : "selected"),
             expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: multiple)
     }
 
@@ -615,6 +621,7 @@ final class WalletVisualTests: XCTestCase {
                                               expected: Set<String>, scrollToBottom: Bool = false) async throws {
         var ready: Set<String> = []
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = Set($0.map(\.selection.id)) }
@@ -715,6 +722,7 @@ final class WalletVisualTests: XCTestCase {
                                       layoutDirection: LayoutDirection = .leftToRight,
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)

@@ -76,7 +76,7 @@ fun WalletDemoTheme(
     content: @Composable () -> Unit,
 ) {
     val preferences = rememberWalletVisualPreferences()
-    CompositionLocalProvider(LocalWalletDemoBranding provides branding, LocalWalletVisualPreferences provides preferences) {
+    CompositionLocalProvider(LocalWalletTimeFormatter provides rememberWalletTimeFormatter(), LocalWalletDemoBranding provides branding, LocalWalletVisualPreferences provides preferences) {
         MaterialTheme(
             motionScheme = if (preferences.reduceMotion) WalletMotion.reduced else WalletMotion.standard,
             colorScheme = if (isSystemInDarkTheme()) darkColorScheme(

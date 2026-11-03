@@ -4,6 +4,151 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
+    func testTimestampOffsetsAndUninterpretedCalendarValues() {
+        let expected = WalletInstant(epochSeconds: 1793410200, nanoseconds: 123456789)
+        for source in ["2026-10-30T23:30:00.123456789-02:00", "2026-10-31T03:30:00.123456789+02:00", "2026-10-31t01:30:00.123456789z", "2026-10-31T01:30:00.123456789-00:00"] {
+            XCTAssertEqual(WalletInstant.parseTimestamp(source), expected, source)
+            XCTAssertEqual(disclosureValue("validUntil", "\"\(source)\""), .instant(expected))
+        }
+        for source in ["2026-10-30", "2026-10-30T01:30:00", "2026-02-30T00:00:00Z", "2026-10-30T24:00:00Z", "2026-10-30T00:00:60Z", "2026-10-30T00:00:00+25:00", "2026-10-30T00:00:00+18:01", "0000-01-01T00:00:00Z", "2026-10-30T00:00:00+02", "2026-10-30T00:00:00+02:00:30", "2026-10-30T00:00:00Zextra", "2026-10-30T00:00:00.1234567891Z", "2026-10-30T00:00:00Z[Europe/Budapest]"] {
+            XCTAssertNil(WalletInstant.parseTimestamp(source), source)
+        }
+    }
+
+    func testW3cTimestampsWithoutOffsetUseUtcOnlyInTheirDefinedScope() {
+        let source = "2026-10-30T23:30:00.125"
+        let expected = DisplayValue.instant(WalletInstant(epochSeconds: 1793403000, nanoseconds: 125000000))
+        for format in ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "dc+sd-jwt", "vc+sd-jwt", "mso_mdoc"] {
+            for name in ["validFrom", "validUntil", "vc.validUntil", "proof.created", "vc.proof.expires", "credentialSubject.validUntil", "expiry_date"] {
+                let value = disclosureValue(name, "\"\(source)\"", format: format)
+                let isW3cTimestamp = ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format) &&
+                    ["validFrom", "validUntil", "vc.validUntil", "proof.created", "vc.proof.expires"].contains(name)
+                XCTAssertEqual(value, isW3cTimestamp ? expected : .text(source), "\(format) \(name)")
+            }
+        }
+        for source in ["2026-10-30", "2026-02-30T23:30:00", "2026-10-30T23:30:00+99:99"] {
+            XCTAssertEqual(disclosureValue("validUntil", "\"\(source)\"", format: "ldp_vc"), .text(source))
+        }
+    }
+
+    func testMdocDateAndTimestampClaimsRetainTheirDifferentMeaningsInDetailsAndConsent() {
+        for name in ["issue_date", "expiry_date", "portrait_capture_date"] {
+            for source in ["2026-10-30", "2026-10-30T02:00:00+02:00"] {
+                let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
+                    issuer: nil, subject: nil, label: "mDL",
+                    credentialDataJSON: "{\"org.iso.18013.5.1\":{\"\(name)\":\"\(source)\"}}", disclosures: [
+                        PresentationDisclosure(path: "org.iso.18013.5.1/\(name)", name: name,
+                            valueJSON: "\"\(source)\"", displayValue: source, selectivelyDisclosable: false)
+                    ])
+                let expected: DisplayValue = source.count == 10 ? .text(source)
+                    : .instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0))
+                let items = CredentialDisplayNormalizer.details(for: option).groups.flatMap(\.items)
+                XCTAssertEqual(items.map(\.value), [expected, expected], "\(name) \(source)")
+                XCTAssertTrue(items.allSatisfy { $0.rawValue == "\"\(source)\"" })
+            }
+        }
+    }
+
+    func testDateTimeDisplayUsesLocaleAndOffsetAtTheInstant() throws {
+        let cases = [
+            ("2026-03-29T00:30:00Z", "Europe/Budapest", "01:30:00 UTC+01:00"),
+            ("2026-03-29T01:30:00Z", "Europe/Budapest", "03:30:00 UTC+02:00"),
+            ("2026-10-25T00:30:00Z", "Europe/Budapest", "02:30:00 UTC+02:00"),
+            ("2026-10-25T01:30:00Z", "Europe/Budapest", "02:30:00 UTC+01:00"),
+            ("2026-10-30T00:00:00Z", "America/Los_Angeles", "17:00:00 UTC-07:00"),
+            ("2026-10-30T00:00:00Z", "Asia/Kathmandu", "05:45:00 UTC+05:45")
+        ]
+        for (source, zone, suffix) in cases {
+            let instant = try XCTUnwrap(WalletInstant.parseTimestamp(source))
+            let text = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: zone)), locale: Locale(identifier: "en_GB"))
+            XCTAssertTrue(text.hasSuffix(suffix), text)
+            if zone == "America/Los_Angeles" { XCTAssertTrue(text.contains("29 Oct 2026"), text) }
+        }
+        XCTAssertEqual(WalletInstant(Date(timeIntervalSince1970: 1793367000.123)),
+                       WalletInstant(epochSeconds: 1793367000, nanoseconds: 123000000))
+        let instant = WalletInstant(epochSeconds: 1793367000, nanoseconds: 123456789)
+        let zone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let british = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_GB"))
+        let american = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_US"))
+        let german = instant.formatted(timeZone: zone, locale: Locale(identifier: "de_DE"))
+        XCTAssertTrue(british.contains("13:30:00.123456789"), british)
+        XCTAssertTrue(american.contains("1:30:00.123456789") && american.contains("PM"), american)
+        XCTAssertTrue(german.contains("13:30:00,123456789"), german)
+    }
+
+    func testConsentPreservesNormalizedClaimsAcrossCredentialFormats() {
+        for format in ["dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "mso_mdoc"] {
+            let disclosures = [("iat", "1793318400"), ("exp", "1801094400"), ("nbf", "1793318400.25")]
+            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
+                issuer: nil, subject: nil, label: "Identity",
+                credentialDataJSON: #"{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}"#,
+                disclosures: disclosures.map { name, value in
+                    PresentationDisclosure(path: name, name: name, valueJSON: value, displayValue: value,
+                        selectivelyDisclosable: false)
+                })
+            let details = CredentialDisplayNormalizer.details(for: option)
+            let expected = [WalletInstant(epochSeconds: 1793318400, nanoseconds: 0), WalletInstant(epochSeconds: 1801094400, nanoseconds: 0), WalletInstant(epochSeconds: 1793318400, nanoseconds: 250000000)]
+            XCTAssertEqual(details.groups.first?.items.map(\.value), expected.map(DisplayValue.instant), format)
+            let stored = details.groups.dropFirst().flatMap(\.items)
+            for (index, disclosure) in disclosures.enumerated() {
+                XCTAssertEqual(stored.first { $0.path.id == disclosure.0 }?.value, .instant(expected[index]), format)
+                XCTAssertEqual(details.groups.first?.items[index].rawValue, disclosure.1)
+            }
+        }
+    }
+
+    func testTemporalFormattingPreservesSecondsAndRejectsUnitGuessing() {
+        let cases = [
+            ("-62135596800", WalletInstant(epochSeconds: -62135596800, nanoseconds: 0)),
+            ("0", WalletInstant(epochSeconds: 0, nanoseconds: 0)),
+            ("-1", WalletInstant(epochSeconds: -1, nanoseconds: 0)),
+            ("-0.25", WalletInstant(epochSeconds: -1, nanoseconds: 750000000)),
+            ("1.793318400125e9", WalletInstant(epochSeconds: 1793318400, nanoseconds: 125000000)),
+            ("1793318400.123456789", WalletInstant(epochSeconds: 1793318400, nanoseconds: 123456789)),
+            ("10000000000", WalletInstant(epochSeconds: 10000000000, nanoseconds: 0)),
+            ("253402300799", WalletInstant(epochSeconds: 253402300799, nanoseconds: 0)),
+        ]
+        for (raw, expected) in cases {
+            XCTAssertEqual(disclosureValue("iat", raw), .instant(expected), raw)
+            XCTAssertEqual(disclosureValue("validFrom", "\"\(raw)\""), .text(raw), raw)
+        }
+        for raw in ["1793318400000", "253402300800", "1e100", "1793318400.1234567891"] {
+            XCTAssertEqual(disclosureValue("exp", raw), .number(raw), raw)
+        }
+    }
+
+    func testTypedClaimFallbackDoesNotChangeSourceMeaning() {
+        XCTAssertEqual(disclosureValue("age_over_18", "true"), .bool(true))
+        XCTAssertEqual(disclosureValue("custom", #""true""#), .text("true"))
+        XCTAssertEqual(disclosureValue("custom", #""false""#), .text("false"))
+        XCTAssertEqual(disclosureValue("idx", "1793318400"), .number("1793318400"))
+        XCTAssertEqual(disclosureValue("document_number", #""00123""#), .text("00123"))
+        XCTAssertEqual(disclosureValue("custom", "null"), .null)
+        for date in ["1990-01-01", "2026-10-30T23:30:00", "2026-02-30T12:00:00Z", "2026-10-30T23:30:60Z", "2026-10-30T23:30:00.1234567891Z", "not a date", "SGVsbG8gd29ybGQ="] {
+            XCTAssertEqual(disclosureValue("expiry_date", "\"\(date)\""), .text(date))
+        }
+        XCTAssertEqual(disclosureValue("custom", "{"), .text("Fallback"))
+    }
+
+    func testNestedAndArrayTemporalValuesUseTheSameFormatting() {
+        let value = disclosureValue("history", #"[{"issued_at":1793318400,"flags":[true,"true"]}]"#)
+        guard case .list(let values) = value, case .object(let items) = values.first else {
+            return XCTFail("Expected the original list and object")
+        }
+        XCTAssertEqual(items.first?.value, .instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)))
+        XCTAssertEqual(items.last?.value, .list([.bool(true), .text("true")]))
+        XCTAssertEqual(disclosureValue("exp", "[1793318400]"), .list([.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0))]))
+    }
+
+    private func disclosureValue(_ name: String, _ json: String, format: String = "dc+sd-jwt") -> DisplayValue? {
+        let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
+            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
+                PresentationDisclosure(path: name, name: name, valueJSON: json, displayValue: "Fallback",
+                    selectivelyDisclosable: false)
+            ])
+        return CredentialDisplayNormalizer.details(for: option).groups.first?.items.first?.value
+    }
+
     func testSharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
@@ -415,8 +560,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
         XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 undisclosed claim values"))
         XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
-        XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .text("2025-01-15"))
-        XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .text("2030-01-15"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .instant(WalletInstant(epochSeconds: 1736899200, nanoseconds: 0)))
+        XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .instant(WalletInstant(epochSeconds: 1894699800, nanoseconds: 0)))
         XCTAssertFalse(technical.items.contains { item in
             item.value == .text("very-long-x-coordinate") ||
                 item.value == .text("very-long-y-coordinate")
@@ -797,7 +942,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testRendersArbitraryDataImageClaimsForSDJWTAndW3CCredentialsUsingDetectedMimeType() {
-        for format in ["vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"] {
+        for format in ["vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"] {
             let details = CredentialDisplayNormalizer.details(
                 id: "cred-1",
                 title: format,
@@ -1173,7 +1318,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             "Subject"
         ])
         XCTAssertEqual(systemInfo.items.map(\.value), [
-            .text("2026-07-09T12:00:00Z"),
+            .instant(WalletInstant(addedAt)),
             .text("cred-1"),
             .text("vc+sd-jwt"),
             .text("Example Issuer"),

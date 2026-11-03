@@ -496,6 +496,18 @@
       "title": "Sharing — selected information"
     },
     {
+      "id": "sharing.information.dates",
+      "composeTest": "sharingInformationDates",
+      "swiftTest": "testSharingInformationDates",
+      "requirements": [
+        "Issued at and Expires show readable UTC dates and times",
+        "Unavoidable claim explanation remains visible",
+        "Share and dismissal actions remain reachable"
+      ],
+      "kind": "deterministic",
+      "note": "Numeric SD-JWT claims with the SDK raw display-string fallback, rendered through production consent normalization."
+    },
+    {
       "id": "sharing.information.alternative",
       "requirements": [
         "Alternative credential information"

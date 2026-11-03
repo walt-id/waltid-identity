@@ -318,6 +318,14 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/sharing.information.selected.png" alt="Sharing — selected information, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/sharing.information.selected.png" alt="Sharing — selected information, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/sharing-information-selected.native-ios27_0-phone-en-light.png" alt="Sharing — selected information, Native iOS" width="240"> |
 
+## sharing-information-dates
+
+**sharing · information · dates**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/sharing.information.dates.png" alt="sharing · information · dates, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/sharing.information.dates.png" alt="sharing · information · dates, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/sharing-information-dates.native-ios27_0-phone-en-light.png" alt="sharing · information · dates, Native iOS" width="240"> |
+
 ## sharing-information-alternative
 
 **sharing · information · alternative**

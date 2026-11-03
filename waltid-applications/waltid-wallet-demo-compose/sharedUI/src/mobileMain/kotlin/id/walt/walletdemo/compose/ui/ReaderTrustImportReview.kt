@@ -51,8 +51,8 @@ internal fun ReaderTrustImportReview(
                     SettingsDetailRow(stringResource(Res.string.reader_trust_role), stringResource(Res.string.reader_trust_anchor))
                     SettingsDetailRow(stringResource(Res.string.reader_trust_subject), authority.subject)
                     SettingsDetailRow(stringResource(Res.string.reader_trust_issuer), authority.issuer)
-                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_from), authority.validFrom.toString())
-                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_until), authority.validUntil.toString())
+                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_from), walletInstantText(authority.validFrom))
+                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_until), walletInstantText(authority.validUntil))
                 }
                 SettingsCopyRow(stringResource(Res.string.reader_trust_fingerprint), authority.sha256Fingerprint,
                     "reader-ca-fingerprint-${authority.sha256Fingerprint}", "reader-ca-copy-${authority.sha256Fingerprint}",
@@ -63,9 +63,9 @@ internal fun ReaderTrustImportReview(
                 WalletSection(provider.providerName) {
                     SettingsDetailRow(stringResource(Res.string.reader_trust_provider_id), provider.providerId)
                     SettingsDetailRow(stringResource(Res.string.reader_trust_type), provider.type)
-                    SettingsDetailRow(stringResource(Res.string.reader_trust_issued), provider.issuedAt.toString())
-                    SettingsDetailRow(stringResource(Res.string.reader_trust_next_update), provider.nextUpdate?.toString() ?: stringResource(Res.string.reader_trust_unspecified))
-                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_until), provider.validUntil?.toString() ?: stringResource(Res.string.reader_trust_unspecified))
+                    SettingsDetailRow(stringResource(Res.string.reader_trust_issued), walletInstantText(provider.issuedAt))
+                    SettingsDetailRow(stringResource(Res.string.reader_trust_next_update), provider.nextUpdate?.let { walletInstantText(it) } ?: stringResource(Res.string.reader_trust_unspecified))
+                    SettingsDetailRow(stringResource(Res.string.reader_trust_valid_until), provider.validUntil?.let { walletInstantText(it) } ?: stringResource(Res.string.reader_trust_unspecified))
                     SettingsNotice(stringResource(if (provider.establishesReaderTrust) Res.string.reader_trust_establishes_reader_trust else Res.string.reader_trust_evidence_only))
                 }
             }
