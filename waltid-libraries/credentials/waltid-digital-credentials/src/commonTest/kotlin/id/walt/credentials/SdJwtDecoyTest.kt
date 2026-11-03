@@ -1,5 +1,6 @@
 package id.walt.credentials
 
+import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.credentials.signatures.sdjwt.SdJwtDisclosureLocator
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
@@ -111,4 +112,54 @@ class SdJwtDecoyTest {
         assertEquals(path(0), located.location)
     }
 
+    @Test
+    fun legacyIssuerDigestsAfterDecoysResolveAtTheLogicalIndexWithTheirWireEncoding() {
+        val de = disclosure("DE")
+        val fr = disclosure("FR")
+        // Each element matches only through a legacy digest variant, not the wire-encoding digest
+        assertNotEquals(de.asHashedFromEncoded(), de.asHashed2())
+        assertNotEquals(fr.asHashedFromEncoded(), fr.asHashed3())
+        val payload = buildJsonObject {
+            putJsonArray("nationalities") {
+                add(reference("decoy-first"))
+                add(reference(de.asHashed2()))
+                add(reference("decoy-middle"))
+                add(reference(fr.asHashed3()))
+            }
+        }
+        val located = SdJwtDisclosureLocator.locate(payload, listOf(de, fr))
+        assertEquals(path(0), located.single { it.value == de.value }.location)
+        assertEquals(path(1), located.single { it.value == fr.value }.location)
+        assertEquals(listOf(de.encoded, fr.encoded), located.map { it.encoded })
+    }
+
+    @Test
+    fun verifierParsesAPresentationWithDecoysAndWithheldElementsInLogicalOrder() = runTest {
+        // nationalities: [decoy, DE, AT (withheld), "US" (clear text), decoy, FR, decoy]; the holder presents DE and FR
+        val de = disclosure("DE")
+        val fr = disclosure("FR")
+        fun encode(value: JsonObject) = value.toString().encodeToByteArray().encodeToBase64Url()
+        val payload = buildJsonObject {
+            put("iss", "https://issuer.example")
+            put("vct", "https://issuer.example/pid")
+            put("_sd_alg", "sha-256")
+            putJsonArray("nationalities") {
+                add(reference("decoy-before"))
+                add(reference(de.asHashedFromEncoded()))
+                add(reference(disclosure("AT").asHashedFromEncoded()))
+                add(JsonPrimitive("US"))
+                add(reference("decoy-between"))
+                add(reference(fr.asHashedFromEncoded()))
+                add(reference("decoy-after"))
+            }
+        }
+        val issuerJwt = "${encode(buildJsonObject { put("alg", "ES256"); put("typ", "dc+sd-jwt") })}.${encode(payload)}.c2ln"
+        val kbJwt = "${encode(buildJsonObject { put("alg", "ES256"); put("typ", "kb+jwt") })}." +
+            "${encode(buildJsonObject { put("aud", "verifier"); put("nonce", "nonce"); put("sd_hash", "hash") })}.c2ln"
+
+        val presentation = DcSdJwtPresentation.parse("$issuerJwt~${de.encoded}~${fr.encoded}~$kbJwt").getOrThrow()
+        assertEquals(json("""["DE", "US", "FR"]"""), presentation.credential.credentialData["nationalities"])
+    }
+
+    private fun json(value: String) = Json.parseToJsonElement(value)
 }
