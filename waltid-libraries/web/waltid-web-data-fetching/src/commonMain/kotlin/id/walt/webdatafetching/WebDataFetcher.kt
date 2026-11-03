@@ -120,7 +120,9 @@ class WebDataFetcher private constructor(
                     dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
                 }.getOrElse { ex ->
                     throw DataFetchingException(
-                        "Server answered request with non-/invalid JSON: $body (to request to $url)",
+                        // The body is not included: the URL is often caller-supplied, and this message can reach
+                        // client-facing errors and logs.
+                        "Server answered request with non-/invalid JSON (to request to $url)",
                         cause = ex,
                     )
                 }
