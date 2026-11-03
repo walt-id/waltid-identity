@@ -1,0 +1,74 @@
+name: WAL-1580 focused native setup repair acceptance
+
+on:
+  push:
+    branches: [chore/wal-1580-native-setup-check-20261103]
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+
+jobs:
+  native:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the framework producer source
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@9da6eff35d279d3793f47466cf31d001a1e739da
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          resolved-refs: '{"unified":"fe7ad3cfee01dc1107eaad6a7d8bc11b62ba500a","identity":"9da6eff35d279d3793f47466cf31d001a1e739da","enterprise":"7b7c3c6f5a8f895e58e706f4433b70cc0c80581a","enterprise_license":"89e50887a63586c021b4bb927e5c2c696c229ce1"}'
+      - name: Checkout the two test setup repairs
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          path: native-setup-check
+          sparse-checkout: .github/scripts/ci/native-setup-acceptance.patch
+          sparse-checkout-cone-mode: false
+      - name: Restore the refreshed parent framework
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: '13225652126'
+          run-id: '41621627510'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/wallet-core-artifact
+          merge-multiple: true
+      - name: Verify producer source, toolchain and framework bytes
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
+      - name: Apply the two Swift test setup repairs and focused selection
+        working-directory: waltid-identity
+        run: |
+          git apply ../native-setup-check/.github/scripts/ci/native-setup-acceptance.patch
+          git diff --check
+          git diff --stat
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+      - name: Check the two repaired tests once
+        timeout-minutes: 25
+        uses: ./waltid-identity/.github/actions/gradle-ios
+        with:
+          waltid-directory: waltid-identity
+          simulator-destination: platform=iOS Simulator,name=iPhone 17,OS=27.0
+          wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
+          run-ios-simulator-tests: 'false'
+          run-wallet-sdk-tests: 'false'
+          run-native-demo-tests: 'true'
+          run-compose-demo-tests: 'false'
+          collect-test-diagnostics: on-failure
+          collect-test-reports: 'false'
+          test-result-artifact-name: native-setup-acceptance-results
+      - name: Preserve results and phase logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-setup-acceptance
+          path: |
+            ios-ci-logs/
+            waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult/
+          retention-days: 7
+          if-no-files-found: error

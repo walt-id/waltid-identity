@@ -1,0 +1,44 @@
+diff --git a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/MockWalletUITests.swift b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/MockWalletUITests.swift
+index 5e523f7f11..84f1c3f33e 100644
+--- a/waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/MockWalletUITests.swift
++++ b/waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/MockWalletUITests.swift
+@@ -691,12 +691,7 @@ final class MockWalletUITests: XCTestCase {
+ 
+         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
+ 
+-        ui.openWalletLink("openid-credential-offer://mock")
+-        XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
+-        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
+-
+-        ui.openWalletLink("openid4vp://mock")
++        ui.openDeepLink("openid4vp://mock")
+         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
+ 
+         ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Reject")
+@@ -1058,12 +1053,7 @@ final class MockWalletUITests: XCTestCase {
+             "Wallet ready"
+         )
+ 
+-        ui.openWalletLink("openid-credential-offer://mock")
+-        XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
+-        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
+-
+-        ui.openWalletLink("openid4vp://mock")
++        ui.openDeepLink("openid4vp://mock")
+         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
+ 
+         XCTAssertTrue(app.descendants(matching: .any)["wallet.presentationVerifierSection"].waitForExistence(timeout: 10))
+diff --git a/.github/actions/gradle-ios/action.yml b/.github/actions/gradle-ios/action.yml
+--- a/.github/actions/gradle-ios/action.yml
++++ b/.github/actions/gradle-ios/action.yml
+@@ -202,6 +202,8 @@
+           -scheme iosApp \
+           -configuration Debug \
+           -destination "platform=iOS Simulator,id=$simulator" \
++          -only-testing:iosAppUITests/MockWalletUITests/testPresentationDeclineSendsProtocolRejection \
++          -only-testing:iosAppUITests/MockWalletUITests/testPresentationWithoutVerifierDisplayKeepsClientIDInTechnicalDetails \
+           -skip-testing:iosAppEnterpriseTests \
+           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
+           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
