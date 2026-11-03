@@ -2,11 +2,12 @@ package id.walt.wallet2.persistence
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionCreationStore
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
@@ -21,7 +22,7 @@ import org.jetbrains.exposed.v1.jdbc.update
 class ExposedIssuanceSessionStore internal constructor(
     private val scope: ExposedWalletScope,
     private val db: Database,
-) : AtomicWalletIssuanceSessionStore {
+) : AtomicWalletIssuanceSessionCreationStore {
     private val scopedWalletId get() = scope.walletId
     val walletGeneration: String get() = scope.generation
     private val table = Wallet2Tables.IssuanceSessions
@@ -47,6 +48,22 @@ class ExposedIssuanceSessionStore internal constructor(
                 it[table.payload] = record.payload
                 it[table.updatedAt] = record.updatedAtEpochMilliseconds
             }
+        }
+    }
+
+    override suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean = suspendTransaction(db) {
+        scope.requireCurrentForWrite()
+        if (table.selectAll().where { (table.walletId eq scopedWalletId) and (table.id eq record.id) }.any()) false
+        else {
+            table.insert {
+                it[table.walletId] = scopedWalletId
+                it[table.id] = record.id
+                it[table.sessionId] = record.sessionId
+                it[table.kind] = record.kind.name
+                it[table.payload] = record.payload
+                it[table.updatedAt] = record.updatedAtEpochMilliseconds
+            }
+            true
         }
     }
 

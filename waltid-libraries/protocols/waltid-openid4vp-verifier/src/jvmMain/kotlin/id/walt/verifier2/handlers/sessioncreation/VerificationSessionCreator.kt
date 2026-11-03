@@ -683,6 +683,7 @@ object VerificationSessionCreator {
 
             policies = effectivePolicies,
             notifications = setup.core.notifications,
+            reattemptable = setup.core.reattemptable,
             redirects = when (setup) {
                 is SameDeviceFlowSetup -> setup.redirects
                 is CrossDeviceFlowSetup -> setup.redirects

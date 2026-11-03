@@ -38,31 +38,17 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: ${{ inputs.version }}
-      KEYCLOAK: ${{ secrets.DEV_KEYCLOAK_CLIENT_SECRET }}
     strategy:
       matrix:
         services:
-          - k8s: waltid-identity/waltid-services/waltid-issuer-api/k8s
-            name: issuer
-            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-issuer-api2/k8s
             name: issuer2
-            namespace: ${{ inputs.oss }}
-          - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s
-            name: verifier
             namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-verifier-api2/k8s
             name: verifier2
             namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-wallet-api2/k8s
             name: wallet-api2
-            namespace: ${{ inputs.oss }}
-          - k8s: waltid-identity/waltid-services/waltid-wallet-api/k8s
-            name: web-wallet
-            namespace: ${{ inputs.oss }}
-            keycloak: true
-          - k8s: waltid-identity/waltid-applications/waltid-web-portal/k8s
-            name: portal
             namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-applications/waltid-web-portal2/k8s
             name: portal2
@@ -96,13 +82,8 @@ jobs:
       - name: Prepare CD - ${{ matrix.services.name }}
         if: matrix.services.name != 'waltid-enterprise' && matrix.services.name != 'waltid-enterprise-sandbox'
         run: |
-          modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
-                                sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
-          if [ "${{ matrix.services.keycloak }}" == true ]; then
-            echo "$modified_deployment" | sed "s/__DEFAULT_KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
-          else
-            echo "$modified_deployment" > ${{ matrix.services.k8s }}/deployment_mod.yaml
-          fi
+          sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
+            sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
       - name: Prepare CD
         if: matrix.services.name == 'waltid-enterprise'
         run: |

@@ -221,6 +221,7 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     final fun insertCredential(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertCredential|insertCredential(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?;kotlin.String?){}[0]
     final fun insertDid(kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertDid|insertDid(kotlin.String;kotlin.String){}[0]
     final fun insertIssuanceSessionRecord(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertIssuanceSessionRecord|insertIssuanceSessionRecord(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+    final fun insertIssuanceSessionRecordIfAbsent(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertIssuanceSessionRecordIfAbsent|insertIssuanceSessionRecordIfAbsent(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
     final fun issuanceSessionRecordChanges(): app.cash.sqldelight/ExecutableQuery<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.issuanceSessionRecordChanges|issuanceSessionRecordChanges(){}[0]
     final fun putIdentityRecord(kotlin/String, kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.putIdentityRecord|putIdentityRecord(kotlin.String;kotlin.String;kotlin.String){}[0]
     final fun selectActiveIdentity(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_active_identity> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectActiveIdentity|selectActiveIdentity(kotlin.String){}[0]
@@ -436,13 +437,14 @@ final class id.walt.wallet2.persistence.stores/SqlDelightDidStore : id.walt.wall
     final suspend fun removeDid(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightDidStore.removeDid|removeDid(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : id.walt.wallet2.handlers/AtomicWalletIssuanceSessionStore { // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore|null[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : id.walt.wallet2.handlers/AtomicWalletIssuanceSessionCreationStore { // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
 
     final suspend fun compareAndSet(id.walt.wallet2.handlers/WalletIssuanceSessionRecord, id.walt.wallet2.handlers/WalletIssuanceSessionRecord?): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.compareAndSet|compareAndSet(id.walt.wallet2.handlers.WalletIssuanceSessionRecord;id.walt.wallet2.handlers.WalletIssuanceSessionRecord?){}[0]
     final suspend fun get(kotlin/String): id.walt.wallet2.handlers/WalletIssuanceSessionRecord? // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.get|get(kotlin.String){}[0]
     final suspend fun list(): kotlin.collections/List<id.walt.wallet2.handlers/WalletIssuanceSessionRecord> // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.list|list(){}[0]
     final suspend fun put(id.walt.wallet2.handlers/WalletIssuanceSessionRecord) // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.put|put(id.walt.wallet2.handlers.WalletIssuanceSessionRecord){}[0]
+    final suspend fun putIfAbsent(id.walt.wallet2.handlers/WalletIssuanceSessionRecord): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.putIfAbsent|putIfAbsent(id.walt.wallet2.handlers.WalletIssuanceSessionRecord){}[0]
     final suspend fun remove(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.remove|remove(kotlin.String){}[0]
 }
 

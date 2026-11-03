@@ -3,24 +3,9 @@
 	admin off
 }
 
-# Wallet API
-:{$WALLET_BACKEND_PORT} {
-    reverse_proxy http://wallet-api:{$WALLET_BACKEND_PORT}
-}
-
-# Issuer API
-:{$ISSUER_API_PORT} {
-    reverse_proxy http://issuer-api:{$ISSUER_API_PORT}
-}
-
 # Issuer API2
 :{$ISSUER_API2_PORT} {
     reverse_proxy http://issuer-api2:{$ISSUER_API2_PORT}
-}
-
-# Verifier API
-:{$VERIFIER_API_PORT} {
-    reverse_proxy http://verifier-api:{$VERIFIER_API_PORT}
 }
 
 # Verifier API2
@@ -31,24 +16,6 @@
 # Wallet API2
 :{$WALLET_API2_PORT} {
     reverse_proxy http://wallet-api2:{$WALLET_API2_PORT}
-}
-
-
-# Web Demo Wallet Frontend
-:{$DEMO_WALLET_FRONTEND_PORT} {
-    reverse_proxy http://waltid-demo-wallet:{$DEMO_WALLET_FRONTEND_PORT} # frontend
-    reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
-}
-
-# Web Dev Wallet Frontend
-:{$DEV_WALLET_FRONTEND_PORT} {
-    reverse_proxy http://waltid-dev-wallet:{$DEV_WALLET_FRONTEND_PORT} # frontend
-    reverse_proxy /wallet-api/* http://wallet-api:{$WALLET_BACKEND_PORT} # backend
-}
-
-# Web Portal
-:{$WEB_PORTAL_PORT} {
-    reverse_proxy http://web-portal:{$WEB_PORTAL_PORT}
 }
 
 # Web Portal2

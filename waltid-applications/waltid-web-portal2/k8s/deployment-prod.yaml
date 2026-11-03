@@ -37,7 +37,7 @@ spec:
             - name: NUXT_PUBLIC_VERIFIER_BASE
               value: "https://verifier2.demo.walt.id"
             - name: NUXT_PUBLIC_WALLET_URL
-              value: "https://wallet.demo.walt.id"
+              value: "https://wallet2.demo.walt.id"
           envFrom:
             - secretRef:
                 name: portal2-pid-secret
@@ -76,6 +76,52 @@ spec:
       secretName: web-portal2-tls-secret
   rules:
     - host: portal2.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal2
+                port:
+                  name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: legacy-portal-redirect
+spec:
+  redirectRegex:
+    regex: ^https?://(portal\.demo\.walt\.id|portal\.walt\.id)(:\d+)?(/.*)?$
+    replacement: https://portal2.demo.walt.id/
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: identity-main-legacy-portal-redirect@kubernetescrd
+spec:
+  tls:
+    - hosts:
+        - portal.demo.walt.id
+        - portal.walt.id
+      secretName: web-portal-tls-secret
+  rules:
+    - host: portal.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal2
+                port:
+                  name: http
+    - host: portal.walt.id
       http:
         paths:
           - path: /

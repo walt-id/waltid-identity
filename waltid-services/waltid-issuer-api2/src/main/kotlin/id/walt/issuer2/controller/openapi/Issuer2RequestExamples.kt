@@ -187,8 +187,8 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
-    val EUDI_IDENTITY_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "identityCredentialSdJwtEudi")
-    val EUDI_PHOTO_ID_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "isoPhotoIdEudi")
+    val EUDI_IDENTITY_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "identityCredentialSdJwt")
+    val EUDI_PHOTO_ID_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "isoPhotoId")
     val EUDI_PID_SD_JWT_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_SD_JWT_PROFILE_ID)
     val EUDI_PID_MDOC_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_MDOC_PROFILE_ID)
 

@@ -36,6 +36,12 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.forms.submitForm
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
+import kotlinx.serialization.json.Json
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import io.ktor.http.Url
 import io.ktor.server.application.Application
 import kotlinx.serialization.json.jsonObject
@@ -140,7 +146,15 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() {
+    fun `omitted lifecycle flag keeps sessions reusable`() = verifyLifecycle(null)
+
+    @Test
+    fun `explicit reusable sessions accept another presentation`() = verifyLifecycle(true)
+
+    @Test
+    fun `single use sessions reject presentations and request fetches after success`() = verifyLifecycle(false)
+
+    private fun verifyLifecycle(reattemptable: Boolean?) {
         val host = "127.0.0.1"
         val port = freePort()
         Verifier2WebhookRecorder().start().use { webhook ->
@@ -172,7 +186,13 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
 
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup(webhook.notifications()))
+                    val setup = verificationSessionSetup(webhook.notifications()) as CrossDeviceFlowSetup
+                    if (reattemptable == null) {
+                        // The default JSON serializer omits default values, including reattemptable=true.
+                        setBody(Json.encodeToString<VerificationSessionSetup>(setup))
+                    } else {
+                        setBody<VerificationSessionSetup>(setup.copy(core = setup.core.copy(reattemptable = reattemptable)))
+                    }
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -195,6 +215,22 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                     info1.creationDate.wasWithinLastSeconds()
                 }
             }
+
+            assertEquals(reattemptable ?: true, info1.reattemptable)
+            assertNull(info1.presentationId)
+
+            // A failed attempt must not consume even a single-use session.
+            val failedAttempt = http.submitForm(
+                "/verification-session/$sessionId/response",
+                Parameters.build {
+                    append("state", info1.authorizationRequest.state!!)
+                    append("vp_token", """{"my_pid":["invalid-presentation"]}""")
+                },
+            )
+            assertEquals(HttpStatusCode.BadRequest, failedAttempt.status)
+            val failedInfo = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+            assertEquals(Verification2Session.VerificationSessionStatus.FAILED, failedInfo.status)
+            val failedPresentationId = assertNotNull(failedInfo.presentationId)
 
             val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
             val holderKey = holderKeyFun()
@@ -250,14 +286,52 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
             }
 
             test("Emit successful verification callback events") {
-                webhook.assertReceivedInOrder(
-                    sessionId,
-                    Verifier2WebhookRecorder.successfulPresentationEvents,
+                val presentationId = assertNotNull(info2.presentationId)
+                assertNotEquals(failedPresentationId, presentationId)
+                assertNull(info2.failure)
+                val updates = webhook.received().filter {
+                    it.target == sessionId && it.session["presentationId"]?.jsonPrimitive?.content == presentationId
+                }
+                assertEquals(
+                    Verifier2WebhookRecorder.successfulPresentationEvents.drop(1).map { it.name },
+                    updates.map { it.event },
                 )
-                webhook.assertDoesNotContain(sessionId, SessionEvent.presentation_validation_failed)
-                webhook.assertDoesNotContain(sessionId, SessionEvent.dcql_fulfillment_check_failed)
-                webhook.assertDoesNotContain(sessionId, SessionEvent.wallet_error_response_received)
+                assertTrue(updates.all { it.requestId == null })
             }
+
+            val originalId = assertNotNull(info2.presentationId)
+            val raw = assertNotNull(info2.presentedRawData)
+            val repeated = http.submitForm(
+                "/verification-session/$sessionId/response",
+                Parameters.build {
+                    append("state", raw.state!!)
+                    append("vp_token", Json.encodeToString(raw.vpToken))
+                },
+            )
+            assertEquals(if (reattemptable == false) HttpStatusCode.Conflict else HttpStatusCode.OK, repeated.status)
+            val latest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+            assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, latest.status)
+            if (reattemptable == false) {
+                assertEquals(originalId, latest.presentationId)
+                assertEquals(HttpStatusCode.BadRequest, http.get("/verification-session/$sessionId/request").status)
+                assertEquals(HttpStatusCode.BadRequest, http.submitForm("/verification-session/$sessionId/request").status)
+            } else {
+                assertNotEquals(originalId, latest.presentationId)
+                assertEquals(HttpStatusCode.OK, http.get("/verification-session/$sessionId/request").status)
+                assertEquals(HttpStatusCode.OK, http.submitForm("/verification-session/$sessionId/request").status)
+                val afterRequest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+                assertEquals(latest.presentationId, afterRequest.presentationId)
+                assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, afterRequest.status)
+                val attemptUpdates = webhook.received().filter {
+                    it.session["presentationId"]?.jsonPrimitive?.content == latest.presentationId &&
+                        it.event != SessionEvent.authorization_request_requested.name
+                }
+                assertEquals(
+                    Verifier2WebhookRecorder.successfulPresentationEvents.drop(1).map { it.name },
+                    attemptUpdates.map { it.event },
+                )
+            }
+
         }
         }
     }

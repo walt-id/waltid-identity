@@ -20,6 +20,7 @@ import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
 import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.*
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
@@ -432,8 +433,8 @@ object Verifier2VPDirectPostHandler {
         log.trace { "Handling direct post for received data: $responseData" }
 
         val session = verificationSession
+        session.requireAvailable(verificationTime)
         val responseMode = session.authorizationRequest.responseMode
-        val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
         if (responseData is ErrorResponseDirectPost) {
             return handleWalletErrorResponse(session, responseData, updateSessionCallback)
@@ -451,17 +452,28 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
+        // Parse vp_token
+        val phaseStart = TimeSource.Monotonic.markNow()
+        val vpTokenContents = parseVpToken(vpTokenString)
+        val afterVpToken = phaseStart.elapsedNow()
+        // Start the attempt before validation can emit any callback.
+        session.updateSession(SessionEvent.attempted_presentation) {
+            resetPresentationAttempt()
+            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
+            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
+        }
+        val afterSessionUpdate = phaseStart.elapsedNow()
+
         // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
         // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
-        if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
-            val idToken = extractIdToken(
-                responseData,
-                session,
-                ephemeralDecryptionKey,
-                crypto2EphemeralDecryptionKey,
-            )
-                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+        if (session.authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
             try {
+                val idToken = extractIdToken(
+                    responseData,
+                    session,
+                    ephemeralDecryptionKey,
+                    crypto2EphemeralDecryptionKey,
+                ) ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
                 val allowedAlgorithms = session.authorizationRequest.clientMetadata
                     ?.idTokenSignedResponseAlg
                     ?: ClientMetadata.DEFAULT_ID_TOKEN_SIGNED_RESPONSE_ALG
@@ -484,18 +496,7 @@ object Verifier2VPDirectPostHandler {
             log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 
-        // Parse vp_token
-        val phaseStart = TimeSource.Monotonic.markNow()
-        val vpTokenContents = parseVpToken(vpTokenString)
-        val afterVpToken = phaseStart.elapsedNow()
         log.trace { "Parsed vp_token for state $receivedState: $vpTokenContents" }
-
-        session.updateSession(SessionEvent.attempted_presentation) {
-            attempted = true
-            status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
-            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
-        }
-        val afterSessionUpdate = phaseStart.elapsedNow()
 
         // Process
 
@@ -602,13 +603,27 @@ object Verifier2VPDirectPostHandler {
         Verifier2Response.Verifier2Error.MALFORMED_VP_TOKEN.throwAsError()
     }
 
+    /** Clear the previous attempt's evidence before publishing the new attempt's identifier. */
+    private fun Verification2Session.resetPresentationAttempt() {
+        presentationId = Uuid.random().toString()
+        attempted = true
+        statusReason = null
+        failure = null
+        policyResults = null
+        presentationValidationResults = null
+        presentedPresentations = null
+        presentedCredentials = null
+        presentedRawData = null
+        responseCode = null
+    }
+
     /**
      * Handles an OID4VP 1.0 §8.5 wallet error response. Validates `state` echo, marks the
      * session as `FAILED` with a structured [SessionFailure.WalletErrorResponse], and emits
      * [SessionEvent.wallet_error_response_received].
      *
-     * Idempotent: if the session is already in a terminal state, the response is acknowledged
-     * without overwriting any existing outcome.
+     * Each error admitted by requireAvailable() is a new attempt, including after a previous
+     * failure or a reusable session's success. Consumed single-use sessions remain closed.
      */
     private suspend fun handleWalletErrorResponse(
         session: Verification2Session,
@@ -621,16 +636,8 @@ object Verifier2VPDirectPostHandler {
             ?.takeIf { it != responseData.state }
             ?.let { Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError() }
 
-        if (session.status == SUCCESSFUL || session.status == FAILED) {
-            log.info { "Session ${session.id} already terminal (${session.status}); ignoring wallet error." }
-            return mapOf(
-                "status" to "acknowledged",
-                "message" to "Session already terminal; wallet error response ignored.",
-            )
-        }
-
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
-            attempted = true
+            resetPresentationAttempt()
             status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
             failure = SessionFailure.WalletErrorResponse(
