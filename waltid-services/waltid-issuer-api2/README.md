@@ -298,13 +298,30 @@ the first item's credential references index 94567 and the second item's credent
 | `GET` | `/issuer2/sessions/{sessionId}` | Get an issuance session |
 | `GET` | `/issuer2/sessions/{sessionId}/events` | Stream issuance session updates via SSE |
 
+### Issuer URLs
+
+`issuer-service.conf`'s `baseUrl` is the public deployment URL. Internally,
+`publicBaseUrl` names that value, `issuerServiceBaseUrl` is the issuer service URL
+(the same URL in this standalone service), and `openId4VciIssuerUrl` appends
+`/openid4vci`. OAuth, credential offers, and credential proof audiences use the
+OpenID4VCI URL. New SD-JWT VCs use the issuer service URL as their default `iss`;
+explicit issuer overrides keep their existing behavior.
+
+For `baseUrl = "https://issuer.example"`, SD-JWT issuer metadata is discovered at
+`https://issuer.example/.well-known/jwt-vc-issuer` and returns
+`issuer = "https://issuer.example"`. It references the shared `/openid4vci/jwks`
+endpoint. The old metadata path remains available with its original
+`issuer = "https://issuer.example/openid4vci"` for existing credentials. VCT values
+and type-metadata URLs retain their existing identities.
+
 ### OpenID4VCI API
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/.well-known/openid-credential-issuer/openid4vci` | Credential issuer metadata |
 | `GET` | `/.well-known/oauth-authorization-server/openid4vci` | Authorization server metadata |
-| `GET` | `/.well-known/jwt-vc-issuer/openid4vci` | JWT VC issuer metadata |
+| `GET` | `/.well-known/jwt-vc-issuer` | SD-JWT VC issuer metadata |
+| `GET` | `/.well-known/jwt-vc-issuer/openid4vci` | Compatibility metadata for previously issued credentials |
 | `GET` | `/.well-known/vct/{type}` | SD-JWT VC type metadata |
 | `GET` | `/openid4vci/jwks` | Issuer signing keys |
 | `GET` | `/openid4vci/credential-offer?id={sessionId}` | Credential offer by reference |

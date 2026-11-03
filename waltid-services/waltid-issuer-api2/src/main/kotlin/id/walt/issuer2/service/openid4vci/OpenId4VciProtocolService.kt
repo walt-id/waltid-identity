@@ -995,13 +995,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val observedIssuanceRequest = requireNotNull(observedSession.issuanceRequests.find {
             it.credentialIdentifier == authorization.credentialIdentifier
         })
-        val issuerId = observedIssuanceRequest.issuerDid ?: metadataService.openId4VciIssuerUrl()
-        val requestWithSession = credentialRequest
-            .withSession(DefaultSession(subject = sessionId))
-            .withIssuer(issuerId)
         val sessionConfiguration = metadataService.getCredentialConfiguration(
             observedIssuanceRequest.credentialConfigurationId
         )
+        val credentialIssuerId = observedIssuanceRequest.issuerDid ?: when (sessionConfiguration?.format) {
+            CredentialFormat.SD_JWT_VC -> metadataService.issuerServiceBaseUrl()
+            else -> metadataService.openId4VciIssuerUrl()
+        }
+        val requestWithSession = credentialRequest
+            .withSession(DefaultSession(subject = sessionId))
+            .withIssuer(credentialIssuerId)
 
         if (
             observedSession.isClosed ||
@@ -1242,7 +1245,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         request = requestWithSession,
                         configuration = configuration,
                         issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
-                        issuerId = issuerId,
+                        issuerId = credentialIssuerId,
                         issuanceInputData = issuanceInputData,
                         dataMapping = issuanceRequest.mapping,
                         selectiveDisclosure = issuanceRequest.selectiveDisclosure,
@@ -1259,7 +1262,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         request = requestWithSession,
                         configuration = configuration,
                         issuerKey = issuerKey,
-                        issuerId = issuerId,
+                        issuerId = credentialIssuerId,
                         issuanceInputData = issuanceInputData,
                         dataMapping = issuanceRequest.mapping,
                         selectiveDisclosure = issuanceRequest.selectiveDisclosure,

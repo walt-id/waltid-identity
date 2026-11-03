@@ -161,13 +161,14 @@ class MetadataService @JvmOverloads constructor(
         return metadata.copy(signedMetadata = signer.sign(metadata))
     }
 
-    fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
-        getAuthorizationServerMetadata().let { metadata ->
-            JWTVCIssuerMetadata(
-                issuer = metadata.issuer,
-                jwksUri = metadata.jwksUri,
-            )
-        }
+    fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata = JWTVCIssuerMetadata(
+        issuer = issuerServiceBaseUrl(),
+        jwksUri = "$openId4VciIssuerUrl/${Issuer2EndpointPaths.JWKS}",
+    )
+
+    /** Discovery for credentials issued before the SD-JWT issuer URL lost its protocol suffix. */
+    fun getLegacyJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
+        getJwtVcIssuerMetadata().copy(issuer = openId4VciIssuerUrl)
 
     fun getCredentialConfiguration(credentialConfigurationId: String): CredentialConfiguration? =
         credentialConfigurations[credentialConfigurationId]

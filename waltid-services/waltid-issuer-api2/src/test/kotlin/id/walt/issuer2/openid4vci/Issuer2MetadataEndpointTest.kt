@@ -161,7 +161,7 @@ class Issuer2MetadataEndpointTest {
             .body<JsonObject>()
 
         assertFalse("signed_metadata" in authorizationServerMetadataJson)
-        val jwtVcIssuerMetadataRaw = client.get("/.well-known/jwt-vc-issuer/openid4vci")
+        val jwtVcIssuerMetadataRaw = client.get(JWT_VC_ISSUER_METADATA_PATH)
         assertEquals(HttpStatusCode.OK, jwtVcIssuerMetadataRaw.status)
         val jwtVcIssuerMetadata = jwtVcIssuerMetadataRaw.body<JWTVCIssuerMetadata>()
 
@@ -171,7 +171,6 @@ class Issuer2MetadataEndpointTest {
         assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/vct/$SD_JWT_INTERNAL_CONFIG_ID").status)
         assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/openid-credential-issuer").status)
         assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/oauth-authorization-server").status)
-        assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/jwt-vc-issuer").status)
         assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/vct").status)
 
         assertNull(credentialIssuerMetadata.authorizationServers)
@@ -221,7 +220,7 @@ class Issuer2MetadataEndpointTest {
                 ?.map { it.jsonPrimitive.content },
         )
 
-        assertEquals(ISSUER_BASE_URL, jwtVcIssuerMetadata.issuer)
+        assertEquals(ISSUER_AUTHORITY_BASE_URL, jwtVcIssuerMetadata.issuer)
         assertEquals("$ISSUER_BASE_URL/jwks", jwtVcIssuerMetadata.jwksUri)
         assertNull(jwtVcIssuerMetadata.jwks)
 
@@ -520,11 +519,41 @@ class Issuer2MetadataEndpointTest {
         assertEquals(HttpStatusCode.OK, jwtVcIssuerMetadataRaw.status)
         val jwtVcIssuerMetadata = jwtVcIssuerMetadataRaw.body<JWTVCIssuerMetadata>()
 
-        assertEquals(authorizationServerMetadata.issuer, jwtVcIssuerMetadata.issuer)
+        assertEquals(ISSUER_AUTHORITY_BASE_URL, jwtVcIssuerMetadata.issuer)
+        assertEquals(ISSUER_BASE_URL, authorizationServerMetadata.issuer)
+        val legacy = client.get(LEGACY_JWT_VC_ISSUER_METADATA_PATH).body<JWTVCIssuerMetadata>()
+        assertEquals(ISSUER_BASE_URL, legacy.issuer)
+        assertEquals(jwtVcIssuerMetadata.jwksUri, legacy.jwksUri)
         assertEquals(authorizationServerMetadata.jwksUri, jwtVcIssuerMetadata.jwksUri)
         assertNull(jwtVcIssuerMetadata.jwks)
 
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    @Test
+    fun issuedSdJwtUsesTheDiscoveredServiceIssuerAndPublishedKey() = testApplication {
+        installIssuer2WithConfigFiles(serviceIssuerForSdJwt = true)
+        val client = apiClient()
+        val metadata = client.get(JWT_VC_ISSUER_METADATA_PATH).body<JWTVCIssuerMetadata>()
+        val offer = client.createCredentialOffer(
+            Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                profileId = Issuer2CredentialScenarios.IDENTITY_SD_JWT_PROFILE_ID,
+            )
+        )
+        val protocol = Issuer2WalletFlowDriver(client)
+        val resolved = protocol.resolve(offer)
+        assertEquals(ISSUER_BASE_URL, resolved.offer.credentialIssuer)
+        val accessToken = protocol.exchangePreAuthorizedCode(resolved, txCode = null).access_token
+        val response = protocol.requestCredential(resolved, accessToken, includeDidInProof = false)
+        val credential = response.getValue("credentials").jsonArray.single().jsonObject
+            .getValue("credential").jsonPrimitive.content.substringBefore('~')
+        val decoded = credential.decodeJws()
+        assertEquals(ISSUER_AUTHORITY_BASE_URL, decoded.payload["iss"]?.jsonPrimitive?.content)
+        assertEquals(metadata.issuer, decoded.payload["iss"]?.jsonPrimitive?.content)
+        val kid = decoded.header.getValue("kid").jsonPrimitive.content
+        val jwks = client.get(requireNotNull(metadata.jwksUri)).body<JsonObject>()
+        val jwk = jwks.getValue("keys").jsonArray.single { it.jsonObject["kid"]?.jsonPrimitive?.content == kid }.jsonObject
+        assertTrue(JWKKey.importJWK(jwk.toString()).getOrThrow().verifyJws(credential).isSuccess)
     }
 
     private val allowedMdocAgeOverClaims = setOf(
@@ -832,8 +861,9 @@ class Issuer2MetadataEndpointTest {
         signedMetadata: MetadataSigningMethod? = null,
         metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
         metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
+        serviceIssuerForSdJwt: Boolean = false,
     ) {
-        loadIssuer2ConfigFiles(signedMetadata)
+        loadIssuer2ConfigFiles(signedMetadata, serviceIssuerForSdJwt)
         application {
             install(ServerContentNegotiation) {
                 json(json)
@@ -861,7 +891,7 @@ class Issuer2MetadataEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles(signedMetadata: MetadataSigningMethod? = null) {
+    private fun loadIssuer2ConfigFiles(signedMetadata: MetadataSigningMethod? = null, serviceIssuerForSdJwt: Boolean = false) {
         ConfigManager.preclear()
         FeatureManager.preclear()
         registerIssuer2ConfigDecoders()
@@ -876,6 +906,11 @@ class Issuer2MetadataEndpointTest {
                     }.orEmpty()
                     val baseline = requireNotNull(javaClass.getResource("/metadata/issuer-service.conf")).readText()
                     Files.writeString(it, baseline + "\nbaseUrl = \"http://localhost\"\n" + signingBlock)
+                }
+            } else if (id == "issuer2-profiles" && serviceIssuerForSdJwt) {
+                Files.createTempFile(temporaryDirectory, "issuer-profiles-", ".conf").also {
+                    Files.writeString(it, Files.readString(configDir.resolve("$id.conf")) +
+                            "\nprofiles.identityCredentialSdJwt.issuerDid = null\n")
                 }
             } else configDir.resolve("$id.conf")
             System.setProperty("config.file.$id", path.toString())
@@ -906,7 +941,8 @@ class Issuer2MetadataEndpointTest {
             get() = ConfigManager.getConfig<Issuer2ServiceConfig>().baseUrl.trimEnd('/')
         val ISSUER_BASE_URL: String get() = "$ISSUER_AUTHORITY_BASE_URL$OPENID4VCI_PREFIX"
         const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
-        const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
+        const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer"
+        const val LEGACY_JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val PID_CARD_ART_FILE = "pid-mdoc.png"

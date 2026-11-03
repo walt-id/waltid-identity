@@ -65,6 +65,9 @@ object OpenId4VciRoutesDocs {
     fun jwtVcIssuerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC issuer metadata"
+        description = "Discover verification keys from the credential's iss using /.well-known/jwt-vc-issuer. " +
+                "The default SD-JWT issuer is the service base URL. The /openid4vci-suffixed metadata route " +
+                "is retained for older credentials and returns their original issuer identifier."
         response {
             HttpStatusCode.OK to {
                 description = "SD-JWT VC issuer metadata"

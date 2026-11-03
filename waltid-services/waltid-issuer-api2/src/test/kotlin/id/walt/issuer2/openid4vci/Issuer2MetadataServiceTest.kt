@@ -35,6 +35,25 @@ import kotlin.test.assertTrue
 class Issuer2MetadataServiceTest {
 
     @Test
+    fun `SD-JWT discovery uses the service URL and preserves protocol and VCT URLs`() {
+        for (publicBaseUrl in listOf("https://issuer.example/", "https://issuer.example/deployment/")) {
+            val service = metadataService(
+                baseUrl = publicBaseUrl,
+                metadataConfig = sdJwtMetadata("identity", "vctBaseUrl"),
+            )
+            val serviceUrl = publicBaseUrl.trimEnd('/')
+            val protocolUrl = "$serviceUrl/openid4vci"
+            assertEquals(serviceUrl, service.getJwtVcIssuerMetadata().issuer)
+            assertEquals("$protocolUrl/jwks", service.getJwtVcIssuerMetadata().jwksUri)
+            assertEquals(protocolUrl, service.getLegacyJwtVcIssuerMetadata().issuer)
+            assertEquals(protocolUrl, service.getCredentialIssuerMetadata().credentialIssuer)
+            assertEquals(protocolUrl, service.getAuthorizationServerMetadata().issuer)
+            assertEquals("$protocolUrl/identity", service.getVctTypeMetadata("identity").vct)
+        }
+    }
+
+
+    @Test
     fun `authorization metadata advertises credential authorization details`() {
         val metadata = metadataService().getAuthorizationServerMetadata()
         assertEquals(setOf("openid_credential"), metadata.authorizationDetailsTypesSupported)
