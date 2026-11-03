@@ -3,7 +3,9 @@ package id.walt.openid4vci.proofs.jwt
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -68,6 +70,28 @@ class JwtCredentialProofHandlerTest {
 
         val failure = assertFailsWith<CredentialProofValidationException> {
             fixture.verify("$DID#legacy-thumbprint")
+        }
+
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, failure.errorCode)
+    }
+
+    @Test
+    fun `DID proof accepts legacy thumbprint kid when the DID has a single signing key`() = runTest {
+        val fixture = didProofFixture(includeAuthenticationMethod = false)
+        val thumbprint = Jwk.sha256Thumbprint(fixture.signingKey.exportPublicJwk())
+
+        val evidence = assertIs<VerifiedJwtProof>(fixture.verify("$DID#$thumbprint").evidence)
+
+        assertEquals(KeyId(SIGNING_METHOD_ID), evidence.holderKey.id)
+    }
+
+    @Test
+    fun `DID proof rejects legacy thumbprint kid when the DID has multiple signing keys`() = runTest {
+        val fixture = didProofFixture(authenticationMethodId = AUTHENTICATION_METHOD_ID)
+        val thumbprint = Jwk.sha256Thumbprint(fixture.signingKey.exportPublicJwk())
+
+        val failure = assertFailsWith<CredentialProofValidationException> {
+            fixture.verify("$DID#$thumbprint")
         }
 
         assertEquals(CredentialErrorCodes.INVALID_PROOF, failure.errorCode)
