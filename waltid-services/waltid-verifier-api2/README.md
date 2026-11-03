@@ -62,6 +62,26 @@ Backed by `waltid-digital-credentials` for parsing and validation.
 - OpenAPI helpers for documentation and example payloads
 - VICAL helper endpoints (fetch/validate) for mdoc trust lists
 
+## Offer lifecycle and callback correlation
+
+Set `core_flow.reattemptable` on cross-device session creation requests (`core.reattemptable`
+for same-device requests):
+
+- `true` (default): accept presentations until the session expires.
+- `false`: reject further presentations and request URI GET/POST fetches after the first successful
+  presentation. Failed attempts can be retried until success or expiry.
+
+For example, add `"reattemptable": false` alongside `dcql_query` in `core_flow` for a single-use offer.
+Result retention follows this release's existing storage behavior. Enterprise MongoDB TTL removes the
+session at its offer expiration time; the separate used-session retention policy is available on mainline.
+
+Each accepted presentation, including a wallet error response, gets a UUID in `session.presentationId`.
+All callbacks for that attempt carry the same ID. The next accepted presentation replaces it;
+previous callback payloads keep their original IDs. Request URI fetches do not generate presentation IDs.
+A wallet error after a failed attempt or a reusable offer's success starts a new attempt and emits a callback.
+Expired or consumed single-use offers reject errors without changing the outcome or presentation ID.
+Use `target` to identify the session and `session.presentationId` to correlate its presentation callbacks.
+
 ## Assumptions and dependencies
 
 - Runtime: JVM (Ktor server, Java 21)

@@ -13,6 +13,7 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -28,6 +29,7 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToHexString
@@ -337,6 +339,7 @@ object Verifier2VPDirectPostHandler {
         log.debug { "Handling direct post for received data: $responseData" }
 
         val session = verificationSession
+        session.requireAvailable()
         val responseMode = session.authorizationRequest.responseMode
         val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
@@ -355,27 +358,38 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
-        // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
-        // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
-        if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
-            val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
-                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
-            SelfIssuedIdTokenValidator.validate(
-                idToken = idToken,
-                expectedNonce = session.authorizationRequest.nonce!!,
-                expectedAudience = session.authorizationRequest.clientId!!,
-            )
-            log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
-        }
-
-        // Parse vp_token
         val vpTokenContents = parseVpToken(vpTokenString)
         log.debug { "Parsed vp_token for state $receivedState: $vpTokenContents" }
 
+        // Start the attempt before validation can emit any callback.
         session.updateSession(SessionEvent.attempted_presentation) {
-            attempted = true
+            resetPresentationAttempt()
             status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
             presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
+        }
+
+        // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
+        // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
+        if (session.authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
+            try {
+                val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
+                    ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+                SelfIssuedIdTokenValidator.validate(
+                    idToken = idToken,
+                    expectedNonce = session.authorizationRequest.nonce!!,
+                    expectedAudience = session.authorizationRequest.clientId!!,
+                )
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Throwable) {
+                val reason = "Self-Issued ID Token validation failed: ${cause.message}"
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason, emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason, cause)
+            }
+            log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 
         // Process
@@ -434,13 +448,28 @@ object Verifier2VPDirectPostHandler {
         Verifier2Response.Verifier2Error.MALFORMED_VP_TOKEN.throwAsError()
     }
 
+    /** Clear the previous attempt's evidence before publishing the new attempt's identifier. */
+    private fun Verification2Session.resetPresentationAttempt() {
+        presentationId = Uuid.random().toString()
+        attempted = true
+        statusReason = null
+        failure = null
+        policyResults = null
+        presentationValidationResults = null
+        presentedPresentations = null
+        presentedPresentationsList = null
+        presentedCredentials = null
+        presentedRawData = null
+        responseCode = null
+    }
+
     /**
      * Handles an OID4VP 1.0 §8.5 wallet error response. Validates `state` echo, marks the
      * session as `FAILED` with a structured [SessionFailure.WalletErrorResponse], and emits
      * [SessionEvent.wallet_error_response_received].
      *
-     * Idempotent: if the session is already in a terminal state, the response is acknowledged
-     * without overwriting any existing outcome.
+     * Each error admitted by requireAvailable() is a new attempt, including after a previous
+     * failure or a reusable session's success. Consumed single-use sessions remain closed.
      */
     private suspend fun handleWalletErrorResponse(
         session: Verification2Session,
@@ -453,16 +482,8 @@ object Verifier2VPDirectPostHandler {
             ?.takeIf { it != responseData.state }
             ?.let { Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError() }
 
-        if (session.status == SUCCESSFUL || session.status == FAILED) {
-            log.info { "Session ${session.id} already terminal (${session.status}); ignoring wallet error." }
-            return mapOf(
-                "status" to "acknowledged",
-                "message" to "Session already terminal; wallet error response ignored.",
-            )
-        }
-
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
-            attempted = true
+            resetPresentationAttempt()
             status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
             failure = SessionFailure.WalletErrorResponse(

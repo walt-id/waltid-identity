@@ -136,7 +136,8 @@ class DcApiTest {
 
     @Test
     fun testDcApi1() = runTest {
-        val verificationSession = Json.decodeFromString<Verification2Session>(request1)
+        // This recorded protocol fixture has a historical offer expiry; admission expiry has dedicated tests.
+        val verificationSession = Json.decodeFromString<Verification2Session>(request1).copy(expirationDate = null)
 
         Verifier2VPDirectPostHandler.handleDirectPost(
             verificationSession = verificationSession,

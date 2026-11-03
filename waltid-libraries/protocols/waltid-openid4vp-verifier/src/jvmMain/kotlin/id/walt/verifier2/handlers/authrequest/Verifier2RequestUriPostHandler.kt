@@ -47,6 +47,8 @@ object Verifier2RequestUriPostHandler {
     ) {
         val call = this
 
+        verificationSession.requireAvailable()
+
         // Parse wallet_nonce and wallet_metadata from the URL-encoded POST body
         val bodyParams = call.receiveParameters()
         val walletNonce = bodyParams["wallet_nonce"]
@@ -104,10 +106,11 @@ object Verifier2RequestUriPostHandler {
             headers = existingHeaders
         )
 
-        // Store wallet_nonce on session so the wallet-nonce check can be done on future requests if needed
-        if (walletNonce != null) {
-            updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
-                // No-op session update — wallet_nonce is ephemeral per request
+        // wallet_nonce is ephemeral per request. Share the GET handler's status rule so a signed
+        // fetch does not move a finished or in-progress session back to IN_USE.
+        updateSessionCallback(verificationSession, SessionEvent.authorization_request_requested) {
+            if (needsInUseTransition) {
+                status = Verification2Session.VerificationSessionStatus.IN_USE
             }
         }
 

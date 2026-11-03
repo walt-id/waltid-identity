@@ -38,6 +38,9 @@ data class GeneralFlowConfig(
 
     val notifications: KtorSessionNotifications? = null,
 
+    /** Allow further presentations until expiry. False consumes the session after its first success. */
+    val reattemptable: Boolean = true,
+
     /** Expiration duration in ISO-8601 duration format. Used to calculate expiration date. */
     @SerialName("expiration_duration") val expirationDuration: Duration? = null,
     /** Expiration date (takes precedence over expiration_duration if both set) */

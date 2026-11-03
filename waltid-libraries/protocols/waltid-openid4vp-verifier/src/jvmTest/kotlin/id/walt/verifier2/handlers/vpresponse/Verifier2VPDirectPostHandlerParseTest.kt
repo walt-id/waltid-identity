@@ -2,6 +2,7 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -11,6 +12,7 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJ
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DirectPostResponse
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.EncryptedResponseStringDirectPostResponse
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.ErrorResponseDirectPost
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.handleDirectPost
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.parseHttpRequestToDirectPostResponse
 import io.ktor.client.request.post
@@ -25,11 +27,17 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
+import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalSerializationApi::class)
 class Verifier2VPDirectPostHandlerParseTest {
@@ -138,6 +146,7 @@ class Verifier2VPDirectPostHandlerParseTest {
         val events = session.handleWalletError(state = "expected-state")
 
         assertEquals(listOf(SessionEvent.wallet_error_response_received), events)
+        assertNotNull(session.presentationId)
         assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
         assertEquals("Wallet returned OID4VP error: access_denied", session.statusReason)
 
@@ -164,40 +173,155 @@ class Verifier2VPDirectPostHandlerParseTest {
     }
 
     @Test
-    fun walletErrorResponse_secondPost_doesNotOverwriteTerminalSession() = kotlinx.coroutines.test.runTest {
-        val session = directPostSession(expectedState = "expected-state")
+    fun walletErrorResponse_afterFinishedAttempt_recordsANewAttempt() = runTest {
+        for (reattemptable in listOf(false, true)) {
+            for (previousStatus in listOf(
+                Verification2Session.VerificationSessionStatus.FAILED,
+                Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            )) {
+                if (!reattemptable && previousStatus == Verification2Session.VerificationSessionStatus.SUCCESSFUL) continue
+                val session = directPostSession("expected-state").copy(
+                    reattemptable = reattemptable,
+                    status = previousStatus,
+                    presentationId = "previous-presentation",
+                    responseCode = "previous-response",
+                    presentedCredentials = emptyMap(),
+                )
 
-        // First POST flips session to FAILED with access_denied
-        session.handleWalletError(state = "expected-state")
-        val failureAfterFirst = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
-        assertEquals("access_denied", failureAfterFirst.error)
+                // A wallet error is the next attempt after either a retryable failure or reusable success.
+                val events = session.handleWalletError(state = "expected-state")
+                assertEquals(listOf(SessionEvent.wallet_error_response_received), events)
+                assertNotEquals("previous-presentation", assertNotNull(session.presentationId))
+                assertEquals(null, session.responseCode)
+                assertEquals(null, session.presentedCredentials)
+                assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+                val firstId = session.presentationId
 
-        // Second POST with a different error must not overwrite status/statusReason/failure
-        val events = session.handleWalletError(
-            state = "expected-state",
-            error = "invalid_request",
-            errorDescription = "overwrite attempt",
-        )
-
-        assertEquals(emptyList(), events, "No events should fire for a terminal session")
-        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
-        assertEquals("Wallet returned OID4VP error: access_denied", session.statusReason)
-
-        val failureAfterSecond = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
-        assertEquals("access_denied", failureAfterSecond.error, "original failure must be preserved")
+                // A second POST with a different error replaces the previous attempt's outcome and ID.
+                val nextEvents = session.handleWalletError(state = "expected-state", error = "invalid_request")
+                assertEquals(listOf(SessionEvent.wallet_error_response_received), nextEvents)
+                assertNotEquals(firstId, assertNotNull(session.presentationId))
+                val failure = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
+                assertEquals("invalid_request", failure.error)
+            }
+        }
     }
 
     @Test
-    fun walletErrorResponse_onSuccessfulSession_doesNotOverwrite() = kotlinx.coroutines.test.runTest {
-        val session = directPostSession(expectedState = "expected-state").apply {
-            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+    fun walletErrorResponse_afterSingleUseSuccess_keepsTheConsumedOutcome() = runTest {
+        val session = directPostSession("expected-state").copy(
+            reattemptable = false,
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            presentationId = "successful-presentation",
+        )
+        assertFailsWith<IllegalArgumentException> { session.handleWalletError(state = "expected-state") }
+        assertEquals("successful-presentation", session.presentationId)
+        assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
+        assertEquals(null, session.failure)
+    }
+
+    @Test
+    fun walletErrorResponse_onReusableSuccessfulSession_recordsWalletError() = runTest {
+        val session = directPostSession("expected-state").copy(
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+        )
+        val events = session.handleWalletError(state = "expected-state")
+        assertEquals(listOf(SessionEvent.wallet_error_response_received), events)
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+        assertIs<SessionFailure.WalletErrorResponse>(session.failure)
+        assertNotNull(session.presentationId)
+    }
+
+    @Test
+    fun singleUseSession_rejectsAnotherPresentationAfterSuccess() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state").copy(
+            reattemptable = false,
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            presentationId = "already-accepted",
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            handleDirectPost(
+                verificationSession = session,
+                responseData = CleartextDirectPostResponse("{}", "expected-state"),
+                updateSessionCallback = { current, _, block -> current.block() },
+                failSessionCallback = { _, _, _ -> },
+            )
         }
 
-        val events = session.handleWalletError(state = "expected-state")
-
-        assertEquals(emptyList(), events)
+        assertEquals("already-accepted", session.presentationId)
         assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
-        assertEquals(null, session.failure, "must not attach failure to a SUCCESSFUL session")
+    }
+
+    @Test
+    fun missingIdToken_failsTheAttemptInsteadOfLeavingItInProgress() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state").copy(
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            presentationId = "previous-attempt",
+            authorizationRequest = AuthorizationRequest(
+                state = "expected-state",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce",
+                clientId = "https://verifier.example",
+            ),
+        )
+        val events = mutableListOf<SessionEvent>()
+
+        val rejection = assertFailsWith<PresentationRejectionException> {
+            handleDirectPost(
+                verificationSession = session,
+                responseData = CleartextDirectPostResponse(
+                    vpToken = """{"identity":["not-a-credential"]}""",
+                    state = "expected-state",
+                ),
+                updateSessionCallback = { current, event, block ->
+                    events += event
+                    current.block()
+                },
+                failSessionCallback = { current, event, updateSession ->
+                    updateSession(current, event) {
+                        status = Verification2Session.VerificationSessionStatus.FAILED
+                    }
+                },
+            )
+        }
+
+        assertEquals(
+            listOf(
+                SessionEvent.attempted_presentation,
+                SessionEvent.presentation_validation_available,
+                SessionEvent.presentation_validation_failed,
+            ),
+            events,
+        )
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+        assertNotEquals("previous-attempt", session.presentationId)
+        assertNotNull(session.presentationId)
+        val failure = assertIs<SessionFailure.PresentationValidation>(session.failure)
+        assertEquals(
+            "Self-Issued ID Token validation failed: id_token is required for response_type=vp_token id_token but was absent",
+            failure.reason,
+        )
+        assertEquals(failure.reason, rejection.message)
+    }
+
+    @Test
+    fun requireAvailable_rejectsExpiredSessionsAndKeepsFailedAttemptsRetryable() {
+        val expired = directPostSession(expectedState = "expected-state").copy(
+            expirationDate = Clock.System.now() - 1.minutes,
+            attempted = true,
+            status = Verification2Session.VerificationSessionStatus.FAILED,
+        )
+        assertFailsWith<IllegalArgumentException> { expired.requireAvailable() }
+
+        val failedSingleUse = directPostSession(expectedState = "expected-state").copy(
+            reattemptable = false,
+            attempted = true,
+            status = Verification2Session.VerificationSessionStatus.FAILED,
+        )
+        failedSingleUse.requireAvailable()
     }
 
     @Test
