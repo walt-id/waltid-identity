@@ -13,6 +13,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Require the root Gradle wrapper
+      shell: bash
+      run: |
+        if [ ! -f "$GITHUB_WORKSPACE/gradle/wrapper/gradle-wrapper.jar" ]; then
+          echo "::error::Root Gradle wrapper missing; check the coordinated checkout."
+          exit 1
+        fi
     - name: Setup JDK
       uses: actions/setup-java@v5
       with:
@@ -21,7 +28,8 @@ runs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v5
       with:
+        # setup-gradle validates every wrapper, including the nested repositories.
+        validate-wrappers: true
+        allow-snapshot-wrappers: false
         cache-overwrite-existing: true
         dependency-graph: ${{ inputs.dependency-graph }}
-    - name: Gradle wrapper validation
-      uses: gradle/actions/wrapper-validation@v5
