@@ -326,6 +326,7 @@ class WebhookDeliveryQueueTest {
             requestObserved = true
             assertEquals(delivery.deliveryId, request.headers[WEBHOOK_ID_HEADER])
             assertEquals(delivery.deliveryId, request.headers[IDEMPOTENCY_KEY_HEADER])
+            assertEquals(delivery.enqueueOrder.toString(), request.headers[WEBHOOK_SEQUENCE_HEADER])
             assertEquals("123", request.headers[WEBHOOK_TIMESTAMP_HEADER])
             assertEquals("2", request.headers[WEBHOOK_ATTEMPT_HEADER])
             assertEquals(delivery.contentDigest, request.headers[CONTENT_DIGEST_HEADER])

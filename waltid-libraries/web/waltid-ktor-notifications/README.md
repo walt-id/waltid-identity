@@ -153,6 +153,7 @@ Every attempt sends the following headers:
 | --- | --- |
 | `Webhook-Id` | Stable unique ID for the logical delivery |
 | `Idempotency-Key` | Same value as `Webhook-Id`, for deduplication |
+| `Webhook-Sequence` | Monotonic enqueue order for this process. Sort by it when delivery arrival order differs from event order |
 | `Webhook-Timestamp` | Attempt time as Unix epoch seconds |
 | `Webhook-Attempt` | One-based attempt number |
 | `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
@@ -162,8 +163,9 @@ must return success without applying the update again. The receiver should also 
 processing. The digest detects body changes; request authentication and signed callbacks are a separate concern
 from delivery idempotency and should be used together with HTTPS.
 
-Events raised by one request are enqueued in order. A failed delivery is retried independently, so receivers must
-not assume global ordering between different events or sessions.
+Events raised by one request are enqueued in order. A failed delivery is retried independently, and concurrent
+delivery means HTTP arrival order can differ from enqueue order. Receivers that need that order sort by
+`Webhook-Sequence`. They must not assume global ordering between different sessions.
 
 ## Related Libraries
 
