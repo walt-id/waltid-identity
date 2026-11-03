@@ -7,7 +7,7 @@ permissions:
 jobs:
   receipt-readiness:
     runs-on: xcode-27
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
@@ -26,17 +26,18 @@ jobs:
           run-id: 41666422173
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/wallet-core-artifact
-      - name: Verify exact framework before adding metadata-only Swift probes
+      - name: Verify exact framework before adding the Swift candidate
         working-directory: waltid-identity
         run: |
           python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
           components=waltid-applications/waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Components
           cp "../diagnostic-source/$components/WalletSheetSizing.swift" "$components/WalletSheetSizing.swift"
-          cp "../diagnostic-source/$components/WalletSheetReadinessTrace.swift" "$components/WalletSheetReadinessTrace.swift"
+          cp "../diagnostic-source/$components/WalletReviewScaffold.swift" "$components/WalletReviewScaffold.swift"
           mkdir -p "$GITHUB_WORKSPACE/diagnostic-evidence"
-          git diff > "$GITHUB_WORKSPACE/diagnostic-evidence/metadata-probe.patch"
+          git diff > "$GITHUB_WORKSPACE/diagnostic-evidence/candidate.patch"
           cp "$RUNNER_TEMP/wallet-core-artifact/wallet-core.json" "$GITHUB_WORKSPACE/diagnostic-evidence/"
-      - name: Reproduce receipt failure on the pinned CI toolchain
+      - name: Repeat the receipt candidate on the pinned CI toolchain
+        timeout-minutes: 40
         working-directory: waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp
         run: |
           evidence="$GITHUB_WORKSPACE/diagnostic-evidence"
