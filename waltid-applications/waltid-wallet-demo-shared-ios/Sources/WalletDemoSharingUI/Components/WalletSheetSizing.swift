@@ -95,9 +95,11 @@ public struct WalletSheetScrollView<Content: View>: View {
 }
 
 private final class WalletSheetSizingCoordinator: ObservableObject {
+    private let diagnosticSamples = WalletSheetReadinessSamples()
     weak var activePage: WalletSheetPageMeasurement.Controller? {
         didSet {
             guard activePage !== oldValue else { return }
+            WalletSheetReadinessTrace.emit("active-page", WalletSheetReadinessTrace.controllers(page: activePage))
             // Appearance callbacks can run inside a SwiftUI update. Invalidate before
             // the queued measurement, without publishing from that update itself.
             DispatchQueue.main.async { [weak self] in
@@ -137,10 +139,18 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
         let container = owner.sheetPresentationController?.containerView?.layer
         var layer: CALayer? = owner.view.layer
         while let current = layer {
-            guard let rendered = current.presentation() else { return false }
+            guard let rendered = current.presentation() else {
+                diagnosticSamples.emit("no-presentation", key: WalletSheetReadinessTrace.identity(current),
+                    WalletSheetReadinessTrace.layers(from: owner.view.layer, through: container, blocked: current, renderedAtPredicate: nil))
+                return false
+            }
             // Animation keys can outlive their animation. Compare visible geometry instead,
             // allowing only numerical round-off in Core Animation's presentation copy.
-            guard geometry(current).elementsEqual(geometry(rendered), by: { abs($0 - $1) < 0.000001 }) else { return false }
+            guard geometry(current).elementsEqual(geometry(rendered), by: { abs($0 - $1) < 0.000001 }) else {
+                diagnosticSamples.emit("geometry-blocked", key: WalletSheetReadinessTrace.identity(current),
+                    WalletSheetReadinessTrace.layers(from: owner.view.layer, through: container, blocked: current, renderedAtPredicate: rendered))
+                return false
+            }
             if current === container { break }
             layer = current.superlayer
         }
@@ -160,6 +170,8 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
         guard #available(iOS 16, *), activePage === page,
               !isResizing(owner), height.isFinite, height > 0,
               let presentation = owner.sheetPresentationController else { return }
+        diagnosticSamples.emit("update", key: WalletSheetReadinessTrace.identity(page),
+            WalletSheetReadinessTrace.controllers(page: page, owner: owner).merging(["height": String(Double(height)), "previousHeight": String(Double(self.height)), "ready": layoutReady]) { _, new in new })
         let rounded = ceil(height)
         // SwiftUI can reset the same presentation controller when the task root changes.
         // Reinstall our detent after scanner/loading/review transitions, not only for a new host.
@@ -171,7 +183,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
                 transition.animate(alongsideTransition: nil) { [weak page] _ in page?.scheduleMeasurement() }
                 return
             }
-            if !layoutReady { layoutReady = true }
+            if !layoutReady { layoutReady = true; WalletSheetReadinessTrace.emit("ready", ["height": String(Double(height))]) }
             let completion = layoutCompletion
             layoutCompletion = nil
             completion?.action()
@@ -210,6 +222,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
         guard resizeLink === link else { return }
         resizeLink = nil
         resizingSheet = nil
+        WalletSheetReadinessTrace.emit("resize-finished", ["height": String(Double(height))])
         activePage?.scheduleMeasurement()
     }
 }
