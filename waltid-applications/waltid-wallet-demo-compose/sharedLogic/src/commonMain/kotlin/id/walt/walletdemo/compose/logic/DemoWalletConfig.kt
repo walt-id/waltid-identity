@@ -16,5 +16,5 @@ object DemoPublicBackendDefaults {
     const val attestationAttesterPath = ""
     const val attestationBearerToken = ""
     const val attestationHostHeader = ""
-    const val transactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
+    const val transactionDataProfilesUrl = "https://wallet2.demo.walt.id/transaction-data-profiles"
 }
