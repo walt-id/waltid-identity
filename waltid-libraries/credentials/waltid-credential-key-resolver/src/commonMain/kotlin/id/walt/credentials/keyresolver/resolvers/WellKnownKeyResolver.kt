@@ -12,6 +12,7 @@ import io.ktor.http.encodedPath
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -42,6 +43,11 @@ object WellKnownKeyResolver : BaseKeyResolver {
 
             log.debug { "Fetching metadata from: $wellKnownUrl" }
             val metadata = web.fetch<JsonObject>(wellKnownUrl).body
+
+            val metadataIssuer = (metadata["issuer"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            require(metadataIssuer == issuerId) {
+                "JWT VC issuer metadata issuer must exactly match the credential issuer."
+            }
 
             // Find the JWKS (either inline or via URI)
             val jwks = when {
