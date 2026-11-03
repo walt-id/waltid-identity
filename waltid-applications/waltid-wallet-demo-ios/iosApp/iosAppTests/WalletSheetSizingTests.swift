@@ -34,7 +34,6 @@ final class WalletSheetSizingTests: XCTestCase {
     func testCompletedContainerAnimationDoesNotKeepTheSheetUnready() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
-        model.acceptsFocus = false
         let presentation = try await SheetPresentation(model: model)
         defer { presentation.close() }
         let initial = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in model.layoutReady }, object: nil)
@@ -73,7 +72,6 @@ final class WalletSheetSizingTests: XCTestCase {
     func testSuccessDismissalAllowsFiveSecondsAfterTheSheetSettles() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
-        model.acceptsFocus = false
         let presentation = try await SheetPresentation(model: model)
         defer { model.didSettle = nil; model.didDismiss = nil; presentation.close() }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in model.layoutReady }, object: nil)
@@ -106,7 +104,6 @@ final class WalletSheetSizingTests: XCTestCase {
     func testReplacingThePageWaitsForTheCurrentSheetResize() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
-        model.acceptsFocus = false
         let presentation = try await SheetPresentation(model: model)
         defer { presentation.host.didLayout = nil; model.didSettle = nil; presentation.close() }
         let host = presentation.host
@@ -127,7 +124,7 @@ final class WalletSheetSizingTests: XCTestCase {
             settled.fulfill()
         }
         host.didLayout = { [weak host] in
-            guard let host, model.manual, host.view.bounds.height < 400 else { return }
+            guard let host, model.compact, host.view.bounds.height < 400 else { return }
             let firstTarget = host.view.bounds.height
             let rendered = host.view.layer.presentation()
             XCTAssertNotNil(rendered)
@@ -147,102 +144,16 @@ final class WalletSheetSizingTests: XCTestCase {
             // Let SwiftUI replace the measurement controller on its next update.
             DispatchQueue.main.async { model.replacement = true }
         }
-        model.manual = true
+        model.compact = true
         await fulfillment(of: [replaced, settled], timeout: 5, enforceOrder: true)
     }
-
-    func testWithdrawnAutofocusCannotRunAfterTheResize() async throws {
-        guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
-        let model = SheetModel()
-        let presentation = try await SheetPresentation(model: model)
-        defer { model.didFocus = nil; presentation.close() }
-        let host = presentation.host
-        let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            host.view.bounds.height > 400 && host.view.bounds.height < 600
-        }, object: nil)
-        await fulfillment(of: [initialSize], timeout: 5)
-        let notFocused = expectation(description: "Withdrawn focus request stays cancelled")
-        notFocused.isInverted = true
-        model.didFocus = { notFocused.fulfill() }
-        let withdrawn = expectation(description: "Withdraw focus while UIKit lays out the compact sheet")
-        host.didLayout = { [weak host] in
-            guard let host, model.manual, host.view.bounds.height < 400 else { return }
-            host.didLayout = nil
-            // A close/submit decision must take effect before SwiftUI renders the next body.
-            model.acceptsFocus = false
-            withdrawn.fulfill()
-        }
-        model.manual = true
-        await fulfillment(of: [withdrawn], timeout: 5)
-        await fulfillment(of: [notFocused], timeout: 1)
-    }
-
-    func testAutofocusWaitsForTheManualSheetToFinishResizing() async throws {
-        guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
-        let model = SheetModel()
-        let presentation = try await SheetPresentation(model: model)
-        defer { model.didFocus = nil; presentation.close() }
-        let host = presentation.host
-        let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            host.view.bounds.height > 400 && host.view.bounds.height < 600
-        }, object: nil)
-        await fulfillment(of: [initialSize], timeout: 5)
-
-        let focused = expectation(description: "Manual input automatically receives focus")
-        let keyboardShown = expectation(description: "Manual input's keyboard finishes appearing")
-        let context = SheetDetentContext(traits: host.traitCollection)
-        let container = try XCTUnwrap(host.view.superview).layer
-        var manualHeight: CGFloat?
-        let keyboardObserver = NotificationCenter.default.addObserver(
-            forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main
-        ) { _ in keyboardShown.fulfill() }
-        defer { NotificationCenter.default.removeObserver(keyboardObserver) }
-        model.didFocus = {
-            let layer = host.view.layer
-            XCTAssertLessThan(layer.bounds.height, 400, "Resize the compact manual page before requesting its keyboard")
-            let presentation = layer.presentation()
-            XCTAssertNotNil(presentation, "Observe the rendered sheet, not only its model geometry")
-            if let presentation {
-                XCTAssertEqual(presentation.bounds.height, layer.bounds.height, accuracy: 1,
-                    "Autofocus must not interrupt an unfinished sheet resize")
-                XCTAssertEqual(presentation.position.y, layer.position.y, accuracy: 1,
-                    "Autofocus must not compete with the sheet's position animation")
-            }
-            XCTAssertEqual(container.presentation()?.position.y ?? 0, container.position.y, accuracy: 1,
-                "Autofocus must wait for the containing sheet, not only its content view")
-            manualHeight = host.sheetPresentationController?.detents.first?.resolvedValue(in: context)
-            focused.fulfill()
-        }
-        // UIKit can animate the enclosing sheet after its content bounds have settled.
-        let settling = CABasicAnimation(keyPath: "position.y")
-        settling.fromValue = container.position.y + 40
-        settling.toValue = container.position.y
-        settling.duration = 2
-        container.add(settling, forKey: "sheet-container-settling")
-        model.manual = true
-        await fulfillment(of: [focused, keyboardShown], timeout: 5, enforceOrder: true)
-        let heightBeforeKeyboard = try XCTUnwrap(manualHeight)
-        let heightWithKeyboard = try XCTUnwrap(host.sheetPresentationController?.detents.first?.resolvedValue(in: context))
-        XCTAssertEqual(heightWithKeyboard, heightBeforeKeyboard, accuracy: 1,
-            "Keyboard avoidance must not become part of the content detent and start another sheet resize")
-    }
-}
-
-@available(iOS 16, *)
-private final class SheetDetentContext: NSObject, UISheetPresentationControllerDetentResolutionContext {
-    let containerTraitCollection: UITraitCollection
-    let maximumDetentValue: CGFloat = 2_000
-
-    init(traits: UITraitCollection) { containerTraitCollection = traits }
 }
 
 @MainActor
 private final class SheetModel: ObservableObject {
-    @Published var manual = false
+    @Published var compact = false
     @Published var replacement = false
     @Published var dismissSuccess = false
-    var acceptsFocus = true
-    var didFocus: (() -> Void)?
     var layoutReady = false
     var didSettle: (() -> Void)?
     var didDismiss: (() -> Void)?
@@ -291,17 +202,14 @@ private final class SheetHostingController: UIHostingController<SheetContent> {
 
 private struct SheetContent: View {
     @ObservedObject var model: SheetModel
-    @FocusState private var focused: Bool
-    @State private var input = ""
 
     var body: some View {
         WalletNavigationContainer {
-            WalletReviewScaffold(showsActions: model.manual) {
+            WalletReviewScaffold(showsActions: model.compact) {
                 if model.replacement {
                     Rectangle().frame(height: 180)
-                } else if model.manual {
-                    TextField("Credential offer or request", text: $input)
-                        .focused($focused).frame(height: 52)
+                } else if model.compact {
+                    Rectangle().frame(height: 52)
                 } else {
                     Rectangle().frame(height: 360)
                 }
@@ -316,12 +224,10 @@ private struct SheetContent: View {
             })
             .walletSuccessDismissal(key: 0, enabled: model.dismissSuccess) { model.didDismiss?() }
             .environment(\.scenePhase, .active)
-            .navigationTitle(model.manual ? "Enter a link" : "Scan QR code")
+            .navigationTitle(model.compact ? "Compact review" : "Review")
             .navigationBarTitleDisplayMode(.inline)
         }
         .ignoresSafeArea(.container, edges: .bottom)
-        .walletSheetAutofocus($focused, when: model.manual && model.acceptsFocus)
-        .onChange(of: focused) { if $0 { model.didFocus?() } }
         .walletSheetSizing()
     }
 }

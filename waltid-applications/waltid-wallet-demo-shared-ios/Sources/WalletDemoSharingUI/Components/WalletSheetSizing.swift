@@ -4,41 +4,6 @@ import UIKit
 extension View {
     /// Fit the active page, capped by the system's available presentation height.
     public func walletSheetSizing() -> some View { modifier(WalletSheetSizingModifier()) }
-
-    /// Request the keyboard after the new page content has finished resizing its sheet.
-    public func walletSheetAutofocus(_ focus: FocusState<Bool>.Binding,
-        when requested: @autoclosure @escaping () -> Bool) -> some View {
-        modifier(WalletSheetAutofocusModifier(focus: focus, isRequested: requested))
-    }
-}
-
-private struct WalletSheetAutofocusModifier: ViewModifier {
-    let focus: FocusState<Bool>.Binding
-    let isRequested: () -> Bool
-    @Environment(\.walletSheetSizing) private var sizing
-    @State private var request: UUID?
-
-    func body(content: Content) -> some View {
-        content.onChange(of: isRequested()) { requested in
-            cancelRequest()
-            guard requested else { focus.wrappedValue = false; return }
-            guard #available(iOS 16, *), let sizing else { focus.wrappedValue = true; return }
-            let id = UUID()
-            request = id
-            sizing.afterLayout(id: id) { [focus, request = $request, isRequested] in
-                guard request.wrappedValue == id else { return }
-                request.wrappedValue = nil
-                // Closing or submitting can precede SwiftUI's next onChange/onDisappear.
-                guard isRequested() else { return }
-                focus.wrappedValue = true
-            }
-        }.onDisappear(perform: cancelRequest)
-    }
-
-    private func cancelRequest() {
-        if let request { sizing?.cancelAfterLayout(id: request) }
-        request = nil
-    }
 }
 
 private struct WalletSheetSizingModifier: ViewModifier {
@@ -113,18 +78,8 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     private let identifier = UISheetPresentationController.Detent.Identifier("wallet.content")
     private weak var resizingSheet: UISheetPresentationController?
     private var resizeLink: CADisplayLink?
-    private var layoutCompletion: (id: UUID, action: () -> Void)?
 
     deinit { resizeLink?.invalidate() }
-
-    func afterLayout(id: UUID, _ completion: @escaping () -> Void) {
-        layoutCompletion = (id, completion)
-        activePage?.scheduleMeasurement()
-    }
-
-    func cancelAfterLayout(id: UUID) {
-        if layoutCompletion?.id == id { layoutCompletion = nil }
-    }
 
     func isResizing(_ owner: UIViewController) -> Bool {
         resizeLink != nil && resizingSheet === owner.sheetPresentationController
@@ -146,9 +101,6 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
                 return
             }
             if !layoutReady { layoutReady = true }
-            let completion = layoutCompletion
-            layoutCompletion = nil
-            completion?.action()
             return
         }
         if layoutReady { layoutReady = false }

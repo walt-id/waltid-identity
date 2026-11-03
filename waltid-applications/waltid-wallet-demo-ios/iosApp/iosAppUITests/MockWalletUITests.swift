@@ -335,10 +335,19 @@ final class MockWalletUITests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
-        ui.openScanner()
+        ui.tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste a link")
+        let cameraHeader = app.navigationBars["Scan QR code"]
+        XCTAssertTrue(cameraHeader.waitForExistence(timeout: 5))
+        let cameraY = cameraHeader.frame.minY
+        let camera = XCTAttachment(screenshot: app.screenshot())
+        camera.name = "scanner-camera-system-sheet"; camera.lifetime = .keepAlways; add(camera)
+        ui.tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
         let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
         // Switching modes must make the action safe without tapping the field again.
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertLessThan(cameraY, app.frame.height / 5, "The scanner starts in the system's large sheet")
+        XCTAssertEqual(app.navigationBars["Enter a link"].frame.minY, cameraY, accuracy: 2,
+            "Switching input modes must not resize the scanner while its keyboard appears")
         input.typeText("openid-credential-offer://mock")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let action = app.buttons["wallet.scanContinue"]
