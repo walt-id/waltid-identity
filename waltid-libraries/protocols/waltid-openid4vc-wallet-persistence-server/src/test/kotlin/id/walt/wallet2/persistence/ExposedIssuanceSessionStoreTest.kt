@@ -31,6 +31,27 @@ import kotlin.test.assertTrue
 
 class ExposedIssuanceSessionStoreTest {
     @Test
+    fun creationIsAtomicAcrossAdaptersAndNeverOverwritesTheWinner() = runTest {
+        val db = database(poolSize = 2)
+        ExposedWalletStore(db).saveDescriptor(WalletDescriptor(id = "wallet"))
+        val first = ExposedStoreRegistry(db).issuanceSessionStore("wallet")
+        val second = ExposedStoreRegistry(db).issuanceSessionStore("wallet")
+        val record = WalletIssuanceSessionRecord("freshness", "freshness",
+            WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS, "first", 1)
+        val candidates = listOf(record, record.copy(payload = "second"))
+        val inserted = listOf(first, second).mapIndexed { index, store ->
+            async(Dispatchers.Default) { store.putIfAbsent(candidates[index]) }
+        }.awaitAll()
+        assertEquals(1, inserted.count { it })
+        val winner = candidates[inserted.indexOf(true)]
+        assertEquals(winner, first.get(record.id))
+        assertFalse(second.putIfAbsent(record.copy(payload = "overwritten")))
+        assertEquals(winner, second.get(record.id))
+        ExposedWalletStore(db).deleteWallet("wallet")
+        assertFailsWith<IllegalStateException> { first.putIfAbsent(record) }
+    }
+
+    @Test
     fun recordsRemainWalletScopedAcrossRecreationReplacementRemovalAndWalletDeletion() = runTest {
         val db = database()
         val wallets = ExposedWalletStore(db)

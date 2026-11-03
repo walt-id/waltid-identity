@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 enum class WalletIssuanceSessionRecordKind {
     ACTIVE_SESSION,
     DEFERRED_CREDENTIAL,
+    CLIENT_ATTESTATION_FRESHNESS,
 }
 
 /**
@@ -59,4 +60,13 @@ interface AtomicWalletIssuanceSessionStore : WalletIssuanceSessionStore {
      * coordinate across all connections to the backing store, not just this adapter instance.
      */
     suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean
+}
+
+/**
+ * Adds atomic creation for records shared by different wallet runtimes. Existing store interfaces
+ * remain supported; implement this capability for cross-runtime client-attestation freshness.
+ */
+interface AtomicWalletIssuanceSessionCreationStore : AtomicWalletIssuanceSessionStore {
+    /** Inserts [record] only if its ID is absent across all connections; never replaces an existing row. */
+    suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean
 }

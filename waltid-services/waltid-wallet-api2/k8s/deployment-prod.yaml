@@ -255,3 +255,51 @@ spec:
                 name: wallet-demo-compose-web
                 port:
                   name: http
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: legacy-wallet-redirect
+spec:
+  redirectRegex:
+    regex: ^https?://(wallet\.demo\.walt\.id|wallet-dev\.demo\.walt\.id)(:\d+)?(/.*)?$
+    replacement: https://wallet2.demo.walt.id/
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wallet-ingress
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: identity-main-legacy-wallet-redirect@kubernetescrd
+spec:
+  tls:
+    - hosts:
+        - wallet-dev.demo.walt.id
+      secretName: wallet-dev-tls-secret
+    - hosts:
+        - wallet.demo.walt.id
+      secretName: wallet-demo-tls-secret
+  rules:
+    - host: wallet-dev.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-demo-compose-web
+                port:
+                  name: http
+    - host: wallet.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-demo-compose-web
+                port:
+                  name: http

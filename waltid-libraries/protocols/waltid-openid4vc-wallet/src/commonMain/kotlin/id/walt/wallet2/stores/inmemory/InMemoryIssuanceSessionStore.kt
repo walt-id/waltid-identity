@@ -1,18 +1,21 @@
 package id.walt.wallet2.stores.inmemory
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
-import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionCreationStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** Process-local continuations. Create a separate instance for each wallet. */
-class InMemoryIssuanceSessionStore : AtomicWalletIssuanceSessionStore {
+class InMemoryIssuanceSessionStore : AtomicWalletIssuanceSessionCreationStore {
     private val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
     private val mutex = Mutex()
 
     override suspend fun get(id: String) = mutex.withLock { records[id] }
     override suspend fun list() = mutex.withLock { records.values.toList() }
     override suspend fun put(record: WalletIssuanceSessionRecord) { mutex.withLock { records[record.id] = record } }
+    override suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean = mutex.withLock {
+        if (records.containsKey(record.id)) false else { records[record.id] = record; true }
+    }
     override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
         require(replacement == null || expected.id == replacement.id) { "Cannot change a continuation record ID" }
         return mutex.withLock {

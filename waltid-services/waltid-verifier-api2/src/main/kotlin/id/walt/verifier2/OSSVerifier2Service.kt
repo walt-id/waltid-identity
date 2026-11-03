@@ -123,7 +123,17 @@ object Verifier2Service {
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
         val notificationConfig = session.notifications
-        val updated = repository.update(session.id, block).session
+        // Request retrieval retries only a real status transition and never changes a processing claim's version.
+        val updated = if (event == SessionEvent.authorization_request_requested) {
+            repository.update(session.id, shouldUpdate = {
+                requireAvailable()
+                needsInUseTransition
+            }, transform = block).session
+        } else {
+            val current = repository.get(session.id) ?: throw VerificationSessionNotFoundException(session.id)
+            // The verification engine reads this same instance between updates.
+            repository.compareAndSet(session.id, current.version, session.apply(block)).session
+        }
 
         try {
             // publicView() keeps the ephemeral decryption keys and internal policy detail out of
@@ -304,11 +314,11 @@ object Verifier2Service {
                         val claim = repository.claimForProcessingWithOriginal(sessionId)
                         try {
                             call.respondHandleDirectPostResponse(
-                                verificationSession = claim.claimed.session,
+                                verificationSession = claim.original.session,
                                 updateSessionCallback = updateSessionCallback,
                                 failSessionCallback = failSessionCallback,
-                                beforeRespond = { rejected ->
-                                    if (rejected) repository.restoreProcessingClaim(claim)
+                                beforeRespond = {
+                                    repository.restoreProcessingClaim(claim)
                                 },
                             )
                         } catch (exception: Exception) {

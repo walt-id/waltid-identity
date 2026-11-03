@@ -16,7 +16,7 @@ fi
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest \
   "${instrumentation_args[@]}" \
   "-Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest${ANDROID_TEST_NOT_ANNOTATION:+,$ANDROID_TEST_NOT_ANNOTATION}" \
-  -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
+  -PtransactionDataProfiles.url=https://wallet2.demo.walt.id/transaction-data-profiles \
   --info
 
 "$identity_dir/gradlew" -p "$identity_dir" \
