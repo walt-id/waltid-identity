@@ -314,6 +314,13 @@ endpoint. The old metadata path is deprecated in OpenAPI and remains available
 with its original `issuer = "https://issuer.example/openid4vci"` for existing
 credentials. VCT values and type-metadata URLs retain their existing identities.
 
+This URL change requires no additional database, profile, or session migration,
+and existing credentials do not need to be reissued. Keep the legacy discovery
+route and the original public signing keys available while those credentials
+remain valid. Verifiers that pin an allowed issuer URL must also allow the new
+service URL for newly issued credentials. An explicit profile or runtime
+`issuerDid` override can retain the previous issuer URL for new issuance.
+
 ### OpenID4VCI API
 
 | Method | Path | Description |
