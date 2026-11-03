@@ -2,6 +2,7 @@ package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
+import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
 import id.walt.openid4vp.conformance.testplans.parseKeyAttesterJwks
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import kotlinx.coroutines.runBlocking
@@ -161,7 +162,11 @@ class IssuerConformanceTests {
 
     @Test
     fun runIssuerConformanceTests() {
-        assumeTrue(credentialIssuerUrl != null, "No credential issuer URL / enterprise issuer target configured")
+        if (IssuerIssuanceMode.fromEnvironment() == IssuerIssuanceMode.DEFERRED) {
+            requireNotNull(credentialIssuerUrl) { "Deferred conformance requires an OSS credential issuer URL" }
+        } else {
+            assumeTrue(credentialIssuerUrl != null, "No credential issuer URL / enterprise issuer target configured")
+        }
 
         runBlocking {
             withTimeout(timeoutMinutes.minutes) {

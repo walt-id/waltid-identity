@@ -1,5 +1,8 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
+import id.walt.openid4vp.conformance.testplans.IssuerDeferredEvidence
+import id.walt.openid4vp.conformance.testplans.readIssuerDeferredEvidence
 import id.walt.openid4vp.conformance.testplans.keyAttestationAcceptanceModules
 import id.walt.openid4vp.conformance.testplans.requireIssuerProofEvidence
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
@@ -17,6 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 
 /**
  * Runner for OpenID4VCI Issuer conformance tests.
@@ -29,7 +33,8 @@ import java.nio.charset.StandardCharsets
 class IssuerTestPlanRunner(
     val config: IssuerTestPlanConfiguration,
     val conformance: ConformanceInterface,
-    val issuerInterface: IssuerInterface? = null
+    val issuerInterface: IssuerInterface? = null,
+    private val issuanceMode: IssuerIssuanceMode = IssuerIssuanceMode.IMMEDIATE,
 ) {
     private val conformanceHost = conformance.conformanceHost
     private val conformancePort = conformance.conformancePort
@@ -106,7 +111,15 @@ class IssuerTestPlanRunner(
             }
         }
         val excludedModuleNames = excludedModules.map { it.first }.toSet()
-        val modulesToRun = selectedModules.filterNot { it.testModule in excludedModuleNames }
+        val modulesToRun = selectedModules.filterNot { it.testModule in excludedModuleNames }.filter {
+            issuanceMode == IssuerIssuanceMode.IMMEDIATE || it.testModule in DEFERRED_MODULES
+        }
+        if (issuanceMode == IssuerIssuanceMode.DEFERRED) {
+            val expected = DEFERRED_MODULES
+            require(modulesToRun.map { it.testModule }.toSet() == expected) {
+                "Deferred coverage requires all expected VCI happy-flow/batch modules from pinned suite db1080a"
+            }
+        }
         excludedModules.distinct().forEach { (module, reason) ->
             println("Excluding $module: $reason")
         }
@@ -148,6 +161,8 @@ class IssuerTestPlanRunner(
     ): IssuerVariantModuleRunResult {
         var testId: String? = null
         var stage = "Create test"
+        val offerIds = mutableListOf<String>()
+        var deferredEvidence: IssuerDeferredEvidence? = null
         val logUrlForTest: (String) -> String = { "https://$conformanceHost:$conformancePort/log-detail.html?log=$it" }
 
         return runCatching {
@@ -161,14 +176,26 @@ class IssuerTestPlanRunner(
             println("Waiting for conformance suite to complete issuer test...")
 
             stage = "Wait for test completion"
-            waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule))
+            waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule, offerIds))
 
             stage = "Read test result"
             val testRunInfo = conformance.getTestRunInfo(testId)
             println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
             val accepted = acceptsModuleResult(testModule, testRunInfo.status, testRunInfo.result)
-            if (proofType != null && testRunInfo.result == "PASSED" &&
+            if (issuanceMode == IssuerIssuanceMode.DEFERRED) {
+                stage = "Check deferred evidence"
+                deferredEvidence = readIssuerDeferredEvidence(
+                    Path.of(requireNotNull(System.getenv("OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE")) {
+                        "Deferred mode requires OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE"
+                    }), offerIds,
+                )
+                require(testRunInfo.status == "FINISHED" && testRunInfo.result == "PASSED") { "Deferred suite module must pass without skipping" }
+                deferredEvidence.requireComplete()
+                requireIssuerProofEvidence(requireNotNull(proofType), conformance.getTestLog(testId))
+                deferredEvidence = deferredEvidence.copy(proofVerified = true)
+            }
+            if (issuanceMode == IssuerIssuanceMode.IMMEDIATE && proofType != null && testRunInfo.result == "PASSED" &&
                 (testModule in keyAttestationAcceptanceModules || testModule == "oid4vci-1_0-issuer-batch-issuance")) {
                 stage = "Check proof evidence"
                 requireIssuerProofEvidence(proofType, conformance.getTestLog(testId))
@@ -180,6 +207,7 @@ class IssuerTestPlanRunner(
                 status = testRunInfo.status,
                 result = testRunInfo.result,
                 accepted = accepted,
+                deferredEvidence = deferredEvidence,
                 variant = moduleVariant,
             )
         }.getOrElse { throwable ->
@@ -194,6 +222,7 @@ class IssuerTestPlanRunner(
                 accepted = false,
                 error = throwable.compactMessage(),
                 failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
+                deferredEvidence = deferredEvidence,
                 variant = moduleVariant,
             )
         }
@@ -203,6 +232,7 @@ class IssuerTestPlanRunner(
         if (status == "FINISHED" && result == "PASSED") {
             return true
         }
+        if (issuanceMode == IssuerIssuanceMode.DEFERRED) return false
         if (status == "FINISHED" && result == "SKIPPED") {
             return true
         }
@@ -285,6 +315,9 @@ class IssuerTestPlanRunner(
         listOfNotNull(javaClass.simpleName, message).joinToString(": ")
 
     private companion object {
+        // The encrypted happy-flow module also tests a second issuance after collection.
+        // Use the standard single-request module for deferred collection coverage.
+        val DEFERRED_MODULES = setOf("oid4vci-1_0-issuer-happy-flow-skip-notification", "oid4vci-1_0-issuer-batch-issuance")
         const val PRE_AUTHORIZATION_CODE = "pre_authorization_code"
         const val CLIENT_ATTESTATION = "client_attestation"
 
@@ -307,7 +340,7 @@ class IssuerTestPlanRunner(
         )
     }
 
-    private fun credentialOfferProviderFor(testModule: String): (suspend () -> String)? {
+    private fun credentialOfferProviderFor(testModule: String, offerIds: MutableList<String>): (suspend () -> String)? {
         val authMethod = config.credentialOfferAuthMethod ?: return null
 
         return suspend {
@@ -319,7 +352,9 @@ class IssuerTestPlanRunner(
                 profileId = config.credentialProfileId,
                 authMethod = authMethod,
                 staticTxCode = config.staticTxCode,
+                deferred = issuanceMode == IssuerIssuanceMode.DEFERRED,
             )
+            offerIds += offerResponse.offerId
             println("Created credential offer: ${offerResponse.offerId}")
             println("Credential offer URI: ${offerResponse.credentialOffer}")
             offerResponse.txCodeValue?.let { println("Credential offer tx_code: $it") }
