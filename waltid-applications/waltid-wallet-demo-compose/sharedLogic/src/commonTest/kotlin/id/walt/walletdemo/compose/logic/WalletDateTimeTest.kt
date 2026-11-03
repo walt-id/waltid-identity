@@ -78,6 +78,15 @@ class WalletDateTimeTest {
     }
 
     @Test
+    fun localConversionKeepsTheCalendarEraUnambiguous() {
+        val formatted = WalletDateTime.format(Instant.parse("0001-01-01T00:00:00Z"), "Etc/GMT+1", "en-GB")
+        assertTrue(formatted.contains("31 Dec"), formatted)
+        assertTrue(formatted.contains("BC"), formatted)
+        assertTrue(formatted.contains("23:00:00"), formatted)
+        assertTrue(formatted.endsWith("UTC-01:00"), formatted)
+    }
+
+    @Test
     fun localizationAndExactFractionsDoNotDependOnStoredFormatting() {
         val instant = Instant.parse("2026-10-30T13:30:00.123456789Z")
         val british = WalletDateTime.format(instant, "UTC", "en-GB")

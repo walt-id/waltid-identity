@@ -24,7 +24,10 @@ public struct WalletInstant: Equatable {
         let formatter = Self.gregorianFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
-        formatter.setLocalizedDateFormatFromTemplate("yMMMdjmmss")
+        let offset = timeZone.secondsFromGMT(for: date)
+        // Gregorian year 1 in UTC can fall into BCE in the viewer's timezone.
+        let era = epochSeconds < -62_135_596_800 - Int64(offset) ? "G" : ""
+        formatter.setLocalizedDateFormatFromTemplate("\(era)yMMMdjmmss")
         let number = NumberFormatter()
         number.locale = locale
         number.minimumIntegerDigits = 9
@@ -35,7 +38,7 @@ public struct WalletInstant: Equatable {
         if !digits.isEmpty {
             formatter.dateFormat = Self.withFraction(formatter.dateFormat, fraction: (number.decimalSeparator ?? ".") + digits)
         }
-        return formatter.string(from: date) + " " + Self.offsetLabel(timeZone.secondsFromGMT(for: date))
+        return formatter.string(from: date) + " " + Self.offsetLabel(offset)
     }
 
     static func parseTimestamp(_ value: String) -> WalletInstant? {

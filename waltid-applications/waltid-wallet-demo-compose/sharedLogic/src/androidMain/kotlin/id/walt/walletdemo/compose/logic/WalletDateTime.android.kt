@@ -26,7 +26,8 @@ internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: St
     val symbols = DecimalFormatSymbols.getInstance(locale)
     val digits = instant.nanosecondsOfSecond.toString().padStart(9, '0').trimEnd('0')
     val fraction = if (digits.isEmpty()) "" else symbols.decimalSeparator + digits.map { symbols.zeroDigit + (it - '0') }.joinToString("")
-    val formatter = DateTimeFormatter.ofPattern(withSecondFraction(pattern, fraction), locale)
+    val era = if (date.year <= 0) " G" else ""
+    val formatter = DateTimeFormatter.ofPattern(withSecondFraction(pattern, fraction) + era, locale)
         .withDecimalStyle(DecimalStyle.of(locale))
     // kotlinx-datetime owns conversion and offsets; the platform supplies localized text only.
     return "${formatter.format(date.toJavaLocalDateTime())} ${utcOffsetLabel(zone.offsetAt(instant).totalSeconds)}"

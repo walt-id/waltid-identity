@@ -12,15 +12,21 @@ internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: St
     const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', calendar: 'gregory', timeZoneName: 'longOffset' };
     if (timeZone) options.timeZone = timeZone;
     if (hourCycle) options.hourCycle = hourCycle;
+    const date = new Date(milliseconds);
+    // A supported UTC year-1 instant can fall into BCE in the viewer's timezone.
+    if (date.getUTCFullYear() <= 1) {
+        const era = new Intl.DateTimeFormat('en-US', {year: 'numeric', era: 'short', calendar: 'gregory', timeZone: timeZone || undefined}).formatToParts(date).find(p => p.type === 'era').value;
+        if (era === 'BC') options.era = 'short';
+    }
     const language = locale || undefined;
     const fraction = String(nanos).padStart(9, '0').replace(/0+$/, '');
     const digits = new Intl.NumberFormat(language, {useGrouping: false});
     const separator = new Intl.NumberFormat(language).formatToParts(1.1).find(p => p.type === 'decimal').value;
-    return new Intl.DateTimeFormat(language, options).formatToParts(new Date(milliseconds)).map(p => {
+    return new Intl.DateTimeFormat(language, options).formatToParts(date).map(p => {
         if (p.type === 'second' && fraction) return p.value + separator + [...fraction].map(c => digits.format(Number(c))).join('');
         if (p.type === 'timeZoneName') {
             // Use a stable UTC offset label; the offset is resolved for this instant, including DST.
-            const offset = new Intl.DateTimeFormat('en-US', {timeZone: timeZone || undefined, timeZoneName: 'longOffset'}).formatToParts(new Date(milliseconds)).find(p => p.type === 'timeZoneName').value;
+            const offset = new Intl.DateTimeFormat('en-US', {timeZone: timeZone || undefined, timeZoneName: 'longOffset'}).formatToParts(date).find(p => p.type === 'timeZoneName').value;
             return offset.replace('GMT', 'UTC');
         }
         return p.value;

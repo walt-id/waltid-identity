@@ -6,6 +6,7 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.*
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.offsetAt
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.toNSDate
 import kotlinx.datetime.toNSTimeZone
 import kotlin.time.Instant
@@ -23,7 +24,8 @@ internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: St
         gregorianStartDate = NSDate.distantPast
         timeZone = zone.toNSTimeZone()
         val hour = when (use24HourClock) { true -> "H"; false -> "h"; null -> "j" }
-        setLocalizedDateFormatFromTemplate("yMMMd${hour}mmss")
+        val era = if (instant.toLocalDateTime(zone).year <= 0) "G" else ""
+        setLocalizedDateFormatFromTemplate("${era}yMMMd${hour}mmss")
         dateFormat = withSecondFraction(dateFormat, if (digits.isEmpty()) "" else (number.decimalSeparator ?: ".") + digits)
     }
     return "${formatter.stringFromDate(date)} ${utcOffsetLabel(zone.offsetAt(instant).totalSeconds)}"

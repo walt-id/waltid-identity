@@ -49,6 +49,15 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         }
     }
 
+    func testLocalConversionKeepsTheCalendarEraUnambiguous() throws {
+        let instant = try XCTUnwrap(WalletInstant.parseTimestamp("0001-01-01T00:00:00Z"))
+        let formatted = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Etc/GMT+1")), locale: Locale(identifier: "en_GB"))
+        XCTAssertTrue(formatted.contains("31 Dec"), formatted)
+        XCTAssertTrue(formatted.contains("BC"), formatted)
+        XCTAssertTrue(formatted.contains("23:00:00"), formatted)
+        XCTAssertTrue(formatted.hasSuffix("UTC-01:00"), formatted)
+    }
+
     func testDateTimeDisplayUsesLocaleAndOffsetAtTheInstant() throws {
         let cases = [
             ("2026-03-29T00:30:00Z", "Europe/Budapest", "01:30:00 UTC+01:00"),

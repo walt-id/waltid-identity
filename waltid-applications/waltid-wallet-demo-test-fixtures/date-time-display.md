@@ -30,6 +30,7 @@ requires such an override. Unrecognized zoned-date syntaxes remain source text.
   dates matching credential calendar semantics. Show the year and seconds; never present an
   expiry instant as a date-only deadline. Use a full UTC offset rather than an ambiguous zone
   abbreviation. Resolve DST for the timestamp's date, not the current date.
+  Include the calendar era if a supported instant crosses into BCE in the viewer's zone.
 - Keep source JSON/raw values unchanged for technical inspection and all protocol operations.
   Formatting is not validation, and localized strings must never feed expiry checks, storage,
   signing or presentation payloads. UTC remains appropriate for protocol serialization and logs.
