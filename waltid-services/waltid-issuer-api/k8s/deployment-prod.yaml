@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: issuer-web-config
+data:
+  _features.conf: |
+    enabledFeatures = [
+        entra
+    ]
+  web.conf: |
+    webHost = "0.0.0.0"
+    webPort = 3000
+  issuer-service.conf: |
+    baseUrl = "https://issuer.demo.walt.id"
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: issuer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: issuer
+  template:
+    metadata:
+      labels:
+        app: issuer
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: issuer
+          image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/_features.conf"
+              subPath: _features.conf
+              readOnly: true
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/web.conf"
+              subPath: web.conf
+              readOnly: true
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/issuer-service.conf"
+              subPath: issuer-service.conf
+              readOnly: true
+          ports:
+            - containerPort: 3000
+              name: http-api
+      volumes:
+        - name: issuer-web-config
+          configMap:
+            name: issuer-web-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: issuer
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: issuer
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: issuer
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - issuer.demo.walt.id
+        - issuer.portal.walt.id
+      secretName: issuer-tls-secret
+  rules:
+    - host: issuer.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  name: http
+    - host: issuer.portal.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  name: http
