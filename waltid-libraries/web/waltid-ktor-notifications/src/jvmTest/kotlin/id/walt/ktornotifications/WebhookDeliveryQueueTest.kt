@@ -7,6 +7,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
@@ -40,6 +41,15 @@ import kotlin.test.assertTrue
 
 class WebhookDeliveryQueueTest {
     private val temporaryDirectories = mutableListOf<Path>()
+
+    @Test
+    fun `signing secret requires at least 32 UTF-8 bytes`() {
+        val config = webhook()
+        assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "") }
+        assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "x".repeat(31)) }
+        assertEquals("x".repeat(32), config.copy(signingSecret = "x".repeat(32)).signingSecret)
+        assertEquals("é".repeat(16), config.copy(signingSecret = "é".repeat(16)).signingSecret)
+    }
 
     @AfterTest
     fun cleanUp() {
@@ -354,11 +364,27 @@ class WebhookDeliveryQueueTest {
     fun `signed attempt authenticates the raw body and delivery metadata`() = runTest {
         val secret = "a shared secret with sufficient entropy"
         val payload = """{"event":"completed"}"""
-        val delivery = delivery(payload).copy(signingSecret = secret)
+        val normalizedUrl = Url("https://receiver.example:443/webhook?source=issuer2").toString()
+        assertEquals("https://receiver.example/webhook?source=issuer2", normalizedUrl)
+        val delivery = delivery(payload).copy(
+            url = normalizedUrl,
+            signingSecret = secret,
+            bearerToken = "receiver-token",
+        )
         val client = HttpClient(MockEngine { request ->
             val signature = assertNotNull(request.headers[WEBHOOK_SIGNATURE_HEADER])
+            assertEquals("Bearer receiver-token", request.headers[HttpHeaders.Authorization])
             assertTrue(WebhookSignature.verify(
                 signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest((request.body as TextContent).text)
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature.removePrefix("v1="), secret, delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                "v1=invalid!", secret, delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature, "a different secret with sufficient entropy", delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
             ))
             assertFalse(WebhookSignature.verify(
                 signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest("tampered")
@@ -387,7 +413,6 @@ class WebhookDeliveryQueueTest {
 
         assertEquals(secret, FileWebhookDeliveryStore(root).pending(signedId)?.signingSecret)
         assertNull(store.pending(unsignedId)?.signingSecret)
-        assertFalse(WebhookSignature.verify("v1=invalid", secret, "https://receiver.example/webhook", signedId, 1, 1, "digest"))
     }
 
     private fun temporaryDirectory(): Path =

@@ -166,15 +166,15 @@ authentication and use HTTPS.
 
 ### Signed callbacks
 
-Set `signing_secret` on the webhook notification for Issuer2 or Verifier2. Use a unique, randomly generated secret
-of at least 32 bytes per receiver, store it as a secret, and share it with that receiver through a secure channel.
+Set `signing_secret` on the webhook notification for Issuer2 or Verifier2. It must contain at least 32 UTF-8 bytes.
+Use a unique, randomly generated secret per receiver, store it as a secret, and share it with that receiver through a secure channel.
 Basic or Bearer authentication may remain configured during migration. Existing callbacks without `signing_secret`
 continue to be delivered without `X-Webhook-Signature`.
 
 ```json
 {
   "url": "https://example.com/webhook",
-  "signing_secret": "replace-with-a-random-secret"
+  "signing_secret": "replace-with-a-random-32-byte-secret"
 }
 ```
 
@@ -190,8 +190,9 @@ POST
 ```
 
 The signature is `v1=` plus standard Base64 of `HMAC-SHA256(signing_secret, canonical string)`.
-The callback URL is the exact configured URL, including its query string. A receiver behind a proxy should use the
-agreed configured URL, not an internal rewritten URL. To verify, calculate SHA-256 over the raw request body and
+The callback URL is the normalized Ktor URL string stored in the delivery, including its query string. For example,
+`https://example.com:443/hook?source=issuer2` is signed as `https://example.com/hook?source=issuer2`.
+A receiver behind a proxy should use that external URL, not an internal rewritten URL. To verify, calculate SHA-256 over the raw request body and
 compare its RFC 9530-style value with `Content-Digest`; then compute the HMAC and compare decoded bytes in constant
 time. Reject missing or invalid signatures, timestamps outside a short window (for example five minutes), and
 previously processed `Webhook-Id` values. Retries keep the same ID and body but get a new timestamp and signature.

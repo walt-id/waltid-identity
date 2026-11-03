@@ -8,6 +8,16 @@ import kotlinx.serialization.Serializable
 data class KtorSessionNotifications(
     val webhook: VerificationSessionWebhookNotification? = null
 ) {
+    /** Remove authentication material before exposing notifications in sessions or callbacks. */
+    fun withoutCredentials(): KtorSessionNotifications = copy(
+        webhook = webhook?.copy(
+            basicAuthUser = null,
+            basicAuthPass = null,
+            bearerToken = null,
+            signingSecret = null,
+        ),
+    )
+
     @Serializable
     data class WebhookRetryPolicy(
         @SerialName("max_attempts")
@@ -53,7 +63,9 @@ data class KtorSessionNotifications(
         val retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy(),
     ) {
         init {
-            require(signingSecret == null || signingSecret.isNotBlank()) { "signing_secret must not be blank" }
+            require(signingSecret == null || signingSecret.encodeToByteArray().size >= 32) {
+                "signing_secret must contain at least 32 UTF-8 bytes"
+            }
         }
     }
 }
