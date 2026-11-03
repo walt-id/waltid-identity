@@ -374,21 +374,23 @@ object DcqlMatcher {
     private fun matchSelectivelyDisclosableClaim(credential: DcqlCredential, claimQuery: ClaimsQuery): Result<ClaimMatch> {
         val vcObject = credential.data["vc"] as? JsonObject
         val root = vcObject ?: credential.data
+        fun DcqlDisclosure.claimLocation() =
+            location ?: name?.takeIf { claimQuery.path.size == 1 }?.let { listOf(JsonPrimitive(it)) }
         val selectedClaims = processClaimsPath(root, claimQuery.path).getOrElse { error ->
             // Callers may pass disclosures without the claims they reveal in data; select by disclosure location then
             if (error !is ClaimNotFoundException) return Result.failure(error)
             credential.disclosures.orEmpty().mapNotNull { disclosure ->
-                disclosure.location?.takeIf { it.matchesClaimsPath(claimQuery.path) }?.let { it to disclosure.value }
+                disclosure.claimLocation()?.takeIf { it.matchesClaimsPath(claimQuery.path) }?.let { it to disclosure.value }
             }.ifEmpty { return Result.failure(error) }
         }.filter { (_, value) -> claimQuery.values.isNullOrEmpty() || claimQuery.values.any { it == value } }
         if (selectedClaims.isEmpty()) {
             return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path.joinToString(".")}"))
         }
 
-        // Disclosure locations are relative to the issuer-signed payload, which may wrap the claims in "vc".
-        val selectedLocations = selectedClaims.flatMap { (location, _) -> listOfNotNull(location, vcObject?.let { listOf(JsonPrimitive("vc")) + location }) }
+        // Disclosure locations are relative to the credential root, like the selected claims: inside a W3C "vc" wrapper
+        val selectedLocations = selectedClaims.map { (location, _) -> location }
         val disclosures = credential.disclosures.orEmpty().filter { disclosure ->
-            val location = disclosure.location ?: disclosure.name?.let { listOf(JsonPrimitive(it)) } ?: return@filter false
+            val location = disclosure.claimLocation() ?: return@filter false
             selectedLocations.any { selected -> location.isSameOrAncestorOf(selected) }
         }
         log.trace { "Claim path ${claimQuery.path.joinToString(".")} selects ${selectedClaims.size} claim(s) and ${disclosures.size} disclosure(s) in ${credential.id}" }
@@ -396,7 +398,7 @@ object DcqlMatcher {
         // selectedDisclosures keeps its shape: the disclosure for a single disclosed claim, otherwise the selected value(s)
         val (_, value) = selectedClaims.singleOrNull() ?: return Result.success(ClaimMatch(JsonArray(selectedClaims.map { it.second }), disclosures))
         val exactDisclosure = disclosures.singleOrNull { disclosure ->
-            val location = disclosure.location ?: disclosure.name?.let { listOf(JsonPrimitive(it)) }
+            val location = disclosure.claimLocation()
             location != null && selectedLocations.any { it.size == location.size && location.isSameOrAncestorOf(it) }
         }
         return Result.success(ClaimMatch(exactDisclosure ?: value, disclosures))

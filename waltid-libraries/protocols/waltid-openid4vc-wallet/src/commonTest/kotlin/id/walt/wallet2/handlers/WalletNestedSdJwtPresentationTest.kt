@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -136,11 +137,11 @@ class WalletNestedSdJwtPresentationTest {
         }
     }
 
-    private fun sdJwt(issuerSignedPayload: SdJwtBuilder.() -> JsonObject): String {
+    private fun sdJwt(typ: String = "dc+sd-jwt", issuerSignedPayload: SdJwtBuilder.() -> JsonObject): String {
         val builder = SdJwtBuilder()
         val payload = builder.issuerSignedPayload()
         fun encode(json: JsonObject) = json.toString().encodeToByteArray().encodeToBase64Url()
-        val header = buildJsonObject { put("alg", "ES256"); put("typ", "dc+sd-jwt") }
+        val header = buildJsonObject { put("alg", "ES256"); put("typ", typ) }
         // The wallet does not verify the issuer signature when presenting
         return "${encode(header)}.${encode(payload)}.c2lnbmF0dXJl~${builder.disclosures.joinToString("~") { it.encoded }}~"
     }
@@ -171,8 +172,9 @@ class WalletNestedSdJwtPresentationTest {
     }
 
     /** A request for [claims] (DCQL claims queries as JSON), with optional `claim_sets`. */
-    private fun request(vararg claims: String, claimSets: String? = null): AuthorizationRequest {
-        val query = """{"credentials": [{"id": "$QUERY_ID", "format": "dc+sd-jwt", "meta": {"vct_values": ["$VCT"]},
+    private fun request(vararg claims: String, claimSets: String? = null, format: String = "dc+sd-jwt"): AuthorizationRequest {
+        val metadata = if (format == "dc+sd-jwt") """{"vct_values": ["$VCT"]}""" else "{}"
+        val query = """{"credentials": [{"id": "$QUERY_ID", "format": "$format", "meta": $metadata,
             "claims": [${claims.joinToString(",")}]${claimSets?.let { ""","claim_sets": $it""" }.orEmpty()}}]}"""
         return AuthorizationRequest(
             clientId = "redirect_uri:https://verifier.example/callback",
@@ -193,6 +195,7 @@ class WalletNestedSdJwtPresentationTest {
         request: AuthorizationRequest,
         selectedOptionalPaths: List<String>? = null,
         credential: String = sdJwt,
+        did: String? = null,
     ): Presented {
         val wallet = wallet(credential)
         val preview = WalletPresentationHandler.previewPresentationStateless(
@@ -210,6 +213,7 @@ class WalletNestedSdJwtPresentationTest {
                 selectedCredentialOptions = listOf(PresentationCredentialSelection(QUERY_ID, CREDENTIAL_ID)),
                 selectedDisclosureOptions = selectedOptionalPaths?.map { PresentationDisclosureSelection(QUERY_ID, CREDENTIAL_ID, it) },
                 keyId = ready.keyId,
+                did = did,
             ),
             resolveAuthorizationRequest = resolverFor(request),
         ).vpToken
@@ -236,6 +240,40 @@ class WalletNestedSdJwtPresentationTest {
     // ---------------------------------------------------------------------------------------------------------
     // Cases
     // ---------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun w3cWrapperPathDoesNotPresentAnUnrequestedNestedVcDisclosure() = runTest {
+        val credential = sdJwt(typ = "JWT") {
+            buildJsonObject {
+                put("iss", "https://issuer.example")
+                put("_sd_alg", "sha-256")
+                putJsonObject("vc") {
+                    putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
+                    putJsonArray("type") { add("VerifiableCredential") }
+                    put("issuer", "https://issuer.example")
+                    putJsonObject("credentialSubject") { put("given_name", "Alice") }
+                    putJsonObject("vc") {
+                        putJsonObject("credentialSubject") {
+                            putJsonArray("_sd") { add(property("given_name", JsonPrimitive("Secret"))) }
+                        }
+                    }
+                }
+            }
+        }
+        assertIs<W3C11>(CredentialParser.detectAndParse(credential).second)
+
+        // The parser locates Secret relative to the outer vc, at vc.credentialSubject.given_name.
+        // Requesting the outer subject must not also select that distinct nested extension.
+        val presented = present(
+            request(claim("credentialSubject", "given_name"), format = "jwt_vc_json"),
+            credential = credential,
+            did = "did:example:holder",
+        )
+        assertEquals(JsonPrimitive("Alice"), presented.previewValue("\"credentialSubject\".\"given_name\""))
+        val vc = presented.verifierView.getValue("vc").jsonObject
+        assertEquals(json("""{"given_name":"Alice"}"""), vc.getValue("credentialSubject"))
+        assertFalse("given_name" in vc.getValue("vc").jsonObject.getValue("credentialSubject").jsonObject)
+    }
 
     @Test
     fun containerPathPresentsTheContainerWithoutItsDisclosedChildren() = runTest {
@@ -458,6 +496,34 @@ class WalletNestedSdJwtPresentationTest {
         // sees:    nationalities = ["FR"]
         val shared = present(request, selectedOptionalPaths = listOf(optionalPath))
         assertEquals(json("""["FR"]"""), shared.verifierView["nationalities"])
+    }
+
+    @Test
+    fun optionalClaimCarriedByARequiredClaimsDisclosuresIsNotSelectable() = runTest {
+        // request: ["nationalities", 1, "country"] required, ["nationalities", 1, "kind"] and
+        //          ["nationalities", 1, "since"] optional (claim_sets [["country"], ["country", "kind", "since"]])
+        val request = request(
+            """{"id": "country", "path": ["nationalities", 1, "country"]}""",
+            """{"id": "kind", "path": ["nationalities", 1, "kind"]}""",
+            """{"id": "since", "path": ["nationalities", 1, "since"]}""",
+            claimSets = """[["country"], ["country", "kind", "since"]]""",
+        )
+        val kindPath = """"nationalities".1."kind""""
+        val sincePath = """"nationalities".1."since""""
+
+        // user selects nothing optional
+        // sent:    nationalities, element 1, country   (kind is clear text inside element 1, since has its own disclosure)
+        // sees:    nationalities = [{kind: "residency", country: "DE"}]
+        val presented = present(request, selectedOptionalPaths = emptyList())
+        assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), presented.verifierView["nationalities"])
+
+        // kind is sent whatever the user selects, so consent shows it without a choice
+        val kind = presented.preview.single { it.path == kindPath }
+        assertFalse(kind.selectable)
+        assertEquals(json(""""residency""""), kind.value)
+
+        // since needs a disclosure of its own, so it stays a choice and is withheld when left out
+        assertTrue(presented.preview.single { it.path == sincePath }.selectable)
     }
 
     private companion object {
