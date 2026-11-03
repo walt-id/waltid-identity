@@ -91,11 +91,6 @@ class Issuer2TestNotificationServer {
 
     fun getReceivedCallbacks(): List<ReceivedCallback> = receivedUpdates.sortedBy { it.sequence }
 
-    fun orderedEvents(target: String): List<String> =
-        receivedUpdates.filter { it.update.target == target }
-            .sortedBy { it.sequence }
-            .map { it.update.event }
-
     fun awaitEvent(
         sessionId: String,
         event: IssuanceSessionEvent,

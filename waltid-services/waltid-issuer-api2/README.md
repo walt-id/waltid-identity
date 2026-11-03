@@ -396,7 +396,7 @@ To authenticate issuance webhooks, add `signing_secret` to the offer's notificat
     "notifications": {
       "webhook": {
         "url": "https://receiver.example/issuer2",
-        "signing_secret": "replace-with-a-random-secret"
+        "signing_secret": "replace-with-a-random-32-byte-secret"
       }
     }
   }
