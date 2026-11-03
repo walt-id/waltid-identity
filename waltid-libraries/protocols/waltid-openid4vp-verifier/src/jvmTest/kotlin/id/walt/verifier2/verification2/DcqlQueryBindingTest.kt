@@ -12,6 +12,7 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.Presen
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlin.reflect.KClass
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
@@ -57,14 +58,15 @@ class DcqlQueryBindingTest {
         holder = JWKKey.generate(KeyType.secp256r1)
     }
 
-    private suspend fun credential(type: String, subject: JsonObjectBuilder.() -> Unit = {}): String = issuer.signJws(
+    private suspend fun credential(type: String, scalarType: Boolean = false, subject: JsonObjectBuilder.() -> Unit = {}): String = issuer.signJws(
         buildJsonObject {
             put("iss", "did:example:issuer"); put("sub", "did:example:holder"); put("jti", "urn:uuid:$type")
             put("nbf", Clock.System.now().minus(10.days).epochSeconds)
             put("exp", Clock.System.now().plus(30.days).epochSeconds)
             putJsonObject("vc") {
                 putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
-                putJsonArray("type") { add("VerifiableCredential"); add(type) }
+                if (scalarType) put("type", type)
+                else putJsonArray("type") { add("VerifiableCredential"); add(type) }
                 put("expirationDate", Clock.System.now().plus(30.days).toString())
                 putJsonObject("credentialSubject") { put("id", "did:example:holder"); subject() }
             }
@@ -86,18 +88,20 @@ class DcqlQueryBindingTest {
 
     private suspend fun verify(dcqlQuery: String, vpToken: Map<String, List<String>>): Verification2Session {
         val session = session(dcqlQuery)
-        runCatching {
+        try {
             PresentationVerificationEngine.executeAllVerification(
                 vpTokenContents = vpToken,
                 session = session,
                 updateSessionCallback = { s, _, block -> s.block() },
                 failSessionCallback = { s, event, update -> update(s, event) { status = FAILED } },
             )
-        }.exceptionOrNull()?.let { assertIs<PresentationRejectionException>(it) }
+        } catch (e: PresentationRejectionException) {
+            assertEquals(FAILED, session.status, e.message)
+        }
         return session
     }
 
-    private fun Verification2Session.assertFailedWith(failure: kotlin.reflect.KClass<out SessionFailure>) {
+    private fun Verification2Session.assertFailedWith(failure: KClass<out SessionFailure>) {
         assertEquals(FAILED, status, "session must fail")
         assertTrue(failure.isInstance(this.failure), "expected ${failure.simpleName}, got ${this.failure}")
     }
@@ -228,6 +232,49 @@ class DcqlQueryBindingTest {
 
         val accepted = verify(query, mapOf("employee" to listOf(presentation(credential("EmployeeCredential") { put("contractor_number", "c-1") }))))
         assertEquals(SUCCESSFUL, accepted.status, accepted.failure.toString())
+    }
+
+    @Test
+    fun `wildcard claim values match individual selected claims`() = runTest {
+        val query = """{"credentials":[{"id":"admin","format":"jwt_vc_json","meta":{},
+            "claims":[{"path":["credentialSubject","roles",null],"values":["admin"]}]}]}"""
+        for ((roles, accepted) in listOf(listOf("admin") to true, listOf("user", "admin") to true, listOf("user") to false)) {
+            val session = verify(query, mapOf("admin" to listOf(presentation(credential("AdministratorCredential") {
+                putJsonArray("roles") { roles.forEach { add(it) } }
+            }))))
+            if (accepted) assertEquals(SUCCESSFUL, session.status, session.failure.toString())
+            else session.assertFailedWith(SessionFailure.DcqlFulfillment::class)
+        }
+    }
+
+    @Test
+    fun `invalid claim path does not prevent a matching alternative claim set`() = runTest {
+        val query = """{"credentials":[{"id":"admin","format":"jwt_vc_json","meta":{},
+            "claims":[{"id":"address","path":["credentialSubject","address","street"]},
+                      {"id":"email","path":["credentialSubject","email"]}],
+            "claim_sets":[["address"],["email"]]}]}"""
+        for (hasEmail in listOf(true, false)) {
+            val session = verify(query, mapOf("admin" to listOf(presentation(credential("AdministratorCredential") {
+                put("address", "unstructured address")
+                if (hasEmail) put("email", "alice@example.com")
+            }))))
+            if (hasEmail) assertEquals(SUCCESSFUL, session.status, session.failure.toString())
+            else session.assertFailedWith(SessionFailure.DcqlFulfillment::class)
+        }
+    }
+
+    @Test
+    fun `scalar W3C type is expanded and matched`() = runTest {
+        for ((requiredType, accepted) in listOf(
+            "https://www.w3.org/2018/credentials#VerifiableCredential" to true,
+            "https://example.com/OtherCredential" to false,
+        )) {
+            val query = """{"credentials":[{"id":"admin","format":"jwt_vc_json",
+                "meta":{"type_values":[["$requiredType"]]}}]}"""
+            val session = verify(query, mapOf("admin" to listOf(presentation(credential("VerifiableCredential", scalarType = true)))))
+            if (accepted) assertEquals(SUCCESSFUL, session.status, session.failure.toString())
+            else session.assertFailedWith(SessionFailure.DcqlFulfillment::class)
+        }
     }
 
     // language=JSON
