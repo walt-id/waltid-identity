@@ -8,10 +8,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 
 internal object DisplayUriResolver {
-    fun resolve(element: JsonElement, issuerHttpBaseUrl: String): JsonElement {
-        val baseUrl = issuerHttpBaseUrl.trimEnd('/')
+    fun resolve(element: JsonElement, publicBaseUrl: String): JsonElement {
+        val normalizedPublicBaseUrl = publicBaseUrl.trimEnd('/')
         return resolve(element) { uri ->
-            if (uri.startsWith("/")) "$baseUrl$uri" else uri
+            if (uri.startsWith("/")) "$normalizedPublicBaseUrl$uri" else uri
         }
     }
 
