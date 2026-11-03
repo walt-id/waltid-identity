@@ -135,7 +135,7 @@ class OpenId4VciController(
             }
 
             // Retain the original issuer value for credentials carrying the old iss.
-            route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
+            route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata(legacy = true)) {
                 call.respond(metadataService.getLegacyJwtVcIssuerMetadata())
             }
 

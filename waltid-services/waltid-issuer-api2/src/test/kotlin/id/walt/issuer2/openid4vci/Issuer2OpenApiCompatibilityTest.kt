@@ -55,6 +55,10 @@ class Issuer2OpenApiCompatibilityTest {
         fun body(operation: JsonObject) = operation.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("schema")
         val paths = specification.getValue("paths").jsonObject
+        val canonicalMetadata = paths.getValue("/.well-known/jwt-vc-issuer").jsonObject.getValue("get").jsonObject
+        val legacyMetadata = paths.getValue("/.well-known/jwt-vc-issuer/openid4vci").jsonObject.getValue("get").jsonObject
+        assertFalse(canonicalMetadata["deprecated"]?.jsonPrimitive?.booleanOrNull == true)
+        assertEquals(true, legacyMetadata["deprecated"]?.jsonPrimitive?.booleanOrNull)
         val challenge = paths.getValue("/openid4vci/challenge").jsonObject.getValue("post").jsonObject
         assertFalse(challenge.containsKey("requestBody"), "Challenge endpoint accepts an empty body")
         val challengeResponses = challenge.getValue("responses").jsonObject

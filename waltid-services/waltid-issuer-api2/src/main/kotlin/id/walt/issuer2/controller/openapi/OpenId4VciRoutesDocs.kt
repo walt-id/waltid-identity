@@ -62,12 +62,18 @@ object OpenId4VciRoutesDocs {
         }
     }
 
-    fun jwtVcIssuerMetadata(): RouteConfig.() -> Unit = {
+    fun jwtVcIssuerMetadata(legacy: Boolean = false): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
-        summary = "Get SD-JWT VC issuer metadata"
-        description = "Discover verification keys from the credential's iss using /.well-known/jwt-vc-issuer. " +
-                "The default SD-JWT issuer is the service base URL. The /openid4vci-suffixed metadata route " +
-                "is retained for older credentials and returns their original issuer identifier."
+        deprecated = legacy
+        summary = if (legacy) "Get compatibility SD-JWT VC issuer metadata" else "Get SD-JWT VC issuer metadata"
+        description = if (legacy) {
+            "Deprecated compatibility endpoint for credentials whose iss includes /openid4vci. " +
+                    "It remains available and returns their original issuer identifier. New credentials use " +
+                    "the issuer service URL and /.well-known/jwt-vc-issuer for discovery."
+        } else {
+            "Discover verification keys from the credential's iss using /.well-known/jwt-vc-issuer. " +
+                    "The default SD-JWT issuer is the service base URL."
+        }
         response {
             HttpStatusCode.OK to {
                 description = "SD-JWT VC issuer metadata"
