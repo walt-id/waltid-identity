@@ -2,6 +2,7 @@ package id.walt.ktornotifications
 
 import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessionWebhookNotification
 import id.walt.ktornotifications.core.KtorSessionUpdate
+import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
@@ -45,6 +46,10 @@ import kotlin.random.Random
 
 private val log = KotlinLogging.logger { }
 
+/** The private-network guard refused the webhook URL; the guard has already logged the destination. */
+class WebhookDestinationNotAllowedException(cause: Throwable) :
+    IllegalArgumentException("Webhook destination is not allowed (network-fetch-guard.conf)", cause)
+
 internal interface WebhookTransport {
     suspend fun deliver(delivery: WebhookDelivery, attempt: Int, timestampEpochSeconds: Long): WebhookAttemptResult
 }
@@ -68,21 +73,31 @@ internal class KtorWebhookTransport(
         attempt: Int,
         timestampEpochSeconds: Long,
     ): WebhookAttemptResult {
-        val response = client.post(delivery.url) {
-            contentType(ContentType.Application.Json)
-            header(WEBHOOK_ID_HEADER, delivery.deliveryId)
-            header(IDEMPOTENCY_KEY_HEADER, delivery.deliveryId)
-            header(WEBHOOK_TIMESTAMP_HEADER, timestampEpochSeconds)
-            header(WEBHOOK_ATTEMPT_HEADER, attempt)
-            header(CONTENT_DIGEST_HEADER, delivery.contentDigest)
-            setBody(delivery.payload)
+        val response = try {
+            client.post(delivery.url) {
+                contentType(ContentType.Application.Json)
+                header(WEBHOOK_ID_HEADER, delivery.deliveryId)
+                header(IDEMPOTENCY_KEY_HEADER, delivery.deliveryId)
+                header(WEBHOOK_SEQUENCE_HEADER, delivery.enqueueOrder)
+                header(WEBHOOK_TIMESTAMP_HEADER, timestampEpochSeconds)
+                header(WEBHOOK_ATTEMPT_HEADER, attempt)
+                header(CONTENT_DIGEST_HEADER, delivery.contentDigest)
+                setBody(delivery.payload)
 
-            if (delivery.basicAuthUser != null && delivery.basicAuthPass != null) {
-                basicAuth(delivery.basicAuthUser, delivery.basicAuthPass)
+                if (delivery.basicAuthUser != null && delivery.basicAuthPass != null) {
+                    basicAuth(delivery.basicAuthUser, delivery.basicAuthPass)
+                }
+                if (delivery.bearerToken != null) {
+                    bearerAuth(delivery.bearerToken)
+                }
             }
-            if (delivery.bearerToken != null) {
-                bearerAuth(delivery.bearerToken)
+        } catch (ex: CancellationException) {
+            throw ex
+        } catch (ex: Exception) {
+            if (generateSequence<Throwable>(ex) { it.cause }.any { it is BlockedAddressException }) {
+                return WebhookAttemptResult(error = WebhookDestinationNotAllowedException(ex))
             }
+            throw ex
         }
         val result = WebhookAttemptResult(
             statusCode = response.status.value,
@@ -373,6 +388,7 @@ object WebhookNotifier {
 
 const val WEBHOOK_ID_HEADER = "Webhook-Id"
 const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+const val WEBHOOK_SEQUENCE_HEADER = "Webhook-Sequence"
 const val WEBHOOK_TIMESTAMP_HEADER = "Webhook-Timestamp"
 const val WEBHOOK_ATTEMPT_HEADER = "Webhook-Attempt"
 const val CONTENT_DIGEST_HEADER = "Content-Digest"

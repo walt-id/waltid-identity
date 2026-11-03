@@ -66,7 +66,8 @@ internal data class WebhookAttemptResult(
     val successful: Boolean get() = statusCode in 200..299
 
     val retryable: Boolean
-        get() = error != null || statusCode == 408 || statusCode == 429 || statusCode in 500..599
+        get() = error !is WebhookDestinationNotAllowedException &&
+            (error != null || statusCode == 408 || statusCode == 429 || statusCode in 500..599)
 
     fun failureMessage(): String = when {
         error != null -> "${error::class.simpleName}: ${error.message ?: "request failed"}"
