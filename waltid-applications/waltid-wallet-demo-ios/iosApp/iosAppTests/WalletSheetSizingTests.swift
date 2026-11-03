@@ -1,12 +1,36 @@
 import Combine
 import SwiftUI
 import UIKit
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import XCTest
 @testable import iosApp
 
 @MainActor
 final class WalletSheetSizingTests: XCTestCase {
+    func testUnanimatedPresentationMismatchCanSettleWithoutAcceptingMotion() throws {
+        let layer = SheetGeometryLayer()
+        let rendered = SheetGeometryLayer()
+        layer.rendered = rendered
+        // Captured from CI after the sheet's resize completed: UIKit's container retained
+        // a different presentation scale with no animation keys and no further movement.
+        layer.transform = CATransform3DMakeScale(0.9601990049751243, 0.9601990049751243, 1)
+        rendered.transform = CATransform3DMakeScale(0.9617239713035861, 0.9617239713035861, 1)
+        let first = try XCTUnwrap(WalletSheetGeometrySnapshot(root: layer, container: layer))
+        XCTAssertFalse(first.matches(nil), "A single sample cannot establish that the sheet stopped moving")
+        XCTAssertTrue(WalletSheetGeometrySnapshot(root: layer, container: layer)?.matches(first) == true)
+
+        rendered.position.y += 1
+        XCTAssertFalse(WalletSheetGeometrySnapshot(root: layer, container: layer)?.matches(first) == true,
+            "Unanimated presentation geometry must still stop changing before readiness")
+        layer.keys = ["transform"]
+        XCTAssertNil(WalletSheetGeometrySnapshot(root: layer, container: layer),
+            "A real animation away from its target must finish before readiness")
+        rendered.position = layer.position
+        rendered.transform = layer.transform
+        XCTAssertNotNil(WalletSheetGeometrySnapshot(root: layer, container: layer),
+            "A retained key at the target must not block readiness")
+    }
+
     func testCompletedContainerAnimationDoesNotKeepTheSheetUnready() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
@@ -309,4 +333,12 @@ private struct SheetReadiness: View {
     var body: some View {
         Color.clear.onAppear { changed(ready) }.onChange(of: ready, perform: changed)
     }
+}
+
+private final class SheetGeometryLayer: CALayer {
+    var rendered: SheetGeometryLayer?
+    var keys: [String] = []
+
+    override func presentation() -> Self? { rendered as? Self }
+    override func animationKeys() -> [String]? { keys }
 }
