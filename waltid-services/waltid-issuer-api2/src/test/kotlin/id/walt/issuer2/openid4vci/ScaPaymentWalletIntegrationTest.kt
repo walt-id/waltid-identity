@@ -188,6 +188,8 @@ class ScaPaymentWalletIntegrationTest {
                     ScaAuthenticationMethods.Possession.OTHER, ScaAuthenticationMethods.Inherence.OTHER)
             }
             val policy = PaymentConsentPolicy(PaymentConsentResolver(listOf(PaymentCredentialIssuer(
+                issuerBase, issuerPublicJwk,
+            ), PaymentCredentialIssuer(
                 "$issuerBase/openid4vci", issuerPublicJwk,
             )), http), listOf("de-DE", "en"))
             signatures = 0 // The issuance proof is separate from payment authorization.
