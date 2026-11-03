@@ -80,7 +80,10 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 }
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
-    val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
+    val publicNotifications = notifications?.let {
+        it.copy(webhook = it.webhook?.copy(signingSecret = null))
+    }
+    val encoded = JsonObject(json.encodeToJsonElement(copy(notifications = publicNotifications)).jsonObject - buildSet {
         add("deferredState")
         add("issuanceClaimId")
         if (deferredStatus == null) add("deferredStatus")

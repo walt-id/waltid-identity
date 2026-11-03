@@ -36,6 +36,7 @@ import id.walt.issuer2.testsupport.issuer2TestJson
 import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.issuer2.testsupport.resolveOffer
 import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.WebhookSignature
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
@@ -87,9 +88,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.security.MessageDigest
+import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -108,6 +113,59 @@ class IssuanceNotificationRouteTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun issuanceOfferWebhookIsSignedAndItsSecretIsRedacted() = testApplication {
+        val notificationServer = Issuer2TestNotificationServer()
+        notificationServer.startServer()
+        val secret = "manual-test-secret-0123456789abcdef"
+
+        try {
+            installIssuer2WithConfigFiles()
+            val client = apiClient()
+            val callbackUrl = notificationServer.webhookUrl()
+            val createdOffer = client.createCredentialOffer(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
+                    CredentialOfferRuntimeOverrides(
+                        notifications = IssuanceNotifications(
+                            webhook = IssuanceNotifications.WebhookNotification(
+                                url = callbackUrl,
+                                signingSecret = secret,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            notificationServer.awaitEvent(createdOffer.offerId, IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED)
+            val callback = notificationServer.getReceivedCallbacks().first {
+                it.update.target == createdOffer.offerId &&
+                    it.update.event == IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED.value
+            }
+            val deliveryId = assertNotNull(callback.deliveryId)
+            assertEquals(deliveryId, callback.idempotencyKey)
+            assertEquals("1", callback.attempt)
+            val digest = "sha-256=:" + Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(callback.rawBody.toByteArray(Charsets.UTF_8)),
+            ) + ":"
+            assertEquals(digest, callback.contentDigest)
+            assertTrue(WebhookSignature.verify(
+                signature = assertNotNull(callback.signature),
+                secret = secret,
+                url = callbackUrl,
+                deliveryId = deliveryId,
+                timestampEpochSeconds = assertNotNull(callback.timestamp).toLong(),
+                attempt = 1,
+                contentDigest = digest,
+            ))
+            assertFalse(secret in callback.rawBody)
+            val publicSession = client.get("/issuer2/sessions/${createdOffer.offerId}")
+            assertEquals(HttpStatusCode.OK, publicSession.status)
+            assertFalse(secret in publicSession.bodyAsText())
+        } finally {
+            notificationServer.stopServer()
+        }
     }
 
     @Test
