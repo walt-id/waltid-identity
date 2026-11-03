@@ -1452,7 +1452,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             NonceResponseHttp(
                 status = 200,
                 payload = mapOf("c_nonce" to JsonPrimitive(issuedNonce.nonce)),
-                headers = mapOf("Cache-Control" to "no-store"),
             ) to null
         } catch (e: CancellationException) {
             throw e
@@ -1465,7 +1464,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     put("error", JsonPrimitive(error.error))
                     error.description?.let { put("error_description", JsonPrimitive(it)) }
                 },
-                headers = mapOf("Cache-Control" to "no-store"),
             ) to error
         }
 

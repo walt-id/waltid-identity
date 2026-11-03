@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
@@ -278,7 +279,7 @@ class DefaultOAuth2Provider(
         PushedAuthorizationResponseHttp(
             status = oauthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = error.responseHeaders + noStoreHeaders(),
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
         )
 
     override fun writePushedAuthorizationError(
@@ -297,7 +298,6 @@ class DefaultOAuth2Provider(
                 put("request_uri", JsonPrimitive(response.requestUri))
                 put("expires_in", JsonPrimitive(response.expiresIn))
             },
-            headers = noStoreHeaders(),
         )
 
     override suspend fun createAccessTokenRequest(
@@ -487,7 +487,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = oauthJsonErrorStatus(error),
-            headers = error.responseHeaders + TOKEN_RESPONSE_HEADERS,
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
@@ -503,7 +503,6 @@ class DefaultOAuth2Provider(
     ): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 200,
-            headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("token_type", JsonPrimitive(response.tokenType))
                 put("access_token", JsonPrimitive(response.accessToken))
@@ -535,10 +534,6 @@ class DefaultOAuth2Provider(
     private companion object {
         const val HTTP_POST = "POST"
         const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
-        val TOKEN_RESPONSE_HEADERS = mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
     }
 
     override suspend fun createCredentialRequest(
@@ -723,7 +718,6 @@ class DefaultOAuth2Provider(
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
-            headers = noStoreHeaders(),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
@@ -733,7 +727,7 @@ class DefaultOAuth2Provider(
         CredentialResponseHttp(
             status = credentialOAuthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = noStoreHeaders() + credentialOAuthErrorHeaders(error),
+            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA + credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -745,7 +739,7 @@ class DefaultOAuth2Provider(
     ): CredentialResponseHttp {
         val payload = response.toJsonObject()
         val encryption = request.credentialResponseEncryption
-            ?: return CredentialResponseHttp(status = 200, payload = payload, headers = noStoreHeaders())
+            ?: return CredentialResponseHttp(status = 200, payload = payload)
 
         val encrypted = try {
             config.credentialResponseEncryptor.encrypt(payload, encryption)
@@ -763,7 +757,6 @@ class DefaultOAuth2Provider(
         return CredentialResponseHttp(
             status = 200,
             body = CredentialResponseBody.EncryptedJwt(encrypted),
-            headers = noStoreHeaders(),
         )
     }
 
@@ -1096,12 +1089,6 @@ class DefaultOAuth2Provider(
 
             else -> 400
         }
-
-    private fun noStoreHeaders(): Map<String, String> =
-        mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
 
     private fun Map<String, List<String>>.withAuthenticatedClientId(
         authenticatedClient: AuthenticatedClient?,
