@@ -24,7 +24,8 @@ public struct WalletReviewScaffold<Content: View, Actions: View>: View {
         if #available(iOS 27, *) {
             // The footer supplies its own material. UIKit's additional bottom-edge effect
             // can duplicate animation callbacks when the keyboard resizes a fitted sheet.
-            scaffold.scrollEdgeEffectHidden(showsActions, for: .bottom)
+            // Keep it hidden while scanner actions appear, before requesting that keyboard.
+            scaffold.scrollEdgeEffectHidden(true, for: .bottom)
         } else { scaffold }
     }
 
