@@ -29,6 +29,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -157,7 +158,7 @@ class WalletNestedSdJwtPresentationTest {
         fun previewName(path: String): String? = preview.single { it.path == path }.name
     }
 
-    private suspend fun wallet(sdJwt: String, staleLocations: Boolean = false): Wallet {
+    private suspend fun wallet(sdJwt: String, staleLocations: Boolean = false, alsoStored: List<StoredCredential> = emptyList()): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
         val storedCredential = if (staleLocations) {
             // Simulate a credential persisted before decoy-aware indexing, without reimporting it.
@@ -166,6 +167,7 @@ class WalletNestedSdJwtPresentationTest {
         } else credential
         val store = InMemoryCredentialStore().also {
             it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = storedCredential))
+            alsoStored.forEach { stored -> it.addCredential(stored) }
         }
         // The legacy P-256 generator uses the iOS Keychain; these tests need only software signing.
         val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
@@ -205,8 +207,9 @@ class WalletNestedSdJwtPresentationTest {
         credential: String = sdJwt,
         did: String? = null,
         staleLocations: Boolean = false,
+        alsoStored: List<StoredCredential> = emptyList(),
     ): Presented {
-        val wallet = wallet(credential, staleLocations)
+        val wallet = wallet(credential, staleLocations, alsoStored)
         val preview = WalletPresentationHandler.previewPresentationStateless(
             wallet = wallet,
             request = PreviewPresentationRequest(REQUEST_URL),
@@ -657,6 +660,30 @@ class WalletNestedSdJwtPresentationTest {
         val result = present(request(claim("nationalities", 1, "documents", 2)), credential = decoySdJwt, staleLocations = true)
         assertEquals(json("\"visa\""), result.previewValue("\"nationalities\".1.\"documents\".2"))
         assertEquals(json("""[{"documents": ["clear-document", "visa"]}]"""), result.verifierView["nationalities"])
+    }
+
+    @Test
+    fun storedCredentialWhoseDisclosuresCannotBeLocatedIsSkippedWithoutFailingTheRequest() = runTest {
+        // Stored before stricter parsing: its issuer-signed payload repeats a digest (RFC 9901 §7.1 step 4)
+        val valid = assertIs<SdJwtCredential>(CredentialParser.detectAndParse(sdJwt).second)
+        val payload = assertNotNull(valid.originalCredentialData)
+        val digests = payload.getValue("_sd").jsonArray
+        val malformed = StoredCredential(
+            id = "malformed",
+            credential = valid.copy(originalCredentialData = JsonObject(payload + ("_sd" to JsonArray(digests + digests.first())))),
+        )
+        val request = request(claim("nationalities", 0))
+
+        // request: ["nationalities", 0], with the malformed credential stored next to the valid one
+        // sent:    from the valid credential: nationalities, element 0
+        // sees:    nationalities = ["IN"]
+        val presented = present(request, alsoStored = listOf(malformed))
+        assertEquals(json("""["IN"]"""), presented.verifierView["nationalities"])
+
+        val matched = WalletPresentationHandler.matchCredentials(
+            MatchCredentialsRequest(assertNotNull(request.dcqlQuery), listOf(StoredCredential(id = CREDENTIAL_ID, credential = valid), malformed))
+        )
+        assertEquals(mapOf(QUERY_ID to listOf(CREDENTIAL_ID)), matched.matchedCredentialIds)
     }
 
     private companion object {
