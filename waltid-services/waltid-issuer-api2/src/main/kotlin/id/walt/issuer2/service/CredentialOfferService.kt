@@ -123,7 +123,7 @@ class CredentialOfferService(
                 )
                 resolvedTxCodeValue = preAuthorizedCode.txCodeValue
                 CredentialOffer.withPreAuthorizedCodeGrant(
-                    credentialIssuer = issuerBaseUrl(),
+                    credentialIssuer = openId4VciIssuerUrl(),
                     credentialConfigurationIds = credentialConfigurationIds,
                     preAuthorizedCode = preAuthorizedCode.code,
                     txCode = request.txCode,
@@ -132,7 +132,7 @@ class CredentialOfferService(
 
             AuthenticationMethod.AUTHORIZED ->
                 CredentialOffer.withAuthorizationCodeGrant(
-                    credentialIssuer = issuerBaseUrl(),
+                    credentialIssuer = openId4VciIssuerUrl(),
                     credentialConfigurationIds = credentialConfigurationIds,
                     issuerState = sessionId.takeIf { issuerStateMode == IssuerStateMode.INCLUDE },
                 )
@@ -157,7 +157,7 @@ class CredentialOfferService(
         val offerRequest = when (request.valueMode) {
             CredentialOfferValueMode.BY_VALUE -> CredentialOfferRequest(credentialOffer = credentialOffer)
             CredentialOfferValueMode.BY_REFERENCE -> CredentialOfferRequest(
-                credentialOfferUri = "${issuerBaseUrl()}/credential-offer?id=$sessionId",
+                credentialOfferUri = "${openId4VciIssuerUrl()}/credential-offer?id=$sessionId",
             )
         }
 
@@ -186,7 +186,7 @@ class CredentialOfferService(
 
     suspend fun removeIssuanceSession(sessionId: String) = sessionService.removeSession(sessionId)
 
-    private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
+    private fun openId4VciIssuerUrl(): String = config.openId4VciIssuerUrl()
 
     private fun expirationTimestamp(expiresInSeconds: Long): Instant =
         when (expiresInSeconds) {

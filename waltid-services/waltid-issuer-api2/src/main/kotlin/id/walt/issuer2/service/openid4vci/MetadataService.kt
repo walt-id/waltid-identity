@@ -51,8 +51,8 @@ class MetadataService @JvmOverloads constructor(
         encodeDefaults = true
     }
 
-    private val issuerHttpBaseUrl = serviceConfig.baseUrl.trimEnd('/')
-    private val baseUrl = serviceConfig.openId4VciBaseUrl()
+    private val publicBaseUrl = serviceConfig.baseUrl.trimEnd('/')
+    private val openId4VciIssuerUrl = serviceConfig.openId4VciIssuerUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
     private val credentialEncryptionKeyConfig = serviceConfig.credentialEncryptionKey
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
@@ -71,7 +71,7 @@ class MetadataService @JvmOverloads constructor(
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
-            ?.map { DisplayUriResolver.resolve(it, issuerHttpBaseUrl) }
+            ?.map { DisplayUriResolver.resolve(it, publicBaseUrl) }
             ?.map { json.decodeFromJsonElement(IssuerDisplay.serializer(), it) }
             ?.takeIf { it.isNotEmpty() }
 
@@ -79,7 +79,7 @@ class MetadataService @JvmOverloads constructor(
         metadataConfig.credentialConfigurations.mapValues { (configurationId, value) ->
             json.decodeFromJsonElement(
                 CredentialConfiguration.serializer(),
-                DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
+                DisplayUriResolver.resolve(value, publicBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
                 configuration.vct?.let { validateVct(configurationId, it) }
             }
@@ -116,7 +116,7 @@ class MetadataService @JvmOverloads constructor(
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
             CredentialIssuerMetadata.fromBaseUrl(
-                baseUrl = baseUrl,
+                baseUrl = openId4VciIssuerUrl,
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
@@ -140,7 +140,7 @@ class MetadataService @JvmOverloads constructor(
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
-            baseUrl = baseUrl,
+            baseUrl = openId4VciIssuerUrl,
             codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/par",
             challengeEndpointPath = if (supportsAttestationChallenges) "/${Issuer2EndpointPaths.CHALLENGE}" else null,
@@ -196,7 +196,9 @@ class MetadataService @JvmOverloads constructor(
         return configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
     }
 
-    fun issuerBaseUrl(): String = baseUrl
+    fun issuerServiceBaseUrl(): String = publicBaseUrl
+
+    fun openId4VciIssuerUrl(): String = openId4VciIssuerUrl
 
     /**
      * Publishes token and credential signing public keys, per RFC 8414 `jwks_uri`.
@@ -284,7 +286,7 @@ class MetadataService @JvmOverloads constructor(
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
 
     private fun selfHostedVct(credentialType: String): String =
-        "$baseUrl/$credentialType"
+        "$openId4VciIssuerUrl/$credentialType"
 
     private fun validateVct(configurationId: String, vct: String) {
         require(vct.isNotBlank()) {
@@ -328,7 +330,7 @@ class MetadataService @JvmOverloads constructor(
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
         // Only HTTP(S) VCTs that share this issuer's origin can collide with protocol routes.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
-        val issuerUri = URI(baseUrl)
+        val issuerUri = URI(openId4VciIssuerUrl)
         if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
             !vctUri.host.equals(issuerUri.host, ignoreCase = true) ||
             vctUri.effectivePort() != issuerUri.effectivePort()

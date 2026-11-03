@@ -153,7 +153,7 @@ data class OpenId4VciModule(
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
-                    authorizationServerIssuer = config.openId4VciBaseUrl(),
+                    authorizationServerIssuer = config.openId4VciIssuerUrl(),
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),

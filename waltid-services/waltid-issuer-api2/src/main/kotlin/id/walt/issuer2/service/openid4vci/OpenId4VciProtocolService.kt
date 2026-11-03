@@ -146,7 +146,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val service = attestationChallengeService
             ?: throw NotFoundException("Attestation challenges are disabled")
         return try {
-            AttestationChallengeResponse(service.issue(metadataService.issuerBaseUrl())).toHttp()
+            AttestationChallengeResponse(service.issue(metadataService.openId4VciIssuerUrl())).toHttp()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -274,7 +274,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ): AuthorizationResponseHttp {
         val authorizationRequest = try {
             when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
-                is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
+                is AuthorizationRequestResult.Success -> result.request.withIssuer(metadataService.openId4VciIssuerUrl())
                 is AuthorizationRequestResult.Failure -> {
                     notificationService.notify(
                         requestId = requestId,
@@ -357,7 +357,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
 
         val redirectUri =
-            "${metadataService.issuerBaseUrl()}/external_login/$authorizationRequestEnvelope"
+            "${metadataService.openId4VciIssuerUrl()}/external_login/$authorizationRequestEnvelope"
         return AuthorizationResponseHttp(
             status = 302,
             redirectUri = redirectUri,
@@ -497,7 +497,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return oauth2Provider.writeAuthorizationError(authorizationError)
         }
 
-        val authorizationRequest = storedAuthorizationRequest.withIssuer(metadataService.issuerBaseUrl())
+        val authorizationRequest = storedAuthorizationRequest.withIssuer(metadataService.openId4VciIssuerUrl())
 
         if (!session.isActiveAuthorizationCodeSession()) {
             val authorizationError = OAuthError(OAuthErrorCodes.INVALID_REQUEST, "issuer_state is invalid")
@@ -619,7 +619,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 return response
             }
         ) {
-            is AccessTokenRequestResult.Success -> result.request.withIssuer(metadataService.issuerBaseUrl())
+            is AccessTokenRequestResult.Success -> result.request.withIssuer(metadataService.openId4VciIssuerUrl())
             is AccessTokenRequestResult.Failure -> {
                 val response = oauth2Provider.writeAccessTokenError(result.error)
                 notificationService.notify(
@@ -826,7 +826,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 parameters = parameterMap,
                 accessTokenContext = CredentialAccessTokenContext(
                     authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
+                    expectedIssuer = metadataService.openId4VciIssuerUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
                     credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
@@ -847,7 +847,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 encryptedCredentialRequest = encryptedCredentialRequest,
                 accessTokenContext = CredentialAccessTokenContext(
                     authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
+                    expectedIssuer = metadataService.openId4VciIssuerUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
                     credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
@@ -995,7 +995,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val observedIssuanceRequest = requireNotNull(observedSession.issuanceRequests.find {
             it.credentialIdentifier == authorization.credentialIdentifier
         })
-        val issuerId = observedIssuanceRequest.issuerDid ?: metadataService.issuerBaseUrl()
+        val issuerId = observedIssuanceRequest.issuerDid ?: metadataService.openId4VciIssuerUrl()
         val requestWithSession = credentialRequest
             .withSession(DefaultSession(subject = sessionId))
             .withIssuer(issuerId)
@@ -1500,7 +1500,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         claims: JsonObject?,
         requestId: String,
     ): AuthorizationResponseHttp {
-        val requestWithIssuer = authorizationRequest.withIssuer(metadataService.issuerBaseUrl())
+        val requestWithIssuer = authorizationRequest.withIssuer(metadataService.openId4VciIssuerUrl())
         val oauthSession = DefaultSession(subject = issuanceSession.sessionId)
 
         val authorizationResponse = try {
@@ -1973,7 +1973,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         parseQueryString(query).entries().associate { it.key to it.value }
 
     private fun endpointUri(path: String): String =
-        "${metadataService.issuerBaseUrl().trimEnd('/')}/$path"
+        "${metadataService.openId4VciIssuerUrl().trimEnd('/')}/$path"
 
     private fun Exception.toAuthorizationError(): OAuthError =
         when (this) {

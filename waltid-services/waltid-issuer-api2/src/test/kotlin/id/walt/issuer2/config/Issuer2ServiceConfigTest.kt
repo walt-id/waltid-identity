@@ -59,7 +59,7 @@ class Issuer2ServiceConfigTest {
         assertNull(config.signedMetadata)
         assertNull(config.clientAttestationConfig())
         assertEquals(false, config.supportsPreAuthAnonymous())
-        assertEquals("http://localhost:7002/openid4vci", config.openId4VciBaseUrl())
+        assertEquals("http://localhost:7002/openid4vci", config.openId4VciIssuerUrl())
     }
 
     @Test
