@@ -12,11 +12,15 @@ data class IssuanceNotifications(
     data class WebhookNotification(
         val url: String,
 
+        @SerialName("signing_secret")
+        val signingSecret: String? = null,
+
         @SerialName("retry_policy")
         val retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy(),
     ) {
         init {
             require(url.isNotBlank()) { "webhook url must not be blank" }
+            require(signingSecret == null || signingSecret.isNotBlank()) { "signing_secret must not be blank" }
         }
     }
 }

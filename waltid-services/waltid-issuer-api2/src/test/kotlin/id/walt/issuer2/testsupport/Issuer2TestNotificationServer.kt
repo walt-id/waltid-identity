@@ -4,6 +4,12 @@ import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.apply
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.ktornotifications.WEBHOOK_SEQUENCE_HEADER
+import id.walt.ktornotifications.WEBHOOK_ID_HEADER
+import id.walt.ktornotifications.IDEMPOTENCY_KEY_HEADER
+import id.walt.ktornotifications.WEBHOOK_TIMESTAMP_HEADER
+import id.walt.ktornotifications.WEBHOOK_ATTEMPT_HEADER
+import id.walt.ktornotifications.CONTENT_DIGEST_HEADER
+import id.walt.ktornotifications.WEBHOOK_SIGNATURE_HEADER
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.HttpStatusCode
@@ -16,7 +22,7 @@ import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.request.request
 import io.ktor.server.response.respond
 import io.ktor.server.routing.post
@@ -83,6 +89,13 @@ class Issuer2TestNotificationServer {
     fun getReceivedUpdates(): List<KtorSessionUpdate> =
         receivedUpdates.sortedBy { it.sequence }.map { it.update }
 
+    fun getReceivedCallbacks(): List<ReceivedCallback> = receivedUpdates.sortedBy { it.sequence }
+
+    fun orderedEvents(target: String): List<String> =
+        receivedUpdates.filter { it.update.target == target }
+            .sortedBy { it.sequence }
+            .map { it.update.event }
+
     fun awaitEvent(
         sessionId: String,
         event: IssuanceSessionEvent,
@@ -103,13 +116,31 @@ class Issuer2TestNotificationServer {
     private suspend fun ApplicationCall.receiveUpdate() {
         val sequence = request.headers[WEBHOOK_SEQUENCE_HEADER]?.toLongOrNull()
             ?: throw IllegalArgumentException("Webhook callback is missing $WEBHOOK_SEQUENCE_HEADER")
-        receivedUpdates += ReceivedCallback(receive(), sequence)
+        val body = receiveText()
+        receivedUpdates += ReceivedCallback(
+            update = issuer2TestJson.decodeFromString<KtorSessionUpdate>(body),
+            sequence = sequence,
+            rawBody = body,
+            deliveryId = request.headers[WEBHOOK_ID_HEADER],
+            idempotencyKey = request.headers[IDEMPOTENCY_KEY_HEADER],
+            timestamp = request.headers[WEBHOOK_TIMESTAMP_HEADER],
+            attempt = request.headers[WEBHOOK_ATTEMPT_HEADER],
+            contentDigest = request.headers[CONTENT_DIGEST_HEADER],
+            signature = request.headers[WEBHOOK_SIGNATURE_HEADER],
+        )
         respond(HttpStatusCode.OK)
     }
 
-    private data class ReceivedCallback(
+    data class ReceivedCallback(
         val update: KtorSessionUpdate,
         val sequence: Long,
+        val rawBody: String,
+        val deliveryId: String?,
+        val idempotencyKey: String?,
+        val timestamp: String?,
+        val attempt: String?,
+        val contentDigest: String?,
+        val signature: String?,
     )
 
     private data class GuardSnapshot(
