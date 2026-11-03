@@ -113,7 +113,7 @@ class Issuer2MetadataEndpointTest {
     fun unknownVctTypesReturnNotFoundThroughBothMetadataUrls() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
-        listOf("/.well-known/vct/missing-type", "$OPENID4VCI_PREFIX/missing-type").forEach { path ->
+        listOf("/missing-type", "/.well-known/vct/missing-type", "$OPENID4VCI_PREFIX/missing-type").forEach { path ->
             assertEquals(HttpStatusCode.NotFound, client.get(path).status, path)
         }
     }
@@ -544,7 +544,7 @@ class Issuer2MetadataEndpointTest {
         // Reproduce the pre-change HTTPS issuer payload independently of the new default issuer selection.
         val legacyPayload = buildJsonObject {
             put("iss", ISSUER_BASE_URL)
-            put("vct", INTERNAL_SD_JWT_VCT)
+            put("vct", LEGACY_INTERNAL_SD_JWT_VCT)
             put("given_name", "Alice")
         }
         val credential = issuerKey.signJws(
@@ -590,6 +590,7 @@ class Issuer2MetadataEndpointTest {
         val decoded = credential.decodeJws()
         assertEquals(ISSUER_AUTHORITY_BASE_URL, decoded.payload["iss"]?.jsonPrimitive?.content)
         assertEquals(metadata.issuer, decoded.payload["iss"]?.jsonPrimitive?.content)
+        assertEquals(INTERNAL_SD_JWT_VCT, decoded.payload["vct"]?.jsonPrimitive?.content)
         val kid = decoded.header.getValue("kid").jsonPrimitive.content
         val jwks = client.get(requireNotNull(metadata.jwksUri)).body<JsonObject>()
         val jwk = jwks.getValue("keys").jsonArray.single { it.jsonObject["kid"]?.jsonPrimitive?.content == kid }.jsonObject
@@ -738,8 +739,9 @@ class Issuer2MetadataEndpointTest {
             val publishedVct = assertNotNull(configuration.vct)
 
             // The in-memory test server uses port 80; exercise a published HTTP VCT path on that server.
-            // Identifier VCTs such as urn:eudi:pid:1 are not URLs, so only the well-known route applies.
+            // URN VCTs are looked up by identifier through the direct and well-known routes.
             val metadataUrls = buildList {
+                add("/$credentialConfigurationId")
                 add("/.well-known/vct/$credentialConfigurationId")
                 if (publishedVct.startsWith("http://") || publishedVct.startsWith("https://")) {
                     add(Url(publishedVct).encodedPath)
@@ -769,6 +771,10 @@ class Issuer2MetadataEndpointTest {
                     assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
                 }
             }
+            val legacyMetadata = client.get("$OPENID4VCI_PREFIX/$credentialConfigurationId").body<SdJwtVcTypeMetadataDraft04>()
+            val legacyVct = if (credentialConfigurationId in IDENTIFIER_VCTS) publishedVct
+                else "$ISSUER_BASE_URL/$credentialConfigurationId"
+            assertEquals(legacyVct, legacyMetadata.vct)
         }
     }
 
@@ -794,7 +800,7 @@ class Issuer2MetadataEndpointTest {
             val expectedVct = if (credentialConfigurationId in IDENTIFIER_VCTS) {
                 credentialConfigurationId
             } else {
-                "$ISSUER_BASE_URL/$credentialConfigurationId"
+                "$ISSUER_AUTHORITY_BASE_URL/$credentialConfigurationId"
             }
             assertEquals(expectedVct, configuration.vct)
             assertEquals(
@@ -989,7 +995,8 @@ class Issuer2MetadataEndpointTest {
         const val PID_SD_JWT_CARD_ART_FILE = "pid-sd-jwt.png"
         const val WALTID_MARK_FILE = "waltid-mark.png"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
-        val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+        val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_AUTHORITY_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+        val LEGACY_INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",

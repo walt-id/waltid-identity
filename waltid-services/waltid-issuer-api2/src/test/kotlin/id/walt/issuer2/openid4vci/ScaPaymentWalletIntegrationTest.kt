@@ -154,7 +154,8 @@ class ScaPaymentWalletIntegrationTest {
                 wallet, ReceiveCredentialRequest(offerUrl = Url(offer.credentialOffer)), httpClient = http,
             ).toList().single()
             val vct = credential.credential.credentialData.getValue("vct").jsonPrimitive.content
-            assertEquals("$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
+            assertTrue(vct in setOf("$issuerBase/sca_payment_card_sd_jwt", "$issuerBase/openid4vci/sca_payment_card_sd_jwt"))
+            assertEquals(configurations.getValue("sca_payment_card_sd_jwt").jsonObject.getValue("vct").jsonPrimitive.content, vct)
 
             // Reuse the shipped demo request. Only transport protection and the issuer VCT differ;
             // signed/encrypted transport variants already have their own protocol/app coverage.

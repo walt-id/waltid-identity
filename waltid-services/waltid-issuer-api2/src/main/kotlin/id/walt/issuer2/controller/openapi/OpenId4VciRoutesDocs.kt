@@ -83,11 +83,13 @@ object OpenId4VciRoutesDocs {
         }
     }
 
-    fun vctTypeMetadata(): RouteConfig.() -> Unit = {
+    fun vctTypeMetadata(legacy: Boolean = false): RouteConfig.() -> Unit = {
         tags = listOf(SD_JWT_VC_TAG)
-        summary = "Get SD-JWT VC type metadata"
+        deprecated = legacy
+        summary = if (legacy) "Get compatibility SD-JWT VC type metadata" else "Get SD-JWT VC type metadata"
         description = "Look up type metadata this issuer stores. Self-hosted HTTPS vct values are served at " +
-                "`/.well-known/vct/{type}` and `/openid4vci/{type}`. A configured URN such as `urn:eudi:pid:1` " +
+                "`/{type}` and `/.well-known/vct/{type}`. The deprecated `/openid4vci/{type}` route retains " +
+                "the original VCT identifier for existing credentials. A configured URN such as `urn:eudi:pid:1` " +
                 "is served from those same routes by identifier. SD-JWT VC retrieves HTTPS type metadata from the " +
                 "vct URL itself; this route is the issuer's lookup, not that resolution rule. Unknown types, " +
                 "external HTTPS vct values, and reserved OpenID4VCI path names return 404."

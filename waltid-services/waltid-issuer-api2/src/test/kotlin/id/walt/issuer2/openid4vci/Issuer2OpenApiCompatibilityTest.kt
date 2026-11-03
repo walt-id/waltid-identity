@@ -57,7 +57,7 @@ class Issuer2OpenApiCompatibilityTest {
         val paths = specification.getValue("paths").jsonObject
         for (path in listOf(
             "/.well-known/jwt-vc-issuer", "/.well-known/jwt-vc-issuer/openid4vci",
-            "/.well-known/vct/{type}", "/openid4vci/{type}",
+            "/{type}", "/.well-known/vct/{type}", "/openid4vci/{type}",
         )) {
             assertEquals(
                 listOf("Issuer Service API v2 - SD-JWT VC"),
@@ -80,6 +80,8 @@ class Issuer2OpenApiCompatibilityTest {
         val legacyMetadata = paths.getValue("/.well-known/jwt-vc-issuer/openid4vci").jsonObject.getValue("get").jsonObject
         assertFalse(canonicalMetadata["deprecated"]?.jsonPrimitive?.booleanOrNull == true)
         assertEquals(true, legacyMetadata["deprecated"]?.jsonPrimitive?.booleanOrNull)
+        assertEquals(true, paths.getValue("/openid4vci/{type}").jsonObject.getValue("get").jsonObject["deprecated"]?.jsonPrimitive?.booleanOrNull)
+        assertFalse(paths.getValue("/{type}").jsonObject.getValue("get").jsonObject["deprecated"]?.jsonPrimitive?.booleanOrNull == true)
         val challenge = paths.getValue("/openid4vci/challenge").jsonObject.getValue("post").jsonObject
         assertFalse(challenge.containsKey("requestBody"), "Challenge endpoint accepts an empty body")
         val challengeResponses = challenge.getValue("responses").jsonObject
