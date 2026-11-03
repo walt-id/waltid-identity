@@ -175,10 +175,10 @@ enum class X509OutputFile(val defaultFileName: String) {
     /** The certificate followed by its issuers up to the root, PEM. */
     CHAIN("chain.pem"),
 
-    /** Private JWK with `kid` and `x5c`. */
+    /** Private JWK with `kid` and `alg`. */
     PRIVATE_JWK("private.jwk.json"),
 
-    /** Public JWK with `kid` and `x5c`. */
+    /** Public JWK with `kid` and `alg`. */
     PUBLIC_JWK("public.jwk.json"),
 }
 
