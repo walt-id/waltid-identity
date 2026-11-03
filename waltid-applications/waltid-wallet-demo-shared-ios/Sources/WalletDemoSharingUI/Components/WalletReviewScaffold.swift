@@ -21,15 +21,6 @@ public struct WalletReviewScaffold<Content: View, Actions: View>: View {
     }
 
     public var body: some View {
-        if #available(iOS 27, *) {
-            // The footer supplies its own material. UIKit's additional bottom-edge effect
-            // can duplicate animation callbacks when the keyboard resizes a fitted sheet.
-            // Keep it hidden while scanner actions appear, before requesting that keyboard.
-            scaffold.scrollEdgeEffectHidden(true, for: .bottom)
-        } else { scaffold }
-    }
-
-    private var scaffold: some View {
         WalletSheetScrollView {
             VStack(alignment: .leading, spacing: 14) { content }
                 .frame(maxWidth: .infinity, alignment: .leading)
