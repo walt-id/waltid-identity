@@ -83,11 +83,6 @@ class Issuer2TestNotificationServer {
     fun getReceivedUpdates(): List<KtorSessionUpdate> =
         receivedUpdates.sortedBy { it.sequence }.map { it.update }
 
-    fun orderedEvents(target: String): List<String> =
-        receivedUpdates.filter { it.update.target == target }
-            .sortedBy { it.sequence }
-            .map { it.update.event }
-
     fun awaitEvent(
         sessionId: String,
         event: IssuanceSessionEvent,
