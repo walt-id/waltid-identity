@@ -11,11 +11,11 @@ ping()
     local max_attempts=60
     local attempt=1
 
-    echo "Waiting for ${service}-api on ${livez_url}"
+    echo "Waiting for ${service} on ${livez_url}"
 
     until nc -z localhost "$port" >/dev/null 2>&1; do
         if [[ "$attempt" -ge "$max_attempts" ]]; then
-            echo "${service}-api did not open port ${port} in time"
+            echo "${service} did not open port ${port} in time"
             return 1
         fi
         printf '.'
@@ -27,7 +27,7 @@ ping()
     until response="$(curl -fsS "$livez_url" 2>/dev/null)" \
         && printf '%s' "$response" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"Healthy"'; do
         if [[ "$attempt" -ge "$max_attempts" ]]; then
-            echo "${service}-api did not become healthy in time"
+            echo "${service} did not become healthy in time"
             curl -sS "$livez_url" || true
             return 1
         fi
@@ -36,10 +36,10 @@ ping()
         ((attempt++))
     done
 
-    echo "${service}-api is healthy"
+    echo "${service} is healthy"
 }
 
 # main
-ping wallet 7001
-ping issuer 7002
-ping verifier 7003
+ping wallet-api2 7006
+ping issuer-api2 7005
+ping verifier-api2 7004

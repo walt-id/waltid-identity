@@ -3,6 +3,7 @@ package id.walt.webwallet
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
+import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.webwallet.config.*
@@ -77,7 +78,8 @@ object FeatureCatalog : ServiceFeatureCatalog {
     )
 
     override val baseFeatures = listOf(
-        databaseFeature
+        databaseFeature,
+        CommonsFeatureCatalog.networkFetchGuardFeature,
     )
     override val optionalFeatures = listOf(
         devModeFeature,

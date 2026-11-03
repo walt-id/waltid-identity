@@ -1,7 +1,7 @@
 # Local development compose - uses prebuilt server with custom nginx (for proper SSL cert)
 services:
   mongodb:
-    image: ${MONGODB_IMAGE:-mongo:6.0.13}
+    image: ${MONGODB_IMAGE:-mongo:6.0.28}
     volumes:
      - ./mongo/data:/data/db
     logging:

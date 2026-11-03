@@ -1,23 +1,11 @@
 [
   {
-    "commandPath": ":waltid-services:waltid-issuer-api",
-    "image": "issuer-api"
-  },
-  {
     "commandPath": ":waltid-services:waltid-issuer-api2",
     "image": "issuer-api2"
   },
   {
-    "commandPath": ":waltid-services:waltid-verifier-api",
-    "image": "verifier-api"
-  },
-  {
     "commandPath": ":waltid-services:waltid-verifier-api2",
     "image": "verifier-api2"
-  },
-  {
-    "commandPath": ":waltid-services:waltid-wallet-api",
-    "image": "wallet-api"
   },
   {
     "commandPath": ":waltid-services:waltid-wallet-api2",

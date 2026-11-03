@@ -8,7 +8,7 @@ plugins {
 }
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
-val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
+val publicDemoTransactionDataProfilesUrl = "https://wallet2.demo.walt.id/transaction-data-profiles"
 val walletSigningProtectionMode =
     providers.gradleProperty("walletSigningProtectionMode").getOrElse("optional").trim().lowercase()
 require(walletSigningProtectionMode in setOf("required", "optional", "disabled")) {

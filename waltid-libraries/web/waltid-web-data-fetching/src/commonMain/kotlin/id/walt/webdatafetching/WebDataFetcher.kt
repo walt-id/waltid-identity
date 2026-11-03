@@ -1,6 +1,7 @@
 package id.walt.webdatafetching
 
 import id.walt.webdatafetching.config.RequestConfiguration
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -34,6 +35,11 @@ class WebDataFetcher private constructor(
 
     val httpClient = clientOverride ?: dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
+
+        // Every caller-supplied URL this client fetches is a potential SSRF target (issuer metadata,
+        // request_uri, token/credential endpoints, ...). Guard unconditionally, not just when a `url`
+        // allowlist happens to be configured for this fetcher id.
+        installPrivateNetworkGuard()
 
         install(ContentNegotiation) {
             json()
@@ -114,7 +120,9 @@ class WebDataFetcher private constructor(
                     dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
                 }.getOrElse { ex ->
                     throw DataFetchingException(
-                        "Server answered request with non-/invalid JSON: $body (to request to $url)",
+                        // The body is not included: the URL is often caller-supplied, and this message can reach
+                        // client-facing errors and logs.
+                        "Server answered request with non-/invalid JSON (to request to $url)",
                         cause = ex,
                     )
                 }

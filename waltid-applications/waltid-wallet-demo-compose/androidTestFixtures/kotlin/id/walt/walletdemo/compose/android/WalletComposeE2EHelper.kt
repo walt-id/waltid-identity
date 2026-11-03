@@ -102,6 +102,9 @@ internal object WalletComposeE2EHelper {
     }
 
     fun launch(context: Context, signingProtectionMode: String = "disabled") {
+        // Enterprise fixtures are reached through adb reverse on 127.0.0.1. Device tests do not
+        // receive the JVM walt.ssrf.allowLoopback property that host tests get from Gradle.
+        System.setProperty("walt.ssrf.allowLoopback", "true")
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)

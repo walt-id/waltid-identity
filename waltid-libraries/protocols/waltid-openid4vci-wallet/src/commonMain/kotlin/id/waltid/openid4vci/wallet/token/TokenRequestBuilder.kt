@@ -1,13 +1,14 @@
 package id.waltid.openid4vci.wallet.token
 
+import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.plugins.retry
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeRetry
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.clientauth.CLIENT_ASSERTION_TYPE_JWT_BEARER
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
-import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
@@ -440,11 +441,10 @@ class TokenRequestBuilder(
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
         var dpopNonce: String? = null
-        // One bounded retry covers a single server challenge round. Response headers advance the attestation
-        // challenge before a DPoP-nonce retry, so requirements from the same response are satisfied together.
-        // Sequential challenge rounds intentionally do not receive independent retry budgets.
-        // Client assertions are regenerated per attempt so every request carries a unique jti (RFC 7523 §3).
-        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
+        val attestationRecovery = ClientAttestationChallengeRetry()
+        var dpopRetried = false
+        // Each independent freshness mechanism gets one recovery; total attempts remain bounded.
+        repeat(3) {
             val attemptParameters = clientAssertionFactory?.let { factory ->
                 val assertion = factory()
                 Parameters.build {
@@ -464,36 +464,24 @@ class TokenRequestBuilder(
                 onResponseHeaders = onResponseHeaders,
             )
 
-                if (!response.status.isSuccess()) {
-                    val errorResponse = response.oauthError()
-                    val oauthError = errorResponse?.error
-                    val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
-                if (
-                    attempt == 0 &&
-                    dpopProofFactory != null &&
-                    oauthError == USE_DPOP_NONCE &&
-                    !suppliedNonce.isNullOrBlank()
-                ) {
-                    dpopNonce = suppliedNonce
+            val suppliedNonce = response.headers[DPOP_NONCE_HEADER]?.takeIf { it.isNotBlank() }
+            suppliedNonce?.let { dpopNonce = it }
+            if (!response.status.isSuccess()) {
+                val errorResponse = response.oauthError()
+                val oauthError = errorResponse?.error
+                if (!dpopRetried && dpopProofFactory != null && oauthError == USE_DPOP_NONCE && suppliedNonce != null) {
+                    dpopRetried = true
                     return@repeat
                 }
-                if (
-                    attempt == 0 &&
-                    attestationHeadersFactory != null &&
-                    oauthError == USE_ATTESTATION_CHALLENGE &&
-                    !response.headers[CLIENT_ATTESTATION_CHALLENGE].isNullOrBlank()
-                ) {
-                    return@repeat
-                }
-                    throw TokenRequestException(
-                        statusCode = response.status.value,
-                        oauthError = oauthError,
-                        oauthErrorDescription = errorResponse?.description,
-                        // A body that is not an OAuth error object means the request failed before the
-                        // grant was ever evaluated, so name that instead of leaving a bare status code
-                        // that reads like a rejected grant.
-                        nonOAuthErrorBody = errorResponse == null,
-                    )
+                if (attestationRecovery.shouldRetry(
+                        response.status, oauthError, response.headers, attestationHeadersFactory != null,
+                    )) return@repeat
+                throw TokenRequestException(
+                    statusCode = response.status.value,
+                    oauthError = oauthError,
+                    oauthErrorDescription = errorResponse?.description,
+                    nonOAuthErrorBody = errorResponse == null,
+                )
             }
 
             return response.decodeTokenResponse().also { tokenResponse ->
@@ -543,6 +531,8 @@ class TokenRequestBuilder(
             val dpopProof = dpopProofFactory?.invoke(endpoint, dpopNonce)
             return try {
                 httpClient.post(endpoint) {
+                    expectSuccess = false
+                    retry { noRetry() }
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(parameters.formUrlEncode())
                     appendTokenRequestHeaders(additionalHeaders, requestAttestationHeaders, dpopProof)
@@ -588,6 +578,20 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
     }
     }
 
+    /**
+     * `additionalHeaders`/`tokenRequestHeaders` is caller-controlled (an enterprise API caller supplies it for
+     * client authentication against their own token endpoint - overriding `Host` for tenant/virtual-host
+     * routing is a deliberately supported use of it too, see [TokenRequestBuilderTest]). Block only headers
+     * that could corrupt the request at the wire level; the actual SSRF surface (reaching an internal
+     * target at all) is closed by the private-network guard on the underlying client, not by header
+     * filtering, so this stays narrow rather than a general allowlist.
+     */
+    private fun isBlockedTokenRequestHeader(name: String): Boolean {
+        if (name.equals(HttpHeaders.ContentLength, ignoreCase = true)) return true
+        if (name.equals(HttpHeaders.TransferEncoding, ignoreCase = true)) return true
+        return false
+    }
+
     private fun isSameOrigin(source: String, target: String): Boolean {
         val sourceUrl = Url(source)
         val targetUrl = Url(target)
@@ -601,7 +605,12 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
         attestationHeaders: ClientAttestationHeaders?,
         dpopProof: String? = null,
     ) {
-        additionalHeaders.forEach { (name, value) -> header(name, value) }
+        additionalHeaders.forEach { (name, value) ->
+            require(!isBlockedTokenRequestHeader(name)) {
+                "'$name' cannot be set via additionalHeaders/tokenRequestHeaders"
+            }
+            header(name, value)
+        }
         attestationHeaders?.let {
             header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
             header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
@@ -610,7 +619,6 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
     }
 
     private companion object {
-        const val USE_ATTESTATION_CHALLENGE = "use_attestation_challenge"
         val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }

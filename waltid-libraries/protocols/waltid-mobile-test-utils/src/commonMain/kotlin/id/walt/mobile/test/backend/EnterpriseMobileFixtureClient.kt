@@ -27,6 +27,9 @@ class EnterpriseMobileFixtureClient(
     private val baseUrl: String,
     private val client: HttpClient = defaultClient(),
 ) {
+    suspend fun challengeTrace(id: String): Map<String, Int> =
+        json.decodeFromString(client.get("$baseUrl/challenge-traces/$id").requireBody())
+
     suspend fun scenarios(): List<EnterpriseMobileScenario> {
         val response = client.get("$baseUrl/scenarios") {
             accept(ContentType.Application.Json)
@@ -133,6 +136,7 @@ data class EnterpriseMobileOffer(
     val offerUrl: String,
     val txCode: String? = null,
     val attestation: EnterpriseMobileAttestationConfig? = null,
+    val challengeTraceId: String? = null,
 )
 
 @Serializable
