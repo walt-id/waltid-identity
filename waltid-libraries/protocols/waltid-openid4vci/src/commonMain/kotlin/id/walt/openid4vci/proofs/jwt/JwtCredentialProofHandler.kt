@@ -30,6 +30,7 @@ import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.proofs.validateCredentialNonce
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -304,10 +305,47 @@ class JwtCredentialProofHandler(
         runCatching {
             didKeyResolver.resolveFromDidStrict(did, holderKid, relationship = null)
         }
+            .recoverCatching { strictFailure ->
+                if (strictFailure is CancellationException) throw strictFailure
+                resolveLegacyHolderDidKey(did, holderKid) ?: throw strictFailure
+            }
             .getOrElse {
                 if (it is CancellationException) throw it
                 throw invalidCredentialProof("Could not resolve credential proof DID key", it)
             }
+
+    /**
+     * Deprecated compatibility fallback for wallets that do not send a verification method ID as `kid`.
+     *
+     * Older wallets build the proof `kid` as `"$did#${key.getKeyId()}"`, i.e. with a JWK thumbprint
+     * (or, for did:jwk, a KMS-path) fragment that does not exist in the DID document. This is not
+     * OpenID4VCI compliant (Appendix F.1: the `kid` identifies a particular key in the DID document).
+     * The fallback is only accepted when it cannot select a different key than the wallet intended:
+     * - did:jwk: the document contains exactly one key, so any fragment is accepted.
+     * - other DIDs: the DID must expose exactly one signature-capable key, and the `kid` fragment
+     *   must equal that key's RFC 7638 thumbprint. A `kid` naming an existing but unusable method
+     *   (e.g. a `keyAgreement` key) never matches, so it stays rejected.
+     *
+     * TODO: remove once wallets send verification method IDs as proof `kid`.
+     */
+    private suspend fun resolveLegacyHolderDidKey(did: String, holderKid: String): Key? {
+        val fragment = holderKid.substringAfter('#', missingDelimiterValue = "").takeIf(String::isNotBlank)
+            ?: return null
+        val key = try {
+            didKeyResolver.resolveFromDid(did, if (did.startsWith("did:jwk:")) holderKid else null)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            return null
+        }
+        if (!did.startsWith("did:jwk:") && Jwk.sha256Thumbprint(key.exportPublicJwk()) != fragment) return null
+        log.warn {
+            "DEPRECATED: credential proof kid '$holderKid' does not match a verification method of '$did'; " +
+                "accepted via legacy fallback as key '${key.id.value}'. Wallets must send the verification " +
+                "method ID as kid. This fallback will be removed in a future release."
+        }
+        return key
+    }
 
     /** Restores an inline holder JWK as a verification-only crypto2 key. */
     private suspend fun restoreHolderJwk(jwk: JsonObject): Key {
@@ -456,6 +494,7 @@ class JwtCredentialProofHandler(
     )
 
     private companion object {
+        private val log = KotlinLogging.logger {}
         const val DEFAULT_PROOF_MAX_AGE_SECONDS = 300L
         const val DEFAULT_CLOCK_SKEW_SECONDS = 60L
         const val JWT_TYPE = "openid4vci-proof+jwt"
