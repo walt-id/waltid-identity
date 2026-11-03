@@ -58,6 +58,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
+import io.ktor.http.URLBuilder
+import io.ktor.http.encodedPath
 import io.ktor.http.contentType
 import io.ktor.http.getSplitValues
 import io.ktor.serialization.kotlinx.json.json
@@ -86,6 +88,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFails
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.util.Base64
 
 class Issuer2MetadataEndpointTest {
@@ -528,6 +532,42 @@ class Issuer2MetadataEndpointTest {
         assertNull(jwtVcIssuerMetadata.jwks)
 
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    @Test
+    fun previouslySignedSdJwtStillVerifiesUsingLegacyDiscoveryAndUnchangedVct() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val profile = ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles
+            .getValue(Issuer2CredentialScenarios.IDENTITY_SD_JWT_PROFILE_ID)
+        val issuerKey = KeyManager.resolveSerializedKey(profile.issuerKey)
+        // Reproduce the pre-change HTTPS issuer payload independently of the new default issuer selection.
+        val legacyPayload = buildJsonObject {
+            put("iss", ISSUER_BASE_URL)
+            put("vct", INTERNAL_SD_JWT_VCT)
+            put("given_name", "Alice")
+        }
+        val credential = issuerKey.signJws(
+            legacyPayload.toString().encodeToByteArray(),
+            mapOf("kid" to JsonPrimitive(issuerKey.getKeyId()), "typ" to JsonPrimitive("dc+sd-jwt")),
+        ) + "~"
+        val decoded = credential.substringBefore('~').decodeJws()
+        val issuer = decoded.payload.getValue("iss").jsonPrimitive.content
+        val discoveryUrl = URLBuilder(Url(issuer)).apply {
+            encodedPath = "/.well-known/jwt-vc-issuer" + encodedPath.removeSuffix("/")
+        }.buildString()
+        val metadataResponse = client.get(discoveryUrl)
+        assertEquals(HttpStatusCode.OK, metadataResponse.status)
+        assertNull(metadataResponse.headers[HttpHeaders.Location])
+        val metadata = metadataResponse.body<JWTVCIssuerMetadata>()
+        assertEquals(issuer, metadata.issuer)
+        assertEquals(ISSUER_AUTHORITY_BASE_URL, client.get(JWT_VC_ISSUER_METADATA_PATH).body<JWTVCIssuerMetadata>().issuer)
+        val kid = decoded.header.getValue("kid").jsonPrimitive.content
+        val jwks = client.get(requireNotNull(metadata.jwksUri)).body<JsonObject>()
+        val jwk = jwks.getValue("keys").jsonArray.single { it.jsonObject["kid"]?.jsonPrimitive?.content == kid }.jsonObject
+        assertTrue(JWKKey.importJWK(jwk.toString()).getOrThrow().verifyJws(credential.substringBefore('~')).isSuccess)
+        val vct = decoded.payload.getValue("vct").jsonPrimitive.content
+        assertEquals(vct, client.get(vct).body<SdJwtVcTypeMetadataDraft04>().vct)
     }
 
     @Test

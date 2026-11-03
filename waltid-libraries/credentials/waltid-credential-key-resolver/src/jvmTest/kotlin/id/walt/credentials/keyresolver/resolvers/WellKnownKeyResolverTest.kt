@@ -1,5 +1,6 @@
 package id.walt.credentials.keyresolver.resolvers
 
+import id.walt.crypto.keys.jwk.JWKKey
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
@@ -14,11 +15,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class WellKnownKeyResolverTest {
     @Test
-    fun `discovers root and path issuers with inline or referenced keys`() = runTest {
-        for (path in listOf("", "/tenant")) {
+    fun `discovers current and legacy issuers and verifies their signatures with inline or referenced keys`() = runTest {
+        for (path in listOf("", "/tenant", "/tenant/openid4vci")) {
             for (inline in listOf(true, false)) {
                 withIssuerServer(path, metadata = { issuer, base ->
                     buildJsonObject {
@@ -30,6 +32,15 @@ class WellKnownKeyResolverTest {
                         issuer, buildJsonObject { put("kid", "issuer-key") },
                     )
                     assertEquals(jwk, Json.parseToJsonElement(resolved.data.toByteArray().decodeToString()))
+                    val signingKey = JWKKey.importJWK(JsonObject(jwk + ("d" to JsonPrimitive(
+                        "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
+                    ))).toString()).getOrThrow()
+                    val signed = signingKey.signJws(
+                        buildJsonObject { put("iss", issuer); put("vct", "urn:example:identity") }.toString().encodeToByteArray(),
+                        mapOf("kid" to JsonPrimitive("issuer-key"), "typ" to JsonPrimitive("dc+sd-jwt")),
+                    )
+                    val verificationKey = JWKKey.importJWK(resolved.data.toByteArray().decodeToString()).getOrThrow()
+                    assertTrue(verificationKey.verifyJws(signed).isSuccess)
                     assertEquals(
                         listOf("/.well-known/jwt-vc-issuer$path") + if (inline) emptyList() else listOf("/keys"),
                         requestedPaths.toList(),
