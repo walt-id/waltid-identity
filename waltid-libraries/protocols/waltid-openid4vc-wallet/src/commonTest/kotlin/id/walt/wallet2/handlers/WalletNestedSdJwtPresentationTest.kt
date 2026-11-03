@@ -517,14 +517,76 @@ class WalletNestedSdJwtPresentationTest {
         val presented = present(request, selectedOptionalPaths = emptyList())
         assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), presented.verifierView["nationalities"])
 
-        // kind is sent whatever the user selects, so consent shows it without a choice
+        // kind is sent whatever the user selects, so consent shows it as included, without a choice
         val kind = presented.preview.single { it.path == kindPath }
+        assertTrue(kind.required)
         assertFalse(kind.selectable)
         assertEquals(json(""""residency""""), kind.value)
 
         // since needs a disclosure of its own, so it stays a choice and is withheld when left out
-        assertTrue(presented.preview.single { it.path == sincePath }.selectable)
+        val since = presented.preview.single { it.path == sincePath }
+        assertFalse(since.required)
+        assertTrue(since.selectable)
     }
+
+    @Test
+    fun claimCarriedByOneQueryIsIncludedWhereAnotherQueryOffersItAsAChoice() = runTest {
+        // request: one credential answers both queries
+        //   A: ["nationalities", 1, "country"] required, ["nationalities", 1, "kind"] optional
+        //   B: ["given_name"] required, ["nationalities", 1, "kind"] optional
+        val query = """{"credentials": [
+            {"id": "A", "format": "dc+sd-jwt", "meta": {"vct_values": ["$VCT"]},
+             "claims": [${claim("nationalities", 1, "country").withId("country")}, ${claim("nationalities", 1, "kind").withId("kind")}],
+             "claim_sets": [["country"], ["country", "kind"]]},
+            {"id": "B", "format": "dc+sd-jwt", "meta": {"vct_values": ["$VCT"]},
+             "claims": [${claim("given_name").withId("name")}, ${claim("nationalities", 1, "kind").withId("kind")}],
+             "claim_sets": [["name"], ["name", "kind"]]}
+        ]}"""
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            nonce = "nonce",
+            dcqlQuery = DcqlParser.parse(query).getOrThrow(),
+        )
+        val kindPath = """"nationalities".1."kind""""
+        val wallet = wallet(sdJwt)
+        val ready = assertIs<StatelessPreviewPresentationResult.Ready>(
+            WalletPresentationHandler.previewPresentationStateless(
+                wallet = wallet,
+                request = PreviewPresentationRequest(REQUEST_URL),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                resolveAuthorizationRequest = resolverFor(request),
+            )
+        )
+        fun kindRow(queryId: String) = ready.credentialOptions.single { it.queryId == queryId }.disclosures.single { it.path == kindPath }
+
+        // A sends kind with country's parent whatever the user selects; B alone could withhold it
+        assertTrue(kindRow("A").required)
+        assertFalse(kindRow("A").selectable)
+        assertFalse(kindRow("B").required)
+        assertTrue(kindRow("B").selectable)
+
+        // user selects nothing optional
+        // sent:    A: nationalities, element 1, country   B: no disclosures
+        // sees:    A: nationalities = [{kind: "residency", country: "DE"}]   B: no nationalities
+        val vpToken = Json.parseToJsonElement(
+            WalletPresentationHandler.buildVpToken(
+                wallet = wallet,
+                request = BuildVpTokenRequest(
+                    requestUrl = REQUEST_URL,
+                    selectedCredentialOptions = listOf("A", "B").map { PresentationCredentialSelection(it, CREDENTIAL_ID) },
+                    selectedDisclosureOptions = emptyList(),
+                    keyId = ready.keyId,
+                ),
+                resolveAuthorizationRequest = resolverFor(request),
+            ).vpToken
+        ).jsonObject
+        fun verifierView(queryId: String) = SDJwt.parse(vpToken.getValue(queryId).jsonArray.single().jsonPrimitive.content).fullPayload
+        assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), verifierView("A")["nationalities"])
+        assertFalse("nationalities" in verifierView("B"))
+    }
+
+    private fun String.withId(id: String) = Json.parseToJsonElement(this).jsonObject.let { JsonObject(it + ("id" to JsonPrimitive(id))) }.toString()
 
     private companion object {
         const val VCT = "https://issuer.example/pid"

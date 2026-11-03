@@ -286,6 +286,10 @@ data class PresentationDisclosure(
     val name: String?,
     val value: JsonElement,
     val selectivelyDisclosable: Boolean,
+    /**
+     * True when the value is presented whatever the user selects: the query requires it, or the
+     * disclosures it needs are already presented for a required claim.
+     */
     val required: Boolean,
     val selectable: Boolean,
     /** False for unrequested clear-text data that the credential must also transmit. */
@@ -2127,14 +2131,17 @@ object WalletPresentationHandler {
             val required = plan.isRequired(path)
             val value = claim.value
             when {
-                claim.selectivelyDisclosable -> PresentationDisclosure(
-                    path = path,
-                    name = (value as? DcqlDisclosure)?.name ?: claimName(path) ?: path.substringAfterLast('.', path),
-                    value = disclosedValue(path, claim),
-                    selectivelyDisclosable = true,
-                    required = required,
-                    selectable = plan.isSelectable(path, claim) && claim.disclosures.any { it !in requiredDisclosures },
-                )
+                claim.selectivelyDisclosable -> {
+                    val presentedAnyway = required || claim.disclosures.all { it in requiredDisclosures }
+                    PresentationDisclosure(
+                        path = path,
+                        name = (value as? DcqlDisclosure)?.name ?: claimName(path) ?: path.substringAfterLast('.', path),
+                        value = disclosedValue(path, claim),
+                        selectivelyDisclosable = true,
+                        required = presentedAnyway,
+                        selectable = plan.isSelectable(path, claim) && !presentedAnyway,
+                    )
+                }
                 // Clear text, but its own children may be disclosures that are not presented
                 value is JsonElement -> PresentationDisclosure(
                     path = path,
