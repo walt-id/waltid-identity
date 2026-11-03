@@ -173,7 +173,7 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
                 }
 
                 test("Emit wallet_error_response_received callback") {
-                webhook.assertReceivedInOrder(
+                    webhook.assertReceivedInOrder(
                         sessionId,
                         Verifier2WebhookRecorder.walletRejectionEvents,
                     )
