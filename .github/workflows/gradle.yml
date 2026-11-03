@@ -939,6 +939,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+      - name: Collect issuer proxy diagnostics
+        if: always()
+        run: |
+          mkdir -p "$ISSUER_DIAGNOSTICS_DIR"
+          if [ -f "$RUNNER_TEMP/issuer-deferred-proxy.log" ]; then
+            cp "$RUNNER_TEMP/issuer-deferred-proxy.log" "$ISSUER_DIAGNOSTICS_DIR/proxy.log"
+          fi
+
       - name: Prepare issuer proof results
         if: always()
         env:
@@ -973,6 +981,7 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/suite-version.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/results.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/shard.json
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/proxy.log
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/deferred/
 
   issuer-conformance-results:

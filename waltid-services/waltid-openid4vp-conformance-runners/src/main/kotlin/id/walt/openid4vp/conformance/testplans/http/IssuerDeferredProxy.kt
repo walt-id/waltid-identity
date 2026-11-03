@@ -6,6 +6,7 @@ import id.walt.openid4vp.conformance.testplans.DeferredProxyEvent
 import id.walt.openid4vp.conformance.testplans.deferredOfferKey
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import java.io.ByteArrayInputStream
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.http.HttpClient
@@ -18,6 +19,10 @@ import java.time.Duration
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.zip.GZIPInputStream
+import java.util.zip.Inflater
+import java.util.zip.InflaterInputStream
+import java.util.zip.ZipException
 
 /** Test-only proxy. It never manufactures credential responses or validates tokens. */
 class IssuerDeferredProxy(
@@ -41,8 +46,10 @@ class IssuerDeferredProxy(
         Files.createDirectories(evidenceFile.toAbsolutePath().parent)
         Files.writeString(evidenceFile, "")
         server.createContext("/") { exchange ->
-            try { forward(exchange) } catch (_: Exception) {
+            try { forward(exchange) } catch (exception: Exception) {
                 // Never include request data or upstream exception messages in the response/log.
+                val route = exchange.requestURI.path.takeIf { it in observedPaths } ?: "<other>"
+                System.err.println("Issuer conformance proxy failed: ${exchange.requestMethod} $route (${exception::class.simpleName})")
                 exchange.runCatching { sendResponseHeaders(502, -1) }
             } finally { exchange.close() }
         }
@@ -72,7 +79,10 @@ class IssuerDeferredProxy(
         if (exchange.requestMethod == "POST" && path == "/issuer2/credential-offers" && response.statusCode() == 201) {
             val deferred = Json.parseToJsonElement(body.decodeToString()).jsonObject["deferred"]?.jsonPrimitive?.booleanOrNull == true
             if (deferred) {
-                val id = Json.parseToJsonElement(response.body().decodeToString()).jsonObject.getValue("offerId").jsonPrimitive.content
+                // Cloudflare adds Accept-Encoding even when the management client did not.
+                // Decode a copy for correlation; forward the original body and encoding headers.
+                val receipt = decodeManagementReceipt(response.body(), response.headers().allValues("Content-Encoding"))
+                val id = Json.parseToJsonElement(receipt.decodeToString()).jsonObject.getValue("offerId").jsonPrimitive.content
                 val key = deferredOfferKey(id)
                 offers.add(key)
                 record(key, "registered")
@@ -123,6 +133,31 @@ class IssuerDeferredProxy(
 
     companion object {
         private val hopHeaders = setOf("host", "connection", "content-length", "transfer-encoding", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade", "expect")
+        private val observedPaths = setOf("/issuer2/credential-offers", "/openid4vci/credential", "/openid4vci/deferred_credential")
+
+        private fun decodeManagementReceipt(body: ByteArray, encodings: List<String>): ByteArray =
+            encodings.flatMap { it.split(',') }.map { it.trim().lowercase() }.asReversed().fold(body) { bytes, encoding ->
+                when (encoding) {
+                    "", "identity" -> bytes
+                    "gzip" -> GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readAllBytes() }
+                    "deflate" -> try {
+                        inflateManagementReceipt(bytes, raw = false)
+                    } catch (_: ZipException) {
+                        // Ktor sends raw DEFLATE; other upstreams may use a zlib wrapper.
+                        inflateManagementReceipt(bytes, raw = true)
+                    }
+                    else -> error("Unsupported management receipt content encoding")
+                }
+            }
+
+        private fun inflateManagementReceipt(bytes: ByteArray, raw: Boolean): ByteArray {
+            val inflater = Inflater(raw)
+            return try {
+                InflaterInputStream(ByteArrayInputStream(bytes), inflater).use { it.readAllBytes() }
+            } finally {
+                inflater.end()
+            }
+        }
 
         internal fun sessionSubject(authorization: String?): String? = runCatching {
             val token = requireNotNull(authorization).substringAfter(' ')

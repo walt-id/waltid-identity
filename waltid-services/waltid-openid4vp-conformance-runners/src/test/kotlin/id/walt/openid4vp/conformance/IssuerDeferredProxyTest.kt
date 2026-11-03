@@ -6,6 +6,14 @@ import id.walt.openid4vp.conformance.testplans.http.IssuerDeferredProxy
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantMatrix
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
+import java.util.zip.Inflater
+import java.util.zip.Deflater
+import java.util.zip.InflaterInputStream
+import java.util.zip.DeflaterOutputStream
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.http.HttpClient
@@ -19,7 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 class IssuerDeferredProxyTest {
-    private class Fixture(val failApproval: Boolean = false, val approvalDelay: Long = 0) : AutoCloseable {
+    private class Fixture(val failApproval: Boolean = false, val approvalDelay: Long = 0, val offerEncoding: String? = null) : AutoCloseable {
         val events = CopyOnWriteArrayList<String>()
         val approved = mutableSetOf<String>()
         val evidence = Files.createTempFile("issuer-deferred", ".jsonl")
@@ -28,6 +36,7 @@ class IssuerDeferredProxyTest {
         val opaqueRequest = "header.encrypted.request.with.tag".toByteArray()
         val opaquePending = "header.encrypted.pending.with.tag".toByteArray()
         val opaqueCredentials = "header.encrypted.credentials.with.tag".toByteArray()
+        var encodedOfferResponse = ByteArray(0)
         val upstream = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
             createContext("/") { call ->
                 val path = call.requestURI.path
@@ -61,10 +70,24 @@ class IssuerDeferredProxyTest {
                     }
                     else -> 200 to body
                 }
-                call.responseHeaders.add("Content-Type", "application/jwt")
+                val wireResponse = if (path == "/issuer2/credential-offers" && offerEncoding != null) {
+                    val coding = offerEncoding.substringBefore('-')
+                    assertTrue(call.requestHeaders.getFirst("Accept-Encoding").contains(coding))
+                    call.responseHeaders.add("Content-Encoding", coding)
+                    ByteArrayOutputStream().also { output ->
+                        if (offerEncoding == "gzip") {
+                            GZIPOutputStream(output).use { it.write(response) }
+                        } else {
+                            val deflater = Deflater(Deflater.DEFAULT_COMPRESSION, offerEncoding == "deflate-raw")
+                            try { DeflaterOutputStream(output, deflater).use { it.write(response) } }
+                            finally { deflater.end() }
+                        }
+                    }.toByteArray().also { encodedOfferResponse = it }
+                } else response
+                call.responseHeaders.add("Content-Type", if (path == "/issuer2/credential-offers") "application/json" else "application/jwt")
                 call.responseHeaders.add("DPoP-Nonce", "original-server-nonce")
-                call.sendResponseHeaders(status, if (response.isEmpty()) -1 else response.size.toLong())
-                if (response.isNotEmpty()) call.responseBody.write(response)
+                call.sendResponseHeaders(status, if (wireResponse.isEmpty()) -1 else wireResponse.size.toLong())
+                if (wireResponse.isNotEmpty()) call.responseBody.write(wireResponse)
                 call.close()
             }
             start()
@@ -72,11 +95,12 @@ class IssuerDeferredProxyTest {
         val proxy = IssuerDeferredProxy(URI("http://127.0.0.1:${upstream.address.port}"), 0, evidence,
             Duration.ofMillis(if (approvalDelay > 0) 100 else 5000)).apply { start() }
 
-        fun post(path: String, body: ByteArray = opaqueRequest, offer: String? = null): HttpResponse<ByteArray> {
+        fun post(path: String, body: ByteArray = opaqueRequest, offer: String? = null, acceptEncoding: String? = null): HttpResponse<ByteArray> {
             val request = HttpRequest.newBuilder(URI("http://127.0.0.1:${proxy.port}$path"))
                 .timeout(Duration.ofSeconds(10)).POST(HttpRequest.BodyPublishers.ofByteArray(body))
                 .header("Content-Type", "application/jwt").header("DPoP", "original-dpop-proof")
                 .header("X-Forwarded-Host", "issuer.example")
+            acceptEncoding?.let { request.header("Accept-Encoding", it) }
             offer?.let {
                 val payload = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"sub\":\"$it\"}".toByteArray())
                 request.header("Authorization", "DPoP header.$payload.signature")
@@ -113,6 +137,28 @@ class IssuerDeferredProxyTest {
         assertFalse(receipts.contains("signature"))
         assertFalse(receipts.contains(second))
         assertFalse(receipts.contains("encrypted"))
+    }
+
+    @Test
+    fun compressedManagementReceiptsAreRegisteredWithoutChangingForwardedBytes() {
+        for (encoding in listOf("gzip", "deflate", "deflate-raw")) Fixture(offerEncoding = encoding).use { fixture ->
+            val response = fixture.post("/issuer2/credential-offers", "{\"deferred\":true}".toByteArray(),
+                acceptEncoding = if (encoding == "gzip") "br, gzip" else "deflate")
+            assertEquals(201, response.statusCode(), "HTTP $encoding management receipt must not become a proxy 502")
+            assertEquals(encoding.substringBefore('-'), response.headers().firstValue("Content-Encoding").orElseThrow())
+            assertContentEquals(fixture.encodedOfferResponse, response.body())
+            val input = ByteArrayInputStream(response.body())
+            val decoded = if (encoding == "gzip") GZIPInputStream(input).use { it.readAllBytes().decodeToString() }
+                else {
+                    val inflater = Inflater(encoding == "deflate-raw")
+                    try { InflaterInputStream(input, inflater).use { it.readAllBytes().decodeToString() } }
+                    finally { inflater.end() }
+                }
+            val offer = Json.parseToJsonElement(decoded).jsonObject.getValue("offerId").jsonPrimitive.content
+            assertEquals(202, fixture.post("/openid4vci/credential", offer = offer).statusCode())
+            assertEquals(200, fixture.post("/openid4vci/deferred_credential", offer = offer).statusCode())
+            readIssuerDeferredEvidence(fixture.evidence, listOf(offer)).requireComplete()
+        }
     }
 
     @Test

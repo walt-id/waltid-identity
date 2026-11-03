@@ -154,6 +154,10 @@ and then releases the original response unchanged. The suite subsequently collec
 from the advertised deferred endpoint. The proxy never decrypts or manufactures
 credentials; it preserves JWE bodies and DPoP headers and uses the verified access
 token's session subject only to correlate test traffic with registered offer IDs.
+Cloudflare requests compressed origin responses, so the proxy decodes a copy of
+gzip/deflate management receipts to read the offer ID. The original encoded receipt
+and its headers are forwarded unchanged. Proxy diagnostics contain only the method,
+known route, and exception class; CI includes this log in each proof artifact.
 
 For the existing local Docker/nginx setup, start issuer-api2 on host port 7005 with
 the conformance profiles and public base URL described above, then run from the
