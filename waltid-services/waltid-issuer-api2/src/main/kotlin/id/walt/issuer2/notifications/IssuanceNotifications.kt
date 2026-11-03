@@ -20,7 +20,9 @@ data class IssuanceNotifications(
     ) {
         init {
             require(url.isNotBlank()) { "webhook url must not be blank" }
-            require(signingSecret == null || signingSecret.isNotBlank()) { "signing_secret must not be blank" }
+            require(signingSecret == null || signingSecret.encodeToByteArray().size >= 32) {
+                "signing_secret must contain at least 32 UTF-8 bytes"
+            }
         }
     }
 }
