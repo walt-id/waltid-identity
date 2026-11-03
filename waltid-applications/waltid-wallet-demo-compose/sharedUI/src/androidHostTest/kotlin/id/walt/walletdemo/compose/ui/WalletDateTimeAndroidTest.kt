@@ -20,7 +20,7 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "en-rUS")
+@Config(sdk = [31, 35], qualifiers = "en-rUS")
 class WalletDateTimeAndroidTest {
     @Test
     fun cachedClaimRefreshesAfterTimeZoneAndClockPreferenceChanges() {

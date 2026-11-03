@@ -8,7 +8,6 @@ import android.text.format.DateFormat
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import id.walt.walletdemo.compose.logic.WalletDateTime
@@ -29,7 +28,8 @@ internal actual fun rememberWalletTimeFormatter(): (Instant) -> String {
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_LOCALE_CHANGED)
         }
-        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        // All actions are protected system broadcasts; no export flag or app permission is needed.
+        context.registerReceiver(receiver, filter)
         onDispose { context.unregisterReceiver(receiver) }
     }
     return remember(locale, revision) {
