@@ -5,6 +5,7 @@ package id.walt.wallet2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.AttestationChallengeGateway
 import id.walt.commons.testing.E2ETest
+import id.walt.commons.testing.LocalOAuthIdentityProvider
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TypedKeyGenerationRequest
@@ -36,7 +37,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.server.auth.*
-import io.ktor.server.response.respondRedirect
 import io.ktor.server.application.install
 import io.ktor.server.plugins.callid.CallId
 import io.ktor.server.request.receive
@@ -57,6 +57,7 @@ class Wallet2ClientAttestationChallengeIntegrationTest {
         val port = freePort()
         val baseUrl = "http://127.0.0.1:$port"
         AttestationChallengeGateway(baseUrl, responseOnly).use { gateway ->
+        LocalOAuthIdentityProvider().use { identityProvider ->
         HttpClient().use { oauthClient ->
         val redirectUri = "openid://challenge-callback"
         val issuerKey = runBlocking { JWKKey.generate(KeyType.secp256r1) }
@@ -120,8 +121,8 @@ class Wallet2ClientAttestationChallengeIntegrationTest {
                         client = oauthClient
                         urlProvider = { "${gateway.baseUrl}/openid4vci/external/oauth/callback" }
                         providerLookup = { OAuthServerSettings.OAuth2ServerSettings(
-                            name = "challenge-test-idp", authorizeUrl = "$baseUrl/test-idp/authorize",
-                            accessTokenUrl = "$baseUrl/test-idp/token", requestMethod = HttpMethod.Post,
+                            name = "challenge-test-idp", authorizeUrl = "${identityProvider.baseUrl}/authorize",
+                            accessTokenUrl = "${identityProvider.baseUrl}/token", requestMethod = HttpMethod.Post,
                             clientId = "local-issuer", clientSecret = "local-test-only", defaultScopes = listOf("openid"),
                         ) }
                     }
@@ -129,19 +130,6 @@ class Wallet2ClientAttestationChallengeIntegrationTest {
                 routing {
                     issuer.managementController.register(this)
                     issuer.openId4VciController.register(this)
-                    get("/test-idp/authorize") {
-                        call.respondRedirect(URLBuilder(requireNotNull(call.parameters["redirect_uri"])).apply {
-                            parameters.append("code", "test-login")
-                            parameters.append("state", requireNotNull(call.parameters["state"]))
-                        }.buildString())
-                    }
-                    post("/test-idp/token") {
-                        fun encoded(value: String) = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray())
-                        call.respond(buildJsonObject {
-                            put("access_token", "local-idp-token"); put("token_type", "Bearer")
-                            put("id_token", "${encoded("""{"alg":"none"}""")}.${encoded("""{"sub":"challenge-holder"}""")}.")
-                        })
-                    }
                     post("/test-attester") {
                         attesterCalls++
                         val jwk = call.receive<JsonObject>().getValue("jwk").jsonObject
@@ -240,6 +228,7 @@ class Wallet2ClientAttestationChallengeIntegrationTest {
                     }
                 }
             }
+        }
         }
         }
         }

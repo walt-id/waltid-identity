@@ -31,6 +31,7 @@ import id.waltid.openid4vci.wallet.authorization.RetryablePushedAuthorizationReq
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
@@ -490,8 +491,8 @@ class WalletIssuanceSessionService(
             keyId = selectedKeyId,
             did = request.did ?: wallet.defaultDid(),
             authorization = null,
-            attestationChallenge = resolved.discoveryHeaders["OAuth-Client-Attestation-Challenge"],
-            authorizationServerDpopNonce = resolved.discoveryHeaders["DPoP-Nonce"],
+            attestationChallenge = resolved.discoveryHeaders[CLIENT_ATTESTATION_CHALLENGE],
+            authorizationServerDpopNonce = resolved.discoveryHeaders[DPOP_NONCE_HEADER],
             state = SessionState.AWAITING_ACCEPTANCE,
             expiresAtEpochMilliseconds = nowEpochMilliseconds() +
                     sessionPolicy.reviewTtl.inWholeMilliseconds,

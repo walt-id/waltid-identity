@@ -7,6 +7,7 @@ import org.kotlincrypto.hash.sha2.SHA256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
@@ -34,6 +35,8 @@ class WalletIssuanceSessionState(
     private val challengeMutex = Mutex()
     internal var challengeNow: () -> Long = { Clock.System.now().toEpochMilliseconds() }
     private var lastChallengeSweep: Long? = null
+    private val pkceCorrelationLifetime = 10.minutes
+    private val challengeSweepInterval = 1.minutes
     private val challengeAccess = mutableMapOf<ChallengeScope, Long>()
     @Serializable
     private data class ChallengeScope(val issuer: String, val clientId: String, val keyThumbprint: String, val flowId: String)
@@ -47,7 +50,7 @@ class WalletIssuanceSessionState(
     ): ClientAttestationChallengeContext = challengeMutex.withLock {
         check(!closed) { "Wallet issuance is closed" }
         val now = challengeNow()
-        val cutoff = now - 10 * 60 * 1000
+        val cutoff = now - pkceCorrelationLifetime.inWholeMilliseconds
         challengeAccess.filter { (scope, touched) -> scope.flowId.startsWith("pkce:") && touched < cutoff }
             .keys.toList().forEach { challenges.remove(it); challengeAccess.remove(it) }
         val scope = ChallengeScope(issuer, clientId, keyThumbprint, flowId)
@@ -69,7 +72,7 @@ class WalletIssuanceSessionState(
             }
         }
         val lastSweep = lastChallengeSweep
-        if (lastSweep == null || now < lastSweep || now - lastSweep >= 60_000) {
+        if (lastSweep == null || now < lastSweep || now - lastSweep >= challengeSweepInterval.inWholeMilliseconds) {
             store?.list()?.forEach { record ->
                 if (record.updatedAtEpochMilliseconds < cutoff) {
                     val expired = record.sweepScope()

@@ -41,6 +41,7 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeContext
 import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
@@ -2197,7 +2198,7 @@ object WalletIssuanceHandler {
         val context = flowId?.let { wallet?.clientAttestationChallenges(asMetadata.issuer, clientId, key, it) }
             ?: ClientAttestationChallengeContext()
         if (restoredDiscovery) context.restore(
-            discoveryHeaders["OAuth-Client-Attestation-Challenge"], discoveryHeaders["DPoP-Nonce"])
+            discoveryHeaders[CLIENT_ATTESTATION_CHALLENGE], discoveryHeaders[DPOP_NONCE_HEADER])
         else context.observe(discoveryHeaders)
         val attestationJwt = assembler.obtainAttestationJwt(key, clientId)
         onAttestationObtained()
