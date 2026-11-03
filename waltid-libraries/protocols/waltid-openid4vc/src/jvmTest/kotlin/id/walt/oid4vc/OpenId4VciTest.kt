@@ -37,6 +37,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import kotlin.test.*
 import kotlin.time.Clock
 
@@ -885,6 +886,7 @@ class OpenId4VciTest {
         )
     }
 
+    @Disabled("Issuer not available any more")
     @Test
     fun testWalletRelatedIsolatedFunctions() = runTest {
         //
