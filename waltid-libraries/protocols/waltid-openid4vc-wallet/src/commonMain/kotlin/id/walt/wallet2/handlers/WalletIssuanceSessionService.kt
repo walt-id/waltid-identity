@@ -5,6 +5,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.selectJwsAlgorithm
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
@@ -61,8 +62,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
+import id.waltid.openid4vci.wallet.credential.CredentialEncryption
+import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
+import id.waltid.openid4vci.wallet.credential.isApplicationJwt
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -927,10 +931,25 @@ class WalletIssuanceSessionService(
                 val claimed = record.copy(claimed = true)
                 retainDeferred(claimed, preserveOnFailure = false)
                 record = claimed
+                val deferredPayload = buildJsonObject { put("transaction_id", request.transactionId) }
+                // Reuse the metadata resolved when the session started. A fresh fetch would drop the
+                // original Accept-Language and can change the negotiated encryption profile.
+                val issuerMetadata = request.issuerMetadataJson?.let { encoded ->
+                    json.decodeFromString<CredentialIssuerMetadata>(encoded)
+                } ?: request.credentialIssuer?.let { issuer ->
+                    IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer).metadata
+                }
+                val preparedRequest = try {
+                    CredentialEncryption.prepare(deferredPayload, issuerMetadata)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL, error)
+                }
                 val response = postProtected(
                     endpoint = request.endpoint, accessToken = request.accessToken, tokenType = request.tokenType,
                     dpop = request.dpop, keyMaterial = request.keyMaterial, dpopNonce = request.dpopNonce,
-                    body = buildJsonObject { put("transaction_id", request.transactionId) }.toString(),
+                    body = preparedRequest.body, contentType = preparedRequest.contentType,
                 )
                 ensureContinuationOwned(record.persistedSnapshot)
                 val updatedRequest = request.copy(dpopNonce = response.dpopNonce)
@@ -938,7 +957,7 @@ class WalletIssuanceSessionService(
                 stage = WalletIssuanceErrorCode.PROTOCOL
                 val legacyPending = response.response.status == HttpStatusCode.BadRequest && response.oauthError == "issuance_pending"
                 if (response.response.status == HttpStatusCode.Accepted || legacyPending) {
-                    val pendingBody = response.response.body<CredentialResponse>()
+                    val pendingBody = response.response.credentialResponse(preparedRequest.responseDecryptionKey, legacyPending)
                     val pending = if (legacyPending) pendingBody.validateLegacyDeferredPendingResponse(request.transactionId)
                         else pendingBody.validateCredentialResponse(response.response.status.value, request.transactionId)
                     record = record.copy(
@@ -958,7 +977,7 @@ class WalletIssuanceSessionService(
                     return failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_RESPONSE,
                         deferredCredentials = if (terminal) emptyList() else listOf(record.public))
                 }
-                val issued = response.response.body<CredentialResponse>()
+                val issued = response.response.credentialResponse(preparedRequest.responseDecryptionKey, legacyPending = false)
                     .validateCredentialResponse(response.response.status.value, request.transactionId)
                 val credentials = requireNotNull(issued.credentials)
                 val configured = request.validation as? DeferredResponseValidation.Configured
@@ -1498,6 +1517,7 @@ class WalletIssuanceSessionService(
         keyMaterial: WalletKeyStoreEntry,
         dpopNonce: String?,
         body: String,
+        contentType: ContentType = ContentType.Application.Json,
     ): ProtectedResponse {
         var nonce = dpopNonce
         repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
@@ -1520,7 +1540,8 @@ class WalletIssuanceSessionService(
                 httpClient.post(endpoint) {
                     header(HttpHeaders.Authorization, "${authorizationScheme(tokenType)} $accessToken")
                     proof?.let { header(DPOP_HEADER, it) }
-                    contentType(ContentType.Application.Json)
+                    if (contentType.isApplicationJwt()) acceptCredentialResponse()
+                    contentType(contentType)
                     setBody(body)
                 }
             } catch (error: CancellationException) {
@@ -1542,6 +1563,21 @@ class WalletIssuanceSessionService(
             return ProtectedResponse(response, suppliedNonce ?: nonce, oauthError)
         }
         error("DPoP nonce retry exhausted")
+    }
+
+    private suspend fun HttpResponse.credentialResponse(
+        responseDecryptionKey: Key?,
+        legacyPending: Boolean,
+    ): CredentialResponse {
+        if (responseDecryptionKey != null && !legacyPending && status.isSuccess()) {
+            require(contentType().isApplicationJwt()) {
+                "Encrypted deferred credential response must use application/jwt"
+            }
+            return json.decodeFromString(
+                CredentialEncryption.decryptResponse(bodyAsText(), responseDecryptionKey),
+            )
+        }
+        return body()
     }
 
     private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
@@ -1910,6 +1946,8 @@ class WalletIssuanceSessionService(
                             label = request.label,
                             metadata = request.metadata,
                             nextPollAtEpochMilliseconds = request.nextPollAtEpochMilliseconds,
+                            credentialIssuer = request.credentialIssuer,
+                            issuerMetadataJson = request.issuerMetadataJson,
                         ))
                     }
                 },
@@ -1987,6 +2025,9 @@ class WalletIssuanceSessionService(
         metadata: JsonObject?,
         sessionId: String = public.id,
         dpopNonce: String? = null,
+        credentialIssuer: String? = null,
+        /** Issuer metadata resolved for this issuance, including its encryption profile. */
+        issuerMetadataSnapshot: CredentialIssuerMetadata? = null,
     ) {
         retainDeferred(DeferredRecord(
             public = public,
@@ -2007,6 +2048,8 @@ class WalletIssuanceSessionService(
                 label = label,
                 metadata = metadata,
                 nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(public.intervalSeconds)),
+                credentialIssuer = credentialIssuer,
+                issuerMetadataJson = issuerMetadataSnapshot?.let { json.encodeToString(it) },
             )),
         ))
     }
@@ -2053,6 +2096,8 @@ class WalletIssuanceSessionService(
                     keyMaterial = senderKey,
                     keyId = it.keyId, selectedPublicJwk = it.selectedPublicJwk, label = it.label, metadata = it.metadata,
                     nextPollAtEpochMilliseconds = it.nextPollAtEpochMilliseconds,
+                    credentialIssuer = it.credentialIssuer,
+                    issuerMetadataJson = it.issuerMetadataJson,
                 ))
             }
         }
@@ -2276,6 +2321,8 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val credentialIssuer: String? = null,
+        val issuerMetadataJson: String? = null,
     )
 
     private data class ProtectedResponse(
@@ -2403,6 +2450,8 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val credentialIssuer: String? = null,
+        val issuerMetadataJson: String? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(

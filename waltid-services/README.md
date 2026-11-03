@@ -43,6 +43,18 @@
 
 This directory contains production-ready services built on top of the walt.id libraries. These services provide complete, deployable solutions for credential issuance, verification, wallet management, and testing infrastructure.
 
+Please note that these services are treated as reference implementations of our libraries. They may not implement the best practices in terms of security, performance, or scalability. They are not intended to be used "as-is" in production environments.
+
+Common extensiones required for production use are:
+- Authentication and authorization
+- Rate limiting
+- Improved logging & monitoring
+- Performance optimization
+- Security best practices
+- Scalability
+
+If you are looking for a production-ready service, we recommend looking into our [enterprise stack](https://walt.id/enterprise-stack) offering, which includes all of these services and more with the best practices and production-ready features implemented.
+
 ## Services
 
 ### Core Services

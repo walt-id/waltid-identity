@@ -7,6 +7,7 @@ import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.WebhookDestinationNotAllowedException
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataProfile
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
@@ -40,6 +41,18 @@ import kotlinx.serialization.serializer
 
 
 private val log = logger("Verifier2Service")
+
+private data class VicalFetchSettings(val enabled: Boolean, val allowPrivateNetworks: Boolean)
+
+/**
+ * Absent configuration is the embedded and test case: fetch enabled, private networks refused.
+ */
+private fun vicalFetchSettings(): VicalFetchSettings = try {
+    val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
+    VicalFetchSettings(config.vicalFetchEnabled, config.allowPrivateNetworkVical)
+} catch (_: IllegalArgumentException) {
+    VicalFetchSettings(true, false)
+}
 private const val VERIFICATION_SESSION = "verification-session"
 private const val VICAL = "vical"
 private const val ENVELOPE_QUERY_PARAM = "envelope"
@@ -63,7 +76,7 @@ enum class Verifier2RouteSurface {
     /** `GET transaction-data-profiles` - discloses the configured transaction data profiles. */
     TRANSACTION_DATA_PROFILES,
 
-    /** `POST vical/fetch` (fetches a caller-supplied http(s) URL) and `POST vical/validate`. */
+    /** `POST vical/fetch` (http and https only, unless disabled) and `POST vical/validate`. */
     VICAL,
     ;
 
@@ -119,6 +132,8 @@ object Verifier2Service {
             Verifier2SessionUpdate(publicSession.id, event, publicSession)
                 .toKtorSessionUpdate()
                 .notifySessionUpdate(publicSession.id, notificationConfig)
+        } catch (exception: WebhookDestinationNotAllowedException) {
+            log.warn { "Could not deliver verification session notification for ${updated.id}: ${exception.message}" }
         } catch (exception: Exception) {
             log.warn(exception) { "Could not deliver verification session notification for ${updated.id}" }
         }
@@ -323,8 +338,9 @@ object Verifier2Service {
             route("", {
                 tags("VICAL")
             }) {
-                post("fetch", {
-                    summary = "Fetches a VICAL over HTTP(S) and returns it Base64-encoded"
+                val fetchSettings = vicalFetchSettings()
+                if (fetchSettings.enabled) post("fetch", {
+                    summary = "Fetches an http(s) VICAL and returns it Base64-encoded."
                     request {
                         body<VicalFetchRequest> {
                             example("Remote VICAL") {
@@ -335,8 +351,13 @@ object Verifier2Service {
                     response { HttpStatusCode.OK to { body<VicalFetchResponse>() } }
                 }) {
                     val vicalFetchRequest = call.receive<VicalFetchRequest>()
-                    val vicalCbor = withContext(Dispatchers.IO) { fetchBinaryFile(vicalFetchRequest.vicalUrl) }
-                    call.respond(VicalFetchResponse(vicalCbor?.encodeToBase64()))
+                    val vicalCbor = withContext(Dispatchers.IO) {
+                        fetchBinaryFile(
+                            url = vicalFetchRequest.vicalUrl,
+                            allowPrivateNetworks = fetchSettings.allowPrivateNetworks,
+                        )
+                    }
+                    call.respond(VicalFetchResponse(vicalCbor.encodeToBase64()))
                 }
 
                 post("validate", {

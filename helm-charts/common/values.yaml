@@ -18,6 +18,7 @@ configFiles: {}
 
 # Plain container environment variables (name: value). Used by workloads that
 # configure via env vars instead of mounted config files (e.g. the portals).
+# Values support Helm templating (tpl), e.g. https://{{ .Values.ingress.host }}.
 env: {}
 
 # Names of pre-existing Kubernetes secrets whose keys are injected as env vars.
