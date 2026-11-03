@@ -20,7 +20,7 @@ internal fun DigitalCredential.statusAudience(): String = when (this) {
 }
 
 internal fun JsonElement?.requireIetfStatusClaim(audience: String): JsonElement? {
-    if (this == null || this is JsonNull) return null
+    if (this == null) return null
     val status = this as? JsonObject ?: throw IllegalArgumentException(
         "$audience status claim must be a JSON object with status_list, but was ${jsonValueKind(this)}."
     )

@@ -64,8 +64,12 @@ class CredentialStatusVariantTest {
     }
 
     @Test
-    fun `sd-jwt with a null status claim reports that nothing can be evaluated`() = runTest {
-        assertStatusUnavailable(sdJwt(statusJson = "null"))
+    fun `sd-jwt with an explicit null status claim fails because null is not a status object`() = runTest {
+        val result = policy.verify(CredentialParser.parseOnly(sdJwt(statusJson = "null")))
+        assertEquals(
+            "SD-JWT VC status claim must be a JSON object with status_list, but was null.",
+            result.exceptionOrNull()?.message,
+        )
     }
 
     @Test
