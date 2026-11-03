@@ -54,8 +54,6 @@ jobs:
           # Copy the file to modify it
           cp $HELM_VALUES_PATH helm-values.json
 
-          sed -i 's#"authConf": .*#"authConf": ${{ secrets.WALLET_AUTH_SECRET }}#g' helm-values.json
-
           if [ -z "$WALLET2_AUTH_SIGNING_KEY" ]; then
             echo "::error::WALLET2_AUTH_SIGNING_KEY is not set. Add it to the repository secrets as a walt.id key JSON, e.g. {\"type\":\"jwk\",\"jwk\":{...}}."
             echo "Deploy aborted: WALLET2_AUTH_SIGNING_KEY is not set." >> $GITHUB_STEP_SUMMARY
@@ -67,15 +65,10 @@ jobs:
           mv helm-values.patched.json helm-values.json
 
           # Update domain names in the file
-          sed -i "s/issuer\.portal\.test\.waltid\.cloud/issuer.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/issuer2\.portal\.test\.waltid\.cloud/issuer2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
-          sed -i "s/verifier\.portal\.test\.waltid\.cloud/verifier.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/verifier2\.portal\.test\.waltid\.cloud/verifier2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/wallet2\.test\.waltid\.cloud/wallet2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
-          sed -i "s/wallet\.test\.waltid\.cloud/wallet.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/portal2\.test\.waltid\.cloud/portal2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
-          sed -i "s/portal\.test\.waltid\.cloud/portal.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
-          sed -i "s/wallet-dev\.test\.waltid\.cloud/wallet-dev.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
 
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
@@ -146,13 +139,8 @@ jobs:
           echo "## Deployment URLs" >> $GITHUB_STEP_SUMMARY
           echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
-          echo "| Issuer | https://issuer.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Issuer2 | https://issuer2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
-          echo "| Verifier | https://verifier.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Verifier2 | https://verifier2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
-          echo "| Wallet | https://wallet.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet (Compose web) | https://wallet2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet API2 (same host as above) | https://wallet2.${VERSION}.waltid.cloud/swagger |" >> $GITHUB_STEP_SUMMARY
-          echo "| Wallet Dev | https://wallet-dev.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
-          echo "| Portal | https://portal.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Portal2 | https://portal2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY

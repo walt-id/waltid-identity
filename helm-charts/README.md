@@ -1,6 +1,6 @@
 # Waltid Helm Chart
 
-This Helm chart deploys the Waltid stack, which consists of various applications including the issuer API, verifier API, web portal, VC (Verifiable Credential) repository, wallet API and wallet web application.
+This Helm chart deploys the Waltid stack, which consists of the issuer API2, verifier API2, web portal2, wallet API2 and the Compose web wallet.
 
 ## Prerequisites
 
