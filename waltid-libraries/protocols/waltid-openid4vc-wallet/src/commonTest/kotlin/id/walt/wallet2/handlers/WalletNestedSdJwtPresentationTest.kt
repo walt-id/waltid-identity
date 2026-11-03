@@ -314,6 +314,28 @@ class WalletNestedSdJwtPresentationTest {
     }
 
     @Test
+    fun pidNationalitiesArePresentedThroughNull() = runTest {
+        // EUDI PID shape (eu-digital-identity-wallet/eudi-lib-android-wallet-core#287): the nationalities array
+        // and each of its elements are selectively disclosable
+        val pid = sdJwt { payload { putJsonArray("_sd") { add(property("nationalities", buildJsonArray { add(element("US")); add(element("NL")) })) } } }
+
+        // request: ["nationalities"]
+        // sent:    nationalities
+        // sees:    nationalities = []   (the path selects the array, not its elements)
+        val array = present(request(claim("nationalities")), credential = pid)
+        assertEquals(json("[]"), array.verifierView["nationalities"])
+        assertEquals(json("[]"), array.previewValue(""""nationalities""""))
+
+        // request: ["nationalities", null]
+        // sent:    nationalities, element 0, element 1
+        // sees:    nationalities = ["US", "NL"]
+        val elements = present(request(claim("nationalities", null)), credential = pid)
+        assertEquals(json("""["US", "NL"]"""), elements.verifierView["nationalities"])
+        assertEquals(json("""["US", "NL"]"""), elements.previewValue(""""nationalities".null"""))
+        assertEquals("nationalities", elements.previewName(""""nationalities".null"""))
+    }
+
+    @Test
     fun indexPresentsThatElementWithTheDisclosuresContainingIt() = runTest {
         // request: ["nationalities", 0]
         // sent:    nationalities, element 0
