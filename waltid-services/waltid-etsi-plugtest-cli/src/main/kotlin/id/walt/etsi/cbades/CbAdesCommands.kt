@@ -90,7 +90,7 @@ class CbAdesGenerateCommand : CliktCommand(name = "generate") {
 
     override fun run() = runBlocking {
         plugtestHttpClient().use { http ->
-            val transport = KtorAdesTransport(http)
+            val transport = KtorAdesTransport(http, ::checkPlugtestUrl)
             val pki = LocalPlugtestPki(signing.pkiDir, signing.participant)
             val extraChain = signing.chain.flatMap { Pem.certificates(it.readBytes()) }
             val main = signing.p12?.let { CbAdesCredentials.fromPkcs12(it, (signing.p12Password ?: error("--p12-password required")).toCharArray(), extraChain) }
@@ -146,8 +146,8 @@ class CbAdesVerifyCommand : CliktCommand(name = "verify") {
         val (anchorsData, extraData) = loadTrust(listOfNotNull(File(dir, "Data").takeIf { it.isDirectory }, File(dir, "trust").takeIf { it.isDirectory }) + trust)
         echo("Trust anchors: ${anchorsData.joinToString { it.subject.commonName ?: it.subject.toString() }}")
         plugtestHttpClient().use { http ->
-            val transport = if (offline) null else KtorAdesTransport(http)
-            val validator = CbAdesValidator(AdesValidationPolicy(trustAnchors = anchorsData, transport = transport, additionalValidationData = extraData))
+            val transport = if (offline) null else KtorAdesTransport(http, ::checkPlugtestUrl)
+            val validator = CbAdesValidator(AdesValidationPolicy(trustAnchors = anchorsData, transport = transport, additionalValidationData = extraData), documentResolver = transport?.let(DocumentResolver::http))
             val outDir = File(output, participant).apply { mkdirs() }
             val written = mutableListOf<File>()
             val folders = dir.listFiles()!!.filter { it.isDirectory && it.name !in setOf("Data", "trust") }
@@ -181,7 +181,7 @@ class CbAdesAugmentCommand : CliktCommand(name = "augment") {
     override fun run() = runBlocking {
         val dir = extractIfZip(packageFile)
         plugtestHttpClient().use { http ->
-            val transport = KtorAdesTransport(http)
+            val transport = KtorAdesTransport(http, ::checkPlugtestUrl)
             val pki = LocalPlugtestPki(signing.pkiDir, signing.participant)
             val (anchors, extra) = loadTrust(listOfNotNull(File(dir, "Data").takeIf { it.isDirectory }, File(dir, "trust").takeIf { it.isDirectory }) + signing.trust)
             val signer = CbAdesSigner(
@@ -220,7 +220,14 @@ class CbAdesAugmentCommand : CliktCommand(name = "augment") {
 }
 
 /** Bounded timeouts: a single unresponsive OCSP/CRL/TSA endpoint must not stall a whole plugtest run. */
+// Operator-driven plugtest tooling permits HTTP(S) endpoints from the downloaded test package.
+// Services validating untrusted documents must use a DNS-aware outbound URL policy instead.
+internal fun checkPlugtestUrl(url: String) {
+    require(url.startsWith("https://") || url.startsWith("http://")) { "Unsupported plugtest URL: $url" }
+}
+
 internal fun plugtestHttpClient() = HttpClient(Java) {
+    followRedirects = false
     install(HttpTimeout) {
         connectTimeoutMillis = 10.seconds.inWholeMilliseconds
         requestTimeoutMillis = 30.seconds.inWholeMilliseconds

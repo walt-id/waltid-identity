@@ -49,7 +49,7 @@ class JadesValidator(
         detachedObjects: List<DetachedObject> = emptyList(),
     ): DocumentValidationResult {
         val resolver = DetachedContentResolver.chain(
-            DetachedContentResolver.of(detachedObjects), contentResolver, policy.transport?.let(DetachedContentResolver::http),
+            DetachedContentResolver.of(detachedObjects), contentResolver,
         )
         val documentChecks = mutableListOf<ValidationCheck>()
         if (document.serialization == JadesSerialization.JSON_GENERAL && document.signatures.map { it.base64UrlPayload }.distinct().size > 1) {

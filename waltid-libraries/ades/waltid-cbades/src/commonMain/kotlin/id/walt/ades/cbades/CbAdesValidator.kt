@@ -30,7 +30,7 @@ import kotlin.time.Instant
 /** Validates CB-AdES signatures (ETSI TS 119 152-1) using the EN 319 102-1 processes of waltid-ades-core. */
 class CbAdesValidator(
     private val policy: AdesValidationPolicy = AdesValidationPolicy(),
-    private val documentResolver: DocumentResolver? = policy.transport?.let(DocumentResolver::http),
+    private val documentResolver: DocumentResolver? = null,
     private val externalAad: ByteArray = ByteArray(0),
     /** Fetch signature policy documents referenced by spURI when not stored in sigPSt. */
     private val fetchSignaturePolicies: Boolean = policy.transport != null,

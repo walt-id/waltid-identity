@@ -13,6 +13,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             api(identityLibs.kotlinx.serialization.json)
             api(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.coroutines.core)
