@@ -127,21 +127,33 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
     }
 
     func isResizing(_ owner: UIViewController) -> Bool {
-        guard resizeLink != nil, resizingSheet === owner.sheetPresentationController else { return false }
+        resizeLink != nil && resizingSheet === owner.sheetPresentationController
+    }
+
+    func geometryIsSettled(_ owner: UIViewController) -> Bool {
         // UIKit also animates containers above the content host. Its bounds can settle
         // before those containers finish moving or scaling, so focus must wait for both.
         // Observe only the sheet's ancestor chain, excluding content such as loading spinners.
         let container = owner.sheetPresentationController?.containerView?.layer
         var layer: CALayer? = owner.view.layer
         while let current = layer {
-            guard let rendered = current.presentation() else { return true }
-            if !(current.animationKeys() ?? []).isEmpty || rendered.bounds != current.bounds
-                || rendered.position != current.position
-                || !CATransform3DEqualToTransform(rendered.transform, current.transform) { return true }
+            guard let rendered = current.presentation() else { return false }
+            // Animation keys can outlive their animation. Compare visible geometry instead,
+            // allowing only numerical round-off in Core Animation's presentation copy.
+            guard geometry(current).elementsEqual(geometry(rendered), by: { abs($0 - $1) < 0.000001 }) else { return false }
             if current === container { break }
             layer = current.superlayer
         }
-        return false
+        return true
+    }
+
+    private func geometry(_ layer: CALayer) -> [CGFloat] {
+        let bounds = layer.bounds, position = layer.position, transform = layer.transform
+        return [bounds.minX, bounds.minY, bounds.width, bounds.height, position.x, position.y,
+                transform.m11, transform.m12, transform.m13, transform.m14,
+                transform.m21, transform.m22, transform.m23, transform.m24,
+                transform.m31, transform.m32, transform.m33, transform.m34,
+                transform.m41, transform.m42, transform.m43, transform.m44]
     }
 
     func update(page: WalletSheetPageMeasurement.Controller, height: CGFloat, owner: UIViewController, animated: Bool) {
@@ -205,6 +217,7 @@ private final class WalletSheetSizingCoordinator: ObservableObject {
 private final class WalletSheetResizeObserver: NSObject {
     private weak var sizing: WalletSheetSizingCoordinator?
     private weak var owner: UIViewController?
+    private var settledOnPreviousFrame = false
 
     init(sizing: WalletSheetSizingCoordinator, owner: UIViewController) {
         self.sizing = sizing
@@ -213,8 +226,14 @@ private final class WalletSheetResizeObserver: NSObject {
 
     @objc func frame(_ link: CADisplayLink) {
         guard let sizing else { link.invalidate(); return }
-        if let owner, owner.view.window != nil, owner.presentingViewController != nil,
-           sizing.isResizing(owner) { return }
+        if let owner, owner.view.window != nil, owner.presentingViewController != nil {
+            let settled = sizing.geometryIsSettled(owner)
+            let finished = settled && settledOnPreviousFrame
+            settledOnPreviousFrame = settled
+            // Keep measurements out of the resize until the rendered target has survived
+            // a display boundary. A replacement page then measures its latest content once.
+            guard finished else { return }
+        }
         sizing.finishResize(link)
     }
 }

@@ -7,11 +7,50 @@ import XCTest
 
 @MainActor
 final class WalletSheetSizingTests: XCTestCase {
+    func testCompletedContainerAnimationDoesNotKeepTheSheetUnready() async throws {
+        guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
+        let model = SheetModel()
+        model.acceptsFocus = false
+        let presentation = try await SheetPresentation(model: model)
+        defer { presentation.close() }
+        let initial = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in model.layoutReady }, object: nil)
+        await fulfillment(of: [initial], timeout: 5)
+
+        let host = presentation.host
+        let container = try XCTUnwrap(host.view.superview).layer
+        let key = "retained-sheet-container-animation"
+        defer { container.removeAnimation(forKey: key) }
+        let settling = CABasicAnimation(keyPath: "opacity")
+        settling.fromValue = 0.5
+        settling.toValue = container.opacity
+        settling.duration = 0.25
+        // Core Animation may retain a completed animation for reuse. Its presence
+        // does not mean the sheet is still moving or that its controls are unusable.
+        settling.isRemovedOnCompletion = false
+        settling.fillMode = .forwards
+        container.add(settling, forKey: key)
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            model.layoutReady && host.view.bounds.height < 400
+        }, object: nil)
+        model.replacement = true
+
+        let rendered = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard let content = host.view.layer.presentation(), let enclosing = container.presentation() else { return false }
+            return host.view.bounds.height < 400
+                && abs(content.bounds.height - host.view.bounds.height) < 1
+                && abs(enclosing.position.y - container.position.y) < 1
+                && abs(enclosing.opacity - container.opacity) < 0.001
+        }, object: nil)
+        await fulfillment(of: [rendered], timeout: 5)
+        XCTAssertNotNil(container.animation(forKey: key), "Exercise a completed animation that remains attached")
+        await fulfillment(of: [ready], timeout: 2)
+    }
+
     func testSuccessDismissalAllowsFiveSecondsAfterTheSheetSettles() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
         model.acceptsFocus = false
-        let presentation = try SheetPresentation(model: model)
+        let presentation = try await SheetPresentation(model: model)
         defer { model.didSettle = nil; model.didDismiss = nil; presentation.close() }
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in model.layoutReady }, object: nil)
         await fulfillment(of: [ready], timeout: 5)
@@ -44,7 +83,7 @@ final class WalletSheetSizingTests: XCTestCase {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
         model.acceptsFocus = false
-        let presentation = try SheetPresentation(model: model)
+        let presentation = try await SheetPresentation(model: model)
         defer { presentation.host.didLayout = nil; model.didSettle = nil; presentation.close() }
         let host = presentation.host
         let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -91,7 +130,7 @@ final class WalletSheetSizingTests: XCTestCase {
     func testWithdrawnAutofocusCannotRunAfterTheResize() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
-        let presentation = try SheetPresentation(model: model)
+        let presentation = try await SheetPresentation(model: model)
         defer { model.didFocus = nil; presentation.close() }
         let host = presentation.host
         let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -117,7 +156,7 @@ final class WalletSheetSizingTests: XCTestCase {
     func testAutofocusWaitsForTheManualSheetToFinishResizing() async throws {
         guard #available(iOS 16, *) else { throw XCTSkip("Custom sheet detents require iOS 16") }
         let model = SheetModel()
-        let presentation = try SheetPresentation(model: model)
+        let presentation = try await SheetPresentation(model: model)
         defer { model.didFocus = nil; presentation.close() }
         let host = presentation.host
         let initialSize = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -192,8 +231,16 @@ private final class SheetPresentation {
     private let window: UIWindow
     private let previousWindow: UIWindow?
 
-    init(model: SheetModel) throws {
-        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+    init(model: SheetModel) async throws {
+        // XCTest can enter the first test before SwiftUI connects the app's scene.
+        // Present only after a real foreground window exists, rather than racing launch.
+        func activeScene() -> UIWindowScene? {
+            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+                .first { $0.activationState == .foregroundActive && $0.keyWindow != nil }
+        }
+        let connected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in activeScene() != nil }, object: nil)
+        await XCTWaiter.fulfillment(of: [connected], timeout: 5)
+        let scene = try XCTUnwrap(activeScene(), "The test app needs a foreground window before presenting a sheet")
         previousWindow = scene.keyWindow
         window = UIWindow(windowScene: scene)
         host = SheetHostingController(rootView: SheetContent(model: model))
