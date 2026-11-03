@@ -89,6 +89,7 @@ internal fun mdlFixtureCredential(credentialData: String): MdocsCredential = run
         ),
         validFrom = now,
         validUntil = now + MDL_FIXTURE_MSO_VALIDITY,
+        signedAt = now,
     )
     MdocsCredential(
         credentialData = data,
