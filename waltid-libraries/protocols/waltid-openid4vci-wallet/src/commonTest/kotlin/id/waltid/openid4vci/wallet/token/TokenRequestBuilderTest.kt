@@ -813,4 +813,50 @@ class TokenRequestBuilderTest {
             proofInputs,
         )
     }
+    @Test
+    fun independentChallengeBudgetsRecoverInEitherOrderAndPreserveTheGrant() = runTest {
+        for (errors in listOf(
+            listOf("use_attestation_challenge", "use_dpop_nonce"),
+            listOf("use_dpop_nonce", "use_attestation_challenge"),
+            listOf("use_attestation_challenge", "use_attestation_challenge"),
+            listOf("use_dpop_nonce", "use_dpop_nonce"),
+        )) {
+            val context = id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeContext()
+            val forms = mutableListOf<String>()
+            val pops = mutableListOf<String?>()
+            val nonces = mutableListOf<String?>()
+            val client = createMockClient { request ->
+                forms += request.bodyText()
+                pops += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+                val error = errors.getOrNull(forms.lastIndex)
+                if (error == null) respond("""{"access_token":"access","token_type":"DPoP"}""",
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                else respond("""{"error":"$error"}""", HttpStatusCode.BadRequest,
+                    headersOf(HttpHeaders.ContentType to listOf("application/json"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-${forms.size}"),
+                        "DPoP-Nonce" to listOf("nonce-${forms.size}")))
+            }
+            suspend fun exchange() = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+                tokenEndpoint = tokenEndpoint, code = "single-use-code", codeVerifier = "same-verifier",
+                attestationHeadersFactory = {
+                    ClientAttestationHeaders("same-attestation", "pop-${forms.size}-${context.challenge}")
+                },
+                dpopProofFactory = { _, nonce -> nonces += nonce; "dpop-${forms.size}" },
+                onResponseHeaders = context::observe,
+            )
+            if (errors.distinct().size == 2) {
+                assertEquals("access", exchange().access_token)
+                assertEquals(3, forms.size)
+                assertEquals(listOf(null, "nonce-1", "nonce-2"), nonces)
+                assertTrue(pops[2]!!.endsWith("challenge-2"))
+            } else {
+                assertFailsWith<TokenRequestException> { exchange() }
+                assertEquals(2, forms.size)
+            }
+            assertEquals(1, forms.distinct().size)
+            assertEquals(forms.size, pops.distinct().size)
+            client.close()
+        }
+    }
+
 }

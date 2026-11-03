@@ -1,5 +1,16 @@
 package id.walt.wallet2.handlers
 
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeContext
+import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeResult
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import org.kotlincrypto.hash.sha2.SHA256
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -19,7 +30,143 @@ class WalletIssuanceSessionState(
     internal val deferred = LinkedHashMap<String, WalletIssuanceSessionService.DeferredRecord>()
     internal val pollingDeferred = mutableSetOf<String>()
 
+    // Owned by this wallet generation; never shared through a process-global issuer cache.
+    private val challenges = LinkedHashMap<ChallengeScope, ClientAttestationChallengeContext>()
+    private val challengeMutex = Mutex()
+    internal var challengeNow: () -> Long = { Clock.System.now().toEpochMilliseconds() }
+    private var lastChallengeSweep: Long? = null
+    private val pkceCorrelationLifetime = 10.minutes
+    private val challengeSweepInterval = 1.minutes
+    private val challengeAccess = mutableMapOf<ChallengeScope, Long>()
+    @Serializable
+    private data class ChallengeScope(val issuer: String, val clientId: String, val keyThumbprint: String, val flowId: String)
+    @Serializable
+    private data class PersistedFreshness(val scope: ChallengeScope, val challenge: String?, val dpopNonce: String?, val prepared: Boolean = false)
+
+    internal suspend fun challengeContext(
+        issuer: String, clientId: String, keyThumbprint: String,
+        initialChallenge: String? = null, initialDpopNonce: String? = null,
+        flowId: String,
+    ): ClientAttestationChallengeContext = challengeMutex.withLock {
+        check(!closed) { "Wallet issuance is closed" }
+        val now = challengeNow()
+        val cutoff = now - pkceCorrelationLifetime.inWholeMilliseconds
+        challengeAccess.filter { (scope, touched) -> scope.flowId.startsWith("pkce:") && touched < cutoff }
+            .keys.toList().forEach { challenges.remove(it); challengeAccess.remove(it) }
+        val scope = ChallengeScope(issuer, clientId, keyThumbprint, flowId)
+        // Requested stateless scopes expire promptly, independently of background sweep timing.
+        if (flowId.startsWith("pkce:")) {
+            while (true) {
+                val record = store?.get(scope.recordId()) ?: break
+                if (record.updatedAtEpochMilliseconds >= cutoff) break
+                val freshness = Json.decodeFromString<PersistedFreshness>(record.payload)
+                require(record.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS &&
+                    record.sessionId == record.id && freshness.scope == scope)
+                if (compareAndSet(record, null)) {
+                    challenges.remove(scope)
+                    challengeAccess.remove(scope)
+                    break
+                }
+                currentCoroutineContext().ensureActive()
+                yield()
+            }
+        }
+        val lastSweep = lastChallengeSweep
+        if (lastSweep == null || now < lastSweep || now - lastSweep >= challengeSweepInterval.inWholeMilliseconds) {
+            store?.list()?.forEach { record ->
+                if (record.updatedAtEpochMilliseconds < cutoff) {
+                    val expired = record.sweepScope()
+                    if (expired != null && expired.flowId.startsWith("pkce:") && compareAndSet(record, null)) {
+                        challenges.remove(expired)
+                        challengeAccess.remove(expired)
+                    }
+                }
+            }
+            lastChallengeSweep = now
+        }
+        challengeAccess[scope] = now
+        challenges.getOrPut(scope) {
+            // Prior wallet-wide records must never mark a new issuance flow as prepared.
+            val id = scope.recordId()
+            var snapshot: WalletIssuanceSessionRecord? = null
+            fun decode(record: WalletIssuanceSessionRecord?): PersistedFreshness {
+                if (record == null) return PersistedFreshness(scope, null, null)
+                require(record.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS && record.sessionId == id)
+                return Json.decodeFromString<PersistedFreshness>(record.payload).also {
+                    require(it.scope == scope) { "Stored attestation freshness scope is invalid" }
+                }
+            }
+            fun PersistedFreshness.result() = WalletAttestationChallengeResult(challenge, dpopNonce, prepared)
+            suspend fun persist(challenge: String?, nonce: String?, onlyIfAbsent: Boolean, prepared: Boolean): WalletAttestationChallengeResult {
+                val backingStore = requireNotNull(store)
+                var expected = snapshot
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val current = decode(expected)
+                    val next = PersistedFreshness(scope,
+                        if (onlyIfAbsent) current.challenge ?: challenge else challenge ?: current.challenge,
+                        if (onlyIfAbsent) current.dpopNonce ?: nonce else nonce ?: current.dpopNonce,
+                        current.prepared || prepared)
+                    if (next == current) {
+                        snapshot = expected
+                        return current.result()
+                    }
+                    val replacement = WalletIssuanceSessionRecord(id, id,
+                        WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS,
+                        Json.encodeToString(next),
+                        maxOf(Clock.System.now().toEpochMilliseconds(), (expected?.updatedAtEpochMilliseconds ?: 0) + 1))
+                    val written = if (expected == null) putIfAbsent(replacement) else compareAndSet(expected, replacement)
+                    if (written) {
+                        snapshot = replacement
+                        return next.result()
+                    }
+                    // Serialize overlapping observations by successful writes. Rebase only supplied
+                    // fields, preserving the other response's independent freshness value. Restored
+                    // snapshots remain fill-only even if a live response won the race.
+                    expected = backingStore.get(id)
+                    yield()
+                }
+            }
+            ClientAttestationChallengeContext(
+                load = { snapshot = store?.get(id); snapshot?.let { decode(it).result() } },
+                persist = if (store == null) null else ::persist,
+            )
+        }.also { it.restore(initialChallenge, initialDpopNonce) }
+    }
+
+    private fun ChallengeScope.recordId() = "attestation-flow:" +
+        SHA256().digest(Json.encodeToString(this).encodeToByteArray()).encodeToBase64Url()
+
+    private fun WalletIssuanceSessionRecord.sweepScope(): ChallengeScope? {
+        if (kind != WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS ||
+            !id.startsWith("attestation-flow:") || sessionId != id) return null
+        return runCatching { Json.decodeFromString<PersistedFreshness>(payload).scope }
+            .getOrNull()?.takeIf { it.recordId() == id }
+    }
+
+    internal suspend fun removeChallengeFlow(flowId: String) = challengeMutex.withLock {
+        challenges.keys.removeAll { it.flowId == flowId }
+        challengeAccess.keys.removeAll { it.flowId == flowId }
+        store?.list()?.filter { it.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS &&
+            it.id.startsWith("attestation-flow:") }?.forEach { record ->
+            if (record.sweepScope()?.flowId == flowId) {
+                compareAndSet(record, null)
+            }
+        }
+    }
+
+    internal suspend fun clearChallenges() = challengeMutex.withLock { challenges.clear(); challengeAccess.clear() }
+
     private val storeUpdates = Mutex()
+
+    private suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean {
+        val backingStore = requireNotNull(store)
+        if (backingStore is AtomicWalletIssuanceSessionCreationStore) return backingStore.putIfAbsent(record)
+        // Released adapters retain their existing single-runtime coordination contract.
+        return storeUpdates.withLock {
+            if (backingStore.get(record.id) != null) false else { backingStore.put(record); true }
+        }
+    }
 
     internal suspend fun compareAndSet(
         expected: WalletIssuanceSessionRecord,

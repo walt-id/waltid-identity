@@ -1,5 +1,11 @@
 # Unreleased
 
+### Wallet2 client attestation compatibility
+
+Client attestation freshness adds `CLIENT_ATTESTATION_FRESHNESS` to the public issuance-record enum. Exhaustive enum consumers must handle this value. Storage is forward-only: older library/service versions cannot read a wallet store containing these records. Downgrading or sharing that store with older readers is unsupported while freshness records remain. No database schema migration is required.
+
+Authorization server discovery now checks the issuer identifier exactly, including trailing slashes, through both legacy and detailed resolver methods. A mismatch raises `AuthorizationServerIssuerMismatchException` immediately; it is not treated as a parse failure or retried through another discovery document. HTTP, network and parse fallback remains supported.
+
 ### Breaking: `waltid-dcql-jvm` ABI
 
 `DcqlDisclosure` now includes optional `location: List<JsonElement>? = null`. Kotlin source that used the two-argument constructor or `copy` remains valid because of the default. JVM consumers compiled against `waltid-dcql-jvm` 1.0.0 must rebuild: constructor and `copy` descriptors change from `(Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)` to three-argument forms. This is an approved breaking release; there is no dual-ABI shim.
