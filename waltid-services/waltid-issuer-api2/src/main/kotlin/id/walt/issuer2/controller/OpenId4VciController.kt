@@ -150,7 +150,8 @@ class OpenId4VciController(
             }
         }
 
-        route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
+        // Tag operations individually: the VCT lookup shares this path prefix but belongs to SD-JWT VC.
+        route.route("openid4vci", {}) {
             if (Issuer2RouteSurface.METADATA in surfaces) get(Issuer2EndpointPaths.JWKS, OpenId4VciRoutesDocs.jwks()) {
                 call.respond(metadataService.listJwks())
             }

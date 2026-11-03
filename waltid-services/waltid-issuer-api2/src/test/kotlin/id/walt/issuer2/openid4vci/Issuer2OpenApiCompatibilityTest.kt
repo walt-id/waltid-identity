@@ -55,6 +55,27 @@ class Issuer2OpenApiCompatibilityTest {
         fun body(operation: JsonObject) = operation.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("schema")
         val paths = specification.getValue("paths").jsonObject
+        for (path in listOf(
+            "/.well-known/jwt-vc-issuer", "/.well-known/jwt-vc-issuer/openid4vci",
+            "/.well-known/vct/{type}", "/openid4vci/{type}",
+        )) {
+            assertEquals(
+                listOf("Issuer Service API v2 - SD-JWT VC"),
+                paths.getValue(path).jsonObject.getValue("get").jsonObject.getValue("tags")
+                    .jsonArray.map { it.jsonPrimitive.content },
+                path,
+            )
+        }
+        paths.filterKeys { it.startsWith("/openid4vci/") && it != "/openid4vci/{type}" }
+            .forEach { (path, operations) ->
+                operations.jsonObject.filterKeys { it in setOf("get", "post") }.values.forEach { operation ->
+                    assertEquals(
+                        listOf("Issuer Service API v2 - OpenID4VCI"),
+                        operation.jsonObject.getValue("tags").jsonArray.map { it.jsonPrimitive.content },
+                        path,
+                    )
+                }
+            }
         val canonicalMetadata = paths.getValue("/.well-known/jwt-vc-issuer").jsonObject.getValue("get").jsonObject
         val legacyMetadata = paths.getValue("/.well-known/jwt-vc-issuer/openid4vci").jsonObject.getValue("get").jsonObject
         assertFalse(canonicalMetadata["deprecated"]?.jsonPrimitive?.booleanOrNull == true)
