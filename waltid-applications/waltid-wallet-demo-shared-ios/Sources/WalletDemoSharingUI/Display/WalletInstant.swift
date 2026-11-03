@@ -115,6 +115,6 @@ public struct WalletInstantDisplay: Equatable {
     public let time: String
     public let timeZone: String
 
-    public var supportingText: String { "\(time) (\(timeZone))" }
-    public var fullText: String { "\(date), \(supportingText)" }
+    // Isolate the parenthesized zone when its script differs from the localized date/time.
+    public var fullText: String { "\(date), \(time) \u{2068}(\(timeZone))\u{2069}" }
 }

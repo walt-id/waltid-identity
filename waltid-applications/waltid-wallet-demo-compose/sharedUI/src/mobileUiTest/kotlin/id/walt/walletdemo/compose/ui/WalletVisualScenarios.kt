@@ -118,8 +118,8 @@ internal class WalletVisualScenarios(
         values.forEach { onNodeWithTag(WalletUiTestTags.claim(it.path.id)).assertIsDisplayed() }
         onNodeWithText("1990-05-21").assertIsDisplayed()
         if (!rtl) {
-            onNodeWithText("02:30 (Budapest, CEST)", substring = true).assertIsDisplayed()
-            onNodeWithText("02:30 (Budapest, CET)", substring = true).assertIsDisplayed()
+            onNodeWithText("02:30 \u2068(Budapest, CEST)\u2069", substring = true).assertIsDisplayed()
+            onNodeWithText("02:30 \u2068(Budapest, CET)\u2069", substring = true).assertIsDisplayed()
         }
         capture(if (rtl) "components.dates.compact_large_text_rtl" else "components.dates")
     }

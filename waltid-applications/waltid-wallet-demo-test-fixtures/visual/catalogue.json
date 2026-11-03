@@ -500,7 +500,7 @@
       "composeTest": "sharingInformationDates",
       "swiftTest": "testSharingInformationDates",
       "requirements": [
-        "Issued at and Expires show date-first values with time and parenthesized timezone below",
+        "Issued at and Expires show a continuous date, time and parenthesized timezone value",
         "Unavoidable claim explanation remains visible",
         "Share and dismissal actions remain reachable"
       ],
@@ -917,7 +917,7 @@
       "id": "settings.reader.import_review",
       "requirements": [
         "Reader trust import review",
-        "Scrolled validity fields show date-first timestamps above the import action"
+        "Scrolled validity fields show complete localized timestamps above the import action"
       ],
       "composeTest": "readerTrustImport",
       "swiftTest": "testReaderTrustImport",
@@ -955,7 +955,7 @@
     {
       "id": "components.dates",
       "requirements": [
-        "Date precedes the smaller time and parenthesized geographic timezone",
+        "Date, time and parenthesized geographic timezone form one continuous text value",
         "DST overlap instants show Budapest CEST and CET despite equal local clock times",
         "Calendar-only birth date has no time or timezone"
       ],
@@ -967,7 +967,7 @@
     {
       "id": "components.dates.compact_large_text_rtl",
       "requirements": [
-        "Date precedes the smaller time and parenthesized geographic timezone",
+        "Date, time and parenthesized geographic timezone form one continuous text value",
         "DST overlap instants retain distinct seasonal zone labels",
         "Named-zone text wraps at large text size in RTL without clipping",
         "Calendar-only birth date has no time or timezone"

@@ -72,7 +72,7 @@ class WalletDateTimeTest {
             val formatted = WalletDateTime.format(Instant.parse(raw), "Europe/Budapest", "en-GB")
             assertEquals(time, formatted.time, raw)
             assertEquals(name, formatted.timeZone, raw)
-            assertEquals("$time ($name)", formatted.supportingText)
+            assertEquals("${formatted.date}, $time \u2068($name)\u2069", formatted.fullText)
         }
         val previousDay = WalletDateTime.format(Instant.parse("2026-01-01T00:00:00Z"), "America/Los_Angeles", "en-GB")
         assertTrue(previousDay.date.contains("31 Dec 2025"), previousDay.date)
@@ -82,7 +82,7 @@ class WalletDateTimeTest {
         assertEquals("05:45:34", nonHour.time)
         assertTrue(nonHour.timeZone.startsWith("Kathmandu, ") || nonHour.timeZone.startsWith("Katmandu, "), nonHour.timeZone)
         val utc = WalletDateTime.format(Instant.parse("2026-10-30T00:00:00Z"), "UTC", "en-GB")
-        assertEquals("00:00 (UTC)", utc.supportingText)
+        assertEquals("${utc.date}, 00:00 \u2068(UTC)\u2069", utc.fullText)
     }
 
     @Test

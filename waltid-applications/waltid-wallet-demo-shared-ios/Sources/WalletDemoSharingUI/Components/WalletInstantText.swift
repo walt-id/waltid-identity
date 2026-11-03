@@ -11,12 +11,8 @@ public struct WalletInstantText: View {
 
     public var body: some View {
         let text = instant.formatted(timeZone: timeZone, locale: locale)
-        VStack(alignment: .leading, spacing: 2) {
-            Text(text.date).font(.body)
-            Text(text.supportingText).font(.subheadline).foregroundStyle(.primary)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(text.fullText)
+        Text(text.fullText)
+            .font(.body)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

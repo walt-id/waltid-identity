@@ -36,8 +36,8 @@ object WalletDateTime {
 
 /** Independently localized fields, never reconstructed by splitting a localized sentence. */
 data class WalletDateTimeText(val date: String, val time: String, val timeZone: String) {
-    val supportingText: String get() = "$time ($timeZone)"
-    val fullText: String get() = "$date, $supportingText"
+    // Isolate the parenthesized zone: its script may differ from the localized date/time.
+    val fullText: String get() = "$date, $time \u2068($timeZone)\u2069"
 }
 
 internal expect fun platformFormatWalletInstant(instant: Instant, timeZoneId: String?, localeTag: String?, use24HourClock: Boolean?): WalletDateTimeText

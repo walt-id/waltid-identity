@@ -70,7 +70,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             let text = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")), locale: Locale(identifier: "en_GB"))
             XCTAssertEqual(text.time, time)
             XCTAssertEqual(text.timeZone, name)
-            XCTAssertEqual(text.supportingText, "\(time) (\(name))")
+            XCTAssertEqual(text.fullText, "\(text.date), \(time) \u{2068}(\(name))\u{2069}")
         }
         let boundary = try XCTUnwrap(WalletInstant.parseTimestamp("2026-01-01T00:00:00Z"))
             .formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles")), locale: Locale(identifier: "en_GB"))
@@ -83,7 +83,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertTrue(nonHour.timeZone.hasPrefix("Kathmandu, "), nonHour.timeZone)
         let utc = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-30T00:00:00Z"))
             .formatted(timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0)), locale: Locale(identifier: "en_GB"))
-        XCTAssertEqual(utc.supportingText, "00:00 (UTC)")
+        XCTAssertEqual(utc.fullText, "\(utc.date), 00:00 \u{2068}(UTC)\u{2069}")
         XCTAssertEqual(WalletInstant(Date(timeIntervalSince1970: 1793367000.123)),
                        WalletInstant(epochSeconds: 1793367000, nanoseconds: 123000000))
         let instant = WalletInstant(epochSeconds: 1793367000, nanoseconds: 123456789)

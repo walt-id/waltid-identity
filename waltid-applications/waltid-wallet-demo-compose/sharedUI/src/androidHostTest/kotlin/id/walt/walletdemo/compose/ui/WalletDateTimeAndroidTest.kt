@@ -17,7 +17,6 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.util.TimeZone as HostTimeZone
 import kotlin.time.Instant
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -35,15 +34,12 @@ class WalletDateTimeAndroidTest {
                 value = DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z")), rawValue = "1793318400")
             runComposeUiTest {
                 setContent { WalletDemoTheme { ClaimValueRow(item) } }
-                onNodeWithText("01:00 (Budapest, CET)", substring = true).assertIsDisplayed()
-                val date = onNodeWithText("Oct 30, 2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val time = onNodeWithText("01:00 (Budapest, CET)", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue(time.top >= date.bottom, "Time and timezone must be below the date")
+                onNodeWithText("Oct 30, 2026, 01:00 \u2068(Budapest, CET)\u2069", useUnmergedTree = true).assertIsDisplayed()
                 runOnIdle {
                     HostTimeZone.setDefault(HostTimeZone.getTimeZone("America/Los_Angeles"))
                     app.sendBroadcast(Intent(Intent.ACTION_TIMEZONE_CHANGED))
                 }
-                onNodeWithText("17:00 (Los Angeles, PDT)", substring = true).assertIsDisplayed()
+                onNodeWithText("17:00 \u2068(Los Angeles, PDT)\u2069", substring = true).assertIsDisplayed()
                 onNodeWithText("Oct 29, 2026", substring = true).assertIsDisplayed()
                 runOnIdle {
                     Settings.System.putString(app.contentResolver, Settings.System.TIME_12_24, "12")

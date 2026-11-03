@@ -9,7 +9,7 @@ validity/receipts. Native punctuation may differ because platform locale data di
 
 | Value | Display rule |
 | --- | --- |
-| Instant: issued/not-before/expiry, added, completed, certificate validity | Current device timezone and locale. Date on the primary line; time and a parenthesized geographic timezone on the smaller supporting line, for example `01:00 (Budapest, CET)`. |
+| Instant: issued/not-before/expiry, added, completed, certificate validity | Current device timezone and locale. One continuous value containing the date, time and parenthesized geographic timezone, for example `30 Oct 2026, 01:00 (Budapest, CET)`. |
 | Calendar date: birth date, a document's date-only issue/expiry date | Preserve the supplied calendar date. Never interpret midnight in UTC or shift it into another day. The wallet currently retains the source date text. |
 | Local/floating date-time with no offset | Preserve the source value unless the governing specification explicitly supplies a default. Never silently attach the viewer's timezone. |
 | Domain-specific zone: a venue, departure, jurisdiction or recurring schedule | Use the zone specified by that use case and label it. Preserve its IANA zone ID when the domain requires zone rules. An offset alone does not identify a region. |
@@ -34,10 +34,13 @@ requires such an override. Unrecognized zoned-date syntaxes remain source text.
   the geographic city, so abbreviations such as CST are not presented without context.
   Include the calendar era if a supported instant crosses into BCE in the viewer's zone.
 - Keep date, time and timezone as separate localized fields from one settings snapshot. Render
-  them with the same reusable date-first component on every timestamp surface. The supporting
-  line uses parentheses, never a middle-dot separator. It may wrap at large text sizes; no fixed
-  height, truncation or smaller-than-supporting typography. Accessibility combines the date,
-  time and zone into one value. Calendar dates remain a single line.
+  them with the same reusable component on every timestamp surface: one text value in the normal
+  body style, with no forced line break. The timezone uses parentheses, never a middle-dot
+  separator. Let the complete value wrap naturally in narrow layouts or at large text sizes;
+  never truncate it or shrink the text to force one line. Accessibility reads the date, time and
+  zone as one value. Isolate the parenthesized timezone with Unicode FSI/PDI so mixed scripts
+  retain their punctuation and reading order. Calendar dates retain their source text without
+  adding a time or timezone.
 - Use platform CLDR names where available. Android and browser city names use CLDR's last-IANA-
   component fallback (underscores become spaces); Apple supplies localized exemplar cities.
   Short seasonal names may fall back to a localized GMT offset where the platform has no name,
@@ -109,6 +112,7 @@ Keep rendered-state comparisons, app journeys and physical/system evidence disti
 
 - [RFC 7519 §2](https://www.rfc-editor.org/rfc/rfc7519.html#section-2): NumericDate seconds, including fractional values.
 - [Unicode CLDR date/time-zone names](https://unicode.org/reports/tr35/tr35-dates.html#Time_Zone_Names): exemplar cities, specific seasonal names and documented fallbacks.
+- [Unicode Bidirectional Algorithm](https://www.unicode.org/reports/tr9/#Explicit_Directional_Isolates): isolate a timezone whose script differs from the surrounding localized timestamp.
 - [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339.html): offset-bearing timestamps, distinct from unqualified local times.
 - [SD-JWT VC draft 23](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-23#section-2.2.2): registered JWT claim semantics.
 - [W3C VCDM 1.1](https://www.w3.org/TR/vc-data-model-1.1/#issuance-date) and [VCDM 2.0](https://www.w3.org/TR/vc-data-model-2.0/#representing-time): credential timestamps and missing-offset interpretation.
