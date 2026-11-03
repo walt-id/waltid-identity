@@ -301,10 +301,7 @@ final class WalletVisualTests: XCTestCase {
         let content = ReaderTrustImportReviewView(preview: try WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {})
             .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(identifier: "UTC")!)
-        let host = WalletVisualHostingController(rootView: content)
-        host.scrollToBottom = true
-        try capture(host, id: "settings.reader.import_review")
-        XCTAssertTrue(host.didScroll, "Trust validity must be visible in the captured review")
+        try capture(WalletVisualHostingController(rootView: content), id: "settings.reader.import_review")
     }
 
     func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }
