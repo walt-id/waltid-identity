@@ -236,7 +236,7 @@ Replace that file in the dist folder, or set the matching `WALLET_BRAND_*` envir
 Clean demo installs use the public walt.id demo profile endpoint for OpenID4VP transaction-data support:
 
 ```text
-https://wallet.demo.walt.id/wallet-api/transaction-data-profiles
+https://wallet2.demo.walt.id/transaction-data-profiles
 ```
 
 Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose iOS can override it with the `TRANSACTION_DATA_PROFILES_URL` launch environment variable or `UserDefaults` key. Wallet attestation values remain explicit overrides through `attestation.*` Gradle properties on Android and `ATTESTATION_*` environment/UserDefaults values on iOS; no bearer token is defaulted.

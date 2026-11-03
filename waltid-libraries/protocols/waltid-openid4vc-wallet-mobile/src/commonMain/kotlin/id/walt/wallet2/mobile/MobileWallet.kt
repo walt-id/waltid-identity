@@ -210,6 +210,7 @@ public class MobileWallet internal constructor(
     private val generateAndPersistHolderKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> id.walt.crypto2.keys.Key =
         { _, _ -> error("Holder key creation requires the persistent mobile wallet factory") },
     attestationConfig: WalletAttestationConfig? = null,
+    attestationProvider: id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
@@ -247,7 +248,7 @@ public class MobileWallet internal constructor(
     private val registrationMutex = Mutex()
     private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
-    private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
+    private val attestationAssembler: ClientAttestationAssembler? = attestationProvider?.let(::ClientAttestationAssembler) ?: attestationConfig?.let { config ->
         ClientAttestationAssembler(
             HttpWalletAttestationProvider(
                 baseUrl = config.baseUrl,

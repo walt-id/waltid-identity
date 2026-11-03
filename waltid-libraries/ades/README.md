@@ -10,7 +10,7 @@ B-B, B-T, B-LT and B-LTA. Validation follows the ETSI EN 319 102-1 processes.
 | `waltid-jades` | JAdES (JSON / JWS) | ETSI TS 119 182-1 | JVM, JS, iOS, Android |
 | `waltid-xades` | XAdES (XML / XMLDSig) | ETSI EN 319 132-1 | JVM (Apache Santuario) |
 | `waltid-pades` | PAdES (PDF / CAdES) | ETSI EN 319 142-1 | JVM (Apache PDFBox, Bouncy Castle) |
-| `waltid-ades-test` | test PKI fixtures (CA, TSA, OCSP, CRL) | - | JVM, tests only |
+| `waltid-ades-test` | test PKI fixtures (CA, TSA, OCSP, CRL) | - | KMP software-key fixture; JVM test PKI, tests only |
 
 ## Concepts
 
@@ -18,7 +18,14 @@ B-B, B-T, B-LT and B-LTA. Validation follows the ETSI EN 319 102-1 processes.
   `AdesSigningCredentials(key, certificateChain)`. No module needs a `java.security.PrivateKey`.
 - **Time-stamps** come from a `TimestampSource`, for example `Rfc3161TimestampClient(url, transport)`.
 - **Network access** (TSA, OCSP, CRL, AIA, detached documents) goes through `AdesTransport`. Use
-  `KtorAdesTransport(httpClient)` with any Ktor engine, or keep validation offline.
+  `KtorAdesTransport(httpClient, checkUrl)` with any Ktor engine, or keep validation offline. Disable
+  automatic redirects on the client. The required `checkUrl` rejects disallowed destinations for both
+  GET and POST; server applications must use a DNS-aware outbound guard, including protection against
+  private addresses and DNS rebinding. Custom transports have the same responsibility.
+- **Detached documents** require an explicit `DocumentResolver` (CB-AdES), `DetachedContentResolver`
+  (JAdES), or `XadesDocumentResolver` (XAdES). Supplying a transport does not enable document fetching.
+- **Trust** requires configured anchors. An empty/default anchor list never trusts a self-signed root.
+  Time-stamps require a certificate whose critical EKU extension contains only `id-kp-timeStamping`.
 - **B-LT material** is gathered by `ValidationDataCollector`. It covers the signing certificate chain,
   TSA certificates, OCSP responders, counter-signers and anything needed for earlier archive time-stamps,
   and it avoids duplicating data that is already embedded.
@@ -30,21 +37,34 @@ B-B, B-T, B-LT and B-LTA. Validation follows the ETSI EN 319 102-1 processes.
 ## CB-AdES example
 
 ```kotlin
+// http is configured with followRedirects = false; checkUrl enforces the application's outbound policy.
+val transport = KtorAdesTransport(http, checkUrl)
 val credentials = AdesSigningCredentials(key, listOf(signingCert, issuingCa, rootCa))
 val signer = CbAdesSigner(
     CbAdesSigningContext(
-        timestampSource = Rfc3161TimestampClient("https://tsa.example/tsr", KtorAdesTransport(http)),
-        transport = KtorAdesTransport(http),
+        timestampSource = Rfc3161TimestampClient("https://tsa.example/tsr", transport),
+        transport = transport,
         trustAnchors = listOf(rootCa),
     )
 )
 val signed = signer.signSign1(payload, credentials, CbAdesSignatureParameters(level = AdesLevel.B_LTA, contentType = "text/plain"))
 val lta2 = signer.augment(signed, AdesLevel.B_LTA) // renews the archive time-stamp
 
-val result = CbAdesValidator(AdesValidationPolicy(trustAnchors = listOf(rootCa), transport = KtorAdesTransport(http)))
+val result = CbAdesValidator(AdesValidationPolicy(trustAnchors = listOf(rootCa), transport = transport))
     .validate(lta2.encode())
 check(result.isValid)
 ```
+
+## Shared X.509 validation
+
+AdES uses `waltid-x509` for certificate-path signatures, authority-key identifiers, CA constraints,
+path lengths and CA validity. Explicit anchors are passed through an `InMemoryTrustStore`; system roots
+are not implicitly added. Leaf validity, revocation and historical proof-of-existence decisions remain
+in the EN 319 102-1 process so expired and revoked signatures retain their precise sub-indications.
+
+The format-facing DER certificate and CRL views remain in AdES for now. The shared complete-CRL verifier
+requires current, direct v2 CRLs with AKI and does not directly replace historical AdES revocation evidence.
+Consolidating those views and extending shared CRL support remains follow-up work.
 
 ## CB-AdES interpretation notes (ETSI CB-AdES Plugtests 2026)
 

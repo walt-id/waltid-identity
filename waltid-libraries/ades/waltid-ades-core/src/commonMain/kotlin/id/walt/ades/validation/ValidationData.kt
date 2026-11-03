@@ -92,7 +92,7 @@ class ValidationDataResolver(
         return emptyList()
     }
 
-    /** All chains from [cert] to a trust anchor (or to a self-signed root when no anchors are configured). */
+    /** All chains from [cert] to an explicitly configured trust anchor. */
     suspend fun buildChains(cert: X509Certificate, maxDepth: Int = 10): List<List<X509Certificate>> {
         val result = mutableListOf<List<X509Certificate>>()
         suspend fun walk(chain: List<X509Certificate>) {
@@ -101,10 +101,7 @@ class ValidationDataResolver(
                 result += chain; return
             }
             if (chain.size >= maxDepth) return
-            if (last.isSelfIssued) {
-                if (trustAnchors.isEmpty()) result += chain
-                return
-            }
+            if (last.isSelfIssued) return
             for (issuer in issuersOf(last)) if (issuer !in chain) walk(chain + issuer)
         }
         walk(listOf(cert))

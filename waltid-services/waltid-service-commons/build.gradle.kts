@@ -22,6 +22,7 @@ dependencies {
     api(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.ktor.server.auth)
     implementation(identityLibs.ktor.client.java)
+    implementation(identityLibs.ktor.client.okhttp) // okhttp3 for fetchBinaryFile
 
     // Logging
     api(identityLibs.klogging) // JVM + ~JS

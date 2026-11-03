@@ -45,6 +45,6 @@ class StatusPolicy : CredentialWrapperValidatorPolicy() {
         requireNotNull(args) { "args required" }
         require(args is JsonElement) { "args must be JsonElement" }
         val arguments = argumentParser.parse(args)
-        return verifyWithAttributes(data, arguments)
+        return verifyWithAttributes(data, arguments, context)
     }
 }

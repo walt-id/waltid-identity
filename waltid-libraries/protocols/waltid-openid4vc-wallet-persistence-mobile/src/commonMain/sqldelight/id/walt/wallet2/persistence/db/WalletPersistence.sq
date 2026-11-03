@@ -86,6 +86,10 @@ insertIssuanceSessionRecord:
 INSERT OR REPLACE INTO issuance_session_records (record_id, session_id, kind, payload, updated_at)
 VALUES (?, ?, ?, ?, ?);
 
+insertIssuanceSessionRecordIfAbsent:
+INSERT OR IGNORE INTO issuance_session_records (record_id, session_id, kind, payload, updated_at)
+VALUES (?, ?, ?, ?, ?);
+
 deleteIssuanceSessionRecordById:
 DELETE FROM issuance_session_records WHERE record_id = ?;
 

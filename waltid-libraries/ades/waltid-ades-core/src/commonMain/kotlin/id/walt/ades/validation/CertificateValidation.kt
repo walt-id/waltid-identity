@@ -3,8 +3,19 @@ package id.walt.ades.validation
 import id.walt.ades.asn1.Oids
 import id.walt.ades.transport.AdesTransport
 import id.walt.ades.tsp.TimeStampToken
-import id.walt.ades.x509.KeyUsageBit
 import id.walt.ades.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.X509Certificate as SharedCertificate
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.certificate.x509.validation.ValidationContext
+import id.walt.certificate.x509.validation.X509CertificateChainValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateCaHasKeyCertSignKeyUsageValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
+import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -12,7 +23,7 @@ import kotlin.time.Instant
 
 /** Signature validation policy / constraints (subset of ETSI TS 119 172-1 validation constraints). */
 class AdesValidationPolicy(
-    /** Trust anchors; when empty, chains ending in any self-signed root are accepted (test/diagnostic mode). */
+    /** Explicit trust anchors; an empty list never establishes trust. */
     val trustAnchors: List<X509Certificate> = emptyList(),
     /** Validation (current) time; defaults to the system clock. */
     val validationTime: Instant? = null,
@@ -49,6 +60,28 @@ class CertificateChainValidator(
     val resolver: ValidationDataResolver,
     private val policy: AdesValidationPolicy,
 ) {
+    /** RFC 5280 path constraints are shared with waltid-x509; AdES retains revocation and POE processing. */
+    private suspend fun validatePath(chain: List<X509Certificate>, time: Instant): String? {
+        val util = X509CertificateUtil.Default
+        val sharedChain = chain.map { util.parseCertificateDerEncoded(ByteString(it.encoded)) }
+        val anchors = policy.trustAnchors.map { util.parseCertificateDerEncoded(ByteString(it.encoded)) }
+        val validity = X509CertificateValidityValidator(clock = object : Clock {
+            override fun now() = time
+        })
+        val caValidity = object : X509CertificateValidator by validity {
+            // Shell model: the leaf validity is classified below, while the trust anchor is a policy input.
+            override suspend fun accepts(context: ValidationContext, x509Certificate: SharedCertificate) =
+                !context.isLeaf && context.certificateIndex != 0
+        }
+        val validators = listOf(
+            X509CertificateBasicConstraintsValidator(), X509CertificateCaHasKeyCertSignKeyUsageValidator(),
+            X509CertificateAuthorityKeyIdValidator(), X509CertificateSignatureValidator(util.services.signatureValidator), caValidity,
+        )
+        val result = X509CertificateChainValidator(validators, InMemoryTrustStore(anchors))
+            .validate(util.services.cryptoRuntime, sharedChain)
+        return result.errorLog.takeIf { !result.valid }?.joinToString { it.message }
+    }
+
     fun freshAt(time: Instant): (RevocationStatus) -> Boolean = { status ->
         when (status) {
             is RevocationStatus.Good -> status.issuedAt >= time - policy.revocationFreshness || (status.nextUpdate != null && status.nextUpdate >= time && status.issuedAt <= time)
@@ -74,20 +107,11 @@ class CertificateChainValidator(
         var last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.CERTIFICATE_CHAIN_GENERAL_FAILURE, chains.first(), null, "no valid chain")
 
         chainLoop@ for (chain in chains) {
-            // RFC 5280 6.1 (simplified): issuer constraints and CA validity (shell model)
-            for (i in 0 until chain.size - 1) {
-                val ca = chain[i + 1]
-                val anchor = resolver.isTrustAnchor(ca) && i + 1 == chain.lastIndex
-                if (!anchor) {
-                    if (!ca.isCa || (ca.keyUsage?.contains(KeyUsageBit.KEY_CERT_SIGN) == false)) {
-                        last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.CERTIFICATE_CHAIN_GENERAL_FAILURE, chain, null, "${ca.subject} is not a CA")
-                        continue@chainLoop
-                    }
-                    if (!ca.isValidAt(time)) {
-                        last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.CERTIFICATE_CHAIN_GENERAL_FAILURE, chain, null, "CA ${ca.subject} not valid at $time")
-                        continue@chainLoop
-                    }
-                }
+            // RFC 5280 6.1 (simplified): issuer constraints and CA validity (shell model); see validatePath().
+            val pathProblem = validatePath(chain, time)
+            if (pathProblem != null) {
+                last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.CERTIFICATE_CHAIN_GENERAL_FAILURE, chain, null, pathProblem)
+                continue
             }
             if (requiredEku != null && requiredEku !in certificate.extendedKeyUsage) {
                 last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.CHAIN_CONSTRAINTS_FAILURE, chain, null, "certificate lacks EKU $requiredEku")
@@ -165,6 +189,11 @@ class TimestampValidator(
             ?: return TimestampValidationResult(evidence.type, Indication.INDETERMINATE, SubIndication.NO_SIGNING_CERTIFICATE_FOUND, genTime, null, v.problems)
         if (!v.signatureValid) return TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.SIG_CRYPTO_FAILURE, genTime, tsa, v.problems)
         if (!v.signingCertificateReferenceValid) return TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.FORMAT_FAILURE, genTime, tsa, v.problems)
+
+        if (!v.timestampingCertificateValid) return TimestampValidationResult(
+            evidence.type, Indication.INDETERMINATE, SubIndication.CHAIN_CONSTRAINTS_FAILURE, genTime, tsa,
+            v.problems + "TSA certificate must have only id-kp-timeStamping in a critical EKU extension",
+        )
 
         // TSA certificate validated at generation time; revocation known at any later point counts.
         val chain = chainValidator.validate(tsa, genTime, fresh = { it !is RevocationStatus.Unknown })

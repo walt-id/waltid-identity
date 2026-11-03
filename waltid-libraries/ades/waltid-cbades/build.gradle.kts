@@ -17,11 +17,12 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
         }
         commonTest.dependencies {
+            implementation(project(":waltid-libraries:ades:waltid-ades-test"))
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
-            implementation(project(":waltid-libraries:ades:waltid-ades-test"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.ktor.client.java)
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.bouncycastle.prov)

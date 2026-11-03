@@ -1,5 +1,5 @@
 plugins {
-    id("waltid.multiplatform.library.jvm")
+    id("waltid.full.library")
 }
 
 group = "id.walt.ades"

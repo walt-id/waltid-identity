@@ -13,6 +13,8 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import java.io.File
 import java.math.BigInteger
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
@@ -157,9 +159,10 @@ class LocalPlugtestPki(private val dir: File, private val participant: String) {
         }
         dir.mkdirs()
         return create().also {
-            certFile.writeBytes(it.cert.encoded)
+            // Create with owner-only permissions before writing any private key material.
+            Files.createFile(keyFile.toPath(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
             keyFile.writeBytes(it.keyPair.private.encoded)
-            keyFile.setReadable(false, false); keyFile.setReadable(true, true)
+            certFile.writeBytes(it.cert.encoded)
         }
     }
 

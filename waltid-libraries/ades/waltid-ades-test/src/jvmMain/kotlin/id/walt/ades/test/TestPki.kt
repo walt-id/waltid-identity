@@ -226,6 +226,8 @@ class TestPki(
             .generateCertificate(authority.der.inputStream()) as X509Certificate)
         val gen = TimeStampTokenGenerator(signerInfo, JcaDigestCalculatorProviderBuilder().build().get(AlgorithmIdentifier(NISTObjectIdentifiers.id_sha256)), ASN1ObjectIdentifier("1.2.3.4.1"))
         gen.addCertificates(JcaCertStore(listOf(CertificateFactory.getInstance("X.509").generateCertificate(authority.der.inputStream()))))
+        // Preserve subsecond times so ordering tests do not depend on the current fraction of a second.
+        gen.setResolution(TimeStampTokenGenerator.R_MICROSECONDS)
         tsaAccuracySeconds?.let(gen::setAccuracySeconds)
         val responder = TimeStampResponseGenerator(gen, TSPAlgorithms.ALLOWED)
         return responder.generate(request, BigInteger.valueOf(serial.incrementAndGet()), Date.from(tsaClock().toJavaInstant())).encoded

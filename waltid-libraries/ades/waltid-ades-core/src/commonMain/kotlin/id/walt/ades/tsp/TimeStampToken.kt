@@ -43,7 +43,11 @@ class TimestampVerification(
     val signingCertificateReferenceValid: Boolean,
     val problems: List<String>,
 ) {
-    val isValid: Boolean get() = messageImprintMatches && signatureValid && signerCertificate != null && signingCertificateReferenceValid
+    /** RFC 3161 2.3 requires the critical EKU extension to contain only id-kp-timeStamping. */
+    val timestampingCertificateValid: Boolean get() = signerCertificate?.let {
+        it.extendedKeyUsage == listOf(Oids.EKU_TIME_STAMPING) && it.extension(Oids.EXT_EXTENDED_KEY_USAGE)?.critical == true
+    } == true
+    val isValid: Boolean get() = messageImprintMatches && signatureValid && timestampingCertificateValid && signingCertificateReferenceValid
 }
 
 /** RFC 3161 time-stamp token (a CMS SignedData encapsulating a TSTInfo). */

@@ -24,7 +24,7 @@ set +e
   "-Pandroid.testInstrumentationRunnerArguments.class=$test_classes" \
   "${instrumentation_args[@]}" \
   -Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest \
-  -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
+  -PtransactionDataProfiles.url=https://wallet2.demo.walt.id/transaction-data-profiles \
   --info
 test_status=$?
 set -e

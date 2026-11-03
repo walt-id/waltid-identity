@@ -196,7 +196,9 @@ class JadesTest {
         assertEquals(setOf("sigD", "b64"), h.array(JadesHeaders.CRIT)!!.strings()!!.toSet())
 
         val policy = AdesValidationPolicy(trustAnchors = listOf(pki.root.certificate), transport = transport)
-        assertPassed(JadesValidator(policy).validate(jws), AdesLevel.B_LTA)
+        val missing = JadesValidator(policy).validate(jws)
+        assertEquals(SubIndication.SIGNED_DATA_NOT_FOUND, missing.subIndication)
+        assertPassed(JadesValidator(policy, DetachedContentResolver.http(transport)).validate(jws), AdesLevel.B_LTA)
         assertEquals(SubIndication.SIGNED_DATA_NOT_FOUND, JadesValidator(offline).validate(jws).subIndication)
         val wrong = JadesValidator(offline, DetachedContentResolver.of(mapOf(docUrl to "forged".encodeToByteArray()))).validate(jws)
         assertEquals(Indication.TOTAL_FAILED, wrong.indication)

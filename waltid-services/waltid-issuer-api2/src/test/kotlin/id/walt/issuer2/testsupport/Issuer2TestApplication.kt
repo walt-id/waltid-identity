@@ -2,6 +2,7 @@ package id.walt.issuer2.testsupport
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.issuer2Module
@@ -20,6 +21,7 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
     credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
     json: Json = issuer2TestJson,
     configureProfilesConfig: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
+    configureMetadataConfig: (Issuer2MetadataConfig) -> Issuer2MetadataConfig = { it },
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
     loadIssuer2ConfigFiles()
@@ -29,6 +31,9 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
     val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
     ConfigManager.loadedConfigurations["issuer2-profiles" to Issuer2ProfilesConfig::class] =
         configureProfilesConfig(profilesConfig)
+    val metadataConfig = ConfigManager.getConfig<Issuer2MetadataConfig>()
+    ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] =
+        configureMetadataConfig(metadataConfig)
     application {
         install(ServerContentNegotiation) {
             json(json)

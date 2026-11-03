@@ -25,7 +25,12 @@ class SqlDelightIssuanceSessionStoreTest {
                 WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL, "pending", 123)
             val claimed = original.copy(payload = "claimed", updatedAtEpochMilliseconds = 456)
             assertFalse(first.compareAndSet(original, claimed))
-            first.put(original)
+            val insertions = listOf(first, second).map { store ->
+                async(Dispatchers.Default) { store.putIfAbsent(original) }
+            }.awaitAll()
+            assertEquals(1, insertions.count { it })
+            assertFalse(second.putIfAbsent(claimed))
+            assertEquals(original, first.get(original.id))
             for (stale in listOf(original.copy(payload = "stale"), original.copy(sessionId = "stale"),
                 original.copy(kind = WalletIssuanceSessionRecordKind.ACTIVE_SESSION), original.copy(updatedAtEpochMilliseconds = 0))) {
                 assertFalse(second.compareAndSet(stale, claimed))

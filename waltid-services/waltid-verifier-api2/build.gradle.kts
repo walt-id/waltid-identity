@@ -3,6 +3,7 @@ import io.ktor.plugin.features.*
 plugins {
     id("waltid.ktorbackend")   // Handles Kotlin, App config, Start scripts, Version props
     id("waltid.ktordocker")    // Handles Jib, Docker credentials, Platforms
+    id("waltid.x509")          // Test mdoc issuer certificates
 }
 
 group = "id.walt"
@@ -88,6 +89,23 @@ dependencies {
 
 application {
     mainClass.set("id.walt.verifier2.MainKt")
+}
+
+// ISO 18013-5 issuer chain the mdoc tests sign their fixtures with (see MdlTestFixture.kt).
+x509 {
+    outputDirectory = layout.buildDirectory.dir("generated/x509/test")
+    iaca("mdl-fixture-iaca") {
+        subject = "C=AT,CN=Waltid Test IACA"
+        issuerAlternativeNameUri = "https://walt.id"
+    }
+    documentSigner("mdl-fixture-ds") {
+        issuer = "mdl-fixture-iaca"
+        subject = "C=AT,CN=Waltid Test Document Signer"
+        crlDistributionPointUri = "https://walt.id/crl"
+    }
+}
+sourceSets.test {
+    resources.srcDir(files(x509.outputDirectory).builtBy(tasks.generateX509Certificates))
 }
 
 buildConfig {
