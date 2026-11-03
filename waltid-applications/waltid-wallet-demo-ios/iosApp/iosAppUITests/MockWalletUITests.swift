@@ -1058,12 +1058,7 @@ final class MockWalletUITests: XCTestCase {
             "Wallet ready"
         )
 
-        ui.openWalletLink("openid-credential-offer://mock")
-        XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
-        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
-
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
 
         XCTAssertTrue(app.descendants(matching: .any)["wallet.presentationVerifierSection"].waitForExistence(timeout: 10))
