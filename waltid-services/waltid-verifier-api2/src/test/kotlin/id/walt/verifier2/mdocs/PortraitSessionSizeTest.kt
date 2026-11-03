@@ -2,7 +2,7 @@ package id.walt.verifier2.mdocs
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
@@ -89,16 +89,16 @@ class PortraitSessionSizeTest {
     @Test
     fun `a session holding a portrait presentation stays within the document limit`() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         val holder = runBlocking { portraitHolder() }
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = null,
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize",
                     )
                 )
@@ -111,6 +111,7 @@ class PortraitSessionSizeTest {
             },
             module = Application::verifierModule,
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             val created = testAndReturn("Create verification session") {
@@ -215,17 +216,17 @@ class PortraitSessionSizeTest {
     @Test
     fun `measure the cost of a portrait against a minimal credential`() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         val minimal = runBlocking { portraitHolder(portraitBytes = 0) }
         val portrait = runBlocking { portraitHolder(portraitBytes = portraitBytes) }
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = null,
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize",
                     )
                 )
@@ -238,6 +239,7 @@ class PortraitSessionSizeTest {
             },
             module = Application::verifierModule,
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val rounds = 20
 
