@@ -20,14 +20,17 @@ public struct WalletInstant: Equatable {
 
     private var date: Date { Date(timeIntervalSince1970: TimeInterval(epochSeconds)) }
 
-    public func formatted(timeZone: TimeZone = .current, locale: Locale = .current) -> String {
+    public func formatted(timeZone: TimeZone = .current, locale: Locale = .current) -> WalletInstantDisplay {
         let formatter = Self.gregorianFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone
         let offset = timeZone.secondsFromGMT(for: date)
         // Gregorian year 1 in UTC can fall into BCE in the viewer's timezone.
         let era = epochSeconds < -62_135_596_800 - Int64(offset) ? "G" : ""
-        formatter.setLocalizedDateFormatFromTemplate("\(era)yMMMdjmmss")
+        formatter.setLocalizedDateFormatFromTemplate("\(era)yMMMd")
+        let dateText = formatter.string(from: date)
+        let seconds = (epochSeconds + Int64(offset)) % 60 != 0 || nanoseconds != 0 ? "ss" : ""
+        formatter.setLocalizedDateFormatFromTemplate("jmm\(seconds)")
         let number = NumberFormatter()
         number.locale = locale
         number.minimumIntegerDigits = 9
@@ -38,7 +41,13 @@ public struct WalletInstant: Equatable {
         if !digits.isEmpty {
             formatter.dateFormat = Self.withFraction(formatter.dateFormat, fraction: (number.decimalSeparator ?? ".") + digits)
         }
-        return formatter.string(from: date) + " " + Self.offsetLabel(offset)
+        let time = formatter.string(from: date)
+        let hasLocation = timeZone.identifier.contains("/") && !timeZone.identifier.hasPrefix("Etc/")
+        formatter.dateFormat = "VVV"
+        let city = hasLocation ? formatter.string(from: date) : nil
+        formatter.dateFormat = "z"
+        let name = hasLocation ? formatter.string(from: date) : Self.offsetLabel(offset)
+        return WalletInstantDisplay(date: dateText, time: time, timeZone: city.map { "\($0), \(name)" } ?? name)
     }
 
     static func parseTimestamp(_ value: String) -> WalletInstant? {
@@ -98,4 +107,14 @@ public struct WalletInstant: Equatable {
         let seconds = value % 60 == 0 ? "" : String(format: ":%02d", value % 60)
         return "UTC\(total < 0 ? "-" : "+")\(minutes)\(seconds)"
     }
+}
+
+/// Renderable fields share one locale/timezone snapshot; the original instant remains unchanged.
+public struct WalletInstantDisplay: Equatable {
+    public let date: String
+    public let time: String
+    public let timeZone: String
+
+    public var supportingText: String { "\(time) (\(timeZone))" }
+    public var fullText: String { "\(date), \(supportingText)" }
 }

@@ -2,13 +2,14 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.*
 import id.walt.walletdemo.compose.logic.WalletDateTime
+import id.walt.walletdemo.compose.logic.WalletDateTimeText
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.events.Event
 import kotlin.time.Instant
 
 @Composable
-internal actual fun rememberWalletTimeFormatter(): (Instant) -> String {
+internal actual fun rememberWalletTimeFormatter(): (Instant) -> WalletDateTimeText {
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
         val refresh: (Event) -> Unit = { revision++ }

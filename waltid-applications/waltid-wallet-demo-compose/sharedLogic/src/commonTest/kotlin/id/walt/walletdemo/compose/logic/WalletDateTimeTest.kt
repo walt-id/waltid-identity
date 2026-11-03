@@ -61,29 +61,37 @@ class WalletDateTimeTest {
     }
 
     @Test
-    fun formatUsesOffsetAtTheInstantIncludingDstAndDateBoundaries() {
+    fun namedZonesResolveSeasonAndLocalDateAtTheInstant() {
         val cases = listOf(
-            Triple("2026-03-29T00:30:00Z", "Europe/Budapest", "01:30:00 UTC+01:00"),
-            Triple("2026-03-29T01:30:00Z", "Europe/Budapest", "03:30:00 UTC+02:00"),
-            Triple("2026-10-25T00:30:00Z", "Europe/Budapest", "02:30:00 UTC+02:00"),
-            Triple("2026-10-25T01:30:00Z", "Europe/Budapest", "02:30:00 UTC+01:00"),
-            Triple("2026-10-30T00:00:00Z", "America/Los_Angeles", "17:00:00 UTC-07:00"),
-            Triple("2026-10-30T00:00:00Z", "Asia/Kathmandu", "05:45:00 UTC+05:45"),
+            Triple("2026-03-29T00:30:00Z", "01:30", "Budapest, CET"),
+            Triple("2026-03-29T01:30:00Z", "03:30", "Budapest, CEST"),
+            Triple("2026-10-25T00:30:00Z", "02:30", "Budapest, CEST"),
+            Triple("2026-10-25T01:30:00Z", "02:30", "Budapest, CET"),
         )
-        for ((raw, zone, time) in cases) {
-            val formatted = WalletDateTime.format(Instant.parse(raw), zone, "en-GB")
-            assertTrue(formatted.endsWith(time), "$raw in $zone: $formatted")
-            if (zone == "America/Los_Angeles") assertTrue(formatted.contains("29 Oct 2026"), formatted)
+        for ((raw, time, name) in cases) {
+            val formatted = WalletDateTime.format(Instant.parse(raw), "Europe/Budapest", "en-GB")
+            assertEquals(time, formatted.time, raw)
+            assertEquals(name, formatted.timeZone, raw)
+            assertEquals("$time ($name)", formatted.supportingText)
         }
+        val previousDay = WalletDateTime.format(Instant.parse("2026-01-01T00:00:00Z"), "America/Los_Angeles", "en-GB")
+        assertTrue(previousDay.date.contains("31 Dec 2025"), previousDay.date)
+        assertEquals("16:00", previousDay.time)
+        assertTrue(previousDay.timeZone.startsWith("Los Angeles, "), previousDay.timeZone)
+        val nonHour = WalletDateTime.format(Instant.parse("2026-10-30T00:00:34Z"), "Asia/Kathmandu", "en-GB")
+        assertEquals("05:45:34", nonHour.time)
+        assertTrue(nonHour.timeZone.startsWith("Kathmandu, ") || nonHour.timeZone.startsWith("Katmandu, "), nonHour.timeZone)
+        val utc = WalletDateTime.format(Instant.parse("2026-10-30T00:00:00Z"), "UTC", "en-GB")
+        assertEquals("00:00 (UTC)", utc.supportingText)
     }
 
     @Test
     fun localConversionKeepsTheCalendarEraUnambiguous() {
         val formatted = WalletDateTime.format(Instant.parse("0001-01-01T00:00:00Z"), "Etc/GMT+1", "en-GB")
-        assertTrue(formatted.contains("31 Dec"), formatted)
-        assertTrue(formatted.contains("BC"), formatted)
-        assertTrue(formatted.contains("23:00:00"), formatted)
-        assertTrue(formatted.endsWith("UTC-01:00"), formatted)
+        assertTrue(formatted.date.contains("31 Dec"), formatted.fullText)
+        assertTrue(formatted.date.contains("BC"), formatted.fullText)
+        assertTrue(formatted.time == "23:00", formatted.fullText)
+        assertTrue(formatted.timeZone == "UTC-01:00", formatted.fullText)
     }
 
     @Test
@@ -92,9 +100,9 @@ class WalletDateTimeTest {
         val british = WalletDateTime.format(instant, "UTC", "en-GB")
         val american = WalletDateTime.format(instant, "UTC", "en-US")
         val german = WalletDateTime.format(instant, "UTC", "de-DE")
-        assertTrue(british.contains("13:30:00.123456789"), british)
-        assertTrue(american.contains("1:30:00.123456789") && american.contains("PM"), american)
-        assertTrue(german.contains("13:30:00,123456789"), german)
+        assertTrue(british.time.contains("13:30:00.123456789"), british.fullText)
+        assertTrue(american.time.contains("1:30:00.123456789") && american.time.contains("PM"), american.fullText)
+        assertTrue(german.time.contains("13:30:00,123456789"), german.fullText)
         assertNotEquals(british, american)
     }
 }

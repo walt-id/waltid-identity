@@ -10,6 +10,13 @@ public struct WalletInstantText: View {
     public init(_ date: Date) { self.instant = WalletInstant(date) }
 
     public var body: some View {
-        Text(instant.formatted(timeZone: timeZone, locale: locale))
+        let text = instant.formatted(timeZone: timeZone, locale: locale)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(text.date).font(.body)
+            Text(text.supportingText).font(.subheadline).foregroundStyle(.primary)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text.fullText)
     }
 }

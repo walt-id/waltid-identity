@@ -4,13 +4,14 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.*
 import id.walt.walletdemo.compose.logic.WalletDateTime
+import id.walt.walletdemo.compose.logic.WalletDateTimeText
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.*
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import kotlin.time.Instant
 
 @Composable
-internal actual fun rememberWalletTimeFormatter(): (Instant) -> String {
+internal actual fun rememberWalletTimeFormatter(): (Instant) -> WalletDateTimeText {
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
         val center = NSNotificationCenter.defaultCenter

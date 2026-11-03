@@ -56,6 +56,26 @@ final class WalletVisualTests: XCTestCase {
         try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl", layoutDirection: .rightToLeft)
     }
 
+    func testDateValues() throws { try dateValues() }
+    func testDateValuesCompactRtl() throws { try dateValues(rtl: true) }
+
+    private func dateValues(rtl: Bool = false) throws {
+        let first = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T00:30:00Z"))
+        let second = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T01:30:00Z"))
+        let content = VStack(alignment: .leading, spacing: 20) {
+            ClaimValueRow(item: ClaimItem(path: .topLevel("iat"), label: "Issued at", value: .instant(first), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("exp"), label: "Expires", value: .instant(second), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("birth_date"), label: "Birth date", value: .text("1990-05-21"), rawValue: nil))
+        }
+        .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .environment(\.locale, Locale(identifier: rtl ? "ar@hours=h23" : "en_GB@hours=h23"))
+        .environment(\.timeZone, try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")))
+        .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+        try capture(content, id: rtl ? "components.dates.compact_large_text_rtl" : "components.dates",
+                    config: rtl ? .iPhoneSe : .iPhone13, sizeCategory: rtl ? .accessibilityMedium : .large,
+                    layoutDirection: rtl ? .rightToLeft : .leftToRight)
+    }
+
     func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
     func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
 
@@ -278,8 +298,13 @@ final class WalletVisualTests: XCTestCase {
             id: required ? "settings.reader_required.default" : "settings.reader.default")
     }
     func testReaderTrustImport() throws {
-        try capture(ReaderTrustImportReviewView(preview: WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {}),
-            id: "settings.reader.import_review")
+        let content = ReaderTrustImportReviewView(preview: try WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {})
+            .environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+        let host = WalletVisualHostingController(rootView: content)
+        host.scrollToBottom = true
+        try capture(host, id: "settings.reader.import_review")
+        XCTAssertTrue(host.didScroll, "Trust validity must be visible in the captured review")
     }
 
     func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }

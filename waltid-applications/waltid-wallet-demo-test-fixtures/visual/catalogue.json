@@ -500,7 +500,7 @@
       "composeTest": "sharingInformationDates",
       "swiftTest": "testSharingInformationDates",
       "requirements": [
-        "Issued at and Expires show readable UTC dates and times",
+        "Issued at and Expires show date-first values with time and parenthesized timezone below",
         "Unavoidable claim explanation remains visible",
         "Share and dismissal actions remain reachable"
       ],
@@ -916,7 +916,8 @@
     {
       "id": "settings.reader.import_review",
       "requirements": [
-        "Reader trust import review"
+        "Reader trust import review",
+        "Scrolled validity fields show date-first timestamps above the import action"
       ],
       "composeTest": "readerTrustImport",
       "swiftTest": "testReaderTrustImport",
@@ -947,6 +948,57 @@
           "layoutDirection": "rtl"
         },
         "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
+    },
+    {
+      "id": "components.dates",
+      "requirements": [
+        "Date precedes the smaller time and parenthesized geographic timezone",
+        "DST overlap instants show Budapest CEST and CET despite equal local clock times",
+        "Calendar-only birth date has no time or timezone"
+      ],
+      "composeTest": "dateValues",
+      "swiftTest": "testDateValues",
+      "kind": "deterministic",
+      "note": "Production claim rows; timestamp formatter explicitly uses en-GB and Europe/Budapest while host metadata remains en-US/UTC. Two instants share a local clock time during DST rollback."
+    },
+    {
+      "id": "components.dates.compact_large_text_rtl",
+      "requirements": [
+        "Date precedes the smaller time and parenthesized geographic timezone",
+        "DST overlap instants retain distinct seasonal zone labels",
+        "Named-zone text wraps at large text size in RTL without clipping",
+        "Calendar-only birth date has no time or timezone"
+      ],
+      "composeTest": "dateValuesCompactRtl",
+      "swiftTest": "testDateValuesCompactRtl",
+      "kind": "deterministic",
+      "note": "Production claim rows at 320x568 with large text and RTL. Timestamp formatter explicitly uses Arabic and Europe/Budapest; host metadata remains en-US/UTC. Two instants share a local clock time during DST rollback. Calendar text remains unchanged.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5,
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5,
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium",
           "layoutDirection": "rtl"
         }
       }
@@ -1118,6 +1170,7 @@
     }
   ],
   "galleryPreview": [
+    "components.dates",
     "wallet.home.credential",
     "onboarding.pin.setup",
     "wallet.scan.empty",
@@ -1129,6 +1182,7 @@
   ],
   "galleryVariants": [
     "onboarding.pin.compact_dark_large_text",
-    "batch.offer.compact_dark_large_text"
+    "batch.offer.compact_dark_large_text",
+    "components.dates.compact_large_text_rtl"
   ]
 }

@@ -52,27 +52,38 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     func testLocalConversionKeepsTheCalendarEraUnambiguous() throws {
         let instant = try XCTUnwrap(WalletInstant.parseTimestamp("0001-01-01T00:00:00Z"))
         let formatted = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Etc/GMT+1")), locale: Locale(identifier: "en_GB"))
-        XCTAssertTrue(formatted.contains("31 Dec"), formatted)
-        XCTAssertTrue(formatted.contains("BC"), formatted)
-        XCTAssertTrue(formatted.contains("23:00:00"), formatted)
-        XCTAssertTrue(formatted.hasSuffix("UTC-01:00"), formatted)
+        XCTAssertTrue(formatted.date.contains("31 Dec"), formatted.fullText)
+        XCTAssertTrue(formatted.date.contains("BC"), formatted.fullText)
+        XCTAssertTrue(formatted.time == "23:00", formatted.fullText)
+        XCTAssertTrue(formatted.timeZone == "UTC-01:00", formatted.fullText)
     }
 
-    func testDateTimeDisplayUsesLocaleAndOffsetAtTheInstant() throws {
+    func testDateTimeDisplayUsesLocaleAndNamedZoneAtTheInstant() throws {
         let cases = [
-            ("2026-03-29T00:30:00Z", "Europe/Budapest", "01:30:00 UTC+01:00"),
-            ("2026-03-29T01:30:00Z", "Europe/Budapest", "03:30:00 UTC+02:00"),
-            ("2026-10-25T00:30:00Z", "Europe/Budapest", "02:30:00 UTC+02:00"),
-            ("2026-10-25T01:30:00Z", "Europe/Budapest", "02:30:00 UTC+01:00"),
-            ("2026-10-30T00:00:00Z", "America/Los_Angeles", "17:00:00 UTC-07:00"),
-            ("2026-10-30T00:00:00Z", "Asia/Kathmandu", "05:45:00 UTC+05:45")
+            ("2026-03-29T00:30:00Z", "01:30", "Budapest, CET"),
+            ("2026-03-29T01:30:00Z", "03:30", "Budapest, CEST"),
+            ("2026-10-25T00:30:00Z", "02:30", "Budapest, CEST"),
+            ("2026-10-25T01:30:00Z", "02:30", "Budapest, CET")
         ]
-        for (source, zone, suffix) in cases {
+        for (source, time, name) in cases {
             let instant = try XCTUnwrap(WalletInstant.parseTimestamp(source))
-            let text = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: zone)), locale: Locale(identifier: "en_GB"))
-            XCTAssertTrue(text.hasSuffix(suffix), text)
-            if zone == "America/Los_Angeles" { XCTAssertTrue(text.contains("29 Oct 2026"), text) }
+            let text = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")), locale: Locale(identifier: "en_GB"))
+            XCTAssertEqual(text.time, time)
+            XCTAssertEqual(text.timeZone, name)
+            XCTAssertEqual(text.supportingText, "\(time) (\(name))")
         }
+        let boundary = try XCTUnwrap(WalletInstant.parseTimestamp("2026-01-01T00:00:00Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles")), locale: Locale(identifier: "en_GB"))
+        XCTAssertTrue(boundary.date.contains("31 Dec 2025"), boundary.date)
+        XCTAssertEqual(boundary.time, "16:00")
+        XCTAssertTrue(boundary.timeZone.hasPrefix("Los Angeles, "), boundary.timeZone)
+        let nonHour = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-30T00:00:34Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu")), locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(nonHour.time, "05:45:34")
+        XCTAssertTrue(nonHour.timeZone.hasPrefix("Kathmandu, "), nonHour.timeZone)
+        let utc = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-30T00:00:00Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0)), locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(utc.supportingText, "00:00 (UTC)")
         XCTAssertEqual(WalletInstant(Date(timeIntervalSince1970: 1793367000.123)),
                        WalletInstant(epochSeconds: 1793367000, nanoseconds: 123000000))
         let instant = WalletInstant(epochSeconds: 1793367000, nanoseconds: 123456789)
@@ -80,9 +91,9 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let british = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_GB"))
         let american = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_US"))
         let german = instant.formatted(timeZone: zone, locale: Locale(identifier: "de_DE"))
-        XCTAssertTrue(british.contains("13:30:00.123456789"), british)
-        XCTAssertTrue(american.contains("1:30:00.123456789") && american.contains("PM"), american)
-        XCTAssertTrue(german.contains("13:30:00,123456789"), german)
+        XCTAssertTrue(british.time.contains("13:30:00.123456789"), british.fullText)
+        XCTAssertTrue(american.time.contains("1:30:00.123456789") && american.time.contains("PM"), american.fullText)
+        XCTAssertTrue(german.time.contains("13:30:00,123456789"), german.fullText)
     }
 
     func testConsentPreservesNormalizedClaimsAcrossCredentialFormats() {

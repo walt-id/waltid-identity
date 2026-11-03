@@ -41,10 +41,14 @@ class WalletVisualAndroidTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
+    fun dateValuesCompactRtl() = scenario(fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
-    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun readerTrustImport() = scenario(sheetHost = true) { readerTrustImport() }
     @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
     @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
     @Test fun settingsNearby() = scenario { settingsRoot("nearby") }

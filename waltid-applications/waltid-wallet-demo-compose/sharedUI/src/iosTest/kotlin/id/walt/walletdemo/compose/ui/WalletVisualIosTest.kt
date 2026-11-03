@@ -44,6 +44,8 @@ class WalletVisualIosTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test fun dateValuesCompactRtl() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }

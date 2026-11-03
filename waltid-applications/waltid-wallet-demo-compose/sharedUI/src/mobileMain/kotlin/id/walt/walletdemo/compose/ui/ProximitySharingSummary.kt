@@ -59,7 +59,7 @@ internal fun ProximitySharingReceiptContent(
     credentialDetailsById: Map<String, CredentialDetails>,
 ) {
     ReviewMetadataSection(stringResource(Res.string.proximity_shared_data)) {
-        Text(walletInstantText(completedAt), style = MaterialTheme.typography.bodySmall)
+        WalletInstantText(completedAt)
         if (approvalTiming == ProximityApprovalTiming.BeforeConnection) {
             Text(stringResource(Res.string.proximity_used_prepared_approval))
         }

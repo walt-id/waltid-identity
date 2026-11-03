@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,8 +15,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.ClaimItemPath
+import id.walt.walletdemo.compose.logic.DisplayValue
+import id.walt.walletdemo.compose.logic.WalletDateTime
+import id.walt.walletdemo.compose.ui.components.ClaimValueRow
+import kotlin.time.Instant
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
@@ -85,6 +94,34 @@ internal class WalletVisualScenarios(
         capture(if (rtl) "components.controls.rtl" else "components.controls.default")
         onNodeWithTag("preview.copies.more").performClick()
         onNodeWithText("Copies: 2").assertIsDisplayed()
+    }
+
+    fun dateValues(rtl: Boolean = false) = with(test) {
+        layoutDirection = if (rtl) "rtl" else "ltr"
+        val values = listOf(
+            ClaimItem(ClaimItemPath.topLevel("iat"), label = "Issued at",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T00:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("exp"), label = "Expires",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T01:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("birth_date"), label = "Birth date",
+                value = DisplayValue.Text("1990-05-21"), rawValue = null),
+        )
+        content {
+            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalWalletTimeFormatter provides { WalletDateTime.format(it, "Europe/Budapest", if (rtl) "ar" else "en-GB", true) }) {
+                Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    values.forEach { ClaimValueRow(it) }
+                }
+            }
+        }
+        values.forEach { onNodeWithTag(WalletUiTestTags.claim(it.path.id)).assertIsDisplayed() }
+        onNodeWithText("1990-05-21").assertIsDisplayed()
+        if (!rtl) {
+            onNodeWithText("02:30 (Budapest, CEST)", substring = true).assertIsDisplayed()
+            onNodeWithText("02:30 (Budapest, CET)", substring = true).assertIsDisplayed()
+        }
+        capture(if (rtl) "components.dates.compact_large_text_rtl" else "components.dates")
     }
 
     fun walletOpening(failure: Boolean = false) = with(test) {
@@ -286,6 +323,8 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).assertIsDisplayed()
         onNodeWithText("Example Reader CA", substring = false).assertIsDisplayed()
+        onNodeWithText("Jan 1, 2031", substring = true).performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Valid until", substring = false).assertIsDisplayed()
         capture("settings.reader.import_review")
     }
 

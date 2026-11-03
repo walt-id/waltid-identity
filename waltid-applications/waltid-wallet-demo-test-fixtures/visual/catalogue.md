@@ -606,6 +606,22 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/components.controls.rtl.png" alt="components · controls · rtl, Compose Android" width="240"><br>393×852, RTL | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/components.controls.rtl.png" alt="components · controls · rtl, Compose iOS" width="240"><br>393×852, RTL | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/components-controls-rtl.native-ios27_0-phone-en-light.png" alt="components · controls · rtl, Native iOS" width="240"><br>390×844, RTL |
 
+## components-dates
+
+**components · dates**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/components.dates.png" alt="components · dates, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/components.dates.png" alt="components · dates, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/components-dates.native-ios27_0-phone-en-light.png" alt="components · dates, Native iOS" width="240"> |
+
+## components-dates-compact_large_text_rtl
+
+**components · dates · compact large text rtl**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/components.dates.compact_large_text_rtl.png" alt="components · dates · compact large text rtl, Compose Android" width="240"><br>320×568, 1.5× text, RTL | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/components.dates.compact_large_text_rtl.png" alt="components · dates · compact large text rtl, Compose iOS" width="240"><br>320×568, 1.5× text, RTL | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/components-dates-compact_large_text_rtl.native-ios27_0-phone-en-light.png" alt="components · dates · compact large text rtl, Native iOS" width="240"><br>320×568, accessibilityMedium, RTL |
+
 ## onboarding-biometric-cancelled
 
 **onboarding · biometric · cancelled**

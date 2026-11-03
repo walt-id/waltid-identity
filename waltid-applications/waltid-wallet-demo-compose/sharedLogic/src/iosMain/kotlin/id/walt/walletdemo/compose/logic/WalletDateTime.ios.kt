@@ -11,9 +11,10 @@ import kotlinx.datetime.toNSDate
 import kotlinx.datetime.toNSTimeZone
 import kotlin.time.Instant
 
-internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: String?, localeTag: String?, use24HourClock: Boolean?): String {
+internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: String?, localeTag: String?, use24HourClock: Boolean?): WalletDateTimeText {
     val locale = localeTag?.let { NSLocale(it) } ?: NSLocale.currentLocale
     val zone = timeZoneId?.let(TimeZone::of) ?: TimeZone.currentSystemDefault()
+    val local = instant.toLocalDateTime(zone)
     val date = Instant.fromEpochSeconds(instant.epochSeconds).toNSDate()
     val number = NSNumberFormatter().apply { this.locale = locale; minimumIntegerDigits = 9u; usesGroupingSeparator = false }
     val zero = NSNumberFormatter().apply { this.locale = locale }.stringFromNumber(NSNumber(int = 0)) ?: "0"
@@ -23,10 +24,19 @@ internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: St
         calendar = NSCalendar(calendarIdentifier = NSCalendarIdentifierGregorian)
         gregorianStartDate = NSDate.distantPast
         timeZone = zone.toNSTimeZone()
-        val hour = when (use24HourClock) { true -> "H"; false -> "h"; null -> "j" }
-        val era = if (instant.toLocalDateTime(zone).year <= 0) "G" else ""
-        setLocalizedDateFormatFromTemplate("${era}yMMMd${hour}mmss")
-        dateFormat = withSecondFraction(dateFormat, if (digits.isEmpty()) "" else (number.decimalSeparator ?: ".") + digits)
     }
-    return "${formatter.stringFromDate(date)} ${utcOffsetLabel(zone.offsetAt(instant).totalSeconds)}"
+    val era = if (local.year <= 0) "G" else ""
+    formatter.setLocalizedDateFormatFromTemplate("${era}yMMMd")
+    val dateText = formatter.stringFromDate(date)
+    val hour = when (use24HourClock) { true -> "H"; false -> "h"; null -> "j" }
+    val seconds = if (local.second != 0 || instant.nanosecondsOfSecond != 0) "ss" else ""
+    formatter.setLocalizedDateFormatFromTemplate("${hour}mm$seconds")
+    formatter.dateFormat = withSecondFraction(formatter.dateFormat, if (digits.isEmpty()) "" else (number.decimalSeparator ?: ".") + digits)
+    val time = formatter.stringFromDate(date)
+    val hasLocation = '/' in zone.id && !zone.id.startsWith("Etc/")
+    formatter.dateFormat = "VVV"
+    val city = if (hasLocation) formatter.stringFromDate(date) else null
+    formatter.dateFormat = "z"
+    val name = if (hasLocation) formatter.stringFromDate(date) else utcOffsetLabel(zone.offsetAt(instant).totalSeconds)
+    return WalletDateTimeText(dateText, time, timeZoneLabel(city, name))
 }

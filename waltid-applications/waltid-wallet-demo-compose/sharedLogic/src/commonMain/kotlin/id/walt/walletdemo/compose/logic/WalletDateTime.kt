@@ -30,11 +30,25 @@ object WalletDateTime {
     }
 
     /** Null settings mean the current device settings; an override must come from the use case. */
-    fun format(instant: Instant, timeZoneId: String? = null, localeTag: String? = null, use24HourClock: Boolean? = null): String =
+    fun format(instant: Instant, timeZoneId: String? = null, localeTag: String? = null, use24HourClock: Boolean? = null): WalletDateTimeText =
         platformFormatWalletInstant(instant, timeZoneId, localeTag, use24HourClock)
 }
 
-internal expect fun platformFormatWalletInstant(instant: Instant, timeZoneId: String?, localeTag: String?, use24HourClock: Boolean?): String
+/** Independently localized fields, never reconstructed by splitting a localized sentence. */
+data class WalletDateTimeText(val date: String, val time: String, val timeZone: String) {
+    val supportingText: String get() = "$time ($timeZone)"
+    val fullText: String get() = "$date, $supportingText"
+}
+
+internal expect fun platformFormatWalletInstant(instant: Instant, timeZoneId: String?, localeTag: String?, use24HourClock: Boolean?): WalletDateTimeText
+
+internal fun timeZoneLabel(city: String?, specificName: String): String =
+    if (city.isNullOrBlank() || city == specificName) specificName else "$city, $specificName"
+
+/** CLDR's exemplar-city fallback for a geographical IANA ID; fixed offsets have no city. */
+internal fun timeZoneCity(zoneId: String): String? =
+    if (zoneId.substringBefore('/') in setOf("Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific"))
+        zoneId.substringAfterLast('/').replace('_', ' ') else null
 
 internal fun utcOffsetLabel(totalSeconds: Int): String {
     if (totalSeconds == 0) return "UTC"

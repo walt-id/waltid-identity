@@ -9,7 +9,7 @@ validity/receipts. Native punctuation may differ because platform locale data di
 
 | Value | Display rule |
 | --- | --- |
-| Instant: issued/not-before/expiry, added, completed, certificate validity | Current device timezone and locale; include the date, time through seconds, exact nonzero fractional seconds and the UTC offset **at that instant**. |
+| Instant: issued/not-before/expiry, added, completed, certificate validity | Current device timezone and locale. Date on the primary line; time and a parenthesized geographic timezone on the smaller supporting line, for example `01:00 (Budapest, CET)`. |
 | Calendar date: birth date, a document's date-only issue/expiry date | Preserve the supplied calendar date. Never interpret midnight in UTC or shift it into another day. The wallet currently retains the source date text. |
 | Local/floating date-time with no offset | Preserve the source value unless the governing specification explicitly supplies a default. Never silently attach the viewer's timezone. |
 | Domain-specific zone: a venue, departure, jurisdiction or recurring schedule | Use the zone specified by that use case and label it. Preserve its IANA zone ID when the domain requires zone rules. An offset alone does not identify a region. |
@@ -18,7 +18,7 @@ validity/receipts. Native punctuation may differ because platform locale data di
 A serialized offset such as `Z` or `+02:00` identifies an instant. It is not an instruction to
 display credential expiry in the issuer's timezone. For example, `2026-10-30T23:30:00-02:00`
 and `2026-10-31T01:30:00Z` display identically for the same viewer. In Budapest both are
-31 October at 02:30 UTC+01:00; in Los Angeles both are 30 October at 18:30 UTC-07:00.
+31 October at 02:30 (Budapest, CET); in Los Angeles both are 30 October at 18:30 (Los Angeles, PDT).
 Only explicit domain semantics override the device zone; no current wallet timestamp surface
 requires such an override. Unrecognized zoned-date syntaxes remain source text.
 
@@ -27,10 +27,22 @@ requires such an override. Unrecognized zoned-date syntaxes remain source text.
 - Keep parsed instants typed until rendering. A cached credential must not cache a timezone or
   localized date string. Refresh visible output after device settings changes or resuming the app.
 - Use the user's locale and hour-cycle preference through platform formatters, with Gregorian
-  dates matching credential calendar semantics. Show the year and seconds; never present an
-  expiry instant as a date-only deadline. Use a full UTC offset rather than an ambiguous zone
-  abbreviation. Resolve DST for the timestamp's date, not the current date.
+  dates matching credential calendar semantics. Show the year and time; never present an expiry
+  instant as a date-only deadline. Omit seconds only when both seconds and fractions are zero;
+  otherwise preserve seconds and exact nonzero fractional precision without rounding.
+  Resolve the seasonal abbreviation for the timestamp's date, not the current date. Pair it with
+  the geographic city, so abbreviations such as CST are not presented without context.
   Include the calendar era if a supported instant crosses into BCE in the viewer's zone.
+- Keep date, time and timezone as separate localized fields from one settings snapshot. Render
+  them with the same reusable date-first component on every timestamp surface. The supporting
+  line uses parentheses, never a middle-dot separator. It may wrap at large text sizes; no fixed
+  height, truncation or smaller-than-supporting typography. Accessibility combines the date,
+  time and zone into one value. Calendar dates remain a single line.
+- Use platform CLDR names where available. Android and browser city names use CLDR's last-IANA-
+  component fallback (underscores become spaces); Apple supplies localized exemplar cities.
+  Short seasonal names may fall back to a localized GMT offset where the platform has no name,
+  while retaining the city. UTC and fixed-offset zones have no invented geographic location.
+  Never infer a city from an offset or maintain a custom city/abbreviation table.
 - Keep source JSON/raw values unchanged for technical inspection and all protocol operations.
   Formatting is not validation, and localized strings must never feed expiry checks, storage,
   signing or presentation payloads. UTC remains appropriate for protocol serialization and logs.
@@ -96,6 +108,7 @@ Keep rendered-state comparisons, app journeys and physical/system evidence disti
 ## Basis
 
 - [RFC 7519 §2](https://www.rfc-editor.org/rfc/rfc7519.html#section-2): NumericDate seconds, including fractional values.
+- [Unicode CLDR date/time-zone names](https://unicode.org/reports/tr35/tr35-dates.html#Time_Zone_Names): exemplar cities, specific seasonal names and documented fallbacks.
 - [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339.html): offset-bearing timestamps, distinct from unqualified local times.
 - [SD-JWT VC draft 23](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-23#section-2.2.2): registered JWT claim semantics.
 - [W3C VCDM 1.1](https://www.w3.org/TR/vc-data-model-1.1/#issuance-date) and [VCDM 2.0](https://www.w3.org/TR/vc-data-model-2.0/#representing-time): credential timestamps and missing-offset interpretation.

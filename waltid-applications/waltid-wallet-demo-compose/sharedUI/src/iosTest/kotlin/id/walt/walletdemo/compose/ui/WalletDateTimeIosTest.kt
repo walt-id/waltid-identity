@@ -38,13 +38,13 @@ class WalletDateTimeIosTest {
             )
             runSkikoComposeUiTest(size = Size(393f, 852f)) {
                 setContent { WalletDemoTheme { ClaimValueRow(item) } }
-                onNodeWithText("UTC+01:00", substring = true).assertIsDisplayed()
+                onNodeWithText("Budapest,", substring = true).assertIsDisplayed()
                 runOnIdle {
                     setenv("TZ", "America/Los_Angeles", 1)
                     tzset()
                     NSNotificationCenter.defaultCenter.postNotificationName(NSSystemTimeZoneDidChangeNotification, null)
                 }
-                onNodeWithText("UTC-07:00", substring = true).assertIsDisplayed()
+                onNodeWithText("Los Angeles,", substring = true).assertIsDisplayed()
             }
         } finally {
             previousZone?.let { setenv("TZ", it, 1) } ?: unsetenv("TZ")
