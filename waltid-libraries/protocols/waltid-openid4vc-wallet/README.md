@@ -325,3 +325,5 @@ The OSS and ES `Wallet2ClientAttestationChallengeIntegrationTest` suites each co
 Freshness headers from validated authorization-server metadata responses are retained before the first proof. A restored preview cannot overwrite a newer challenge. Clearing issuance state also clears its freshness records.
 
 The built-in in-memory, server SQL, mobile SQLDelight and ES stores atomically create shared freshness records. Concurrent updates merge only the received fields; storage conflicts retry the local update without resending the OAuth request. Custom stores can implement `AtomicWalletIssuanceSessionCreationStore` for the same coordination across runtimes. Older store interfaces remain supported with their existing coordination within one wallet runtime.
+
+Compatibility: `CLIENT_ATTESTATION_FRESHNESS` is a new public record kind. Exhaustive enum consumers must handle it. Older library/service versions cannot read stores containing this kind; downgrade or mixed-version access is unsupported while these records remain, even though no schema migration is needed.

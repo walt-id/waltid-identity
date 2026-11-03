@@ -509,4 +509,29 @@ class IssuerMetadataResolverTest {
         )
     }
 
+
+    @Test fun `issuer mismatches are terminal for legacy and detailed discovery`() = runTest {
+        for (method in 0..3) for (returnedIssuer in listOf("https://other.example", "https://issuer.example.org/")) {
+            var requests = 0
+            val http = createMockClient {
+                requests++
+                respond("""{"issuer":"$returnedIssuer","authorization_endpoint":"https://issuer.example.org/authorize","token_endpoint":"https://issuer.example.org/token","response_types_supported":["code"]}""",
+                    HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+            try {
+                val resolver = IssuerMetadataResolver(http)
+                val issuerMetadata = kotlinx.serialization.json.Json.decodeFromString<id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata>(
+                    """{"credential_issuer":"https://issuer.example.org","credential_endpoint":"https://issuer.example.org/credential","credential_configurations_supported":{}}""")
+                assertFailsWith<AuthorizationServerIssuerMismatchException> {
+                    when (method) {
+                        0 -> resolver.resolveAuthorizationServerMetadata("https://issuer.example.org")
+                        1 -> resolver.resolveAuthorizationServerMetadataDetailed("https://issuer.example.org")
+                        2 -> resolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
+                        else -> resolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+                    }
+                }
+                assertEquals(1, requests)
+            } finally { http.close() }
+        }
+    }
 }

@@ -235,12 +235,14 @@ class IssuerMetadataResolver(
      * Resolves authorization server metadata from the well-known endpoint
      * 
      * @param authorizationServerUrl The authorization server URL (can be issuer URL or separate AS URL)
+     * @throws AuthorizationServerIssuerMismatchException if parsed metadata identifies another issuer
      * @return AuthorizationServerMetadata
      * @throws Exception if metadata cannot be fetched or parsed
      */
     suspend fun resolveAuthorizationServerMetadata(authorizationServerUrl: String): AuthorizationServerMetadata =
         resolveAuthorizationServerMetadataDetailed(authorizationServerUrl).metadata
 
+    /** Resolves metadata and freshness; throws [AuthorizationServerIssuerMismatchException] for a different issuer. */
     suspend fun resolveAuthorizationServerMetadataDetailed(authorizationServerUrl: String): ResolvedAuthorizationServerMetadata {
         require(authorizationServerUrl.isNotBlank()) { "Authorization server URL cannot be blank" }
 
@@ -282,19 +284,8 @@ class IssuerMetadataResolver(
             dpopNonce = response.headers[DPOP_NONCE_HEADER]?.takeIf(String::isNotBlank) ?: dpopNonce
 
             if (response.status.isSuccess()) {
-                try {
-                    val metadata = response.body<AuthorizationServerMetadata>()
-                    // Publish discovery freshness only after validating the selected AS identity.
-                    require(metadata.issuer == authorizationServerUrl ||
-                        (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH) &&
-                            metadataUrl == buildMetadataUrl(metadata.issuer, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))) {
-                        "Authorization server metadata issuer does not match the selected server"
-                    }
-                    return ResolvedAuthorizationServerMetadata(metadata, Headers.build {
-                        appendAll(response.headers)
-                        attestationChallenge?.let { set(CLIENT_ATTESTATION_CHALLENGE, it) }
-                        dpopNonce?.let { set(DPOP_NONCE_HEADER, it) }
-                    })
+                val metadata = try {
+                    response.body<AuthorizationServerMetadata>()
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     val responseBody = runCatching { response.bodyAsText() }.getOrDefault("")
@@ -302,6 +293,17 @@ class IssuerMetadataResolver(
                     failures += ResolveFailure.Parse(metadataUrl, e, bodyPreview(responseBody))
                     continue
                 }
+                // Identity failures are terminal, not parsing failures eligible for fallback.
+                if (!(metadata.issuer == authorizationServerUrl ||
+                    (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH) &&
+                        metadataUrl == buildMetadataUrl(metadata.issuer, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)))) {
+                    throw AuthorizationServerIssuerMismatchException()
+                }
+                return ResolvedAuthorizationServerMetadata(metadata, Headers.build {
+                    appendAll(response.headers)
+                    attestationChallenge?.let { set(CLIENT_ATTESTATION_CHALLENGE, it) }
+                    dpopNonce?.let { set(DPOP_NONCE_HEADER, it) }
+                })
             } else {
                 val errorBody = runCatching { response.bodyAsText() }.getOrDefault("")
                 log.debug { "Failed to fetch authorization server metadata from $metadataUrl. Status: ${response.status}" }
@@ -385,12 +387,14 @@ class IssuerMetadataResolver(
      * tried against both well-known endpoints; see [resolveAuthorizationServerMetadata].
      *
      * @param credentialIssuerMetadata The credential issuer metadata
+     * @throws AuthorizationServerIssuerMismatchException if parsed metadata identifies another issuer
      * @return AuthorizationServerMetadata
      */
     suspend fun resolveAuthorizationServerMetadataWithFallback(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ): AuthorizationServerMetadata = resolveAuthorizationServerMetadataWithFallbackDetailed(credentialIssuerMetadata).metadata
 
+    /** Resolves the selected issuer and freshness; an issuer mismatch is terminal. */
     suspend fun resolveAuthorizationServerMetadataWithFallbackDetailed(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ): ResolvedAuthorizationServerMetadata {

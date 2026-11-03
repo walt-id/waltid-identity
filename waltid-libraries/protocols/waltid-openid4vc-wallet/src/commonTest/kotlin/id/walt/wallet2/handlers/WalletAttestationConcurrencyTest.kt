@@ -45,9 +45,9 @@ class WalletAttestationConcurrencyTest {
 
     @Test fun concurrentResponsesDoNotFailWhenUpdatingExistingFreshness() = runTest {
         val store = ConcurrentReadStore()
-        val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+        val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
         first.observe(headersOf("OAuth-Client-Attestation-Challenge", "initial"))
-        val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+        val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
         store.gateReads = true
         val results = listOf(
             async { runCatching { first.observe(headersOf("OAuth-Client-Attestation-Challenge", "first-response")) } },
@@ -59,16 +59,16 @@ class WalletAttestationConcurrencyTest {
     @Test fun concurrentResponsesRetainBothIndependentFreshnessValues() = runTest {
         for (existing in listOf(false, true)) {
             val store = ConcurrentReadStore()
-            val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+            val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             if (existing) first.observe(headersOf("OAuth-Client-Attestation-Challenge" to listOf("old-challenge"), "DPoP-Nonce" to listOf("old-nonce")))
-            val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+            val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             store.gateReads = true
             listOf(
                 async { first.observe(headersOf("OAuth-Client-Attestation-Challenge", "challenge")) },
                 async { second.observe(headersOf("DPoP-Nonce", "nonce")) },
             ).awaitAll()
             store.gateReads = false
-            val restored = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+            val restored = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             assertEquals("challenge", restored.challenge)
             assertEquals("nonce", restored.dpopNonce)
             // Reloading either runtime must also expose the authoritative merged state.
@@ -83,8 +83,8 @@ class WalletAttestationConcurrencyTest {
     @Test fun concurrentLegacyRestoreCannotReplaceLiveFreshness() = runTest {
         for (restoreFirst in listOf(false, true)) {
             val store = ConcurrentReadStore()
-            val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
-            val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+            val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
+            val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             store.gateReads = true
             val operations: List<suspend () -> Unit> = listOf(
                 { first.restore("legacy-challenge", "legacy-nonce") },
@@ -92,7 +92,7 @@ class WalletAttestationConcurrencyTest {
             )
             (if (restoreFirst) operations else operations.reversed()).map { async { it() } }.awaitAll()
             store.gateReads = false
-            val restored = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+            val restored = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             assertEquals("live-challenge", restored.challenge)
             assertEquals("live-nonce", restored.dpopNonce)
         }
@@ -100,9 +100,9 @@ class WalletAttestationConcurrencyTest {
 
     @Test fun successfulTokenResponsesSurviveFreshnessContentionWithoutHttpRetries() = runTest {
         val store = ConcurrentReadStore()
-        val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+        val first = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
         first.observe(headersOf("OAuth-Client-Attestation-Challenge", "initial"))
-        val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key")
+        val second = WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "test-flow")
         var requests = 0
         val requestMutex = Mutex()
         val client = HttpClient(MockEngine) {

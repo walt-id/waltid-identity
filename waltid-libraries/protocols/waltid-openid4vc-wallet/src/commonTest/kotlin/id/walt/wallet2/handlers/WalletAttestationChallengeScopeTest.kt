@@ -10,31 +10,31 @@ import kotlin.test.*
 class WalletAttestationChallengeScopeTest {
     @Test fun sharedRuntimeRetainsFreshnessOnlyForTheSameClientInstanceAndServer() = runTest {
         val runtime = WalletIssuanceSessionState("wallet", null)
-        val contexts = (1..8).map { async { runtime.challengeContext("https://as.example", "client", "key") } }.awaitAll()
+        val contexts = (1..8).map { async { runtime.challengeContext("https://as.example", "client", "key", flowId = "test-flow") } }.awaitAll()
         contexts.forEach { assertSame(contexts.first(), it) }
         contexts.first().observe(headersOf("OAuth-Client-Attestation-Challenge", "opaque"))
-        assertEquals("opaque", runtime.challengeContext("https://as.example", "client", "key").challenge)
-        assertNull(runtime.challengeContext("https://other-as.example", "client", "key").challenge)
-        assertNull(runtime.challengeContext("https://as.example", "other-client", "key").challenge)
-        assertNull(runtime.challengeContext("https://as.example", "client", "rotated-key").challenge)
-        assertNull(WalletIssuanceSessionState("other-wallet", null).challengeContext("https://as.example", "client", "key").challenge)
-        assertNull(WalletIssuanceSessionState("wallet", null).challengeContext("https://as.example", "client", "key").challenge)
+        assertEquals("opaque", runtime.challengeContext("https://as.example", "client", "key", flowId = "test-flow").challenge)
+        assertNull(runtime.challengeContext("https://other-as.example", "client", "key", flowId = "test-flow").challenge)
+        assertNull(runtime.challengeContext("https://as.example", "other-client", "key", flowId = "test-flow").challenge)
+        assertNull(runtime.challengeContext("https://as.example", "client", "rotated-key", flowId = "test-flow").challenge)
+        assertNull(WalletIssuanceSessionState("other-wallet", null).challengeContext("https://as.example", "client", "key", flowId = "test-flow").challenge)
+        assertNull(WalletIssuanceSessionState("wallet", null).challengeContext("https://as.example", "client", "key", flowId = "test-flow").challenge)
     }
 
     @Test fun storedFreshnessWinsOverAnOlderSessionSnapshotAndRemainsScoped() = runTest {
         val store = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
         val first = WalletIssuanceSessionState("wallet", store)
-        first.challengeContext("https://as.example", "client", "key")
+        first.challengeContext("https://as.example", "client", "key", flowId = "test-flow")
             .observe(headersOf("OAuth-Client-Attestation-Challenge", "newest"))
         val reopened = WalletIssuanceSessionState("wallet", store)
-        assertEquals("newest", reopened.challengeContext("https://as.example", "client", "key", "older").challenge)
-        assertNull(reopened.challengeContext("https://other.example", "client", "key").challenge)
-        assertNull(reopened.challengeContext("https://as.example", "other-client", "key").challenge)
-        assertNull(reopened.challengeContext("https://as.example", "client", "new-key").challenge)
+        assertEquals("newest", reopened.challengeContext("https://as.example", "client", "key", "older", flowId = "test-flow").challenge)
+        assertNull(reopened.challengeContext("https://other.example", "client", "key", flowId = "test-flow").challenge)
+        assertNull(reopened.challengeContext("https://as.example", "other-client", "key", flowId = "test-flow").challenge)
+        assertNull(reopened.challengeContext("https://as.example", "client", "new-key", flowId = "test-flow").challenge)
         // Existing stores with only per-session freshness still restore without a migration.
-        assertEquals("legacy", reopened.challengeContext("https://legacy.example", "client", "key", "legacy").challenge)
+        assertEquals("legacy", reopened.challengeContext("https://legacy.example", "client", "key", "legacy", flowId = "test-flow").challenge)
         assertEquals("legacy", WalletIssuanceSessionState("wallet", store)
-            .challengeContext("https://legacy.example", "client", "key").challenge)
+            .challengeContext("https://legacy.example", "client", "key", flowId = "test-flow").challenge)
     }
 
     @Test fun newFlowsFetchWhileReopenedFlowsKeepResponseChallenges() = runTest {
@@ -87,5 +87,76 @@ class WalletAttestationChallengeScopeTest {
                 .prepare(http, "https://as.example/challenge")
             assertEquals(3, fetches, "Expired legacy correlation must prepare again")
         } finally { http.close() }
+    }
+
+    @Test fun malformedRecordsDoNotBlockThrottledSweepsOrCompletion() = runTest {
+        val backing = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        var lists = 0
+        val store = object : AtomicWalletIssuanceSessionCreationStore by backing {
+            override suspend fun list(): List<WalletIssuanceSessionRecord> { lists++; return backing.list() }
+        }
+        val broken = WalletIssuanceSessionRecord("attestation-flow:broken", "attestation-flow:broken",
+            WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS, "not-json", 0)
+        backing.put(broken)
+        val runtime = WalletIssuanceSessionState("wallet", store)
+        var now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        runtime.challengeNow = { now }
+        runtime.challengeContext("https://as.example", "client", "key", flowId = "flow")
+            .observe(headersOf("OAuth-Client-Attestation-Challenge", "fresh"))
+        repeat(3) { runtime.challengeContext("https://as.example", "client", "key", flowId = "flow") }
+        assertEquals(1, lists)
+        runtime.challengeContext("https://as.example", "client", "key", flowId = "pkce:orphan")
+            .observe(headersOf("OAuth-Client-Attestation-Challenge", "old"))
+        backing.list().filter { it.payload.contains("pkce:orphan") }.forEach {
+            backing.put(it.copy(updatedAtEpochMilliseconds = 0))
+        }
+        now += 60_000
+        runtime.challengeContext("https://as.example", "client", "key", flowId = "flow")
+        assertEquals(2, lists)
+        runtime.removeChallengeFlow("flow")
+        assertEquals(listOf(broken), backing.list())
+    }
+
+    @Test fun requestedPkceExpiryIsEnforcedBetweenSweeps() = runTest {
+        val store = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        val runtime = WalletIssuanceSessionState("wallet", store)
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        runtime.challengeNow = { now }
+        runtime.challengeContext("https://as.example", "client", "key", flowId = "pkce:flow")
+            .observe(headersOf("OAuth-Client-Attestation-Challenge", "expired"))
+        store.list().forEach { store.put(it.copy(updatedAtEpochMilliseconds = now - 600_001)) }
+        val reopened = runtime.challengeContext("https://as.example", "client", "key", flowId = "pkce:flow")
+        assertNull(reopened.challenge)
+        assertTrue(store.list().isEmpty())
+    }
+
+    @Test fun cleanupDoesNotDeleteAConcurrentUpdate() = runTest {
+        val backing = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        var race = false
+        val store = object : AtomicWalletIssuanceSessionCreationStore by backing {
+            override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+                if (race && replacement == null) {
+                    race = false
+                    backing.put(expected.copy(updatedAtEpochMilliseconds = expected.updatedAtEpochMilliseconds + 1))
+                }
+                return backing.compareAndSet(expected, replacement)
+            }
+        }
+        val runtime = WalletIssuanceSessionState("wallet", store)
+        runtime.challengeContext("https://as.example", "client", "key", flowId = "flow")
+            .observe(headersOf("OAuth-Client-Attestation-Challenge", "fresh"))
+        race = true
+        runtime.removeChallengeFlow("flow")
+        assertEquals(1, backing.list().size)
+    }
+
+    @Test fun sweepStorageCancellationPropagates() = runTest {
+        val backing = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
+        val store = object : WalletIssuanceSessionStore by backing {
+            override suspend fun list(): List<WalletIssuanceSessionRecord> = throw kotlinx.coroutines.CancellationException("cancel")
+        }
+        assertFailsWith<kotlinx.coroutines.CancellationException> {
+            WalletIssuanceSessionState("wallet", store).challengeContext("https://as.example", "client", "key", flowId = "flow")
+        }
     }
 }

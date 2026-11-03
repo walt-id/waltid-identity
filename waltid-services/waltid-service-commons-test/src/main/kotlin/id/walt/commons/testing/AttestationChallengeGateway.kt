@@ -26,6 +26,7 @@ class AttestationChallengeGateway(
     private val responseOnly: Boolean,
     port: Int = ServerSocket(0).use { it.localPort },
     host: String = "127.0.0.1",
+    bindHost: String = host,
 ) : AutoCloseable {
     val baseUrl = "http://$host:$port"
     data class Exchange(
@@ -47,7 +48,7 @@ class AttestationChallengeGateway(
         install(HttpTimeout) { requestTimeoutMillis = 30_000 }
     }
     private val hopHeaders = setOf("host", "content-length", "transfer-encoding", "connection", "accept-encoding", "upgrade", "http2-settings")
-    private val server = embeddedServer(CIO, host = "0.0.0.0", port = port) {
+    private val server = embeddedServer(CIO, host = bindHost, port = port) {
         routing {
             route("/{path...}") {
                 handle {
@@ -83,11 +84,20 @@ class AttestationChallengeGateway(
                 }
             }
         }
-    }.start(wait = false)
+    }
+
+    init {
+        try {
+            server.start(wait = false)
+        } catch (error: Exception) {
+            runCatching { server.stop(0, 1_000) }.exceptionOrNull()?.let(error::addSuppressed)
+            client.close()
+            throw error
+        }
+    }
 
     override fun close() {
-        server.stop(0, 1_000)
-        client.close()
+        try { server.stop(0, 1_000) } finally { client.close() }
     }
 
     companion object { const val CHALLENGE_HEADER = "OAuth-Client-Attestation-Challenge" }

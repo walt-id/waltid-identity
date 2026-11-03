@@ -32,6 +32,8 @@ class WalletIssuanceSessionState(
     // Owned by this wallet generation; never shared through a process-global issuer cache.
     private val challenges = LinkedHashMap<ChallengeScope, ClientAttestationChallengeContext>()
     private val challengeMutex = Mutex()
+    internal var challengeNow: () -> Long = { Clock.System.now().toEpochMilliseconds() }
+    private var lastChallengeSweep: Long? = null
     private val challengeAccess = mutableMapOf<ChallengeScope, Long>()
     @Serializable
     private data class ChallengeScope(val issuer: String, val clientId: String, val keyThumbprint: String, val flowId: String)
@@ -41,28 +43,48 @@ class WalletIssuanceSessionState(
     internal suspend fun challengeContext(
         issuer: String, clientId: String, keyThumbprint: String,
         initialChallenge: String? = null, initialDpopNonce: String? = null,
-        flowId: String = "legacy",
+        flowId: String,
     ): ClientAttestationChallengeContext = challengeMutex.withLock {
         check(!closed) { "Wallet issuance is closed" }
-        val now = Clock.System.now().toEpochMilliseconds()
-        // Split authorization calls have no retained session lifecycle. Bound their correlation
-        // lifetime; retained session records are removed by their own completion/expiry path.
+        val now = challengeNow()
         val cutoff = now - 10 * 60 * 1000
         challengeAccess.filter { (scope, touched) -> scope.flowId.startsWith("pkce:") && touched < cutoff }
             .keys.toList().forEach { challenges.remove(it); challengeAccess.remove(it) }
-        store?.list()?.filter { it.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS &&
-            it.id.startsWith("attestation-flow:") && it.updatedAtEpochMilliseconds < cutoff }?.forEach { record ->
-            val expired = Json.decodeFromString<PersistedFreshness>(record.payload).scope
-            if (expired.flowId.startsWith("pkce:") && compareAndSet(record, null)) {
-                challenges.remove(expired)
-                challengeAccess.remove(expired)
+        val scope = ChallengeScope(issuer, clientId, keyThumbprint, flowId)
+        // Requested stateless scopes expire promptly, independently of background sweep timing.
+        if (flowId.startsWith("pkce:")) {
+            while (true) {
+                val record = store?.get(scope.recordId()) ?: break
+                if (record.updatedAtEpochMilliseconds >= cutoff) break
+                val freshness = Json.decodeFromString<PersistedFreshness>(record.payload)
+                require(record.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS &&
+                    record.sessionId == record.id && freshness.scope == scope)
+                if (compareAndSet(record, null)) {
+                    challenges.remove(scope)
+                    challengeAccess.remove(scope)
+                    break
+                }
+                currentCoroutineContext().ensureActive()
+                yield()
             }
         }
-        val scope = ChallengeScope(issuer, clientId, keyThumbprint, flowId)
+        val lastSweep = lastChallengeSweep
+        if (lastSweep == null || now < lastSweep || now - lastSweep >= 60_000) {
+            store?.list()?.forEach { record ->
+                if (record.updatedAtEpochMilliseconds < cutoff) {
+                    val expired = record.sweepScope()
+                    if (expired != null && expired.flowId.startsWith("pkce:") && compareAndSet(record, null)) {
+                        challenges.remove(expired)
+                        challengeAccess.remove(expired)
+                    }
+                }
+            }
+            lastChallengeSweep = now
+        }
         challengeAccess[scope] = now
         challenges.getOrPut(scope) {
             // Prior wallet-wide records must never mark a new issuance flow as prepared.
-            val id = "attestation-flow:" + SHA256().digest(Json.encodeToString(scope).encodeToByteArray()).encodeToBase64Url()
+            val id = scope.recordId()
             var snapshot: WalletIssuanceSessionRecord? = null
             fun decode(record: WalletIssuanceSessionRecord?): PersistedFreshness {
                 if (record == null) return PersistedFreshness(scope, null, null)
@@ -109,12 +131,22 @@ class WalletIssuanceSessionState(
         }.also { it.restore(initialChallenge, initialDpopNonce) }
     }
 
+    private fun ChallengeScope.recordId() = "attestation-flow:" +
+        SHA256().digest(Json.encodeToString(this).encodeToByteArray()).encodeToBase64Url()
+
+    private fun WalletIssuanceSessionRecord.sweepScope(): ChallengeScope? {
+        if (kind != WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS ||
+            !id.startsWith("attestation-flow:") || sessionId != id) return null
+        return runCatching { Json.decodeFromString<PersistedFreshness>(payload).scope }
+            .getOrNull()?.takeIf { it.recordId() == id }
+    }
+
     internal suspend fun removeChallengeFlow(flowId: String) = challengeMutex.withLock {
         challenges.keys.removeAll { it.flowId == flowId }
         challengeAccess.keys.removeAll { it.flowId == flowId }
         store?.list()?.filter { it.kind == WalletIssuanceSessionRecordKind.CLIENT_ATTESTATION_FRESHNESS &&
             it.id.startsWith("attestation-flow:") }?.forEach { record ->
-            if (Json.decodeFromString<PersistedFreshness>(record.payload).scope.flowId == flowId) {
+            if (record.sweepScope()?.flowId == flowId) {
                 compareAndSet(record, null)
             }
         }
