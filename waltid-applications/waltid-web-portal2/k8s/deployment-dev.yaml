@@ -37,7 +37,7 @@ spec:
             - name: NUXT_PUBLIC_VERIFIER_BASE
               value: "https://verifier2.portal.test.waltid.cloud"
             - name: NUXT_PUBLIC_WALLET_URL
-              value: "https://wallet.test.waltid.cloud"
+              value: "https://wallet2.test.waltid.cloud"
           envFrom:
             - secretRef:
                 name: portal2-pid-secret

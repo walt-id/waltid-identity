@@ -101,5 +101,5 @@ private enum DemoBackendDefaults {
     static let attestationAttesterPath = ""
     static let attestationBearerToken = ""
     static let attestationHostHeader = ""
-    static let transactionDataProfilesURL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
+    static let transactionDataProfilesURL = "https://wallet2.demo.walt.id/transaction-data-profiles"
 }

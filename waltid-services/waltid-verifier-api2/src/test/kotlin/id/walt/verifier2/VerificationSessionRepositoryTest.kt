@@ -100,6 +100,65 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `processing claims exclude concurrent submissions in both modes`() = runTest {
+        for (reattemptable in listOf(false, true)) {
+            val repository = InMemoryVerificationSessionRepository()
+            repository.create(session("exclusive").copy(reattemptable = reattemptable))
+            repository.claimForProcessing("exclusive")
+            assertFailsWith<VerificationSessionAlreadyUsedException> { repository.claimForProcessing("exclusive") }
+        }
+    }
+
+    @Test
+    fun `concurrent request fetches leave an in-flight processing claim unchanged`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        repository.create(session("fetch-during-processing"))
+        val claim = repository.claimForProcessingWithOriginal("fetch-during-processing")
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        coroutineScope {
+            repeat(8) {
+                launch {
+                    assertEquals(HttpStatusCode.OK, client.get("/verification-session/fetch-during-processing/request").status)
+                    assertEquals(HttpStatusCode.OK, client.post("/verification-session/fetch-during-processing/request") {
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("wallet_nonce=request-nonce")
+                    }.status)
+                }
+            }
+        }
+        assertEquals(claim.claimed.version, repository.get("fetch-during-processing")!!.version)
+        assertEquals(Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
+            repository.get("fetch-during-processing")!!.session.status)
+        repository.restoreProcessingClaim(claim)
+        assertEquals(claim.original.session.status, repository.get("fetch-during-processing")!!.session.status)
+    }
+
+    @Test
+    fun `failed attempts can be retried in both modes and success consumes only single use sessions`() = runTest {
+        for (reattemptable in listOf(false, true)) {
+            val repository = InMemoryVerificationSessionRepository()
+            repository.create(session("retry").copy(reattemptable = reattemptable))
+            repository.update("retry") {
+                attempted = true
+                status = Verification2Session.VerificationSessionStatus.FAILED
+            }
+            val claim = repository.claimForProcessingWithOriginal("retry")
+            // Releasing a claim before an attempt is admitted leaves the stored outcome intact.
+            repository.restoreProcessingClaim(claim)
+            assertEquals(Verification2Session.VerificationSessionStatus.FAILED, repository.get("retry")!!.session.status)
+            repository.claimForProcessing("retry")
+            repository.update("retry") { status = Verification2Session.VerificationSessionStatus.SUCCESSFUL }
+            if (reattemptable) repository.claimForProcessing("retry")
+            else assertFailsWith<VerificationSessionAlreadyUsedException> { repository.claimForProcessing("retry") }
+        }
+    }
+
+    @Test
     fun `terminal session uses retention instead of request expiration`() = runTest {
         val repository = InMemoryVerificationSessionRepository()
         val now = Clock.System.now()
@@ -159,7 +218,33 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
-    fun `info route returns 404 for missing session`() = testApplication {
+    fun `used sessions reject presentations and request fetches after expiry in both modes`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        for (reattemptable in listOf(false, true)) {
+            repository.create(session("expired-$reattemptable").copy(
+                reattemptable = reattemptable,
+                attempted = true,
+                status = Verification2Session.VerificationSessionStatus.FAILED,
+                expirationDate = Clock.System.now() - 1.minutes,
+            ))
+        }
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        for (reattemptable in listOf(false, true)) {
+            val path = "/verification-session/expired-$reattemptable"
+            assertEquals(HttpStatusCode.BadRequest, client.get("$path/request").status)
+            assertEquals(HttpStatusCode.BadRequest, client.post("$path/request").status)
+            assertEquals(HttpStatusCode.BadRequest, client.post("$path/response").status)
+            assertEquals(HttpStatusCode.OK, client.get("$path/info").status)
+        }
+    }
+
+    @Test
+    fun `routes return 404 for missing sessions`() = testApplication {
         application {
             install(ContentNegotiation) { json() }
             install(SSE)
@@ -168,6 +253,9 @@ class VerificationSessionRepositoryTest {
         }
 
         assertEquals(HttpStatusCode.NotFound, client.get("/verification-session/missing/info").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("/verification-session/missing/request").status)
+        assertEquals(HttpStatusCode.NotFound, client.post("/verification-session/missing/request").status)
+        assertEquals(HttpStatusCode.NotFound, client.post("/verification-session/missing/response").status)
     }
 
     @Test

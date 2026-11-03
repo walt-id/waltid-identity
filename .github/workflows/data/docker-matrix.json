@@ -1,21 +1,6 @@
 [
   {
     "context": "waltid-identity",
-    "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet",
-    "image": "waltid-demo-wallet"
-  },
-  {
-    "context": "waltid-identity",
-    "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet",
-    "image": "waltid-dev-wallet"
-  },
-  {
-    "context": "waltid-identity",
-    "folder": "waltid-identity/waltid-applications/waltid-web-portal",
-    "image": "portal"
-  },
-  {
-    "context": "waltid-identity",
     "folder": "waltid-identity/waltid-applications/waltid-web-portal2",
     "image": "portal2"
   },
