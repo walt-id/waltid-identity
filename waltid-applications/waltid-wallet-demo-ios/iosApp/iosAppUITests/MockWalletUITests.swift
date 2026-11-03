@@ -536,8 +536,6 @@ final class MockWalletUITests: XCTestCase {
             ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
-        receiveMockCredential(app: app, ui: ui)
-        ui.returnToWallet()
 
         let proximityScreen = app.descendants(matching: .any)["wallet.proximityScreen"]
         func captureNearby(_ name: String) {
@@ -1029,8 +1027,7 @@ final class MockWalletUITests: XCTestCase {
             ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
-        receiveMockCredential(app: app, ui: ui)
-        ui.openWalletLink("openid4vp://mock")
+        ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 10), app.debugDescription)
 
         XCTAssertFalse(app.staticTexts["Not requested"].exists)
