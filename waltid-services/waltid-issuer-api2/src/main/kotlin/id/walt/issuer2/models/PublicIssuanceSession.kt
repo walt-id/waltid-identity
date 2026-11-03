@@ -49,7 +49,10 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 }
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
-    val encoded = json.encodeToJsonElement(this).jsonObject
+    val publicNotifications = notifications?.let {
+        it.copy(webhook = it.webhook?.copy(signingSecret = null))
+    }
+    val encoded = json.encodeToJsonElement(copy(notifications = publicNotifications)).jsonObject
     if (issuanceRequests.size != 1) return encoded
     val request = issuanceRequests.single()
     val fields = encoded.toMutableMap()
