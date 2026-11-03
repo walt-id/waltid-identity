@@ -21,6 +21,7 @@
 - JVM ABI: `DcqlMatchResult` gained `disclosuresByPath`. Kotlin source stays valid through the defaults; JVM binary consumers must rebuild, as the `<init>` and `copy` descriptors change.
 - Wallet2 presentation preview: rows for array elements now carry their array's claim name in `name` (for example `nationalities`) instead of `null`.
 - Wallet2 presentation preview: rows for requested clear-text claims now carry the plain claim name in `name` (for example `address`, previously `"address"` with quotes, or the index for array elements), and their `value` leaves out selectively disclosable children that are not presented, matching what the verifier receives.
+- Wallet2 presentation preview: `required` now means the value is presented whatever the user selects. An optional claim whose disclosures are all needed by a required claim (for example clear text inside a required claim's parent element) is reported as `required = true, selectable = false` instead of offered as a choice.
 
 ## Configuration:
 
