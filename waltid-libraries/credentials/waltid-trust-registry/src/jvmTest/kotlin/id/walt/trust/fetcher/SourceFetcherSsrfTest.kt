@@ -1,7 +1,10 @@
 package id.walt.trust.fetcher
 
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.UnknownHostException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,8 +13,10 @@ import kotlin.test.assertFalse
 /**
  * SSRF guard tests for addresses that Java's `InetAddress` predicates do not classify as local:
  * IPv6 transition addresses (NAT64, 6to4, Teredo) that embed an IPv4 address, and the unspecified addresses.
- * Each check runs against both layers: URL pre-validation and the connect-time [SourceFetcher.SecureDns].
- * All addresses are IP literals, so resolution never leaves the JVM.
+ * Checks run against URL pre-validation and [SourceFetcher.SecureDns], which stands in for a hostname that
+ * resolves to the address (OkHttp only calls it for hostnames). Blocked addresses also run against
+ * [SourceFetcher.SecureSocketFactory], which guards every connect, including IP literals and redirect targets.
+ * All addresses are IP literals, so nothing leaves the JVM.
  */
 class SourceFetcherSsrfTest {
 
@@ -23,6 +28,13 @@ class SourceFetcherSsrfTest {
         assertEquals(true, reason?.contains("embedded in IPv6 transition address"), "Unexpected reason for $address: $reason")
         assertFailsWith<UnknownHostException>("SecureDns resolved $address") {
             SourceFetcher.SecureDns(config).lookup(address)
+        }
+        assertSocketBlocked(address)
+    }
+
+    private fun assertSocketBlocked(address: String) {
+        assertFailsWith<SourceFetcher.BlockedAddressException>("Socket connected to $address") {
+            SourceFetcher.SecureSocketFactory(config).createSocket().connect(InetSocketAddress(InetAddress.getByName(address), 80))
         }
     }
 
@@ -64,6 +76,7 @@ class SourceFetcherSsrfTest {
     fun `applies the configured block rules to the embedded IPv4 address`() {
         val loopbackAllowed = FetcherSecurityConfig(blockLoopback = false)
         assertEquals(true to null, SourceFetcher.validateUrl("http://[64:ff9b::7f00:1]/", loopbackAllowed))
+        assertEquals(listOf(InetAddress.getByName("64:ff9b::7f00:1")), SourceFetcher.SecureDns(loopbackAllowed).lookup("64:ff9b::7f00:1"))
     }
 
     @Test
@@ -73,6 +86,40 @@ class SourceFetcherSsrfTest {
         assertEquals(false to reason, SourceFetcher.validateUrl("http://[::]/", config))
         assertFailsWith<UnknownHostException> { SourceFetcher.SecureDns(config).lookup("0.0.0.0") }
         assertFailsWith<UnknownHostException> { SourceFetcher.SecureDns(config).lookup("::") }
+        assertSocketBlocked("0.0.0.0")
+        assertSocketBlocked("::")
+    }
+
+    @Test
+    fun `fetch refuses a redirect to a blocked IP literal`() = runBlocking {
+        val redirects = mapOf(
+            "/metadata" to "http://169.254.169.254/latest/meta-data/",
+            "/nat64-metadata" to "http://[64:ff9b::a9fe:a9fe]/latest/meta-data/",
+        )
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        redirects.forEach { (path, location) ->
+            server.createContext(path) { exchange ->
+                exchange.responseHeaders.add("Location", location)
+                exchange.sendResponseHeaders(302, -1)
+                exchange.close()
+            }
+        }
+        server.start()
+        try {
+            // Loopback is allowed so the first hop reaches the local server; the redirect target must still be refused.
+            val loopbackAllowed = FetcherSecurityConfig(blockLoopback = false)
+            for (path in redirects.keys) {
+                val result = SourceFetcher.fetch("http://127.0.0.1:${server.address.port}$path", loopbackAllowed)
+                assertFalse(result.success, "Redirect from $path was followed")
+                assertEquals(
+                    true,
+                    result.error?.startsWith("Blocked by security policy: Link-local addresses are blocked"),
+                    "Unexpected error for $path: ${result.error}"
+                )
+            }
+        } finally {
+            server.stop(0)
+        }
     }
 
     @Test

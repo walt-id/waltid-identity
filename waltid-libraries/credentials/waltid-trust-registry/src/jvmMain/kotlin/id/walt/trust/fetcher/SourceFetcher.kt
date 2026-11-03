@@ -8,9 +8,14 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import okhttp3.Dns
+import java.io.IOException
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketAddress
 import java.net.UnknownHostException
+import javax.net.SocketFactory
 
 private val log = KotlinLogging.logger {}
 
@@ -22,6 +27,8 @@ private val log = KotlinLogging.logger {}
  * - Hostname allow-listing (optional)
  * - Private IP blocking at DNS resolution time via [SecureDns]
  * - The same blocking for IPv4 addresses embedded in NAT64, 6to4 and Teredo IPv6 addresses
+ * - The same blocking on every socket connect via [SecureSocketFactory], which also covers
+ *   IP-literal URLs and redirect targets that never pass through [SecureDns]
  * - DNS pinning to prevent TOCTOU/rebinding attacks
  * - Request timeouts to prevent resource exhaustion
  */
@@ -46,6 +53,46 @@ actual object SourceFetcher {
         }
     }
 
+    internal class BlockedAddressException(message: String) : IOException(message)
+
+    /**
+     * Socket factory that validates every connection target against security policy.
+     * OkHttp skips [Dns] for IP-literal hosts, and Ktor follows redirects without re-running
+     * [validateUrl], so a redirect to an IP literal is only caught here.
+     */
+    internal class SecureSocketFactory(private val config: FetcherSecurityConfig) : SocketFactory() {
+        override fun createSocket(): Socket = object : Socket() {
+            override fun connect(endpoint: SocketAddress, timeout: Int) {
+                val address = (endpoint as? InetSocketAddress)?.address
+                if (address != null) {
+                    blockedReason(address, config)?.let {
+                        close()
+                        throw BlockedAddressException("$it: ${address.hostAddress}")
+                    }
+                }
+                super.connect(endpoint, timeout)
+            }
+        }
+
+        override fun createSocket(host: String, port: Int): Socket =
+            createSocket().apply { connect(InetSocketAddress(host, port)) }
+
+        override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket =
+            createSocket().apply {
+                bind(InetSocketAddress(localHost, localPort))
+                connect(InetSocketAddress(host, port))
+            }
+
+        override fun createSocket(host: InetAddress, port: Int): Socket =
+            createSocket().apply { connect(InetSocketAddress(host, port)) }
+
+        override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket =
+            createSocket().apply {
+                bind(InetSocketAddress(localAddress, localPort))
+                connect(InetSocketAddress(address, port))
+            }
+    }
+
     private fun createClient(config: FetcherSecurityConfig): HttpClient {
         return HttpClient(OkHttp) {
             expectSuccess = false
@@ -57,6 +104,7 @@ actual object SourceFetcher {
             engine {
                 config {
                     dns(SecureDns(config))
+                    socketFactory(SecureSocketFactory(config))
                 }
             }
         }
@@ -93,6 +141,9 @@ actual object SourceFetcher {
                 )
             }
         } catch (e: UnknownHostException) {
+            log.warn { "SSRF protection blocked request to $url: ${e.message}" }
+            FetchResult(success = false, error = "Blocked by security policy: ${e.message}")
+        } catch (e: BlockedAddressException) {
             log.warn { "SSRF protection blocked request to $url: ${e.message}" }
             FetchResult(success = false, error = "Blocked by security policy: ${e.message}")
         } catch (e: Exception) {
