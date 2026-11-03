@@ -130,8 +130,13 @@ class OpenId4VciController(
                 call.respond(metadataService.getAuthorizationServerDiscoveryMetadata())
             }
 
-            route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
+            route.get(".well-known/jwt-vc-issuer", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
                 call.respond(metadataService.getJwtVcIssuerMetadata())
+            }
+
+            // Retain the original issuer value for credentials carrying the old iss.
+            route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata(legacy = true)) {
+                call.respond(metadataService.getLegacyJwtVcIssuerMetadata())
             }
 
             route.get(".well-known/vct/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
@@ -139,13 +144,19 @@ class OpenId4VciController(
                 call.respond(metadataService.getVctTypeMetadata(credentialType))
             }
 
-            route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
+            route.get("{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
                 call.respond(metadataService.getVctTypeMetadata(credentialType))
             }
+
+            route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata(legacy = true)) {
+                val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
+                call.respond(metadataService.getVctTypeMetadata(credentialType, legacy = true))
+            }
         }
 
-        route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
+        // Tag operations individually: the VCT lookup shares this path prefix but belongs to SD-JWT VC.
+        route.route("openid4vci", {}) {
             if (Issuer2RouteSurface.METADATA in surfaces) get(Issuer2EndpointPaths.JWKS, OpenId4VciRoutesDocs.jwks()) {
                 call.respond(metadataService.listJwks())
             }

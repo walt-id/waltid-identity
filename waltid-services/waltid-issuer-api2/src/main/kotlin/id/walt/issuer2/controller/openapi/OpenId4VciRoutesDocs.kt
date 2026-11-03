@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 
 object OpenId4VciRoutesDocs {
     const val OPENID4VCI_TAG = "Issuer Service API v2 - OpenID4VCI"
+    const val SD_JWT_VC_TAG = "Issuer Service API v2 - SD-JWT VC"
 
     fun credentialIssuerMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
@@ -62,9 +63,18 @@ object OpenId4VciRoutesDocs {
         }
     }
 
-    fun jwtVcIssuerMetadata(): RouteConfig.() -> Unit = {
-        tags = listOf(OPENID4VCI_TAG)
-        summary = "Get SD-JWT VC issuer metadata"
+    fun jwtVcIssuerMetadata(legacy: Boolean = false): RouteConfig.() -> Unit = {
+        tags = listOf(SD_JWT_VC_TAG)
+        deprecated = legacy
+        summary = if (legacy) "Get compatibility SD-JWT VC issuer metadata" else "Get SD-JWT VC issuer metadata"
+        description = if (legacy) {
+            "Deprecated compatibility endpoint for credentials whose iss includes /openid4vci. " +
+                    "It remains available and returns their original issuer identifier. New credentials use " +
+                    "the issuer service URL and /.well-known/jwt-vc-issuer for discovery."
+        } else {
+            "Discover verification keys from the credential's iss using /.well-known/jwt-vc-issuer. " +
+                    "The default SD-JWT issuer is the service base URL."
+        }
         response {
             HttpStatusCode.OK to {
                 description = "SD-JWT VC issuer metadata"
@@ -73,11 +83,13 @@ object OpenId4VciRoutesDocs {
         }
     }
 
-    fun vctTypeMetadata(): RouteConfig.() -> Unit = {
-        tags = listOf(OPENID4VCI_TAG)
-        summary = "Get SD-JWT VC type metadata"
+    fun vctTypeMetadata(legacy: Boolean = false): RouteConfig.() -> Unit = {
+        tags = listOf(SD_JWT_VC_TAG)
+        deprecated = legacy
+        summary = if (legacy) "Get compatibility SD-JWT VC type metadata" else "Get SD-JWT VC type metadata"
         description = "Look up type metadata this issuer stores. Self-hosted HTTPS vct values are served at " +
-                "`/.well-known/vct/{type}` and `/openid4vci/{type}`. A configured URN such as `urn:eudi:pid:1` " +
+                "`/{type}` and `/.well-known/vct/{type}`. The deprecated `/openid4vci/{type}` route retains " +
+                "the original VCT identifier for existing credentials. A configured URN such as `urn:eudi:pid:1` " +
                 "is served from those same routes by identifier. SD-JWT VC retrieves HTTPS type metadata from the " +
                 "vct URL itself; this route is the issuer's lookup, not that resolution rule. Unknown types, " +
                 "external HTTPS vct values, and reserved OpenID4VCI path names return 404."
@@ -96,6 +108,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun jwks(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get issuer JWKS"
         response {
             HttpStatusCode.OK to {
@@ -106,6 +119,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun credentialOffer(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get credential offer"
         description = "Resolve a credential offer by issuance session ID."
         request {
@@ -126,6 +140,7 @@ object OpenId4VciRoutesDocs {
         "A valid challenge is reusable across PAR, TOKEN and refresh until expiry; it is separate from c_nonce."
 
     fun challenge(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Client attestation challenge"
         description = "Unauthenticated endpoint accepting an empty POST body. Enabled by the client-attestation " +
                 "challenge configuration and advertised as challenge_endpoint in authorization server metadata."
@@ -148,6 +163,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun pushedAuthorizationRequest(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Pushed Authorization Request (PAR)"
         description = "RFC 9126 PAR endpoint: submit authorization parameters and receive a request_uri." +
                 ATTESTATION_CHALLENGE_RETRY
@@ -181,6 +197,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun authorize(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Authorization endpoint"
         description =
             "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example."
@@ -192,14 +209,17 @@ object OpenId4VciRoutesDocs {
     }
 
     fun externalOAuthCallback(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         hidden = true
     }
 
     fun externalLogin(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         hidden = true
     }
 
     fun token(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Token endpoint"
         description = "The token endpoint. A DPoP proof binds the issued access token to the proof key." +
                 ATTESTATION_CHALLENGE_RETRY
@@ -237,6 +257,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun credential(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Credential endpoint"
         description = """
             Issue one or more credentials for a single credential target. Plaintext JSON and encrypted
@@ -381,6 +402,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun nonce(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Nonce endpoint"
         description = "Return a signed OpenID4VCI c_nonce. This endpoint is not protected by an access token."
         response {

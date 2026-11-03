@@ -365,7 +365,7 @@ class Issuer2AttestationChallengeTest {
         val material: Issuer2ClientAttestationTestMaterial,
         val instanceKey: id.walt.crypto2.keys.Key,
     ) {
-        val issuer = config.openId4VciBaseUrl()
+        val issuer = config.openId4VciIssuerUrl()
         var codeConsumptions = 0
         private val codeStore = InMemoryAuthorizationCodeRepository()
         val codes = object : id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository by codeStore {

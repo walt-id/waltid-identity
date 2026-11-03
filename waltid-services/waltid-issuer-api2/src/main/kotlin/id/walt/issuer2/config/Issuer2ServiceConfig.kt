@@ -14,6 +14,7 @@ import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
+    /** Public deployment URL. Service and protocol URLs are derived from this setting. */
     val baseUrl: String,
     /** Legacy token key retained as the validation sidecar and in-memory migration source. */
     val ciTokenKey: String = runBlocking { KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1)) },
@@ -64,7 +65,9 @@ data class Issuer2ServiceConfig(
         credentialEncryptionKey?.let(CredentialEncryptionKeyConfig::validate)
     }
 
-    fun openId4VciBaseUrl(): String = baseUrl.trimEnd('/') + "/openid4vci"
+    fun issuerServiceBaseUrl(): String = baseUrl.trimEnd('/')
+
+    fun openId4VciIssuerUrl(): String = issuerServiceBaseUrl() + "/openid4vci"
 
     fun clientAttestationConfig(): ClientAttestationVerifierConfig? =
         clientAuthenticationConfig?.clientAttestationMethod()?.config

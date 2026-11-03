@@ -515,6 +515,7 @@ object Verifier2OpenApiExamples {
                     id = "sca_payment",
                     format = CredentialFormat.DC_SD_JWT,
                     meta = SdJwtVcMeta(vctValues = listOf(
+                        "https://issuer2.demo.walt.id/sca_payment_card_sd_jwt",
                         "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt",
                     )),
                     claims = listOf("card_scheme", "card_last4", "card_holder_name")

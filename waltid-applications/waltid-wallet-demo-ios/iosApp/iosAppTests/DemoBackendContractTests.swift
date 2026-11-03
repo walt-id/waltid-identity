@@ -10,7 +10,8 @@ final class DemoBackendContractTests: XCTestCase {
         XCTAssertEqual(query["id"] as? String, "sca_payment")
         XCTAssertEqual(query["format"] as? String, "dc+sd-jwt")
         XCTAssertEqual((query["meta"] as? [String: [String]])?["vct_values"],
-                       ["https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt"])
+                       ["https://issuer2.demo.walt.id/sca_payment_card_sd_jwt",
+                        "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt"])
         let claims = try XCTUnwrap(query["claims"] as? [[String: [String]]])
         XCTAssertEqual(claims.compactMap { $0["path"] },
                        [["card_scheme"], ["card_last4"], ["card_holder_name"]])

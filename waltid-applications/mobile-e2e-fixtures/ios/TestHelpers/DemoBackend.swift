@@ -33,7 +33,11 @@ public struct DemoMetadataSigner {
 
 public final class DemoBackend {
     public static let shared = DemoBackend()
-    private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
+    private static let eudiPidSdJwtVcts = [
+        "urn:eudi:pid:1",
+        "https://issuer2.demo.walt.id/urn:eudi:pid:1",
+        "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1",
+    ]
     public static let transactionDataProfilesURL = URL(string: "https://wallet2.demo.walt.id/transaction-data-profiles")!
     private static let paymentAuthorizationType = "org.waltid.transaction-data.payment-authorization"
     private static let requiredPaymentAuthorizationFields: Set<String> = ["merchant_name", "amount", "currency"]
@@ -47,7 +51,7 @@ public final class DemoBackend {
             format: "dc+sd-jwt",
             verifierCredentialQuery: sdJwtQuery(
                 id: "pid",
-                vct: eudiPidSdJwtVct
+                vctValues: eudiPidSdJwtVcts
             )
         ),
         DemoCredentialScenario(
@@ -85,7 +89,10 @@ public final class DemoBackend {
         id: "sca-payment-sdjwt", displayName: "SCA Payment Card SD-JWT (demo)",
         profileId: "scaPaymentCardSdJwt", credentialConfigurationId: "sca_payment_card_sd_jwt", format: "dc+sd-jwt",
         verifierCredentialQuery: sdJwtQuery(
-            id: "sca_payment", vct: "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt",
+            id: "sca_payment", vctValues: [
+                "https://issuer2.demo.walt.id/sca_payment_card_sd_jwt",
+                "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt",
+            ],
             claims: ["card_scheme", "card_last4", "card_holder_name"]
         )
     )
@@ -530,11 +537,11 @@ public final class DemoBackend {
         )
     }
 
-    private static func sdJwtQuery(id: String, vct: String, claims: [String] = []) -> [String: Any] {
+    private static func sdJwtQuery(id: String, vctValues: [String], claims: [String] = []) -> [String: Any] {
         var query: [String: Any] = [
             "id": id,
             "format": "dc+sd-jwt",
-            "meta": ["vct_values": [vct]],
+            "meta": ["vct_values": vctValues],
         ]
         if !claims.isEmpty {
             query["claims"] = claims.map { ["path": [$0]] }

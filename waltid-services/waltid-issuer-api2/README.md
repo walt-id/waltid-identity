@@ -298,14 +298,51 @@ the first item's credential references index 94567 and the second item's credent
 | `GET` | `/issuer2/sessions/{sessionId}` | Get an issuance session |
 | `GET` | `/issuer2/sessions/{sessionId}/events` | Stream issuance session updates via SSE |
 
+### Issuer URLs
+
+`issuer-service.conf`'s `baseUrl` is the public deployment URL. Internally,
+`publicBaseUrl` names that value, `issuerServiceBaseUrl` is the issuer service URL
+(the same URL in this standalone service), and `openId4VciIssuerUrl` appends
+`/openid4vci`. OAuth, credential offers, and credential proof audiences use the
+OpenID4VCI URL. New SD-JWT VCs use the issuer service URL as their default `iss`;
+explicit issuer overrides keep their existing behavior.
+
+For `baseUrl = "https://issuer.example"`, SD-JWT issuer metadata is discovered at
+`https://issuer.example/.well-known/jwt-vc-issuer` and returns
+`issuer = "https://issuer.example"`. It references the shared `/openid4vci/jwks`
+endpoint. The old metadata path is deprecated in OpenAPI and remains available
+with its original `issuer = "https://issuer.example/openid4vci"` for existing
+credentials.
+
+New self-hosted VCTs use `https://issuer.example/{type}`. Type metadata is served
+at both `/{type}` and `/.well-known/vct/{type}`. The old `/openid4vci/{type}`
+route is deprecated and retains the original `vct` in its response for existing
+credentials. Explicit VCT URLs and URN identifiers keep their configured values.
+
+This URL change requires no additional database schema or session migration,
+and existing credentials do not need to be reissued. Keep the legacy discovery
+route and the original public signing keys available while those credentials
+remain valid. Verifiers that pin an allowed issuer URL must also allow the new
+service URL for newly issued credentials. An explicit profile or runtime
+`issuerDid` override can retain the previous issuer URL for new issuance.
+Queries that pin self-hosted VCT identifiers must also accept the new service
+URLs for newly issued credentials; keep the legacy type metadata available for
+credentials that still contain the previous VCT URLs.
+Self-hosted type names must avoid reserved service and documentation paths. An
+explicit VCT URL can retain a legacy identifier when its type name conflicts
+with a service path.
+
 ### OpenID4VCI API
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/.well-known/openid-credential-issuer/openid4vci` | Credential issuer metadata |
 | `GET` | `/.well-known/oauth-authorization-server/openid4vci` | Authorization server metadata |
-| `GET` | `/.well-known/jwt-vc-issuer/openid4vci` | JWT VC issuer metadata |
+| `GET` | `/.well-known/jwt-vc-issuer` | SD-JWT VC issuer metadata |
+| `GET` | `/.well-known/jwt-vc-issuer/openid4vci` | Deprecated compatibility metadata for previously issued credentials |
 | `GET` | `/.well-known/vct/{type}` | SD-JWT VC type metadata |
+| `GET` | `/{type}` | SD-JWT VC type metadata at the VCT URL |
+| `GET` | `/openid4vci/{type}` | Deprecated compatibility type metadata with its original VCT |
 | `GET` | `/openid4vci/jwks` | Issuer signing keys |
 | `GET` | `/openid4vci/credential-offer?id={sessionId}` | Credential offer by reference |
 | `GET` | `/openid4vci/authorize` | Authorization endpoint |

@@ -35,6 +35,26 @@ import kotlin.test.assertTrue
 class Issuer2MetadataServiceTest {
 
     @Test
+    fun `SD-JWT discovery and self-hosted VCTs use the service URL and preserve legacy discovery`() {
+        for (publicBaseUrl in listOf("https://issuer.example/", "https://issuer.example/deployment/")) {
+            val service = metadataService(
+                baseUrl = publicBaseUrl,
+                metadataConfig = sdJwtMetadata("identity", "vctBaseUrl"),
+            )
+            val serviceUrl = publicBaseUrl.trimEnd('/')
+            val protocolUrl = "$serviceUrl/openid4vci"
+            assertEquals(serviceUrl, service.getJwtVcIssuerMetadata().issuer)
+            assertEquals("$protocolUrl/jwks", service.getJwtVcIssuerMetadata().jwksUri)
+            assertEquals(protocolUrl, service.getLegacyJwtVcIssuerMetadata().issuer)
+            assertEquals(protocolUrl, service.getCredentialIssuerMetadata().credentialIssuer)
+            assertEquals(protocolUrl, service.getAuthorizationServerMetadata().issuer)
+            assertEquals("$serviceUrl/identity", service.getVctTypeMetadata("identity").vct)
+            assertEquals("$protocolUrl/identity", service.getVctTypeMetadata("identity", legacy = true).vct)
+        }
+    }
+
+
+    @Test
     fun `authorization metadata advertises credential authorization details`() {
         val metadata = metadataService().getAuthorizationServerMetadata()
         assertEquals(setOf("openid_credential"), metadata.authorizationDetailsTypesSupported)
@@ -59,7 +79,7 @@ class Issuer2MetadataServiceTest {
             sdJwtVcTypeMetadataConfiguration = mapOf("payment" to configured),
         )
         val metadata = metadataService(metadataConfig = config).getVctTypeMetadata("payment")
-        assertEquals(configured.copy(vct = "http://localhost/openid4vci/payment"), metadata)
+        assertEquals(configured.copy(vct = "http://localhost/payment"), metadata)
         assertEquals(extension, metadata.toJSON()["transaction_data_types"])
     }
 
@@ -75,6 +95,33 @@ class Issuer2MetadataServiceTest {
             wrongFormat.copy(sdJwtVcTypeMetadataConfiguration = mapOf("payment" to metadata)),
             valid.copy(sdJwtVcTypeMetadataConfiguration = mapOf("payment" to metadata.copy(vct = "https://different.example/type"))),
         )) assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = invalid) }
+    }
+
+    @Test
+    fun `legacy explicit VCT settings and metadata remain loadable without rewriting configuration`() {
+        val legacyVct = "http://localhost/openid4vci/identity"
+        for (configuredVct in listOf("vctBaseUrl", legacyVct)) {
+            for (metadataVct in listOf("vctBaseUrl", legacyVct)) {
+                val config = sdJwtMetadata("identity", configuredVct).copy(
+                    sdJwtVcTypeMetadataConfiguration = mapOf("identity" to SdJwtVcTypeMetadataDraft04(vct = metadataVct, name = "Identity")),
+                )
+                val service = metadataService(metadataConfig = config)
+                val expectedVct = if (configuredVct == "vctBaseUrl") "http://localhost/identity" else legacyVct
+                assertEquals(expectedVct, service.getVctTypeMetadata("identity").vct)
+                assertEquals(legacyVct, service.getVctTypeMetadata("identity", legacy = true).vct)
+                assertEquals(metadataVct, config.sdJwtVcTypeMetadataConfiguration.getValue("identity").vct)
+            }
+        }
+    }
+
+    @Test
+    fun `self-hosted VCTs cannot shadow the service or documentation routes`() {
+        for (name in listOf("api.json", "swagger", "redoc", "issuer2", "openid4vci", ".well-known", "static", "health")) {
+            assertFailsWith<IllegalArgumentException>(name) { metadataService(metadataConfig = sdJwtMetadata(name, "vctBaseUrl")) }
+            val legacyVct = "http://localhost/openid4vci/$name"
+            val legacy = metadataService(metadataConfig = sdJwtMetadata(name, legacyVct))
+            assertEquals(legacyVct, legacy.getVctTypeMetadata(name, legacy = true).vct)
+        }
     }
 
     @Test
@@ -213,7 +260,7 @@ class Issuer2MetadataServiceTest {
     @Test
     fun `unknown and reserved metadata types are not found`() {
         val service = metadataService(metadataConfig = sdJwtMetadata("EmployeeCredential", "vctBaseUrl"))
-        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
+        assertEquals("http://localhost/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
         (RESERVED_VCT_NAMES + "missing-type").forEach { name ->
             assertFailsWith<NotFoundException>(name) { service.getVctTypeMetadata(name) }
         }

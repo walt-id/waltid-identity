@@ -51,8 +51,8 @@ class MetadataService @JvmOverloads constructor(
         encodeDefaults = true
     }
 
-    private val issuerHttpBaseUrl = serviceConfig.baseUrl.trimEnd('/')
-    private val baseUrl = serviceConfig.openId4VciBaseUrl()
+    private val publicBaseUrl = serviceConfig.baseUrl.trimEnd('/')
+    private val openId4VciIssuerUrl = serviceConfig.openId4VciIssuerUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
     private val credentialEncryptionKeyConfig = serviceConfig.credentialEncryptionKey
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
@@ -71,7 +71,7 @@ class MetadataService @JvmOverloads constructor(
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
-            ?.map { DisplayUriResolver.resolve(it, issuerHttpBaseUrl) }
+            ?.map { DisplayUriResolver.resolve(it, publicBaseUrl) }
             ?.map { json.decodeFromJsonElement(IssuerDisplay.serializer(), it) }
             ?.takeIf { it.isNotEmpty() }
 
@@ -79,7 +79,7 @@ class MetadataService @JvmOverloads constructor(
         metadataConfig.credentialConfigurations.mapValues { (configurationId, value) ->
             json.decodeFromJsonElement(
                 CredentialConfiguration.serializer(),
-                DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
+                DisplayUriResolver.resolve(value, publicBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
                 configuration.vct?.let { validateVct(configurationId, it) }
             }
@@ -104,7 +104,10 @@ class MetadataService @JvmOverloads constructor(
             val vct = requireNotNull(configuration.vct) { "SD-JWT configuration '$configurationId' requires a VCT" }
             val suppliedVct =
                 metadata.vct?.let { if (it == INTERNAL_VCT_BASE_URL) selfHostedVct(configurationId) else it }
-            require(suppliedVct == null || suppliedVct == vct) {
+            val hostedAliases = setOf(
+                selfHostedVct(configurationId), "$publicBaseUrl/.well-known/vct/$configurationId", legacySelfHostedVct(configurationId),
+            )
+            require(suppliedVct == null || suppliedVct == vct || (suppliedVct in hostedAliases && vct in hostedAliases)) {
                 "Type metadata VCT does not match credential configuration '$configurationId'"
             }
             val resolved = metadata.copy(vct = vct)
@@ -116,7 +119,7 @@ class MetadataService @JvmOverloads constructor(
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
             CredentialIssuerMetadata.fromBaseUrl(
-                baseUrl = baseUrl,
+                baseUrl = openId4VciIssuerUrl,
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
@@ -140,7 +143,7 @@ class MetadataService @JvmOverloads constructor(
 
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
-            baseUrl = baseUrl,
+            baseUrl = openId4VciIssuerUrl,
             codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/par",
             challengeEndpointPath = if (supportsAttestationChallenges) "/${Issuer2EndpointPaths.CHALLENGE}" else null,
@@ -161,13 +164,14 @@ class MetadataService @JvmOverloads constructor(
         return metadata.copy(signedMetadata = signer.sign(metadata))
     }
 
-    fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
-        getAuthorizationServerMetadata().let { metadata ->
-            JWTVCIssuerMetadata(
-                issuer = metadata.issuer,
-                jwksUri = metadata.jwksUri,
-            )
-        }
+    fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata = JWTVCIssuerMetadata(
+        issuer = issuerServiceBaseUrl(),
+        jwksUri = "$openId4VciIssuerUrl/${Issuer2EndpointPaths.JWKS}",
+    )
+
+    /** Discovery for credentials issued before the SD-JWT issuer URL lost its protocol suffix. */
+    fun getLegacyJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
+        getJwtVcIssuerMetadata().copy(issuer = openId4VciIssuerUrl)
 
     fun getCredentialConfiguration(credentialConfigurationId: String): CredentialConfiguration? =
         credentialConfigurations[credentialConfigurationId]
@@ -179,24 +183,29 @@ class MetadataService @JvmOverloads constructor(
             }
             .keys
 
-    fun getVctTypeMetadata(credentialType: String): SdJwtVcTypeMetadataDraft04 {
+    fun getVctTypeMetadata(credentialType: String, legacy: Boolean = false): SdJwtVcTypeMetadataDraft04 {
         if (credentialType in Issuer2EndpointPaths.reservedVctNames) {
             throw NotFoundException("Credential type metadata not found: $credentialType")
         }
         val hostedVct = selfHostedVct(credentialType)
+        val legacyVct = legacySelfHostedVct(credentialType)
+        val hostedAliases = setOf(hostedVct, "$publicBaseUrl/.well-known/vct/$credentialType", legacyVct)
         val resolvedVct = credentialConfigurations.values.firstNotNullOfOrNull { configuration ->
             val vct = configuration.vct ?: return@firstNotNullOfOrNull null
             when {
-                vct == hostedVct -> vct
+                vct in hostedAliases -> vct
                 vct == credentialType && vctKind(vct) == VctKind.URN -> vct
                 else -> null
             }
         } ?: throw NotFoundException("Credential type metadata not found: $credentialType")
 
-        return configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
+        val metadata = configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
+        return if (legacy && resolvedVct in hostedAliases) metadata.copy(vct = legacyVct) else metadata
     }
 
-    fun issuerBaseUrl(): String = baseUrl
+    fun issuerServiceBaseUrl(): String = publicBaseUrl
+
+    fun openId4VciIssuerUrl(): String = openId4VciIssuerUrl
 
     /**
      * Publishes token and credential signing public keys, per RFC 8414 `jwks_uri`.
@@ -284,7 +293,10 @@ class MetadataService @JvmOverloads constructor(
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
 
     private fun selfHostedVct(credentialType: String): String =
-        "$baseUrl/$credentialType"
+        "$publicBaseUrl/$credentialType"
+
+    private fun legacySelfHostedVct(credentialType: String): String =
+        "$openId4VciIssuerUrl/$credentialType"
 
     private fun validateVct(configurationId: String, vct: String) {
         require(vct.isNotBlank()) {
@@ -326,18 +338,26 @@ class MetadataService @JvmOverloads constructor(
         )
 
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
-        // Only HTTP(S) VCTs that share this issuer's origin can collide with protocol routes.
+        // Only HTTP(S) VCTs that share this issuer's origin can collide with service routes.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
-        val issuerUri = URI(baseUrl)
+        val issuerUri = URI(openId4VciIssuerUrl)
         if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
             !vctUri.host.equals(issuerUri.host, ignoreCase = true) ||
             vctUri.effectivePort() != issuerUri.effectivePort()
         ) return
 
         val prefix = issuerUri.normalize().path.trimEnd('/') + "/"
+        val servicePrefix = URI(publicBaseUrl).normalize().path.trimEnd('/') + "/"
         val path = vctUri.normalize().path ?: return
-        if (!path.startsWith(prefix)) return
-        val name = path.removePrefix(prefix).substringBefore('/')
+        val servicePath = path.takeIf { it.startsWith(servicePrefix) }?.removePrefix(servicePrefix)
+        require(servicePath !in Issuer2EndpointPaths.reservedServiceVctNames) {
+            "Credential configuration '$configurationId' has self-hosted VCT '$vct' under reserved issuer service path '$servicePath'."
+        }
+        val name = when {
+            path.startsWith(prefix) -> path.removePrefix(prefix).substringBefore('/')
+            servicePath in Issuer2EndpointPaths.reservedVctNames -> servicePath
+            else -> return
+        }
         require(name !in Issuer2EndpointPaths.reservedVctNames) {
             "Credential configuration '$configurationId' has self-hosted VCT '$vct' under reserved " +
                     "OpenID4VCI path '$name'. Choose a different VCT path or an externally hosted VCT URL."

@@ -1089,7 +1089,7 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     private fun configuredIssuerBaseUrl(): String =
-        ConfigManager.getConfig<Issuer2ServiceConfig>().openId4VciBaseUrl()
+        ConfigManager.getConfig<Issuer2ServiceConfig>().openId4VciIssuerUrl()
 
     private fun runtimeOverridesForConfiguredProfile(profileId: String): CredentialOfferRuntimeOverrides? =
         when (profileId) {

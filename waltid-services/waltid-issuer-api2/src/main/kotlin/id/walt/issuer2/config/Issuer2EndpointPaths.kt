@@ -17,4 +17,8 @@ internal object Issuer2EndpointPaths {
     val reservedVctNames: Set<String> = setOf(
         JWKS, CREDENTIAL_OFFER, PAR, AUTHORIZE, EXTERNAL_LOGIN, EXTERNAL_CALLBACK, TOKEN, NONCE, CHALLENGE, CREDENTIAL,
     ).map { it.substringBefore('/') }.toSet()
+
+    val reservedServiceVctNames: Set<String> = setOf(
+        ".well-known", "openid4vci", "issuer2", "static", "api.json", "swagger", "redoc", "health",
+    )
 }
