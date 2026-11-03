@@ -3,6 +3,7 @@ package id.walt.policies.policies.status.validator
 import id.walt.policies.policies.status.CredentialFetcher
 import id.walt.policies.policies.status.model.*
 import id.walt.policies.policies.status.reader.StatusValueReader
+import id.walt.policies2.vc.policies.status.runStatusCheck
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : StatusPolicyAttribute>(
@@ -11,11 +12,19 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
 ) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
-    override suspend fun validate(entry: M, attribute: T): Result<Unit> = runCatching {
+    override suspend fun validate(entry: M, attribute: T): Result<Unit> =
+        validate(entry, attribute, authenticate = null)
+
+    protected suspend fun validate(
+        entry: M,
+        attribute: T,
+        authenticate: (suspend (String) -> Unit)?,
+    ): Result<Unit> = runStatusCheck {
         logger.debug { "Credential URL: ${entry.uri}" }
         // download status credential
         val statusListContent = fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
+        authenticate?.invoke(statusListContent)
         val matchingReader = reader.firstOrNull { it.canHandle(statusListContent) }
         requireNotNull(matchingReader) { "No available reader to handle the status list content." }
         // parse status list
