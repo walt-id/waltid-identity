@@ -31,6 +31,11 @@ tasks.withType<AbstractTestTask>().configureEach {
 // Live suites (OpenID conformance, e2e, integration) are one Gradle Test task wrapping
 // many minutes of work. A global JUnit/task timeout kills those. Opt in from CI instead.
 tasks.withType<Test>().configureEach {
+    // The private-network guard refuses loopback unless a deployment opts in. JVM tests bind servers on
+    // 127.0.0.1. waltid-web-data-fetching's own tests assert that default, so they do not get this property.
+    if (project.name != "waltid-web-data-fetching") {
+        systemProperty("walt.ssrf.allowLoopback", "true")
+    }
     val junitTimeout = providers.environmentVariable("JUNIT_TIMEOUT_DEFAULT").orNull
     val longRunning = project.name in setOf(
         "waltid-openid4vp-conformance-runners",

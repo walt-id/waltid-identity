@@ -4,6 +4,8 @@ import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.webwallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
@@ -70,7 +72,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         localWalletClient = newClient()
 
         WalletHttpClients.defaultMethod = {
-            newClient()
+            WebDataFetcher.wrapping(newClient(), WebDataFetcherId.WALLET_API_HTTP_CLIENT.name)
         }
         setupTestWebWallet()
 

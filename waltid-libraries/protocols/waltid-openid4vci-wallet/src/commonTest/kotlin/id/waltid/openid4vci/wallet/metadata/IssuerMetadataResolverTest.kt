@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.metadata
 
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -287,6 +288,68 @@ class IssuerMetadataResolverTest {
     }
 
     @Test
+    fun `fallback retains independent freshness and uses the latest nonblank headers`() = runTest {
+        val issuer = "https://issuer.example.org"
+        val challengeHeader = "OAuth-Client-Attestation-Challenge"
+        for (firstStatus in listOf(HttpStatusCode.NotFound, HttpStatusCode.ServiceUnavailable)) {
+            for ((nextChallenge, nextNonce) in listOf(null to null, "new-challenge" to null,
+                null to "new-nonce", "new-challenge" to "new-nonce", " " to " ")) {
+                val requested = mutableListOf<String>()
+                val client = HttpClient(MockEngine) {
+                    expectSuccess = true
+                    install(ContentNegotiation) { json(json) }
+                    install(HttpRequestRetry) { retryOnServerErrors(maxRetries = 2); delayMillis { 0L } }
+                    engine { addHandler { request ->
+                        requested += request.url.encodedPath
+                        when (request.url.encodedPath) {
+                            "/.well-known/oauth-authorization-server" -> respond("{}", firstStatus, Headers.build {
+                                append(challengeHeader, "first-challenge")
+                                append("DPoP-Nonce", "first-nonce")
+                                append("X-Error-Only", "do-not-forward")
+                            })
+                            "/.well-known/openid-configuration" -> respond(
+                                """{"issuer":"$issuer","authorization_endpoint":"$issuer/authorize","token_endpoint":"$issuer/token","response_types_supported":["code"]}""",
+                                HttpStatusCode.OK, Headers.build {
+                                    append(HttpHeaders.ContentType, "application/json")
+                                    append("X-Metadata", "retained")
+                                    nextChallenge?.let { append(challengeHeader, it) }
+                                    nextNonce?.let { append("DPoP-Nonce", it) }
+                                })
+                            else -> error("Unexpected metadata request ${request.url}")
+                        }
+                    } }
+                }
+                try {
+                    val resolved = IssuerMetadataResolver(client).resolveAuthorizationServerMetadataDetailed(issuer)
+                    assertEquals(issuer, resolved.metadata.issuer)
+                    assertEquals(nextChallenge?.takeIf(String::isNotBlank) ?: "first-challenge", resolved.headers[challengeHeader])
+                    assertEquals(nextNonce?.takeIf(String::isNotBlank) ?: "first-nonce", resolved.headers["DPoP-Nonce"])
+                    assertEquals("retained", resolved.headers["X-Metadata"])
+                    assertNull(resolved.headers["X-Error-Only"])
+                    assertEquals(listOf("/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"), requested)
+                } finally { client.close() }
+            }
+        }
+    }
+
+    @Test
+    fun `fallback freshness is not returned for mismatched issuer metadata`() = runTest {
+        val client = createMockClient { request ->
+            if (request.url.encodedPath.contains("oauth-authorization-server")) {
+                respond("{}", HttpStatusCode.NotFound, headersOf("OAuth-Client-Attestation-Challenge", "challenge"))
+            } else {
+                respond("""{"issuer":"https://other.example","authorization_endpoint":"https://other.example/authorize","token_endpoint":"https://other.example/token","response_types_supported":["code"]}""",
+                    HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+        }
+        try {
+            assertFailsWith<Exception> {
+                IssuerMetadataResolver(client).resolveAuthorizationServerMetadataDetailed("https://issuer.example.org")
+            }
+        } finally { client.close() }
+    }
+
+    @Test
     fun `an empty authorization_servers array is rejected by the issuer metadata itself`() = runTest {
         // resolveAuthorizationServerMetadataWithFallback uses firstOrNull rather than first so an
         // empty array would fall back to the credential issuer instead of raising
@@ -409,7 +472,7 @@ class IssuerMetadataResolverTest {
     }
 
     @Test
-    fun `HTTP status failure surfaces status code and body preview`() = runTest {
+    fun `HTTP status failure surfaces status code but not the response body`() = runTest {
         val issuerUrl = "https://issuer.example.org"
         val client = createMockClient {
             respond("issuer temporarily unavailable", HttpStatusCode.ServiceUnavailable)
@@ -421,7 +484,11 @@ class IssuerMetadataResolverTest {
 
         val message = failure.message ?: ""
         assertContains(message, "HTTP 503", message = "Status code must be surfaced")
-        assertContains(message, "issuer temporarily unavailable", message = "Body preview must be surfaced")
+        assertTrue(
+            "issuer temporarily unavailable" !in message,
+            "issuerUrl is caller-controlled input, so its response body must not be echoed into a message " +
+                "that reaches a client-facing exception - see ResolveFailure.HttpStatus.describe()",
+        )
     }
 
     @Test
@@ -442,4 +509,29 @@ class IssuerMetadataResolverTest {
         )
     }
 
+
+    @Test fun `issuer mismatches are terminal for legacy and detailed discovery`() = runTest {
+        for (method in 0..3) for (returnedIssuer in listOf("https://other.example", "https://issuer.example.org/")) {
+            var requests = 0
+            val http = createMockClient {
+                requests++
+                respond("""{"issuer":"$returnedIssuer","authorization_endpoint":"https://issuer.example.org/authorize","token_endpoint":"https://issuer.example.org/token","response_types_supported":["code"]}""",
+                    HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+            try {
+                val resolver = IssuerMetadataResolver(http)
+                val issuerMetadata = kotlinx.serialization.json.Json.decodeFromString<id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata>(
+                    """{"credential_issuer":"https://issuer.example.org","credential_endpoint":"https://issuer.example.org/credential","credential_configurations_supported":{}}""")
+                assertFailsWith<AuthorizationServerIssuerMismatchException> {
+                    when (method) {
+                        0 -> resolver.resolveAuthorizationServerMetadata("https://issuer.example.org")
+                        1 -> resolver.resolveAuthorizationServerMetadataDetailed("https://issuer.example.org")
+                        2 -> resolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
+                        else -> resolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+                    }
+                }
+                assertEquals(1, requests)
+            } finally { http.close() }
+        }
+    }
 }

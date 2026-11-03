@@ -3,6 +3,7 @@ package id.walt.verifier
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.applyNetworkFetchGuardConfig
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
@@ -18,6 +19,7 @@ suspend fun main(args: Array<String>) {
         ServiceConfiguration("verifier", version = BuildConfig.VERSION), ServiceInitialization(
             features = FeatureCatalog,
             init = {
+                applyNetworkFetchGuardConfig()
                 DidService.apply {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()

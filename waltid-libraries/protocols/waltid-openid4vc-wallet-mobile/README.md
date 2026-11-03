@@ -741,3 +741,12 @@ Two additional checks require explicit instrumentation flags:
   before browser return; both copies must then issue and present successfully.
   This uses the fixture’s controlled identity provider; real issuer PAR/PKCE and token routes
   remain in use. The test-only callback Activity is absent from production artifacts.
+
+
+## Client attestation challenge interoperability
+
+The SDK inherits [Wallet2 client attestation challenge recovery](../waltid-openid4vc-wallet/README.md#client-attestation-challenge-support) through its existing `WalletAttestationConfig`. `startIssuance`, `beginAuthorizationIssuance`, `continuePreAuthorizedIssuance` and `continueAuthorizationIssuance` require no new challenge parameters. The SDK signs the PoP with the platform instance key and restores flow-scoped freshness and preparation from the wallet's issuance store after wallet recreation. New issuance flows fetch an advertised challenge again; resuming the same flow preserves response-provided challenges. Applications should reattach the same attester configuration when reopening a wallet.
+
+`MobileWalletAttestationChallengeTest` covers the public SDK operations for both grants and both discovery modes. The Android device and Swift enterprise integration suites add native signing, persistent storage, the real KMP bridge on iOS, and ES issuer2 validation. Their four dedicated fixture scenarios are `enterprise-mdl-challenge-endpoint`, `enterprise-mdl-challenge-response`, and each name with `-authorized` appended. Authorization tests recreate the wallet between PAR and code exchange. The fixture's trace check verifies that issuer2 produced the error and the retry used its challenge, without exposing tokens in the trace API.
+
+The challenge fixture additionally uses ports 33336 and 33337. The coordinated enterprise Gradle task forwards them with ADB; manual device runs must forward all ports 33334–33337. iOS simulators use localhost; physical iOS devices need the configured fixture host reachable on all four ports. Native iOS execution requires macOS/Xcode.

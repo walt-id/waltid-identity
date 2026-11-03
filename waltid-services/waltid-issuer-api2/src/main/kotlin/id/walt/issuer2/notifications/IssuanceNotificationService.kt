@@ -4,6 +4,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.models.toPublicJson
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.WebhookDestinationNotAllowedException
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -53,8 +54,11 @@ class IssuanceNotificationService {
             }
         }.getOrElse { ex ->
             if (ex is CancellationException) throw ex
-            logger.warn(ex) {
-                "Failed to send issuance notification (requestId=$requestId, sessionId=${session?.sessionId}, event=$event)"
+            val context = "requestId=$requestId, sessionId=${session?.sessionId}, event=$event"
+            if (ex is WebhookDestinationNotAllowedException) {
+                logger.warn { "Failed to send issuance notification ($context): ${ex.message}" }
+            } else {
+                logger.warn(ex) { "Failed to send issuance notification ($context)" }
             }
         }
     }

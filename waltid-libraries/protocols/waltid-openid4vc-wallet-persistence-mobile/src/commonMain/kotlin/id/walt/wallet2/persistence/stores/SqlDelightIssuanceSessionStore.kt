@@ -2,13 +2,13 @@ package id.walt.wallet2.persistence.stores
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionCreationStore
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 
 /** SQLCipher-backed storage for sensitive OpenID4VCI continuation records. */
 public class SqlDelightIssuanceSessionStore(
     private val queries: WalletPersistenceQueries,
-) : AtomicWalletIssuanceSessionStore {
+) : AtomicWalletIssuanceSessionCreationStore {
     /** Returns the encrypted continuation record identified by [id], when present. */
     override suspend fun get(id: String): WalletIssuanceSessionRecord? =
         queries.selectIssuanceSessionRecordById(id).executeAsOneOrNull()?.let { row ->
@@ -42,6 +42,16 @@ public class SqlDelightIssuanceSessionStore(
             payload = record.payload,
             updated_at = record.updatedAtEpochMilliseconds,
         )
+    }
+
+    /**
+     * Atomically inserts the encrypted continuation [record] if its ID is absent.
+     * Returns `true` when inserted, or `false` when an existing record was preserved.
+     */
+    override suspend fun putIfAbsent(record: WalletIssuanceSessionRecord): Boolean = queries.transactionWithResult {
+        queries.insertIssuanceSessionRecordIfAbsent(record.id, record.sessionId, record.kind.name,
+            record.payload, record.updatedAtEpochMilliseconds)
+        queries.issuanceSessionRecordChanges().executeAsOne() == 1L
     }
 
     /** Claims or checkpoints a continuation only when the persisted snapshot is unchanged. */
