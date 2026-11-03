@@ -574,7 +574,7 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val isolatedCredentialsById = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored }.toMap()
-        val rawCredentials = isolatedCredentialsById.map { (id, stored) ->
+        val rawCredentials = isolatedCredentialsById.mapNotNull { (id, stored) ->
             stored.credential.toRawDcqlCredential(id)
         }
 
@@ -1451,7 +1451,7 @@ object WalletPresentationHandler {
     suspend fun matchCredentials(request: MatchCredentialsRequest): MatchCredentialsResult {
         // Build index: rawCredential index → wallet credential id
         val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
-        val rawCredentials = request.credentials.mapIndexed { idx, stored ->
+        val rawCredentials = request.credentials.mapIndexedNotNull { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
         val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
@@ -1745,7 +1745,7 @@ object WalletPresentationHandler {
         val candidates = storedCredentials.filter { stored ->
             eligibleCredentialIds == null || stored.id in eligibleCredentialIds
         }
-        val rawCredentials = candidates.mapIndexed { idx, stored ->
+        val rawCredentials = candidates.mapIndexedNotNull { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
             stored.credential.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
@@ -2350,14 +2350,21 @@ object WalletPresentationHandler {
         }
     }
 
-    private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
+    /** Null for a stored credential whose disclosures cannot be located, so it cannot fail matching for the others. */
+    private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential? {
         val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        val disclosures = try {
+            sdvc?.locatedDisclosures()
+        } catch (e: IllegalArgumentException) {
+            log.warn { "Skipping credential $id: its disclosures cannot be located in the issuer-signed payload (${e.message})" }
+            return null
+        }
         return RawDcqlCredential(
             id = id,
             format = format,
             data = credentialData,
             originalCredential = this,
-            disclosures = sdvc?.locatedDisclosures()?.map { DcqlDisclosure(it.name, it.value, it.location) }
+            disclosures = disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
         )
     }
 }
