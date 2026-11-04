@@ -196,7 +196,8 @@ object OIDCVerifierService : OpenIDCredentialVerifier(
                             tokenResponse.presentationSubmission?.toJSON()?.let { "presentationSubmission" to it },
                             "challenge" to (session.authorizationRequest?.nonce ?: ""),
                             "clientId" to (session.authorizationRequest?.clientId ?: ""),
-                            "responseUri" to (session.authorizationRequest?.responseUri ?: "")
+                            "responseUri" to (session.authorizationRequest?.responseUri ?: ""),
+                            session.trustedRootCAs?.let { TRUSTED_ROOT_CAS_CONTEXT_KEY to it }
                         ).toMap()
                     )
                 }

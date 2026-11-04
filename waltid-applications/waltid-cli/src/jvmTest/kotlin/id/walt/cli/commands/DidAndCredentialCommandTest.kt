@@ -2,13 +2,20 @@ package id.walt.cli.commands
 
 import com.github.ajalt.clikt.testing.test
 import id.walt.cli.util.CredentialHolderBinding
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.cli.util.KeyUtil
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
 import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.jose.preferredJwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeySpec
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.vc.vcs.W3CVC
@@ -16,6 +23,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -204,6 +212,52 @@ class DidAndCredentialCommandTest {
         assertFailsWith<IllegalArgumentException> {
             runBlocking { CredentialHolderBinding.requireBoundToPresenter(mdocCredential, fixtureDid, unrelatedKey) }
         }
+    }
+
+    @Test
+    fun `issuer key from x5c is accepted only with x509-trust and its root`() {
+        val directory = Files.createTempDirectory("cli-vc-x5c")
+        val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val (rootPem, otherRootPem, signed) = runBlocking {
+            val rootKey = KeyUtil.generate(KeySpec.Ec(EcCurve.P256))
+            val root = X509CertificateUtil.createSelfSignedCertificate(rootKey, sigAlg) { subjectDn = "CN=Root CA" }
+            val otherRootKey = KeyUtil.generate(KeySpec.Ec(EcCurve.P256))
+            val otherRoot = X509CertificateUtil.createSelfSignedCertificate(otherRootKey, sigAlg) { subjectDn = "CN=Other CA" }
+            val issuerKey = KeyUtil.generate(KeySpec.Ec(EcCurve.P256))
+            val issuerCertificate = X509CertificateUtil.createCertificate(rootKey, root, sigAlg) {
+                subjectDn = "CN=Credential issuer"
+                subjectPublicKey(issuerKey)
+                extensionSan { addDnsName("issuer.example") }
+            }
+            val signed = W3CVC.fromJson(
+                credentialJson("2030-01-01T00:00:00Z").replace("did:example:issuer", "https://issuer.example")
+            ).signJws(
+                issuerKey = issuerKey,
+                algorithm = issuerKey.preferredJwsAlgorithm(),
+                issuerId = "https://issuer.example",
+                issuerKid = issuerKey.id.value,
+                subjectDid = "did:example:holder",
+                additionalJwtHeader = mapOf(
+                    "x5c" to JsonArray(listOf(JsonPrimitive(Base64.encode(issuerCertificate.encodedDer.toByteArray()))))
+                ),
+            )
+            Triple(root.encodedPem, otherRoot.encodedPem, signed)
+        }
+        val credential = directory.resolve("credential.jwt").also { it.writeText(signed) }
+        val rootFile = directory.resolve("root-ca.pem").also { it.writeText(rootPem) }
+        val otherRootFile = directory.resolve("other-ca.pem").also { it.writeText(otherRootPem) }
+
+        val withoutTrust = VCVerifyCmd().test(listOf(credential.toString()))
+        assertEquals(1, withoutTrust.statusCode)
+        assertContains(withoutTrust.stdout, "signature: Fail!")
+
+        val trusted = VCVerifyCmd().test(listOf("-p", "x509-trust", "-a", "trust-root=$rootFile", credential.toString()))
+        assertEquals(0, trusted.statusCode, trusted.stdout + trusted.stderr)
+        assertContains(trusted.stdout, "x509-trust: Success!")
+
+        val otherRoot = VCVerifyCmd().test(listOf("-p", "x509-trust", "-a", "trust-root=$otherRootFile", credential.toString()))
+        assertEquals(1, otherRoot.statusCode)
+        assertContains(otherRoot.stdout, "x509-trust: Fail!")
     }
 
     private fun credentialJson(expiration: String, issuance: String = "2026-01-01T00:00:00Z") = """

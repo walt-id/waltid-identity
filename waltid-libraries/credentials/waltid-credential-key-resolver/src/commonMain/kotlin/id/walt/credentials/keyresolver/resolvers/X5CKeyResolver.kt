@@ -10,6 +10,10 @@ import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
+/**
+ * Extracts the public key of the first certificate in an `x5c` chain. It does not validate the chain;
+ * use [X5cTrustAnchors] for that.
+ */
 object X5CKeyResolver : BaseKeyResolver {
     private val log = KotlinLogging.logger { }
 

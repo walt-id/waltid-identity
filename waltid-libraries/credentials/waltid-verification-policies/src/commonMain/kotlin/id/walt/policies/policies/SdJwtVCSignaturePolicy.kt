@@ -28,18 +28,19 @@ object JWTCryptoProviderManager {
 class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
     override val name = "signature_sd-jwt-vc"
     override val description =
-        "Checks a SD-JWT-VC credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
+        "Checks a SD-JWT-VC credential by verifying its cryptographic signature using the key referenced by the DID in `iss`, or the key from the x5c certificate chain header if that chain is anchored by a trusted root CA."
     override val supportedVCFormats = setOf(VCFormat.sd_jwt_vc)
 
-    private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC): Set<Key> {
+    private suspend fun resolveIssuerKeysFromSdJwt(sdJwt: SDJwtVC, context: Map<String, Any>): Set<Key> {
         val kid = sdJwt.issuer ?: randomUUIDString()
         return if (DidUtils.isDidUrl(kid)) {
             DidService.resolveToKeys(kid).getOrThrow()
         } else {
-            val issuerEncodedCert = sdJwt.header["x5c"]?.jsonArray?.first()?.jsonPrimitive?.content
+            val x5c = sdJwt.header["x5c"]?.jsonArray?.map { it.jsonPrimitive.content }?.takeIf { it.isNotEmpty() }
                 ?: throw IllegalArgumentException("x5c header parameter is missing or empty.")
+            requireTrustedIssuerX5c(x5c, context)
             val key = JWKKey.importPEM(
-                pem = JWKKey.wrapAsPem(issuerEncodedCert.decodeFromBase64()),
+                pem = JWKKey.wrapAsPem(x5c.first().decodeFromBase64()),
             ).getOrThrow().let { JWKKey(it.exportJWK(), kid) }
             setOf(key)
         }
@@ -56,7 +57,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
 
             if (!sdJwtVC.isPresentation) {
                 // Get all possible issuer keys from the DID document
-                val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+                val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC, context)
 
                 if (issuerKeys.isEmpty()) {
                     throw VerificationException("No issuer keys found in the DID document")
@@ -74,7 +75,7 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
 
             } else {
                 // For presentations, get all possible issuer keys
-                val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC)
+                val issuerKeys = resolveIssuerKeysFromSdJwt(sdJwtVC, context)
                 val issuerKey =
                     issuerKeys.firstOrNull() ?: throw VerificationException("No issuer keys found in the DID document")
 

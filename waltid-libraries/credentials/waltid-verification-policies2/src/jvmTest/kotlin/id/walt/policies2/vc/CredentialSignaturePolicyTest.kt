@@ -5,15 +5,23 @@ package id.walt.policies2.vc
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.formats.W3C11
+import id.walt.credentials.representations.X5CCertificateString
+import id.walt.credentials.representations.X5CList
+import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -23,15 +31,21 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.did.dids.DidService
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.ETSITrustListPolicy
+import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.policies2.vc.policies.PolicyServiceKey
+import id.walt.policies2.vc.policies.TrustRegistryServiceResolver
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -43,7 +57,7 @@ class CredentialSignaturePolicyTest {
     fun verifiesW3cCredentialAndReturnsEstablishedResultFields() = runTest {
         val credential = createJwtCredential(sdJwt = false)
 
-        val result = CredentialSignaturePolicy().verify(credential).getOrThrow()
+        val result = CredentialSignaturePolicy().verify(credential, issuerTrustPolicyRuns).getOrThrow()
 
         assertEquals(
             setOf(
@@ -63,21 +77,21 @@ class CredentialSignaturePolicyTest {
     fun rejectsTamperedW3cCredentialWithoutV1Fallback() = runTest {
         val credential = createJwtCredential(sdJwt = false).tamperJwt()
 
-        assertTrue(CredentialSignaturePolicy().verify(credential).isFailure)
+        assertTrue(CredentialSignaturePolicy().verify(credential, issuerTrustPolicyRuns).isFailure)
     }
 
     @Test
     fun verifiesSdJwtCredential() = runTest {
         val credential = createJwtCredential(sdJwt = true)
 
-        assertTrue(CredentialSignaturePolicy().verify(credential).isSuccess)
+        assertTrue(CredentialSignaturePolicy().verify(credential, issuerTrustPolicyRuns).isSuccess)
     }
 
     @Test
     fun rejectsTamperedSdJwtCredential() = runTest {
         val credential = createJwtCredential(sdJwt = true).tamperJwt()
 
-        assertTrue(CredentialSignaturePolicy().verify(credential).isFailure)
+        assertTrue(CredentialSignaturePolicy().verify(credential, issuerTrustPolicyRuns).isFailure)
     }
 
     @Test
@@ -85,7 +99,66 @@ class CredentialSignaturePolicyTest {
         val credential = createJwtCredential(sdJwt = true)
         val policy = CredentialSignaturePolicy(allowedJwsAlgorithms = setOf(JwsAlgorithm.RS256.identifier))
 
-        assertTrue(policy.verify(credential).isFailure)
+        assertTrue(policy.verify(credential, issuerTrustPolicyRuns).isFailure)
+    }
+
+    @Test
+    fun rejectsX5cSdJwtKeyWithoutIssuerTrust() = runTest {
+        val failure = CredentialSignaturePolicy().verify(createJwtCredential(sdJwt = true)).exceptionOrNull()
+
+        assertContains(requireNotNull(failure?.message), "x509-trust")
+    }
+
+    @Test
+    fun rejectsX5cW3cKeyWithoutIssuerTrust() = runTest {
+        val failure = CredentialSignaturePolicy().verify(createJwtCredential(sdJwt = false)).exceptionOrNull()
+
+        assertContains(requireNotNull(failure?.message), "x509-trust")
+    }
+
+    @Test
+    fun rejectsX5cKeyThatLinkedTrustRegistryDoesNotTrust() = runTest {
+        val credential = createJwtCredential(sdJwt = true)
+
+        assertTrue(CredentialSignaturePolicy().verify(credential, registryContext("NOT_TRUSTED")).isFailure)
+    }
+
+    @Test
+    fun acceptsX5cKeyThatLinkedTrustRegistryTrusts() = runTest {
+        val credential = createJwtCredential(sdJwt = true)
+
+        assertTrue(CredentialSignaturePolicy().verify(credential, registryContext("TRUSTED")).isSuccess)
+    }
+
+    @Test
+    fun acceptsX5cKeyWhenEtsiTrustListRunsForCredential() = runTest {
+        val credential = createJwtCredential(sdJwt = true)
+
+        assertTrue(CredentialSignaturePolicy().verify(credential, policiesRun("signature", "etsi-trust-list")).isSuccess)
+    }
+
+    @Test
+    fun rejectsX5cKeyWhenNoIssuerTrustPolicyRuns() = runTest {
+        val credential = createJwtCredential(sdJwt = true)
+
+        assertTrue(CredentialSignaturePolicy().verify(credential, policiesRun("signature", "expired")).isFailure)
+    }
+
+    @Test
+    fun didIssuerKeyTakesPrecedenceOverX5c() = runTest {
+        val (didKey, did) = generateDidJwkKey()
+        val attackerKey = generateSigningKey()
+
+        assertTrue(CredentialSignaturePolicy().verify(createDidIssuerCredentialWithX5c(did, signer = didKey, x5cKey = attackerKey)).isSuccess)
+        assertTrue(CredentialSignaturePolicy().verify(createDidIssuerCredentialWithX5c(did, signer = attackerKey, x5cKey = attackerKey)).isFailure)
+    }
+
+    @Test
+    fun rejectsCoseW3cX5cKeyWithoutIssuerTrust() = runTest {
+        val credential = createCoseW3cCredential()
+
+        assertTrue(CredentialSignaturePolicy().verify(credential).isFailure)
+        assertTrue(CredentialSignaturePolicy().verify(credential, issuerTrustPolicyRuns).isSuccess)
     }
 
     @Test
@@ -131,7 +204,7 @@ class CredentialSignaturePolicyTest {
         assertTrue(configured.policies.single() is CredentialSignaturePolicy)
         assertTrue(simple.policies.single() is CredentialSignaturePolicy)
         assertTrue(Json.encodeToString(configured).contains("allowedJwsAlgorithms"))
-        assertTrue(configured.policies.single().verify(createJwtCredential(sdJwt = false)).isFailure)
+        assertTrue(configured.policies.single().verify(createJwtCredential(sdJwt = false), issuerTrustPolicyRuns).isFailure)
     }
 
     private suspend fun createJwtCredential(sdJwt: Boolean): DigitalCredential {
@@ -179,6 +252,87 @@ class CredentialSignaturePolicyTest {
             )
         }
     }
+
+    private val issuerTrustPolicyRuns = policiesRun("signature", "x509-trust")
+
+    private fun policiesRun(vararg ids: String) =
+        PolicyExecutionContext(mapOf(PolicyServiceKey.CREDENTIAL_POLICY_IDS to ids.toSet()))
+
+    private suspend fun generateDidJwkKey(): Pair<Key, String> {
+        DidService.minimalInit()
+        val key = generateSigningKey()
+        val publicJwkJson = key.capabilities.publicKeyExporter!!.exportPublicKey()
+            .toPublicJwk(key.spec).data.toByteArray().decodeToString()
+        return key to "did:jwk:" + base64.encode(publicJwkJson.encodeToByteArray())
+    }
+
+    /** A JWT VC whose `iss` is [did], signed by [signer], that also carries an `x5c` header for [x5cKey]. */
+    private suspend fun createDidIssuerCredentialWithX5c(did: String, signer: Key, x5cKey: Key): DigitalCredential {
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            x5cKey,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) { subjectDn = "CN=Credential issuer" }
+        val payload = buildJsonObject { put("iss", did) }
+        val signed = CompactJws.sign(
+            payload = Json.encodeToString(payload).encodeToByteArray(),
+            key = signer,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("kid", "$did#0")
+                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.encode(certificate.encodedDer.toByteArray())))))
+            },
+        )
+        return W3C11(
+            credentialData = payload,
+            signature = JwtCredentialSignature(signed, CompactJws.decodeUnverified(signed).protectedHeader),
+            signed = signed,
+        )
+    }
+
+    private suspend fun createCoseW3cCredential(): DigitalCredential {
+        val key = generateSigningKey()
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            key,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) { subjectDn = "CN=Credential issuer" }
+        val payload = buildJsonObject {
+            put("iss", "https://issuer.example")
+            put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+        }
+        val coseSign1 = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+            payload = Json.encodeToString(payload).encodeToByteArray(),
+            signer = key.toCoseSigner(Cose.Algorithm.ES256),
+        )
+        val publicJwk = key.capabilities.publicKeyExporter!!.exportPublicKey()
+            .toPublicJwk(key.spec).data.toByteArray().decodeToString()
+        return W3C11(
+            credentialData = payload,
+            signature = CoseCredentialSignature(
+                signerKey = DirectSerializedKey(JWKKey.importJWK(publicJwk).getOrThrow()),
+                x5cList = X5CList(listOf(X5CCertificateString(Base64.encode(certificate.encodedDer.toByteArray())))),
+            ),
+            signed = base64.encode(coseSign1.toTagged()),
+        )
+    }
+
+    private fun registryContext(decision: String) = PolicyExecutionContext(
+        mapOf(
+            PolicyServiceKey.TRUST_REGISTRY_RESOLVER to object : TrustRegistryServiceResolver {
+                override suspend fun resolveCertificateChain(
+                    certificateChainPem: List<String>,
+                    expectedEntityType: String?,
+                    expectedServiceType: String?,
+                ) = ETSITrustListPolicy.TrustDecisionResponse(decision = decision, sourceFreshness = "FRESH")
+
+                override suspend fun resolveByPublicKey(
+                    publicKeyJwk: String,
+                    expectedEntityType: String?,
+                    expectedServiceType: String?,
+                ) = error("x5c issuer keys must be resolved by certificate chain")
+            }
+        )
+    )
 
     private suspend fun generateSigningKey(): Key = runtime.generateSoftwareKey(
         GenerateSoftwareKeyRequest(

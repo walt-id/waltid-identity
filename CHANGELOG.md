@@ -1,5 +1,15 @@
 # Unreleased
 
+### Issuer trust for keys from `x5c`
+
+New `x509-trust` credential policy (verification policies 2). It takes caller-supplied `trustRoots` (PEM or base64 DER) and trusts the credential issuer when the signing certificate is one of them or chains to one. Certificates inside the credential are never used as anchors, and no system trust store is consulted. It supports SD-JWT VC, W3C VCs secured as JWT or COSE, and mdoc.
+
+```json
+{ "policy": "x509-trust", "trustRoots": ["-----BEGIN CERTIFICATE-----..."] }
+```
+
+Issuer keys taken from `x5c` now require an issuer trust policy (`x509-trust`, `etsi-trust-list`) or a linked trust registry. See `BREAKING_CHANGES.md`.
+
 ### Wallet2 client attestation compatibility
 
 Client attestation freshness adds `CLIENT_ATTESTATION_FRESHNESS` to the public issuance-record enum. Exhaustive enum consumers must handle this value. Storage is forward-only: older library/service versions cannot read a wallet store containing these records. Downgrading or sharing that store with older readers is unsupported while freshness records remain. No database schema migration is required.

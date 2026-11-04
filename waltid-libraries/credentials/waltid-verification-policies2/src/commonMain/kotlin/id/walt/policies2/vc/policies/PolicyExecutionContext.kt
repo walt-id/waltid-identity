@@ -14,6 +14,13 @@ enum class PolicyServiceKey {
 
     /** Key for a status-list signer authorizer used by [StatusPolicy] and [RevocationPolicy]. */
     STATUS_LIST_SIGNER_AUTHORIZER,
+
+    /**
+     * Key for the ids (`Set<String>`) of all policies that run for the current credential, set by the
+     * verifier pipeline. [CredentialSignaturePolicy] uses it to see whether an issuer trust policy
+     * ([X509TrustPolicy], [ETSITrustListPolicy]) also runs.
+     */
+    CREDENTIAL_POLICY_IDS,
 }
 
 /**
