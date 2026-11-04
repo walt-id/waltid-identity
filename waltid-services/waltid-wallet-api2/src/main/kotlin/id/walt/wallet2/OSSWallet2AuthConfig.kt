@@ -2,6 +2,7 @@ package id.walt.wallet2
 
 import id.walt.commons.config.WaltConfig
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -50,6 +51,8 @@ data class OSSWallet2AuthConfig(
     val tokenExpiry: Duration = 24.hours,
     /** Encoded Crypto2 StoredKey. Preferred, and sufficient on its own. */
     val signingStoredKey: String? = null,
+    /** Optional OIDC authentication configuration. When absent, OIDC authentication is disabled. */
+    val oidc: OidcAuthConfiguration? = null,
 ) : WaltConfig() {
     init {
         require(signingKey != null || signingStoredKey != null) {
@@ -58,5 +61,5 @@ data class OSSWallet2AuthConfig(
     }
 
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
-    constructor(signingKey: DirectSerializedKey, tokenExpiry: Duration) : this(signingKey, tokenExpiry, null)
+    constructor(signingKey: DirectSerializedKey, tokenExpiry: Duration) : this(signingKey, tokenExpiry, null, null)
 }
