@@ -92,22 +92,30 @@ object ExternalReaderVerification {
         }
 
         // Match returned claims, without claiming to know which DeviceRequest the kiosk sent.
+        // Explicit DCQL alternatives must match in full before assignment. requestedElements remains
+        // a doctype adapter, as in Annex C: holders may withhold requested elements.
         val credentialsByQuery: Map<String, List<DigitalCredential>> = query?.let { dcql ->
             dcql.credentials.associate { credentialQuery ->
                 val matching = credentials.filter { credential ->
                     DcqlMatcher.matchCredential(
-                        credentialQuery.copy(claims = null, claimSets = null),
+                        if (setup.core.dcqlQuery != null) credentialQuery else credentialQuery.copy(claims = null, claimSets = null),
                         RawDcqlCredential(credentialQuery.id, credential.format, credential.credentialData, originalCredential = credential),
                         trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker,
                     ).isSuccess
                 }
-                credentialQuery.id to matching
+                credentialQuery.id to if (credentialQuery.multiple) matching else matching.take(1)
             }.filterValues { it.isNotEmpty() }
         } ?: credentials.groupBy { it.docType }
         // Preserve all documents, including those not covered by a query, on the public session.
-        session.presentedCredentials = credentialsByQuery + credentials.filter { credential ->
-            credentialsByQuery.values.none { credential in it }
-        }.mapIndexed { index, credential -> "unrequested_$index" to listOf(credential) }
+        val reservedIds = query?.credentials.orEmpty().mapTo(mutableSetOf()) { it.id }
+            .apply { addAll(policies.specific_vc_policies.orEmpty().keys) }
+        session.presentedCredentials = credentialsByQuery.toMutableMap().apply {
+            var extraIndex = 0
+            credentials.filter { credential -> credentialsByQuery.values.none { credential in it } }.forEach { credential ->
+                while ("unrequested_$extraIndex" in reservedIds || "unrequested_$extraIndex" in this) extraIndex++
+                put("unrequested_${extraIndex++}", listOf(credential))
+            }
+        }
         session.presentedPresentations = session.presentedCredentials!!.mapValues { (_, docs) ->
             docs.map { MsoMdocPresentation(it as MdocsCredential) }
         }
