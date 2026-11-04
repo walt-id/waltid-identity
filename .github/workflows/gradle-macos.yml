@@ -22,7 +22,9 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           sparse-checkout-cone-mode: false
-          sparse-checkout: .github/scripts/mobile-ci/enterprise-runtime-diagnostic.py
+          sparse-checkout: |
+            .github/scripts/mobile-ci/enterprise-runtime-diagnostic.py
+            .github/scripts/mobile-ci/run-enterprise-ios.sh
       - uses: actions/download-artifact@v8
         with:
           name: wallet-core-release-1
@@ -44,8 +46,8 @@ jobs:
           python3 diagnostic-source/.github/scripts/mobile-ci/enterprise-runtime-diagnostic.py -- \
             python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$GITHUB_WORKSPACE/ios-ci-logs" enterprise \
-            ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
-            --no-configuration-cache \
+            bash diagnostic-source/.github/scripts/mobile-ci/run-enterprise-ios.sh \
+            --no-build-cache \
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}" \
             -Penterprise.ios.collectTestDiagnostics=never \
             -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact"
