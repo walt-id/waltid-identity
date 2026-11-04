@@ -87,6 +87,9 @@ internal fun mdlFixtureCredential(credentialData: String): MdocsCredential = run
         data = MdocIssuer.MdocUniversalIssuanceData(
             data.filterValues { it is JsonObject }.mapValues { it.value as JsonObject }
         ),
+        // Same instant as validFrom: the issuer would otherwise read the clock again, and a second
+        // boundary crossed during key restoration makes `signed` later than `validFrom`.
+        signedAt = now,
         validFrom = now,
         validUntil = now + MDL_FIXTURE_MSO_VALIDITY,
     )

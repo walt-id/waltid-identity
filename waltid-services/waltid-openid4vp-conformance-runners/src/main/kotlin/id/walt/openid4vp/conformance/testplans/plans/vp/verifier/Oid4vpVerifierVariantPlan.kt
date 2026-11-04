@@ -138,6 +138,7 @@ class Oid4vpVerifierVariantPlan(
         /** SAN DNS entry of [TestKeyMaterial.VERIFIER_LEAF_CERT]. */
         private const val VERIFIER_SAN_DNS = "verifier.example.com"
 
+        /** Matches the PID credential the OIDF suite presents. */
         // language=JSON
         private val SD_JWT_VC_DCQL = """
             {
@@ -146,13 +147,12 @@ class Oid4vpVerifierVariantPlan(
                         "id": "pid",
                         "format": "dc+sd-jwt",
                         "meta": {
-                            "vct_values": ["https://credentials.example.com/identity_credential"]
+                            "vct_values": ["urn:eudi:pid:1"]
                         },
                         "claims": [
                             {"path": ["given_name"]},
                             {"path": ["family_name"]},
-                            {"path": ["birthdate"]},
-                            {"path": ["age_in_years"]}
+                            {"path": ["birthdate"]}
                         ]
                     }
                 ]
