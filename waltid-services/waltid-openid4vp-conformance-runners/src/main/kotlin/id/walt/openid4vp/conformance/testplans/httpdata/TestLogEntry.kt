@@ -30,6 +30,15 @@ data class TestLogEntry(
      * field, so this stays a [JsonElement] and callers pick out the numeric HTTP status themselves.
      */
     val actual: JsonElement? = null,
+    /**
+     * HTTP status on a request/response log line (`response_status_code`).
+     *
+     * A Cloudflare Quick Tunnel records `502`, `503`, or `504` here when it cannot reach the
+     * issuer. The suite then interrupts the module. Kept as a [JsonElement] so a non-numeric
+     * value cannot fail decoding of the rest of the log.
+     */
+    @SerialName("response_status_code")
+    val responseStatusCode: JsonElement? = null,
 ) {
     /** An image placeholder that is still waiting to be filled. */
     val isPendingUpload: Boolean get() = upload != null && img == null

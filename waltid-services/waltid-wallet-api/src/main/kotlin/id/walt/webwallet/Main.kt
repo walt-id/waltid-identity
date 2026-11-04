@@ -3,6 +3,7 @@ package id.walt.webwallet
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.applyNetworkFetchGuardConfig
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.WebService
@@ -40,6 +41,7 @@ suspend fun main(args: Array<String>) {
                 CommonsFeatureCatalog.authenticationServiceFeature to walletAuthenticationPluginAmendment
             ),
             init = {
+                applyNetworkFetchGuardConfig()
                 webWalletSetup()
                 DidService.minimalInit()
                 WaltCryptoOci.init()
