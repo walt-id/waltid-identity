@@ -5,6 +5,9 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -15,13 +18,25 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ETSITrustListPolicy
 import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.x509.X509ValidityPeriod
+import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.x509.iso.documentsigner.builder.Crypto2IACASignerSpecification
+import id.walt.x509.iso.documentsigner.builder.DocumentSignerCertificateBuilder
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
+import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
+import id.walt.x509.iso.iaca.builder.IACACertificateBuilder
+import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
+import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -29,6 +44,8 @@ import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 /**
  * Unit tests for ETSITrustListPolicy.
@@ -242,8 +259,8 @@ class ETSITrustListPolicyTest {
         fixture: String,
         trusted: Boolean,
     ) = runTest {
-        val credential = CredentialParser.detectAndParse(x5cFixture(fixture)).second
-        val policy = ETSITrustListPolicy(trustLists = listOf(x5cFixture("lote-iaca-root.json")))
+        val credential = CredentialParser.detectAndParse(x5cFixture("wal-1638", fixture)).second
+        val policy = ETSITrustListPolicy(trustLists = listOf(x5cFixture("wal-1638", "lote-iaca-root.json")))
 
         val result = policy.verify(credential, PolicyExecutionContext.Empty)
 
@@ -251,25 +268,133 @@ class ETSITrustListPolicyTest {
     }
 
     // ---------------------------------------------------------------------------
+    // verify() alongside the `signature` policy: trust must be decided for the key
+    // that verified the signature. With a DID `iss`, that is the DID key, even when
+    // an `x5c` chain is present (WAL-1637).
+    // ---------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @CsvSource(
+        "wal-1638, sd-jwt-x5c-ds.txt, true",
+        "wal-1637, sd-jwt-didjwk-iss.txt, false",
+        "wal-1637, sd-jwt-didjwk-iss-ds-x5c.txt, false",
+    )
+    fun `verify trusts only the key the signature policy verified with`(
+        directory: String,
+        fixture: String,
+        trusted: Boolean,
+    ) = runTest {
+        DidService.minimalInit()
+        val credential = CredentialParser.detectAndParse(x5cFixture(directory, fixture)).second
+        val policy = ETSITrustListPolicy(trustLists = listOf(x5cFixture("wal-1638", "lote-iaca-root.json")))
+
+        val signature = CredentialSignaturePolicy().verify(credential, PolicyExecutionContext.Empty)
+        val trust = policy.verify(credential, PolicyExecutionContext.Empty)
+
+        assertTrue(signature.isSuccess, signature.exceptionOrNull()?.message)
+        assertEquals(trusted, trust.isSuccess, trust.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `verify resolves the issuer key from the signed JWT, not from the parsed credential data`() = runTest {
+        val (signerKey, signerDid) = generateIssuerKeyAndDid(KeyId("signing-key"))
+        val (_, listedDid) = generateIssuerKeyAndDid(KeyId("listed-key"))
+        val signed = CompactJws.sign(
+            payload = Json.encodeToString(buildJsonObject { put("iss", signerDid) }).encodeToByteArray(),
+            key = signerKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject { put("kid", "$signerDid#0") },
+        )
+        val credential: DigitalCredential = W3C11(
+            credentialData = buildJsonObject { put("iss", listedDid) },
+            signature = JwtCredentialSignature(signed, CompactJws.decodeUnverified(signed).protectedHeader),
+            signed = signed,
+        )
+        val policy = ETSITrustListPolicy(trustLists = listOf(loteRegisteringDidJwkIssuer(listedDid)))
+
+        val result = policy.verify(credential, PolicyExecutionContext.Empty)
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            result.exceptionOrNull()!!.message!!.startsWith("Certificate not trusted"),
+            result.exceptionOrNull()?.message,
+        )
+    }
+
+    @Test
+    fun `verify checks the x5c chain when its leaf certificate holds the DID issuer key`() = runTest {
+        DidService.minimalInit()
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val now = Clock.System.now()
+        val rootKey = generateP256Key(KeyId("iaca-root-key"))
+        val (signerKey, signerDid) = generateIssuerKeyAndDid(KeyId("document-signer-key"))
+        val rootProfile = IACACertificateProfileData(
+            principalName = IACAPrincipalName(country = "AT", commonName = "Test IACA"),
+            validityPeriod = X509ValidityPeriod(now - 1.days, now + 365.days),
+            issuerAlternativeName = IssuerAlternativeName(uri = "https://iaca.example"),
+        )
+        val rootDer = IACACertificateBuilder().buildDer(rootProfile, rootKey, algorithm)
+        val signerDer = DocumentSignerCertificateBuilder().buildDer(
+            profileData = DocumentSignerCertificateProfileData(
+                principalName = DocumentSignerPrincipalName(country = "AT", commonName = "Test Document Signer"),
+                validityPeriod = X509ValidityPeriod(now, now + 30.days),
+                crlDistributionPointUri = "https://iaca.example/crl",
+            ),
+            publicKey = signerKey,
+            iacaSignerSpec = Crypto2IACASignerSpecification(rootProfile, rootKey, algorithm),
+        )
+        val signed = CompactJws.sign(
+            payload = Json.encodeToString(
+                buildJsonObject {
+                    put("iss", signerDid)
+                    put("vct", "https://example.org/vct/a")
+                }
+            ).encodeToByteArray(),
+            key = signerKey,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "dc+sd-jwt")
+                put("kid", "$signerDid#0")
+                putJsonArray("x5c") { add(Base64.encode(signerDer.bytes.toByteArray())) }
+            },
+        )
+        val credential = CredentialParser.detectAndParse("$signed~").second
+        // Lists only the root: a public-key match on the Document Signer key alone would fail.
+        val rootCertificate = Base64.encode(rootDer.bytes.toByteArray())
+        val policy = ETSITrustListPolicy(
+            trustLists = listOf(loteWithServiceIdentity(""""X509Certificates": [{"val": "$rootCertificate"}]"""))
+        )
+
+        val signature = CredentialSignaturePolicy().verify(credential, PolicyExecutionContext.Empty)
+        val trust = policy.verify(credential, PolicyExecutionContext.Empty)
+
+        assertTrue(signature.isSuccess, signature.exceptionOrNull()?.message)
+        assertTrue(trust.isSuccess, trust.exceptionOrNull()?.message)
+    }
+
+    // ---------------------------------------------------------------------------
     // Test fixtures
     // ---------------------------------------------------------------------------
 
-    private fun x5cFixture(name: String): String =
-        this::class.java.classLoader.getResource("etsi-trust-list/wal-1638/$name")!!.readText().trim()
+    private fun x5cFixture(directory: String, name: String): String =
+        this::class.java.classLoader.getResource("etsi-trust-list/$directory/$name")!!.readText().trim()
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
-    /** Generates a P-256 key and derives its self-contained `did:jwk:` identifier. */
-    private suspend fun generateIssuerKeyAndDid(keyId: KeyId): Pair<id.walt.crypto2.keys.Key, String> {
-        DidService.minimalInit()
-        val key = runtime.generateSoftwareKey(
+    private suspend fun generateP256Key(keyId: KeyId): id.walt.crypto2.keys.Key =
+        runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = keyId,
                 spec = KeySpec.Ec(EcCurve.P256),
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
+
+    /** Generates a P-256 key and derives its self-contained `did:jwk:` identifier. */
+    private suspend fun generateIssuerKeyAndDid(keyId: KeyId): Pair<id.walt.crypto2.keys.Key, String> {
+        DidService.minimalInit()
+        val key = generateP256Key(keyId)
         val publicJwkJson = key.capabilities.publicKeyExporter!!.exportPublicKey()
             .toPublicJwk(key.spec).data.toByteArray().decodeToString()
         val did = "did:jwk:" + base64Url.encode(publicJwkJson.encodeToByteArray())
@@ -306,6 +431,11 @@ class ETSITrustListPolicyTest {
         val publicJwkJson = Json.parseToJsonElement(
             base64Url.decode(did.removePrefix("did:jwk:")).decodeToString()
         )
+        return loteWithServiceIdentity(""""PublicKeyValues": [$publicJwkJson]""")
+    }
+
+    /** A minimal ETSI TS 119 602 LoTE JSON source with one service whose `ServiceDigitalIdentity` holds [serviceDigitalIdentity]. */
+    private fun loteWithServiceIdentity(serviceDigitalIdentity: String): String {
         return """
             {
               "LoTE": {
@@ -333,7 +463,7 @@ class ETSITrustListPolicyTest {
                         "ServiceInformation": {
                           "ServiceName": [{"lang": "en", "value": "SD-JWT Credential Issuance"}],
                           "ServiceDigitalIdentity": {
-                            "PublicKeyValues": [$publicJwkJson]
+                            $serviceDigitalIdentity
                           },
                           "ServiceTypeIdentifier": "https://trust.example.org/ns/svc-type/issuer/credential-issuance",
                           "ServiceStatus": "http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted",
