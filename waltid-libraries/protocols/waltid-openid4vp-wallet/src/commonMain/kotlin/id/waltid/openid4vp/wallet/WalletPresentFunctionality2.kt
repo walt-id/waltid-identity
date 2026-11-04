@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.verifier.openid.transactiondata.validateTs12PaymentEntries
 import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
@@ -1531,6 +1532,7 @@ object WalletPresentFunctionality2 {
         }
         val sdHash = calculateSha256Base64Url(stringToHash)
         val decodedTransactionData = decodeList(transactionData.orEmpty())
+        validateTs12PaymentEntries(decodedTransactionData, scaContext?.clock?.now() ?: Clock.System.now())
         val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
             calculateTransactionDataHashes(
@@ -1578,6 +1580,7 @@ object WalletPresentFunctionality2 {
             )
             context.authorizer.authorize(presentation).also { currentCoroutineContext().ensureActive() }
         }
+        validateTs12PaymentEntries(decodedTransactionData, scaContext?.clock?.now() ?: Clock.System.now())
         val kbJwtPayload = buildJsonObject {
             if (scaContext != null) {
                 put("jti", requireNotNull(proofId))
@@ -1614,6 +1617,7 @@ object WalletPresentFunctionality2 {
         )
         // A native signer may finish after cancellation without observing the coroutine's Job.
         if (scaContext != null) currentCoroutineContext().ensureActive()
+        validateTs12PaymentEntries(decodedTransactionData, scaContext?.clock?.now() ?: Clock.System.now())
         return proof
     }
 

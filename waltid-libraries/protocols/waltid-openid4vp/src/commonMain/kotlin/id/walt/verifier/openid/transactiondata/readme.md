@@ -17,6 +17,10 @@ Two entry points in `TransactionDataRequestValidator`:
 - `validateRequestTransactionData(transactionData, typeRegistry, credentialQueriesById)` — used by the **wallet**. Enforces both structural rules and that each type is in the registry.
 - `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Runs structural checks only (no type registry).
 
+Both validate the built-in `urn:eudi:sca:payment:1` payload against the pinned TS12 schema,
+format assertions and product rules. Other types retain the structural checks below.
+Payment normalization never replaces the original encoded hash input.
+
 Both validate:
 - `type` is non-blank
 - `credential_ids` is non-empty and references valid DCQL credential query ids (when provided)
@@ -50,3 +54,8 @@ the matching and verification code above only knows type strings.
 - Verifier-side session creation validation: `VerificationSessionCreator` in `waltid-openid4vp-verifier`
 - Verifier policy (mdoc hash check): `TransactionDataMdocVpPolicy` in `waltid-verification-policies2-vp`
 - Verifier policy (SD-JWT hash check): SD-JWT transaction-data policy in `waltid-verification-policies2-vp`
+
+Profile responses project the stored DTO into `TransactionDataProfileResponse`, adding optional
+read-only `payloadSchema` for the built-in payment type. Storage/configuration and CRUD inputs
+remain `TransactionDataProfile`. Updated DTO readers ignore unknown response properties.
+See `docs/ts12-sca-payment-demo.md` for the full payload and upstream-drift maintenance contract.

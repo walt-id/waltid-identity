@@ -17,6 +17,7 @@ public enum PaymentReviewState: Equatable {
 struct PaymentConsentView: View {
     let state: PaymentReviewState
     var transactions: [ClaimGroup] = []
+    var detailsInitiallyExpanded = false
 
     var body: some View {
         switch state {
@@ -25,13 +26,16 @@ struct PaymentConsentView: View {
         case .blocked(let message): Text(message).foregroundStyle(.red).accessibilityIdentifier("payment-consent-blocked")
         default: EmptyView()
         }
-        ForEach(state.displays(transactions: transactions)) { PaymentReviewContent(payment: $0) }
+        ForEach(state.displays(transactions: transactions)) {
+            PaymentReviewContent(payment: $0, detailsInitiallyExpanded: detailsInitiallyExpanded)
+        }
     }
 }
 
 /// Both payment sources use the same hierarchy, field renderer and detail controls.
 private struct PaymentReviewContent: View {
     let payment: PaymentDisplay
+    var detailsInitiallyExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -48,7 +52,7 @@ private struct PaymentReviewContent: View {
             ForEach(payment.fields.filter { $0.placement == .main }) { fieldView($0, prominent: false) }
             let details = payment.fields.filter { $0.placement == .details }
             if !details.isEmpty {
-                MetadataDisclosure(title: String(localized: "Payment details", bundle: .module), initiallyExpanded: false,
+                MetadataDisclosure(title: String(localized: "Payment details", bundle: .module), initiallyExpanded: detailsInitiallyExpanded,
                     accessibilityIdentifier: "payment-details-toggle") {
                     ForEach(details) { fieldView($0, prominent: false) }
                 }

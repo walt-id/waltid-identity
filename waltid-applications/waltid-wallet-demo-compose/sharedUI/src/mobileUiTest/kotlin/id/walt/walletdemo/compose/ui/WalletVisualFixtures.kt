@@ -107,6 +107,7 @@ internal object WalletVisualFixtures {
 
     val payment: WalletDemoPaymentConsent get() = payment("payment")
     val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    fun paymentTerms(recurring: Boolean): WalletDemoPaymentConsent = payment(if (recurring) "paymentRecurring" else "paymentScheduled")
     private fun payment(key: String): WalletDemoPaymentConsent {
         val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(

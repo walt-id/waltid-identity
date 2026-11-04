@@ -97,7 +97,10 @@ internal fun localizePaymentConsent(
     val fieldsByPath = fields.associateBy { it.path }
     if (!fieldsByPath.keys.containsAll(values.keys)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
     val presentFields = fields.filter { it.path in values }
-    val languageSets = labels.values.map { it.keys } + presentFields.map { it.labels.keys }
+    val frequencyPath = listOf("recurrence", "frequency")
+    val frequency = values[frequencyPath]
+    val languageSets = labels.values.map { it.keys } + presentFields.map { it.labels.keys } +
+        if (frequency != null) listOf(PAYMENT_FREQUENCY_LABELS.keys) else emptyList()
     val candidates = LocalizedMetadata.normalizedPreferences(preferredLocales).flatMap { LocalizedMetadata.lookupRanges(it).toList() }.distinct()
     val locale = candidates.firstOrNull { candidate -> languageSets.all { it.matchingTag(candidate) != null } }
         ?: consentFailure(PaymentConsentFailure.MISSING_TRANSLATION)
@@ -110,12 +113,12 @@ internal fun localizePaymentConsent(
         denialAction = labels["denial_action_label"]?.localized(),
         fields = presentFields.map { field ->
             val label = field.labels.localized()
-            PaymentConsentField(field.path, label.label, label.description, values.getValue(field.path), field.placement)
+            PaymentConsentField(field.path, label.label, label.description, if (field.path == frequencyPath) PAYMENT_FREQUENCY_LABELS.localized().getValue(requireNotNull(frequency)) else values.getValue(field.path), field.placement)
         },
     )
 }
 
-/** Supported one-off payments contain objects and scalar leaves, not arrays. */
+/** Supported payments contain objects and scalar leaves, not arrays. */
 private fun JsonObject.claimAt(path: List<String>): JsonElement? {
     var value: JsonElement = this
     for (part in path) {
@@ -155,4 +158,14 @@ private val CATALOGUE_LIMITS = mapOf(
     "denial_action_label" to 30,
     "transaction_title" to 50,
     "security_hint" to 250,
+)
+
+// Wallet-owned value translations; issuer metadata remains authoritative for the field label/placement.
+private val PAYMENT_FREQUENCY_LABELS = mapOf(
+    "en" to mapOf("INDA" to "Several times a day", "DAIL" to "Daily", "WEEK" to "Weekly", "TOWK" to "Every two weeks",
+        "TWMN" to "Twice a month", "MNTH" to "Monthly", "TOMN" to "Every two months", "QUTR" to "Quarterly",
+        "FOMN" to "Every four months", "SEMI" to "Twice a year", "YEAR" to "Yearly", "TYEA" to "Every two years"),
+    "de" to mapOf("INDA" to "Mehrmals täglich", "DAIL" to "Täglich", "WEEK" to "Wöchentlich", "TOWK" to "Alle zwei Wochen",
+        "TWMN" to "Zweimal im Monat", "MNTH" to "Monatlich", "TOMN" to "Alle zwei Monate", "QUTR" to "Vierteljährlich",
+        "FOMN" to "Alle vier Monate", "SEMI" to "Zweimal im Jahr", "YEAR" to "Jährlich", "TYEA" to "Alle zwei Jahre"),
 )

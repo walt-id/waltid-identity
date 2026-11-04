@@ -77,7 +77,7 @@
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
       "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
-      "title": "Wallet — saved credential"
+      "title": "Wallet \u2014 saved credential"
     },
     {
       "id": "wallet.scan.empty",
@@ -91,7 +91,7 @@
     },
     {
       "id": "wallet.scan.fido",
-      "title": "Scanner — FIDO request",
+      "title": "Scanner \u2014 FIDO request",
       "requirements": [
         "Android system handoff action and iOS system scanner guidance"
       ],
@@ -142,7 +142,7 @@
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
-      "title": "Receiving — selected credentials"
+      "title": "Receiving \u2014 selected credentials"
     },
     {
       "id": "batch.offer.none_selected",
@@ -159,7 +159,7 @@
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
-      "title": "Receiving — saved and deferred"
+      "title": "Receiving \u2014 saved and deferred"
     },
     {
       "id": "payment.mixed_credentials.main",
@@ -209,7 +209,7 @@
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
-      "title": "Nearby sharing — hold near reader",
+      "title": "Nearby sharing \u2014 hold near reader",
       "note": "Synthetic engagement with the decorative animation paused (Compose reduced motion; native inactive scene); no radio session or system NFC prompt."
     },
     {
@@ -220,7 +220,7 @@
         "PIN setup guidance and input"
       ],
       "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
-      "title": "Onboarding — choose a PIN"
+      "title": "Onboarding \u2014 choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -283,7 +283,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "PIN — compact, dark, large text"
+      "title": "PIN \u2014 compact, dark, large text"
     },
     {
       "id": "onboarding.pin.unlock",
@@ -366,7 +366,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "Receiving — compact, dark, large text"
+      "title": "Receiving \u2014 compact, dark, large text"
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -438,7 +438,7 @@
       "composeTest": "missingSavedDetails",
       "swiftTest": "testMissingSavedDetails",
       "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
-      "title": "Receiving — saved details unavailable"
+      "title": "Receiving \u2014 saved details unavailable"
     },
     {
       "id": "onboarding.key.summary",
@@ -493,7 +493,7 @@
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
       "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
-      "title": "Sharing — selected information"
+      "title": "Sharing \u2014 selected information"
     },
     {
       "id": "sharing.information.dates",
@@ -662,6 +662,79 @@
         "Localized payment layout with compact large text"
       ],
       "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "payment.scheduled.main",
+      "composeTest": "scheduledPaymentTerms",
+      "swiftTest": "testScheduledPaymentMain",
+      "title": "Scheduled payment",
+      "requirements": [
+        "Issuer-labelled execution timestamp and pinned confirmation action"
+      ],
+      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+    },
+    {
+      "id": "payment.scheduled.details",
+      "composeTest": "scheduledPaymentTerms",
+      "swiftTest": "testScheduledPaymentDetails",
+      "title": "Scheduled payment details",
+      "requirements": [
+        "Expanded transaction and PISP details with URI values displayed as text"
+      ],
+      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+    },
+    {
+      "id": "payment.recurring.main",
+      "composeTest": "recurringPaymentTerms",
+      "swiftTest": "testRecurringPaymentMain",
+      "title": "Recurring payment",
+      "requirements": [
+        "Recurring timing and merchant-initiated terms remain scrollable with pinned actions"
+      ],
+      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+    },
+    {
+      "id": "payment.recurring.details",
+      "composeTest": "recurringPaymentTerms",
+      "swiftTest": "testRecurringPaymentDetails",
+      "title": "Recurring payment details",
+      "requirements": [
+        "Expanded transaction and PISP details remain reachable below all recurring terms"
+      ],
+      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+    },
+    {
+      "id": "payment.recurring.compact_large_text",
+      "composeTest": "recurringPaymentTermsLargeText",
+      "swiftTest": "testRecurringPaymentCompactLargeText",
+      "title": "Recurring payment at compact width and large text",
+      "requirements": [
+        "Long recurring terms wrap and scroll without obscuring confirmation or cancellation"
+      ],
+      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state.",
       "configuration": {
         "android": {
           "viewport": [
