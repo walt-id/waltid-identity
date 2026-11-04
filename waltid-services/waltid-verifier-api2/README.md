@@ -62,6 +62,28 @@ Backed by `waltid-digital-credentials` for parsing and validation.
 - OpenAPI helpers for documentation and example payloads
 - VICAL helper endpoints (fetch/validate) for mdoc trust lists
 
+## Offer lifecycle and callback correlation
+
+Set `core_flow.reattemptable` on cross-device session creation requests (`core.reattemptable`
+for same-device requests):
+
+- `true` (default): accept presentations until the session expires.
+- `false`: reject further presentations and request URI GET/POST fetches after the first successful
+  presentation. Failed attempts can be retried until success or expiry.
+
+For example, add `"reattemptable": false` alongside `dcql_query` in `core_flow` for a single-use offer.
+Completed results remain available for inspection until the configured retention date.
+In Enterprise, keep `persistSessionResult` enabled for reusable offers; disabling it explicitly discards
+finished sessions regardless of retention or reuse settings.
+
+Each accepted presentation, including a wallet error response, gets a UUID in `session.presentationId`.
+All callbacks for that attempt carry the same ID. The next accepted presentation replaces it;
+previous callback payloads keep their original IDs. Request URI fetches do not generate presentation IDs.
+A wallet error after a failed attempt or a reusable offer's success starts a new attempt and emits a callback.
+Expired or consumed single-use offers reject errors without changing the outcome or presentation ID.
+Use `target` to identify the session and `session.presentationId` to correlate its presentation callbacks.
+The outer `requestId` field keeps its existing meaning.
+
 ## Assumptions and dependencies
 
 - Runtime: JVM (Ktor server, Java 21)
@@ -91,9 +113,13 @@ Base path: `/verification-session`
 - `GET /verification-session/{sessionId}/verification-session/events` (SSE)
   - Streams live session updates (`event`, `session`)
 
+Session webhooks are sent by the service to a caller-supplied URL. `config/network-fetch-guard.conf` refuses loopback and private destinations for webhooks and for the service's other outbound requests, such as DID resolution and policy fetches, unless that deployment opts in. Link-local and cloud-metadata addresses stay refused. The other API services read the same file. The Docker Compose configs allow private networks so the services can reach each other.
+
 VICAL utilities:
-- `POST /vical/fetch` — Fetch remote/file VICAL and return Base64
+- `POST /vical/fetch` — Fetch an http(s) VICAL and return Base64. `vicalFetchEnabled` in `verifier-service.conf` defaults to true. `file` URLs and loopback, link-local, and private destinations are refused. Set it to false to remove the route. `allowPrivateNetworkVical` opts network fetches into RFC1918 and IPv6 unique-local addresses. `POST /vical/validate` accepts a Base64 VICAL and stays available when fetch is disabled.
 - `POST /vical/validate` — Validate VICAL with provided verification key
+
+Verifier API 2 does not authenticate callers. Deployments, including the public demo, are expected to put their own access control in front of the service.
 
 ## Quick start
 

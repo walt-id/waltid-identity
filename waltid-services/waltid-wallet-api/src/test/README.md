@@ -28,12 +28,8 @@ currently being worked on as the next set of tests to add.
 ## Architecture
 
 The basic idea is to have a base class `E2EWalletTestBase` which provides
-the basic test logic for all tests. There are then two subclasses:
-
-* `E2EWalletTestLocal` provides the e2e capability for testing APIs on the local code base, i.e., code on a particuar branch
-* `E2EWalletTestDeployed` provides the e2e capability for testing the walt.id deployed APIs, i.e.,
-    * Wallet API: `https://wallet.walt.id`
-    * Issuer API: `https://issuer.portal.walt.id`
+the basic test logic for all tests. The subclass `E2EWalletTestLocal` provides the e2e capability
+for testing APIs on the local code base, i.e., code on a particuar branch.
 
 To run the suite of tests within that class, you can either click on the green button (above) from within _intellij IDE_,
 or run from the command line using _gradle_. See _Running the Tests_ below.
@@ -42,8 +38,7 @@ The following Architecture diagram summarises how the switchable nature of the f
 is implemented.
 
 ![img.png](resources/architecture.png)
-The HttpClient is a standard (default) client, relying on API ports, for the deployed APIs
-but is a custom _ktor Test Application_ HttpClient for the local API tests.
+The HttpClient is a custom _ktor Test Application_ HttpClient for the local API tests.
 
 For further information on the ktor Test Application, see:
 
@@ -81,8 +76,6 @@ The `e2eTestWalletCredentials` test suite contains a number of component steps a
 * `localWalletClient = newClient(token)`
   In local class, calls `newClient()` within the ApplicationTestBuilder ktor class to
   set up a ktor test client.
-  In the deployed case, creates a standard http client which can call the deployed servers based on
-  port number.
   <br></br>
 * `listAllWalletsForUser()`   
   Each user can have a number of wallets attached to the account. We need to retrieve one to use

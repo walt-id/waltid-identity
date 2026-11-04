@@ -1,4 +1,5 @@
 import com.github.jk1.license.filter.DependencyFilter
+import org.gradle.api.tasks.testing.Test
 import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.JsonReportRenderer
 import com.github.jk1.license.render.ReportRenderer
@@ -7,6 +8,12 @@ import groovy.json.JsonSlurper
 
 plugins {
     id("com.github.jk1.dependency-license-report")
+}
+
+tasks.withType<Test>().configureEach {
+    if (project.name != "waltid-web-data-fetching") {
+        systemProperty("walt.ssrf.allowLoopback", "true")
+    }
 }
 // Run: ./gradlew -p waltid-identity aggregateDependencyNotices --no-configuration-cache
 configure<com.github.jk1.license.LicenseReportExtension> {

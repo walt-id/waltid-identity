@@ -505,33 +505,33 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 ### General and EUDI credential configurations
 
 JWT key attestation is selected per credential configuration, independently of metadata
-signing and OAuth client authentication. The shipped catalog offers these pairs:
+signing and OAuth client authentication. The shipped identity and photo-ID profiles are:
 
-| General configuration / profile | EUDI configuration / profile |
+| Configuration | Profile |
 | --- | --- |
-| `identity_credential` / `identityCredentialSdJwt` | `identity_credential_eudi` / `identityCredentialSdJwtEudi` |
-| `org.iso.23220.photoid.1` / `isoPhotoId` | `org.iso.23220.photoid.1_eudi` / `isoPhotoIdEudi` |
+| `identity_credential` | `identityCredentialSdJwt` |
+| `org.iso.23220.photoid.1` | `isoPhotoId` |
 
-The general variants omit `proof_types_supported.jwt.key_attestations_required`. The EUDI
-variants advertise ES256 JWT proofs with `key_attestations_required: {}` and require a valid
-`key_attestation` in the proof JWT header. `{}` requires attestation without adding storage or
-user-authentication assurance constraints. The EUDI configurations and profiles are full,
-independent definitions with the same initial credential data as the
-general profiles, but distinct IDs and scopes. Edits to one definition do not update the other.
-To share the signed-metadata signer with `identityCredentialSdJwtEudi`, `isoPhotoIdEudi`,
-`eudiPidSdJwt`, and `eudiPidMdoc`, set `defaultEudiIssuerKey` and
-`defaultEudiIssuerX5chain` in `issuer2-profiles.conf` and reference them from each
-profile's `issuerKey` and `x5Chain`. Omit `issuerDid` for these certificate-based profiles.
-Use the matching key and certificate from `issuer-service.conf`'s `signedMetadata`;
-mdoc embeds the matching leaf chain in
-`issuerAuth`'s `x5chain`, and SD-JWT publishes it in `x5c`. Replace the key and chain in
-both configurations together when using your own signing material.
-The SD-JWT EUDI
-variant gets its own self-hosted VCT ending in `/identity_credential_eudi`; the photo-ID
-variant retains the original mdoc doctype and namespaces.
+`identity_credential_eudi` / `identityCredentialSdJwtEudi` and
+`org.iso.23220.photoid.1_eudi` / `isoPhotoIdEudi` are not in the shipped catalog. Their
+metadata definitions were removed and their profiles are commented out. Uncommenting
+`keyAttestationConfig` does not restore them.
 
-The following existing EUDI-related catalog entries also require nested attestation when
-using JWT proofs, directly in their full metadata definitions:
+The shipped catalog does not require key attestation. `key_attestations_required` and standalone
+`attestation` proof types are present in the credential metadata as comments, and
+`keyAttestationConfig` and the `client-attestation` client authentication method are commented
+out in `issuer-service.conf`. Uncomment a credential's attestation metadata together with
+`keyAttestationConfig` to require it. `{}` requires attestation without adding storage or
+user-authentication assurance constraints.
+To share the signed-metadata signer with `eudiPidSdJwt` and `eudiPidMdoc`, set
+`defaultEudiIssuerKey` and `defaultEudiIssuerX5chain` in `issuer2-profiles.conf` and reference
+them from each profile's `issuerKey` and `x5Chain`. Omit `issuerDid` for these
+certificate-based profiles. Use the matching key and certificate from `issuer-service.conf`'s
+`signedMetadata`; mdoc embeds the matching leaf chain in `issuerAuth`'s `x5chain`, and SD-JWT
+publishes it in `x5c`. Replace the key and chain in both configurations together when using
+your own signing material.
+
+The following shipped EUDI-related catalog entries include commented attestation examples:
 
 | Configuration | Profile |
 | --- | --- |
@@ -544,27 +544,24 @@ using JWT proofs, directly in their full metadata definitions:
 | `sca_payment_card_mso_mdoc` | `scaPaymentCardMdoc` |
 | `emvco_dpc_mso_mdoc` | `emvcoDpcMdoc` |
 
-Together with the identity/photo-ID EUDI variants, ten configurations require JWT key
-attestation. The payment entries are demonstration credentials included in this catalog
-policy; the flag does not establish EUDI compliance. Commented-out configurations remain disabled.
-Other general catalog configurations do not require nested JWT key attestation. Standalone
-`proofs.attestation`, where advertised, still requires a valid attestation by definition.
+These entries keep that example commented out. The payment entries are demonstration credentials;
+the flag does not establish EUDI compliance. Commented-out configurations remain disabled.
+Uncommented standalone `proofs.attestation` still requires `keyAttestationConfig`.
 
-Use the EUDI profile ID in the usual create-offer request, for example:
+Use a shipped profile ID in the usual create-offer request, for example:
 
 ```json
 {
-  "profileId": "identityCredentialSdJwtEudi",
+  "profileId": "eudiPidSdJwt",
   "authMethod": "PRE_AUTHORIZED"
 }
 ```
 
-Swagger includes EUDI identity and photo-ID offer examples. Profiles determine the offered
-configuration; selecting an EUDI profile does not change another credential's proof policy.
-`keyAttestationConfig` configures trusted attestation signers for the issuer; it does not
-make attestation mandatory on all configurations. Any supplied attestation is verified,
-even when optional. Configure the trust appropriate for the wallet deployment separately.
-These examples do not assert full EUDI compliance for every credential schema.
+Profiles determine the offered configuration; selecting one profile does not change another
+credential's proof policy. `keyAttestationConfig` configures trusted attestation signers for the
+issuer; it does not make attestation mandatory on all configurations. Any supplied attestation
+is verified, even when optional. Configure the trust appropriate for the wallet deployment
+separately. These examples do not assert full EUDI compliance for every credential schema.
 
 Restart OSS issuer2 after editing the metadata/profile configuration files. Existing offers
 should be replaced with offers selecting the intended profile after a policy change.

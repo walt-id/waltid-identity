@@ -34,7 +34,7 @@ public struct DemoMetadataSigner {
 public final class DemoBackend {
     public static let shared = DemoBackend()
     private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
-    public static let transactionDataProfilesURL = URL(string: "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles")!
+    public static let transactionDataProfilesURL = URL(string: "https://wallet2.demo.walt.id/transaction-data-profiles")!
     private static let paymentAuthorizationType = "org.waltid.transaction-data.payment-authorization"
     private static let requiredPaymentAuthorizationFields: Set<String> = ["merchant_name", "amount", "currency"]
 

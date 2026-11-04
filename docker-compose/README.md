@@ -86,11 +86,8 @@ $ ./gradlew jibDockerBuild # build docker images
 $
 $ docker image ls # verify images are built and published in the local docker registry
 REPOSITORY             TAG              IMAGE ID       CREATED        SIZE
-waltid/issuer-api      1.0.0-SNAPSHOT   0d8752382eae   55 years ago   359MB
 waltid/issuer-api2     1.0.0-SNAPSHOT   1a4b62c9f0de   55 years ago   361MB
-waltid/verifier-api    1.0.0-SNAPSHOT   5ce8428d031a   55 years ago   353MB
 waltid/verifier-api2   1.0.0-SNAPSHOT   9c1de4470bb8   55 years ago   355MB
-waltid/wallet-api      1.0.0-SNAPSHOT   712427b1f532   55 years ago   575MB
 waltid/wallet-api2     1.0.0-SNAPSHOT   3fa0c7185ed2   55 years ago   578MB
 
 $
@@ -115,18 +112,18 @@ $ docker compose up
 
 It is possible to start services selectively, including their dependencies.
 
-#### Start the demo wallet and all dependent services
+#### Start the Compose web wallet and all dependent services
 
 ```console
-$ docker compose up waltid-demo-wallet
+$ docker compose up wallet-demo-compose-web wallet-api2
 ```
 
 will start automatically:
 
 - caddy
 - postgres
-- wallet-api
-- and waltid-demo-wallet itself
+- wallet-api2
+- and wallet-demo-compose-web itself
 
 #### Start services using compose profiles
 
@@ -138,13 +135,9 @@ profiles to start the services for. The services are available with the followin
   `wallet-api2/config/auth.conf`). The published `stable` tag (0.23.0) cannot load that auth config; use `latest`
   or a locally built `1.0.0-SNAPSHOT` image for wallet-api2 when auth is on. The Compose web wallet image is
   built from source (`docker compose build wallet-demo-compose-web`) until a matching tag is published.
-- **identity-old** - the original stack implementing the draft protocols (wallet-api, issuer-api, verifier-api,
-  waltid-demo-wallet, waltid-dev-wallet, web-portal, vc-repo)
-- **services** - for API services of both stacks (wallet-api, issuer-api, verifier-api, vc-repo, issuer-api2,
-  verifier-api2, wallet-api2)
-- **apps** - for web applications of both stacks (waltid-demo-wallet, waltid-dev-wallet, web-portal, web-portal2,
-  wallet-demo-compose-web)
-- **valkey** - for the Valkey/Redis service (required when using valkey for session storage in wallet-api)
+- **services** - for API services (issuer-api2, verifier-api2, wallet-api2, vc-repo)
+- **apps** - for web applications (web-portal2, wallet-demo-compose-web)
+- **valkey** - for the Valkey/Redis service (required when using valkey for session storage)
 - **tse** - for the Hashicorp vault service, will be initialized with:
   - a transit secrets engine
   - and authentication methods
@@ -183,14 +176,6 @@ $ docker compose down -v
 
 ### Services
 
-Old Services
-
-- Wallet API: [http://localhost:7001](http://localhost:7001)
-- Issuer API: [http://localhost:7002](http://localhost:7002)
-- Verifier API: [http://localhost:7003](http://localhost:7003)
-
-New Services
-
 - Issuer API2: [http://localhost:7005](http://localhost:7005)
 - Verifier API2: [http://localhost:7004](http://localhost:7004)
 - Wallet API2: [http://localhost:7006](http://localhost:7006)
@@ -203,17 +188,9 @@ Dependencies
 
 ### Apps
 
-Old Apps
-
-- Demo Web Wallet: [http://localhost:7101](http://localhost:7101)
-- Dev Web Wallet: [http://localhost:7104](http://localhost:7104)
-- Web Portal: [http://localhost:7102](http://localhost:7102)
-- Credential Repo: [http://localhost:7103](http://localhost:7103)
-
-New Apps
-
 - Web Portal2: [http://localhost:7105](http://localhost:7105)
 - Compose Web Wallet: [http://localhost:7106](http://localhost:7106)
+- Credential Repo: [http://localhost:7103](http://localhost:7103)
 
 Optional `WALLET_BRAND_*` variables in `.env` rewrite that app's `branding.json` (title and Material3 colours) at container start.
 
@@ -221,9 +198,6 @@ Optional `WALLET_BRAND_*` variables in `.env` rewrite that app's `branding.json`
 
 Each API service reads the configuration files mounted from its own directory:
 
-- wallet API: `wallet-api/config`
-- issuer API: `issuer-api/config`
-- verifier API: `verifier-api/config`
 - issuer API2: `issuer-api2/config`
 - verifier API2: `verifier-api2/config`
 - wallet API2: `wallet-api2/config` (including `_features.conf` and `auth.conf` when `auth` is enabled)
@@ -265,15 +239,6 @@ and the Compose web wallet's wallet-api2 base URL.
 Make sure the ports are also updated in:
 
 - Caddyfile
-- issuer-api/config
-  - issuer-service.conf
-  - web.conf
-- verifier-api/config
-  - verifier-service.conf
-  - web.conf
-- wallet-api/config
-  - web.conf
-  - db.conf
 - issuer-api2/config
   - issuer-service.conf
   - web.conf
