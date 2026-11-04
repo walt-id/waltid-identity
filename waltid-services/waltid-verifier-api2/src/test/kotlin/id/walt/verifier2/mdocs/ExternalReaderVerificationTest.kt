@@ -9,6 +9,7 @@ import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
@@ -161,7 +162,7 @@ class ExternalReaderVerificationTest {
         application { installRoutes(repository, secure) }
     }
 
-    private suspend fun fixture(nfc: Boolean = false): ExternalReaderDeviceResponse {
+    private suspend fun fixture(nfc: Boolean = false, familyName: String = "Doe", docType: String = "org.iso.18013.5.1.mDL"): ExternalReaderDeviceResponse {
         val holder = restoreMdlHolderCrypto2Key("external-reader-holder")
         val readerKey = (holder.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
         val engagement = DeviceEngagement("1.0", DeviceEngagementSecurity(1u, ByteStringWrapper(readerKey, coseCompliantCbor.encodeToByteArray(readerKey))))
@@ -171,7 +172,10 @@ class ExternalReaderVerificationTest {
         val request = byteArrayOf(4, 5, 6)
         val handover = if (nfc) MdocSessionHandover.NfcConnection(ByteString(select), ByteString(request)) else MdocSessionHandover.Qr
         val transcript = handover.createTranscript(ByteString(engagementBytes), ByteString(readerBytes))
-        val credential = mdlFixtureCredential("""{"docType":"org.iso.18013.5.1.mDL","org.iso.18013.5.1":{"family_name":"Doe"}}""")
+        val credential = mdlFixtureCredential(buildJsonObject {
+            put("docType", docType)
+            put("org.iso.18013.5.1", buildJsonObject { put("family_name", familyName) })
+        }.toString())
         val namespaces = ByteStringWrapper(DeviceNameSpaces(emptyMap()))
         val signature = CoseSign1.createAndSignDetached(
             protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
@@ -352,6 +356,84 @@ class ExternalReaderVerificationTest {
         val failed = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(base.copy(core = missing)) }
         assertEquals(HttpStatusCode.OK, failed.status)
         assertEquals(VerificationSessionStatus.FAILED, failed.body<Verification2Session>().status)
+    }
+
+    private fun combineResponses(vararg requests: ExternalReaderDeviceResponse): ExternalReaderDeviceResponse {
+        val responses = requests.map { coseCompliantCbor.decodeFromByteArray<DeviceResponse>(Base64.decode(it.deviceResponse)) }
+        return requests.first().copy(deviceResponse = Base64.encode(coseCompliantCbor.encodeToByteArray(
+            responses.first().copy(documents = responses.flatMap { it.documents.orEmpty().toList() }.toTypedArray()),
+        )))
+    }
+
+    @Test
+    fun `extra document ids cannot overwrite queried credentials or bypass specific policies`() = testApplication {
+        startup()
+        routes()
+        val http = createClient { install(ClientContentNegotiation) { json() } }
+        val body = combineResponses(fixture(), fixture(familyName = "Smith", docType = "org.example.extra")).copy(
+            core = GeneralFlowConfig(
+                dcqlQuery = DcqlQuery(listOf(CredentialQuery(
+                    id = "unrequested_0", format = CredentialFormat.MSO_MDOC,
+                    meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
+                ))),
+                policies = Verification2Session.DefinedVerificationPolicies(specific_vc_policies = mapOf(
+                    "unrequested_0" to VCPolicyList(listOf(RegexPolicy(path = "$['org.iso.18013.5.1'].family_name", regex = "Smith"))),
+                    "unrequested_1" to VCPolicyList(emptyList()),
+                )),
+            ),
+        )
+        val response = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(body) }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val session = response.body<Verification2Session>()
+        assertEquals(VerificationSessionStatus.FAILED, session.status)
+        assertEquals(setOf("unrequested_0", "unrequested_2"), session.presentedCredentials!!.keys)
+        assertEquals("Doe", session.presentedCredentials!!.getValue("unrequested_0").single()
+            .credentialData.getValue("org.iso.18013.5.1").jsonObject.getValue("family_name").jsonPrimitive.content)
+        assertTrue(!session.policyResults!!.specificVcPolicies.getValue("unrequested_0").single().success)
+    }
+
+    @Test
+    fun `DCQL alternatives sharing a doctype match their complete claim constraints`() = testApplication {
+        startup()
+        routes()
+        val http = createClient { install(ClientContentNegotiation) { json() } }
+        val names = listOf("Doe", "Smith")
+        val query = DcqlQuery(
+            credentials = names.map { name -> CredentialQuery(
+                id = name.lowercase(), format = CredentialFormat.MSO_MDOC,
+                meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
+                claims = listOf(ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name"), values = listOf(JsonPrimitive(name)))),
+            ) },
+            credentialSets = listOf(CredentialSetQuery(options = names.map { listOf(it.lowercase()) })),
+        )
+        for (name in names) {
+            val request = fixture(familyName = name).copy(core = GeneralFlowConfig(dcqlQuery = query))
+            val response = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(request) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val session = response.body<Verification2Session>()
+            assertEquals(VerificationSessionStatus.SUCCESSFUL, session.status, session.failure.toString())
+            assertEquals(setOf(name.lowercase()), session.presentedCredentials!!.keys)
+        }
+    }
+
+    @Test
+    fun `DCQL multiple selects one or all matching documents and preserves extras`() = testApplication {
+        startup()
+        routes()
+        val http = createClient { install(ClientContentNegotiation) { json() } }
+        val body = combineResponses(fixture(), fixture(familyName = "Smith"))
+        for (multiple in listOf(false, true)) {
+            val request = body.copy(core = GeneralFlowConfig(dcqlQuery = DcqlQuery(listOf(CredentialQuery(
+                id = "licences", format = CredentialFormat.MSO_MDOC, multiple = multiple,
+                meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
+            )))))
+            val response = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(request) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val session = response.body<Verification2Session>()
+            assertEquals(VerificationSessionStatus.SUCCESSFUL, session.status, session.failure.toString())
+            assertEquals(if (multiple) 2 else 1, session.presentedCredentials!!.getValue("licences").size)
+            assertEquals(2, session.presentedCredentials!!.values.sumOf { it.size })
+        }
     }
 
     @Test
