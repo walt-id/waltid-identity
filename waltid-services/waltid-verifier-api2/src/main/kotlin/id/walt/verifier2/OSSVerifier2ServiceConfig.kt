@@ -5,7 +5,16 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration
 
-data class OSSVerifier2ServiceConfig(
+/**
+ * JVM overloads preserve the compatibility constructor descriptors without exposing secondary Kotlin
+ * constructors to Hoplite. Hoplite otherwise accepts an older constructor and silently ignores newer config.
+ *
+ * Preserves the JVM constructor descriptor from before the StoredKey field was added.
+ * Preserves the JVM constructor descriptor from before session retention became configurable.
+ * Preserves the JVM constructor descriptor from before the in-memory store limits became configurable.
+ * Preserves the JVM constructor descriptor from before VICAL fetch mode became configurable.
+ */
+data class OSSVerifier2ServiceConfig @JvmOverloads constructor(
     /** When omitted, unsigned cross-device sessions use `redirect_uri:<response_uri>`. Signed requests require an explicit value. */
     val clientId: String? = null,
     val clientMetadata: ClientMetadata? = null,
@@ -17,10 +26,10 @@ data class OSSVerifier2ServiceConfig(
     /** Preferred encoded crypto2 StoredKey. Invalid values fail startup without falling back to [key]. */
     val requestSigningStoredKey: String? = null,
     /**
-     * How long a used verification session is kept, in ISO-8601 duration format, e.g. `P30D`.
+     * How long a used verification session is kept, in Hoplite duration format, e.g. `30d`.
      *
      * A request may override it per session with `retention_duration`/`retention_date`. Omitted means the
-     * historical ten years; `PT2147483647S`-style infinite values, or any non-finite duration, mean keep
+     * historical ten years; Non-finite durations mean keep
      * indefinitely and never expire the record.
      */
     val sessionRetention: Duration? = null,
@@ -53,64 +62,4 @@ data class OSSVerifier2ServiceConfig(
      * and cloud-metadata addresses stay blocked. Default false, including on the public demo.
      */
     val allowPrivateNetworkVical: Boolean = false,
-) : WaltConfig() {
-    /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
-    constructor(
-        clientId: String?,
-        clientMetadata: ClientMetadata?,
-        urlPrefix: String,
-        urlHost: String,
-        key: JsonObject?,
-        x5c: List<String>?,
-    ) : this(clientId, clientMetadata, urlPrefix, urlHost, key, x5c, null)
-
-    /** Preserves the JVM constructor descriptor from before session retention became configurable. */
-    constructor(
-        clientId: String?,
-        clientMetadata: ClientMetadata?,
-        urlPrefix: String,
-        urlHost: String,
-        key: JsonObject?,
-        x5c: List<String>?,
-        requestSigningStoredKey: String?,
-    ) : this(clientId, clientMetadata, urlPrefix, urlHost, key, x5c, requestSigningStoredKey, null)
-
-    /** Preserves the JVM constructor descriptor from before the in-memory store limits became configurable. */
-    constructor(
-        clientId: String?,
-        clientMetadata: ClientMetadata?,
-        urlPrefix: String,
-        urlHost: String,
-        key: JsonObject?,
-        x5c: List<String>?,
-        requestSigningStoredKey: String?,
-        sessionRetention: Duration?,
-    ) : this(clientId, clientMetadata, urlPrefix, urlHost, key, x5c, requestSigningStoredKey, sessionRetention, null, null)
-
-    /** Preserves the JVM constructor descriptor from before VICAL fetch mode became configurable. */
-    constructor(
-        clientId: String?,
-        clientMetadata: ClientMetadata?,
-        urlPrefix: String,
-        urlHost: String,
-        key: JsonObject?,
-        x5c: List<String>?,
-        requestSigningStoredKey: String?,
-        sessionRetention: Duration?,
-        maxInMemorySessions: Int?,
-        maxInMemoryBytes: Long?,
-    ) : this(
-        clientId,
-        clientMetadata,
-        urlPrefix,
-        urlHost,
-        key,
-        x5c,
-        requestSigningStoredKey,
-        sessionRetention,
-        maxInMemorySessions,
-        maxInMemoryBytes,
-        true,
-        false,
-    )
-}
+) : WaltConfig()
