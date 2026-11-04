@@ -24,6 +24,7 @@ object OSSVerifier2FeatureCatalog : ServiceFeatureCatalog {
     override val baseFeatures = listOf(verifierService, CommonsFeatureCatalog.networkFetchGuardFeature)
     override val optionalFeatures: List<OptionalFeature> = listOf(
         devModeFeature,
+        CommonsFeatureCatalog.proximityVerifierFeature,
         transactionDataProfilesFeature,
     )
 }
