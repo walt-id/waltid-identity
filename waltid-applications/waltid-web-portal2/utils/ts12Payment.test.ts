@@ -62,6 +62,14 @@ test("invalid numeric drafts are rejected without coercion", () => {
   }
 });
 
+test("frequency selection rejects names inherited from JavaScript objects", () => {
+  const draft = paymentDraft(paymentExample("recurring"));
+  for (const code of ["toString", "constructor", "__proto__"]) {
+    draft.values["recurrence.frequency"] = code;
+    assert.throws(() => paymentPayload(draft), /supported payment frequency/);
+  }
+});
+
 test("incomplete PISP, timestamps and Unicode ID boundaries are checked in the form", () => {
   const draft = paymentDraft(paymentExample("unscheduled"));
   draft.pisp = true;

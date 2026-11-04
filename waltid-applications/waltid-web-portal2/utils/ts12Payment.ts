@@ -105,7 +105,7 @@ export function paymentPayload(draft: PaymentDraft): string {
       if (raw !== "true" && raw !== "false") throw new Error(field.label + " must be true or false.");
       value = raw === "true";
     } else if (!raw.trim()) throw new Error(field.label + " must not be blank.");
-    if (field.kind === "frequency" && !(raw in PAYMENT_FREQUENCIES)) throw new Error("Select a supported payment frequency.");
+    if (field.kind === "frequency" && !Object.hasOwn(PAYMENT_FREQUENCIES, raw)) throw new Error("Select a supported payment frequency.");
     if (field.path === "transaction_id" && [...raw].length > 36) throw new Error("Transaction ID must have at most 36 characters.");
     if (field.path === "currency" && !/^[A-Z]{3}$/.test(raw)) throw new Error("Currency must be an ISO 4217 alpha-3 code.");
     if (field.kind === "timestamp" && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/i.test(raw) || !Number.isFinite(Date.parse(raw)))) {
