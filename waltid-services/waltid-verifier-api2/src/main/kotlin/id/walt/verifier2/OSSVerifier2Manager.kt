@@ -51,6 +51,7 @@ object OSSVerifier2Manager {
                 ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
 
             is DcApiAnnexCFlowSetup -> setup.origin
+            is ExternalReaderFlowSetup -> throw IllegalArgumentException("Use proximity/device-response for external-reader submissions")
         }
         val x5c = setup.core.x5c ?: config.x5c
         requireX5cForX509ClientId(clientId, x5c)
