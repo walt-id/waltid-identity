@@ -698,7 +698,7 @@
     },
     {
       "id": "payment.scheduled.details",
-      "composeTest": "scheduledPaymentTerms",
+      "composeTest": "scheduledPaymentTermsDetails",
       "swiftTest": "testScheduledPaymentDetails",
       "title": "Scheduled payment details",
       "requirements": [
@@ -718,7 +718,7 @@
     },
     {
       "id": "payment.recurring.details",
-      "composeTest": "recurringPaymentTerms",
+      "composeTest": "recurringPaymentTermsDetails",
       "swiftTest": "testRecurringPaymentDetails",
       "title": "Recurring payment details",
       "requirements": [

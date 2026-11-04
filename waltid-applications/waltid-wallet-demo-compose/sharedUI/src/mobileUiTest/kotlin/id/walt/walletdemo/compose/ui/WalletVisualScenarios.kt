@@ -781,7 +781,7 @@ internal class WalletVisualScenarios(
         capture("payment.localized.compact_large_text")
     }
 
-    fun paymentTerms(recurring: Boolean, compact: Boolean = false) = with(test) {
+    fun paymentTerms(recurring: Boolean, compact: Boolean = false, details: Boolean = false) = with(test) {
         val consent = WalletVisualFixtures.paymentTerms(recurring)
         var cancelled = false
         var submitted = false
@@ -791,21 +791,27 @@ internal class WalletVisualScenarios(
                 preparePaymentConsent = { consent })
         }
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
-        onNodeWithText(if (recurring) "Monthly" else "2099-01-01T12:00:00Z").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").performScrollToContent(this).assertIsDisplayed()
+        if (!recurring) {
+            onNodeWithText("(UTC)", substring = true).performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("2099-01-01T12:00:00Z").assertDoesNotExist()
+        }
         if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
             val results = mutableListOf<TextLayoutResult>()
             kotlin.test.assertTrue(layout(results))
             kotlin.test.assertEquals(1.5f, results.single().layoutInput.density.fontScale)
         }
         val id = if (recurring) "payment.recurring" else "payment.scheduled"
-        capture(if (compact) "$id.compact_large_text" else "$id.main")
-        if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
-        onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
-        if (!compact) capture("$id.details")
-        consent.fields.forEach { field ->
-            onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
-                .performScrollToContent(this).assertIsDisplayed()
+        if (!details) capture(if (compact) "$id.compact_large_text" else "$id.main")
+        if (details || compact) {
+            if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
+            if (details) capture("$id.details")
+            consent.fields.forEach { field ->
+                onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
+                    .performScrollToContent(this).assertIsDisplayed()
+            }
         }
         onNodeWithText("Cancel payment").assertIsDisplayed().performClick()
         kotlin.test.assertTrue(cancelled)

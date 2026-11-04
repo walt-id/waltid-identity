@@ -75,7 +75,9 @@ class WalletVisualAndroidTest {
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
     @Test fun scheduledPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = false) }
+    @Test fun scheduledPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = false, details = true) }
     @Test fun recurringPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = true) }
+    @Test fun recurringPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = true, details = true) }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi", fontScale = 1.5f)
     fun recurringPaymentTermsLargeText() = scenario(fontScale = 1.5f, sheetHost = true) { paymentTerms(recurring = true, compact = true) }
