@@ -27,7 +27,9 @@ class Ts12Payment internal constructor(
     val schedule: Ts12PaymentSchedule,
     fields: Map<List<String>, String>,
 ) {
-    val fields: Map<List<String>, String> = fields.toMap()
+    val fields: Map<List<String>, String> = buildMap {
+        fields.forEach { (path, value) -> put(buildList { addAll(path) }, value) }
+    }
 
     fun requireCurrent(now: Instant = Clock.System.now()) {
         if (schedule is Ts12PaymentSchedule.Scheduled && schedule.executionDate < now) {
