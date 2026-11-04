@@ -106,6 +106,19 @@ class Issuer2MetadataEndpointTest {
     }
 
     @Test
+    fun bundledDockerPaymentMetadataMatchesTheServiceCatalogue() {
+        loadIssuer2ConfigFiles()
+        val servicePayment = ConfigManager.getConfig<Issuer2MetadataConfig>()
+            .sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+        val dockerMetadata = issuer2ConfigDir().parent.parent.parent
+            .resolve("docker-compose/issuer-api2/config/credential-issuer-metadata.conf")
+        loadIssuer2ConfigFiles(metadataConfigFile = dockerMetadata)
+        val dockerPayment = ConfigManager.getConfig<Issuer2MetadataConfig>()
+            .sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+        assertEquals(servicePayment, dockerPayment, "Docker and service deployments must publish the same payment instructions")
+    }
+
+    @Test
     fun unknownVctTypesReturnNotFoundThroughBothMetadataUrls() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -861,7 +874,7 @@ class Issuer2MetadataEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles(signedMetadata: MetadataSigningMethod? = null) {
+    private fun loadIssuer2ConfigFiles(signedMetadata: MetadataSigningMethod? = null, metadataConfigFile: Path? = null) {
         ConfigManager.preclear()
         FeatureManager.preclear()
         registerIssuer2ConfigDecoders()
@@ -877,6 +890,8 @@ class Issuer2MetadataEndpointTest {
                     val baseline = requireNotNull(javaClass.getResource("/metadata/issuer-service.conf")).readText()
                     Files.writeString(it, baseline + "\nbaseUrl = \"http://localhost\"\n" + signingBlock)
                 }
+            } else if (id == "credential-issuer-metadata" && metadataConfigFile != null) {
+                metadataConfigFile
             } else configDir.resolve("$id.conf")
             System.setProperty("config.file.$id", path.toString())
             ConfigManager.registerConfig(id, type)
