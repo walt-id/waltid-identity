@@ -1249,11 +1249,17 @@
     "wallet.scan.empty",
     "batch.offer.two_targets_three_copies",
     "sharing.information.selected",
+    "payment.scheduled.main",
+    "payment.scheduled.details",
+    "payment.recurring.main",
+    "payment.recurring.details",
     "credential.details.identity",
     "nearby.ready.qr",
     "settings.root.default"
   ],
   "galleryVariants": [
+    "payment.recurring.compact_large_text",
+    "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",
     "batch.offer.compact_dark_large_text",
     "components.dates.compact_large_text_rtl"
