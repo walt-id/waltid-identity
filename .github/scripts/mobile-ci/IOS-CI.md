@@ -26,9 +26,31 @@ The archive is retained for one day; rerun the producer if it has expired.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
-afterwards to ensure the fixture build did not replace it. Consumers run in three
-independent jobs: native provider plus native demo, Compose provider plus Compose
-demo, and Swift bridge tests. Each provider stays with its demo to reuse the build.
+afterwards to ensure the fixture build did not replace it. Gradle builds the fixture
+on each runner; Swift tests and result collection always execute.
+
+## Shared app test products
+
+Two build jobs prepare the selected native and Compose Debug test targets with
+`build-for-testing`. Each job retains its app's document-provider signing,
+entitlement and embedding checks, then packages an `.xctestproducts` bundle.
+Compose's generated framework symlink is materialized inside the bundle so it
+does not depend on the producer's build directory. The manifest binds all four
+repository revisions, exact Xcode version, configuration, expected test targets,
+file hashes and modes. Consumers verify the archive and its contents before use.
+Artifacts are named for their producing job's attempt and retained for one day.
+Native and Compose publish separate artifact outputs so partial reruns can reuse
+the successful sibling's bundle from its original attempt.
+
+Native and Compose functional tests, Enterprise tests and SwiftUI visual comparisons
+use those bundles with `test-without-building`. Each suite keeps its own selectors,
+simulator, fixture lifetime and result checks. Local action/task callers without
+an app artifact retain their build path. The Compose test job needs only its
+self-contained app bundle; native visual and bridge consumers also restore the
+release framework. The app build jobs have a 45-minute limit;
+the existing consumer limits below remain unchanged.
+
+Functional consumers run in three jobs: native demo, Compose demo and Swift bridge.
 Bridge tests run whenever either native or Compose is selected. Matrix failures
 do not cancel siblings; every selected job must succeed for the reusable workflow
 and `ci-gate` to succeed. Reports and logs have distinct names for each consumer.
@@ -41,8 +63,11 @@ These limits bound failures; successful runs finish as soon as their suites comp
 
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
-framework itself. In both paths, its fixture starts only after framework
-preparation succeeds and is stopped after XCTest.
+framework itself. CI also supplies `-Penterprise.ios.testProductsArtifacts=<directory>`
+with the `native/` and `compose/` artifact directories. The task verifies each
+selected app bundle before starting its fixture; without that property, it builds
+each app itself. In both paths, the fixture starts after build preparation succeeds
+and is stopped after XCTest.
 The task's `enterprise.ios.destination` property (or `IOS_SIMULATOR_DESTINATION`)
 must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
 `platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
@@ -120,6 +145,7 @@ start/end/exit metadata; it propagates command failures and terminates the comma
 process group on cancellation. Failed or cancelled consumer executions retain raw
 result bundles and phase logs for seven days, including when a bundle cannot be
 converted to JUnit. Converted consumer reports are also retained on success.
+App producers and Enterprise retain phase logs and timings on success too.
 There is no periodic resource sampling or unconditional Gradle profiling.
 Missing required test reports fail the affected lane and the aggregate CI gate.
 
