@@ -112,6 +112,12 @@ class Ts12PaymentTest {
         for ((currency, amount) in listOf("JPY" to "1.1", "EUR" to "1.001", "KWD" to "0.0001")) {
             assertFailsWith<Ts12PaymentValidationException> { parse(currency=currency, amount=amount) }
         }
+        for (field in listOf("min_amount", "max_amount", "total_amount", "initial_amount")) {
+            val failure = assertFailsWith<Ts12PaymentValidationException> {
+                parse("""{"recurrence":{"frequency":"MNTH","mit_options":{"$field":1.001}}}""")
+            }
+            assertEquals("/recurrence/mit_options/$field", failure.path)
+        }
         for (token in listOf("2", "2.0", "2e0")) {
             assertEquals("2", parse("""{"recurrence":{"frequency":"DAIL","number":$token}}""").fields[listOf("recurrence","number")])
         }
@@ -127,5 +133,14 @@ class Ts12PaymentTest {
         for (id in listOf("", " ", "x".repeat(37), "😀".repeat(37))) assertFailsWith<Ts12PaymentValidationException> {
             Ts12Payment.validate(JsonObject(base + ("transaction_id" to JsonPrimitive(id))), now)
         }
+    }
+
+    @Test fun validatedPaymentHasImmutableFieldsAndPaths() {
+        val payment = parse()
+        assertFails { (payment.fields as MutableMap<List<String>, String>)[listOf("amount")] = "0" }
+        val path = payment.fields.keys.single { it == listOf("payee", "name") }
+        assertFails { (path as MutableList<String>)[0] = "changed" }
+        assertEquals("11.56", payment.fields[listOf("amount")])
+        assertEquals("Shop", payment.fields[listOf("payee", "name")])
     }
 }
