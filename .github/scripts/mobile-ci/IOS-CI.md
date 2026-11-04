@@ -16,13 +16,19 @@ aligned because framework reuse requires an exact Xcode match.
 
 ## Shared release framework
 
-One producer assembles the full release `WalletCore.xcframework`, including device
-and simulator arm64 slices. Its worker limit avoids concurrent native links on
-the small hosted runner. It records the four resolved repository revisions.
-Downstream consumers check out those exact revisions and restore the same-run
-artifact. The manifest verifies the Identity commit, Xcode version, release
-configuration, platform coverage and file hashes before the framework is used.
-The archive is retained for one day; rerun the producer if it has expired.
+One producer, `.github/workflows/wallet-core-framework.yml`, assembles the full
+release `WalletCore.xcframework`, including device and simulator arm64 slices.
+Its worker limit avoids concurrent native links on the small hosted runner.
+macOS CI calls it when a consumer, Enterprise, or SDK-docs lane is selected.
+The release candidate calls it with the tagged checkout refs and passes the
+artifact into mobile SDK docs, so that job restores the framework instead of
+linking it. The docs action's assemble fallback uses the same single-worker
+limit when no artifact is provided. The producer records the four resolved
+repository revisions. Downstream consumers check out those exact revisions and
+restore the same-run artifact. The manifest verifies the Identity commit, Xcode
+version, release configuration, platform coverage and file hashes before the
+framework is used. The archive is retained for one day; rerun the producer if
+it has expired.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again

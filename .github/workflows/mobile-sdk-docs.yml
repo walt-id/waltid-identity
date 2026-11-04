@@ -131,8 +131,10 @@ jobs:
             scripts/check-mobile-swift-parity-decision.sh
           fi
 
+      # Covers Dokka, DocC, and the assemble fallback. Linking both slices needs
+      # more than 45 minutes; a restored artifact skips that link.
       - name: Generate mobile SDK API docs
-        timeout-minutes: 45
+        timeout-minutes: 75
         uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'

@@ -45,6 +45,8 @@ runs:
           --console=plain \
           --warning-mode=summary
 
+    # Used only when the caller did not restore a prebuilt release framework.
+    # Concurrent device/simulator links cause heavy swapping on the hosted runner.
     - name: Assemble Swift wallet SDK core XCFramework
       if: ${{ inputs.skip-wallet-core-assemble != 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
@@ -53,10 +55,13 @@ runs:
         ./gradlew \
           :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework \
           -PenableIosBuild=true \
+          --max-workers=1 \
           --no-daemon \
           --console=plain \
           --warning-mode=summary
 
+    # Package.swift's WalletCore binary target is the release XCFramework path.
+    # That is the restored artifact when assemble was skipped, and the assemble output otherwise.
     - name: Generate Swift WalletSDK DocC archive
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
