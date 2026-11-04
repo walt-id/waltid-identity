@@ -191,7 +191,8 @@ struct WalletVisualFixtures {
             requiresUnsignedRequestWarning: value["requiresUnsignedRequestWarning"] as? Bool ?? true,
             fields: try array(value, "fields").map { field in
                 PaymentConsentField(label: try text(field, "name"), description: nil, value: try text(field, "value"),
-                                    placement: try XCTUnwrap(placements[text(field, "placement")]))
+                                    placement: try XCTUnwrap(placements[text(field, "placement")]),
+                                    path: field["path"] as? [String] ?? [])
             }
         )
     }

@@ -110,6 +110,12 @@ payment currency's exact decimal precision; APR is a percentage independent of c
 Counts are mathematical integers (`2`, `2.0` and `2e0` are equivalent). No extra payment
 network rules or recurrence ordering constraints are inferred.
 
+The four timestamp paths use the demos' shared date/time display policy: current device
+locale and timezone, with an explicit timezone label. Consent field paths carry the semantics
+through both mobile adapters; labels, exact original values and proof inputs stay unchanged.
+Unsupported display spellings remain visible verbatim. See the
+[date/time policy](../waltid-applications/waltid-wallet-demo-test-fixtures/date-time-display.md).
+
 `transaction_id` is limited to 1–36 Unicode characters. Unknown fields are rejected
 at every object level; nested rejection is product policy because the published schema
 explicitly closes only its root. Nonblank strings, a 128-character numeric-token limit

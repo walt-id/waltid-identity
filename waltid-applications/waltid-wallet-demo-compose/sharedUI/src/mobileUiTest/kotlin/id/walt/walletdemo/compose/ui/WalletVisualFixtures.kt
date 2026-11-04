@@ -118,7 +118,8 @@ internal object WalletVisualFixtures {
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),
-                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")))
+                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")),
+                    path = field["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList())
             },
         )
     }

@@ -520,6 +520,7 @@ final class WalletVisualTests: XCTestCase {
             ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
                 onCancel: {}, paymentReview: state)
         }.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
             .environment(\.colorScheme, .light).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
         try await captureWhenReady(content, id: id, config: compact ? .iPhoneSe : .iPhone13,

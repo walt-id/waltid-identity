@@ -26,7 +26,7 @@ extension PaymentReviewState {
                 requiresUnsignedRequestWarning: consent.requiresUnsignedRequestWarning,
                 fields: consent.fields.enumerated().map { index, field in
                     PaymentDisplayField(item: ClaimItem(path: ClaimItemPath(id: "payment").indexedChild(index),
-                        label: field.label, value: .text(field.value), rawValue: field.value),
+                        pathComponents: field.path, label: field.label, value: field.displayValue, rawValue: field.value),
                         placement: field.placement, description: field.description)
                 }))
         }
@@ -38,6 +38,19 @@ extension PaymentReviewState {
                 }, technical: transaction.items.filter { $0.pathComponents.dropFirst().first != "details" }))
         }
         return displays
+    }
+}
+
+private let paymentTimestampPaths: Set<[String]> = [
+    ["date_time"], ["execution_date"], ["recurrence", "start_date"], ["recurrence", "end_date"],
+]
+
+private extension PaymentConsentField {
+    var displayValue: DisplayValue {
+        guard paymentTimestampPaths.contains(path), let instant = WalletInstant.parseTimestamp(value) else {
+            return .text(value)
+        }
+        return .instant(instant)
     }
 }
 

@@ -17,6 +17,7 @@ data class WalletDemoPaymentField(
     val description: String?,
     val value: String,
     val placement: WalletDemoPaymentFieldPlacement,
+    val path: List<String> = emptyList(),
 )
 
 enum class WalletDemoPaymentFieldPlacement { Prominent, Main, Details, Omitted }
@@ -68,7 +69,7 @@ fun WalletDemoPaymentReview.displays(transactions: List<ClaimGroup>): List<Walle
         requiresUnsignedRequestWarning = consent.requiresUnsignedRequestWarning,
         fields = consent.fields.mapIndexed { index, field -> WalletDemoPaymentDisplayField(
             ClaimItem(path = ClaimItemPath.topLevel("payment").indexedChild(index), label = field.label,
-                value = DisplayValue.Text(field.value)), field.placement, field.description)
+                value = field.displayValue(), rawValue = field.value, pathComponents = field.path), field.placement, field.description)
         },
     ))
     // An unresolved/rejected TS-12 consent must never fall back to transaction values.
@@ -82,3 +83,13 @@ fun WalletDemoPaymentReview.displays(transactions: List<ClaimGroup>): List<Walle
                 technical = technical))
         }
 }
+
+private val paymentTimestampPaths = setOf(
+    listOf("date_time"), listOf("execution_date"),
+    listOf("recurrence", "start_date"), listOf("recurrence", "end_date"),
+)
+
+/** Only known TS12 instants are interpreted; labels and arbitrary timestamp-looking text stay text. */
+private fun WalletDemoPaymentField.displayValue(): DisplayValue =
+    (if (path in paymentTimestampPaths) WalletDateTime.parseTimestamp(value) else null)
+        ?.let(DisplayValue::InstantValue) ?: DisplayValue.Text(value)

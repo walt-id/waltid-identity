@@ -73,7 +73,9 @@ class WalletVisualIosTest {
     fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario { providerOfferReview() }
     @Test fun scheduledPaymentTerms() = scenario { paymentTerms(recurring = false) }
+    @Test fun scheduledPaymentTermsDetails() = scenario { paymentTerms(recurring = false, details = true) }
     @Test fun recurringPaymentTerms() = scenario { paymentTerms(recurring = true) }
+    @Test fun recurringPaymentTermsDetails() = scenario { paymentTerms(recurring = true, details = true) }
     @Test fun recurringPaymentTermsLargeText() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { paymentTerms(recurring = true, compact = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
