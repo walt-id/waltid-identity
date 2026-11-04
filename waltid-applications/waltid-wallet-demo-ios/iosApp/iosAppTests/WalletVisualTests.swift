@@ -484,6 +484,50 @@ final class WalletVisualTests: XCTestCase {
         }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
     }
 
+    func testScheduledAndRecurringTermsSurviveTheNativeDisplayBoundary() throws {
+        let fixtures = try WalletVisualFixtures()
+        for recurring in [false, true] {
+            let state = PaymentReviewState.ready(try fixtures.payment(recurring: recurring))
+            let display = try XCTUnwrap(state.displays(transactions: []).first)
+            XCTAssertTrue(state.canConfirm)
+            XCTAssertEqual(display.fields.count, recurring ? 25 : 15)
+            XCTAssertEqual(display.fields.first { $0.item.label == "Payee" }?.item.rawValue, "Super Store")
+            if recurring {
+                XCTAssertEqual(display.fields.first { $0.item.label == "Payment frequency" }?.item.rawValue, "Monthly")
+                XCTAssertEqual(display.fields.first { $0.item.label == "Maximum payment amount" }?.item.rawValue, "9007199254740993.01")
+                XCTAssertEqual(display.fields.first { $0.item.label == "Annual percentage rate" }?.item.rawValue, "0.1234567890123456789")
+            } else {
+                XCTAssertEqual(display.fields.first { $0.item.label == "Execution date and time" }?.item.rawValue, "2099-01-01T12:00:00Z")
+            }
+        }
+    }
+
+    func testScheduledPaymentMain() async throws { try await paymentTerms(recurring: false) }
+    func testScheduledPaymentDetails() async throws { try await paymentTerms(recurring: false, details: true) }
+    func testRecurringPaymentMain() async throws { try await paymentTerms(recurring: true) }
+    func testRecurringPaymentDetails() async throws { try await paymentTerms(recurring: true, details: true) }
+    func testRecurringPaymentCompactLargeText() async throws { try await paymentTerms(recurring: true, compact: true) }
+
+    private func paymentTerms(recurring: Bool, details: Bool = false, compact: Bool = false) async throws {
+        let consent = try WalletVisualFixtures().payment(recurring: recurring)
+        let state = PaymentReviewState.ready(consent)
+        let id = "payment.\(recurring ? "recurring" : "scheduled")."
+            + (compact ? "compact_large_text" : details ? "details" : "main")
+        let sizeCategory: ContentSizeCategory = compact ? .accessibilityMedium : .large
+        let content = WalletReviewScaffold {
+            PaymentConsentView(state: state, detailsInitiallyExpanded: details)
+        } actions: {
+            ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
+                onCancel: {}, paymentReview: state)
+        }.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.colorScheme, .light).environment(\.sizeCategory, sizeCategory)
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+        try await captureWhenReady(content, id: id, config: compact ? .iPhoneSe : .iPhone13,
+            sizeCategory: sizeCategory,
+            isReady: { state.canConfirm }, failure: "Payment review did not become available",
+            scrollToBottom: recurring || details, scrollFraction: details || compact ? 1 : 0.4)
+    }
+
     func testPaymentConsent() throws {
         let consent = try WalletVisualFixtures().payment()
         XCTAssertEqual(consent.fields.count, 4)

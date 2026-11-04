@@ -438,6 +438,46 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.localized.compact_large_text.png" alt="payment · localized · compact large text, Compose Android" width="240"><br>320×568, 1.5× text | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.localized.compact_large_text.png" alt="payment · localized · compact large text, Compose iOS" width="240"><br>320×568, 1.5× text | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-localized-compact_large_text.native-ios27_0-phone-en-light.png" alt="payment · localized · compact large text, Native iOS" width="240"><br>320×568, accessibilityMedium |
 
+## payment-scheduled-main
+
+**Scheduled payment**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.scheduled.main.png" alt="Scheduled payment, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.scheduled.main.png" alt="Scheduled payment, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-scheduled-main.native-ios27_0-phone-en-light.png" alt="Scheduled payment, Native iOS" width="240"> |
+
+## payment-scheduled-details
+
+**Scheduled payment details**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.scheduled.details.png" alt="Scheduled payment details, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.scheduled.details.png" alt="Scheduled payment details, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-scheduled-details.native-ios27_0-phone-en-light.png" alt="Scheduled payment details, Native iOS" width="240"> |
+
+## payment-recurring-main
+
+**Recurring payment**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.recurring.main.png" alt="Recurring payment, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.recurring.main.png" alt="Recurring payment, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-recurring-main.native-ios27_0-phone-en-light.png" alt="Recurring payment, Native iOS" width="240"> |
+
+## payment-recurring-details
+
+**Recurring payment details**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.recurring.details.png" alt="Recurring payment details, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.recurring.details.png" alt="Recurring payment details, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-recurring-details.native-ios27_0-phone-en-light.png" alt="Recurring payment details, Native iOS" width="240"> |
+
+## payment-recurring-compact_large_text
+
+**Recurring payment at compact width and large text**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/payment.recurring.compact_large_text.png" alt="Recurring payment at compact width and large text, Compose Android" width="240"><br>320×568, 1.5× text | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/payment.recurring.compact_large_text.png" alt="Recurring payment at compact width and large text, Compose iOS" width="240"><br>320×568, 1.5× text | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-recurring-compact_large_text.native-ios27_0-phone-en-light.png" alt="Recurring payment at compact width and large text, Native iOS" width="240"><br>320×568, accessibilityMedium |
+
 ## payment-mixed_credentials-unsigned_confirmation
 
 **payment · mixed credentials · unsigned confirmation**

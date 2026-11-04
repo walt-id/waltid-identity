@@ -2,7 +2,7 @@
 
 Both payment paths use one display model and renderer per platform. Issuer-instructed payments project the wallet SDK's immutable, localized consent into that model. Legacy mdoc payments project their existing normalized transaction fields, emphasizing amount, currency and payee. Both use the same field hierarchy, details controls and payment actions. Consent loading or failure never falls back to legacy transaction values.
 
-The renderers do not fetch payment metadata, validate signatures, choose a transaction schema, invent issuer instructions, or reconstruct transaction values. These responsibilities remain in the wallet core. This document maps the issuer-instructed UI to [TS-12, revision ee91a294](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md); the shared layout does not extend protocol support or establish conformance for either path.
+The renderers do not fetch payment metadata, validate signatures, choose a transaction schema, invent issuer instructions, or reconstruct transaction values. These responsibilities remain in the wallet core. This document maps the issuer-instructed UI to [TS12 v1.0.1, revision 365f734a](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/365f734ac95b858343b09aaf56a80f3e1d684119/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md); the shared layout does not establish conformance for either path.
 
 | Requirement | UI behavior and evidence |
 | --- | --- |
@@ -19,3 +19,10 @@ The renderers do not fetch payment metadata, validate signatures, choose a trans
 `payment.sheet.*` captures the actual Compose modal host. Native system-alert interactions are retained as XCTest attachments; SwiftUI component captures do not reproduce Apple's identity-document provider geometry. The same review/actions are reused by supported wallet-owned hosts.
 
 Android's additional-review preference remains intact. With wallet preview disabled, Credential Manager owns the confirmation UI; these wallet screenshots do not establish its TS-12 coverage. That platform limitation remains tracked by WAL-1513. Live signing, system sheets, physical hardware and formal conformance require separate evidence.
+
+`payment.scheduled.*` and `payment.recurring.*` use complete, synthetic consent fields from the
+shared fixture. Their main/details states cover timing, frequency, MIT terms, ordinary optional
+fields and labelled URI text. The recurring compact/large-text state covers scrolling while the
+actions remain pinned. Compose tests also expand details, reach every field and cancel without
+submission; native disclosure interaction retains its separate app-host test. These fixtures do
+not replace the shared validator, issuer-metadata or end-to-end proof tests.

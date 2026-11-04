@@ -55,29 +55,55 @@ import kotlin.test.*
 
 /** Real configured issuer, wallet and verifier; only authentication factors are simulated. */
 class ScaPaymentWalletIntegrationTest {
+    private enum class MissingMetadata { ACTION_LABEL, OPTIONAL_CLAIM }
+
     @AfterEach
     fun clearConfig() = clearIssuer2TestEnvironment()
 
     @Test
-    fun configuredPaymentCardReachesWalletAndVerifier() = paymentFlow(missingLabel = false)
+    fun configuredPaymentCardReachesWalletAndVerifier() = paymentFlow()
 
     @Test
-    fun missingIssuerLabelBlocksConsentBeforeAuthorizationOrSigning() = paymentFlow(missingLabel = true)
+    fun missingIssuerLabelBlocksConsentBeforeAuthorizationOrSigning() = paymentFlow(MissingMetadata.ACTION_LABEL)
 
-    private fun paymentFlow(missingLabel: Boolean) = testApplication {
+    @Test
+    fun missingOptionalFieldMetadataBlocksConsentBeforeAuthorizationOrSigning() =
+        paymentFlow(MissingMetadata.OPTIONAL_CLAIM, recurringTerms())
+
+    @Test
+    fun scheduledPaymentReachesWalletAndVerifier() = paymentFlow(extra = Json.parseToJsonElement(
+        """{"execution_date":"2099-01-01T12:00:00Z","sct_inst":false}""").jsonObject)
+
+    @Test
+    fun recurringPaymentReachesWalletAndVerifier() = paymentFlow(extra = recurringTerms())
+
+    private fun recurringTerms() = Json.parseToJsonElement(
+        """{"recurrence":{"frequency":"MNTH","number":12,"mit_options":{"amount_variable":false,"min_amount":1.23,"max_amount":9007199254740993.01,"apr":0.1234567890123456789}}}""").jsonObject
+
+    private fun paymentFlow(missingMetadata: MissingMetadata? = null, extra: JsonObject? = null) = testApplication {
         val attester = Issuer2TestKeyAttester.create()
         installIssuer2WithConfigFiles(configureServiceConfig = {
             it.copy(baseUrl = "https://localhost", keyAttestationConfig = attester.issuerTrust)
         })
-        if (missingLabel) {
+        if (missingMetadata != null) {
             val config = ConfigManager.getConfig<Issuer2MetadataConfig>()
             val metadata = config.sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
             val parameters = requireNotNull(metadata.customParameters)
             val types = parameters.getValue("transaction_data_types").jsonObject
             val payment = types.getValue("urn:eudi:sca:payment:1").jsonObject
-            val catalogue = payment.getValue("ui_labels").jsonObject
-            val incompletePayment = JsonObject(payment +
-                ("ui_labels" to JsonObject(catalogue - "affirmative_action_label")))
+            val incompletePayment = when (missingMetadata) {
+                MissingMetadata.ACTION_LABEL -> JsonObject(payment + ("ui_labels" to
+                    JsonObject(payment.getValue("ui_labels").jsonObject - "affirmative_action_label")))
+                MissingMetadata.OPTIONAL_CLAIM -> {
+                    val claims = payment.getValue("claims").jsonArray
+                    val remaining = claims.filterNot {
+                        it.jsonObject.getValue("path").jsonArray.map { part -> part.jsonPrimitive.content } ==
+                            listOf("recurrence", "mit_options", "apr")
+                    }
+                    assertEquals(claims.size - 1, remaining.size)
+                    JsonObject(payment + ("claims" to JsonArray(remaining)))
+                }
+            }
             val incomplete = metadata.copy(customParameters = parameters +
                 ("transaction_data_types" to JsonObject(types + ("urn:eudi:sca:payment:1" to incompletePayment))))
             ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] =
@@ -99,7 +125,7 @@ class ScaPaymentWalletIntegrationTest {
         val issuerKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ProfilesConfig>()
             .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
         paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
-            issuerKey.getPublicKey().exportJWK(), missingLabel, attester)
+            issuerKey.getPublicKey().exportJWK(), missingMetadata != null, attester, extra)
     }
 
     @Test
@@ -123,6 +149,7 @@ class ScaPaymentWalletIntegrationTest {
         http: HttpClient, issuerBase: String, verifierBase: String,
         issuerPublicJwk: String, missingLabel: Boolean = false,
         attester: Issuer2TestKeyAttester? = null,
+        extra: JsonObject? = null,
     ) {
         val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
         try {
@@ -158,13 +185,20 @@ class ScaPaymentWalletIntegrationTest {
 
             // Reuse the shipped demo request. Only transport protection and the issuer VCT differ;
             // signed/encrypted transport variants already have their own protocol/app coverage.
-            val example = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
+            val shipped = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
+            val example = if (extra == null) shipped else shipped.copy(openid = requireNotNull(shipped.openid).copy(
+                transactionData = requireNotNull(requireNotNull(shipped.openid).transactionData).map { item ->
+                    JsonObject(item + ("payload" to JsonObject(item.getValue("payload").jsonObject + extra)))
+                }))
             val setup = example.copy(core = example.core.copy(
                 clientId = null, signedRequest = false, encryptedResponse = false,
                 dcqlQuery = DcqlQuery(requireNotNull(example.core.dcqlQuery).credentials.map {
                     it.copy(meta = SdJwtVcMeta(vctValues = listOf(vct)))
                 }),
             ))
+            if (extra?.containsKey("recurrence") == true) assertEquals("9007199254740993.01",
+                requireNotNull(setup.openid?.transactionData).single().getValue("payload").jsonObject
+                    .getValue("recurrence").jsonObject.getValue("mit_options").jsonObject.getValue("max_amount").jsonPrimitive.content)
             val created = http.post("$verifierBase/verification-session/create") {
                 contentType(ContentType.Application.Json)
                 setBody<VerificationSessionSetup>(setup)
@@ -173,6 +207,11 @@ class ScaPaymentWalletIntegrationTest {
             val envelope = http.get("$verifierBase/verification-session/${created.sessionId}/request").body<JsonObject>()
             val request = envelope.getValue("digital").jsonObject.getValue("requests").jsonArray.single().jsonObject
             val data = request.getValue("data").jsonObject
+            if (extra?.containsKey("recurrence") == true) {
+                val encoded = data.getValue("transaction_data").jsonArray.single().jsonPrimitive.content
+                val decoded = Json.parseToJsonElement(Base64.getUrlDecoder().decode(encoded).decodeToString()).jsonObject
+                assertEquals("9007199254740993.01", decoded.getValue("payload").jsonObject.getValue("recurrence").jsonObject.getValue("mit_options").jsonObject.getValue("max_amount").jsonPrimitive.content)
+            }
             val registry = TransactionDataTypeRegistry(setOf("urn:eudi:sca:payment:1"))
             val preview = WalletPresentationHandler.previewDcApiPresentation(wallet,
                 PreviewDcApiPresentationRequest(request.getValue("protocol").jsonPrimitive.content, data, setup.expectedOrigins.single()),
@@ -211,7 +250,7 @@ class ScaPaymentWalletIntegrationTest {
             val payment = prepared.payment
             assertEquals("de", payment.locale)
             assertEquals("Diese Zahlung bestätigen", payment.title)
-            assertEquals("Prüfen Sie Empfänger und Betrag vor der Bestätigung.", payment.securityHint)
+            assertEquals("Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.", payment.securityHint)
             assertEquals("Zahlung bestätigen", payment.affirmativeAction)
             assertEquals("Zahlung abbrechen", payment.denialAction)
             val fields = payment.fields.associateBy { it.path }
@@ -221,6 +260,14 @@ class ScaPaymentWalletIntegrationTest {
             assertEquals(PaymentFieldPlacement.PROMINENT, payee.placement)
             assertEquals("Betrag", fields.getValue(listOf("amount")).label)
             assertEquals("11.56", fields.getValue(listOf("amount")).value)
+            if (extra?.containsKey("execution_date") == true) {
+                assertEquals("2099-01-01T12:00:00Z", fields.getValue(listOf("execution_date")).value)
+            }
+            if (extra?.containsKey("recurrence") == true) {
+                assertEquals("Monatlich", fields.getValue(listOf("recurrence", "frequency")).value)
+                assertEquals("9007199254740993.01", fields.getValue(listOf("recurrence", "mit_options", "max_amount")).value)
+                assertEquals("0.1234567890123456789", fields.getValue(listOf("recurrence", "mit_options", "apr")).value)
+            }
             assertEquals(0, authorizations)
             assertEquals(0, signatures)
             val response = WalletPresentationHandler.submitDcApiPresentation(wallet,

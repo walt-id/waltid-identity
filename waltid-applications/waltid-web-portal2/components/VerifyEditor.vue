@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
+
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import {
   isDcApiFlowType,
@@ -46,7 +48,7 @@ function runtimeConfigValueToString(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
-  return JSON.stringify(value);
+  return stringifyPaymentJson(value);
 }
 
 function wrapRawJwkPreset(value: unknown): unknown {
@@ -66,7 +68,7 @@ function formatJsonPreset(value: unknown): string {
   if (!rawValue.trim()) return "";
 
   try {
-    return JSON.stringify(wrapRawJwkPreset(JSON.parse(rawValue)), null, 2);
+    return stringifyPaymentJson(wrapRawJwkPreset(parsePaymentJson(rawValue)), 2);
   } catch {
     return rawValue;
   }
@@ -77,7 +79,7 @@ function parseX5cPreset(value: unknown): string[] {
   if (!trimmed) return [""];
 
   try {
-    const parsed = JSON.parse(trimmed);
+    const parsed = parsePaymentJson(trimmed);
     if (Array.isArray(parsed)) {
       const certificates = parsed
         .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
@@ -126,6 +128,7 @@ type TransactionDataEntry = {
   profileType: string;
   credentialIds: string[];
   fieldValues: Record<string, string>;
+  payloadError?: string;
 };
 
 const clientIdOptions = [
@@ -167,7 +170,7 @@ const selectedClientIdOption = computed(() =>
 const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
 const parsedPayload = computed<Record<string, unknown> | null>(() => {
   try {
-    const parsed = JSON.parse(json.value || "{}");
+    const parsed = parsePaymentJson(json.value || "{}");
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return null;
     }
@@ -190,7 +193,7 @@ const dcqlCredentialIds = computed(() => {
 const canSubmit = computed(() => {
   if (!json.value.trim()) return false;
   try {
-    JSON.parse(json.value);
+    parsePaymentJson(json.value);
     return true;
   } catch {
     return false;
@@ -219,7 +222,7 @@ const transactionDataUnavailable = computed(
       transactionDataEntries.value.length === 0 ||
       transactionDataEntries.value.some(
         (entry) =>
-          !profileForEntry(entry) || entry.credentialIds.length === 0,
+          !profileForEntry(entry) || !!entry.payloadError || entry.credentialIds.length === 0,
       )),
 );
 const submitDisabled = computed(
@@ -269,7 +272,7 @@ const submitBlockReason = computed(() => {
 });
 
 function readPayload(): Record<string, unknown> {
-  const parsed = JSON.parse(json.value || "{}");
+  const parsed = parsePaymentJson(json.value || "{}");
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Request body must be a JSON object.");
   }
@@ -543,6 +546,7 @@ function applyTransactionDataOverrides(
   const boundCredentialIds = new Set<string>();
 
   for (const [index, entry] of transactionDataEntries.value.entries()) {
+    if (entry.payloadError) { optionsError.value = entry.payloadError; return false; }
     const selectedProfile = profileForEntry(entry);
     if (!selectedProfile) {
       optionsError.value = `Select a transaction data profile for payload ${index + 1}.`;
@@ -655,7 +659,7 @@ async function applySecurityOverridesToJson() {
   }
 
   isWritingJson.value = true;
-  json.value = JSON.stringify(payload, null, 2);
+  json.value = stringifyPaymentJson(payload, 2);
   return payload;
 }
 
@@ -890,7 +894,7 @@ async function submit() {
                 v-if="profileForEntry(entry)"
                 class="grid sm:grid-cols-2 gap-3"
               >
-                <label
+                <div
                   v-for="field in profileForEntry(entry)!.fields"
                   :key="field"
                   class="grid gap-1"
@@ -901,8 +905,13 @@ async function submit() {
                   <span class="form-label !mb-0">
                     {{ formatTransactionFieldLabel(field) }}
                   </span>
+                  <Ts12PaymentEditor
+                    v-if="field === 'payload' && entry.profileType === 'urn:eudi:sca:payment:1' && profileForEntry(entry)?.payloadSchema"
+                    v-model="entry.fieldValues[field]"
+                    @validity="entry.payloadError = $event"
+                  />
                   <textarea
-                    v-if="isNestedTransactionDataField(field)"
+                    v-else-if="isNestedTransactionDataField(field)"
                     v-model="entry.fieldValues[field]"
                     class="form-textarea min-h-[180px] font-mono text-xs"
                     :name="`transaction-${entry.id}-${field}`"
@@ -915,7 +924,7 @@ async function submit() {
                     :name="`transaction-${entry.id}-${field}`"
                   />
                   <p
-                    v-if="isNestedTransactionDataField(field)"
+                    v-if="isNestedTransactionDataField(field) && !profileForEntry(entry)?.payloadSchema"
                     class="text-xs text-[--color-text-muted]"
                   >
                     Nested JSON object (for example SCA
@@ -923,7 +932,7 @@ async function submit() {
                     <code>payload.amount</code>). Amount should be a JSON
                     number.
                   </p>
-                </label>
+                </div>
               </div>
             </div>
 

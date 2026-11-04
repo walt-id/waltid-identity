@@ -32,6 +32,61 @@ import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
     @Test
+    fun scheduledPaymentExpiringDuringNativeSigningNeverReleasesAProof() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val original = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("scheduled-holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
+        val deadline = kotlin.time.Instant.parse("2026-11-04T12:00:00Z")
+        val clock = object : kotlin.time.Clock {
+            var current = deadline
+            override fun now() = current
+        }
+        var signatures = 0
+        var expireDuringAuthorization = false
+        val key = object : id.walt.crypto2.keys.Key by original {
+            override val capabilities = original.capabilities.copy(signer = Signer { data, algorithm ->
+                val signature = requireNotNull(original.capabilities.signer).sign(data, algorithm)
+                signatures++
+                clock.current = kotlin.time.Instant.parse("2026-11-04T12:00:01Z")
+                signature
+            })
+        }
+        val public = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
+        val issuer = JWKKey.generate(KeyType.secp256r1)
+        val issuerJwt = issuer.signJws(buildJsonObject {
+            put("_sd_alg", "sha-256"); put("cnf", buildJsonObject { put("jwk", Jwk.parse(public)) })
+        }.toString().encodeToByteArray())
+        val entry = buildJsonObject {
+            put("type", "urn:eudi:sca:payment:1"); put("credential_ids", buildJsonArray { add("payment") })
+            put("payload", buildJsonObject {
+                put("transaction_id", "scheduled"); put("currency", "EUR"); put("amount", 1.23)
+                put("payee", buildJsonObject { put("name", "Shop"); put("id", "merchant") })
+                put("execution_date", "2026-11-04T12:00:00Z")
+            })
+        }.toString().encodeToByteArray()
+        val context = id.waltid.openid4vp.wallet.presentation.ScaKeyBindingContext(
+            "payment", id.walt.verifier.openid.models.openid.OpenID4VPResponseMode.DC_API,
+            id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer {
+                if (expireDuringAuthorization) clock.current = kotlin.time.Instant.parse("2026-11-04T12:00:01Z")
+                id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.PossessionAndInherence(
+                    id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.Possession.OTHER,
+                    id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.Inherence.OTHER)
+            }, clock)
+        suspend fun attempt() = WalletPresentFunctionality2.createKeyBindingJwt(
+            "$issuerJwt~", "nonce", "verifier", emptyList(), key,
+            listOf(kotlin.io.encoding.Base64.UrlSafe.withPadding(kotlin.io.encoding.Base64.PaddingOption.ABSENT).encode(entry)),
+            scaContext = context)
+        assertEquals("/execution_date", assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }.path)
+        assertEquals(1, signatures)
+        assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }
+        assertEquals(1, signatures) // Expired submission is rejected before calling the signer.
+        clock.current = deadline
+        expireDuringAuthorization = true
+        assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }
+        assertEquals(1, signatures) // A separate authorization callback can expire before signing.
+    }
+
+    @Test
     fun `persisted crypto2 key signs when legacy platform adapter cannot`() = runTest {
         val issuerKey = JWKKey.generate(KeyType.Ed25519)
         val crypto2Key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(

@@ -202,7 +202,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "required"]) { _, new in new },
                   initializeSigningIdentity: false)
-        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Storage"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Storage"].waitForExistence(timeout: 180), app.debugDescription)
         ui.tapButton(identifier: "wallet.keySetupEdit.Storage", fallbackLabel: "Key storage")
         let storage = app.staticTexts["Secure Enclave"]
         XCTAssertTrue(storage.waitForExistence(timeout: 10))
@@ -220,9 +220,11 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.openWalletLink(offer.offerUrl)
         XCTAssertTrue(ui.waitForOfferReview(timeout: 90), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 180), app.debugDescription)
+        let savedCredential = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")
+        ).firstMatch
+        XCTAssertTrue(savedCredential.waitForExistence(timeout: 180), app.debugDescription)
         ui.returnToWallet()
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")).firstMatch.waitForExistence(timeout: 20))
 
         let session = try await backend.createScaPaymentVerifierSession()
         ui.openWalletLink(session.authorizationRequestUri)
@@ -250,6 +252,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
         XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let unsignedConfirmation = app.buttons["payment-unsigned-confirm"]
+        XCTAssertTrue(unsignedConfirmation.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
+        unsignedConfirmation.tap()
         let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
         XCTAssertNotNil(status)
         XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")

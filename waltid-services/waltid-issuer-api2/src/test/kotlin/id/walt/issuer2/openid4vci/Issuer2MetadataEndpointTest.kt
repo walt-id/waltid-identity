@@ -688,7 +688,7 @@ class Issuer2MetadataEndpointTest {
                     val document = vctTypeMetadata.toJSON()
                     assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
                     val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
-                    assertEquals(5, payment.getValue("claims").jsonArray.size)
+                    assertEquals(26, payment.getValue("claims").jsonArray.size)
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
                     assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
                 } else if (credentialConfigurationId == "urn:eudi:pid:1") {

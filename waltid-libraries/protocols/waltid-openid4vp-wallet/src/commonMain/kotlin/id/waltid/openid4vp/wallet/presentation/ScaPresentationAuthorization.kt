@@ -87,6 +87,7 @@ internal data class ScaKeyBindingContext(
     val credentialId: String,
     val responseMode: OpenID4VPResponseMode,
     val authorizer: ScaPresentationAuthorizer,
+    val clock: kotlin.time.Clock = kotlin.time.Clock.System,
 )
 
 internal const val TS12_PAYMENT_TYPE = "urn:eudi:sca:payment:1"

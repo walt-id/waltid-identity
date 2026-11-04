@@ -111,6 +111,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
         XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let unsignedWarning = app.alerts["Unsigned payment request"]
+        XCTAssertTrue(unsignedWarning.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
+        unsignedWarning.buttons["Confirm payment"].tap()
         let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
         XCTAssertNotNil(status)
         XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")

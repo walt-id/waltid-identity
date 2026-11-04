@@ -61,8 +61,8 @@ Credential Manager's payment summary does not establish TS-12 display conformanc
 
 This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
 
-- Required one-off payment values, optional timestamp, payee logo/website, PISP
-  details and payment flags. Every supplied leaf needs a label; URIs remain plain text.
+- Required payment values, optional timestamp, payee logo/website, PISP details,
+  payment flags, scheduled execution and recurring payment terms. Every supplied leaf needs a label; URIs remain plain text.
   Amounts use exact decimal handling and ISO 4217 minor units, without rounding.
 - Inline claims/UI labels or HTTPS references, with at most three documents,
   256 KiB each, three redirects each and ten seconds per document. Every redirect
@@ -79,11 +79,11 @@ This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
   Omitted values remain validated and signed. Ordinary disclosure review and the
   wallet's independent unsigned-request warning remain visible.
 
-Unknown payment fields, unsupported currencies, scheduling/recurrence, arbitrary JSON
+Unknown payment fields, unsupported currencies, arbitrary JSON
 Schema and inherited metadata block consent. PaSO, offline metadata caching and Wallet2
 HTTP-service consent are outside this slice. Legacy mdoc uses generic review when enabled.
 
-The contract pins [TS-12 v1.0.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
+The contract pins [TS-12 v1.0.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/365f734ac95b858343b09aaf56a80f3e1d684119/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
 and [SD-JWT VC draft 16 metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-16.html#section-4).
 Transaction claim paths are payload-relative, following TS-12 §3.3.2; its informative
 example's `payload` prefix is not treated as another supported contract. Claim display
@@ -91,6 +91,61 @@ uses `locale`/`label` from SD-JWT VC; TS-12 UI catalogue entries use `lang`/`val
 Mandatory claim presence is checked; unknown metadata extensions are ignored, and
 transaction claim `sd` is inapplicable. These choices do not claim a resolved standards
 erratum or full TS-12 conformance.
+
+### Payment payload contract
+
+The built-in payment type supports `execution_date` or `recurrence`, never both.
+All timestamps (`date_time`, `execution_date`, `recurrence.start_date`,
+`recurrence.end_date`) use RFC 3339 date-time strings with offsets. This follows the
+published JSON Schema where the TS-12 prose describes some values as dates.
+`execution_date` must remain at or after the current instant through submission and
+native signing; a request that expires during review or signing produces no usable proof.
+
+Recurrence requires `frequency` and supports `start_date`, `end_date`, `number` and
+`mit_options`. The latter supports `amount_variable`, `min_amount`, `max_amount`,
+`total_amount`, `initial_amount`, `initial_amount_number` and `apr`. All twelve TS-12
+frequency codes have English and German display strings. Missing value translations
+use the existing preferred-language fallback or block consent. Monetary terms use the
+payment currency's exact decimal precision; APR is a percentage independent of currency.
+Counts are mathematical integers (`2`, `2.0` and `2e0` are equivalent). No extra payment
+network rules or recurrence ordering constraints are inferred.
+
+`transaction_id` is limited to 1–36 Unicode characters. Unknown fields are rejected
+at every object level; nested rejection is product policy because the published schema
+explicitly closes only its root. Nonblank strings, a 128-character numeric-token limit
+and exponents in -128…128 remain product restrictions. Original encoded transaction
+entries are always the input to proof hashing; normalized display strings are not re-encoded.
+
+Community and Enterprise Verifier2 return HTTP 400 for invalid built-in payment payloads
+before creating a session. Community's custom-type admission behavior is unchanged;
+Enterprise still applies each service's effective type registry. Profile discovery adds
+read-only `payloadSchema` for this type. Stored profiles and CRUD inputs retain their
+existing fields; schema descriptors cannot override payment rules or issuer instructions.
+Both portal editors provide typed controls plus JSON editing, preserve absent versus
+false/zero values and exact decimal tokens, and generate future dates for example requests.
+
+### Keeping the schema current
+
+The upstream schema is pinned by commit and SHA-256 in
+`scripts/ts12-payment-schema.json`; `Ts12PaymentSchema.kt` is generated from that source.
+The normal Linux CI job runs the following check. A local mismatch, upstream change,
+or failed upstream fetch fails the job; no stale-cache fallback is used.
+
+```bash
+python3 scripts/sync-ts12-payment-schema.py --check-upstream
+```
+
+For an offline pin check, use `--check`. When upstream changes, review the schema diff
+and governing TS-12 text, then explicitly select the reviewed revision:
+
+```bash
+python3 scripts/sync-ts12-payment-schema.py --update --ref <reviewed-commit>
+```
+
+Update any affected validators, issuer labels, portal controls and independent test vectors,
+then run the shared, service and affected platform suites. CI checks upstream when it runs;
+there is no transaction-time schema fetch. Adding fields or changing an integrity-pinned
+metadata document requires a coordinated rollout and, where necessary, credential reissuance.
 
 ## Wallet setup
 
@@ -115,11 +170,17 @@ summary does not establish complete TS-12 display compliance.
 | Existing suite | Payment coverage | Boundary |
 | --- | --- | --- |
 | Protocol SCA tests | Exact hashes, KB-JWT claims, transport variants and authorization failures | Synthetic authorization |
+| Shared TS12 contract and consent tests | All optional leaves, formats, exact numbers, deadlines and English/German frequency values | JVM, JS Node and iOS Simulator |
 | Issuer2 integration tests | Configured issuer → wallet → verifier, exact hashes and required policies | Local services and synthetic authorization |
 | `paymentDemoTest` | Same successful scenario against public issuer2/verifier2 | Deployment acceptance; no native authentication |
 | Android DC-API suite | Payment issuance, registration, selection, both preview settings and rejection of unprotected signing | Ordinary emulator keys cannot authorize SCA |
 | Physical Android test | App setup/issuance, Credential Manager, review, native signing and verifier acceptance | Explicit operator interaction |
 | Existing iOS app suites | Corresponding physical URL-payment flow in both demos | Explicit operator interaction |
+
+Both portal directories expose `npm test` for their Node utility tests. After building the
+Community portal with `npm run build`, run `npm run test:proxy` to exercise the actual
+Nitro request-body and HTTP forwarding boundary with independent decimal tokens and
+malformed JSON. The proxy test starts isolated local fixtures and creates no real session.
 
 The existing Linux Gradle job runs `paymentDemoTest` for `ci:mobile-dc-api` PRs
 and eligible main builds, reporting through its ordinary JUnit check and `ci-gate`.

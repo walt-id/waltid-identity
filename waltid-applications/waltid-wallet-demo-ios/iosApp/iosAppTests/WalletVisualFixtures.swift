@@ -178,8 +178,9 @@ struct WalletVisualFixtures {
             credentialRequirements: Array(Set(options.map(\.queryID))).sorted().map { .init(options: [[$0]]) })
     }
 
-    func payment(localized: Bool = false) throws -> PaymentConsent {
-        let value = try object(root, localized ? "paymentLocalized" : "payment")
+    func payment(localized: Bool = false, recurring: Bool? = nil) throws -> PaymentConsent {
+        let key = recurring.map { $0 ? "paymentRecurring" : "paymentScheduled" } ?? (localized ? "paymentLocalized" : "payment")
+        let value = try object(root, key)
         let placements: [String: PaymentConsentFieldPlacement] = [
             "Prominent": .prominent, "Main": .main, "Details": .details, "Omitted": .omitted,
         ]

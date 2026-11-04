@@ -161,6 +161,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
+    @Serializable(with = id.walt.verifier.openid.transactiondata.TransactionDataObjectsSerializer::class)
     val transactionData: List<JsonObject>? = null,
     val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
     val scope: String? = null,

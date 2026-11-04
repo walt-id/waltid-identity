@@ -115,7 +115,7 @@
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay €11.56",
+    "affirmativeAction": "Pay \u20ac11.56",
     "denialAction": "Decline",
     "fields": [
       {
@@ -272,7 +272,7 @@
     "revision": "localized-signed-payment",
     "locale": "de",
     "title": null,
-    "affirmativeAction": "Zahlung verbindlich bestätigen",
+    "affirmativeAction": "Zahlung verbindlich best\u00e4tigen",
     "denialAction": null,
     "fields": [
       {
@@ -281,7 +281,7 @@
         "placement": "Prominent"
       },
       {
-        "name": "Empfänger",
+        "name": "Empf\u00e4nger",
         "value": "Example Bookshop",
         "placement": "Main"
       },
@@ -296,7 +296,7 @@
         "placement": "Omitted"
       }
     ],
-    "securityHint": "Prüfen Sie Betrag und Empfänger.",
+    "securityHint": "Pr\u00fcfen Sie Betrag und Empf\u00e4nger.",
     "requiresUnsignedRequestWarning": false
   },
   "readerTrust": {
@@ -409,6 +409,226 @@
             "requested": true
           }
         ]
+      }
+    ]
+  },
+  "paymentScheduled": {
+    "revision": "paymentScheduled",
+    "locale": "en",
+    "title": "Confirm payment",
+    "affirmativeAction": "Confirm payment",
+    "denialAction": "Cancel payment",
+    "requiresUnsignedRequestWarning": false,
+    "fields": [
+      {
+        "name": "Transaction ID",
+        "value": "scheduled-reference",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee",
+        "value": "Super Store",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Payee ID",
+        "value": "merchant-001",
+        "placement": "Main"
+      },
+      {
+        "name": "Currency",
+        "value": "EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Amount",
+        "value": "11.56",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Execution date and time",
+        "value": "2099-01-01T12:00:00Z",
+        "placement": "Main"
+      },
+      {
+        "name": "Request started",
+        "value": "2026-11-04T10:00:00Z",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee logo",
+        "value": "data:image/png;base64,AA==",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee website",
+        "value": "https://shop.example",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP legal name",
+        "value": "Example Payments Ltd",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP brand",
+        "value": "Example Payments",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP domain",
+        "value": "payments.example",
+        "placement": "Details"
+      },
+      {
+        "name": "Estimated amount",
+        "value": "false",
+        "placement": "Details"
+      },
+      {
+        "name": "Amount earmarked",
+        "value": "false",
+        "placement": "Details"
+      },
+      {
+        "name": "Instant transfer",
+        "value": "true",
+        "placement": "Details"
+      }
+    ]
+  },
+  "paymentRecurring": {
+    "revision": "paymentRecurring",
+    "locale": "en",
+    "title": "Confirm payment",
+    "affirmativeAction": "Confirm payment",
+    "denialAction": "Cancel payment",
+    "requiresUnsignedRequestWarning": false,
+    "fields": [
+      {
+        "name": "Transaction ID",
+        "value": "scheduled-reference",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee",
+        "value": "Super Store",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Payee ID",
+        "value": "merchant-001",
+        "placement": "Main"
+      },
+      {
+        "name": "Currency",
+        "value": "EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Amount",
+        "value": "11.56",
+        "placement": "Prominent"
+      },
+      {
+        "name": "First payment",
+        "value": "2099-01-01T12:00:00Z",
+        "placement": "Main"
+      },
+      {
+        "name": "Last payment",
+        "value": "2099-12-01T12:00:00Z",
+        "placement": "Main"
+      },
+      {
+        "name": "Number of payments",
+        "value": "12",
+        "placement": "Main"
+      },
+      {
+        "name": "Payment frequency",
+        "value": "Monthly",
+        "placement": "Main"
+      },
+      {
+        "name": "Variable amount",
+        "value": "true",
+        "placement": "Main"
+      },
+      {
+        "name": "Minimum payment amount",
+        "value": "10",
+        "placement": "Main"
+      },
+      {
+        "name": "Maximum payment amount",
+        "value": "9007199254740993.01",
+        "placement": "Main"
+      },
+      {
+        "name": "Total payment amount",
+        "value": "200",
+        "placement": "Main"
+      },
+      {
+        "name": "Initial payment amount",
+        "value": "5",
+        "placement": "Main"
+      },
+      {
+        "name": "Number of initial payments",
+        "value": "2",
+        "placement": "Main"
+      },
+      {
+        "name": "Annual percentage rate",
+        "value": "0.1234567890123456789",
+        "placement": "Main"
+      },
+      {
+        "name": "Request started",
+        "value": "2026-11-04T10:00:00Z",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee logo",
+        "value": "data:image/png;base64,AA==",
+        "placement": "Details"
+      },
+      {
+        "name": "Payee website",
+        "value": "https://shop.example",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP legal name",
+        "value": "Example Payments Ltd",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP brand",
+        "value": "Example Payments",
+        "placement": "Details"
+      },
+      {
+        "name": "PISP domain",
+        "value": "payments.example",
+        "placement": "Details"
+      },
+      {
+        "name": "Estimated amount",
+        "value": "false",
+        "placement": "Details"
+      },
+      {
+        "name": "Amount earmarked",
+        "value": "false",
+        "placement": "Details"
+      },
+      {
+        "name": "Instant transfer",
+        "value": "true",
+        "placement": "Details"
       }
     ]
   },
