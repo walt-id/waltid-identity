@@ -74,12 +74,15 @@ actor MockWalletClient: WalletClient {
     nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
         guard let scenario else { return nil }
         if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
-        return PaymentConsent(revision: "ui-test-payment", locale: "de", title: "Zahlung prüfen", securityHint: nil,
-            affirmativeAction: "Zahlen", denialAction: "Ablehnen", requiresUnsignedRequestWarning: scenario == "unsigned",
+        let english = scenario == "english"
+        return PaymentConsent(revision: "ui-test-payment", locale: english ? "en" : "de",
+            title: english ? "Confirm this payment" : "Zahlung prüfen", securityHint: nil,
+            affirmativeAction: english ? "Confirm payment" : "Zahlen",
+            denialAction: english ? "Cancel payment" : "Ablehnen", requiresUnsignedRequestWarning: scenario == "unsigned",
             fields: [
-                .init(label: "Betrag", description: nil, value: "11.56 EUR", placement: .prominent),
-                .init(label: "Empfänger", description: nil, value: "Super Store", placement: .main),
-                .init(label: "Transaktions-ID", description: nil, value: "txn-1", placement: .details),
+                .init(label: english ? "Amount" : "Betrag", description: nil, value: "11.56 EUR", placement: .prominent),
+                .init(label: english ? "Payee" : "Empfänger", description: nil, value: "Super Store", placement: .main),
+                .init(label: english ? "Transaction ID" : "Transaktions-ID", description: nil, value: "txn-1", placement: .details),
                 .init(label: "Omitted", description: nil, value: "bound-but-hidden", placement: .omitted),
             ])
     }

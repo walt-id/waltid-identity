@@ -197,6 +197,29 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Presentation sent", "Present failed"], timeout: 10), "Presentation sent")
     }
 
+    func testPaymentActionsFitOneRowWithFullLabels() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "english"])
+        ui.openDeepLink("openid4vp://mock")
+        let confirm = app.buttons["wallet.presentationSubmitButton"]
+        let cancel = app.buttons["wallet.presentationRejectButton"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        XCTAssertTrue(cancel.exists)
+        XCTAssertEqual(confirm.label, "Confirm payment")
+        XCTAssertEqual(cancel.label, "Cancel payment")
+        XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1,
+            "Normal-width payment actions must stay on one row")
+        XCTAssertLessThanOrEqual(cancel.frame.maxX, confirm.frame.minX)
+        for action in [cancel, confirm] {
+            XCTAssertTrue(action.isHittable)
+            XCTAssertGreaterThanOrEqual(action.frame.minX, app.frame.minX)
+            XCTAssertLessThanOrEqual(action.frame.maxX, app.frame.maxX)
+        }
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "payment-actions-one-row"; capture.lifetime = .keepAlways; add(capture)
+    }
+
     func testMissingPaymentMetadataBlocksSharing() {
         continueAfterFailure = false
         let app = XCUIApplication()

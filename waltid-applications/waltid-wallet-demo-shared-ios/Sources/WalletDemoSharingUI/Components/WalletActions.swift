@@ -30,7 +30,7 @@ public struct WalletActions: View {
         Group {
             if #available(iOS 16, *) {
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 12) { actions }.fixedSize(horizontal: true, vertical: false)
+                    HStack(spacing: 8) { actions }.fixedSize(horizontal: true, vertical: false)
                     stacked
                 }
             } else {
@@ -52,7 +52,7 @@ public struct WalletActions: View {
             Text(action.label).font(.body.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 20).padding(.vertical, 10)
+                .padding(.horizontal, 16).padding(.vertical, 10)
                 .frame(minHeight: 44)
         }
         .buttonStyle(WalletActionStyle(prominence: prominence))
@@ -70,7 +70,7 @@ private struct LegacyWalletActionLayout<Content: View>: View {
     var body: some View {
         Group {
             if intrinsicWidth <= availableWidth {
-                HStack(spacing: 12, content: content)
+                HStack(spacing: 8, content: content)
             } else {
                 VStack(alignment: .trailing, spacing: 8, content: content)
             }
@@ -80,7 +80,7 @@ private struct LegacyWalletActionLayout<Content: View>: View {
             Color.clear.preference(key: ActionAvailableWidth.self, value: geometry.size.width)
         })
         .overlay(alignment: .trailing) {
-            HStack(spacing: 12, content: content).fixedSize(horizontal: true, vertical: false)
+            HStack(spacing: 8, content: content).fixedSize(horizontal: true, vertical: false)
                 .background(GeometryReader { geometry in
                     Color.clear.preference(key: ActionIntrinsicWidth.self, value: geometry.size.width)
                 })
