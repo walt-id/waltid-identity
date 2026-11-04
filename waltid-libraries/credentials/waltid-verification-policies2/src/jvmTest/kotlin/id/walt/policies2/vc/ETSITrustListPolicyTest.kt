@@ -1,5 +1,6 @@
 package id.walt.policies2.vc
 
+import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
@@ -22,6 +23,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -223,8 +226,36 @@ class ETSITrustListPolicyTest {
     }
 
     // ---------------------------------------------------------------------------
+    // verify() with an x5c chain. The trust list registers only the root; the
+    // untrusted signer is self-signed and appends that root to its own x5c (WAL-1638).
+    // ---------------------------------------------------------------------------
+
+    @ParameterizedTest
+    @CsvSource(
+        "sd-jwt-x5c-ds.txt, true",
+        "sd-jwt-x5c-ds-root.txt, true",
+        "sd-jwt-x5c-untrusted-root.txt, false",
+        "mdoc-x5chain-ds.txt, true",
+        "mdoc-x5chain-untrusted-root.txt, false",
+    )
+    fun `verify trusts an x5c chain only when its signer chains to the listed root`(
+        fixture: String,
+        trusted: Boolean,
+    ) = runTest {
+        val credential = CredentialParser.detectAndParse(x5cFixture(fixture)).second
+        val policy = ETSITrustListPolicy(trustLists = listOf(x5cFixture("lote-iaca-root.json")))
+
+        val result = policy.verify(credential, PolicyExecutionContext.Empty)
+
+        assertEquals(trusted, result.isSuccess, result.exceptionOrNull()?.message)
+    }
+
+    // ---------------------------------------------------------------------------
     // Test fixtures
     // ---------------------------------------------------------------------------
+
+    private fun x5cFixture(name: String): String =
+        this::class.java.classLoader.getResource("etsi-trust-list/wal-1638/$name")!!.readText().trim()
 
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)

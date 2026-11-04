@@ -3,6 +3,7 @@ package id.walt.trust
 import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
+import id.walt.trust.utils.HashUtils
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.test.runTest
@@ -19,6 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 
 class Wal1186TrustRegistryTest {
 
@@ -58,6 +60,76 @@ class Wal1186TrustRegistryTest {
         )
 
         assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+    }
+
+    @Test
+    fun `resolves leaf presented with its registry root`() = runTest {
+        val chain = TestCertificates.createChain()
+        val service = loteService(chain.root)
+
+        val decision = service.resolveCertificateChain(
+            certificateChainPemOrDer = listOf(TestCertificates.pem(chain.leaf), TestCertificates.pem(chain.root)),
+            instant = Clock.System.now()
+        )
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertTrue(decision.evidence.any { it.type == "CERTIFICATE_PATH" })
+    }
+
+    @Test
+    fun `rejects unrelated leaf presented with the registry root`() = runTest {
+        val chain = TestCertificates.createChain("Credential")
+        val attacker = TestCertificates.createChain("Attacker")
+        val service = loteService(chain.root)
+
+        val decision = service.resolveCertificateChain(
+            certificateChainPemOrDer = listOf(TestCertificates.pem(attacker.leaf), TestCertificates.pem(chain.root)),
+            instant = Clock.System.now()
+        )
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+    }
+
+    @Test
+    fun `rejects expired leaf registered by exact certificate`() = runTest {
+        val chain = TestCertificates.createChain("Expired")
+        val service = loteService(chain.leaf)
+
+        val decision = service.resolveCertificateChain(
+            certificateChainPemOrDer = listOf(TestCertificates.pem(chain.leaf)),
+            instant = Clock.System.now() + 2.days
+        )
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+    }
+
+    @Test
+    fun `fingerprint-only leaf is trusted by exact match`() = runTest {
+        val chain = TestCertificates.createChain("Pinned")
+        val service = fingerprintOnlyService(chain.leaf)
+
+        val decision = service.resolveCertificateChain(
+            certificateChainPemOrDer = listOf(TestCertificates.pem(chain.leaf), TestCertificates.pem(chain.root)),
+            instant = Clock.System.now()
+        )
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertTrue(decision.warnings.any { it.contains("exact certificate match") })
+    }
+
+    @Test
+    fun `fingerprint-only root is trusted only for a leaf it issued`() = runTest {
+        val chain = TestCertificates.createChain("Fingerprint")
+        val attacker = TestCertificates.createChain("Attacker")
+        val service = fingerprintOnlyService(chain.root)
+
+        suspend fun resolve(vararg certificates: X509Certificate) = service.resolveCertificateChain(
+            certificateChainPemOrDer = certificates.map(TestCertificates::pem),
+            instant = Clock.System.now()
+        ).decision
+
+        assertEquals(TrustDecisionCode.TRUSTED, resolve(chain.leaf, chain.root))
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, resolve(attacker.leaf, chain.root))
     }
 
     @Test
@@ -199,6 +271,46 @@ class Wal1186TrustRegistryTest {
 
         assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
         assertTrue(decision.evidence.any { it.type == "SOURCE_NOT_ACCEPTED" })
+    }
+
+    private suspend fun loteService(certificate: X509Certificate) =
+        DefaultTrustRegistryService(InMemoryTrustStore()).apply {
+            assertTrue(loadSourceFromContent(
+                "root",
+                lote(certificate),
+                options = SourceLoadOptions(SourceAcceptancePolicy.ALLOW_UNSIGNED)
+            ).success)
+        }
+
+    /** A source that registers [certificate] by SHA-256 fingerprint only, without its DER. */
+    private suspend fun fingerprintOnlyService(certificate: X509Certificate): DefaultTrustRegistryService {
+        val store = InMemoryTrustStore()
+        store.upsertSource(
+            TrustSource(
+                sourceId = "fingerprints",
+                sourceFamily = SourceFamily.LOTE,
+                displayName = "Fingerprint-only source",
+                assurance = SourceAssurance(acceptancePolicy = SourceAcceptancePolicy.ALLOW_UNSIGNED, accepted = true)
+            )
+        )
+        store.upsertEntities(
+            listOf(TrustedEntity("provider", "fingerprints", TrustedEntityType.PID_PROVIDER, "Provider"))
+        )
+        store.upsertServices(
+            listOf(TrustedService("provider::service", "fingerprints", "provider", "PID_PROVIDER", TrustStatus.GRANTED))
+        )
+        store.upsertIdentities(
+            listOf(
+                ServiceIdentity(
+                    identityId = "provider::certificate",
+                    sourceId = "fingerprints",
+                    entityId = "provider",
+                    serviceId = "provider::service",
+                    certificateSha256Hex = HashUtils.computeCertificateSha256(TestCertificates.derBase64(certificate))
+                )
+            )
+        )
+        return DefaultTrustRegistryService(store)
     }
 
     private fun lote(root: X509Certificate): String = buildJsonObject {
