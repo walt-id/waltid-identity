@@ -133,6 +133,34 @@ class Wal1186TrustRegistryTest {
     }
 
     @Test
+    fun `fingerprint-only root does not trust an expired leaf it issued`() = runTest {
+        val chain = TestCertificates.createChain("Expired", leafNotAfter = java.time.Instant.now().minusSeconds(1))
+        val service = fingerprintOnlyService(chain.root)
+
+        val decision = service.resolveCertificateChain(
+            certificateChainPemOrDer = listOf(TestCertificates.pem(chain.leaf), TestCertificates.pem(chain.root)),
+            instant = Clock.System.now()
+        )
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+    }
+
+    @Test
+    fun `fingerprint-only intermediate is trusted only for a leaf it issued`() = runTest {
+        val chain = TestCertificates.createChainWithIntermediate("Intermediate")
+        val attacker = TestCertificates.createChain("Attacker")
+        val service = fingerprintOnlyService(chain.intermediate)
+
+        suspend fun resolve(vararg certificates: X509Certificate) = service.resolveCertificateChain(
+            certificateChainPemOrDer = certificates.map(TestCertificates::pem),
+            instant = Clock.System.now()
+        ).decision
+
+        assertEquals(TrustDecisionCode.TRUSTED, resolve(chain.leaf, chain.intermediate))
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, resolve(attacker.leaf, chain.intermediate))
+    }
+
+    @Test
     fun `validates compact JWS LoTE with independently pinned signer`() = runTest {
         val signer = TestCertificates.createChain("Source Signer")
         val service = DefaultTrustRegistryService(InMemoryTrustStore())
