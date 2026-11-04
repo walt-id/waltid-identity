@@ -8,6 +8,8 @@ New `x509-trust` credential policy (verification policies 2). It takes caller-su
 { "policy": "x509-trust", "trustRoots": ["-----BEGIN CERTIFICATE-----..."] }
 ```
 
+`x509-trust` also binds the signing certificate to the claimed issuer. An `https` issuer must equal a URI SAN of the certificate, or its host must equal a DNS SAN (no wildcards). A credential without an issuer is accepted, because the certificate subject is then the issuer. DID and other issuer forms are rejected. The result reports `issuer_binding` (`URI`, `DNS` or `CERTIFICATE_SUBJECT`).
+
 Issuer keys taken from `x5c` now require an issuer trust policy (`x509-trust`, `etsi-trust-list`) or a linked trust registry. See `BREAKING_CHANGES.md`.
 
 ### Wallet2 client attestation compatibility

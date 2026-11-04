@@ -4,6 +4,8 @@ package id.walt.policies2.vc
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
@@ -33,8 +35,10 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -55,6 +59,70 @@ class X509TrustPolicyTest {
         assertEquals(true, result.getValue("trusted").jsonPrimitive.boolean)
         assertEquals("CN=Credential issuer", result.getValue("signing_certificate").jsonPrimitive.content)
         assertEquals(1, result.getValue("chain_length").jsonPrimitive.int)
+        assertEquals("CERTIFICATE_SUBJECT", result.getValue("issuer_binding").jsonPrimitive.content)
+        assertNull(result["issuer"])
+    }
+
+    @Test
+    fun bindsHttpsIssuerToUriSan() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addUri("https://issuer.example/credentials") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "https://issuer.example/credentials"))
+            .getOrThrow().jsonObject
+
+        assertEquals("https://issuer.example/credentials", result.getValue("issuer").jsonPrimitive.content)
+        assertEquals("URI", result.getValue("issuer_binding").jsonPrimitive.content)
+    }
+
+    @Test
+    fun bindsHttpsIssuerHostToDnsSan() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("Issuer.Example") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = false, issuer = "https://issuer.example/tenants/1"))
+            .getOrThrow().jsonObject
+
+        assertEquals("DNS", result.getValue("issuer_binding").jsonPrimitive.content)
+    }
+
+    @Test
+    fun rejectsIssuerTheSigningCertificateDoesNotName() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") {
+            addUri("https://other.example")
+            addDnsName("*.example")
+        }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "https://issuer.example"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "does not name issuer")
+    }
+
+    @Test
+    fun rejectsDidIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("issuer.example") }
+
+        // `vc.issuer` is the claimed issuer, but the key resolver reads only `iss`, so the key comes from x5c
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = false, issuer = "did:example:issuer"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "cannot be bound")
+    }
+
+    @Test
+    fun rejectsHttpIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("issuer.example") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "http://issuer.example"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "cannot be bound")
     }
 
     @Test
@@ -70,7 +138,8 @@ class X509TrustPolicyTest {
         val root = selfSigned("CN=Root CA")
         val leaf = issued(root, "CN=Document signer")
 
-        assertTrue(X509TrustPolicy(listOf(der(root))).verify(mdocCredential(leaf)).isSuccess)
+        val result = X509TrustPolicy(listOf(der(root))).verify(mdocCredential(leaf)).getOrThrow().jsonObject
+        assertEquals("CERTIFICATE_SUBJECT", result.getValue("issuer_binding").jsonPrimitive.content)
     }
 
     @Test
@@ -179,24 +248,38 @@ class X509TrustPolicyTest {
         return Issued(key, X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) { subjectDn = dn })
     }
 
-    private suspend fun issued(issuer: Issued, dn: String, validity: X509Certificate.Validity? = null): Issued {
+    private suspend fun issued(
+        issuer: Issued,
+        dn: String,
+        validity: X509Certificate.Validity? = null,
+        san: (SubjectAlternativeNameExtension.Builder.() -> Unit)? = null,
+    ): Issued {
         val key = generateKey(dn)
         val certificate = X509CertificateUtil.createCertificate(issuer.key, issuer.certificate, sigAlg) {
             subjectDn = dn
             subjectPublicKey(key)
             validity?.let { this.validity = it }
+            san?.let { extensionSan(it) }
         }
         return Issued(key, certificate)
     }
 
-    private suspend fun jwtCredential(signer: Issued, sdJwt: Boolean, chain: List<Issued> = listOf(signer)): DigitalCredential {
+    /** [issuer] goes into `iss` for SD-JWT and `vc.issuer` for W3C, as the credential parser reads it. */
+    private suspend fun jwtCredential(
+        signer: Issued,
+        sdJwt: Boolean,
+        chain: List<Issued> = listOf(signer),
+        issuer: String? = null,
+    ): DigitalCredential {
         val payload = buildJsonObject {
             if (sdJwt) {
+                issuer?.let { put("iss", it) }
                 put("vct", "https://issuer.example/identity-credential")
                 put("_sd_alg", "sha-256")
             } else {
                 put("vc", buildJsonObject {
                     put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+                    issuer?.let { put("issuer", it) }
                 })
             }
         }
@@ -214,11 +297,12 @@ class X509TrustPolicyTest {
             SdJwtCredential(
                 dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
                 credentialData = payload,
+                issuer = issuer,
                 signature = SdJwtCredentialSignature(signed, header),
                 signed = signed,
             )
         } else {
-            W3C11(credentialData = payload, signature = JwtCredentialSignature(signed, header), signed = signed)
+            W3C11(credentialData = payload, issuer = issuer, signature = JwtCredentialSignature(signed, header), signed = signed)
         }
     }
 

@@ -2,6 +2,7 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.SdJwtCredential
@@ -103,6 +104,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
         val certificate = X509CertificateUtil.createCertificate(rootKey, root, sigAlg) {
             subjectDn = "CN=Credential issuer"
             subjectPublicKey(key)
+            extensionSan { addDnsName("issuer.example") }
         }
         val payload = buildJsonObject {
             put("iss", "https://issuer.example")
@@ -121,6 +123,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
         return root to SdJwtCredential(
             dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
             credentialData = payload,
+            issuer = "https://issuer.example",
             signature = SdJwtCredentialSignature(signed, CompactJws.decodeUnverified(signed).protectedHeader),
             signed = signed,
         )
