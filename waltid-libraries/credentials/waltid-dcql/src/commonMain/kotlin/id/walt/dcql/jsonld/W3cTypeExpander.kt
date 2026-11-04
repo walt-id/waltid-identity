@@ -31,7 +31,7 @@ object W3cTypeExpander {
         documents: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
     ): Set<String> {
         val node = w3cCredentialNode(data)
-        val types = stringArray(node["type"])
+        val types = typeValues(node["type"])
         if (types.isEmpty()) return emptySet()
         val active = activeContext(node["@context"], documents)
         return types.map { publishExpansion(it, active) }.toSet()
@@ -84,9 +84,9 @@ object W3cTypeExpander {
     }
 
     internal fun w3cCredentialNode(data: JsonObject): JsonObject {
-        if (data["type"] is JsonArray) return data
+        if (data.containsKey("type")) return data
         val enveloped = data["vc"] as? JsonObject
-        if (enveloped?.get("type") is JsonArray) return enveloped
+        if (enveloped?.containsKey("type") == true) return enveloped
         return data
     }
 
@@ -308,8 +308,12 @@ object W3cTypeExpander {
         return value
     }
 
-    private fun stringArray(element: JsonElement?): List<String> =
-        (element as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+    internal fun typeValues(element: JsonElement?): List<String> =
+        when (element) {
+            is JsonArray -> element.mapNotNull { (it as? JsonPrimitive)?.takeIf { it.isString }?.content }
+            is JsonPrimitive -> listOfNotNull(element.takeIf { it.isString }?.content)
+            else -> emptyList()
+        }
 
     private fun iriEndsWithGenDelim(iri: String): Boolean {
         val last = iri.lastOrNull() ?: return false
