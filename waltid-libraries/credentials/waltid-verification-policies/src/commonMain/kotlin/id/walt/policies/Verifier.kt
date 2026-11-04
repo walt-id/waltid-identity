@@ -6,10 +6,12 @@ import id.walt.policies.models.PolicyResult
 import id.walt.policies.models.PresentationResultEntry
 import id.walt.policies.models.PresentationVerificationResponse
 import id.walt.policies.policies.JwtSignaturePolicy
+import id.walt.policies.policies.status.signature.RAW_CREDENTIAL_CONTEXT_KEY
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwtVC
 import id.walt.w3c.utils.VCFormat
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -118,10 +120,11 @@ object Verifier {
         onSuccess: suspend (PolicyResult) -> Unit,
         onError: suspend (PolicyResult, Throwable) -> Unit,
     ) {
+        val policyContext = context + (RAW_CREDENTIAL_CONTEXT_KEY to jwt)
         coroutineScope {
             policyRequests.forEach { policyRequest ->
                 launch {
-                    runCatching {
+                    try {
                         val dataForPolicy: JsonElement = when (policyRequest.policy) {
                             is JwtVerificationPolicy -> JsonPrimitive(jwt)
 
@@ -129,11 +132,13 @@ object Verifier {
 
                             else -> throw IllegalArgumentException("Unsupported policy type: ${policyRequest.policy::class.simpleName}")
                         }
-                        val runResult = policyRequest.runPolicyRequest(dataForPolicy, context)
+                        val runResult = policyRequest.runPolicyRequest(dataForPolicy, policyContext)
                         val policyResult = PolicyResult(policyRequest, runResult)
                         onSuccess(policyResult)
-                    }.onFailure {
-                        onError(PolicyResult(policyRequest, Result.failure(it)), it)
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (cause: Throwable) {
+                        onError(PolicyResult(policyRequest, Result.failure(cause)), cause)
                     }
                 }
             }
