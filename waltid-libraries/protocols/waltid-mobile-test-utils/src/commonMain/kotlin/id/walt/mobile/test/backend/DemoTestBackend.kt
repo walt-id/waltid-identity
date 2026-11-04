@@ -786,11 +786,11 @@ object DemoTestBackend {
         putJsonArray("claims") {
             add(claimQuery(id = "given_name", path = listOf("given_name")))
             add(claimQuery(id = "family_name", path = listOf("family_name")))
-            add(claimQuery(id = "birth_date", path = listOf("birth_date")))
+            add(claimQuery(id = "birthdate", path = listOf("birthdate")))
         }
         putJsonArray("claim_sets") {
             add(claimSet("given_name", "family_name"))
-            add(claimSet("given_name", "family_name", "birth_date"))
+            add(claimSet("given_name", "family_name", "birthdate"))
         }
     }
 
