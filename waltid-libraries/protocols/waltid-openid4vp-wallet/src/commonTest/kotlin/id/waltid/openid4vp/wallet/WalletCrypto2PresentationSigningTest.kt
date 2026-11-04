@@ -52,10 +52,11 @@ class WalletCrypto2PresentationSigningTest {
             })
         }
         val public = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
-        val issuer = JWKKey.generate(KeyType.secp256r1)
-        val issuerJwt = issuer.signJws(buildJsonObject {
+        val issuer = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("scheduled-issuer"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
+        val issuerJwt = CompactJws.sign(buildJsonObject {
             put("_sd_alg", "sha-256"); put("cnf", buildJsonObject { put("jwk", Jwk.parse(public)) })
-        }.toString().encodeToByteArray())
+        }.toString().encodeToByteArray(), issuer, JwsAlgorithm.ES256)
         val entry = buildJsonObject {
             put("type", "urn:eudi:sca:payment:1"); put("credential_ids", buildJsonArray { add("payment") })
             put("payload", buildJsonObject {
