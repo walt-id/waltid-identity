@@ -7,6 +7,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
@@ -40,6 +41,15 @@ import kotlin.test.assertTrue
 
 class WebhookDeliveryQueueTest {
     private val temporaryDirectories = mutableListOf<Path>()
+
+    @Test
+    fun `signing secret requires at least 32 UTF-8 bytes`() {
+        val config = webhook()
+        assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "") }
+        assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "x".repeat(31)) }
+        assertEquals("x".repeat(32), config.copy(signingSecret = "x".repeat(32)).signingSecret)
+        assertEquals("é".repeat(16), config.copy(signingSecret = "é".repeat(16)).signingSecret)
+    }
 
     @AfterTest
     fun cleanUp() {
@@ -330,6 +340,7 @@ class WebhookDeliveryQueueTest {
             assertEquals("123", request.headers[WEBHOOK_TIMESTAMP_HEADER])
             assertEquals("2", request.headers[WEBHOOK_ATTEMPT_HEADER])
             assertEquals(delivery.contentDigest, request.headers[CONTENT_DIGEST_HEADER])
+            assertNull(request.headers[WEBHOOK_SIGNATURE_HEADER])
             assertEquals(payload, (request.body as TextContent).text)
             assertEquals("application/json", request.body.contentType?.withoutParameters().toString())
             respond(
@@ -347,6 +358,61 @@ class WebhookDeliveryQueueTest {
         assertTrue(result.retryable)
         assertFalse(result.successful)
         client.close()
+    }
+
+    @Test
+    fun `signed attempt authenticates the raw body and delivery metadata`() = runTest {
+        val secret = "a shared secret with sufficient entropy"
+        val payload = """{"event":"completed"}"""
+        val normalizedUrl = Url("https://receiver.example:443/webhook?source=issuer2").toString()
+        assertEquals("https://receiver.example/webhook?source=issuer2", normalizedUrl)
+        val delivery = delivery(payload).copy(
+            url = normalizedUrl,
+            signingSecret = secret,
+            bearerToken = "receiver-token",
+        )
+        val client = HttpClient(MockEngine { request ->
+            val signature = assertNotNull(request.headers[WEBHOOK_SIGNATURE_HEADER])
+            assertEquals("Bearer receiver-token", request.headers[HttpHeaders.Authorization])
+            assertTrue(WebhookSignature.verify(
+                signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest((request.body as TextContent).text)
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature.removePrefix("v1="), secret, delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                "v1=invalid!", secret, delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature, "a different secret with sufficient entropy", delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest("tampered")
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature, secret, delivery.url, delivery.deliveryId, 123, 3, delivery.contentDigest
+            ))
+            assertFalse(WebhookSignature.verify(
+                signature, secret, "https://other.example/webhook", delivery.deliveryId, 123, 2, delivery.contentDigest
+            ))
+            respond("", HttpStatusCode.NoContent)
+        })
+
+        assertEquals(204, KtorWebhookTransport(client).deliver(delivery, 2, 123).statusCode)
+        client.close()
+    }
+
+    @Test
+    fun `signing secret survives outbox restart and unsigned callbacks stay unsigned`() = runTest {
+        val root = temporaryDirectory()
+        val store = FileWebhookDeliveryStore(root)
+        val queue = queue(store, RecordingTransport()) { 1_000L }
+        val secret = "a shared secret with sufficient entropy"
+        val signedId = queue.enqueue(update(), webhook().copy(signingSecret = secret))
+        val unsignedId = queue.enqueue(update(), webhook())
+
+        assertEquals(secret, FileWebhookDeliveryStore(root).pending(signedId)?.signingSecret)
+        assertNull(store.pending(unsignedId)?.signingSecret)
     }
 
     private fun temporaryDirectory(): Path =

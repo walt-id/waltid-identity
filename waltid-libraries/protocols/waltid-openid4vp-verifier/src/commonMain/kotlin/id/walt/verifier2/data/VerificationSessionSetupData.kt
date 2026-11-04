@@ -140,19 +140,10 @@ internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = w
 }
 
 private fun GeneralFlowConfig.publicView(): GeneralFlowConfig = copy(
-    notifications = notifications?.publicView(),
+    notifications = notifications?.withoutCredentials(),
     policies = policies.publicView(),
     key = null,
 )
-
-internal fun KtorSessionNotifications.publicView(): KtorSessionNotifications = copy(
-    webhook = webhook?.copy(
-        basicAuthUser = null,
-        basicAuthPass = null,
-        bearerToken = null,
-    )
-)
-
 
 /** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
