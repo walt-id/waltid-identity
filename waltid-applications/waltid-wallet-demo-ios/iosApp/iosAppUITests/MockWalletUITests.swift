@@ -339,8 +339,6 @@ final class MockWalletUITests: XCTestCase {
         let cameraHeader = app.navigationBars["Scan QR code"]
         XCTAssertTrue(cameraHeader.waitForExistence(timeout: 5))
         let cameraY = cameraHeader.frame.minY
-        let camera = XCTAttachment(screenshot: app.screenshot())
-        camera.name = "scanner-camera-system-sheet"; camera.lifetime = .keepAlways; add(camera)
         ui.tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
         let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
         // Switching modes must make the action safe without tapping the field again.
