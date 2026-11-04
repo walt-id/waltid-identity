@@ -1,0 +1,88 @@
+name: WalletCore release XCFramework
+
+# Shared producer for the full release WalletCore.xcframework (device and simulator arm64).
+# macOS CI and the release candidate both call this workflow, then pass the artifact to
+# consumers. Mobile SDK docs restore it and skip assembleWalletCoreReleaseXCFramework.
+# Concurrent device/simulator links cause heavy swapping on the hosted runner, so the
+# link runs with a single Gradle worker.
+on:
+  workflow_call:
+    inputs:
+      checkout-refs:
+        description: "Exact commits to check out, as a JSON object of unified, identity, enterprise and enterprise_license SHAs (defaults to the branch with main fallback)"
+        required: false
+        type: string
+        default: ''
+    outputs:
+      checkout-refs:
+        description: "Exact revisions this build checked out"
+        value: ${{ jobs.wallet-core-framework.outputs.checkout-refs }}
+      artifact-name:
+        description: "Same-run WalletCore release artifact name"
+        value: ${{ jobs.wallet-core-framework.outputs.artifact-name }}
+
+env:
+  # Must match mobile-sdk-docs.yml. Framework reuse checks the Xcode version in the artifact manifest.
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+
+jobs:
+  wallet-core-framework:
+    runs-on: xcode-27
+    timeout-minutes: 70
+    outputs:
+      checkout-refs: ${{ steps.revisions.outputs.refs }}
+      artifact-name: wallet-core-release-${{ github.run_attempt }}
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          resolved-refs: ${{ inputs.checkout-refs }}
+      - name: Record the resolved source revisions
+        id: revisions
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          paths = {"unified": ".", "identity": "waltid-identity", "enterprise": "waltid-identity-enterprise", "enterprise_license": "waltid-identity-enterprise-license"}
+          refs = {key: subprocess.check_output(["git", "-C", path, "rev-parse", "HEAD"], text=True).strip() for key, path in paths.items()}
+          print(json.dumps(refs, indent=2))
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("refs=" + json.dumps(refs) + "\n")
+          PYTHON
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+      - name: Cache Kotlin Native dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            konan-${{ runner.os }}-${{ runner.arch }}-
+      # Concurrent device/simulator links cause heavy swapping on the hosted runner.
+      - name: Build the full release WalletCore
+        timeout-minutes: 60
+        working-directory: waltid-identity
+        run: |
+          exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
+            --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1
+      - name: Package the framework and its build identity
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
+      - name: Publish the full release framework
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-core-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/wallet-core-artifact/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Retain failed framework build logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-core-framework-failure-logs
+          path: |
+            ${{ runner.temp }}/wallet-core-build/
+          retention-days: 7
