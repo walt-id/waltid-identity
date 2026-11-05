@@ -10,6 +10,8 @@ import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
@@ -266,7 +268,8 @@ data class ETSITrustListPolicy(
             else -> {
                 throw ETSITrustListPolicyException(
                     "Unsupported credential type for ETSI Trust List verification. " +
-                    "Supported: mDoc with COSE x5c, SD-JWT with x5c header, JWT VC with x5c header. " +
+                    "Supported: mDoc with COSE x5chain, SD-JWT VC / JWT VC with an x5c header or a resolvable " +
+                    "DID / HTTPS issuer key. " +
                     "Got: ${credential::class.simpleName} with ${signature?.let { it::class.simpleName } ?: "no signature"}"
                 )
             }
@@ -299,16 +302,15 @@ data class ETSITrustListPolicy(
      * An inline `jwk` header is intentionally not trusted here (`allowInlineJwk = false`): it is
      * self-asserted and establishes no issuer identity on its own.
      *
-     * Signer binding: this trust check is only sound if it covers the *same* key that the base
-     * `signature` policy verified the credential against — otherwise an attacker could sign with a
-     * self-asserted key while trust is established for a different, trust-listed key or certificate.
-     * That binding holds structurally rather than by convention: for both W3C JWT VCs and SD-JWT VCs,
-     * the base signature policy resolves its verification key via
-     * `JwsSignatureScheme.getIssuerCrypto2KeyInfo(signed)`, whose default `resolver` parameter is
-     * `Crypto2JwtKeyResolver()` — the same class, with the same `allowInlineJwk = false` default, as
-     * [keyResolver] here. This policy calls the same function on the same signed JWT, not on the
-     * parsed credential data, whose SD-JWT disclosures can add claims (such as `iss`) that the signed
-     * payload lacks. An `x5c` chain stands in for the key only when its leaf certificate holds it.
+     * Signer binding: this trust check is only sound if it covers the key the credential was signed
+     * with — otherwise an attacker could sign with a self-asserted key while trust is established for
+     * a different, trust-listed key or certificate. The key is resolved as the base `signature` policy
+     * resolves it: `JwsSignatureScheme.getIssuerCrypto2KeyInfo` on the signed JWT, with
+     * `Crypto2JwtKeyResolver`'s `allowInlineJwk = false` default, not on the parsed credential data,
+     * whose SD-JWT disclosures can add claims (such as `iss`) that the signed payload lacks. Resolving
+     * twice does not guarantee the same key, as a `did:web` document or HTTPS issuer metadata is
+     * fetched again, so the signed JWT is verified with the resolved key before its trust is checked.
+     * An `x5c` chain stands in for the key only when its leaf certificate holds it.
      */
     private suspend fun extractJwtTrustMaterial(
         signature: JwtBasedSignature,
@@ -324,6 +326,14 @@ data class ETSITrustListPolicy(
                 "The JWT issuer's public key could not be resolved: ${cause.message}. ETSI Trust List " +
                 "verification requires an x5c header or a resolvable issuer key (DID or HTTPS well-known " +
                 "JWT VC issuer metadata).",
+                cause
+            )
+        }
+        runCatching {
+            CompactJws.verify(signed.substringBefore('~'), resolved.key, JwsAlgorithm.entries.toSet())
+        }.getOrElse { cause ->
+            throw ETSITrustListPolicyException(
+                "The resolved JWT issuer key does not verify the credential signature: ${cause.message}",
                 cause
             )
         }

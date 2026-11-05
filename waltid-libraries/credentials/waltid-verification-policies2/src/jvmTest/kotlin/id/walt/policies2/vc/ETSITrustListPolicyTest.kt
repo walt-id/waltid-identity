@@ -18,6 +18,7 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
+import id.walt.did.dids.resolver.DidResolver
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ETSITrustListPolicy
 import id.walt.policies2.vc.policies.PolicyExecutionContext
@@ -35,11 +36,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -321,55 +324,61 @@ class ETSITrustListPolicyTest {
         )
     }
 
-    @Test
-    fun `verify checks the x5c chain when its leaf certificate holds the DID issuer key`() = runTest {
-        DidService.minimalInit()
-        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
-        val now = Clock.System.now()
-        val rootKey = generateP256Key(KeyId("iaca-root-key"))
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `verify checks the x5c chain when its leaf certificate holds the DID issuer key`(rootListed: Boolean) = runTest {
         val (signerKey, signerDid) = generateIssuerKeyAndDid(KeyId("document-signer-key"))
-        val rootProfile = IACACertificateProfileData(
-            principalName = IACAPrincipalName(country = "AT", commonName = "Test IACA"),
-            validityPeriod = X509ValidityPeriod(now - 1.days, now + 365.days),
-            issuerAlternativeName = IssuerAlternativeName(uri = "https://iaca.example"),
-        )
-        val rootDer = IACACertificateBuilder().buildDer(rootProfile, rootKey, algorithm)
-        val signerDer = DocumentSignerCertificateBuilder().buildDer(
-            profileData = DocumentSignerCertificateProfileData(
-                principalName = DocumentSignerPrincipalName(country = "AT", commonName = "Test Document Signer"),
-                validityPeriod = X509ValidityPeriod(now, now + 30.days),
-                crlDistributionPointUri = "https://iaca.example/crl",
-            ),
-            publicKey = signerKey,
-            iacaSignerSpec = Crypto2IACASignerSpecification(rootProfile, rootKey, algorithm),
-        )
-        val signed = CompactJws.sign(
-            payload = Json.encodeToString(
-                buildJsonObject {
-                    put("iss", signerDid)
-                    put("vct", "https://example.org/vct/a")
-                }
-            ).encodeToByteArray(),
-            key = signerKey,
-            algorithm = JwsAlgorithm.ES256,
-            protectedHeader = buildJsonObject {
-                put("typ", "dc+sd-jwt")
-                put("kid", "$signerDid#0")
-                putJsonArray("x5c") { add(Base64.encode(signerDer.bytes.toByteArray())) }
-            },
-        )
-        val credential = CredentialParser.detectAndParse("$signed~").second
-        // Lists only the root: a public-key match on the Document Signer key alone would fail.
-        val rootCertificate = Base64.encode(rootDer.bytes.toByteArray())
-        val policy = ETSITrustListPolicy(
-            trustLists = listOf(loteWithServiceIdentity(""""X509Certificates": [{"val": "$rootCertificate"}]"""))
-        )
+        val chain = documentSignerChain(signerKey)
+        val credential = signedSdJwtVc(signerKey, signerDid, "$signerDid#0", chain.signerCertificate)
+        // Lists only a root: a public-key match on the Document Signer key alone would fail.
+        val listedRoot = if (rootListed) chain.rootCertificate
+        else documentSignerChain(generateP256Key(KeyId("unrelated-signer-key"))).rootCertificate
+        val policy = ETSITrustListPolicy(trustLists = listOf(loteListingRoot(listedRoot)))
 
         val signature = CredentialSignaturePolicy().verify(credential, PolicyExecutionContext.Empty)
         val trust = policy.verify(credential, PolicyExecutionContext.Empty)
 
         assertTrue(signature.isSuccess, signature.exceptionOrNull()?.message)
-        assertTrue(trust.isSuccess, trust.exceptionOrNull()?.message)
+        assertEquals(rootListed, trust.isSuccess, trust.exceptionOrNull()?.message)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `verify rejects a did-web issuer whose document changes after the signature check`(
+        signerCertificateInX5c: Boolean,
+    ) = runTest {
+        DidService.minimalInit()
+        val did = "did:web:issuer.example"
+        val attackerKey = generateP256Key(KeyId("attacker-key"))
+        val listedKey = generateP256Key(KeyId("listed-signer-key"))
+        val chain = documentSignerChain(listedKey)
+        val credential = signedSdJwtVc(
+            attackerKey, did, "$did#key-1", chain.signerCertificate.takeIf { signerCertificateInX5c }
+        )
+        val policy = ETSITrustListPolicy(
+            trustLists = listOf(
+                if (signerCertificateInX5c) loteListingRoot(chain.rootCertificate)
+                else loteWithServiceIdentity(""""PublicKeyValues": [${publicJwk(listedKey)}]""")
+            )
+        )
+        val didWeb = SwitchableDidWebResolver(publicJwk(attackerKey))
+        val previous = DidService.resolverMethods["web"]
+        DidService.registerResolverForMethod("web", didWeb)
+        try {
+            val signature = CredentialSignaturePolicy().verify(credential, PolicyExecutionContext.Empty)
+            // The DID host now serves the listed key instead of the one that signed the credential.
+            didWeb.jwk = publicJwk(listedKey)
+            val trust = policy.verify(credential, PolicyExecutionContext.Empty)
+
+            assertTrue(signature.isSuccess, signature.exceptionOrNull()?.message)
+            assertTrue(trust.isFailure)
+            assertTrue(
+                trust.exceptionOrNull()!!.message!!.contains("does not verify the credential signature"),
+                trust.exceptionOrNull()?.message,
+            )
+        } finally {
+            previous?.let { DidService.registerResolverForMethod("web", it) }
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -391,15 +400,102 @@ class ETSITrustListPolicyTest {
             )
         )
 
+    private suspend fun publicJwk(key: id.walt.crypto2.keys.Key): JsonObject =
+        Json.parseToJsonElement(
+            key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()
+        ).jsonObject
+
     /** Generates a P-256 key and derives its self-contained `did:jwk:` identifier. */
     private suspend fun generateIssuerKeyAndDid(keyId: KeyId): Pair<id.walt.crypto2.keys.Key, String> {
         DidService.minimalInit()
         val key = generateP256Key(keyId)
-        val publicJwkJson = key.capabilities.publicKeyExporter!!.exportPublicKey()
-            .toPublicJwk(key.spec).data.toByteArray().decodeToString()
-        val did = "did:jwk:" + base64Url.encode(publicJwkJson.encodeToByteArray())
+        val did = "did:jwk:" + base64Url.encode(publicJwk(key).toString().encodeToByteArray())
         return key to did
     }
+
+    /** Base64 DER certificates of a fresh IACA root and a Document Signer certificate for [signerKey]. */
+    private class DocumentSignerChain(val rootCertificate: String, val signerCertificate: String)
+
+    private suspend fun documentSignerChain(signerKey: id.walt.crypto2.keys.Key): DocumentSignerChain {
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val now = Clock.System.now()
+        val rootKey = generateP256Key(KeyId("iaca-root-key"))
+        val rootProfile = IACACertificateProfileData(
+            principalName = IACAPrincipalName(country = "AT", commonName = "Test IACA"),
+            validityPeriod = X509ValidityPeriod(now - 1.days, now + 365.days),
+            issuerAlternativeName = IssuerAlternativeName(uri = "https://iaca.example"),
+        )
+        val rootDer = IACACertificateBuilder().buildDer(rootProfile, rootKey, algorithm)
+        val signerDer = DocumentSignerCertificateBuilder().buildDer(
+            profileData = DocumentSignerCertificateProfileData(
+                principalName = DocumentSignerPrincipalName(country = "AT", commonName = "Test Document Signer"),
+                validityPeriod = X509ValidityPeriod(now, now + 30.days),
+                crlDistributionPointUri = "https://iaca.example/crl",
+            ),
+            publicKey = signerKey,
+            iacaSignerSpec = Crypto2IACASignerSpecification(rootProfile, rootKey, algorithm),
+        )
+        return DocumentSignerChain(
+            rootCertificate = Base64.encode(rootDer.bytes.toByteArray()),
+            signerCertificate = Base64.encode(signerDer.bytes.toByteArray()),
+        )
+    }
+
+    /** An SD-JWT VC without disclosures, signed by [key], with an optional single-certificate `x5c`. */
+    private suspend fun signedSdJwtVc(
+        key: id.walt.crypto2.keys.Key,
+        iss: String,
+        kid: String,
+        x5cCertificate: String?,
+    ): DigitalCredential {
+        val signed = CompactJws.sign(
+            payload = Json.encodeToString(
+                buildJsonObject {
+                    put("iss", iss)
+                    put("vct", "https://example.org/vct/a")
+                }
+            ).encodeToByteArray(),
+            key = key,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("typ", "dc+sd-jwt")
+                put("kid", kid)
+                x5cCertificate?.let { putJsonArray("x5c") { add(it) } }
+            },
+        )
+        return CredentialParser.detectAndParse("$signed~").second
+    }
+
+    /** A `did:web` resolver serving one verification method, `#key-1`, whose key the test can swap. */
+    private class SwitchableDidWebResolver(var jwk: JsonObject) : DidResolver {
+        override val name: String = "switchable-did-web-resolver"
+
+        override suspend fun getSupportedMethods(): Result<Set<String>> = Result.success(setOf("web"))
+
+        override suspend fun resolve(did: String): Result<JsonObject> = Result.success(
+            buildJsonObject {
+                put("id", did)
+                putJsonArray("verificationMethod") {
+                    add(buildJsonObject {
+                        put("id", "$did#key-1")
+                        put("type", "JsonWebKey2020")
+                        put("controller", did)
+                        put("publicKeyJwk", jwk)
+                    })
+                }
+            }
+        )
+
+        override suspend fun resolveToKey(did: String): Result<id.walt.crypto.keys.Key> =
+            Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
+
+        override suspend fun resolveToKeys(did: String): Result<Set<id.walt.crypto.keys.Key>> =
+            Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
+    }
+
+    /** A minimal ETSI TS 119 602 LoTE JSON source registering only the root certificate [rootCertificate]. */
+    private fun loteListingRoot(rootCertificate: String): String =
+        loteWithServiceIdentity(""""X509Certificates": [{"val": "$rootCertificate"}]""")
 
     /**
      * Builds a JWT VC signed by a fresh `did:jwk` issuer key, with no `x5c` header — exercising
