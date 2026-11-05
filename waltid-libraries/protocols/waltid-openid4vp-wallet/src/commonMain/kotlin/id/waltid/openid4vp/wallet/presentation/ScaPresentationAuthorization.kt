@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet.presentation
 
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 
 /**
  * Authorizes this exact TS12 proof and declares the factors its successful signing will establish.
@@ -87,7 +88,7 @@ internal data class ScaKeyBindingContext(
     val credentialId: String,
     val responseMode: OpenID4VPResponseMode,
     val authorizer: ScaPresentationAuthorizer,
-    val clock: kotlin.time.Clock = kotlin.time.Clock.System,
+    val clock: Clock = Clock.System,
 )
 
 internal const val TS12_PAYMENT_TYPE = "urn:eudi:sca:payment:1"

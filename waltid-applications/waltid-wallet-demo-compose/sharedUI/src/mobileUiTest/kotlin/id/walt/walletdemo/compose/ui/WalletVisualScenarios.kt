@@ -790,6 +790,9 @@ internal class WalletVisualScenarios(
                 onSubmit = { submitted = true }, onCancel = { cancelled = true }, compact = false,
                 preparePaymentConsent = { consent })
         }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag("payment-payee-logo").fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithText(if (recurring) "Monthly" else "Execution date and time").performScrollToContent(this).assertIsDisplayed()
         if (!recurring) {
@@ -804,6 +807,8 @@ internal class WalletVisualScenarios(
         val id = if (recurring) "payment.recurring" else "payment.scheduled"
         if (!details) capture(if (compact) "$id.compact_large_text" else "$id.main")
         if (details || compact) {
+            onNodeWithTag("payment-payee-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("https://shop.example ↗").performScrollToContent(this).assertIsDisplayed()
             if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
             onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
             onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()

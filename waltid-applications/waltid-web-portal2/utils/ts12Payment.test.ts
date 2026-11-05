@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { paymentDraft, paymentPayload, paymentExample, parsePaymentJson, stringifyPaymentJson,
-  PAYMENT_FIELDS, PAYMENT_FREQUENCIES } from "./ts12Payment.ts";
+  PAYMENT_FIELDS, PAYMENT_FREQUENCIES, assertPaymentTransactionFields } from "./ts12Payment.ts";
 
 test("payment editor and request serialization preserve independent numeric tokens", () => {
   const input = '{"transaction_id":"test","payee":{"name":"Shop","id":"merchant"},"currency":"EUR","amount":9007199254740993.01,"recurrence":{"frequency":"MNTH","number":2e0,"mit_options":{"apr":0.1234567890123456789,"max_amount":9007199254740993.01}}}';
@@ -79,4 +79,27 @@ test("incomplete PISP, timestamps and Unicode ID boundaries are checked in the f
   assert.doesNotThrow(() => paymentPayload(draft));
   draft.values.transaction_id += "😀";
   assert.throws(() => paymentPayload(draft), /36 characters/);
+});
+
+
+test("literal dotted members cannot alias supported nested payment fields", () => {
+  for (const extra of [
+    { "payee.name": "Replacement" },
+    { recurrence: { frequency: "MNTH", "mit_options.min_amount": 1 } },
+    { "recurrence.mit_options": {} },
+  ]) {
+    const original = stringifyPaymentJson({ ...parsePaymentJson(paymentExample("unscheduled")), ...extra });
+    assert.throws(() => paymentDraft(original), /Unsupported field/);
+  }
+});
+
+test("full-request payment imports reject unsupported entry fields without dropping the draft", () => {
+  const entry = { type: "urn:eudi:sca:payment:1", credential_ids: ["payment"],
+    payload: parsePaymentJson(paymentExample("unscheduled")), future_extension: "keep-this-draft" };
+  const original = stringifyPaymentJson(entry);
+  assert.throws(() => assertPaymentTransactionFields(entry), /future_extension/);
+  assert.equal(stringifyPaymentJson(entry), original);
+  assert.doesNotThrow(() => assertPaymentTransactionFields({ ...entry, type: "org.example.custom" }));
+  const { future_extension, ...supported } = entry;
+  assert.doesNotThrow(() => assertPaymentTransactionFields(supported));
 });

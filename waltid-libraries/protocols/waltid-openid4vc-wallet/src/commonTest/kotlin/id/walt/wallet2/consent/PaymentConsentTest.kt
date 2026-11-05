@@ -278,7 +278,8 @@ class PaymentConsentTest {
             }) })
         } }
         val consent = localizePaymentConsent(JsonArray(claims() + extraClaims), catalogue(), payment, values, listOf("en"))
-        assertEquals(values, consent.fields.associate { it.path to it.value })
+        assertEquals(values + mapOf(listOf("amount_estimated") to "Yes", listOf("amount_earmarked") to "No", listOf("sct_inst") to "Yes"),
+            consent.fields.associate { it.path to it.value })
         for ((name, value) in listOf("date_time" to JsonPrimitive("not-a-date"), "sct_inst" to JsonPrimitive("true"),
             "pisp" to JsonObject(emptyMap()))) failure(PaymentConsentFailure.INVALID_PAYMENT) {
             paymentValues(JsonObject(payload + (name to value)))
@@ -306,12 +307,33 @@ class PaymentConsentTest {
             val full = JsonArray(claims() + extra)
             val german = render(claims = full, payment = payment)
             assertEquals("Monatlich", german.fields.single { it.path == extraPaths.first() }.value)
+            assertEquals("Nein", german.fields.single { it.path == extraPaths[1] }.value)
             assertEquals("Monthly", render(claims = full, payment = payment, locales = listOf("en-GB")).fields.single { it.path == extraPaths.first() }.value)
             for (missing in extra.indices) failure(PaymentConsentFailure.INVALID_METADATA) {
                 render(claims = JsonArray(claims() + extra.filterIndexed { i, _ -> i != missing }), payment = payment)
             }
             failure(PaymentConsentFailure.MISSING_TRANSLATION) {
                 render(claims = full, payment = payment, locales = listOf("fr"))
+            }
+        }
+    }
+
+    @Test
+    fun everyFrequencyHasIndependentEnglishAndGermanWording() {
+        val expected = listOf(
+            Triple("INDA", "Several times a day", "Mehrmals täglich"), Triple("DAIL", "Daily", "Täglich"),
+            Triple("WEEK", "Weekly", "Wöchentlich"), Triple("TOWK", "Every two weeks", "Alle zwei Wochen"),
+            Triple("TWMN", "Twice a month", "Zweimal im Monat"), Triple("MNTH", "Monthly", "Monatlich"),
+            Triple("TOMN", "Every two months", "Alle zwei Monate"), Triple("QUTR", "Quarterly", "Vierteljährlich"),
+            Triple("FOMN", "Every four months", "Alle vier Monate"), Triple("SEMI", "Twice a year", "Zweimal im Jahr"),
+            Triple("YEAR", "Yearly", "Jährlich"), Triple("TYEA", "Every two years", "Alle zwei Jahre"),
+        )
+        val frequencyClaim = Json.parseToJsonElement("""{"path":["recurrence","frequency"],"display":[{"locale":"en","label":"Frequency"},{"locale":"de","label":"Häufigkeit"}]}""")
+        for ((code, english, german) in expected) {
+            val payment = JsonObject(payload + ("recurrence" to Json.parseToJsonElement("""{"frequency":"$code"}""")))
+            for ((locale, value) in listOf("en-GB" to english, "de-AT" to german)) {
+                val consent = render(claims = JsonArray(claims() + frequencyClaim), payment = payment, locales = listOf(locale))
+                assertEquals(value, consent.fields.single { it.path == listOf("recurrence", "frequency") }.value)
             }
         }
     }

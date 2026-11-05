@@ -130,6 +130,27 @@ existing fields; schema descriptors cannot override payment rules or issuer inst
 Both portal editors provide typed controls plus JSON editing, preserve absent versus
 false/zero values and exact decimal tokens, and generate future dates for example requests.
 
+### App-reviewed payment display
+
+Compose Android, Compose iOS and native SwiftUI group payee fields in one card, with
+level-3 fields under **Payee details**. Amount and ISO currency code share a card;
+both issuer labels and the exact amount remain visible. Large text or long amounts
+use a vertical layout. Required recurring terms remain on the main review; PISP
+information is grouped within **Payment details**. Grouping never demotes a field
+from its issuer-defined visibility, and level-4 fields remain hidden.
+
+The shared wallet resolves frequency and Boolean values in the selected consent
+language: English or German, including regional fallback. Missing complete translations
+block authorization; raw codes or `true`/`false` are not display fallbacks.
+
+A valid embedded PNG/JPEG payee logo appears beside the payee name. Remote HTTPS
+logos require an explicit **Load payee logo** action and use no cookies, credentials
+or redirects. Images are bounded to 512 KiB and 2048 pixels per dimension. Missing,
+unsupported or failed images leave no placeholder; branding does not establish payee
+trust. HTTPS websites open only on a tap and show the full destination. Other URI
+schemes remain plain text. These display conveniences never replace validation or
+alter the original transaction bytes.
+
 ### Keeping the schema current
 
 The upstream schema is pinned by commit and SHA-256 in
@@ -232,3 +253,5 @@ The returned possession/inherence categories remain `other`, since the platform
 contract does not attest a biometric modality or certified WSCD category. Record
 source revisions and backend endpoints with physical results; live ITB and formal
 conformance remain separate evidence.
+
+Public-demo scheduled/recurring acceptance is tracked separately in [WAL-1665](https://linear.app/walt-new/issue/WAL-1665) and remains blocked on independently approved service/metadata deployments and fresh credentials. Local integration and deterministic UI checks do not require that rollout.

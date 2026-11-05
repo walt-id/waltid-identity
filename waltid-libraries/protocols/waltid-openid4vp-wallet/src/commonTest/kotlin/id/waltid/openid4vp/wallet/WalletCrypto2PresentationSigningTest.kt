@@ -2,6 +2,20 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.credentials.CredentialDetectorTypes
+import id.walt.credentials.formats.SdJwtCredential
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.Ts12Payment
+import id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException
+import id.waltid.openid4vp.wallet.presentation.ScaKeyBindingContext
+import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
+import id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
+import kotlin.io.encoding.Base64
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.cose.*
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
@@ -22,6 +36,7 @@ import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
@@ -31,23 +46,97 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
+    @Test fun scheduledPaymentCannotExpireWhileAnotherCredentialIsResolved() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val key = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId("review-holder"),
+            KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
+        val public = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
+        val claims = buildJsonObject {
+            put("_sd_alg", "sha-256"); put("vct", "https://issuer.example/payment")
+            put("cnf", buildJsonObject { put("jwk", Jwk.parse(public)) })
+        }
+        val signed = CompactJws.sign(claims.toString().encodeToByteArray(), key, JwsAlgorithm.ES256)
+        val credential = SdJwtCredential(CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+            credentialData = claims, signature = null, signed = signed)
+        val matches = listOf("payment", "second").associateWith { id ->
+            val query = CredentialQuery(id, CredentialFormat.DC_SD_JWT, meta = NoMeta)
+            listOf(DcqlMatcher.DcqlMatchResult(RawDcqlCredential(id, credential.format, claims,
+                originalCredential = credential), null, query))
+        }
+        val deadline = Instant.parse("2099-01-01T00:00:00Z")
+        val clock = object : Clock {
+            var current = deadline
+            override fun now() = current
+        }
+        val payload = Json.parseToJsonElement("""{"transaction_id":"review","payee":{"name":"Shop","id":"merchant"},"currency":"EUR","amount":1,"execution_date":"$deadline"}""").jsonObject
+        val entry = buildJsonObject {
+            put("type", Ts12Payment.TYPE); put("credential_ids", buildJsonArray { add("payment") }); put("payload", payload)
+        }.toString().encodeToByteArray().encodeToBase64Url()
+        val request = AuthorizationRequest(clientId="verifier", nonce="nonce", responseMode=OpenID4VPResponseMode.DC_API,
+            transactionData=listOf(entry))
+        val failure = assertFailsWith<Ts12PaymentValidationException> {
+            WalletPresentFunctionality2.generateVpTokenForRequest(request, matches, null, null,
+            TransactionDataTypeRegistry(), null, key,
+            scaAuthorizer = ScaPresentationAuthorizer {
+                ScaAuthenticationMethods.PossessionAndInherence(ScaAuthenticationMethods.Possession.OTHER, ScaAuthenticationMethods.Inherence.OTHER)
+            }, credentialHolderKeyResolver = CredentialPresentationKeyResolver { id, _ ->
+                if (id == "second") clock.current = deadline + 1.seconds
+                null
+            }, clock = clock)
+        }
+        assertEquals("/execution_date", failure.path)
+        assertEquals(listOf(entry), request.transactionData)
+    }
+
+
+    @Test
+    fun paymentDeadlineIsCheckedAfterResponseEncryptionBeforeHandoff() = runTest {
+        val deadline = Instant.parse("2099-01-01T00:00:00Z")
+        val entry = """{"type":"urn:eudi:sca:payment:1","credential_ids":["payment"],"payload":{"transaction_id":"final-response","payee":{"name":"Shop","id":"merchant"},"currency":"EUR","amount":1,"execution_date":"$deadline"}}"""
+            .encodeToByteArray().encodeToBase64Url()
+        val encryptionKey = Json.parseToJsonElement("""{
+            "kty":"EC","crv":"P-256","x":"y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
+            "y":"jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg","use":"enc","kid":"enc-key","alg":"ECDH-ES"
+        }""").jsonObject
+        for (mode in listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT, OpenID4VPResponseMode.DIRECT_POST_JWT)) {
+            var reads = 0
+            val clock = object : Clock {
+                override fun now(): Instant = if (reads++ == 0) deadline else deadline + 1.seconds
+            }
+            val request = AuthorizationRequest(clientId = "verifier", nonce = "nonce", responseMode = mode,
+                responseUri = "https://verifier.example/response", transactionData = listOf(entry),
+                clientMetadata = ClientMetadata(jwks = ClientMetadata.Jwks(listOf(encryptionKey)),
+                    encryptedResponseEncValuesSupported = listOf("A256GCM")))
+            val error = if (mode == OpenID4VPResponseMode.DIRECT_POST_JWT) {
+                assertIs<Ts12PaymentValidationException>(WalletPresentFunctionality2.sendAuthorizationResponse(
+                    request, "{}", null, request.clientMetadata, clock).exceptionOrNull())
+            } else assertFailsWith<Ts12PaymentValidationException> {
+                DcApiWallet.buildResponse(ResolvedDcApiRequest(DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+                    "https://verifier.example", request), "{}", null, clock)
+            }
+            assertEquals("/execution_date", error.path)
+            assertEquals(2, reads)
+            assertEquals(listOf(entry), request.transactionData)
+        }
+    }
+
     @Test
     fun scheduledPaymentExpiringDuringNativeSigningNeverReleasesAProof() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val original = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
             KeyId("scheduled-holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
-        val deadline = kotlin.time.Instant.parse("2026-11-04T12:00:00Z")
-        val clock = object : kotlin.time.Clock {
+        val deadline = Instant.parse("2026-11-04T12:00:00Z")
+        val clock = object : Clock {
             var current = deadline
             override fun now() = current
         }
         var signatures = 0
         var expireDuringAuthorization = false
-        val key = object : id.walt.crypto2.keys.Key by original {
+        val key = object : Crypto2Key by original {
             override val capabilities = original.capabilities.copy(signer = Signer { data, algorithm ->
                 val signature = requireNotNull(original.capabilities.signer).sign(data, algorithm)
                 signatures++
-                clock.current = kotlin.time.Instant.parse("2026-11-04T12:00:01Z")
+                clock.current = Instant.parse("2026-11-04T12:00:01Z")
                 signature
             })
         }
@@ -65,25 +154,25 @@ class WalletCrypto2PresentationSigningTest {
                 put("execution_date", "2026-11-04T12:00:00Z")
             })
         }.toString().encodeToByteArray()
-        val context = id.waltid.openid4vp.wallet.presentation.ScaKeyBindingContext(
-            "payment", id.walt.verifier.openid.models.openid.OpenID4VPResponseMode.DC_API,
-            id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer {
-                if (expireDuringAuthorization) clock.current = kotlin.time.Instant.parse("2026-11-04T12:00:01Z")
-                id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.PossessionAndInherence(
-                    id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.Possession.OTHER,
-                    id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods.Inherence.OTHER)
+        val context = ScaKeyBindingContext(
+            "payment", OpenID4VPResponseMode.DC_API,
+            ScaPresentationAuthorizer {
+                if (expireDuringAuthorization) clock.current = Instant.parse("2026-11-04T12:00:01Z")
+                ScaAuthenticationMethods.PossessionAndInherence(
+                    ScaAuthenticationMethods.Possession.OTHER,
+                    ScaAuthenticationMethods.Inherence.OTHER)
             }, clock)
         suspend fun attempt() = WalletPresentFunctionality2.createKeyBindingJwt(
             "$issuerJwt~", "nonce", "verifier", emptyList(), key,
-            listOf(kotlin.io.encoding.Base64.UrlSafe.withPadding(kotlin.io.encoding.Base64.PaddingOption.ABSENT).encode(entry)),
+            listOf(Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(entry)),
             scaContext = context)
-        assertEquals("/execution_date", assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }.path)
+        assertEquals("/execution_date", assertFailsWith<Ts12PaymentValidationException> { attempt() }.path)
         assertEquals(1, signatures)
-        assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }
+        assertFailsWith<Ts12PaymentValidationException> { attempt() }
         assertEquals(1, signatures) // Expired submission is rejected before calling the signer.
         clock.current = deadline
         expireDuringAuthorization = true
-        assertFailsWith<id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException> { attempt() }
+        assertFailsWith<Ts12PaymentValidationException> { attempt() }
         assertEquals(1, signatures) // A separate authorization callback can expire before signing.
     }
 

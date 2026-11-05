@@ -74,6 +74,26 @@ actor MockWalletClient: WalletClient {
     nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
         guard let scenario else { return nil }
         if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
+        if scenario == "recurring" {
+            let fields: [PaymentConsentField] = [
+                .init(label: "Payee", description: nil, value: "Super Store", placement: .prominent, path: ["payee", "name"]),
+                .init(label: "Payee ID", description: nil, value: "merchant-001", placement: .main, path: ["payee", "id"]),
+                .init(label: "Payee website", description: nil, value: "https://shop.example", placement: .details, path: ["payee", "website"]),
+                .init(label: "Payee logo", description: nil, value: "data:image/png;base64,AA==", placement: .details, path: ["payee", "logo"]),
+                .init(label: "Amount", description: nil, value: "11.56", placement: .prominent, path: ["amount"]),
+                .init(label: "Currency", description: nil, value: "EUR", placement: .prominent, path: ["currency"]),
+                .init(label: "Payment frequency", description: nil, value: "Monthly", placement: .main, path: ["recurrence", "frequency"]),
+                .init(label: "First payment", description: nil, value: "2099-01-01T12:00:00Z", placement: .main, path: ["recurrence", "start_date"]),
+                .init(label: "Last payment", description: nil, value: "2100-01-01T12:00:00Z", placement: .main, path: ["recurrence", "end_date"]),
+                .init(label: "Payment count", description: nil, value: "12", placement: .main, path: ["recurrence", "number"]),
+                .init(label: "Maximum payment amount", description: nil, value: "9007199254740993.01", placement: .main, path: ["recurrence", "mit_options", "max_amount"]),
+                .init(label: "Annual percentage rate", description: nil, value: "0.1234567890123456789", placement: .main, path: ["recurrence", "mit_options", "apr"]),
+                .init(label: "PISP legal name", description: nil, value: "Example Payments Ltd", placement: .details, path: ["pisp", "legal_name"]),
+                .init(label: "Transaction ID", description: nil, value: "recurring-ui-test", placement: .details, path: ["transaction_id"]),
+            ]
+            return PaymentConsent(revision: "ui-test-recurring", locale: "en", title: "Confirm payment", securityHint: nil,
+                affirmativeAction: "Confirm payment", denialAction: "Cancel payment", requiresUnsignedRequestWarning: false, fields: fields)
+        }
         let english = scenario == "english"
         return PaymentConsent(revision: "ui-test-payment", locale: english ? "en" : "de",
             title: english ? "Confirm this payment" : "Zahlung prüfen", securityHint: nil,

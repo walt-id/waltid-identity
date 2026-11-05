@@ -27,13 +27,17 @@ function update() {
 }
 function example(mode: PaymentMode) { raw.value = paymentExample(mode); }
 function fields(group: string) {
-  return PAYMENT_FIELDS.filter(field =>
-    group === "required" ? !field.path.includes(".") && field.required && field.path !== "execution_date" || field.path === "payee.name" || field.path === "payee.id" :
-    group === "optional" ? !field.required && !field.path.startsWith("recurrence.") :
-    group === "pisp" ? field.path.startsWith("pisp.") :
-    group === "schedule" ? field.path === "execution_date" :
-    group === "recurrence" ? field.path.startsWith("recurrence.") && !field.path.startsWith("recurrence.mit_options.") :
-    field.path.startsWith("recurrence.mit_options."));
+  return PAYMENT_FIELDS.filter(field => {
+    switch (group) {
+      case "required": return field.path === "payee.name" || field.path === "payee.id" ||
+        (!field.path.includes(".") && field.required && field.path !== "execution_date");
+      case "optional": return !field.required && !field.path.startsWith("recurrence.");
+      case "pisp": return field.path.startsWith("pisp.");
+      case "schedule": return field.path === "execution_date";
+      case "recurrence": return field.path.startsWith("recurrence.") && !field.path.startsWith("recurrence.mit_options.");
+      default: return field.path.startsWith("recurrence.mit_options.");
+    }
+  });
 }
 const groups = computed(() => [
   { key: "required", title: "Payment" }, { key: "optional", title: "Optional payment details" },
@@ -79,6 +83,7 @@ const groups = computed(() => [
                 :inputmode="['money','number','integer'].includes(field.kind) ? 'decimal' : 'text'"
                 :disabled="!field.required && !draft.enabled[field.path]" :name="field.path" :id="fieldPrefix + field.path"
                 :placeholder="field.kind === 'timestamp' ? '2027-01-01T12:00:00+01:00' : ''" class="border rounded p-2 w-full" />
+            <p v-if="field.kind === 'timestamp'" class="text-xs">Include seconds and a UTC offset, such as 2099-01-01T12:00:00+01:00 or Z for UTC.</p>
             <p v-if="field.kind === 'money'" class="text-xs">Major currency units; ISO 4217 decimal precision applies.</p>
           </div>
         </div>

@@ -63,6 +63,26 @@ data class WalletDemoPaymentDisplayField(
     val description: String? = null,
 )
 
+/** Presentation grouping never changes issuer placement or recovers fields from the raw payload. */
+enum class PaymentDisplayGroup { Payee, Amount, Timing, Provider, Other }
+
+val WalletDemoPaymentDisplayField.paymentPath: List<String>
+    get() = if (item.pathComponents.getOrNull(1) == "details")
+        item.pathComponents.drop(2).let { if (it.firstOrNull() == "payload") it.drop(1) else it }
+    else item.pathComponents
+
+val WalletDemoPaymentDisplayField.group: PaymentDisplayGroup
+    get() = when (paymentPath.firstOrNull()) {
+        "payee" -> PaymentDisplayGroup.Payee
+        "amount", "currency" -> PaymentDisplayGroup.Amount
+        "execution_date", "recurrence" -> PaymentDisplayGroup.Timing
+        "pisp" -> PaymentDisplayGroup.Provider
+        else -> PaymentDisplayGroup.Other
+    }
+
+val WalletDemoPaymentDisplayField.isLogo: Boolean get() = paymentPath == listOf("payee", "logo")
+val WalletDemoPaymentDisplayField.isWebsite: Boolean get() = paymentPath == listOf("payee", "website")
+
 fun WalletDemoPaymentReview.displays(transactions: List<ClaimGroup>): List<WalletDemoPaymentDisplay> = buildList {
     if (this@displays is WalletDemoPaymentReview.Ready) add(WalletDemoPaymentDisplay(
         id = consent.revision, title = consent.title, securityHint = consent.securityHint,

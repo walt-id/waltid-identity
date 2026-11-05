@@ -61,6 +61,40 @@ class Ts12PaymentTest {
         )) assertFailsWith<Ts12PaymentValidationException> { parse(extra) }
     }
 
+    @Test fun allTimestampFieldsShareRfc3339AssertionAndPreserveTheirOriginalText() {
+        val fields = listOf("date_time", "execution_date", "recurrence/start_date", "recurrence/end_date")
+        fun withTimestamp(path: String, timestamp: String): Ts12Payment = parse(
+            if (path.startsWith("recurrence/"))
+                """{"recurrence":{"frequency":"MNTH","${path.substringAfter('/')}":"$timestamp"}}"""
+            else """{"$path":"$timestamp"}"""
+        )
+        for (timestamp in listOf("2099-01-01T12:00:00+23:59", "2099-01-01T12:00:00-23:59",
+            "2099-01-01t12:00:00z", "2099-01-01T12:00:00.123456789123456789Z")) {
+            for (path in fields) assertEquals(timestamp,
+                withTimestamp(path, timestamp).fields[path.split('/')])
+        }
+        val scheduled = withTimestamp("execution_date", "2099-01-01T12:00:00+23:00")
+        scheduled.requireCurrent(Instant.parse("2098-12-31T13:00:00Z"))
+        assertFailsWith<Ts12PaymentValidationException> {
+            scheduled.requireCurrent(Instant.parse("2098-12-31T13:00:00.000000001Z"))
+        }
+        for (timestamp in listOf("2099-01-01T12:00:00+24:00", "2099-02-29T12:00:00Z",
+            "2099-01-01T24:00:00Z", "2099-01-01T12:00:00.Z", "2099-01-01T12:00:00")) {
+            for (path in fields) {
+                val error = assertFailsWith<Ts12PaymentValidationException> { withTimestamp(path, timestamp) }
+                assertEquals("/$path", error.path)
+                assertFalse(error.message.orEmpty().contains(timestamp))
+            }
+        }
+        assertEquals("2016-12-31T23:59:60Z", parse("""{"date_time":"2016-12-31T23:59:60Z"}""").fields[listOf("date_time")])
+        val leap = Ts12Payment.validate(JsonObject(base + ("execution_date" to JsonPrimitive("2017-01-01T00:59:60.5+01:00"))),
+            Instant.parse("2016-12-31T23:59:59Z"))
+        assertFailsWith<Ts12PaymentValidationException> {
+            leap.requireCurrent(Instant.parse("2017-01-01T00:00:00.1Z"))
+        }
+        assertFailsWith<Ts12PaymentValidationException> { parse("""{"date_time":"2016-12-30T23:59:60Z"}""") }
+    }
+
     @Test fun recurrenceSupportsTheWholeFrequencyEnumerationWithoutExtraBusinessRules() {
         val codes = listOf("INDA","DAIL","WEEK","TOWK","TWMN","MNTH","TOMN","QUTR","FOMN","SEMI","YEAR","TYEA")
         val published = Ts12Payment.schema.getValue("properties").jsonObject.getValue("recurrence").jsonObject

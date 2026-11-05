@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
+import { assertPaymentTransactionFields, parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
 
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import {
@@ -465,6 +465,7 @@ function hydrateTransactionDataFromPayload(payload: Record<string, unknown>) {
   }
 
   const entries = transactionData.filter(isRecord).map((record) => {
+    assertPaymentTransactionFields(record);
     const profileType =
       typeof record.type === "string" && record.type.trim()
         ? record.type
@@ -605,6 +606,8 @@ async function applySecurityOverridesToJson() {
   let payload: Record<string, unknown>;
   try {
     payload = readPayload();
+    const entries = isRecord(payload.openid) ? payload.openid.transactionData : undefined;
+    if (Array.isArray(entries)) entries.filter(isRecord).forEach(assertPaymentTransactionFields);
   } catch (e) {
     optionsError.value =
       e instanceof Error ? e.message : "Request body must be valid JSON.";
