@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -32,6 +34,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialRow
+import id.walt.walletdemo.compose.ui.components.PaymentConsentSection
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
@@ -236,6 +239,29 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Zahlen").performClick()
         onNodeWithTag("payment-unsigned-confirm").performClick()
         assertEquals("revision", submitted?.paymentConsentRevision)
+    }
+
+    fun payeeWebsiteOpensOnlyOnExplicitTap() = runComposeUiTest {
+        val openedWebsites = mutableListOf<String>()
+        val consent = WalletDemoPaymentConsent("revision", "en", null, null, "Confirm", "Cancel", false,
+            listOf(
+                WalletDemoPaymentField("Payee", null, "Super Store", WalletDemoPaymentFieldPlacement.Prominent,
+                    listOf("payee", "name")),
+                WalletDemoPaymentField("Payee website", null, "https://shop.example", WalletDemoPaymentFieldPlacement.Details,
+                    listOf("payee", "website")),
+            ))
+        setContent {
+            CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
+                override fun openUri(uri: String) { openedWebsites += uri }
+            }) {
+                PaymentConsentSection(WalletDemoPaymentReview.Ready(consent))
+            }
+        }
+        onNodeWithTag("payment-payee-details-toggle").performClick()
+        onNodeWithText("https://shop.example ↗").assertIsDisplayed()
+        assertTrue(openedWebsites.isEmpty())
+        onNodeWithText("https://shop.example ↗").performClick()
+        runOnIdle { assertEquals(listOf("https://shop.example"), openedWebsites) }
     }
 
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() = runComposeUiTest {

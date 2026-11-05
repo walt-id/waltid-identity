@@ -30,6 +30,9 @@ class WalletDemoSharingReviewIosTest {
         scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
 
     @Test
+    fun payeeWebsiteOpensOnlyOnExplicitTap() = scenarios.payeeWebsiteOpensOnlyOnExplicitTap()
+
+    @Test
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() =
         scenarios.unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback()
 
