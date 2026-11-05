@@ -66,7 +66,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
 
-    private let testWalletId = "ios-unit-test-wallet"
+    private let testWalletId = "ios-unit-test-wallet-\(UUID().uuidString)"
     private static let eudiPidSdJwtCredentialID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
     private static let eudiEhicSdJwtCredentialID = "eu.europa.ec.eudi.ehic_sd_jwt_vc"
     private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
@@ -85,43 +85,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     // Timeouts (aligned with Android for cross-platform consistency)
     private let verifierPollingTimeout: TimeInterval = 30  // 30 sec - backend verification
 
-    // MARK: - Test Lifecycle
-
-    override func setUp() async throws {
-        try await super.setUp()
-
-        // Clean up test state before each test to ensure isolation
-        // This prevents flakiness from state bleed between tests
-        await clearTestData(walletId: testWalletId)
-    }
-
-    /// Clears all test data (database only) to ensure test isolation
-    private func clearTestData(walletId: String) async {
-        let fileManager = FileManager.default
-        if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let databaseDirectories = [
-                appSupport,
-                appSupport.appendingPathComponent("databases", isDirectory: true)
-            ]
-            let dbFiles = [
-                "wallet_\(walletId).db",
-                "wallet_\(walletId).db-shm",
-                "wallet_\(walletId).db-wal"
-            ]
-            for directory in databaseDirectories {
-                for dbFile in dbFiles {
-                    let dbPath = directory.appendingPathComponent(dbFile)
-                    try? fileManager.removeItem(at: dbPath)
-                }
-            }
-        }
-
-        // Note: We intentionally do NOT delete keychain keys here.
-        // Deleting ALL kSecClassKey items would wipe out keys created during the test itself.
-        // The wallet tracks key references in the database, so deleting the database
-        // orphans any old keys - they remain in keychain but won't be used.
-        // This is acceptable for tests (keychain clears between simulator resets).
-    }
+    // MARK: - Wallet Fixtures
 
     private func makeWallet(walletId: String? = nil) async throws -> Wallet {
         try await Wallet(
@@ -438,7 +402,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testReceiveAndPresentUsingSignedMetadataAgainstDemoIssuer2AndVerifier2() async throws {
         let scenario = try demoPresentationScenario("eudi-pid-mdoc")
         let walletID = "ios-demo-signed-\(UUID().uuidString)"
-        await clearTestData(walletId: walletID)
         let wallet = try await makeSignedMetadataWallet(walletId: walletID)
         let bootstrap = try await initializeSigningIdentity(wallet)
         let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
@@ -530,7 +493,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testRejectPresentationAgainstDemoVerifier2() async throws {
         let scenario = try demoPresentationScenario("eudi-pid-sdjwt")
         let walletId = "ios-demo-reject-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
         _ = try await initializeSigningIdentity(wallet)
@@ -558,7 +520,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testInvalidTransactionDataCanBeReviewedAndReportedWithoutBackendSupport() async throws {
         let walletId = "ios-invalid-transaction-data-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
         let wallet = try await makeWallet(walletId: walletId)
         _ = try await initializeSigningIdentity(wallet)
         let presentationURL = try invalidTransactionDataPresentationURL()
@@ -584,7 +545,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testEudiPidSdJwtPersistsAcrossControllerRecreation() async throws {
         let walletId = "ios-eudi-pid-sd-jwt-persistence-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
         let wallet1 = try await makeEudiWallet(walletId: walletId)
         _ = try await initializeSigningIdentity(wallet1)
 
@@ -608,7 +568,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testDemoCredentialPersistsAcrossControllerRecreation() async throws {
         let scenario = DemoBackend.persistenceScenario
         let walletId = "ios-demo-persist-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
 
         let wallet1 = try await makeWallet(walletId: walletId)
         let bootstrapResult = try await initializeSigningIdentity(wallet1)
@@ -648,7 +607,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func receiveAndPresentEudiCredential(credentialID: String) async throws {
         let walletId = "ios-eudi-present-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
         let wallet = try await makeEudiWallet(walletId: walletId)
         let bootstrapResult = try await initializeSigningIdentity(wallet)
 
@@ -681,7 +639,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func previewAndSubmitEudiCredential(credentialID: String) async throws {
         let walletId = "ios-eudi-preview-submit-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
         let wallet = try await makeEudiWallet(walletId: walletId)
         let bootstrapResult = try await initializeSigningIdentity(wallet)
 
@@ -730,7 +687,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func previewAndSubmitDemoCredential(scenarioID: String) async throws {
         let scenario = try demoPresentationScenario(scenarioID)
         let walletId = "ios-demo-preview-submit-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
         let bootstrapResult = try await initializeSigningIdentity(wallet)
@@ -825,7 +781,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func receiveCredentialFromDemoIssuer2(scenarioID: String) async throws {
         let scenario = try demoScenario(scenarioID)
         let walletId = "ios-demo-receive-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
         _ = try await initializeSigningIdentity(wallet)
@@ -846,7 +801,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
         let scenario = try demoPresentationScenario(scenarioID)
         let walletId = "ios-demo-present-\(scenario.id)-\(UUID().uuidString)"
-        await clearTestData(walletId: walletId)
 
         let wallet = try await makeWallet(walletId: walletId)
         let bootstrapResult = try await initializeSigningIdentity(wallet)
