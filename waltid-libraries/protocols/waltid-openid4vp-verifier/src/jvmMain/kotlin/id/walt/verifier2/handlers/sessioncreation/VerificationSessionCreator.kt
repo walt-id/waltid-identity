@@ -128,6 +128,7 @@ object VerificationSessionCreator {
         key: Key? = null,
         x5c: List<String>? = null,
     ): Verification2Session {
+        require(setup !is ExternalReaderFlowSetup) { "Use proximity/device-response for external-reader submissions" }
         val sessionId = setup.core.sessionId ?: Uuid.random().toString()
 
         val isAnnexC = setup is DcApiAnnexCFlowSetup
