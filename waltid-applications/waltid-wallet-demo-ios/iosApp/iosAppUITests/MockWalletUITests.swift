@@ -261,6 +261,8 @@ final class MockWalletUITests: XCTestCase {
         }
         let amount = app.staticTexts["11.56"].firstMatch
         let currency = app.staticTexts["EUR"].firstMatch
+        XCTAssertFalse(app.staticTexts["Currency"].exists)
+        XCTAssertFalse(app.staticTexts["Payee logo"].exists)
         reveal(amount)
         XCTAssertEqual(amount.frame.midY, currency.frame.midY, accuracy: 1,
             "Amount and currency stay on one line when they fit, including at large text sizes")
@@ -1089,7 +1091,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Review payment"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Amount"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["129.90"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Currency"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Currency"].exists)
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Payee"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Example Merchant"].waitForExistence(timeout: 10))

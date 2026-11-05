@@ -78,17 +78,22 @@ private fun PaymentReviewContent(payment: WalletDemoPaymentDisplay) {
 private fun PaymentField(field: WalletDemoPaymentDisplayField, prominent: Boolean, modifier: Modifier = Modifier) {
     Column(modifier.testTag(WalletUiTestTags.claim(field.item.path.id)), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(field.item.label, style = MaterialTheme.typography.labelLarge)
-        val website = field.item.rawValue?.takeIf { field.isWebsite }?.let(::paymentWebsite)
-        if (website != null) {
-            val uriHandler = LocalUriHandler.current
-            TextButton(onClick = { runCatching { uriHandler.openUri(website) } }, contentPadding = PaddingValues(0.dp)) {
-                Text(website + " ↗")
-            }
-        } else ClaimValue(field.item.value, field.item.path, Modifier.fillMaxWidth(),
-            textStyle = if (prominent) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                else MaterialTheme.typography.bodyLarge)
+        PaymentValue(field, prominent)
         field.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
+}
+
+@Composable
+private fun PaymentValue(field: WalletDemoPaymentDisplayField, prominent: Boolean, modifier: Modifier = Modifier) {
+    val website = field.item.rawValue?.takeIf { field.isWebsite }?.let(::paymentWebsite)
+    if (website != null) {
+        val uriHandler = LocalUriHandler.current
+        TextButton(onClick = { runCatching { uriHandler.openUri(website) } }, modifier = modifier, contentPadding = PaddingValues(0.dp)) {
+            Text(website + " ↗")
+        }
+    } else ClaimValue(field.item.value, field.item.path, modifier.fillMaxWidth(),
+        textStyle = if (prominent) MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+            else MaterialTheme.typography.bodyLarge)
 }
 
 @Composable
@@ -123,11 +128,16 @@ private fun PaymentPayee(fields: List<WalletDemoPaymentDisplayField>) {
 @Composable
 private fun PaymentMoney(fields: List<WalletDemoPaymentDisplayField>) {
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-        FlowRow(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            fields.forEach {
-                PaymentField(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent, Modifier.width(IntrinsicSize.Max))
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            fields.firstOrNull()?.let { Text(it.item.label, style = MaterialTheme.typography.labelLarge) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                fields.forEach {
+                    Box(Modifier.width(IntrinsicSize.Max).alignByBaseline().testTag(WalletUiTestTags.claim(it.item.path.id))) {
+                        PaymentValue(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent)
+                    }
+                }
             }
+            fields.forEach { it.description?.let { description -> Text(description, style = MaterialTheme.typography.bodyMedium) } }
         }
     }
 }
@@ -143,7 +153,6 @@ private fun PaymentLogo(source: String, label: String, description: String?, all
     val painter = rememberAsyncImagePainter(ImageRequest.Builder(LocalPlatformContext.current).data(data).size(128).build())
     val state by painter.state.collectAsState()
     if (state is AsyncImagePainter.State.Success) Column(Modifier.widthIn(max = 80.dp)) {
-        Text(label, style = MaterialTheme.typography.labelSmall)
         Image(painter, contentDescription = label, Modifier.size(56.dp).testTag("payment-payee-logo"))
         description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
     }

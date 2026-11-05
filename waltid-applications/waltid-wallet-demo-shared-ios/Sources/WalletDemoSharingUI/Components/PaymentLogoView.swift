@@ -15,7 +15,6 @@ struct PaymentLogoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.caption)
             Image(uiImage: image).resizable().scaledToFit().frame(width: 56, height: 56)
                 .accessibilityLabel(label).accessibilityIdentifier("payment-payee-logo")
                 .preference(key: CredentialImageReadinessKey.self, value: ["payment-payee-logo"])

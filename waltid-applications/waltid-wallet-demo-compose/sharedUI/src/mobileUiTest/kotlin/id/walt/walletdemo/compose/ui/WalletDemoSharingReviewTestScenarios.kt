@@ -273,13 +273,16 @@ class WalletDemoSharingReviewTestScenarios {
                         listOf(
                             WalletDemoPaymentField("Amount", null, amount.value, WalletDemoPaymentFieldPlacement.Prominent,
                                 path = listOf("amount")),
-                            WalletDemoPaymentField("Currency", null, "EUR", WalletDemoPaymentFieldPlacement.Prominent,
+                            WalletDemoPaymentField("Currency", "Charged in the indicated ISO currency.", "EUR", WalletDemoPaymentFieldPlacement.Prominent,
                                 path = listOf("currency")),
                         ))
                     PaymentConsentSection(WalletDemoPaymentReview.Ready(consent))
                 }
             }
         }
+        onNodeWithText("Amount").assertIsDisplayed()
+        onNodeWithText("Currency").assertDoesNotExist()
+        onNodeWithText("Charged in the indicated ISO currency.").assertIsDisplayed()
         val shortAmount = onNodeWithText("11.56").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val currency = onNodeWithText("EUR").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertEquals(shortAmount.top, currency.top, "Short money values fit on one line even at large text size")
@@ -332,13 +335,15 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Verified website").assertIsDisplayed()
         onAllNodesWithText("Verified website").assertCountEquals(1)
         onNodeWithText("Review payment").performScrollToContent(this).assertIsDisplayed()
-        for ((field, label, value) in listOf(
-            Triple("amount", "Amount", "42.00"),
-            Triple("currency", "Currency", "EUR"),
-            Triple("merchant_name", "Merchant name", "ACME Corp"),
+        onNodeWithText("Amount").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Currency").assertDoesNotExist()
+        onNodeWithText("Merchant name").performScrollToContent(this).assertIsDisplayed()
+        for ((field, value) in listOf(
+            "amount" to "42.00",
+            "currency" to "EUR",
+            "merchant_name" to "ACME Corp",
         )) {
             val row = hasAnyAncestor(hasTestTag(WalletUiTestTags.claim("transactionData[0].details.$field")))
-            onNode(hasText(label) and row).performScrollToContent(this).assertIsDisplayed()
             onNode(hasText(value) and row).performScrollToContent(this).assertIsDisplayed()
         }
         onNodeWithContentDescription("Show Verifier details").performScrollToContent(this).performClick()
