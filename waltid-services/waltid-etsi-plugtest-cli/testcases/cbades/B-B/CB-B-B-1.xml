@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="true">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on a tagged COSE_Sign1 structure (COSE_Sign1_Tagged, CBOR tag 18) with attached payload. The implementation shall add only the minimum mandatory components: the protected header parameters alg, CWT Claims (enclosing iat) and x5chain. The unprotected headers map shall not be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

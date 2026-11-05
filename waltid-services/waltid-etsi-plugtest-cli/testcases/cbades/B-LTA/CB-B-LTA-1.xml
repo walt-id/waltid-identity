@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <contentType>text/plain</contentType>
+        </ProtectedHeader>
+        <UnprotectedHeader>
+            <uHeaders>
+                <sigTst/>
+                <valData>
+                    <xVals>
+                        <x509Cert/>
+                    </xVals>
+                    <rVals>
+                        <ocspVals/>
+                        <crlVals/>
+                    </rVals>
+                </valData>
+                <arcTst>
+                    <tstTokens>
+                        <TstToken/>
+                    </tstTokens>
+                </arcTst>
+            </uHeaders>
+        </UnprotectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-LTA signature obtained by adding one arcTst component to test case CB-B-LT-1. The signature shall be built on an untagged COSE_Sign1 structure with attached payload, including the protected header parameters alg, CWT Claims (enclosing iat) and x5chain. The uHeaders unprotected header parameter of the COSE_Sign1 (body layer) shall contain, in this order: a sigTst unsigned component (label 1) encapsulating one IETF RFC 3161 time-stamp token time-stamping the COSE signature value; a valData unsigned component (label 2) placed immediately after sigTst, containing within xVals (key 1) the certificates required for validating the signing certificate and the signing certificate of the time-stamp token in sigTst that are not already present in the signature (duplication of certificate values should be avoided, Table 14 requirement e), and within rVals (key 2) the revocation values (OCSP responses in ocspVals and/or CRLs in crlVals) required for validating the signing certificate, the certificates of its path and the TSA certificate of sigTst (Table 14 requirements h and i). and finally an arcTst unsigned component (label 3) placed after valData, encapsulating one IETF RFC 3161 archive time-stamp token whose message imprint shall be computed as specified in clause 5.3.5.3 (context string, protected header(s), external data, payload, signature value and the elements of uHeaders preceding the arcTst). All the validation material required by Table 14 requirement k shall be present before the arcTst is generated. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <srCms/>
+            <x5chain/>
+        </ProtectedHeader>
+        <UnprotectedHeader>
+            <uHeaders>
+                <sigTst/>
+            </uHeaders>
+        </UnprotectedHeader>
+        <payload/>
+        <signature/>
+</COSE_Sign1>
+    <Documentation>This test case tests a CB-AdES-B-T signature including a sigTst unsigned header parameter encapsulating one electronic time-stamp time-stamping the Signature Value. Implementation shall add at least the signed header parameters alg, x5chain, srCms, iat and the unsigned header parameter sigTst.  At least the signing certificate shall be included in the x5chain parameter. All certificates needed for path building should be included too.
+    </Documentation>
+</Signature>

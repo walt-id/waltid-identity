@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-3.cbor"/>
+  <Documentation>This is a negative test case for checking an expired signing certificate referenced by the CB-AdES signing-certificate identification information. This test data contains a signature created with an expired signing certificate.
+    ETSI Invalid-Cert Expired SN:7CE2B9
+    25-Oct-2021 10:00:00Z - signer certificate expired SN:7CE2B9
+  </Documentation>
+</SignatureRequest>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+        </ProtectedHeader>
+        <UnprotectedHeader>
+            <uHeaders>
+                <COSE_Countersignature Version="2" Abbreviated="false" Tagged="false">
+                    <ProtectedHeader>
+                        <alg/>
+                        <CWTClaims>
+                            <iat/>
+                        </CWTClaims>
+                        <x5chain/>
+                    </ProtectedHeader>
+                    <UnprotectedHeader>
+                        <uHeaders>
+                            <COSE_Countersignature Version="2" Abbreviated="false" Tagged="false">
+                                <ProtectedHeader>
+                                    <alg/>
+                                    <CWTClaims>
+                                        <iat/>
+                                    </CWTClaims>
+                                    <x5chain/>
+                                </ProtectedHeader>
+                                <signature/>
+                            </COSE_Countersignature>
+                        </uHeaders>
+                    </UnprotectedHeader>
+                    <signature/>
+                </COSE_Countersignature>
+            </uHeaders>
+        </UnprotectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add one counter signature of the signature as the only element of its uHeaders unprotected header parameter, and a second counter signature counter-signing the first counter signature, placed as the only element of the uHeaders unprotected header parameter of the first counter signature. Both counter signatures shall be full (non abbreviated) version 2 counter signatures as specified in IETF RFC 9338 (COSE_Countersignature, label 11), untagged, each one containing at least the protected header parameters alg, CWT Claims (enclosing iat) and x5chain and no content type header parameter. Both signature values shall be computed as specified in clause 3.3 of IETF RFC 9338 with context string "CounterSignature": the first one counter-signing the COSE_Sign1 signature, the second one counter-signing the first counter signature. The two counter signatures should be produced with signing certificates different from the one of the main signature. No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

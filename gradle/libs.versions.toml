@@ -111,6 +111,9 @@ nimbus-jose = "10.10"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
+# AdES (JVM-only formats): XAdES via Apache Santuario, PAdES via Apache PDFBox
+santuario-xmlsec = "4.0.4"
+pdfbox = "3.0.8"
 
 # whyoleg cryptography (multiplatform)
 whyoleg-cryptography = "0.6.0"
@@ -310,6 +313,8 @@ tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose" }
+santuario-xmlsec = { module = "org.apache.santuario:xmlsec", version.ref = "santuario-xmlsec" }
+pdfbox = { module = "org.apache.pdfbox:pdfbox", version.ref = "pdfbox" }
 
 ## Testing
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }

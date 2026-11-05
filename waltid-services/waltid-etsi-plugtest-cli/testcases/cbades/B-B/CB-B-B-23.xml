@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+  <PayloadToBeSigned File="Data/toBeSigned.txt"/>
+  <COSE_Sign1 Tagged="false">
+    <ProtectedHeader>
+      <alg/>
+      <contentType/>
+      <CWTClaims>
+        <iat/>
+      </CWTClaims>
+      <x5chain/>
+      <srCms>
+        <SrCm>
+          <commId>
+            <id>http://uri.etsi.org/01903/v1.2.2#ProofOfCreation</id>
+            <desc>The signer has created the signed data</desc>
+          </commId>
+        </SrCm>
+        <SrCm>
+          <commId>
+            <id>http://uri.etsi.org/01903/v1.2.2#ProofOfApproval</id>
+            <desc>The signer has approved the content of the signed data</desc>
+          </commId>
+        </SrCm>
+      </srCms>
+    </ProtectedHeader>
+    <payload/>
+    <signature/>
+  </COSE_Sign1>
+  <Documentation>This case tests a CB-AdES-B-B signature using an untagged COSE_Sign1 structure with an attached payload and additional signed attributes. The implementation shall add at least alg, content-type, a CWT Claims header containing iat, x5chain and srCms to the protected header. srCms shall contain the commitment identifiers 1.2.840.113549.1.9.16.6.6 and 1.2.840.113549.1.9.16.6.5. At least the signing certificate shall be included in x5chain; the certificates needed for certification-path building should also be included.</Documentation>
+</Signature>

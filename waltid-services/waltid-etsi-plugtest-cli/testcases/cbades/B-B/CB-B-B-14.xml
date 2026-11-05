@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <srAts>
+                <certified>
+                    <CertifiedAttr>
+                        <x509AttrCert/>
+                    </CertifiedAttr>
+                </certified>
+            </srAts>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected srAts header parameter (label 264) containing only the certified member (key 1) with one CertifiedAttr whose x509AttrCert member (key 1) shall encapsulate, within a pkiOb (encoding member absent), the DER-encoded X.509 attribute certificate issued to the signer that will be provided by the Plugtests portal (clause 5.2.5). Neither the claimed nor the signedAssertions members shall be present. No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

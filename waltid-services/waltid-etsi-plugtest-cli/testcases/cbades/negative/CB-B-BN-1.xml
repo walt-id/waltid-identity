@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-1.cbor"/>
+  <Documentation>This is a negative test case for checking an invalid CB-AdES signature value. The signature verification shall fail because the COSE signature value was not generated over the Sig_structure derived from the protected header byte string, the external additional authenticated data, and the specified payload according to the applicable COSE signing rules.</Documentation>
+</SignatureRequest>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-TN-2.cbor"/>
+  <Documentation>This is a negative test case for verifying the signing certificate at the time indicated by the CB-AdES sigTst signature time-stamp. At the time indicated by sigTst, the signing certificate had already been revoked.
+    ETSI Invalid-Cert Revoked SN:7CE2FF
+    22-Oct-2021 14:23:23Z - signing certificate revoked SN:7CE2FF
+    22-Oct-2021 15:12:09Z - sigTst signature time-stamp
+  </Documentation>
+</SignatureRequest>
