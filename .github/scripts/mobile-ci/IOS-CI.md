@@ -48,6 +48,8 @@ must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
 `platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
 running task dependencies. An existing simulator ID or `OS=latest` cannot select
 the fresh, runtime-pinned destinations that keep the two demos isolated.
+Enterprise runs the native SDK and both native and Compose batch suites.
+Report gates require all three suites.
 
 ## Unattended coverage
 
@@ -63,7 +65,10 @@ physical hardware or an operator to skip. sharedLogic links
 and executes its complete Kotlin iOS test target using
 the toolchain's existing SwiftPM dependency linkage.
 
-The recovery job also runs Signum's existing entitled Keychain host on its simulator,
+The recovery job creates its owned simulator from `IOS_SIMULATOR_DESTINATION`,
+using the same explicit device type and runtime as the consumer jobs. Local runs
+may omit the destination to let simctl select a compatible runtime.
+It also runs Signum's existing entitled Keychain host on its simulator,
 requiring the ownership suite and retaining per-test JUnit results. It discovers
 all tests except the physical Secure Enclave class and rejects skipped or incomplete runs.
 The platform result guard also requires X.509 reports on JVM, JS Node, Android host

@@ -14,7 +14,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.SessionEvent
@@ -61,19 +61,19 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
     @Test
     fun loopbackWebhookIsNotDeliveredWhenTheDeploymentRefusesIt() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         val previousAllowLoopback = System.getProperty("walt.ssrf.allowLoopback")
         System.clearProperty("walt.ssrf.allowLoopback")
         try {
             Verifier2WebhookRecorder().start(allowLoopback = false).use { webhook ->
-                E2ETest(host, port, true).testBlock(
+                E2ETest(host, 0, true).testBlock(
                     features = listOf(OSSVerifier2FeatureCatalog),
                     preload = {
                         ConfigManager.preloadConfig(
                             "verifier-service", OSSVerifier2ServiceConfig(
                                 clientId = null,
                                 clientMetadata = ClientMetadata(clientName = "Verifier2"),
-                                urlPrefix = "http://$host:$port/verification-session",
+                                urlPrefix = "http://$host/verification-session",
                                 urlHost = "openid4vp://authorize",
                             )
                         )
@@ -86,6 +86,7 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
                     },
                     module = Application::verifierModule,
                 ) {
+                    useBoundVerifierAddress()
                     val http = testHttpClient()
                     val created = testAndReturn("Create verification session") {
                         http.post("/verification-session/create") {
@@ -113,16 +114,16 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
     @Test
     fun walletRejectionEmitsWalletErrorResponseReceived() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         Verifier2WebhookRecorder().start().use { webhook ->
-            E2ETest(host, port, true).testBlock(
+            E2ETest(host, 0, true).testBlock(
                 features = listOf(OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig(
                         "verifier-service", OSSVerifier2ServiceConfig(
                             clientId = null,
                             clientMetadata = ClientMetadata(clientName = "Verifier2"),
-                            urlPrefix = "http://$host:$port/verification-session",
+                            urlPrefix = "http://$host/verification-session",
                             urlHost = "openid4vp://authorize",
                         )
                     )
@@ -135,6 +136,7 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
                 },
                 module = Application::verifierModule
             ) {
+                useBoundVerifierAddress()
                 val http = testHttpClient()
                 val created = testAndReturn("Create verification session") {
                     http.post("/verification-session/create") {
