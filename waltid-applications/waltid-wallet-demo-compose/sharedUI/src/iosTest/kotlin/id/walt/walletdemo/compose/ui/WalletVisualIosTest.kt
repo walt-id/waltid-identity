@@ -44,6 +44,8 @@ class WalletVisualIosTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test fun dateValuesCompactRtl() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
@@ -64,6 +66,7 @@ class WalletVisualIosTest {
     @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario { sharingInformation(multiple = true) }
     @Test

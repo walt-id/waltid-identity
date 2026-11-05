@@ -932,8 +932,9 @@ final class MockWalletUITests: XCTestCase {
 
     func testScanReceiveDetailsAndShareUsesMockWallet() {
         let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_GB"]
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "TZ": "UTC"])
 
         XCTAssertEqual(
             ui.waitUntilWalletReady(timeout: 10),
@@ -963,7 +964,7 @@ final class MockWalletUITests: XCTestCase {
         ui.assertExists(identifier: "wallet.claim.given_name")
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
         ui.assertExists(identifier: "wallet.claim.valid_to")
-        XCTAssertTrue(app.staticTexts["2026-06-17"].exists)
+        XCTAssertTrue(app.staticTexts["17 Jun 2026, 00:00 \u{2068}(UTC)\u{2069}"].exists)
         ui.tapButton(identifier: "credential-technical-details", fallbackLabel: "Technical details")
         ui.assertExists(identifier: "wallet.claim.system_format")
         XCTAssertTrue(app.staticTexts["jwt_vc_json"].waitForExistence(timeout: 10))
