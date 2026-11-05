@@ -60,13 +60,24 @@ internal class WalletVisualScenarios(
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
     private var layoutDirection = "ltr"
+    private val captureFailures = mutableListOf<AssertionError>()
+
+    fun execute(block: WalletVisualScenarios.() -> Unit) {
+        block()
+        captureFailures.firstOrNull()?.let { failure ->
+            captureFailures.drop(1).forEach(failure::addSuppressed)
+            throw failure
+        }
+    }
 
     private fun capture(id: String) {
         // Capture the settled Compose state after interactions and navigation.
         // Advancing virtual time keeps this independent of host rendering speed.
         test.mainClock.advanceTimeBy(1_000)
         test.waitForIdle()
-        captureImage(id, layoutDirection)
+        // Keep later states and interaction assertions in a journey reachable after a pixel diff.
+        // The platform test still fails after the scenario; references are never accepted here.
+        try { captureImage(id, layoutDirection) } catch (failure: AssertionError) { captureFailures += failure }
     }
 
     private fun content(body: @Composable () -> Unit) {

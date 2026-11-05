@@ -204,6 +204,6 @@ class WalletVisualAndroidTest {
             // These are settled-state screenshots; interaction feedback remains enabled in the app.
             CompositionLocalProvider(LocalRippleConfiguration provides null,
                 LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content)
-        }).block()
+        }).execute(block)
     }
 }
