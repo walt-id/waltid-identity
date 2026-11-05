@@ -243,6 +243,13 @@ final class MockWalletUITests: XCTestCase {
         for _ in 0..<4 where !payeeDetails.isHittable { app.swipeUp() }
         ui.tapElement(identifier: "payment-payee-details-toggle")
         XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5))
+        if !largeText {
+            app.links["https://shop.example ↗"].tap()
+            XCTAssertTrue(XCUIApplication(bundleIdentifier: "com.apple.mobilesafari").wait(for: .runningForeground, timeout: 10))
+            app.activate()
+            XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5), "Browser return keeps the expanded consent")
+            XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
+        }
         let cancel = app.buttons["wallet.presentationRejectButton"]
         let confirm = app.buttons["wallet.presentationSubmitButton"]
         if largeText { XCTAssertLessThan(cancel.frame.maxY, confirm.frame.minY) }

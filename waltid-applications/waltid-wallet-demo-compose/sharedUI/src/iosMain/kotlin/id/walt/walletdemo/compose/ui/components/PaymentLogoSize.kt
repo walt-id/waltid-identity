@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.impl.use
 
 internal actual fun paymentLogoHasSafeSize(bytes: ByteArray): Boolean = runCatching {
     // Skia's encoded image reads dimensions before allocating decoded pixel storage.
