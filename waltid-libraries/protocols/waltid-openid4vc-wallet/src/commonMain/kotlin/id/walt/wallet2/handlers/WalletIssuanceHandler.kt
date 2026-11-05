@@ -1782,21 +1782,18 @@ object WalletIssuanceHandler {
         require(request.tokenType.equals(if (dpop == null) "Bearer" else "DPoP", ignoreCase = true)) {
             "A DPoP token requires its sender-constraining key and a wallet"
         }
-        val requestedCount = request.effectiveProofs?.jwt?.size ?: 1
-        val issuerMetadata = if (requestedCount > 1 || request.credentialIssuerBaseUrl != null) {
+        val proofCount = request.effectiveProofs?.jwt?.size ?: 0
+        val issuerMetadata = if (proofCount > 1 || request.credentialIssuerBaseUrl != null) {
             val issuer = requireNotNull(request.credentialIssuerBaseUrl) {
                 "credentialIssuerBaseUrl is required to validate batch support"
             }
             val metadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer).metadata
             require(request.credentialEndpoint.toString() == metadata.credentialEndpoint) { "Credential endpoint does not match issuer metadata" }
             require(request.credentialConfigurationId in metadata.credentialConfigurationsSupported) { "Unknown credential configuration" }
-            CredentialRequestBuilder.validateBatchSize(metadata, requestedCount)
+            CredentialRequestBuilder.validateBatchSize(metadata, maxOf(1, proofCount))
             metadata
         } else {
             null
-        }
-        if (request.storeInWallet) require(request.holderBindings.size == requestedCount) {
-            "Supply one holder binding for each proof when storing credentials"
         }
         val exchange = requestCredential(request, httpClient, dpop, issuerMetadata)
         val credentialResponse = exchange.response
@@ -1810,9 +1807,8 @@ object WalletIssuanceHandler {
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
             ?: error("Credential response contained no credentials")
-        require(rawCredentials.isNotEmpty() && (request.effectiveProofs == null || rawCredentials.size <= requestedCount)) {
-            "Invalid credential response count"
-        }
+        require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
+        request.effectiveProofs?.let { validateIsolatedCredentialKeys(rawCredentials, it) }
         return FetchCredentialsResult(rawCredentials = rawCredentials)
     }
 
