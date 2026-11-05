@@ -484,6 +484,21 @@ final class WalletVisualTests: XCTestCase {
         }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
     }
 
+    func testPaymentLogoPolicyHidesUnavailableImages() async {
+        XCTAssertNotNil(paymentWebsite("https://shop.example/payments?q=1"))
+        for source in ["http://shop.example", "https://user:password@shop.example", "javascript:alert(1)", "https://shop.example/with space"] {
+            XCTAssertNil(paymentWebsite(source))
+        }
+        for source in ["https://shop.example/logo.png", "data:image/png;base64,AA==", "data:image/svg+xml;base64,PHN2Zz4=",
+                       "data:image/png;base64," + String(repeating: "A", count: 700_000)] {
+            let image = await loadPaymentLogo(source)
+            XCTAssertNil(image)
+        }
+        let embedded = await loadPaymentLogo("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFUlEQVR4nGNgKPhAGhrVMKph+GoAADKWYBBGgv6DAAAAAElFTkSuQmCC")
+        XCTAssertEqual(embedded?.size.width, 16)
+        XCTAssertEqual(embedded?.size.height, 16)
+    }
+
     func testScheduledAndRecurringTermsSurviveTheNativeDisplayBoundary() throws {
         let fixtures = try WalletVisualFixtures()
         for recurring in [false, true] {
@@ -514,6 +529,7 @@ final class WalletVisualTests: XCTestCase {
         let id = "payment.\(recurring ? "recurring" : "scheduled")."
             + (compact ? "compact_large_text" : details ? "details" : "main")
         let sizeCategory: ContentSizeCategory = compact ? .accessibilityMedium : .large
+        var logoReady = false
         let content = WalletReviewScaffold {
             PaymentConsentView(state: state, detailsInitiallyExpanded: details)
         } actions: {
@@ -523,9 +539,10 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
             .environment(\.colorScheme, .light).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+            .onPreferenceChange(CredentialImageReadinessKey.self) { logoReady = $0.contains("payment-payee-logo") }
         try await captureWhenReady(content, id: id, config: compact ? .iPhoneSe : .iPhone13,
             sizeCategory: sizeCategory,
-            isReady: { state.canConfirm }, failure: "Payment review did not become available",
+            isReady: { state.canConfirm && logoReady }, failure: "Payment review did not become available",
             scrollToBottom: recurring || details, scrollFraction: details || compact ? 1 : 0.4)
     }
 

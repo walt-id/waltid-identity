@@ -16,6 +16,13 @@ export const stringifyPaymentJson = (value: unknown, space?: number): string =>
 export const paymentJsonParser = { parse: parsePaymentJson, stringify };
 
 export const PAYMENT_TYPE = "urn:eudi:sca:payment:1";
+/** Reject unsupported entry fields before the full-request editor projects them into guided controls. */
+export function assertPaymentTransactionFields(entry: Record<string, unknown>): void {
+  if (entry.type !== PAYMENT_TYPE) return;
+  const supported = ["type", "credential_ids", "require_cryptographic_holder_binding", "transaction_data_hashes_alg", "payload"];
+  const unknown = Object.keys(entry).find(name => !supported.includes(name));
+  if (unknown !== undefined) throw new Error(`Unsupported TS12 transaction-data field "${unknown}". Correct the JSON before using the form.`);
+}
 export type PaymentMode = "unscheduled" | "scheduled" | "recurring";
 type FieldKind = "text" | "timestamp" | "money" | "number" | "integer" | "boolean" | "frequency";
 export type PaymentField = { path: string; label: string; kind: FieldKind; required?: boolean };
@@ -77,7 +84,11 @@ export function paymentDraft(text: string): PaymentDraft {
         !["", "payee", "pisp", "recurrence", "recurrence.mit_options"].includes(path)) {
       throw new Error("Unsupported field " + (path || "payload") + ". Correct it in JSON before using the form.");
     }
-    for (const [key, child] of Object.entries(value)) visit(child, path ? path + "." + key : key);
+    for (const [key, child] of Object.entries(value)) {
+      // Supported member names never contain dots; a literal dot must not alias a nested path.
+      if (key.includes(".")) throw new Error("Unsupported field " + key + ". Correct it in JSON before using the form.");
+      visit(child, path ? path + "." + key : key);
+    }
   }
   visit(payload, "");
   if (payload.recurrence !== undefined && payload.execution_date !== undefined) {
@@ -129,7 +140,7 @@ export function paymentExample(mode: PaymentMode, now = new Date()): string {
   const base = { transaction_id: "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
     payee: { name: "Super Store", id: "merchant-001" }, currency: "EUR", amount: 11.56 };
   if (mode === "unscheduled") return stringifyPaymentJson(base, 2);
-  const common = { ...base, date_time: now.toISOString(), payee: { ...base.payee, logo: "data:image/png;base64,AA==", website: "https://shop.example" },
+  const common = { ...base, date_time: now.toISOString(), payee: { ...base.payee, logo: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFUlEQVR4nGNgKPhAGhrVMKph+GoAADKWYBBGgv6DAAAAAElFTkSuQmCC", website: "https://shop.example" },
     pisp: { legal_name: "Example Payments Ltd", brand_name: "Example Payments", domain_name: "payments.example" },
     amount_estimated: false, amount_earmarked: false, sct_inst: true };
   if (mode === "scheduled") return stringifyPaymentJson({ ...common, execution_date: future }, 2);

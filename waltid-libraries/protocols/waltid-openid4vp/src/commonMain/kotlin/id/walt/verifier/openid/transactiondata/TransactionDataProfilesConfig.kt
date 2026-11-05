@@ -1,8 +1,6 @@
 package id.walt.verifier.openid.transactiondata
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.JsonIgnoreUnknownKeys
 
 @Serializable
 data class TransactionDataProfilesConfig(
@@ -11,8 +9,6 @@ data class TransactionDataProfilesConfig(
     fun toTypeRegistry() = TransactionDataTypeRegistry(transactionDataProfiles.map { it.type }.toSet())
 }
 
-@OptIn(ExperimentalSerializationApi::class)
-@JsonIgnoreUnknownKeys
 @Serializable
 data class TransactionDataProfile(
     val type: String,

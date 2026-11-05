@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
+import { stringifyPaymentJson } from "~/utils/ts12Payment";
 
 import type { SwaggerExample } from '~/composables/useSwaggerExamples'
 

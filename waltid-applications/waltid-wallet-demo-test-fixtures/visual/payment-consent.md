@@ -22,7 +22,18 @@ Android's additional-review preference remains intact. With wallet preview disab
 
 `payment.scheduled.*` and `payment.recurring.*` use complete, synthetic consent fields from the
 shared fixture. Their main/details states cover timing, frequency, MIT terms, ordinary optional
-fields and labelled URI text. The recurring compact/large-text state covers scrolling while the
+fields, a valid embedded logo, clickable HTTPS website and localized Boolean values. The recurring compact/large-text state covers scrolling while the
 actions remain pinned. Compose tests also expand details, reach every field and cancel without
 submission; native disclosure interaction retains its separate app-host test. These fixtures do
 not replace the shared validator, issuer-metadata or end-to-end proof tests.
+
+Payee identity and its details share a card. Amount and the ISO currency code share a row
+with both issuer labels; long values and large text can stack without truncation. Timing
+and recurring terms keep their issuer-defined placement. Details group the PISP separately.
+
+Logos are optional display assets: a valid bounded PNG/JPEG is shown with its issuer label,
+while missing or failed images leave no placeholder. Remote loading requires an explicit
+action and uses no redirects, cookies or credentials. Only HTTPS websites are actionable;
+other URI schemes remain text. Branding and links do not imply an authenticated payee.
+`MockWalletUITests.testRecurringPaymentDetailsScrollAndCancelWithoutSubmitting` exercises
+native expansion, long exact values, scrolling, hidden invalid logos and cancellation.

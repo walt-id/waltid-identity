@@ -67,6 +67,7 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
@@ -701,7 +702,7 @@ class Issuer2MetadataEndpointTest {
                     val document = vctTypeMetadata.toJSON()
                     assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
                     val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
-                    assertEquals(26, payment.getValue("claims").jsonArray.size)
+                    assertPaymentClaimMetadata(payment.getValue("claims").jsonArray)
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
                     assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
                 } else if (credentialConfigurationId == "urn:eudi:pid:1") {
@@ -714,6 +715,48 @@ class Issuer2MetadataEndpointTest {
                 }
             }
         }
+    }
+
+    private fun assertPaymentClaimMetadata(claims: JsonArray) {
+        val expected = """
+            transaction_id|3|Transaction ID|Transaktions-ID
+            payee/name|1|Payee|Zahlungsempfänger
+            payee/id|2|Payee ID|Empfänger-ID
+            currency|1|Currency|Währung
+            amount|1|Amount|Betrag
+            date_time|3|Request started|Anfrage begonnen
+            payee/logo|3|Payee logo|Empfängerlogo
+            payee/website|3|Payee website|Empfängerwebsite
+            pisp/legal_name|3|PISP legal name|PISP-Firmenname
+            pisp/brand_name|3|PISP brand|PISP-Marke
+            pisp/domain_name|3|PISP domain|PISP-Domain
+            amount_estimated|3|Estimated amount|Geschätzter Betrag
+            amount_earmarked|3|Amount earmarked|Betrag vorgemerkt
+            sct_inst|3|Instant credit transfer requested|Echtzeitüberweisung angefordert
+            execution_date|2|Execution date and time|Ausführungszeitpunkt
+            recurrence/start_date|2|First payment|Erste Zahlung
+            recurrence/end_date|2|Last payment|Letzte Zahlung
+            recurrence/number|2|Number of payments|Anzahl der Zahlungen
+            recurrence/frequency|2|Payment frequency|Zahlungshäufigkeit
+            recurrence/mit_options/amount_variable|2|Variable amount|Variabler Betrag
+            recurrence/mit_options/min_amount|2|Minimum payment amount|Mindestzahlungsbetrag
+            recurrence/mit_options/max_amount|2|Maximum payment amount|Höchstzahlungsbetrag
+            recurrence/mit_options/total_amount|2|Total payment amount|Gesamtzahlungsbetrag
+            recurrence/mit_options/initial_amount|2|Initial payment amount|Anfänglicher Zahlungsbetrag
+            recurrence/mit_options/initial_amount_number|2|Number of initial payments|Anzahl der anfänglichen Zahlungen
+            recurrence/mit_options/apr|2|Annual percentage rate|Jährlicher Prozentsatz
+        """.trimIndent().lines().toSet()
+        val actual = claims.map { entry ->
+            val claim = entry.jsonObject
+            val labels = claim.getValue("display").jsonArray.associate {
+                it.jsonObject.getValue("locale").jsonPrimitive.content to it.jsonObject.getValue("label").jsonPrimitive.content
+            }
+            assertEquals(setOf("en", "de"), labels.keys)
+            val path = claim.getValue("path").jsonArray.joinToString("/") { it.jsonPrimitive.content }
+            "$path|${claim.getValue("visualisation").jsonPrimitive.content}|${labels.getValue("en")}|${labels.getValue("de")}"
+        }
+        assertEquals(expected.size, actual.size)
+        assertEquals(expected, actual.toSet())
     }
 
     private fun assertSdJwtCatalogConfigurations(

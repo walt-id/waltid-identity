@@ -34,6 +34,7 @@ struct PaymentConsentView: View {
 
 /// Both payment sources use the same hierarchy, field renderer and detail controls.
 private struct PaymentReviewContent: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let payment: PaymentDisplay
     var detailsInitiallyExpanded = false
 
@@ -45,16 +46,50 @@ private struct PaymentReviewContent: View {
                     .foregroundStyle(.red).accessibilityIdentifier("payment-unsigned-warning")
             }
             if let hint = payment.securityHint { Text(hint).accessibilityIdentifier("payment-security-hint") }
-            ForEach(payment.fields.filter { $0.placement == .prominent }) { field in
+            let fields = payment.fields.filter { $0.placement != .omitted }
+            let payee = fields.filter { $0.group == .payee }
+            if !payee.isEmpty {
+                PaymentPayee(fields: payee, detailsInitiallyExpanded: detailsInitiallyExpanded)
+            }
+            let money = fields.filter { $0.group == .amount && $0.placement != .details }
+                .sorted { ($0.paymentPath == ["amount"] ? 0 : 1) < ($1.paymentPath == ["amount"] ? 0 : 1) }
+            if !money.isEmpty {
+                Group {
+                    if dynamicTypeSize >= .xxLarge || money.contains(where: { ($0.item.rawValue ?? "").count > 18 }) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(money) { fieldView($0, prominent: $0.placement == .prominent) }
+                        }
+                    } else {
+                        HStack(alignment: .top, spacing: 16) {
+                            ForEach(money) { fieldView($0, prominent: $0.placement == .prominent)
+                                .frame(maxWidth: .infinity, alignment: .leading) }
+                        }
+                    }
+                }.padding().frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            }
+            let remaining = fields.filter { field in field.group != .payee && !money.contains(where: { $0.id == field.id }) }
+            ForEach(remaining.filter { $0.placement == .prominent }) { field in
                 fieldView(field, prominent: true).padding().frame(maxWidth: .infinity, alignment: .leading)
                     .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
             }
-            ForEach(payment.fields.filter { $0.placement == .main }) { fieldView($0, prominent: false) }
-            let details = payment.fields.filter { $0.placement == .details }
+            let main = remaining.filter { $0.placement == .main }
+            let timing = main.filter { $0.group == .timing }
+            if !timing.isEmpty {
+                Text("Payment timing", bundle: .module).font(.headline)
+                ForEach(timing) { fieldView($0, prominent: false) }
+            }
+            ForEach(main.filter { $0.group != .timing }) { fieldView($0, prominent: false) }
+            let details = remaining.filter { $0.placement == .details }
             if !details.isEmpty {
                 MetadataDisclosure(title: String(localized: "Payment details", bundle: .module), initiallyExpanded: detailsInitiallyExpanded,
                     accessibilityIdentifier: "payment-details-toggle") {
-                    ForEach(details) { fieldView($0, prominent: false) }
+                    let provider = details.filter { $0.group == .provider }
+                    if !provider.isEmpty {
+                        Text("Payment service provider", bundle: .module).font(.headline)
+                        ForEach(provider) { fieldView($0, prominent: false) }
+                    }
+                    ForEach(details.filter { $0.group != .provider }) { fieldView($0, prominent: false) }
                 }
             }
             if !payment.technical.isEmpty {
@@ -67,12 +102,54 @@ private struct PaymentReviewContent: View {
         .accessibilityIdentifier("payment-consent")
     }
 
-    private func fieldView(_ field: PaymentDisplayField, prominent: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(field.item.label).font(.subheadline)
+}
+
+private func fieldView(_ field: PaymentDisplayField, prominent: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+        Text(field.item.label).font(.subheadline)
+        if field.isWebsite, let value = field.item.rawValue, let url = paymentWebsite(value) {
+            Link(destination: url) { Text(value + " ↗") }.frame(minHeight: 44, alignment: .leading)
+        } else {
             ClaimValueView(value: field.item.value, path: field.item.path,
                 textFont: prominent ? .title3.weight(.semibold) : .body).textSelection(.enabled)
-            if let description = field.description { Text(description).font(.callout) }
-        }.fixedSize(horizontal: false, vertical: true)
+        }
+        if let description = field.description { Text(description).font(.callout) }
+    }.fixedSize(horizontal: false, vertical: true)
+}
+
+private struct PaymentPayee: View {
+    let fields: [PaymentDisplayField]
+    var detailsInitiallyExpanded = false
+    @State private var allowRemote = false
+
+    var body: some View {
+        let logo = fields.first(where: \.isLogo)
+        let source = logo?.item.rawValue
+        let remote = source.flatMap(paymentWebsite) != nil
+        let details = fields.filter { !$0.isLogo && $0.placement == .details }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(fields.filter { !$0.isLogo && $0.placement != .details }) {
+                        fieldView($0, prominent: $0.placement == .prominent)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                if let logo, let source {
+                    PaymentLogoView(source: source, label: logo.item.label, description: logo.description, allowRemote: allowRemote)
+                }
+            }
+            if !details.isEmpty || (remote && !allowRemote) {
+                MetadataDisclosure(title: String(localized: "Payee details", bundle: .module),
+                    initiallyExpanded: detailsInitiallyExpanded, accessibilityIdentifier: "payment-payee-details-toggle") {
+                    ForEach(details) { fieldView($0, prominent: false) }
+                    if remote && !allowRemote {
+                        Button(String(localized: "Load payee logo", bundle: .module)) { allowRemote = true }
+                            .frame(minHeight: 44)
+                    }
+                }
+            }
+        }.padding().frame(maxWidth: .infinity, alignment: .leading)
+            .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .onChange(of: source) { _ in allowRemote = false }
     }
 }

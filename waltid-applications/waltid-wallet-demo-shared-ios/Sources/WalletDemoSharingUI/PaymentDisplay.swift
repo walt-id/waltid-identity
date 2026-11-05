@@ -18,6 +18,29 @@ struct PaymentDisplayField: Identifiable {
     var id: String { item.id }
 }
 
+// Keep these rendering groups aligned with the Compose demo; validated values, labels,
+// locale and placement continue to come from the same wallet core.
+enum PaymentDisplayGroup { case payee, amount, timing, provider, other }
+
+extension PaymentDisplayField {
+    var paymentPath: [String] {
+        guard item.pathComponents.dropFirst().first == "details" else { return item.pathComponents }
+        let fields = Array(item.pathComponents.dropFirst(2))
+        return fields.first == "payload" ? Array(fields.dropFirst()) : fields
+    }
+    var group: PaymentDisplayGroup {
+        switch paymentPath.first {
+        case "payee": .payee
+        case "amount", "currency": .amount
+        case "execution_date", "recurrence": .timing
+        case "pisp": .provider
+        default: .other
+        }
+    }
+    var isLogo: Bool { paymentPath == ["payee", "logo"] }
+    var isWebsite: Bool { paymentPath == ["payee", "website"] }
+}
+
 extension PaymentReviewState {
     func displays(transactions: [ClaimGroup]) -> [PaymentDisplay] {
         var displays: [PaymentDisplay] = []

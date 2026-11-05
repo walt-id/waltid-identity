@@ -1,10 +1,15 @@
 package id.walt.verifier.openid.transactiondata
 
 import io.github.optimumcode.json.schema.FormatBehavior
+import io.github.optimumcode.json.schema.ExperimentalApi
+import io.github.optimumcode.json.schema.FormatValidator
 import io.github.optimumcode.json.schema.JsonSchemaLoader
 import io.github.optimumcode.json.schema.SchemaOption
+import io.github.optimumcode.json.schema.model.AbstractElement
+import io.github.optimumcode.json.schema.model.PrimitiveElement
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /** A rule and payload-relative JSON pointer; errors never include transaction values. */
@@ -40,10 +45,16 @@ class Ts12Payment internal constructor(
     companion object {
         const val TYPE: String = "urn:eudi:sca:payment:1"
         val schema: JsonObject get() = Ts12PaymentSchema.value
+        @OptIn(ExperimentalApi::class)
         private val validator by lazy {
             JsonSchemaLoader.create()
                 .withSchemaOption(SchemaOption.FORMAT_BEHAVIOR_OPTION, FormatBehavior.ANNOTATION_AND_ASSERTION)
-                .fromJsonElement(schema)
+                .withCustomFormat("ts12-date-time", object : FormatValidator {
+                    override fun validate(element: AbstractElement) =
+                        if (element !is PrimitiveElement || !element.isString || paymentTimestamp(element.content) != null)
+                            FormatValidator.Valid() else FormatValidator.Invalid()
+                })
+                .fromJsonElement(schema.withPaymentTimestampFormat())
         }
 
         fun validate(payload: JsonObject, now: Instant = Clock.System.now()): Ts12Payment {
@@ -86,7 +97,8 @@ class Ts12Payment internal constructor(
             leaves(payload, emptyList())
             val schedule = when {
                 "execution_date" in payload -> Ts12PaymentSchedule.Scheduled(
-                    Instant.parse(payload.getValue("execution_date").jsonPrimitive.content))
+                    paymentTimestamp(payload.getValue("execution_date").jsonPrimitive.content)
+                        ?: invalid("/execution_date", "must satisfy date-time"))
                 "recurrence" in payload -> Ts12PaymentSchedule.Recurring(Ts12PaymentFrequency.valueOf(
                     payload.getValue("recurrence").jsonObject.getValue("frequency").jsonPrimitive.content))
                 else -> Ts12PaymentSchedule.Unscheduled
@@ -96,14 +108,60 @@ class Ts12Payment internal constructor(
     }
 }
 
+private val PAYMENT_TIMESTAMP = Regex(
+    "([0-9]{4}-[0-9]{2}-[0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\\.([0-9]+))?([Zz]|([+-])([0-9]{2}):([0-9]{2}))"
+)
+
+// Validator 0.5.5 gives built-in formats precedence over custom ones. Only its private assertion
+// schema uses this name; the embedded upstream schema and discovery descriptor remain unchanged.
+private fun JsonElement.withPaymentTimestampFormat(): JsonElement = when (this) {
+    is JsonObject -> JsonObject(mapValues { (key, value) ->
+        if (key == "format" && value == JsonPrimitive("date-time")) JsonPrimitive("ts12-date-time")
+        else value.withPaymentTimestampFormat()
+    })
+    is JsonArray -> JsonArray(map { it.withPaymentTimestampFormat() })
+    else -> this
+}
+
+/** RFC 3339 offsets are wider than Instant.parse permits and fractional seconds have no nine-digit limit. */
+private fun paymentTimestamp(value: String): Instant? {
+    val parts = PAYMENT_TIMESTAMP.matchEntire(value)?.groupValues ?: return null
+    val hour = parts[2].toInt()
+    val minute = parts[3].toInt()
+    val second = parts[4].toInt()
+    val offsetHour = parts[8].toIntOrNull() ?: 0
+    val offsetMinute = parts[9].toIntOrNull() ?: 0
+    if (hour > 23 || minute > 59 || second > 60 || offsetHour > 23 || offsetMinute > 59) return null
+    val offset = (offsetHour * 3600 + offsetMinute * 60) * if (parts[7] == "-") -1 else 1
+    // Clock instants have nanosecond resolution. Flooring the fraction preserves the past/not-past
+    // comparison against such a clock; the complete original text remains in fields and proof inputs.
+    val fraction = parts[5].take(9).padEnd(9, '0')
+    val ordinarySecond = minOf(second, 59).toString().padStart(2, '0')
+    val instant = runCatching {
+        Instant.parse("${parts[1]}T${parts[2]}:${parts[3]}:$ordinarySecond.${fraction}Z") - offset.seconds
+    }.getOrNull() ?: return null
+    if (second != 60) return instant
+    // RFC 3339 leap seconds occur at the end of a UTC month; never at arbitrary local minutes.
+    val utc = instant.toString()
+    val midnight = Instant.fromEpochSeconds(instant.epochSeconds + 1)
+    if (!utc.substring(11).startsWith("23:59:59") || midnight.toString().substring(8, 10) != "01") return null
+    // The clock cannot represent the inserted second. Collapse its fraction to the following
+    // midnight, so it can never extend a payment deadline into the next ordinary second.
+    return midnight
+}
+
 /** Called by both request validation modes, and again before releasing a payment proof. */
 fun validateTs12PaymentEntries(entries: List<DecodedTransactionData>, now: Instant = Clock.System.now()) {
-    entries.filter { it.transactionData.type == Ts12Payment.TYPE }.forEach { entry ->
+    parseTs12PaymentEntries(entries, now)
+}
+
+/** Retain validated payments for deadline checks after asynchronous response construction. */
+fun parseTs12PaymentEntries(entries: List<DecodedTransactionData>, now: Instant = Clock.System.now()): List<Ts12Payment> =
+    entries.filter { it.transactionData.type == Ts12Payment.TYPE }.map { entry ->
         if (entry.details.keys != setOf("payload")) invalid("", "requires only the payload extension", unsupported = true)
         val payload = entry.details["payload"] as? JsonObject ?: invalid("", "must be an object")
         Ts12Payment.validate(payload, now)
     }
-}
 
 private fun rejectUnknown(value: JsonObject, schema: JsonObject, path: String) {
     val properties = schema.getValue("properties").jsonObject

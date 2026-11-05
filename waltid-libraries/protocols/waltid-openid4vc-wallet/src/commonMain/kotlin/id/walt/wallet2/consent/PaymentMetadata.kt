@@ -99,8 +99,10 @@ internal fun localizePaymentConsent(
     val presentFields = fields.filter { it.path in values }
     val frequencyPath = listOf("recurrence", "frequency")
     val frequency = values[frequencyPath]
+    val hasBooleans = presentFields.any { it.path in PAYMENT_BOOLEAN_PATHS }
     val languageSets = labels.values.map { it.keys } + presentFields.map { it.labels.keys } +
-        if (frequency != null) listOf(PAYMENT_FREQUENCY_LABELS.keys) else emptyList()
+        (if (frequency != null) listOf(PAYMENT_FREQUENCY_LABELS.keys) else emptyList()) +
+        (if (hasBooleans) listOf(PAYMENT_BOOLEAN_LABELS.keys) else emptyList())
     val candidates = LocalizedMetadata.normalizedPreferences(preferredLocales).flatMap { LocalizedMetadata.lookupRanges(it).toList() }.distinct()
     val locale = candidates.firstOrNull { candidate -> languageSets.all { it.matchingTag(candidate) != null } }
         ?: consentFailure(PaymentConsentFailure.MISSING_TRANSLATION)
@@ -113,7 +115,12 @@ internal fun localizePaymentConsent(
         denialAction = labels["denial_action_label"]?.localized(),
         fields = presentFields.map { field ->
             val label = field.labels.localized()
-            PaymentConsentField(field.path, label.label, label.description, if (field.path == frequencyPath) PAYMENT_FREQUENCY_LABELS.localized().getValue(requireNotNull(frequency)) else values.getValue(field.path), field.placement)
+            val value = when (field.path) {
+                frequencyPath -> PAYMENT_FREQUENCY_LABELS.localized().getValue(requireNotNull(frequency))
+                in PAYMENT_BOOLEAN_PATHS -> PAYMENT_BOOLEAN_LABELS.localized().getValue(values.getValue(field.path))
+                else -> values.getValue(field.path)
+            }
+            PaymentConsentField(field.path, label.label, label.description, value, field.placement)
         },
     )
 }
@@ -161,6 +168,13 @@ private val CATALOGUE_LIMITS = mapOf(
 )
 
 // Wallet-owned value translations; issuer metadata remains authoritative for the field label/placement.
+private val PAYMENT_BOOLEAN_PATHS = setOf(listOf("amount_estimated"), listOf("amount_earmarked"), listOf("sct_inst"),
+    listOf("recurrence", "mit_options", "amount_variable"))
+private val PAYMENT_BOOLEAN_LABELS = mapOf(
+    "en" to mapOf("true" to "Yes", "false" to "No"),
+    "de" to mapOf("true" to "Ja", "false" to "Nein"),
+)
+
 private val PAYMENT_FREQUENCY_LABELS = mapOf(
     "en" to mapOf("INDA" to "Several times a day", "DAIL" to "Daily", "WEEK" to "Weekly", "TOWK" to "Every two weeks",
         "TWMN" to "Twice a month", "MNTH" to "Monthly", "TOMN" to "Every two months", "QUTR" to "Quarterly",

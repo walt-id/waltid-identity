@@ -57,5 +57,7 @@ the matching and verification code above only knows type strings.
 
 Profile responses project the stored DTO into `TransactionDataProfileResponse`, adding optional
 read-only `payloadSchema` for the built-in payment type. Storage/configuration and CRUD inputs
-remain `TransactionDataProfile`. Updated DTO readers ignore unknown response properties.
+remain `TransactionDataProfile`. Response consumers use the projected DTO; stored-profile decoding remains strict.
 See `docs/ts12-sca-payment-demo.md` for the full payload and upstream-drift maintenance contract.
+
+All four timestamps share RFC 3339 format assertion, including offset hours up to 23 and arbitrary fractional digits. Original timestamp text is retained. Deadline comparisons use nanosecond clock precision; leap-second fractions conservatively collapse to the following UTC midnight. UI date formatters retain the original text when their supported representation cannot format it exactly.
