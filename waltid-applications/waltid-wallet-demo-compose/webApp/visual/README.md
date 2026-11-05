@@ -1,9 +1,11 @@
-# Browser account visual pilot
+# Browser wallet visual checks
 
 This small [Playwright comparison lane](https://playwright.dev/docs/test-snapshots) runs the
 production Wasm host. It covers the browser-specific account form at compact/wide widths,
-busy submission, invalid credentials, registration conflict and expired sessions. Shared wallet
-content stays in the [mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md).
+busy submission, invalid credentials, registration conflict and expired sessions. Credential-details
+cases also exercise browser-local timestamp formatting at compact/wide widths, including the two
+02:30 instants in Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
+Other shared wallet content stays in the [mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md).
 The [browser catalogue](catalogue.json) records exact states, requirements and environment.
 
 The tests intercept only synthetic local account/wallet HTTP requests. They exercise the actual
@@ -14,6 +16,11 @@ responses cannot skip the intermediate state. No application test route, separat
 account is needed. Real API2 authentication and protocol tests remain separate evidence.
 A separate immediate-response interaction case uses actual canvas pointer/backing-editor input to
 prove that registration failure restores editable fields and permits a retry with new credentials.
+Credential cases open the real stored card through the API2 mapper, shared normalizer and browser
+Intl adapter. Their catalogue entries explicitly override the default locale/timezone with en-GB
+and Europe/Budapest. No date formatter is copied into the test harness. The browser CI lane also
+runs the shared date/claim unit vectors in Wasm, covering DST gaps, non-hour offsets, local date
+rollover, BCE, fixed zones and locale-specific fractions that do not each need a screenshot.
 
 From the Identity repository:
 

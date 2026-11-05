@@ -813,3 +813,19 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | Browser |
 | --- |
 | <img src="../../waltid-wallet-demo-compose/webApp/visual/snapshots/account-expired-compact.png" alt="account · expired · compact, Browser" width="240"> |
+
+## credential-dates-compact
+
+**credential · dates · compact**
+
+| Browser |
+| --- |
+| <img src="../../waltid-wallet-demo-compose/webApp/visual/snapshots/credential-dates-compact.png" alt="credential · dates · compact, Browser" width="240"><br>393×852, en-GB, Europe/Budapest |
+
+## credential-dates-wide
+
+**credential · dates · wide**
+
+| Browser |
+| --- |
+| <img src="../../waltid-wallet-demo-compose/webApp/visual/snapshots/credential-dates-wide.png" alt="credential · dates · wide, Browser" width="240"><br>1280×900, en-GB, Europe/Budapest |
