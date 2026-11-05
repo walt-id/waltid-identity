@@ -121,15 +121,15 @@ class VPCreateCmd : CliktCommand(name = "create") {
                 JsonArray(queryMatches.map { match ->
                     val credential = (match.credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
                         ?: error("DCQL match did not retain its parsed credential")
-                    require(credential.format == "jwt_vc_json") {
-                        "vp create currently supports jwt_vc_json only; ${credential.format} requires format-specific holder binding/session data"
-                    }
                     val signature = VCUtil.verify(credential, VCUtil.policies(listOf("signature"), emptyMap())).single()
                     require(signature.result.isSuccess) {
                         "Credential signature verification failed: ${signature.result.exceptionOrNull()?.message}"
                     }
                     if (match.originalQuery.requireCryptographicHolderBinding) {
                         CredentialHolderBinding.requireBoundToPresenter(credential, holderDid, holderKey)
+                    }
+                    require(credential.format == "jwt_vc_json") {
+                        "vp create currently supports jwt_vc_json only; ${credential.format} requires format-specific holder binding/session data"
                     }
                     require(
                         credential !is SelectivelyDisclosableVerifiableCredential || credential.disclosures.isNullOrEmpty()
