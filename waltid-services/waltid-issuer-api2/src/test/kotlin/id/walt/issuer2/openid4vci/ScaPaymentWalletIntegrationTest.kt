@@ -125,7 +125,9 @@ class ScaPaymentWalletIntegrationTest {
         val issuerKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ProfilesConfig>()
             .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
         paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
-            issuerKey.getPublicKey().exportJWK(), missingMetadata != null, attester, extra)
+            issuerKey.getPublicKey().exportJWK(),
+            "Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.",
+            missingMetadata != null, attester, extra)
     }
 
     @Test
@@ -141,13 +143,15 @@ class ScaPaymentWalletIntegrationTest {
         }.use { http ->
             // Pin the same public verification key as the demos, independently of the received credential.
             val issuerPublicJwk = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
-            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk) }
+            // Keep the deployed metadata expectation until the rollout tracked by WAL-1665.
+            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk,
+                "Prüfen Sie Empfänger und Betrag vor der Bestätigung.") }
         }
     }
 
     private suspend fun paymentFlow(
         http: HttpClient, issuerBase: String, verifierBase: String,
-        issuerPublicJwk: String, missingLabel: Boolean = false,
+        issuerPublicJwk: String, expectedSecurityHint: String, missingLabel: Boolean = false,
         attester: Issuer2TestKeyAttester? = null,
         extra: JsonObject? = null,
     ) {
@@ -250,7 +254,7 @@ class ScaPaymentWalletIntegrationTest {
             val payment = prepared.payment
             assertEquals("de", payment.locale)
             assertEquals("Diese Zahlung bestätigen", payment.title)
-            assertEquals("Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.", payment.securityHint)
+            assertEquals(expectedSecurityHint, payment.securityHint)
             assertEquals("Zahlung bestätigen", payment.affirmativeAction)
             assertEquals("Zahlung abbrechen", payment.denialAction)
             val fields = payment.fields.associateBy { it.path }
