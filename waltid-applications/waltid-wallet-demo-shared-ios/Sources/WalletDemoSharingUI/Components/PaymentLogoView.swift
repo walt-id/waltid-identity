@@ -9,35 +9,19 @@ func paymentWebsite(_ value: String) -> URL? {
 }
 
 struct PaymentLogoView: View {
-    let source: String
+    let image: UIImage
     let label: String
     let description: String?
-    let allowRemote: Bool
-    @State private var image: UIImage?
-    @State private var loadedRequest: LoadRequest?
 
     var body: some View {
-        Group {
-            if let image, loadedRequest == LoadRequest(source: source, allowRemote: allowRemote) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(label).font(.caption)
-                    Image(uiImage: image).resizable().scaledToFit().frame(width: 56, height: 56)
-                        .accessibilityLabel(label).accessibilityIdentifier("payment-payee-logo")
-                        .preference(key: CredentialImageReadinessKey.self, value: ["payment-payee-logo"])
-                    if let description { Text(description).font(.caption) }
-                }.frame(maxWidth: 80)
-            }
-        }.task(id: LoadRequest(source: source, allowRemote: allowRemote)) {
-            image = nil
-            let loaded = await loadPaymentLogo(source, allowRemote: allowRemote)
-            if !Task.isCancelled {
-                loadedRequest = LoadRequest(source: source, allowRemote: allowRemote)
-                image = loaded
-            }
-        }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption)
+            Image(uiImage: image).resizable().scaledToFit().frame(width: 56, height: 56)
+                .accessibilityLabel(label).accessibilityIdentifier("payment-payee-logo")
+                .preference(key: CredentialImageReadinessKey.self, value: ["payment-payee-logo"])
+            if let description { Text(description).font(.caption) }
+        }.frame(maxWidth: 80)
     }
-
-    private struct LoadRequest: Equatable { let source: String; let allowRemote: Bool }
 }
 
 private let maxPaymentLogoBytes = 524_288
