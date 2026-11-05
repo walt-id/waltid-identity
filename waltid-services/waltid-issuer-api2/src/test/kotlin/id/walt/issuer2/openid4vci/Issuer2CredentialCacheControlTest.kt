@@ -27,7 +27,7 @@ class Issuer2CredentialCacheControlTest {
                 setBody(body)
             }
             assertEquals(if (body == "{") HttpStatusCode.BadRequest else HttpStatusCode.Unauthorized, response.status)
-            assertEquals("no-store", response.headers["Cache-Control"])
+            assertEquals(listOf("no-store"), response.headers.getAll("Cache-Control"))
         }
         val metadata = client.post("/openid4vci/nonexistent")
         assertEquals(HttpStatusCode.NotFound, metadata.status)

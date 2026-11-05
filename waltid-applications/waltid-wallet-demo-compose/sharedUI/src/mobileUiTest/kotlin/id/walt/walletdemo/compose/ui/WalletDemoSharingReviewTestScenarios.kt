@@ -74,7 +74,7 @@ class WalletDemoSharingReviewTestScenarios {
             WalletDemoSharingReviewScreen(review = review, title = "Share credentials", compact = false,
                 onSubmit = { submitted = it }, onCancel = {})
         }
-        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[0].selection.id)).assertIsSelected()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[0].selection.id)).performScrollToContent(this).assertIsSelected()
         onNodeWithText("Credential information").assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(city.selection.id)).performScrollToContent(this).assertIsNotSelected().performClick()
         onNodeWithText("Lovelace").performScrollToContent(this).assertIsDisplayed()
