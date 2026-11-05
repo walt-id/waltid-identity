@@ -133,17 +133,20 @@ false/zero values and exact decimal tokens, and generate future dates for exampl
 ### App-reviewed payment display
 
 Compose Android, Compose iOS and native SwiftUI group payee fields in one card, with
-level-3 fields under **Payee details**. Amount and ISO currency code share one row,
-including at large text sizes, with both issuer labels and the exact amount visible.
+level-3 fields under **Payee details**. The exact amount and ISO currency code share
+one row under the amount label, including at large text sizes.
 They wrap only when the content cannot fit the available width. Required recurring
-terms remain on the main review; PISP information is grouped within **Payment details**. Grouping never demotes a field
-from its issuer-defined visibility, and level-4 fields remain hidden.
+terms remain on the main review; PISP information is grouped within **Payment details**.
+Grouping never demotes a value from its issuer-defined visibility, and level-4 fields
+remain hidden. The demo's [caption policy](../waltid-applications/waltid-wallet-demo-test-fixtures/visual/payment-consent.md)
+documents the TS12 rulebook permission needed to omit the two redundant labels in production.
 
 The shared wallet resolves frequency and Boolean values in the selected consent
 language: English or German, including regional fallback. Missing complete translations
 block authorization; raw codes or `true`/`false` are not display fallbacks.
 
-A valid embedded PNG/JPEG payee logo appears beside the payee name. Remote HTTPS
+A valid embedded PNG/JPEG payee logo appears beside the payee name without a visible
+logo caption; its issuer label remains available to assistive technology. Remote HTTPS
 logos require an explicit **Load payee logo** action and use no cookies, credentials
 or redirects. Images are bounded to 512 KiB and 2048 pixels per dimension. Missing,
 unsupported or failed images leave no placeholder; branding does not establish payee

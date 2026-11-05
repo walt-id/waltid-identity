@@ -805,6 +805,8 @@ internal class WalletVisualScenarios(
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag("payment-payee-logo").fetchSemanticsNodes().isNotEmpty()
         }
+        onNodeWithText("Payee logo").assertDoesNotExist()
+        onNodeWithText("Currency").assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithText(if (recurring) "Monthly" else "Execution date and time").performScrollToContent(this).assertIsDisplayed()
         if (!recurring) {
@@ -826,8 +828,12 @@ internal class WalletVisualScenarios(
             onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
             if (details) capture("$id.details")
             consent.fields.forEach { field ->
-                onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
-                    .performScrollToContent(this).assertIsDisplayed()
+                when (field.path) {
+                    listOf("payee", "logo") -> onNodeWithTag("payment-payee-logo").performScrollToContent(this).assertIsDisplayed()
+                    listOf("currency") -> onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+                    else -> onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
+                        .performScrollToContent(this).assertIsDisplayed()
+                }
             }
         }
         onNodeWithText("Cancel payment").assertIsDisplayed().performClick()

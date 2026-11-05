@@ -93,35 +93,47 @@ private struct PaymentMoney: View {
     let fields: [PaymentDisplayField]
 
     var body: some View {
-        Group {
-            if #available(iOS 16, *) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 16) { values }.fixedSize(horizontal: true, vertical: false)
-                    VStack(alignment: .leading, spacing: 12) { values }
+        VStack(alignment: .leading, spacing: 4) {
+            if let first = fields.first { Text(first.item.label).font(.subheadline) }
+            Group {
+                if #available(iOS 16, *) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) { values }.fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 4) { values }
+                    }
+                } else {
+                    LegacyWalletAdaptiveRow(verticalSpacing: 4, alignment: .leading, verticalAlignment: .firstTextBaseline) { values }
                 }
-            } else {
-                LegacyWalletAdaptiveRow(spacing: 16, verticalSpacing: 12, alignment: .leading, verticalAlignment: .top) { values }
+            }
+            ForEach(fields) { field in
+                if let description = field.description { Text(description).font(.callout) }
             }
         }.padding().frame(maxWidth: .infinity, alignment: .leading)
             .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var values: some View {
-        ForEach(fields) { fieldView($0, prominent: $0.placement == .prominent) }
+        ForEach(fields) { fieldValue($0, prominent: $0.placement == .prominent) }
     }
 }
 
 private func fieldView(_ field: PaymentDisplayField, prominent: Bool) -> some View {
     VStack(alignment: .leading, spacing: 4) {
         Text(field.item.label).font(.subheadline)
-        if field.isWebsite, let value = field.item.rawValue, let url = paymentWebsite(value) {
-            Link(destination: url) { Text(value + " ↗") }.frame(minHeight: 44, alignment: .leading)
-        } else {
-            ClaimValueView(value: field.item.value, path: field.item.path,
-                textFont: prominent ? .title3.weight(.semibold) : .body).textSelection(.enabled)
-        }
+        fieldValue(field, prominent: prominent)
         if let description = field.description { Text(description).font(.callout) }
     }.fixedSize(horizontal: false, vertical: true)
+}
+
+@ViewBuilder
+private func fieldValue(_ field: PaymentDisplayField, prominent: Bool) -> some View {
+    if field.isWebsite, let value = field.item.rawValue, let url = paymentWebsite(value) {
+        Link(destination: url) { Text(value + " ↗") }.frame(minHeight: 44, alignment: .leading)
+    } else {
+        ClaimValueView(value: field.item.value, path: field.item.path,
+            textFont: prominent ? .title3.weight(.semibold) : .body)
+            .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+    }
 }
 
 private struct PaymentPayee: View {
