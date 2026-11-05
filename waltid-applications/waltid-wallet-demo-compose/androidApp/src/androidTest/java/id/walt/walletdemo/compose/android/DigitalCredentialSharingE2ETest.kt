@@ -927,7 +927,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             runCatching { context.packageManager.getPackageInfo("com.google.android.gms", 0) }.isSuccess
 
         private const val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
-        private const val EUDI_PID_SD_JWT_VCT = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
+        private const val EUDI_PID_SD_JWT_VCT = "urn:eudi:pid:1"
         private const val SCA_DOC_TYPE = "eu.europa.ec.eudi.sca.payment_card.1"
         private const val SCA_CREDENTIAL_QUERY_ID = "sca_payment_card"
         private const val AGE_DOC_TYPE = "eu.europa.ec.av.1"
