@@ -7,6 +7,8 @@ import id.walt.issuer2.models.CredentialOfferRequestBody
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.ktornotifications.core.KtorSessionNotifications.WebhookRetryPolicy
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
@@ -156,6 +158,23 @@ object Issuer2RequestExamples {
                     }
                 }
             },
+        ),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        valueMode = CredentialOfferValueMode.BY_REFERENCE,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            notifications = IssuanceNotifications(
+                webhook = IssuanceNotifications.WebhookNotification(
+                    url = "https://example.com/webhook/issuance-status",
+                    retryPolicy = WebhookRetryPolicy(
+                        maxAttempts = 8,
+                        initialBackoffSeconds = 2,
+                        maxBackoffSeconds = 120,
+                        backoffMultiplier = 2.0,
+                    ),
+                ),
+            ),
         ),
     )
 
@@ -550,6 +569,7 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][by-reference][expires in 2 minutes]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY,
         "[pre-authorized][single][by-reference][no expiry]" to PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
         "[pre-authorized][single][by-reference][credentialData override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][webhook runtime override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE,
         "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
         "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
         "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
