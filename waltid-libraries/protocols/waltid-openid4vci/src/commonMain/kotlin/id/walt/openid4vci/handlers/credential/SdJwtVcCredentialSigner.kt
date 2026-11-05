@@ -17,6 +17,7 @@ import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDJwtVerificationException
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
@@ -100,17 +101,14 @@ object SdJwtVcCredentialSigner {
         val holderKeyJson = exportHolderJwk(binding.holderKey)
         val holderDid = binding.holderDid
 
-        val sdPayload = SDPayload.createSDPayload(
-            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
-                mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = issuanceTemplateContext(
-                    issuerId = issuerId,
-                    subjectDid = holderDid,
-                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
-                ),
-                data = issuanceDataFunctions()
+        val credentialClaims = credentialData.mergeSDJwtVCPayloadWithMapping(
+            mapping = dataMapping ?: JsonObject(emptyMap()),
+            context = issuanceTemplateContext(
+                issuerId = issuerId,
+                subjectDid = holderDid,
+                display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
             ),
-            disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
+            data = issuanceDataFunctions()
         )
 
         val defaultPayloadProperties = defaultPayloadProperties(
@@ -128,11 +126,17 @@ object SdJwtVcCredentialSigner {
         }
 
 
-        val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload =
-            sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
-
-        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val clearClaims = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val disclosureMap = selectiveDisclosure
+            ?.let { SDMap(it.fields - clearClaims.keys, it.decoyMode, it.decoys) }
+            ?: SDMap(mapOf())
+        val sdPayload = SDPayload.createSDPayload(
+            fullPayload = JsonObject(credentialClaims + clearClaims),
+            disclosureMap = disclosureMap
+        )
+        if (!sdPayload.verifyDisclosures()) {
+            throw SDJwtVerificationException("Credential claims break SD-JWT processing (RFC 9901 §7.1)")
+        }
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
@@ -151,12 +155,7 @@ object SdJwtVcCredentialSigner {
             }))
         } ?: mapOf())
 
-        val finalSdPayload = SDPayload.createSDPayload(
-            fullPayload = fullPayload,
-            undisclosedPayload = undisclosedPayload
-        )
-
-        val signable = finalSdPayload.undisclosedPayload.toString().encodeToByteArray()
+        val signable = sdPayload.undisclosedPayload.toString().encodeToByteArray()
         val jwt = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> issuerSigningKey.key.signJws(signable, headers)
             is IssuerSigningKey.Crypto2 -> CompactJws.sign(
@@ -170,7 +169,7 @@ object SdJwtVcCredentialSigner {
         val sdJwtVC = SDJwtVC(
             sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
-                sdPayload = finalSdPayload
+                sdPayload = sdPayload
             )
         )
 
