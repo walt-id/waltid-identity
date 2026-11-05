@@ -241,34 +241,16 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.links["https://shop.example ↗"].exists)
         let cancel = app.buttons["wallet.presentationRejectButton"]
         let confirm = app.buttons["wallet.presentationSubmitButton"]
-        let header = app.navigationBars["Share credentials"]
-        func reveal(_ element: XCUIElement) {
-            func visible() -> Bool {
-                element.isHittable && element.frame.minY >= header.frame.maxY + 8
-                    && element.frame.maxY <= cancel.frame.minY - 32
-            }
-            // Full-screen swipes can overshoot a row under the navigation bar at large text sizes.
-            for _ in 0..<20 where !visible() {
-                let top = header.frame.maxY + 8
-                let bottom = cancel.frame.minY - 32
-                let origin = app.coordinate(withNormalizedOffset: .zero)
-                let start = origin.withOffset(CGVector(dx: app.frame.midX, dy: (top + bottom) / 2))
-                let direction: CGFloat = element.frame.minY < top ? 1 : -1
-                let end = start.withOffset(CGVector(dx: 0, dy: direction * (bottom - top) / 3))
-                start.press(forDuration: 0.01, thenDragTo: end)
-            }
-            XCTAssertTrue(visible(), "Review control must be uncovered before interaction: \(element.identifier)")
-        }
         let amount = app.staticTexts["11.56"].firstMatch
         let currency = app.staticTexts["EUR"].firstMatch
         XCTAssertFalse(app.staticTexts["Currency"].exists)
         XCTAssertFalse(app.staticTexts["Payee logo"].exists)
-        reveal(amount)
+        revealReviewElement(amount, in: app)
         XCTAssertEqual(amount.frame.midY, currency.frame.midY, accuracy: 1,
             "Amount and currency stay on one line when they fit, including at large text sizes")
         XCTAssertLessThanOrEqual(amount.frame.maxX, currency.frame.minX)
         let payeeDetails = app.buttons["payment-payee-details-toggle"]
-        reveal(payeeDetails)
+        revealReviewElement(payeeDetails, in: app)
         payeeDetails.tap()
         XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5))
         if !largeText {
@@ -281,13 +263,13 @@ final class MockWalletUITests: XCTestCase {
         if largeText { XCTAssertLessThan(cancel.frame.maxY, confirm.frame.minY) }
         else { XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1) }
         let details = app.buttons["payment-details-toggle"]
-        reveal(details)
+        revealReviewElement(details, in: app)
         XCTAssertTrue(app.staticTexts["9007199254740993.01"].exists)
         XCTAssertTrue(app.staticTexts["0.1234567890123456789"].exists)
         details.tap()
         XCTAssertEqual(details.value as? String, "Expanded")
         let transaction = app.staticTexts["recurring-ui-test"]
-        reveal(transaction)
+        revealReviewElement(transaction, in: app)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "recurring-payment-expanded-details"; capture.lifetime = .keepAlways; add(capture)
         XCTAssertTrue(transaction.isHittable, app.debugDescription)
@@ -296,6 +278,27 @@ final class MockWalletUITests: XCTestCase {
         ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Cancel payment")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
+    }
+
+    private func revealReviewElement(_ element: XCUIElement, in app: XCUIApplication) {
+        let header = app.navigationBars["Share credentials"]
+        let footer = app.otherElements["wallet.footer"]
+        XCTAssertTrue(header.exists && footer.exists)
+        func visible() -> Bool {
+            element.isHittable && element.frame.minY >= header.frame.maxY + 8
+                && element.frame.maxY <= footer.frame.minY - 8
+        }
+        // Hittability alone can include content underneath the fixed footer.
+        for _ in 0..<20 where !visible() {
+            let top = header.frame.maxY + 8
+            let bottom = footer.frame.minY - 8
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: app.frame.midX, dy: (top + bottom) / 2))
+            let direction: CGFloat = element.frame.minY < top ? 1 : -1
+            let end = start.withOffset(CGVector(dx: 0, dy: direction * (bottom - top) / 3))
+            start.press(forDuration: 0.01, thenDragTo: end)
+        }
+        XCTAssertTrue(visible(), "Review control must be uncovered before interaction: \(element.identifier)")
     }
 
     func testMissingPaymentMetadataBlocksSharing() {
@@ -922,6 +925,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Portrait"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["$.portrait"].exists)
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
+        let image = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.claimImage.")).firstMatch
+        revealReviewElement(image, in: app)
         ui.tapElement(identifierPrefix: "wallet.claimImage.")
         ui.assertExists(identifierPrefix: "wallet.claimImageViewer.", timeout: 10)
         XCTAssertTrue(app.images["Full-screen credential image"].waitForExistence(timeout: 10))
