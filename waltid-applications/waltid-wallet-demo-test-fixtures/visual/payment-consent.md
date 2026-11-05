@@ -28,7 +28,8 @@ submission; native disclosure interaction retains its separate app-host test. Th
 not replace the shared validator, issuer-metadata or end-to-end proof tests.
 
 Payee identity and its details share a card. Amount and the ISO currency code share a row
-with both issuer labels; long values and large text can stack without truncation. Timing
+with both issuer labels, including at large text sizes. They wrap only when their actual
+content cannot fit the available width, without truncating either value. Timing
 and recurring terms keep their issuer-defined placement. Details group the PISP separately.
 
 Logos are optional display assets: a valid bounded PNG/JPEG is shown with its issuer label,

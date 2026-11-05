@@ -7,7 +7,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.LocalDensity
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -124,13 +123,10 @@ private fun PaymentPayee(fields: List<WalletDemoPaymentDisplayField>) {
 @Composable
 private fun PaymentMoney(fields: List<WalletDemoPaymentDisplayField>) {
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
-            if (maxWidth < 260.dp || LocalDensity.current.fontScale > 1.3f || fields.any { it.item.rawValue.orEmpty().length > 18 }) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    fields.forEach { PaymentField(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent) }
-                }
-            } else Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                fields.forEach { PaymentField(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent, Modifier.weight(1f)) }
+        FlowRow(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            fields.forEach {
+                PaymentField(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent, Modifier.width(IntrinsicSize.Max))
             }
         }
     }

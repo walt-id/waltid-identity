@@ -133,10 +133,10 @@ false/zero values and exact decimal tokens, and generate future dates for exampl
 ### App-reviewed payment display
 
 Compose Android, Compose iOS and native SwiftUI group payee fields in one card, with
-level-3 fields under **Payee details**. Amount and ISO currency code share a card;
-both issuer labels and the exact amount remain visible. Large text or long amounts
-use a vertical layout. Required recurring terms remain on the main review; PISP
-information is grouped within **Payment details**. Grouping never demotes a field
+level-3 fields under **Payee details**. Amount and ISO currency code share one row,
+including at large text sizes, with both issuer labels and the exact amount visible.
+They wrap only when the content cannot fit the available width. Required recurring
+terms remain on the main review; PISP information is grouped within **Payment details**. Grouping never demotes a field
 from its issuer-defined visibility, and level-4 fields remain hidden.
 
 The shared wallet resolves frequency and Boolean values in the selected consent

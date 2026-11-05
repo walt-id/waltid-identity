@@ -34,7 +34,6 @@ struct PaymentConsentView: View {
 
 /// Both payment sources use the same hierarchy, field renderer and detail controls.
 private struct PaymentReviewContent: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let payment: PaymentDisplay
     var detailsInitiallyExpanded = false
 
@@ -53,21 +52,7 @@ private struct PaymentReviewContent: View {
             }
             let money = fields.filter { $0.group == .amount && $0.placement != .details }
                 .sorted { ($0.paymentPath == ["amount"] ? 0 : 1) < ($1.paymentPath == ["amount"] ? 0 : 1) }
-            if !money.isEmpty {
-                Group {
-                    if dynamicTypeSize >= .xxLarge || money.contains(where: { ($0.item.rawValue ?? "").count > 18 }) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            ForEach(money) { fieldView($0, prominent: $0.placement == .prominent) }
-                        }
-                    } else {
-                        HStack(alignment: .top, spacing: 16) {
-                            ForEach(money) { fieldView($0, prominent: $0.placement == .prominent)
-                                .frame(maxWidth: .infinity, alignment: .leading) }
-                        }
-                    }
-                }.padding().frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            }
+            if !money.isEmpty { PaymentMoney(fields: money) }
             let remaining = fields.filter { field in field.group != .payee && !money.contains(where: { $0.id == field.id }) }
             ForEach(remaining.filter { $0.placement == .prominent }) { field in
                 fieldView(field, prominent: true).padding().frame(maxWidth: .infinity, alignment: .leading)
@@ -102,6 +87,28 @@ private struct PaymentReviewContent: View {
         .accessibilityIdentifier("payment-consent")
     }
 
+}
+
+private struct PaymentMoney: View {
+    let fields: [PaymentDisplayField]
+
+    var body: some View {
+        Group {
+            if #available(iOS 16, *) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 16) { values }.fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 12) { values }
+                }
+            } else {
+                LegacyWalletAdaptiveRow(spacing: 16, verticalSpacing: 12, alignment: .leading, verticalAlignment: .top) { values }
+            }
+        }.padding().frame(maxWidth: .infinity, alignment: .leading)
+            .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var values: some View {
+        ForEach(fields) { fieldView($0, prominent: $0.placement == .prominent) }
+    }
 }
 
 private func fieldView(_ field: PaymentDisplayField, prominent: Bool) -> some View {

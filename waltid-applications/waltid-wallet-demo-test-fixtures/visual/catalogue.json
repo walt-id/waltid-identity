@@ -702,7 +702,7 @@
       "swiftTest": "testScheduledPaymentDetails",
       "title": "Scheduled payment details",
       "requirements": [
-        "Expanded transaction and PISP details with URI values displayed as text"
+        "Expanded transaction and PISP details with an actionable payee website"
       ],
       "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
     },
