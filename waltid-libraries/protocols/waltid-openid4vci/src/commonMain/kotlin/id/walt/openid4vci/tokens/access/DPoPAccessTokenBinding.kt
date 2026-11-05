@@ -17,6 +17,10 @@ internal fun AccessTokenRequest.dpopAccessTokenClaims(): Map<String, Any?> =
         )
     }.orEmpty()
 
+/** Confidential clients continue to authenticate refresh requests using their registered method. */
+internal fun AccessTokenRequest.refreshTokenDpopBinding(): String? =
+    dpopJwkThumbprint.takeIf { authenticatedClient?.authenticationMethod.let { it == null || it == "none" } }
+
 internal fun AccessTokenRequest.accessTokenType(): String =
     if (dpopJwkThumbprint == null) TOKEN_TYPE_BEARER else TOKEN_TYPE_DPOP
 

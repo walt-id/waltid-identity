@@ -1,5 +1,7 @@
 package id.walt.openid4vci
 
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -86,11 +88,21 @@ class ProviderCredentialPreparationTest {
         assertEquals(listOf("proof"), steps)
     }
 
+    @Test
+    fun `accepted requests persist public bindings and never revalidate the original proof`() = runTest {
+        for (crypto2 in listOf(false, true)) {
+            val steps = mutableListOf<String>()
+            assertIs<CredentialResponseResult.Success>(issue(crypto2, steps, deferred = true))
+            assertEquals(listOf("proof", "bindings", "bindings", "allocate", "sign"), steps)
+        }
+    }
+
     /** Custom collaborators isolate provider orchestration; cryptographic proof tests cover evidence validation. */
     private suspend fun issue(
         crypto2: Boolean,
         steps: MutableList<String>,
         supportsCrypto2: Boolean = true,
+        deferred: Boolean = false,
         onStep: (String) -> Unit = {},
     ): CredentialResponseResult {
         fun step(name: String) { steps += name; onStep(name) }
@@ -109,9 +121,9 @@ class ProviderCredentialPreparationTest {
                 listOf(object : VerifiedCredentialProof { override val proofType = ProofType.JWT }), listOf(binding),
             )
         })
-        fun sign(batch: CredentialIssuanceBatch): CredentialResponseResult {
+        suspend fun sign(batch: CredentialIssuanceBatch): CredentialResponseResult {
             step("sign")
-            assertEquals(listOf(binding), batch.bindings)
+            assertEquals(listOf(Jwk.sha256Thumbprint(binding.holderKey.exportPublicJwk())), batch.bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
             assertEquals(1, batch.inputs.size)
             return CredentialResponseResult.Success(CredentialResponse(credentials = listOf(IssuedCredential(JsonPrimitive("issued")))))
         }
@@ -119,7 +131,7 @@ class ProviderCredentialPreparationTest {
         val legacyWithValidation = object : CredentialEndpointHandler by legacy {
             override suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {
                 step("bindings")
-                assertEquals(listOf(binding), bindings)
+                assertEquals(listOf(Jwk.sha256Thumbprint(binding.holderKey.exportPublicJwk())), bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
             }
         }
         val crypto2Handler = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ -> sign(batch) }
@@ -139,11 +151,19 @@ class ProviderCredentialPreparationTest {
             List(count) { CredentialIssuanceInput(buildJsonObject {}) }
         }
         val context = CredentialProofValidationContext("https://issuer.example")
+        val issuanceRequest = if (deferred) {
+            val accepted = provider.acceptCredentialRequest(request, configuration, "credential-id", "identity", context)
+            val encoded = kotlinx.serialization.json.Json.encodeToString(accepted)
+            assertFalse(encoded.contains("handled-by-test-verifier"))
+            assertNull(accepted.request.proofs)
+            val restored = kotlinx.serialization.json.Json.decodeFromString<id.walt.openid4vci.requests.credential.AcceptedCredentialRequest>(encoded)
+            restored.restore()
+        } else request
         return if (crypto2) provider.createCredentialResponse(
-            request, configuration, Crypto2CredentialSigningKey.select(key, configuration), context.credentialIssuer,
+            issuanceRequest, configuration, Crypto2CredentialSigningKey.select(key, configuration), context.credentialIssuer,
             inputs, proofValidationContext = context,
         ) else provider.createCredentialResponse(
-            request, configuration, LegacyP256TestKey(key), context.credentialIssuer,
+            issuanceRequest, configuration, LegacyP256TestKey(key), context.credentialIssuer,
             inputs, proofValidationContext = context,
         )
     }
