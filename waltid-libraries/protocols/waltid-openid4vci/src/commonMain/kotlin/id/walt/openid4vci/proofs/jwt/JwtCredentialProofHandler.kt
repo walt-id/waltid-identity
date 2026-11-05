@@ -12,6 +12,7 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.resolver.DidVerificationMethodNotFoundException
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
@@ -307,6 +308,7 @@ class JwtCredentialProofHandler(
         }
             .recoverCatching { strictFailure ->
                 if (strictFailure is CancellationException) throw strictFailure
+                if (strictFailure !is DidVerificationMethodNotFoundException) throw strictFailure
                 resolveLegacyHolderDidKey(did, holderKid) ?: throw strictFailure
             }
             .getOrElse {
@@ -320,11 +322,12 @@ class JwtCredentialProofHandler(
      * Older wallets build the proof `kid` as `"$did#${key.getKeyId()}"`, i.e. with a JWK thumbprint
      * (or, for did:jwk, a KMS-path) fragment that does not exist in the DID document. This is not
      * OpenID4VCI compliant (Appendix F.1: the `kid` identifies a particular key in the DID document).
-     * The fallback is only accepted when it cannot select a different key than the wallet intended:
+     * The fallback runs only when no verification method has the requested ID and cannot
+     * select a different key than the wallet intended:
      * - did:jwk: the document contains exactly one key, so any fragment is accepted.
      * - other DIDs: the DID must expose exactly one signature-capable key, and the `kid` fragment
      *   must equal that key's RFC 7638 thumbprint. A `kid` naming an existing but unusable method
-     *   (e.g. a `keyAgreement` key) never matches, so it stays rejected.
+     *   (e.g. a `keyAgreement` key) is rejected before the fallback.
      *
      * TODO: remove once wallets send verification method IDs as proof `kid`.
      */
