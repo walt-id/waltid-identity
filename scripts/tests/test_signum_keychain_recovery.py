@@ -62,39 +62,61 @@ class KeychainReportTest(unittest.TestCase):
         self.assertEqual("1", xml.get("failures"))
         self.assertEqual("0", xml.get("errors"))
 
-    def test_incomplete_console_exit_keeps_status_and_publishes_failure_junit(self):
-        def launch(*args, **kwargs):
-            kwargs["stdout"].write(ONE)
-            return subprocess.CompletedProcess(args[0], 137)
+    def test_launch_results_require_observed_completion(self):
+        cases = ((ONE, 137, False, ["ownership.reopen"], "simctl exited with 137"),
+                 (PASSED, 0, False, [], "did not report"),
+                 (PASSED, 0, True, [], None))
+        for text, code, pid_reported, unfinished, reason in cases:
+            with self.subTest(code=code, pid_reported=pid_reported):
+                def launch(arguments, **kwargs):
+                    (self.output / "tests.log").write_text(text)
+                    if pid_reported:
+                        kwargs["stdout"].write(f"{runner.BUNDLE}: 123\n")
+                    return subprocess.CompletedProcess(arguments, code)
 
-        with patch.object(runner.subprocess, "run", side_effect=launch), \
-                patch.object(runner, "crash_diagnostics", return_value=[]), patch.object(runner.time, "sleep"), \
-                patch("builtins.print"):
-            with self.assertRaises(SystemExit):
-                runner.run("specific-device", self.output)
-        receipt = json.loads((self.output / "launch.json").read_text())
-        self.assertEqual(137, receipt["simctl_returncode"])
-        self.assertEqual(["ownership.reopen"], receipt["unfinished"])
-        self.assertEqual("1", ET.parse(self.output / "results.xml").getroot().get("errors"))
+                with patch.object(runner.subprocess, "run", side_effect=launch), \
+                        patch.object(runner.os, "kill", side_effect=[None, ProcessLookupError()]), \
+                        patch.object(runner, "crash_diagnostics", return_value=[]), \
+                        patch.object(runner.time, "sleep"), patch("builtins.print"):
+                    if reason is None:
+                        runner.run("specific-device", self.output)
+                    else:
+                        with self.assertRaisesRegex(SystemExit, reason):
+                            runner.run("specific-device", self.output)
+                receipt = json.loads((self.output / "launch.json").read_text())
+                self.assertEqual(reason is None, receipt["success"])
+                self.assertEqual(code, receipt["simctl_returncode"])
+                self.assertEqual(unfinished, receipt["unfinished"])
+                self.assertEqual("0" if reason is None else "1",
+                                 ET.parse(self.output / "results.xml").getroot().get("errors"))
 
     def test_timeout_keeps_partial_results_and_bounds_cleanup(self):
-        def command(arguments, **kwargs):
-            if "launch" in arguments:
-                kwargs["stdout"].write(ONE)
-                raise subprocess.TimeoutExpired(arguments, 120)
-            self.assertIn("terminate", arguments)
-            self.assertEqual(15, kwargs["timeout"])
-            raise subprocess.TimeoutExpired(arguments, 15)
+        for launch_timeout in (True, False):
+            with self.subTest(launch_timeout=launch_timeout):
+                def command(arguments, **kwargs):
+                    if "launch" in arguments:
+                        (self.output / "tests.log").write_text(ONE if launch_timeout else PASSED)
+                        if launch_timeout:
+                            raise subprocess.TimeoutExpired(arguments, 120)
+                        kwargs["stdout"].write(f"{runner.BUNDLE}: 123\n")
+                        return subprocess.CompletedProcess(arguments, 0)
+                    self.assertIn("terminate", arguments)
+                    self.assertEqual(15, kwargs["timeout"])
+                    raise subprocess.TimeoutExpired(arguments, 15)
 
-        with patch.object(runner.subprocess, "run", side_effect=command), \
-                patch.object(runner, "crash_diagnostics", return_value=[]), patch.object(runner.time, "sleep"), \
-                patch("builtins.print"):
-            with self.assertRaisesRegex(SystemExit, "exceeded 120"):
-                runner.run("specific-device", self.output)
-        receipt = json.loads((self.output / "launch.json").read_text())
-        self.assertIsNone(receipt["simctl_returncode"])
-        self.assertEqual("TimeoutExpired", receipt["cleanup_error"])
-        self.assertTrue((self.output / "results.xml").exists())
+                with patch.object(runner.subprocess, "run", side_effect=command), \
+                        patch.object(runner.os, "kill"), \
+                        patch.object(runner, "crash_diagnostics", return_value=[]), \
+                        patch.object(runner.time, "sleep"), \
+                        patch.object(runner.time, "monotonic", side_effect=[0, 121, 121]), \
+                        patch("builtins.print"):
+                    with self.assertRaisesRegex(SystemExit, "exceeded 120"):
+                        runner.run("specific-device", self.output)
+                receipt = json.loads((self.output / "launch.json").read_text())
+                self.assertEqual(None if launch_timeout else 0, receipt["simctl_returncode"])
+                self.assertFalse(receipt["success"])
+                self.assertEqual("TimeoutExpired", receipt["cleanup_error"])
+                self.assertTrue((self.output / "results.xml").exists())
 
     def test_crash_capture_keeps_termination_metadata_without_raw_private_values(self):
         reports = self.output / "Library/Logs/DiagnosticReports"

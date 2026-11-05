@@ -35,9 +35,11 @@ data class JsonSchemaPolicy(
         )
     }
 
-    suspend fun getCurrentSchema(): JsonObject {
+    suspend fun getCurrentSchema(): JsonObject = getCurrentSchema(schemaFetcher)
+
+    private suspend fun getCurrentSchema(fetcher: WebDataFetcher): JsonObject {
         return when {
-            schemaUrl != null -> schemaFetcher.fetch<JsonObject>(schemaUrl).body
+            schemaUrl != null -> fetcher.fetch<JsonObject>(schemaUrl).body
             schema != null -> schema
             else -> throw IllegalStateException("No schema defined")
         }
@@ -46,8 +48,14 @@ data class JsonSchemaPolicy(
     override suspend fun verify(
         credential: DigitalCredential,
         context: PolicyExecutionContext
+    ): Result<JsonElement> = verify(credential, context, schemaFetcher)
+
+    internal suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext,
+        fetcher: WebDataFetcher,
     ): Result<JsonElement> {
-        val currentSchema = getCurrentSchema()
+        val currentSchema = getCurrentSchema(fetcher)
 
         val jsonSchema = JsonSchema.fromJsonElement(currentSchema, defaultType)
         val errors = mutableListOf<ValidationError>()

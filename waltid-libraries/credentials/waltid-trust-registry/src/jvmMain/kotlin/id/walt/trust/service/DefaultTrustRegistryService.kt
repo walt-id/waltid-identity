@@ -135,7 +135,10 @@ class DefaultTrustRegistryService(
 
         // Backwards compatibility for fingerprint-only sources and credentials that
         // still contain their registered root. New sources should retain certificate DER.
-        for (certificate in certificateChainPemOrDer) {
+        // A registered fingerprint only counts for the leaf itself or for a presented
+        // certificate the leaf validates to; any other one says nothing about the signer.
+        for ((certificate, presentedCertificate) in certificateChainPemOrDer.zip(presentedCertificates)) {
+            if (!validateCertificatePath(presentedCertificates, presentedCertificate, instant)) continue
             val decision = resolveByCertificate(
                 certificate,
                 instant,

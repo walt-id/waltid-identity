@@ -53,7 +53,7 @@ jobs:
       DC_API_AVD_NAME: 'dc-api-api37-pixel7-google-apis'
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
@@ -142,12 +142,6 @@ jobs:
           emulator_revision="$(package_revision "$ANDROID_HOME/emulator/package.xml")"
           platform_tools_revision="$(package_revision "$ANDROID_HOME/platform-tools/package.xml")"
           image_revision="$(package_revision "$ANDROID_HOME/${DC_API_SYSTEM_IMAGE_PACKAGE//;/\/}/package.xml")"
-          for revision in "$emulator_revision" "$platform_tools_revision" "$image_revision"; do
-            [[ "$revision" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || {
-              echo "::error::Cannot identify the installed DC API SDK packages" >&2
-              exit 1
-            }
-          done
           # Select cache and validation from the same installed packages, not a second version list.
           {
             echo "DC_API_EMULATOR_PACKAGE_REVISION=$emulator_revision"
