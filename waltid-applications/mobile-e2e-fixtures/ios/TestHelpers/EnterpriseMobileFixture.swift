@@ -53,6 +53,7 @@ public struct EnterpriseMobileOffer {
     public let offerUrl: String
     public let txCode: String?
     public let attestation: EnterpriseMobileAttestation?
+    public let challengeTraceID: String?
 
     init(json: [String: Any]) throws {
         guard let offerUrl = json["offerUrl"] as? String else {
@@ -61,6 +62,7 @@ public struct EnterpriseMobileOffer {
         self.offerUrl = offerUrl
         self.txCode = json["txCode"] as? String
         self.attestation = try EnterpriseMobileAttestation(json: json["attestation"] as? [String: Any])
+        self.challengeTraceID = json["challengeTraceId"] as? String
     }
 }
 
@@ -85,6 +87,14 @@ public final class EnterpriseMobileFixture {
     public init(baseURL: URL, client: WalletE2EClient = WalletE2EClient()) {
         self.baseURL = baseURL
         self.client = client
+    }
+
+    public func challengeTrace(id: String) async throws -> [String: Int] {
+        let result = try await client.jsonRequest(url: baseURL.appendingPathComponent("challenge-traces").appendingPathComponent(id))
+        guard let counts = result as? [String: Int] else {
+            throw NSError(domain: "WalletE2E", code: 406, userInfo: [NSLocalizedDescriptionKey: "Invalid challenge trace"])
+        }
+        return counts
     }
 
     public func scenarios() async throws -> [EnterpriseMobileScenario] {

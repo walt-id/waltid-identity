@@ -69,8 +69,11 @@ object Verifier2AuthorizationRequestHandler {
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
             updateSessionCallback.invoke(this, event, block)
 
+        verificationSession.requireAvailable()
         verificationSession.updateSession(SessionEvent.authorization_request_requested) {
-            status = Verification2Session.VerificationSessionStatus.IN_USE
+            if (needsInUseTransition) {
+                status = Verification2Session.VerificationSessionStatus.IN_USE
+            }
         }
 
         val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
