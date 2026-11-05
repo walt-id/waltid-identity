@@ -32,6 +32,7 @@ import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.SDJwtVerificationException
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
@@ -730,13 +731,10 @@ object OpenID4VCI {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 
-        val sdPayload = SDPayload.createSDPayload(
-            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
-                mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
-                data = issuanceDataFunctions()
-            ),
-            disclosureMap = selectiveDisclosure ?: SDMap(mapOf()),
+        val credentialClaims = credentialData.mergeSDJwtVCPayloadWithMapping(
+            mapping = dataMapping ?: JsonObject(emptyMap()),
+            context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
+            data = issuanceDataFunctions()
         )
 
         val holderKeyJson = holderKey.exportJWKObject().plus(
@@ -763,10 +761,18 @@ object OpenID4VCI {
         }
 
 
-        val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
-
-        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        // Always in clear text, overriding credential claims of the same name
+        val clearClaims = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val disclosureMap = selectiveDisclosure
+            ?.let { SDMap(it.fields - clearClaims.keys, it.decoyMode, it.decoys) }
+            ?: SDMap(mapOf())
+        val sdPayload = SDPayload.createSDPayload(
+            fullPayload = JsonObject(credentialClaims + clearClaims),
+            disclosureMap = disclosureMap
+        )
+        if (!sdPayload.verifyDisclosures()) {
+            throw SDJwtVerificationException("Credential claims break SD-JWT processing (RFC 9901 §7.1)")
+        }
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
@@ -777,20 +783,15 @@ object OpenID4VCI {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf())
 
-        val finalSdPayload = SDPayload.createSDPayload(
-            fullPayload = fullPayload,
-            undisclosedPayload = undisclosedPayload
-        )
-
         val jwt = issuerKey.signJws(
-            plaintext = finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
+            plaintext = sdPayload.undisclosedPayload.toString().encodeToByteArray(),
             headers = headers.mapValues { it.value.toJsonElement() }
         )
 
         val sdJwtVC = SDJwtVC(
             sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
-                sdPayload = finalSdPayload
+                sdPayload = sdPayload
             )
         )
 

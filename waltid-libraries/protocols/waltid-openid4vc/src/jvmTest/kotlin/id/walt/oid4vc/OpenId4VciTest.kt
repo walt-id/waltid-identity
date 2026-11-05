@@ -18,7 +18,11 @@ import id.walt.oid4vc.responses.CredentialResponse
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.policies.policies.JwtSignaturePolicy
+import id.walt.sdjwt.ArrayElementDisclosure
+import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDJwtVerificationException
+import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.baseIssue
@@ -863,6 +867,62 @@ class OpenId4VciTest {
         assertFalse("https://www.w3.org/2018/credentials/v1" in contextV20Mixed, "V2.0 @context must not contain v1.1 URI even when present in input")
         assertTrue("https://www.w3.org/ns/credentials/v2" in contextV20Mixed, "V2.0 @context must retain v2 URI")
         assertTrue("https://purl.imsglobal.org/spec/ob/v3p0/context.json" in contextV20Mixed, "V2.0 @context must retain other context URIs")
+    }
+
+    private val sdJwtNationalities = buildJsonArray { add("DE"); add("FR"); add("AT") }
+
+    private suspend fun issueSdJwtVc(
+        sdMap: String,
+        data: JsonObject = buildJsonObject { put("given_name", "John"); put("nationalities", sdJwtNationalities) },
+    ): SDJwt {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val issuerId = "https://issuer.example"
+        val request = CredentialRequest(
+            format = CredentialFormat.sd_jwt_dc,
+            proof = ProofOfPossession.JWTProofBuilder(issuerId, keyJwk = holderKey.getPublicKey().exportJWKObject()).build(holderKey),
+            vct = "https://issuer.example/identity",
+        )
+        return SDJwt.parse(
+            OpenID4VCI.generateSdJwtVC(
+                credentialRequest = request,
+                credentialData = data,
+                issuerId = issuerId,
+                issuerKey = JWKKey.generate(KeyType.secp256r1),
+                selectiveDisclosure = Json.decodeFromString<SDMap>(sdMap),
+            )
+        )
+    }
+
+    @Test
+    fun sdJwtVcHiddenArrayKeepsItsHiddenElements() = runTest {
+        val sdJwt = issueSdJwtVc("""{"fields": {"nationalities": {"sd": true, "arrayChildren": {"wildcard": {"sd": true}}}}}""")
+
+        assertFalse("nationalities" in sdJwt.undisclosedPayload)
+        val array = sdJwt.disclosureObjects.filterIsInstance<ObjectPropertyDisclosure>().single { it.key == "nationalities" }.value.jsonArray
+        assertTrue(array.all { it is JsonObject && it.keys == setOf("...") })
+        assertEquals(3, sdJwt.disclosureObjects.filterIsInstance<ArrayElementDisclosure>().size)
+        assertEquals(sdJwtNationalities, sdJwt.fullPayload["nationalities"])
+    }
+
+    @Test
+    fun sdJwtVcArrayDecoysKeepTheElementsHidden() = runTest {
+        val sdJwt = issueSdJwtVc(
+            """{"fields": {"nationalities": {"sd": false, "arrayChildren": {
+                "wildcard": {"sd": true}, "decoyMode": "FIXED", "decoys": 2}}}}"""
+        )
+
+        val signed = sdJwt.undisclosedPayload.getValue("nationalities").jsonArray
+        assertEquals(5, signed.size)
+        assertTrue(signed.all { it is JsonObject && it.keys == setOf("...") })
+        assertEquals(sdJwtNationalities, sdJwt.fullPayload["nationalities"])
+    }
+
+    @Test
+    fun sdJwtVcClaimsBreakingSdJwtProcessingAreRejectedBeforeSigning() = runTest {
+        val malformed = buildJsonObject { putJsonObject("value") { put("_sd", "not-an-array") } }
+
+        assertFailsWith<SDJwtVerificationException> { issueSdJwtVc("""{"fields": {"value": {"sd": true}}}""", data = malformed) }
+        assertFailsWith<SDJwtVerificationException> { issueSdJwtVc("""{"fields": {}}""", data = malformed) }
     }
 
     private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {
