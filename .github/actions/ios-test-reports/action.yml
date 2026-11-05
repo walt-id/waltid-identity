@@ -104,15 +104,12 @@ runs:
       if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
       shell: bash
       run: |
-        # Remove the EHIC allowances when https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93 is resolved.
         python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
           --require-suite iosAppTests.xctest iosAppUITests.xctest \
           --require-class KeychainRecoveryContractTests WalletPersistenceSnippetsTests \
           --allow-skipped \
             'WalletIdentityRecoveryIntegrationTests#testAuthenticatedOrdinaryKeychainRecoveryPreservesOriginalIdentity' \
             'WalletIdentityRecoveryIntegrationTests#testSecureEnclaveGenerationIsHardwareGeneratedAndNotRecoverable' \
-            'MobileWalletIntegrationTests#testReceiveAndPresentEudiEhicSdJwtAgainstEudi' \
-            'MobileWalletIntegrationTests#testPreviewAndSubmitEudiEhicSdJwtAgainstEudi' \
           --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-ios*.xml"
 
     - name: Require Compose unit and UI test targets

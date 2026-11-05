@@ -38,10 +38,10 @@ class OSSVerifier2RequestUriPostIntegrationTest {
     @Test
     fun `request URI POST uses configured OSS service key and binds wallet nonce`() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         val configuredKey = KeyManager.resolveSerializedKeyBlocking(TEST_SIGNING_KEY)
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -49,7 +49,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                     OSSVerifier2ServiceConfig(
                         clientId = "configured-oss-verifier",
                         clientMetadata = ClientMetadata(clientName = "Configured OSS verifier"),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize",
                         key = Json.parseToJsonElement(TEST_SIGNING_KEY).jsonObject,
                     )
@@ -58,6 +58,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
             init = {},
             module = Application::verifierModule,
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val setup: VerificationSessionSetup = CrossDeviceFlowSetup(
                 core = GeneralFlowConfig(
