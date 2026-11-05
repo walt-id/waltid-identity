@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.token
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
@@ -97,5 +98,5 @@ sealed class AccessTokenResponseResult {
 data class AccessTokenResponseHttp(
     val status: Int,
     val payload: Map<String, JsonElement>,
-    val headers: Map<String, String> = emptyMap(),
+    val headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
 )

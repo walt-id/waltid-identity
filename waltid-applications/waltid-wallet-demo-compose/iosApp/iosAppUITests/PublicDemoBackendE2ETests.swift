@@ -562,8 +562,22 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode), dismiss: false)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        // The rejection is above the code input in the scrolling review.
-        app.otherElements["wallet.review.content"].swipeDown()
+        let retryEnabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"), object: app.buttons["wallet.offerAcceptButton"]
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [retryEnabled], timeout: credentialOperationTimeout), .completed)
+        // Reveal the rejection above the input. Stop as soon as it is visible: a full swipe
+        // can overscroll the review and dismiss the sheet instead of exposing the error.
+        let errorDetails = app.buttons["wallet.statusExpand"]
+        let reviewContent = app.otherElements["wallet.review.content"]
+        for _ in 0..<8 {
+            if errorDetails.exists && errorDetails.isHittable { break }
+            XCTAssertTrue(reviewContent.exists, "The rejected offer must remain open")
+            reviewContent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).press(
+                forDuration: 0.05,
+                thenDragTo: reviewContent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+            )
+        }
         let rejectedStatus = ui.waitForStatus(prefixes: ["Receive failed"], timeout: credentialOperationTimeout)
         guard rejectedStatus?.starts(with: "Receive failed") == true else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")

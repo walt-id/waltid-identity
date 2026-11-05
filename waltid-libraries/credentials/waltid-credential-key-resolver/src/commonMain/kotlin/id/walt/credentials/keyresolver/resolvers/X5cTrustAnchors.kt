@@ -16,7 +16,11 @@ import kotlinx.io.bytestring.ByteString
 object X5cTrustAnchors {
 
     /**
-     * Succeeds if every certificate in [x5c] is one of [trustRoots] or chains to one of them.
+     * Succeeds if the leaf of [x5c] is one of [trustRoots] or chains to one of them.
+     *
+     * The chain is validated up to the first certificate that is one of [trustRoots]; the
+     * certificates after it are ignored, so a pinned leaf or intermediate may still be presented
+     * with its own issuers.
      *
      * @param x5c the certificate chain from the token, leaf first, as PEM or base64-encoded DER
      * @param trustRoots trusted root or pinned certificates, as PEM or base64-encoded DER; must not be empty
@@ -25,9 +29,12 @@ object X5cTrustAnchors {
         require(x5c.isNotEmpty()) { "Certificate chain in 'x5c' must not be empty" }
         require(trustRoots.isNotEmpty()) { "No trust roots are configured for the 'x5c' certificate chain" }
 
+        val chain = x5c.map(::parseCertificate)
+        val anchors = trustRoots.map(::parseCertificate)
+        val anchorIndex = chain.indexOfFirst { certificate -> anchors.any { it.encodedDer == certificate.encodedDer } }
         val result = X509CertificateUtil.validateCertificateChain(
-            certificateChain = x5c.map(::parseCertificate),
-            trustOverride = InMemoryTrustStore(trustRoots.map(::parseCertificate)),
+            certificateChain = if (anchorIndex < 0) chain else chain.take(anchorIndex + 1),
+            trustOverride = InMemoryTrustStore(anchors),
         )
         check(result.valid) {
             "Certificate chain in 'x5c' does not chain to a configured trust root: " +

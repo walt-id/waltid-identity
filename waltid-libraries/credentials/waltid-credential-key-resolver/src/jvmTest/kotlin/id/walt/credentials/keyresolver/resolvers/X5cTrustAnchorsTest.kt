@@ -2,6 +2,7 @@ package id.walt.credentials.keyresolver.resolvers
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -40,6 +41,29 @@ class X5cTrustAnchorsTest {
         val leaf = issued(selfSigned("CN=Unconfigured root"), "CN=Pinned issuer")
 
         X5cTrustAnchors.validate(listOf(der(leaf.certificate)), listOf(der(leaf.certificate))).getOrThrow()
+    }
+
+    @Test
+    fun pinnedLeafPresentedWithItsIssuerIsTrusted() = runTest {
+        val root = selfSigned("CN=Unconfigured root")
+        val leaf = issued(root, "CN=Pinned issuer")
+
+        X5cTrustAnchors.validate(
+            listOf(der(leaf.certificate), der(root.certificate)),
+            listOf(der(leaf.certificate)),
+        ).getOrThrow()
+    }
+
+    @Test
+    fun leafUnderPinnedIntermediateIsTrusted() = runTest {
+        val root = selfSigned("CN=Unconfigured root")
+        val intermediate = issued(root, "CN=Pinned intermediate", ca = true)
+        val leaf = issued(intermediate, "CN=Issuer")
+
+        X5cTrustAnchors.validate(
+            listOf(der(leaf.certificate), der(intermediate.certificate), der(root.certificate)),
+            listOf(der(intermediate.certificate)),
+        ).getOrThrow()
     }
 
     @Test
@@ -111,12 +135,18 @@ class X5cTrustAnchorsTest {
         return Issued(key, X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) { subjectDn = dn })
     }
 
-    private suspend fun issued(issuer: Issued, dn: String, validity: X509Certificate.Validity? = null): Issued {
+    private suspend fun issued(
+        issuer: Issued,
+        dn: String,
+        validity: X509Certificate.Validity? = null,
+        ca: Boolean = false,
+    ): Issued {
         val key = generateKey(dn)
         val certificate = X509CertificateUtil.createCertificate(issuer.key, issuer.certificate, sigAlg) {
             subjectDn = dn
             subjectPublicKey(key)
             validity?.let { this.validity = it }
+            if (ca) extensionBasicConstraints { cA = true }
         }
         return Issued(key, certificate)
     }

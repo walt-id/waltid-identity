@@ -358,3 +358,21 @@ same immutable `credentialAuthorization` in `AccessTokenResponseResult.Success`.
 Refresh stores persist the initial `grantedAuthorizationDetails` and retain them
 through rotation; a narrower access token does not narrow the original refresh grant.
 The session's established selection and each token's authorization are distinct.
+
+### HTTP response cache headers
+
+HTTP response models supply endpoint-appropriate cache headers by default:
+
+```kotlin
+val response = NonceResponseHttp(status = 200, payload = noncePayload)
+// Forward response.status, response.payload, and response.headers to your HTTP framework.
+```
+
+Token, PAR, and credential responses default to `Cache-Control: no-store` and
+`Pragma: no-cache`; nonce and attestation challenge responses default to
+`Cache-Control: no-store` only. Explicit `headers` arguments replace these defaults.
+Provider error writers also preserve authentication and attestation challenge headers.
+
+For failures handled before the provider runs, route integrations can apply
+`OpenId4VciResponseHeaders.NO_STORE` from `id.walt.openid4vci.responses`.
+The library does not depend on a server framework.

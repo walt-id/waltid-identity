@@ -8,6 +8,7 @@ import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import id.walt.issuer2.models.singleIssuanceSessionDescriptor
+import id.walt.issuer2.models.multiIssuanceSessionDescriptor
 import io.github.smiley4.ktoropenapi.config.descriptors.array
 import io.github.smiley4.ktoropenapi.config.descriptors.SerialTypeDescriptor
 import io.github.smiley4.ktoropenapi.config.descriptors.anyOf
@@ -86,9 +87,13 @@ object Issuer2ManagementRoutesDocs {
             **Flow and expiry**
 
             - Both request formats support pre-authorized and authorization-code flows, by reference or by value.
-            - Authorization-code offers default to `issuerStateMode: OMIT`, matching Enterprise. Missing or null
+            - Immediate authorization-code offers default to `issuerStateMode: OMIT`, matching Enterprise. Missing or null
               `issuerStateMode` omits `issuer_state` in both request formats and both delivery modes.
-            - Runtime overrides require explicit `issuerStateMode: INCLUDE` for authorization-code offers.
+            - Set `deferred: true` to require backend approval using the returned `offerId`. Complete or deny
+              with a bodyless POST to `/issuer2/credential-offers/{offerId}/deferred/complete` or `/deny`.
+              Completion does not sign credentials. Deferred authorization-code offers default to INCLUDE
+              and reject explicit OMIT. The seven-day deferred deadline begins at first token issuance.
+            - For immediate offers, runtime overrides require explicit `issuerStateMode: INCLUDE` for authorization-code offers.
               Missing, null, or `OMIT` with overrides returns Bad Request.
             - Migration: send `"issuerStateMode": "INCLUDE"` to preserve previous OSS behavior and recover
               the original offer session. Without it, authorization creates a profile-derived session.
@@ -170,7 +175,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance sessions"
-                body(array(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>())))
+                body(array(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), SerialTypeDescriptor(multiIssuanceSessionDescriptor))))
             }
         }
     }
@@ -184,7 +189,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance session"
-                body(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>()))
+                body(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), SerialTypeDescriptor(multiIssuanceSessionDescriptor)))
             }
         }
     }

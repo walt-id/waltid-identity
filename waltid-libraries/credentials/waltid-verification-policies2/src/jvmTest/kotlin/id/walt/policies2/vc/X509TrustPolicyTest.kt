@@ -144,9 +144,12 @@ class X509TrustPolicyTest {
 
     @Test
     fun trustsPinnedSigningCertificate() = runTest {
-        val leaf = issued(selfSigned("CN=Unconfigured root"), "CN=Credential issuer")
+        val root = selfSigned("CN=Unconfigured root")
+        val leaf = issued(root, "CN=Credential issuer")
+        val policy = X509TrustPolicy(listOf(der(leaf)))
 
-        assertTrue(X509TrustPolicy(listOf(der(leaf))).verify(jwtCredential(leaf, sdJwt = true)).isSuccess)
+        assertTrue(policy.verify(jwtCredential(leaf, sdJwt = true)).isSuccess)
+        assertTrue(policy.verify(jwtCredential(leaf, sdJwt = true, chain = listOf(leaf, root))).isSuccess)
     }
 
     @Test
