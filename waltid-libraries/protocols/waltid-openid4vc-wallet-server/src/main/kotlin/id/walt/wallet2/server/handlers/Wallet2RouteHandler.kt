@@ -913,8 +913,8 @@ object Wallet2RouteHandler {
                 try {
                     call.respondFetchCredentialResult(WalletIssuanceHandler.fetchCredentials(wallet, req), req)
                 } catch (error: CredentialEndpointException) {
-                    if (!error.isInvalidNonce) throw error
-                    call.respond(HttpStatusCode.BadRequest, requireNotNull(error.credentialError))
+                    if (error.statusCode !in 400..499 || error.credentialError == null) throw error
+                    call.respond(HttpStatusCode.fromValue(error.statusCode), requireNotNull(error.credentialError))
                 }
             }
 
