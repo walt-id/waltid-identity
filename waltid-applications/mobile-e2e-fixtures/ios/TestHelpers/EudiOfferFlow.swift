@@ -42,8 +42,7 @@ public final class EudiOfferFlow {
         // Step 1: Entry page redirect
         let entry = try await client.textRequest(url: entrypoint, allow3xx: true)
         let redirectAction = try resolveURL(base: entry.finalURL, action: try extractFormAction(page: entry.body, formID: "redirect_form"))
-        let redirectPayload = try extractPayload(page: entry.body)
-        _ = try await client.formRequest(url: redirectAction, fields: ["payload": redirectPayload])
+        _ = try await client.formRequest(url: redirectAction, fields: try redirectFields(page: entry.body))
 
         // Step 2: Generate pre-authorized offer
         let preauthRedirect = try await client.formRequest(url: backendGenerate, fields: [
@@ -55,8 +54,7 @@ public final class EudiOfferFlow {
 
         // Step 3: Display page redirect
         let displayAction = try resolveURL(base: preauthRedirect.finalURL, action: try extractFormAction(page: preauthRedirect.body, formID: "redirect_form"))
-        let displayPayload = try extractPayload(page: preauthRedirect.body)
-        let displayPage = try await client.formRequest(url: displayAction, fields: ["payload": displayPayload])
+        let displayPage = try await client.formRequest(url: displayAction, fields: try redirectFields(page: preauthRedirect.body))
 
         // Step 4: Country/user data submission
         let countryAction = try resolveURL(base: displayPage.finalURL, action: try extractFormAction(page: displayPage.body, formID: "selectCountryForm"))
@@ -73,8 +71,7 @@ public final class EudiOfferFlow {
 
         // Step 5: Authorization page redirect
         let authAction = try resolveURL(base: authorizeRedirect.finalURL, action: try extractFormAction(page: authorizeRedirect.body, formID: "redirect_form"))
-        let authPayload = try extractPayload(page: authorizeRedirect.body)
-        let authPage = try await client.formRequest(url: authAction, fields: ["payload": authPayload])
+        let authPage = try await client.formRequest(url: authAction, fields: try redirectFields(page: authorizeRedirect.body))
 
         // Step 6: Final authorization with user_id
         let userID = try extractUserID(page: authPage.body)
@@ -114,10 +111,22 @@ public final class EudiOfferFlow {
         return EudiGeneratedOffer(offerUrl: urlData, txCode: txCodeValue)
     }
 
-    private func extractPayload(page: String) throws -> String {
-        guard let raw = firstMatch(page, pattern: "name=\\\"payload\\\"\\s+value='(.*?)'\\s*>") else {
+    func extractPayload(page: String) throws -> String {
+        guard let value = extractInput(page: page, name: "payload") else {
             throw EudiOfferFlowError.missingPayload
         }
+        return value
+    }
+
+    func redirectFields(page: String) throws -> [String: String] {
+        var fields = ["payload": try extractPayload(page: page)]
+        if let jwt = extractInput(page: page, name: "payload_jwt") { fields["payload_jwt"] = jwt }
+        return fields
+    }
+
+    private func extractInput(page: String, name: String) -> String? {
+        let pattern = #"(?s)name=["']\#(NSRegularExpression.escapedPattern(for: name))["']\s+value=(["'])(.*?)\1\s*/?>"#
+        guard let raw = firstMatch(page, pattern: pattern, captureGroup: 2) else { return nil }
         return unescapedHTML(raw)
     }
 
@@ -142,17 +151,19 @@ public final class EudiOfferFlow {
     private func unescapedHTML(_ value: String) -> String {
         value
             .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#34;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
             .replacingOccurrences(of: "&#x27;", with: "'")
-            .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&amp;", with: "&")
     }
 
-    private func firstMatch(_ text: String, pattern: String) -> String? {
+    private func firstMatch(_ text: String, pattern: String, captureGroup: Int = 1) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
-              match.numberOfRanges >= 2,
-              let range = Range(match.range(at: 1), in: text) else {
+              match.numberOfRanges > captureGroup,
+              let range = Range(match.range(at: captureGroup), in: text) else {
             return nil
         }
         return String(text[range])

@@ -84,8 +84,7 @@ object EudiTestBackend {
         val entryUrl = entryResponse.call.request.url.toString()
 
         val redirectAction = resolveUrl(entryUrl, extractFormAction(entryBody, "redirect_form"))
-        val redirectPayload = extractPayload(entryBody)
-        postForm(redirectAction, mapOf("payload" to redirectPayload))
+        postForm(redirectAction, redirectFields(entryBody))
 
         // Step 2: Generate pre-authorized offer
         val preauthResponse = postForm(
@@ -102,8 +101,7 @@ object EudiTestBackend {
 
         // Step 3: Follow redirect form to display page
         val displayAction = resolveUrl(preauthUrl, extractFormAction(preauthBody, "redirect_form"))
-        val displayPayload = extractPayload(preauthBody)
-        val displayResponse = postForm(displayAction, mapOf("payload" to displayPayload))
+        val displayResponse = postForm(displayAction, redirectFields(preauthBody))
         val displayBody = displayResponse.bodyAsText()
         val displayUrl = displayResponse.call.request.url.toString()
 
@@ -127,8 +125,7 @@ object EudiTestBackend {
 
         // Step 5: Follow authorization redirect form
         val authFormAction = resolveUrl(authUrl, extractFormAction(authBody, "redirect_form"))
-        val authFormPayload = extractPayload(authBody)
-        val authPageResponse = postForm(authFormAction, mapOf("payload" to authFormPayload))
+        val authPageResponse = postForm(authFormAction, redirectFields(authBody))
         val authPageBody = authPageResponse.bodyAsText()
 
         // Step 6: Extract user_id and authorize
@@ -369,10 +366,18 @@ object EudiTestBackend {
         return htmlUnescape(actionMatch.groups[1]?.value ?: error("Action group not found"))
     }
 
-    private fun extractPayload(html: String): String {
-        val regex = Regex("""(?s)name="payload"\s+value='(.*?)'\s*>""")
-        val match = regex.find(html) ?: error("Payload not found in HTML")
-        return htmlUnescape(match.groups[1]?.value ?: error("Payload group not found"))
+    internal fun extractPayload(html: String): String {
+        return extractInput(html, "payload") ?: error("Payload not found in HTML")
+    }
+
+    internal fun redirectFields(html: String): Map<String, String> = buildMap {
+        put("payload", extractPayload(html))
+        extractInput(html, "payload_jwt")?.let { put("payload_jwt", it) }
+    }
+
+    private fun extractInput(html: String, name: String): String? {
+        val regex = Regex("""(?s)name=["']${Regex.escape(name)}["']\s+value=(["'])(.*?)\1\s*/?>""")
+        return regex.find(html)?.groups?.get(2)?.value?.let(::htmlUnescape)
     }
 
     private fun extractUserId(html: String): String {
@@ -394,11 +399,13 @@ object EudiTestBackend {
     }
 
     private fun htmlUnescape(text: String): String =
-        text.replace("&amp;", "&")
-            .replace("&lt;", "<")
+        text.replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&quot;", "\"")
+            .replace("&#34;", "\"")
             .replace("&#39;", "'")
+            .replace("&#x27;", "'")
+            .replace("&amp;", "&")
 
     private fun urlEncode(value: String): String = value.encodeURLParameter()
 }
