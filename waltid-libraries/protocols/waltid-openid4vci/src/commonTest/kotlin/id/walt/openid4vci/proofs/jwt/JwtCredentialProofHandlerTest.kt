@@ -55,6 +55,18 @@ class JwtCredentialProofHandlerTest {
     }
 
     @Test
+    fun `DID proof rejects encryption method whose ID is the signing key thumbprint`() = runTest {
+        val fixture = didProofFixture(encryptionMethodIdMatchesSigningThumbprint = true)
+        val signingThumbprint = Jwk.sha256Thumbprint(fixture.signingKey.exportPublicJwk())
+
+        val failure = assertFailsWith<CredentialProofValidationException> {
+            fixture.verify("$DID#$signingThumbprint")
+        }
+
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, failure.errorCode)
+    }
+
+    @Test
     fun `DID proof accepts signature method not referenced by authentication`() = runTest {
         val fixture = didProofFixture(authenticationMethodId = AUTHENTICATION_METHOD_ID)
 
@@ -201,6 +213,7 @@ class JwtCredentialProofHandlerTest {
         authenticationMethodId: String = SIGNING_METHOD_ID,
         includeAuthenticationMethod: Boolean = true,
         embedSigningMethod: Boolean = false,
+        encryptionMethodIdMatchesSigningThumbprint: Boolean = false,
     ): DidProofFixture {
         val now = Instant.fromEpochSeconds(1_800_000_000)
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -212,6 +225,11 @@ class JwtCredentialProofHandlerTest {
             )
         )
         val signingKey = key("signing-private")
+        val encryptionMethodId = if (encryptionMethodIdMatchesSigningThumbprint) {
+            "$DID#${Jwk.sha256Thumbprint(signingKey.exportPublicJwk())}"
+        } else {
+            ENCRYPTION_METHOD_ID
+        }
         val encryptionKey = key("encryption-private")
         val authenticationKey = if (includeAuthenticationMethod && authenticationMethodId != SIGNING_METHOD_ID) {
             key("authentication-private")
@@ -231,7 +249,7 @@ class JwtCredentialProofHandlerTest {
                 if (!embedSigningMethod) {
                     add(verificationMethod(signingMethodId, signingKey.exportPublicJwkObject()))
                 }
-                add(verificationMethod(ENCRYPTION_METHOD_ID, encryptionJwk))
+                add(verificationMethod(encryptionMethodId, encryptionJwk))
                 authenticationKey?.let {
                     add(verificationMethod(AUTHENTICATION_METHOD_ID, it.exportPublicJwkObject()))
                 }
@@ -244,7 +262,7 @@ class JwtCredentialProofHandlerTest {
             if (includeAuthenticationMethod) {
                 put("authentication", buildJsonArray { add(JsonPrimitive(authenticationMethodId)) })
             }
-            put("keyAgreement", buildJsonArray { add(JsonPrimitive(ENCRYPTION_METHOD_ID)) })
+            put("keyAgreement", buildJsonArray { add(JsonPrimitive(encryptionMethodId)) })
         }
         val didResolver = DidDocumentCrypto2KeyResolver(
             resolveDocument = { requestedDid ->

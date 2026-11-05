@@ -41,6 +41,10 @@ fun interface Crypto2DidKeyResolver {
     }
 }
 
+/** The requested ID does not identify a method in the resolved DID document. */
+class DidVerificationMethodNotFoundException(keyId: String) :
+    IllegalArgumentException("DID document has no verification method matching key ID: $keyId")
+
 class DidDocumentCrypto2KeyResolver(
     private val resolveDocument: suspend (String) -> Result<JsonObject>,
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
@@ -135,12 +139,14 @@ class DidDocumentCrypto2KeyResolver(
         require(exactMatches.size <= 1) { "Multiple DID verification methods match key ID: $keyId" }
         if (exactMatches.isNotEmpty()) return exactMatches
 
-        if ('#' in keyId || keyId.startsWith("did:")) return emptyList()
+        if ('#' in keyId || keyId.startsWith("did:")) {
+            throw DidVerificationMethodNotFoundException(keyId)
+        }
         val fragmentMatches = methods.filter { method ->
             methodId(method)?.substringAfter('#', missingDelimiterValue = "") == keyId
         }
         require(fragmentMatches.size <= 1) { "Multiple DID verification methods match key ID fragment: $keyId" }
-        return fragmentMatches
+        return fragmentMatches.ifEmpty { throw DidVerificationMethodNotFoundException(keyId) }
     }
 
     private suspend fun restore(method: JsonObject): Key? {
