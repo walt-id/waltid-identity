@@ -138,7 +138,7 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
       });
       const metadata = {
         id: 'synthetic-date-credential', format: 'jwt_vc_json', label: 'Date display credential',
-        issuer: 'Synthetic Issuer', subject: 'did:example:holder', addedAt: '2026-10-30T13:30:00Z',
+        issuer: 'Synthetic Issuer', subject: 'did:example:holder', addedAt: '2026-10-25T00:35:00Z',
       };
       const responses = {
         '/wallet': ['synthetic-wallet'],
@@ -153,7 +153,7 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
             credentialData: {
               // Both instants are 02:30 in Budapest, on opposite sides of the DST overlap.
               iat: 1792888200, exp: 1792891800,
-              validFrom: '2026-10-30T13:30:00.123456789Z',
+              validFrom: '2026-10-25T00:30:00.123456789Z',
               credentialSubject: { birth_date: '1990-05-21' },
             },
           },
@@ -189,8 +189,8 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
       for (const value of [
         '25 Oct 2026, 02:30 \u2068(Budapest, CEST)\u2069',
         '25 Oct 2026, 02:30 \u2068(Budapest, CET)\u2069',
-        '30 Oct 2026, 14:30:00.123456789 \u2068(Budapest, CET)\u2069',
-        '30 Oct 2026, 14:30 \u2068(Budapest, CET)\u2069',
+        '25 Oct 2026, 02:30:00.123456789 \u2068(Budapest, CEST)\u2069',
+        '25 Oct 2026, 02:35 \u2068(Budapest, CEST)\u2069',
       ]) {
         await expect(page.getByText(value, { exact: true })).toBeVisible();
       }
