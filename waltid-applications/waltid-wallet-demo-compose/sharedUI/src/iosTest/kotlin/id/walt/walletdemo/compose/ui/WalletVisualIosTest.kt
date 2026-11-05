@@ -189,6 +189,6 @@ class WalletVisualIosTest {
             platformTheme = { content -> CompositionLocalProvider(
                 LocalSystemTheme provides if (dark) SystemTheme.Dark else SystemTheme.Light,
                 LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content) },
-        ).block()
+        ).execute(block)
     }
 }
