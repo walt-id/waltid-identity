@@ -4,6 +4,7 @@ package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
 import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfileResponse
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureConfig
 import id.walt.commons.featureflag.FeatureManager
@@ -96,7 +97,7 @@ class TransactionDataProfilesIntegrationTest {
                 testAndReturn("Discovery returns configured profiles") {
                     val discovered = http.get("/transaction-data-profiles")
                         .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<List<TransactionDataProfile>>()
+                        .body<List<TransactionDataProfileResponse>>()
                     assertEquals(profiles.map { it.type }.toSet(), discovered.map { it.type }.toSet())
                     assertTrue(discovered.any { it.type == scaType })
                     discovered
