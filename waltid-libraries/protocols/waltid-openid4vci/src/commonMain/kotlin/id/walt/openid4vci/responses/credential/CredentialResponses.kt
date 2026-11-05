@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.credential
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import kotlinx.serialization.SerialName
@@ -58,12 +59,12 @@ sealed interface CredentialResponseBody {
 data class CredentialResponseHttp(
     val status: Int,
     val body: CredentialResponseBody,
-    val headers: Map<String, String> = emptyMap(),
+    val headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
 ) {
     constructor(
         status: Int,
         payload: Map<String, JsonElement>,
-        headers: Map<String, String> = emptyMap(),
+        headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
     ) : this(status, CredentialResponseBody.Json(payload), headers)
 
     val payload: Map<String, JsonElement>

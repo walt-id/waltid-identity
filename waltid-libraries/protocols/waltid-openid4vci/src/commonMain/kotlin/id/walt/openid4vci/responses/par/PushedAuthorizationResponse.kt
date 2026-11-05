@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.par
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import kotlinx.serialization.SerialName
@@ -88,5 +89,5 @@ sealed class PushedAuthorizationResponseResult {
 data class PushedAuthorizationResponseHttp(
     val status: Int,
     val payload: Map<String, JsonElement>,
-    val headers: Map<String, String> = emptyMap(),
+    val headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
 )

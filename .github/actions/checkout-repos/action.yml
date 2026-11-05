@@ -66,12 +66,19 @@ runs:
             return
           fi
           local url="https://github.com/${repo}.git"
-          [ "$needs_token" = "true" ] && url="https://${TOKEN}@github.com/${repo}.git"
-          if [ -n "$REF" ] && git ls-remote --exit-code "$url" "$REF"; then
-            echo "${key}=$REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "${key}=main" >> "$GITHUB_OUTPUT"
+          [ "$needs_token" = "true" ] && url="https://x-access-token:${TOKEN}@github.com/${repo}.git"
+          local status=2
+          if [ -n "$REF" ]; then
+            status=0
+            # Keep the job token out of credential helpers; SwiftPM can block reading it from macOS Keychain.
+            GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote --exit-code "$url" "$REF" || status=$?
           fi
+          case "$status" in
+            0) echo "${key}=$REF" >> "$GITHUB_OUTPUT" ;;
+            2) echo "${key}=main" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Cannot resolve the requested ref in ${repo} (git exit ${status})"
+               return "$status" ;;
+          esac
         }
         resolve_ref "walt-id/waltid-unified-build" true unified
         resolve_ref "walt-id/waltid-identity" false identity
