@@ -119,24 +119,54 @@
     "denialAction": "Decline",
     "fields": [
       {
-        "name": "Amount",
-        "value": "11.56 EUR",
-        "placement": "Prominent"
-      },
-      {
         "name": "Payee",
         "value": "Example Bookshop",
-        "placement": "Main"
+        "placement": "Prominent",
+        "path": [
+          "payee",
+          "name"
+        ]
+      },
+      {
+        "name": "Payee ID",
+        "value": "bookshop-001",
+        "placement": "Main",
+        "path": [
+          "payee",
+          "id"
+        ]
+      },
+      {
+        "name": "Currency",
+        "value": "EUR",
+        "placement": "Prominent",
+        "path": [
+          "currency"
+        ]
+      },
+      {
+        "name": "Amount",
+        "value": "11.56",
+        "placement": "Prominent",
+        "path": [
+          "amount"
+        ]
       },
       {
         "name": "Transaction identifier",
         "value": "example-transaction-001",
-        "placement": "Details"
+        "placement": "Details",
+        "path": [
+          "transaction_id"
+        ]
       },
       {
         "name": "Technical reference",
-        "value": "bound-but-hidden",
-        "placement": "Omitted"
+        "value": "No",
+        "placement": "Omitted",
+        "path": [
+          "amount_earmarked"
+        ]
       }
     ]
   },
@@ -276,24 +306,54 @@
     "denialAction": null,
     "fields": [
       {
-        "name": "Betrag",
-        "value": "11.56 EUR",
-        "placement": "Prominent"
-      },
-      {
         "name": "Empf\u00e4nger",
         "value": "Example Bookshop",
-        "placement": "Main"
+        "placement": "Prominent",
+        "path": [
+          "payee",
+          "name"
+        ]
+      },
+      {
+        "name": "Empf\u00e4nger-ID",
+        "value": "bookshop-001",
+        "placement": "Main",
+        "path": [
+          "payee",
+          "id"
+        ]
+      },
+      {
+        "name": "W\u00e4hrung",
+        "value": "EUR",
+        "placement": "Prominent",
+        "path": [
+          "currency"
+        ]
+      },
+      {
+        "name": "Betrag",
+        "value": "11.56",
+        "placement": "Prominent",
+        "path": [
+          "amount"
+        ]
       },
       {
         "name": "Transaktions-ID",
         "value": "example-transaction-001",
-        "placement": "Details"
+        "placement": "Details",
+        "path": [
+          "transaction_id"
+        ]
       },
       {
         "name": "Interne Referenz",
-        "value": "bound-but-hidden",
-        "placement": "Omitted"
+        "value": "Nein",
+        "placement": "Omitted",
+        "path": [
+          "amount_earmarked"
+        ]
       }
     ],
     "securityHint": "Pr\u00fcfen Sie Betrag und Empf\u00e4nger.",

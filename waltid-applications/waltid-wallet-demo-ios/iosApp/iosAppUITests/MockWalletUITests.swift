@@ -101,7 +101,8 @@ final class MockWalletUITests: XCTestCase {
         ui.openDeepLink("openid4vp://mock")
         ui.assertExists(identifier: "payment-unsigned-warning")
         XCTAssertTrue(app.staticTexts["Zahlung prüfen"].exists)
-        XCTAssertTrue(app.staticTexts["11.56 EUR"].exists)
+        XCTAssertTrue(app.staticTexts["11.56"].exists)
+        XCTAssertTrue(app.staticTexts["EUR"].exists)
         XCTAssertTrue(app.staticTexts["Super Store"].exists)
         XCTAssertFalse(app.staticTexts["txn-1"].exists)
         XCTAssertFalse(app.staticTexts["bound-but-hidden"].exists)
@@ -151,30 +152,43 @@ final class MockWalletUITests: XCTestCase {
     }
 
     func testRecurringPaymentDetailsScrollAndCancelWithoutSubmitting() {
+        recurringPaymentDetailsScrollAndCancel(largeText: false)
+    }
+
+    func testRecurringPaymentLargeTextScrollAndCancelWithoutSubmitting() {
+        recurringPaymentDetailsScrollAndCancel(largeText: true)
+    }
+
+    private func recurringPaymentDetailsScrollAndCancel(largeText: Bool) {
         continueAfterFailure = false
         let app = XCUIApplication()
+        if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"] }
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "recurring"])
         ui.openDeepLink("openid4vp://mock")
         XCTAssertTrue(app.staticTexts["Super Store"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.images["payment-payee-logo"].exists, "An invalid logo must leave no placeholder")
         XCTAssertFalse(app.links["https://shop.example ↗"].exists)
+        let payeeDetails = app.descendants(matching: .any)["payment-payee-details-toggle"].firstMatch
+        for _ in 0..<4 where !payeeDetails.isHittable { app.swipeUp() }
         ui.tapElement(identifier: "payment-payee-details-toggle")
         XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5))
         let cancel = app.buttons["wallet.presentationRejectButton"]
         let confirm = app.buttons["wallet.presentationSubmitButton"]
-        XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1)
+        if largeText { XCTAssertLessThan(cancel.frame.maxY, confirm.frame.minY) }
+        else { XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1) }
         let details = app.descendants(matching: .any)["payment-details-toggle"].firstMatch
-        for _ in 0..<8 where !details.isHittable { app.swipeUp() }
+        for _ in 0..<8 where !details.isHittable || details.frame.maxY > cancel.frame.minY - 32 { app.swipeUp() }
         XCTAssertTrue(app.staticTexts["9007199254740993.01"].exists)
         XCTAssertTrue(app.staticTexts["0.1234567890123456789"].exists)
         ui.tapElement(identifier: "payment-details-toggle")
+        XCTAssertEqual(details.value as? String, "Expanded")
         let transaction = app.staticTexts["recurring-ui-test"]
         for _ in 0..<4 where !transaction.isHittable { app.swipeUp() }
-        XCTAssertTrue(transaction.isHittable)
-        XCTAssertTrue(app.staticTexts["Example Payments Ltd"].exists)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "recurring-payment-expanded-details"; capture.lifetime = .keepAlways; add(capture)
+        XCTAssertTrue(transaction.isHittable, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Example Payments Ltd"].exists)
         XCTAssertTrue(cancel.isHittable, "Actions remain available below scrolling terms")
         ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Cancel payment")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))

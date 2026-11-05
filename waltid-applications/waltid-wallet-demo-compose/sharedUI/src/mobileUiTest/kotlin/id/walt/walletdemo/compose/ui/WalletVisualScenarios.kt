@@ -775,7 +775,8 @@ internal class WalletVisualScenarios(
                 onSubmit = {}, onCancel = {}, compact = false,
                 preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
         }
-        onNodeWithText("11.56 EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("11.56").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
         capture("payment.localized.compact_large_text")
@@ -833,9 +834,9 @@ internal class WalletVisualScenarios(
             )
         }
         onNodeWithText("Confirm payment").performScrollTo().assertIsDisplayed()
-        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
-        onNodeWithText("bound-but-hidden").assertDoesNotExist()
+        onNodeWithText("Technical reference").assertDoesNotExist()
         capture("payment.mixed_credentials.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()

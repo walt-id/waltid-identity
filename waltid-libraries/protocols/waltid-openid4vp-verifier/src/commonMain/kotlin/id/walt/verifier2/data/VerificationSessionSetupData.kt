@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.data
 
+import id.walt.verifier.openid.transactiondata.TransactionDataObjectsSerializer
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -161,7 +162,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    @Serializable(with = id.walt.verifier.openid.transactiondata.TransactionDataObjectsSerializer::class)
+    @Serializable(with = TransactionDataObjectsSerializer::class)
     val transactionData: List<JsonObject>? = null,
     val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
     val scope: String? = null,

@@ -20,7 +20,10 @@ fun paymentWebsite(value: String): String? = runCatching {
 private const val MAX_LOGO_BYTES = 524_288
 
 /** No cookies, credentials, redirects or automatic remote fetches. Image decoding stays with the renderer. */
-suspend fun loadPaymentLogo(value: String, allowRemote: Boolean = false): ByteArray? {
+suspend fun loadPaymentLogo(value: String, allowRemote: Boolean = false): ByteArray? =
+    loadPaymentLogo(value, allowRemote, ::paymentLogoHttpClient)
+
+internal suspend fun loadPaymentLogo(value: String, allowRemote: Boolean, createClient: () -> HttpClient?): ByteArray? {
     try {
         val bytes = if (value.startsWith("data:")) {
             val header = value.substringBefore(',')
@@ -31,7 +34,7 @@ suspend fun loadPaymentLogo(value: String, allowRemote: Boolean = false): ByteAr
             if (!allowRemote || paymentWebsite(value) == null) return null
             val host = Url(value).host.lowercase()
             if (host == "localhost" || host.endsWith(".local") || ':' in host || host.all { it.isDigit() || it == '.' }) return null
-            val client = HttpClient { followRedirects = false; expectSuccess = false }
+            val client = createClient() ?: return null
             try {
                 withTimeoutOrNull(5_000) {
                     client.prepareGet(value) { headers.append(HttpHeaders.Accept, "image/png, image/jpeg") }.execute { response ->
@@ -50,3 +53,6 @@ suspend fun loadPaymentLogo(value: String, allowRemote: Boolean = false): ByteAr
         return null
     }
 }
+
+/** Dedicated platform client without shared cookie or credential storage; null where logos are unsupported. */
+internal expect fun paymentLogoHttpClient(): HttpClient?

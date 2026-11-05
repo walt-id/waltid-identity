@@ -474,14 +474,15 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertFalse(state.canConfirm)
     }
 
-    func testPaymentLocalizedCompact() throws {
+    func testPaymentLocalizedCompact() async throws {
         let state = PaymentReviewState.ready(try WalletVisualFixtures().payment(localized: true))
-        try capture(WalletReviewScaffold {
+        try await captureWhenReady(WalletReviewScaffold {
             PaymentConsentView(state: state)
         } actions: {
             ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
                 onCancel: {}, paymentReview: state)
-        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
+        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium,
+            isReady: { state.canConfirm }, failure: "Payment review did not become available", scrollToBottom: true)
     }
 
     func testPaymentLogoPolicyHidesUnavailableImages() async {
@@ -548,8 +549,8 @@ final class WalletVisualTests: XCTestCase {
 
     func testPaymentConsent() throws {
         let consent = try WalletVisualFixtures().payment()
-        XCTAssertEqual(consent.fields.count, 4)
-        XCTAssertEqual(consent.fields.first?.value, "11.56 EUR")
+        XCTAssertEqual(consent.fields.count, 6)
+        XCTAssertEqual(consent.fields.first(where: { $0.path == ["amount"] })?.value, "11.56")
         try capture(ScrollView { PaymentConsentView(state: .ready(consent)).padding(20) }, id: "payment.consent.main")
     }
 
