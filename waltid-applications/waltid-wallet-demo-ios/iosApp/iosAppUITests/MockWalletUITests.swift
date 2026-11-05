@@ -239,9 +239,29 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Super Store"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.images["payment-payee-logo"].exists, "An invalid logo must leave no placeholder")
         XCTAssertFalse(app.links["https://shop.example ↗"].exists)
-        let payeeDetails = app.descendants(matching: .any)["payment-payee-details-toggle"].firstMatch
-        for _ in 0..<4 where !payeeDetails.isHittable { app.swipeUp() }
-        ui.tapElement(identifier: "payment-payee-details-toggle")
+        let cancel = app.buttons["wallet.presentationRejectButton"]
+        let confirm = app.buttons["wallet.presentationSubmitButton"]
+        let header = app.navigationBars["Share credentials"]
+        func reveal(_ element: XCUIElement) {
+            func visible() -> Bool {
+                element.isHittable && element.frame.minY >= header.frame.maxY + 8
+                    && element.frame.maxY <= cancel.frame.minY - 32
+            }
+            // Full-screen swipes can overshoot a row under the navigation bar at large text sizes.
+            for _ in 0..<20 where !visible() {
+                let top = header.frame.maxY + 8
+                let bottom = cancel.frame.minY - 32
+                let origin = app.coordinate(withNormalizedOffset: .zero)
+                let start = origin.withOffset(CGVector(dx: app.frame.midX, dy: (top + bottom) / 2))
+                let direction: CGFloat = element.frame.minY < top ? 1 : -1
+                let end = start.withOffset(CGVector(dx: 0, dy: direction * (bottom - top) / 3))
+                start.press(forDuration: 0.01, thenDragTo: end)
+            }
+            XCTAssertTrue(visible(), "Review control must be uncovered before interaction: \(element.identifier)")
+        }
+        let payeeDetails = app.buttons["payment-payee-details-toggle"]
+        reveal(payeeDetails)
+        payeeDetails.tap()
         XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5))
         if !largeText {
             app.links["https://shop.example ↗"].tap()
@@ -250,18 +270,16 @@ final class MockWalletUITests: XCTestCase {
             XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5), "Browser return keeps the expanded consent")
             XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
         }
-        let cancel = app.buttons["wallet.presentationRejectButton"]
-        let confirm = app.buttons["wallet.presentationSubmitButton"]
         if largeText { XCTAssertLessThan(cancel.frame.maxY, confirm.frame.minY) }
         else { XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1) }
-        let details = app.descendants(matching: .any)["payment-details-toggle"].firstMatch
-        for _ in 0..<8 where !details.isHittable || details.frame.maxY > cancel.frame.minY - 32 { app.swipeUp() }
+        let details = app.buttons["payment-details-toggle"]
+        reveal(details)
         XCTAssertTrue(app.staticTexts["9007199254740993.01"].exists)
         XCTAssertTrue(app.staticTexts["0.1234567890123456789"].exists)
-        ui.tapElement(identifier: "payment-details-toggle")
+        details.tap()
         XCTAssertEqual(details.value as? String, "Expanded")
         let transaction = app.staticTexts["recurring-ui-test"]
-        for _ in 0..<4 where !transaction.isHittable { app.swipeUp() }
+        reveal(transaction)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "recurring-payment-expanded-details"; capture.lifetime = .keepAlways; add(capture)
         XCTAssertTrue(transaction.isHittable, app.debugDescription)
