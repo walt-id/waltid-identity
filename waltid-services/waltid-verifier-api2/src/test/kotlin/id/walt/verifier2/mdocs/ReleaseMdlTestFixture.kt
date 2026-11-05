@@ -22,7 +22,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
 private val holder by lazy { runBlocking { JWKKey.generate(KeyType.secp256r1) } }
-private val issuer by lazy {
+internal val releaseTestIssuer by lazy {
     runBlocking {
         val rootKey = JWKKey.generate(KeyType.secp256r1)
         val signer = JWKKey.generate(KeyType.secp256r1)
@@ -44,12 +44,12 @@ private val issuer by lazy {
 
 internal fun releaseHolderKey(): JWKKey = holder
 
-internal fun mdlFixtureCredential(credentialData: String) = runBlocking {
+internal fun mdlFixtureCredential(credentialData: String, holderKey: JWKKey = holder) = runBlocking {
     val data = Json.decodeFromString<JsonObject>(credentialData)
     val docType = data.getValue("docType").jsonPrimitive.content
-    val (signer, chain) = issuer
+    val (signer, chain) = releaseTestIssuer
     val issued = MdocIssuer.issueUniversal(
-        issuerKey = signer, issuerCertificate = chain, holderKey = holder.getPublicKey().getCosePublicKey(), docType = docType,
+        issuerKey = signer, issuerCertificate = chain, holderKey = holderKey.getPublicKey().getCosePublicKey(), docType = docType,
         data = MdocIssuer.MdocUniversalIssuanceData(data.filterValues { it is JsonObject }.mapValues { it.value as JsonObject }),
         validUntil = Clock.System.now() + 30.days,
     )
