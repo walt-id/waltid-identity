@@ -279,7 +279,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
                         assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
                     }
-                    listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                    listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
                         "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
                         WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
                             "Payment review is missing issuer instruction '$label'")
@@ -402,15 +402,8 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         device = device,
                         path = "transactionData[0].details.payload.amount",
                         label = "Amount",
-                        expectedValues = listOf(SCA_AMOUNT_TEXT),
-                        message = "SCA payment amount missing from the wallet review",
-                    )
-                    assertClaimValueVisibleAfterScrolling(
-                        device = device,
-                        path = "transactionData[0].details.payload.currency",
-                        label = "Currency",
-                        expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_CURRENCY),
-                        message = "SCA payment currency missing from the wallet review",
+                        expectedValues = listOf(SCA_AMOUNT_TEXT, DemoTestBackend.SCA_PAYMENT_CURRENCY),
+                        message = "SCA payment amount or currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
                     // Check the exact age candidate and its disclosure directly in the consent review.

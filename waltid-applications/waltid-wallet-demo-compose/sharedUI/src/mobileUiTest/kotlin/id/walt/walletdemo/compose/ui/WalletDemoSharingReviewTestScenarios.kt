@@ -335,15 +335,14 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Verified website").assertIsDisplayed()
         onAllNodesWithText("Verified website").assertCountEquals(1)
         onNodeWithText("Review payment").performScrollToContent(this).assertIsDisplayed()
-        onNodeWithText("Amount").performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Currency").assertDoesNotExist()
-        onNodeWithText("Merchant name").performScrollToContent(this).assertIsDisplayed()
-        for ((field, value) in listOf(
-            "amount" to "42.00",
-            "currency" to "EUR",
-            "merchant_name" to "ACME Corp",
+        for ((field, label, value) in listOf(
+            Triple("amount", "Amount", "42.00"),
+            Triple("currency", null, "EUR"),
+            Triple("merchant_name", "Merchant name", "ACME Corp"),
         )) {
             val row = hasAnyAncestor(hasTestTag(WalletUiTestTags.claim("transactionData[0].details.$field")))
+            label?.let { onNode(hasText(it) and row).performScrollToContent(this).assertIsDisplayed() }
             onNode(hasText(value) and row).performScrollToContent(this).assertIsDisplayed()
         }
         onNodeWithContentDescription("Show Verifier details").performScrollToContent(this).performClick()

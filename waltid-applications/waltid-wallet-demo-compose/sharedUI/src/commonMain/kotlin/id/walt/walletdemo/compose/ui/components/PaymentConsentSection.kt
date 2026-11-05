@@ -127,13 +127,16 @@ private fun PaymentPayee(fields: List<WalletDemoPaymentDisplayField>) {
 
 @Composable
 private fun PaymentMoney(fields: List<WalletDemoPaymentDisplayField>) {
+    val primary = fields.first()
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            fields.firstOrNull()?.let { Text(it.item.label, style = MaterialTheme.typography.labelLarge) }
+        Column(Modifier.fillMaxWidth().padding(16.dp).testTag(WalletUiTestTags.claim(primary.item.path.id)),
+            verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(primary.item.label, style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                fields.forEach {
-                    Box(Modifier.width(IntrinsicSize.Max).alignByBaseline().testTag(WalletUiTestTags.claim(it.item.path.id))) {
-                        PaymentValue(it, it.placement == WalletDemoPaymentFieldPlacement.Prominent)
+                fields.forEach { field ->
+                    val valueModifier = Modifier.width(IntrinsicSize.Max).alignByBaseline()
+                    Box(if (field == primary) valueModifier else valueModifier.testTag(WalletUiTestTags.claim(field.item.path.id))) {
+                        PaymentValue(field, field.placement == WalletDemoPaymentFieldPlacement.Prominent)
                     }
                 }
             }

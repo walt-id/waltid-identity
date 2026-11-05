@@ -231,7 +231,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
         let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
         XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
-        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Amount",
                       "Check the payee and amount before confirming."] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             // Static Compose text need not expose an XCTest activation point.
