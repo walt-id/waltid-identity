@@ -51,7 +51,7 @@ jobs:
           export CHROME_BIN="$(node -p "require('playwright').chromium.executablePath()")"
           python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir ../build/reports/browser-visual/timings browser-date-tests \
-            ../../../../gradlew :waltid-applications:waltid-wallet-demo-compose:sharedLogic:wasmJsBrowserTest \
+            ../../../../gradlew --project-dir ../../../.. :waltid-applications:waltid-wallet-demo-compose:sharedLogic:wasmJsBrowserTest \
             --tests '*WalletDateTimeTest*' --tests '*CredentialDisplayNormalizerTest*' \
             -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true \
             --max-workers=2 --console=plain
