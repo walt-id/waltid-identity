@@ -34,7 +34,7 @@ public struct WalletActions: View {
                     stacked
                 }
             } else {
-                LegacyWalletActionLayout { actions }
+                LegacyWalletAdaptiveRow { actions }
             }
         }.frame(maxWidth: .infinity, alignment: .trailing)
     }
@@ -62,7 +62,11 @@ public struct WalletActions: View {
 }
 
 /// iOS 15 keeps the same fit-based behavior without changing the app's deployment target.
-private struct LegacyWalletActionLayout<Content: View>: View {
+struct LegacyWalletAdaptiveRow<Content: View>: View {
+    var spacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 8
+    var alignment: HorizontalAlignment = .trailing
+    var verticalAlignment: VerticalAlignment = .center
     @ViewBuilder let content: () -> Content
     @State private var availableWidth: CGFloat = 0
     @State private var intrinsicWidth: CGFloat = .infinity
@@ -70,17 +74,17 @@ private struct LegacyWalletActionLayout<Content: View>: View {
     var body: some View {
         Group {
             if intrinsicWidth <= availableWidth {
-                HStack(spacing: 8, content: content)
+                HStack(alignment: verticalAlignment, spacing: spacing, content: content)
             } else {
-                VStack(alignment: .trailing, spacing: 8, content: content)
+                VStack(alignment: alignment, spacing: verticalSpacing, content: content)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .frame(maxWidth: .infinity, alignment: Alignment(horizontal: alignment, vertical: .center))
         .background(GeometryReader { geometry in
             Color.clear.preference(key: ActionAvailableWidth.self, value: geometry.size.width)
         })
-        .overlay(alignment: .trailing) {
-            HStack(spacing: 8, content: content).fixedSize(horizontal: true, vertical: false)
+        .overlay(alignment: Alignment(horizontal: alignment, vertical: .center)) {
+            HStack(alignment: verticalAlignment, spacing: spacing, content: content).fixedSize(horizontal: true, vertical: false)
                 .background(GeometryReader { geometry in
                     Color.clear.preference(key: ActionIntrinsicWidth.self, value: geometry.size.width)
                 })

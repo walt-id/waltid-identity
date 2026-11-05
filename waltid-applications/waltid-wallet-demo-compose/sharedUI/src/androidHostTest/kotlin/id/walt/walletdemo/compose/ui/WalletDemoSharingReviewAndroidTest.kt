@@ -4,6 +4,7 @@ import kotlin.test.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -36,6 +37,10 @@ class WalletDemoSharingReviewAndroidTest {
 
     @Test
     fun payeeWebsiteOpensOnlyOnExplicitTap() = scenarios.payeeWebsiteOpensOnlyOnExplicitTap()
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun paymentMoneyUsesAvailableWidthAtLargeText() = scenarios.paymentMoneyUsesAvailableWidthAtLargeText()
 
     @Test
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() =

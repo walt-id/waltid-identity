@@ -33,6 +33,9 @@ class WalletDemoSharingReviewIosTest {
     fun payeeWebsiteOpensOnlyOnExplicitTap() = scenarios.payeeWebsiteOpensOnlyOnExplicitTap()
 
     @Test
+    fun paymentMoneyUsesAvailableWidthAtLargeText() = scenarios.paymentMoneyUsesAvailableWidthAtLargeText()
+
+    @Test
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() =
         scenarios.unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback()
 

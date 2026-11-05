@@ -259,6 +259,12 @@ final class MockWalletUITests: XCTestCase {
             }
             XCTAssertTrue(visible(), "Review control must be uncovered before interaction: \(element.identifier)")
         }
+        let amount = app.staticTexts["11.56"].firstMatch
+        let currency = app.staticTexts["EUR"].firstMatch
+        reveal(amount)
+        XCTAssertEqual(amount.frame.midY, currency.frame.midY, accuracy: 1,
+            "Amount and currency stay on one line when they fit, including at large text sizes")
+        XCTAssertLessThanOrEqual(amount.frame.maxX, currency.frame.minX)
         let payeeDetails = app.buttons["payment-payee-details-toggle"]
         reveal(payeeDetails)
         payeeDetails.tap()

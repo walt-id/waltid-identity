@@ -264,6 +264,33 @@ class WalletDemoSharingReviewTestScenarios {
         runOnIdle { assertEquals(listOf("https://shop.example"), openedWebsites) }
     }
 
+    fun paymentMoneyUsesAvailableWidthAtLargeText() = runComposeUiTest {
+        val amount = mutableStateOf("11.56")
+        setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 2f)) {
+                Box(Modifier.width(320.dp)) {
+                    val consent = WalletDemoPaymentConsent("revision", "en", "Payment", null, "Confirm", "Cancel", false,
+                        listOf(
+                            WalletDemoPaymentField("Amount", null, amount.value, WalletDemoPaymentFieldPlacement.Prominent,
+                                path = listOf("amount")),
+                            WalletDemoPaymentField("Currency", null, "EUR", WalletDemoPaymentFieldPlacement.Prominent,
+                                path = listOf("currency")),
+                        ))
+                    PaymentConsentSection(WalletDemoPaymentReview.Ready(consent))
+                }
+            }
+        }
+        val shortAmount = onNodeWithText("11.56").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val currency = onNodeWithText("EUR").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(shortAmount.top, currency.top, "Short money values fit on one line even at large text size")
+        assertTrue(shortAmount.right <= currency.left)
+        runOnIdle { amount.value = "9007199254740993.01" }
+        val longAmount = onNodeWithText("9007199254740993.01").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val wrappedCurrency = onNodeWithText("EUR").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(wrappedCurrency.top >= longAmount.bottom,
+            "Wrap when the exact amount cannot fit beside the currency: amount=$longAmount, currency=$wrappedCurrency")
+    }
+
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() = runComposeUiTest {
         val review = digitalCredentialReview().let { it.copy(request = it.request.copy(transactionData = it.request.transactionData.map { group ->
             group.copy(transactionType = "urn:eudi:sca:payment:1")
