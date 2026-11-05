@@ -1,5 +1,6 @@
 package id.walt.verifier2.sdjwt
 
+import id.walt.verifier2.freshFixtureCredential
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.credentials.formats.DigitalCredential
@@ -288,7 +289,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     private suspend fun selectCredentialsForQuery(
         query: DcqlQuery,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
-        val storedCredentials = walletCredentials
+        val storedCredentials = walletCredentials.map { freshFixtureCredential(it) }
 
         val dcqlCredentials = storedCredentials.mapIndexed { idx, credential ->
             RawDcqlCredential(
