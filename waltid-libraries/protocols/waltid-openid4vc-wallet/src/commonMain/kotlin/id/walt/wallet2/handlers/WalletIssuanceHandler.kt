@@ -639,7 +639,10 @@ data class FetchCredentialRequest(
      * When storing, pass [credentialIssuerBaseUrl] (and optionally [metadata]/[label])
      * so issuer display metadata and credential labels are persisted the same way as
      * the full pre-authorized receive path. [holderBindings] must identify the stored wallet keys
-     * used for [proofs]; inline holder keys are rejected, and copies require distinct public keys.
+     * selected for storage. Expected public keys come separately from [proofs], including all keys
+     * in a nested key attestation. Each returned proof-bound credential must match its evidence and
+     * a selected wallet key; fewer or reordered credentials are accepted. Inline holder keys are
+     * rejected, and copies require distinct public keys. Attestation authentication belongs to the issuer.
      */
     val storeInWallet: Boolean = false,
     /**
