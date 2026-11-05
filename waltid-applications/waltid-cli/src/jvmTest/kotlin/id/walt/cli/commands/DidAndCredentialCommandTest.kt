@@ -215,7 +215,7 @@ class DidAndCredentialCommandTest {
     }
 
     @Test
-    fun `issuer key from x5c is accepted only with x509-trust and its root`() {
+    fun `issuer key from x5c passes signature alone and x509-trust checks its root`() {
         val directory = Files.createTempDirectory("cli-vc-x5c")
         val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
         val (rootPem, otherRootPem, signed) = runBlocking {
@@ -248,8 +248,8 @@ class DidAndCredentialCommandTest {
         val otherRootFile = directory.resolve("other-ca.pem").also { it.writeText(otherRootPem) }
 
         val withoutTrust = VCVerifyCmd().test(listOf(credential.toString()))
-        assertEquals(1, withoutTrust.statusCode)
-        assertContains(withoutTrust.stdout, "signature: Fail!")
+        assertEquals(0, withoutTrust.statusCode, withoutTrust.stdout + withoutTrust.stderr)
+        assertContains(withoutTrust.stdout, "signature: Success!")
 
         val trusted = VCVerifyCmd().test(listOf("-p", "x509-trust", "-a", "trust-root=$rootFile", credential.toString()))
         assertEquals(0, trusted.statusCode, trusted.stdout + trusted.stderr)

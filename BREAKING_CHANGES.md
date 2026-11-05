@@ -1,13 +1,5 @@
 # Breaking changes since 0.3.1
 
-## Issuer keys from `x5c`
-
-- Verification policies 2: `signature` fails for a credential whose issuer key is taken from its `x5c` certificate chain, unless `x509-trust` or `etsi-trust-list` runs for the same credential or a linked trust registry trusts that chain. Add `x509-trust` with your trust roots to the credential policies. mdoc is unchanged.
-- Verifier2 sessions created without `vc_policies` default to `signature` alone, so they now reject such credentials.
-- Code that runs `signature` outside the Verifier2 pipeline must set `PolicyServiceKey.CREDENTIAL_POLICY_IDS` or `TRUST_REGISTRY_RESOLVER` in the `PolicyExecutionContext`.
-- Legacy policies: `signature` and `signature_sd-jwt-vc` require the chain to be anchored by `trustedRootCAs` (`TRUSTED_ROOT_CAS_CONTEXT_KEY`) in the policy context. The legacy verifier API fills it from the session's `trusted_root_cas`. Callers that pass no roots reject such keys: `Verifier.verifyJws(jwt)`, `OpenID4VCI.validateAuthorizationRequestToken`, and the issuer API's VP-token authorization response.
-- `JwsSignatureScheme.verifyCrypto2(data, allowedAlgorithms, resolver)` and the deprecated `verify(data)` reject a key from `x5c`. Use `verifyCrypto2(data, trustRoots, ...)`.
-
 ## waltid-dcql identifier charset
 
 - `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).

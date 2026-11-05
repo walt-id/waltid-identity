@@ -3,7 +3,6 @@ package id.walt.verifier2.handlers.vpresponse
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.policies.PolicyExecutionContext
-import id.walt.policies2.vc.policies.PolicyServiceKey
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -32,22 +31,13 @@ object Verifier2SessionCredentialPolicyValidation {
         context: PolicyExecutionContext = PolicyExecutionContext.Empty
     ): CredentialPolicyResults = coroutineScope {
 
-        // Every policy sees which policies run for its credential, e.g. `signature` looks for an issuer trust policy
-        val generalPolicyIds = policies.vc_policies?.policies.orEmpty().map { it.id }
-        val contexts = validatedCredentials.keys.associateWith { queryId ->
-            val specificPolicyIds = policies.specific_vc_policies?.get(queryId)?.policies.orEmpty().map { it.id }
-            PolicyExecutionContext(
-                context.services + (PolicyServiceKey.CREDENTIAL_POLICY_IDS to (generalPolicyIds + specificPolicyIds).toSet())
-            )
-        }
-
         // --- General VC Policies ---
         val generalPolicyJobs = validatedCredentials.flatMap { (queryId, credentials) ->
             credentials.flatMapIndexed { credentialIndex, credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
                         log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}': $credential" }
-                        val result = runCatching { policy.verify(credential, contexts.getValue(queryId)) }
+                        val result = runCatching { policy.verify(credential, context) }
                             .getOrElse { ex ->
                                 log.warn { "Policy '${policy.id}' threw an unexpected exception for '$queryId' credential#$credentialIndex: ${ex.message}" }
                                 Result.failure(ex)
@@ -74,7 +64,7 @@ object Verifier2SessionCredentialPolicyValidation {
             credentials.flatMapIndexed { credentialIndex, specificCredential ->
                 queryPolicies.policies.map { policy ->
                     async(Dispatchers.Default) {
-                        val result = runCatching { policy.verify(specificCredential, contexts.getValue(queryId)) }
+                        val result = runCatching { policy.verify(specificCredential, context) }
                             .getOrElse { ex ->
                                 log.warn { "Specific policy '${policy.id}' threw an unexpected exception for '$queryId' credential#$credentialIndex: ${ex.message}" }
                                 Result.failure(ex)

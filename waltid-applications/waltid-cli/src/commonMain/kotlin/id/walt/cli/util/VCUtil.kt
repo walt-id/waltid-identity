@@ -1,9 +1,7 @@
 package id.walt.cli.util
 
 import id.walt.credentials.CredentialParser
-import id.walt.credentials.formats.Crypto2VerificationAlgorithms
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.defaultJwsAlgorithm
 import id.walt.crypto2.keys.Key
 import id.walt.did.dids.DidService
@@ -13,8 +11,6 @@ import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vc.policies.ExpirationDatePolicy
 import id.walt.policies2.vc.policies.JsonSchemaPolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
-import id.walt.policies2.vc.policies.PolicyExecutionContext
-import id.walt.policies2.vc.policies.PolicyServiceKey
 import id.walt.policies2.vc.policies.RevocationPolicy
 import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.policies2.vc.policies.X509TrustPolicy
@@ -61,17 +57,7 @@ object VCUtil {
     suspend fun verify(
         credential: DigitalCredential,
         policies: List<CredentialVerificationPolicy2>,
-    ): List<CredentialPolicyRun> {
-        // `signature` accepts an issuer key from `x5c` only when an issuer trust policy runs too
-        val context = PolicyExecutionContext(mapOf(PolicyServiceKey.CREDENTIAL_POLICY_IDS to policies.map { it.id }.toSet()))
-        return policies.map { policy -> CredentialPolicyRun(policy, policy.verify(credential, context)) }
-    }
-
-    /** Checks the issuer signature of a JWT credential only; whether the issuer is trusted is not decided. */
-    suspend fun verifyJwtSignatureOnly(credential: DigitalCredential): Result<JsonElement> = runCatching {
-        val signerKey = requireNotNull(credential.getSignerCrypto2Key()) { "Could not resolve the credential signer key" }
-        credential.verifyCrypto2(signerKey, Crypto2VerificationAlgorithms(jws = JwsAlgorithm.entries.toSet())).getOrThrow()
-    }
+    ): List<CredentialPolicyRun> = policies.map { policy -> CredentialPolicyRun(policy, policy.verify(credential)) }
 
     fun policies(
         names: List<String>,

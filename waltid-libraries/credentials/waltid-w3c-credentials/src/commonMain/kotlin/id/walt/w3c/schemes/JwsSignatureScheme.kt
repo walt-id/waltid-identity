@@ -2,9 +2,7 @@ package id.walt.w3c.schemes
 
 import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
-import id.walt.credentials.keyresolver.JwtKeyResolutionSource
 import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
-import id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors
 import id.walt.crypto.exceptions.CryptoArgumentException
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.jose.CompactJws
@@ -159,33 +157,14 @@ class JwsSignatureScheme : SignatureScheme {
         )
     }
 
-    /**
-     * Verifies [data] with the issuer key from [resolver]. Fails when that key is taken from the `x5c`
-     * header; pass trust roots to the other overload to accept such a key.
-     */
     @JsExport.Ignore
     suspend fun verifyCrypto2(
         data: String,
-        allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
-        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(),
-    ): Result<JsonElement> = verifyCrypto2(data, emptyList(), allowedAlgorithms, resolver)
-
-    /**
-     * Verifies [data] with the issuer key from [resolver]. A key taken from the `x5c` header is used
-     * only when that chain is anchored by one of [trustRoots] (PEM or base64 DER), see [X5cTrustAnchors].
-     */
-    @JsExport.Ignore
-    suspend fun verifyCrypto2(
-        data: String,
-        trustRoots: List<String>,
         allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
         resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(),
     ): Result<JsonElement> = resultOfSuspend {
         val compact = data.substringBefore('~')
         val info = getIssuerCrypto2KeyInfo(compact, resolver)
-        if (info.resolved.source == JwtKeyResolutionSource.X5C) {
-            X5cTrustAnchors.validate(info.resolved.certificateChain, trustRoots).getOrThrow()
-        }
         val verified = CompactJws.verify(compact, info.resolved.key, allowedAlgorithms)
         Json.parseToJsonElement(verified.payload.decodeToString())
     }
@@ -200,20 +179,15 @@ class JwsSignatureScheme : SignatureScheme {
         Json.parseToJsonElement(verified.payload.decodeToString())
     }
 
-    /** Verifies [data] with the issuer key of its DID or issuer metadata. Fails on a key from the `x5c` header. */
     @Deprecated("Use verifyCrypto2")
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
     suspend fun verify(data: String): Result<JsonElement> = runCatching {
-        val jws = data.split("~")[0]
-        val jwsParsed = jws.decodeJws()
-        require(!JwtKeyResolver.resolvesFromX5c(jwsParsed.header, jwsParsed.payload)) {
-            "The issuer key would be taken from the 'x5c' certificate chain, which is not trusted by itself. " +
-                    "Use verifyCrypto2 with trust roots."
-        }
+        // Get keys from either x5c header or DID document
         val keysInfo = getIssuerKeysInfo(data)
+        val jws = data.split("~")[0]
 
         // Try each key until one succeeds
         var lastException: Throwable? = null

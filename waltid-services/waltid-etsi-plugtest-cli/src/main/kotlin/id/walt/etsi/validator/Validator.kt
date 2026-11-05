@@ -4,12 +4,9 @@ import id.walt.cose.CoseHeaders
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.UnreachableDisclosuresException
-import id.walt.credentials.formats.Crypto2VerificationAlgorithms
-import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.ShaUtils
-import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.policies2.vc.SerializableRuntimeException
@@ -160,6 +157,7 @@ object ZipParser {
 
 object CredentialValidator {
 
+    private val signaturePolicy = CredentialSignaturePolicy()
     // requireField=true: ETSI TS 119 472-1 EAA-5.2.7.1-01/03 mandates both nbf and exp
     private val expirationPolicy = ExpirationDatePolicy(requireField = true)
     private val notBeforePolicy = NotBeforePolicy(requireField = true)
@@ -185,12 +183,6 @@ object CredentialValidator {
         )
 
     /** Convert a CredentialVerificationPolicy2 Result<JsonElement> to a PolicyCheckResult. */
-    private suspend fun verifySignatureOnly(credential: DigitalCredential): Result<JsonElement> = runCatching {
-        val signerKey = credential.getSignerCrypto2Key()
-            ?: throw IllegalArgumentException("Could not resolve the credential signer key")
-        credential.verifyCrypto2(signerKey, Crypto2VerificationAlgorithms(jws = JwsAlgorithm.entries.toSet())).getOrThrow()
-    }
-
     private fun policyResult(
         policyId: String,
         result: Result<JsonElement>,
@@ -298,13 +290,11 @@ object CredentialValidator {
         }
         policyResults += policyResult(vctIntegrityPolicy.id, vctResult, vctStatus)
 
-        // --- Signature (cryptographic check only) ---
-        // The `signature` policy also needs an issuer trust decision for x5c keys (`x509-trust`,
-        // `etsi-trust-list`); this offline validator has no trust list, so it checks the signature alone.
-        val sigResult = verifySignatureOnly(credential)
+        // --- Signature policy (via CredentialSignaturePolicy) ---
+        val sigResult = signaturePolicy.verify(credential, context)
         val sigStatus = if (sigResult.isSuccess) ValidationResult.ValidationStatus.VALID
                         else ValidationResult.ValidationStatus.INVALID
-        policyResults += policyResult("signature", sigResult, sigStatus)
+        policyResults += policyResult(signaturePolicy.id, sigResult, sigStatus)
 
         // --- Expiration policy ---
         // ExpirationDatePolicyException = credential is expired → INVALID (MUST reject per RFC 9901 §7.1 step 6)
