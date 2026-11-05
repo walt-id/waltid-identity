@@ -2,7 +2,7 @@ package id.walt.verifier2.mdocs
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -180,16 +180,15 @@ class DcApiMdocVerifier2IntegrationTest {
 
     private fun runRoundTrip(walletOrigin: String, expectSuccess: Boolean) {
         val host = "127.0.0.1"
-        val port = freePort()
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = null,
                         clientMetadata = ClientMetadata(clientName = "Verifier2"),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize",
                     )
                 )
@@ -202,6 +201,7 @@ class DcApiMdocVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             val sessionResponse = testAndReturn("Create DC API verification session") {
