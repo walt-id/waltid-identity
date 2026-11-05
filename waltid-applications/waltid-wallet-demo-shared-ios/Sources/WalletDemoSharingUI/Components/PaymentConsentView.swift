@@ -120,11 +120,16 @@ private func fieldView(_ field: PaymentDisplayField, prominent: Bool) -> some Vi
 private struct PaymentPayee: View {
     let fields: [PaymentDisplayField]
     var detailsInitiallyExpanded = false
-    @State private var allowRemote = false
+    @State private var allowedRemoteSource: String?
+    @State private var loadedLogo: (request: LogoRequest, image: UIImage)?
+
+    private struct LogoRequest: Equatable { let source: String?; let allowRemote: Bool }
 
     var body: some View {
         let logo = fields.first(where: \.isLogo)
         let source = logo?.item.rawValue
+        let allowRemote = source != nil && source == allowedRemoteSource
+        let request = LogoRequest(source: source, allowRemote: allowRemote)
         let remote = source.flatMap(paymentWebsite) != nil
         let details = fields.filter { !$0.isLogo && $0.placement == .details }
         VStack(alignment: .leading, spacing: 12) {
@@ -134,8 +139,8 @@ private struct PaymentPayee: View {
                         fieldView($0, prominent: $0.placement == .prominent)
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                if let logo, let source {
-                    PaymentLogoView(source: source, label: logo.item.label, description: logo.description, allowRemote: allowRemote)
+                if let logo, let loadedLogo, loadedLogo.request == request {
+                    PaymentLogoView(image: loadedLogo.image, label: logo.item.label, description: logo.description)
                 }
             }
             if !details.isEmpty || (remote && !allowRemote) {
@@ -143,13 +148,20 @@ private struct PaymentPayee: View {
                     initiallyExpanded: detailsInitiallyExpanded, accessibilityIdentifier: "payment-payee-details-toggle") {
                     ForEach(details) { fieldView($0, prominent: false) }
                     if remote && !allowRemote {
-                        Button(String(localized: "Load payee logo", bundle: .module)) { allowRemote = true }
+                        Button(String(localized: "Load payee logo", bundle: .module)) { allowedRemoteSource = source }
                             .frame(minHeight: 44)
                     }
                 }
             }
         }.padding().frame(maxWidth: .infinity, alignment: .leading)
             .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .onChange(of: source) { _ in allowRemote = false }
+            .task(id: request) {
+                // The payee remains mounted when no image is available; an empty logo view does not.
+                loadedLogo = nil
+                guard let source = request.source,
+                      let image = await loadPaymentLogo(source, allowRemote: request.allowRemote),
+                      !Task.isCancelled else { return }
+                loadedLogo = (request, image)
+            }
     }
 }
