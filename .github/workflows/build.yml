@@ -45,14 +45,13 @@ jobs:
       - name: Install the pinned browser test tools
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         run: npm ci
-      - name: Test the browser date adapter and claim normalization
+      - name: Run shared browser logic tests
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         run: |
           export CHROME_BIN="$(node -p "require('playwright').chromium.executablePath()")"
           python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir ../build/reports/browser-visual/timings browser-date-tests \
+            --output-dir ../build/reports/browser-visual/timings browser-logic-tests \
             ../../../../gradlew --project-dir ../../../.. :waltid-applications:waltid-wallet-demo-compose:sharedLogic:wasmJsBrowserTest \
-            --tests '*WalletDateTimeTest*' --tests '*CredentialDisplayNormalizerTest*' \
             -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true \
             --max-workers=2 --console=plain
       - name: Compare every browser catalogue state

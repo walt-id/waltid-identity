@@ -19,7 +19,7 @@ prove that registration failure restores editable fields and permits a retry wit
 Credential cases open the real stored card through the API2 mapper, shared normalizer and browser
 Intl adapter. Their catalogue entries explicitly override the default locale/timezone with en-GB
 and Europe/Budapest. No date formatter is copied into the test harness. The browser CI lane also
-runs the shared date/claim unit vectors in Wasm, covering DST gaps, non-hour offsets, local date
+runs the complete shared Wasm logic suite. Its date regressions cover DST gaps, non-hour offsets, local date
 rollover, BCE, fixed zones and locale-specific fractions that do not each need a screenshot.
 
 From the Identity repository:
