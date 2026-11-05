@@ -726,7 +726,7 @@ final class WalletVisualTests: XCTestCase {
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
-        let host = WalletVisualHostingController(rootView: content)
+        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory))
         host.scrollToBottom = scrollToBottom
         host.scrollFraction = scrollFraction
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
