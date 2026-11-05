@@ -891,12 +891,17 @@ object Wallet2RouteHandler {
                         "resume that handle through the deferred-resume route instead of repeating the issuer fetch. " +
                         "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                         "are persisted like the full receive path. " +
-                        "Supply holderBindings identifying the exact stored wallet keys used to create the submitted proofs; " +
-                        "copies require distinct public keys, and inline holder keys cannot be used for storage. " +
+                        "A JWT proof can carry a nested key_attestation for several expected public keys. " +
+                        "Batch limits count proofs. holderBindings independently selects available wallet keys for storage. " +
+                        "Every returned proof-bound credential must match the expected evidence and a selected wallet key. " +
+                        "This wallet profile accepts fewer or reordered credentials, rejects repeated holder keys, " +
+                        "and limits responses to distinct expected keys; the issuer authenticates the attestation. " +
+                        "Copies require distinct public keys, and inline holder keys cannot be used for storage. " +
                         "For a single instance keyId may supply the default holder key. " +
                         "Requests using only released fields return rawCredentials on success. " +
                         "Providing proofs, non-default holderBindings, credentialIdentifier or DPoP context selects the detailed result. " +
                         "A legacy request that requires remote continuation returns HTTP 409; local-save failure returns HTTP 500 with complete progress. " +
+                        "Structured issuer 4xx errors retain their status and CredentialError body. " +
                         "If the issuer returns invalid_nonce, request a fresh nonce, sign the proof collection again, " +
                         "and repeat this isolated fetch step."
                 request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
