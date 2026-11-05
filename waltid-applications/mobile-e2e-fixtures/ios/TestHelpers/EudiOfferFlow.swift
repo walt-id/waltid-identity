@@ -36,15 +36,14 @@ public final class EudiOfferFlow {
 
     public func generate(credentialID: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> EudiGeneratedOffer {
         let entrypoint = URL(string: "https://issuer.eudiw.dev/credential_offer")!
-        let backendGenerate = URL(string: "https://backend.issuer.eudiw.dev/credential_offer")!
-        let backendAuthorize = URL(string: "https://backend.issuer.eudiw.dev/form_authorize_generate")!
 
         // Step 1: Entry page redirect
         let entry = try await client.textRequest(url: entrypoint, allow3xx: true)
         let redirectAction = try resolveURL(base: entry.finalURL, action: try extractFormAction(page: entry.body, formID: "redirect_form"))
-        _ = try await client.formRequest(url: redirectAction, fields: try redirectFields(page: entry.body))
+        let choicePage = try await client.formRequest(url: redirectAction, fields: try redirectFields(page: entry.body))
 
         // Step 2: Generate pre-authorized offer
+        let backendGenerate = try resolveURL(base: choicePage.finalURL, action: try extractFormAction(page: choicePage.body, formID: "selectCredential"))
         let preauthRedirect = try await client.formRequest(url: backendGenerate, fields: [
             credentialID: credentialID,
             "Authorization Code Grant": "pre_auth_code",
@@ -75,6 +74,7 @@ public final class EudiOfferFlow {
 
         // Step 6: Final authorization with user_id
         let userID = try extractUserID(page: authPage.body)
+        let backendAuthorize = try resolveURL(base: authPage.finalURL, action: try extractFormAction(page: authPage.body, formID: "authForm"))
         let offerRedirect = try await client.formRequest(url: backendAuthorize, fields: [
             "user_id": userID,
             "proceed": "Authorize",

@@ -18,8 +18,6 @@ import kotlin.uuid.Uuid
 object EudiTestBackend {
 
     private const val ENTRYPOINT = "https://issuer.eudiw.dev/credential_offer"
-    private const val BACKEND_GENERATE = "https://backend.issuer.eudiw.dev/credential_offer"
-    private const val BACKEND_AUTHORIZE = "https://backend.issuer.eudiw.dev/form_authorize_generate"
     private const val VERIFIER_BACKEND = "https://verifier-backend.eudiw.dev"
 
     /**
@@ -84,11 +82,14 @@ object EudiTestBackend {
         val entryUrl = entryResponse.call.request.url.toString()
 
         val redirectAction = resolveUrl(entryUrl, extractFormAction(entryBody, "redirect_form"))
-        postForm(redirectAction, redirectFields(entryBody))
+        val choiceResponse = postForm(redirectAction, redirectFields(entryBody))
+        val choiceBody = choiceResponse.bodyAsText()
+        val choiceUrl = choiceResponse.call.request.url.toString()
 
         // Step 2: Generate pre-authorized offer
+        val generateAction = resolveUrl(choiceUrl, extractFormAction(choiceBody, "selectCredential"))
         val preauthResponse = postForm(
-            BACKEND_GENERATE,
+            generateAction,
             mapOf(
                 credentialId to credentialId,
                 "Authorization Code Grant" to "pre_auth_code",
@@ -130,8 +131,9 @@ object EudiTestBackend {
 
         // Step 6: Extract user_id and authorize
         val userId = extractUserId(authPageBody)
+        val authorizeAction = resolveUrl(authPageResponse.call.request.url.toString(), extractFormAction(authPageBody, "authForm"))
         val offerResponse = postForm(
-            BACKEND_AUTHORIZE,
+            authorizeAction,
             mapOf(
                 "user_id" to userId,
                 "proceed" to "Authorize",
