@@ -50,6 +50,38 @@ class RedisPersistence<V>(
     override fun getAndRemove(id: String): V? =
         pool.getDel("$discriminator:$id")?.let { decoding.invoke(it) }
 
+    override fun compareAndSet(id: String, expected: V?, replacement: V, ttl: Duration?): Boolean {
+        val key = "$discriminator:$id"
+        val existing = pool.get(key)
+        // Preserve the original bytes for legacy records whose decoder supplies new default fields.
+        if (existing == null && expected != null) return false
+        if (existing != null && (expected == null || encoding(decoding(existing)) != encoding(expected))) return false
+        val milliseconds = (ttl ?: defaultExpiration)?.inWholeMilliseconds?.coerceAtLeast(1) ?: 0
+        val script = """
+            local current = redis.call('GET', KEYS[1])
+            if ARGV[1] == 'absent' then
+                if current then return 0 end
+            elseif current ~= ARGV[2] then return 0 end
+            if tonumber(ARGV[4]) > 0 then
+                redis.call('SET', KEYS[1], ARGV[3], 'PX', ARGV[4])
+            else redis.call('SET', KEYS[1], ARGV[3]) end
+            return 1
+        """.trimIndent()
+        return pool.eval(script, listOf(key), listOf(if (existing == null) "absent" else "present", existing.orEmpty(), encoding(replacement), milliseconds.toString())) == 1L
+    }
+
+    override fun retainForAtLeast(id: String, ttl: Duration): Boolean {
+        val script = """
+            local remaining = redis.call('PTTL', KEYS[1])
+            if remaining == -2 then return 0 end
+            if remaining >= 0 and remaining < tonumber(ARGV[1]) then
+                redis.call('PEXPIRE', KEYS[1], ARGV[1])
+            end
+            return 1
+        """.trimIndent()
+        return pool.eval(script, listOf("$discriminator:$id"), listOf(ttl.inWholeMilliseconds.coerceAtLeast(1).toString())) == 1L
+    }
+
     override fun contains(id: String): Boolean = pool.exists("$discriminator:$id")
 
     override fun listAllKeys(): Set<String> = scanKeys()
