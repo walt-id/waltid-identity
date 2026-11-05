@@ -4,12 +4,14 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
 import androidx.test.platform.app.InstrumentationRegistry
+import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /** Explicit operator opt-in: -e wallet.sca approve|cancel-retry. Uses only disposable synthetic data. */
+@PhysicalDeviceTest
 class NativeScaDeviceTest {
     @Test
     fun protectedPaymentProof() = runBlocking {

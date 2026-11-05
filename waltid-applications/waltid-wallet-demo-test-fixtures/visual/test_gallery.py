@@ -16,6 +16,8 @@ class GalleryTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.command("init", "-b", "main")
+        # Background maintenance must not outlive this disposable repository.
+        self.command("config", "maintenance.auto", "false")
         self.command("config", "commit.gpgsign", "false")
         self.command("config", "user.name", "Visual contract test")
         self.command("config", "user.email", "visual-test@example.invalid")
