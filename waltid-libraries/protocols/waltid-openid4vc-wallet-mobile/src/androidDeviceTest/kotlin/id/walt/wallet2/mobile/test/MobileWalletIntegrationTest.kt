@@ -53,7 +53,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import org.junit.Ignore
 import org.junit.Test
 import java.util.Base64
 import java.util.UUID
@@ -211,13 +210,11 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    @Ignore("Re-enable after EUDI issuer trust is restored: https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93")
     fun receiveAndPresentEudiEhicSdJwtAgainstEudi() = runBlocking {
         receiveAndPresentEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }
 
     @Test
-    @Ignore("Re-enable after EUDI issuer trust is restored: https://github.com/eu-digital-identity-wallet/eudi-srv-trust-validator/issues/93")
     fun previewAndSubmitEudiEhicSdJwtAgainstEudi() = runBlocking {
         previewAndSubmitEudiCredential(EUDI_EHIC_SD_JWT_CREDENTIAL_ID)
     }

@@ -6,7 +6,7 @@ import id.walt.cose.*
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
@@ -214,9 +214,8 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
         walletCredentials: List<MdocsCredential>,
     ) {
         val host = "127.0.0.1"
-        val port = freePort()
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -226,7 +225,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -239,6 +238,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             val verificationSessionResponse = testAndReturn("Create verification session") {
