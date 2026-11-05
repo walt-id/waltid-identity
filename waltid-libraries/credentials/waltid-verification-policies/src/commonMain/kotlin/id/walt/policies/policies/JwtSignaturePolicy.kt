@@ -1,8 +1,6 @@
 package id.walt.policies.policies
 
-import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.crypto.exceptions.VerificationException
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.policies.JwtVerificationPolicy
 import id.walt.sdjwt.AsyncJWTCryptoProvider
 import id.walt.sdjwt.SDJwt
@@ -10,8 +8,6 @@ import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
@@ -25,27 +21,20 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
 ) {
     override val name = "signature"
     override val description =
-        "Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`, or the key from the x5c certificate chain header if that chain is anchored by a trusted root CA."
+        "Checks a JWT credential by verifying its cryptographic signature using either the key from the x5c certificate chain header or the key referenced by the DID in `iss`."
     override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     @JvmBlocking
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> = runCatching {
-        val jws = credential.substringBefore("~")
-        val jwsParsed = jws.decodeJws()
-        if (JwtKeyResolver.resolvesFromX5c(jwsParsed.header, jwsParsed.payload)) {
-            requireTrustedIssuerX5c(jwsParsed.header.getValue("x5c").jsonArray.map { it.jsonPrimitive.content }, context)
-        }
-
-        JwsSignatureScheme().let {
+    override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
+        return JwsSignatureScheme().let {
             if (SDJwt.isSDJwt(credential, sdOnly = true)) {
                 it.verifySDJwtWithIssuerKeys(credential)
             } else
-                // Not JwsSignatureScheme.verify: it refuses x5c keys, which this policy anchors above
-                it.getIssuerKeysInfo(jws).keys.single().verifyJws(jws)
-        }.getOrThrow()
+                it.verify(credential)
+        }
     }
 
     private suspend fun JwsSignatureScheme.verifySDJwtWithIssuerKeys(credential: String): Result<JsonElement> {

@@ -51,7 +51,6 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.slf4j.simple)
-            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
     }
 }

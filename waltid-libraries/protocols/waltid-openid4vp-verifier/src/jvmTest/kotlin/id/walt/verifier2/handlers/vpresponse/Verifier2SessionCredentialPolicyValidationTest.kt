@@ -32,7 +32,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
     private val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
 
     @Test
-    fun signaturePolicyAloneRejectsX5cIssuerKey() = runTest {
+    fun signaturePolicyAloneAcceptsX5cIssuerKey() = runTest {
         val (_, credential) = x5cSdJwtUnderRoot()
         val results = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
             policies = Verification2Session.DefinedVerificationPolicies(
@@ -41,7 +41,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
             validatedCredentials = mapOf("pid" to listOf(credential)),
         )
 
-        assertFalse(results.vcPolicies.single().success)
+        assertTrue(results.vcPolicies.single().success, results.vcPolicies.toString())
     }
 
     @Test
@@ -58,22 +58,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
     }
 
     @Test
-    fun querySpecificX509TrustCountsForGeneralSignaturePolicy() = runTest {
-        val (root, credential) = x5cSdJwtUnderRoot()
-        val results = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
-            policies = Verification2Session.DefinedVerificationPolicies(
-                vc_policies = VCPolicyList(listOf(CredentialSignaturePolicy())),
-                specific_vc_policies = mapOf("pid" to VCPolicyList(listOf(X509TrustPolicy(listOf(root.encodedPem))))),
-            ),
-            validatedCredentials = mapOf("pid" to listOf(credential)),
-        )
-
-        assertTrue(results.vcPolicies.single().success, results.vcPolicies.toString())
-        assertTrue(results.specificVcPolicies.getValue("pid").single().success)
-    }
-
-    @Test
-    fun x509TrustWithWrongRootFailsAlongsideSignature() = runTest {
+    fun x509TrustWithWrongRootFailsOnTrustNotSignature() = runTest {
         val (_, credential) = x5cSdJwtUnderRoot()
         val (otherRoot, _) = x5cSdJwtUnderRoot()
         val results = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
@@ -83,6 +68,7 @@ class Verifier2SessionCredentialPolicyValidationTest {
             validatedCredentials = mapOf("pid" to listOf(credential)),
         )
 
+        assertTrue(results.vcPolicies.single { it.policy is CredentialSignaturePolicy }.success)
         assertFalse(results.vcPolicies.single { it.policy is X509TrustPolicy }.success)
     }
 

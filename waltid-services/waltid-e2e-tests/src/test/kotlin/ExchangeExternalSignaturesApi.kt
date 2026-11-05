@@ -600,8 +600,6 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
                             })
                     )
                 )
-                // The default `signature_sd-jwt-vc` policy anchors the issuer x5c chain to these roots
-                put("trusted_root_cas", JsonArray(listOf(JsonPrimitive(IssuanceExamples.ROOT_CA_CERT))))
             })
         }
         assertEquals(200, createReqResponse.status.value)

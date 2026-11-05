@@ -13,6 +13,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -64,6 +65,26 @@ class X5cTrustAnchorsTest {
             listOf(der(leaf.certificate), der(intermediate.certificate), der(root.certificate)),
             listOf(der(intermediate.certificate)),
         ).getOrThrow()
+    }
+
+    @Test
+    fun pinnedSelfSignedEndEntityIsTrusted() = runTest {
+        val key = generateKey("CN=Self-signed issuer")
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) {
+            subjectDn = "CN=Self-signed issuer"
+            extensionBasicConstraints { cA = false }
+        }
+
+        X5cTrustAnchors.validate(listOf(der(certificate)), listOf(der(certificate))).getOrThrow()
+    }
+
+    @Test
+    fun pinnedCaSigningCertificateIsRejected() = runTest {
+        val ca = selfSigned("CN=Self-signed CA")
+
+        val failure = X5cTrustAnchors.validate(listOf(der(ca.certificate)), listOf(der(ca.certificate))).exceptionOrNull()
+
+        assertContains(requireNotNull(failure).message.orEmpty(), "cA flag")
     }
 
     @Test

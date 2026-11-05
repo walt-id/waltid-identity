@@ -7,7 +7,6 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.issuer.issuance.IssuanceRequest
-import id.walt.issuer.issuance.openapi.issuerapi.IssuanceExamples
 import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.sdjwt.SDField
@@ -344,7 +343,6 @@ class VerifierPresentedCredentialsIntegrationTests : AbstractIntegrationTest() {
                     }
                 }
             ],
-            "trusted_root_cas": ${buildJsonArray { add(IssuanceExamples.ROOT_CA_CERT) }},
             "vp_policies": [
                 "signature_sd-jwt-vc",
                 "presentation-definition"

@@ -124,10 +124,9 @@ class VPCreateCmd : CliktCommand(name = "create") {
                     require(credential.format == "jwt_vc_json") {
                         "vp create currently supports jwt_vc_json only; ${credential.format} requires format-specific holder binding/session data"
                     }
-                    // The holder checks the signature only: whether the issuer is trusted is the verifier's decision
-                    val signature = VCUtil.verifyJwtSignatureOnly(credential)
-                    require(signature.isSuccess) {
-                        "Credential signature verification failed: ${signature.exceptionOrNull()?.message}"
+                    val signature = VCUtil.verify(credential, VCUtil.policies(listOf("signature"), emptyMap())).single()
+                    require(signature.result.isSuccess) {
+                        "Credential signature verification failed: ${signature.result.exceptionOrNull()?.message}"
                     }
                     if (match.originalQuery.requireCryptographicHolderBinding) {
                         CredentialHolderBinding.requireBoundToPresenter(credential, holderDid, holderKey)
