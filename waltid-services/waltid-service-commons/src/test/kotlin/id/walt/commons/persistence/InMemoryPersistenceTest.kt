@@ -31,6 +31,20 @@ class InMemoryPersistenceTest {
     }
 
     @Test
+    fun `retention extends atomically without shortening existing expiry`() {
+        val time = TestTimeSource()
+        val persistence = InMemoryPersistence<String>("retention", 5.minutes, time)
+        persistence["key"] = "private-key"
+        kotlin.test.assertTrue(persistence.retainForAtLeast("key", 30.minutes))
+        kotlin.test.assertTrue(persistence.retainForAtLeast("key", 1.minutes))
+        time += 6.minutes
+        assertEquals("private-key", persistence["key"])
+        time += 24.minutes
+        assertNull(persistence["key"])
+        assertFalse(persistence.retainForAtLeast("key", 30.minutes))
+    }
+
+    @Test
     fun `scans prune multiple expired entries safely`() {
         val timeSource = TestTimeSource()
         val persistence = InMemoryPersistence<String>("test", 1.minutes, timeSource)

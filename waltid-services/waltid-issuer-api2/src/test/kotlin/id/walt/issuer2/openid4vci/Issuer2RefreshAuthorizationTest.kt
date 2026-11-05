@@ -52,7 +52,10 @@ class Issuer2RefreshAuthorizationTest {
     @Test
     fun rejectedRefreshPreservesInitialCredentialSubset() = verifyRejectedRefresh(initialSubset = true)
 
-    private fun verifyRejectedRefresh(initialSubset: Boolean) = testApplication {
+    @Test fun deferredAuthorizationCodeKeepsOfferAndFullSelection() = verifyRejectedRefresh(initialSubset = false, deferred = true)
+    @Test fun deferredAuthorizationCodeKeepsOfferAndSelectedSubset() = verifyRejectedRefresh(initialSubset = true, deferred = true)
+
+    private fun verifyRejectedRefresh(initialSubset: Boolean, deferred: Boolean = false) = testApplication {
         loadIssuer2ConfigFiles()
         val attestation = createIssuer2ClientAttestationTestMaterial()
         val config = ConfigManager.getConfig<Issuer2ServiceConfig>().copy(clientAuthenticationConfig = attestation.clientAuthenticationConfig)
@@ -87,7 +90,8 @@ class Issuer2RefreshAuthorizationTest {
                 CredentialOfferCredential(scenario.profileId, CredentialOfferRuntimeOverrides(credentialStatus = statuses[index]))
             },
             authMethod = AuthenticationMethod.AUTHORIZED,
-            issuerStateMode = IssuerStateMode.INCLUDE,
+            issuerStateMode = if (deferred) null else IssuerStateMode.INCLUDE,
+            deferred = deferred,
         ))
         val session = assertNotNull(repository.get(offer.offerId))
         val resolved = wallet.resolve(offer)
@@ -158,10 +162,22 @@ class Issuer2RefreshAuthorizationTest {
         assertTrue(assertNotNull(repository.get(offer.offerId)).issuanceResults.isEmpty())
         val first = wallet.buildJwtProofs(resolved.issuerMetadata, a.credentialConfigurationId, includeDidInProof = false)
         val second = wallet.buildJwtProofs(resolved.issuerMetadata, a.credentialConfigurationId, includeDidInProof = false)
-        val issued = client.post(resolved.issuerMetadata.credentialEndpoint) {
+        var issued = client.post(resolved.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
             setBody(credentialRequest(a.credentialConfigurationId, first.copy(jwt = first.jwt!! + second.jwt!!)))
+        }
+        if (deferred) {
+            assertEquals(offer.offerId, resolved.offer.grants?.authorizationCode?.issuerState)
+            assertEquals(HttpStatusCode.Accepted, issued.status, issued.bodyAsText())
+            val transactionId = issued.body<JsonObject>().getValue("transaction_id")
+            assertEquals(HttpStatusCode.NoContent, client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status)
+            assertTrue(repository.get(offer.offerId)!!.issuanceResults.isEmpty())
+            issued = client.post(assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)) {
+                bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(buildJsonObject { put("transaction_id", transactionId) })
+            }
         }
         assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
         val copies = issued.body<JsonObject>().getValue("credentials").jsonArray

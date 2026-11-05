@@ -14,6 +14,7 @@ data class CredentialError(
  * OpenID4VCI credential endpoint error codes.
  */
 object CredentialErrorCodes {
+    const val INVALID_TRANSACTION_ID = "invalid_transaction_id"
     const val INVALID_CREDENTIAL_REQUEST = "invalid_credential_request"
     const val UNKNOWN_CREDENTIAL_CONFIGURATION = "unknown_credential_configuration"
     const val UNKNOWN_CREDENTIAL_IDENTIFIER = "unknown_credential_identifier"

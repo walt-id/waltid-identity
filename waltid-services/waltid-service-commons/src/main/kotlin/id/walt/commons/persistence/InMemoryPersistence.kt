@@ -48,6 +48,22 @@ class InMemoryPersistence<V : Any> @JvmOverloads constructor(
         value
     }
 
+    override fun compareAndSet(id: String, expected: V?, replacement: V, ttl: Duration?): Boolean = synchronized(lock) {
+        if (store.valid(id)?.value != expected) false
+        else {
+            store[id] = entry(replacement, ttl)
+            true
+        }
+    }
+
+    override fun retainForAtLeast(id: String, ttl: Duration): Boolean = synchronized(lock) {
+        val current = store.valid(id) ?: return@synchronized false
+        if (current.ttl != null && current.ttl - current.writtenAt.elapsedNow() < ttl) {
+            store[id] = entry(current.value, ttl)
+        }
+        true
+    }
+
     override fun contains(id: String): Boolean = synchronized(lock) {
         store.valid(id) != null
     }
