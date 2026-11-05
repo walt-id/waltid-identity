@@ -100,9 +100,11 @@ actor MockWalletClient: WalletClient {
             affirmativeAction: english ? "Confirm payment" : "Zahlen",
             denialAction: english ? "Cancel payment" : "Ablehnen", requiresUnsignedRequestWarning: scenario == "unsigned",
             fields: [
-                .init(label: english ? "Amount" : "Betrag", description: nil, value: "11.56 EUR", placement: .prominent),
-                .init(label: english ? "Payee" : "Empfänger", description: nil, value: "Super Store", placement: .main),
-                .init(label: english ? "Transaction ID" : "Transaktions-ID", description: nil, value: "txn-1", placement: .details),
+                .init(label: english ? "Amount" : "Betrag", description: nil, value: "11.56", placement: .prominent, path: ["amount"]),
+                .init(label: english ? "Currency" : "Währung", description: nil, value: "EUR", placement: .prominent, path: ["currency"]),
+                .init(label: english ? "Payee" : "Empfänger", description: nil, value: "Super Store", placement: .prominent, path: ["payee", "name"]),
+                .init(label: english ? "Payee ID" : "Empfänger-ID", description: nil, value: "merchant-001", placement: .main, path: ["payee", "id"]),
+                .init(label: english ? "Transaction ID" : "Transaktions-ID", description: nil, value: "txn-1", placement: .details, path: ["transaction_id"]),
                 .init(label: "Omitted", description: nil, value: "bound-but-hidden", placement: .omitted),
             ])
     }
