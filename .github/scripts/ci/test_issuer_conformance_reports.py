@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from urllib.parse import quote
 
 import issuer_conformance_reports as reports
 
@@ -77,6 +78,15 @@ class IssuerConformanceReportsTest(unittest.TestCase):
         status.update(deferredTestOutcome=outcome, reportErrors=errors)
         reports.write_json(destination / "shard.json", status)
         return errors
+
+    def render_summary(self):
+        script = Path(__file__).with_name("publish-issuer-conformance-summary.sh")
+        summary = self.root / "summary.md"
+        summary.write_text("")
+        subprocess.run(["bash", str(script)], check=True, capture_output=True, text=True,
+                       env={**os.environ, "ISSUER_DIAGNOSTICS_DIR": str(self.output),
+                            "GITHUB_STEP_SUMMARY": str(summary)})
+        return summary.read_text()
 
     def test_deferred_runs_require_both_proofs_and_preserve_immediate_results(self):
         for proof in reports.PROOFS:
@@ -199,23 +209,90 @@ class IssuerConformanceReportsTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which("jq"), "issuer summary rendering requires jq")
     def test_summary_keeps_tables_and_plan_links_and_discloses_incomplete_coverage(self):
         self.make_both()
-        script = Path(__file__).with_name("publish-issuer-conformance-summary.sh")
-        summary = self.root / "summary.md"
         for missing in (False, True):
             with self.subTest(missing=missing):
                 if missing:
                     shutil.rmtree(self.shards / "issuer-conformance-proof-attestation")
                 reports.merge(self.shards, self.output)
-                summary.write_text("")
-                subprocess.run(["bash", str(script)], check=True, capture_output=True, text=True,
-                               env={**os.environ, "ISSUER_DIAGNOSTICS_DIR": str(self.output),
-                                    "GITHUB_STEP_SUMMARY": str(summary)})
-                text = summary.read_text()
+                text = self.render_summary()
                 self.assertIn("# OpenID4VCI Issuer Conformance Summary", text)
                 self.assertIn("| Variant | Status | Plan | Batch coverage |", text)
                 self.assertIn("https://conformance.waltid.cloud/plan-detail.html?plan=plan-0", text)
                 self.assertIn("issuer-conformance-basic-haip-batch", text)
                 self.assertEqual("Issuer result validation failed" in text, missing)
+
+    @unittest.skipUnless(shutil.which("jq"), "issuer summary rendering requires jq")
+    def test_deferred_summary_lists_both_proofs_plans_and_module_logs(self):
+        for proof in reports.PROOFS:
+            self.make_deferred(proof)
+        self.assertEqual([], reports.merge(self.shards, self.output, require_deferred=True))
+        text = self.render_summary().split("## Deferred issuance", 1)[1]
+        self.assertIn("- Total: 24\n- Passed: 24\n- Failed: 0", text)
+        self.assertIn("| jwt | 12 | 12 | 0 |", text)
+        self.assertIn("| attestation | 12 | 12 | 0 |", text)
+        self.assertIn("| Variant | Status | Plan | Batch coverage |", text)
+        self.assertIn("| Test | Status | Suite | Log | Error |", text)
+        self.assertEqual(24, text.count("https://conformance.waltid.cloud/plan-detail.html?plan="))
+        self.assertEqual(48, text.count("https://conformance.waltid.cloud/log-detail.html?log="))
+        for proof in reports.PROOFS:
+            for module in (reports.DEFERRED_HAPPY, reports.DEFERRED_BATCH):
+                self.assertIn(f"variant-0-deferred-proof-{proof}/{module} | passed | PASSED | [log]", text)
+        self.assertNotIn("PRIVATE", text)
+
+    @unittest.skipUnless(shutil.which("jq"), "issuer summary rendering requires jq")
+    def test_deferred_summary_keeps_failure_link_and_escapes_failure_text(self):
+        test_id = "failed test/0?proof=jwt"
+
+        def fail(rows, matrix):
+            rows[0]["status"] = "FAILED"
+            rows[0]["modules"][0].update(
+                testId=test_id, accepted=False, result="FAILED",
+                failureSummary="HTTP 502 | <condition>\nupstream failed",
+                error="PRIVATE RESPONSE", log="PRIVATE LOG",
+            )
+
+        self.make_deferred("jwt", fail)
+        self.make_deferred("attestation")
+        self.assertTrue(reports.merge(self.shards, self.output, require_deferred=True))
+        summary = self.render_summary()
+        self.assertIn("Issuer result validation failed", summary)
+        text = summary.split("## Deferred issuance", 1)[1]
+        self.assertIn("- Total: 24\n- Passed: 23\n- Failed: 1", text)
+        self.assertIn("| jwt | 12 | 11 | 1 |", text)
+        url = f"https://conformance.waltid.cloud/log-detail.html?log={quote(test_id, safe='')}"
+        row = next(line for line in text.splitlines() if url in line)
+        self.assertIn("| failed | FAILED | [log]", row)
+        self.assertIn("HTTP 502", row)
+        self.assertIn("upstream failed", row)
+        self.assertEqual(7, len(row.split("|")))
+        self.assertNotIn("<condition>", text)
+        self.assertNotIn("PRIVATE", text)
+
+    @unittest.skipUnless(shutil.which("jq"), "issuer summary rendering requires jq")
+    def test_deferred_summary_shows_blocked_variant_without_fabricated_links(self):
+        def block(rows, matrix):
+            rows[0].update(status="BLOCKED", planId=None, modules=[])
+            rows[1]["modules"][0].update(testId="N/A", accepted=False, result="ERROR")
+
+        self.make_deferred("jwt", block)
+        self.assertTrue(reports.merge(self.shards, self.output, require_deferred=True))
+        text = self.render_summary().split("## Deferred issuance", 1)[1]
+        self.assertIn("| attestation | 0 | 0 | 0 |", text)
+        self.assertIn("| variant-0-deferred-proof-jwt | BLOCKED | — |", text)
+        self.assertIn("No module results were produced; see proof-job setup/test logs.", text)
+        self.assertNotIn("?plan=null", text)
+        self.assertNotIn("?log=N/A", text)
+
+    @unittest.skipUnless(shutil.which("jq"), "issuer summary rendering requires jq")
+    def test_deferred_summary_discloses_empty_results(self):
+        self.assertTrue(reports.merge(self.shards, self.output, require_deferred=True))
+        text = self.render_summary().split("## Deferred issuance", 1)[1]
+        self.assertIn("- Total: 0\n- Passed: 0\n- Failed: 0", text)
+        for proof in reports.PROOFS:
+            self.assertIn(f"| {proof} | 0 | 0 | 0 |", text)
+        self.assertIn("| Test | Status | Suite | Log | Error |", text)
+        self.assertIn("No deferred issuer results were produced", text)
+        self.assertNotIn("[log]", text)
 
 
 if __name__ == "__main__":
