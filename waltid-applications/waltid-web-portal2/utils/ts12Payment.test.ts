@@ -103,3 +103,53 @@ test("full-request payment imports reject unsupported entry fields without dropp
   const { future_extension, ...supported } = entry;
   assert.doesNotThrow(() => assertPaymentTransactionFields(supported));
 });
+
+
+test("all timestamp fields preserve RFC 3339 offsets, fractions and known leap seconds", () => {
+  const now = Date.parse("2016-01-01T00:00:00Z");
+  for (const path of ["date_time", "execution_date", "recurrence.start_date", "recurrence.end_date"]) {
+    for (const value of ["2016-12-31T23:59:60Z", "2017-01-01T00:59:60+01:00",
+      "2016-12-31t23:59:60.1234567891z", "2099-01-01T12:00:00+23:00", "2099-01-01T00:00:00.1234567891Z"]) {
+      const draft = paymentDraft(paymentExample(path.startsWith("recurrence.") ? "recurring" : "unscheduled", new Date(now)));
+      if (path === "execution_date") draft.mode = "scheduled";
+      draft.enabled[path] = true;
+      draft.values[path] = value;
+      const payload = parsePaymentJson(paymentPayload(draft, now));
+      const actual = path.split(".").reduce((object, key) => object[key], payload);
+      assert.equal(actual, value, path);
+    }
+  }
+});
+
+test("timestamp fields reject calendar rollover and invalid RFC 3339 bounds", () => {
+  for (const path of ["date_time", "execution_date", "recurrence.start_date", "recurrence.end_date"]) {
+    const draft = paymentDraft(paymentExample(path.startsWith("recurrence.") ? "recurring" : "unscheduled"));
+    if (path === "execution_date") draft.mode = "scheduled";
+    draft.enabled[path] = true;
+    for (const value of ["2099-02-30T00:00:00Z", "2100-02-29T00:00:00Z", "2099-13-01T00:00:00Z",
+      "2099-01-00T00:00:00Z", "2099-01-01T24:00:00Z", "2099-01-01T00:60:00Z",
+      "2099-01-01T00:00:00+24:00", "2099-01-01T00:00:00+01:60",
+      "2016-12-30T23:59:60Z", "2016-12-31T12:34:60Z"]) {
+      draft.values[path] = value;
+      assert.throws(() => paymentPayload(draft), /date, time and UTC offset/, path + ": " + value);
+    }
+    if (path !== "execution_date") {
+      for (const value of ["2000-02-29T00:00:00Z", "0000-02-29T00:00:00Z"]) {
+        draft.values[path] = value;
+        assert.doesNotThrow(() => paymentPayload(draft));
+      }
+    }
+  }
+});
+
+test("scheduled leap seconds use the server's conservative deadline boundary", () => {
+  const draft = paymentDraft(paymentExample("unscheduled"));
+  draft.mode = "scheduled";
+  const midnight = Date.parse("2017-01-01T00:00:00Z");
+  for (const value of ["2016-12-31T23:59:60.1234567891Z", "2017-01-01T00:59:60.9+01:00"]) {
+    draft.values.execution_date = value;
+    assert.doesNotThrow(() => paymentPayload(draft, midnight - 1));
+    assert.doesNotThrow(() => paymentPayload(draft, midnight));
+    assert.throws(() => paymentPayload(draft, midnight + 1), /must not lie in the past/);
+  }
+});

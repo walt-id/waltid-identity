@@ -96,7 +96,7 @@ export function paymentDraft(text: string): PaymentDraft {
   }
   return result;
 }
-export function paymentPayload(draft: PaymentDraft): string {
+export function paymentPayload(draft: PaymentDraft, now = Date.now()): string {
   const result: Record<string, any> = {};
   if (draft.pisp) result.pisp = {};
   if (draft.mode === "recurring") result.recurrence = draft.mit ? { mit_options: {} } : {};
@@ -119,15 +119,36 @@ export function paymentPayload(draft: PaymentDraft): string {
     if (field.kind === "frequency" && !Object.hasOwn(PAYMENT_FREQUENCIES, raw)) throw new Error("Select a supported payment frequency.");
     if (field.path === "transaction_id" && [...raw].length > 36) throw new Error("Transaction ID must have at most 36 characters.");
     if (field.path === "currency" && !/^[A-Z]{3}$/.test(raw)) throw new Error("Currency must be an ISO 4217 alpha-3 code.");
-    if (field.kind === "timestamp" && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/i.test(raw) || !Number.isFinite(Date.parse(raw)))) {
-      throw new Error(field.label + " must include a date, time and UTC offset.");
+    if (field.kind === "timestamp") {
+      const timestamp = paymentTimestamp(raw);
+      if (timestamp === undefined) throw new Error(field.label + " must include a valid date, time and UTC offset.");
+      if (field.path === "execution_date" && timestamp < now) throw new Error("Execution date must not lie in the past.");
     }
-    if (field.path === "execution_date" && Date.parse(raw) < Date.now()) throw new Error("Execution date must not lie in the past.");
     const parts = field.path.split("."); let object = result;
     for (const part of parts.slice(0, -1)) object = object[part] ??= {};
     object[parts.at(-1)!] = value;
   }
   return stringifyPaymentJson(result, 2);
+}
+// Check calendar bounds before Date.parse can normalize impossible dates.
+function paymentTimestamp(raw: string): number | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([Zz]|[+-](\d{2}):(\d{2}))$/.exec(raw);
+  if (!match) return;
+  const [, year, month, day, hour, minute, second, fraction = "", zone, offsetHour = "0", offsetMinute = "0"] = match;
+  const y = Number(year), m = Number(month), d = Number(day);
+  const days = [31, y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (m < 1 || m > 12 || d < 1 || d > days[m - 1] || Number(hour) > 23 || Number(minute) > 59 ||
+      Number(second) > 60 || Number(offsetHour) > 23 || Number(offsetMinute) > 59) return;
+  // The clock has millisecond resolution; retain the full original text in the payload.
+  const millis = fraction.slice(0, 3).padEnd(3, "0");
+  const instant = Date.parse(`${year}-${month}-${day}T${hour}:${minute}:${second === "60" ? "59" : second}.${millis}${zone.toUpperCase()}`);
+  if (!Number.isFinite(instant)) return;
+  if (second !== "60") return instant;
+  const utc = new Date(instant);
+  const next = Math.floor(instant / 1000) * 1000 + 1000;
+  if (utc.getUTCHours() !== 23 || utc.getUTCMinutes() !== 59 || new Date(next).getUTCDate() !== 1) return;
+  // Match the server: an inserted second cannot extend a deadline beyond the following midnight.
+  return next;
 }
 function isMathematicalInteger(raw: string): boolean {
   const match = /^-?(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(raw)!;
