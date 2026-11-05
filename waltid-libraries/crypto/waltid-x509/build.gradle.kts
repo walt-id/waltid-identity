@@ -36,6 +36,7 @@ kotlin {
         }
 
         commonMain.dependencies {
+            implementation(identityLibs.signum.indispensable)
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)

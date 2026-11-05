@@ -49,7 +49,8 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
         val deviceAuth = deviceSigned.deviceAuth
         log.trace { "Device auth (of device signed): $deviceAuth" }
 
-        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext.toMdocVerificationContext())
+        val sessionTranscript = verificationContext.mdocSessionTranscript
+            ?: MdocVerifier.buildSessionTranscriptForContext(verificationContext.toMdocVerificationContext())
 
         requireNotNull(sessionTranscript) { "Requiring session transcript for this verification policy" }
 

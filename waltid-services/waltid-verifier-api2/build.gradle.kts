@@ -70,6 +70,7 @@ dependencies {
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.kotlinx.serialization.cbor)
+    testImplementation(project(":waltid-libraries:crypto:waltid-x509"))
     testImplementation(identityLibs.bouncycastle.prov)
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
