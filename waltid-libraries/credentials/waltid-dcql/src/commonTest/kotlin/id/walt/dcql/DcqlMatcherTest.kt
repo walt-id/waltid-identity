@@ -411,7 +411,12 @@ class DcqlMatcherTest {
             id = "core-only",
             format = "dc+sd-jwt",
             data = buildJsonObject { put("vct", "https://issuer.example/pid") },
-            disclosures = listOf(givenName, DcqlDisclosure(null, JsonPrimitive("FR")), DcqlDisclosure("street", JsonPrimitive("Main St 1"))),
+            disclosures = listOf(
+                givenName,
+                DcqlDisclosure(null, JsonPrimitive("FR")),
+                DcqlDisclosure("address", buildJsonObject { put("street", "Main St 1") }),
+                DcqlDisclosure("street", JsonPrimitive("Main St 1")),
+            ),
         )
         fun match(path: String) = DcqlMatcher.match(
             DcqlParser.parse(
@@ -433,7 +438,7 @@ class DcqlMatcherTest {
         assertEquals(givenName, result.selectedDisclosures.orEmpty().values.single())
         assertEquals(listOf(givenName), result.disclosuresByPath.values.flatten())
 
-        // A name alone places a disclosure at the top level only, and an array element has no name
+        // A name alone places a disclosure at the top level only, so no parent is inferred, and an array element has no name
         assertTrue(match("""["address", "street"]""").isFailure)
         assertTrue(match("""["nationalities", 0]""").isFailure)
     }
