@@ -10,7 +10,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -55,7 +54,7 @@ class NotBeforePolicy(
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
-        return PolicyClaimChecker.checkClaim(credential, claims, requireField) { claim ->
+        return PolicyClaimChecker.checkClaim(credential, claims, requireField, checkAllClaims = true) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
             val rawLong = this.longOrNull

@@ -5,6 +5,8 @@ package id.walt.policies2.vc.policies
 import com.nfeld.jsonpathkt.JsonPath
 import com.nfeld.jsonpathkt.kotlinx.resolveOrNull
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.signatures.JwtBasedSignature
+import id.walt.credentials.utils.JwtUtils
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -41,14 +43,22 @@ object PolicyClaimChecker {
         credential: DigitalCredential,
         claims: List<JsonPath>,
         requireField: Boolean = false,
+        checkAllClaims: Boolean = false,
         block: JsonElement.(path: JsonPath) -> Result<ClaimCheckResult>
     ): Result<JsonObject> {
-        val credentialData = credential.credentialData
-        val foundClaim = claims.firstOrNull { claim ->
-            credentialData.resolveOrNull(claim) != null
+        val dataSources = buildList {
+            add(credential.credentialData)
+            // JWT validity claims apply even when the parser unwraps the inner vc object.
+            // W3C VC 1.1 section 6.3.1 and RFC 7519 sections 4.1.4-4.1.5.
+            if (checkAllClaims && credential.signature is JwtBasedSignature) {
+                credential.signed?.let { add(JwtUtils.parseJwt(it.substringBefore("~")).second) }
+            }
         }
+        val foundClaims = dataSources.flatMap { data ->
+            claims.mapNotNull { claim -> data.resolveOrNull(claim)?.let { claim to it } }
+        }.let { if (checkAllClaims) it else it.take(1) }
 
-        if (foundClaim == null) {
+        if (foundClaims.isEmpty()) {
             if (requireField) {
                 val claimNames = claims.joinToString(", ")
                 return Result.failure(IllegalArgumentException("Mandatory claim ($claimNames) is absent"))
@@ -56,9 +66,9 @@ object PolicyClaimChecker {
             return Result.success(ClaimNotFoundClaimCheckResult.CLAIM_NOT_FOUND)
         }
 
-        val data = credentialData.resolveOrNull(foundClaim)
-            ?: throw IllegalStateException("This should not happen: claim could not be resolved the second time")
-
-        return block.invoke(data, foundClaim).map { Json.encodeToJsonElement(it).jsonObject }
+        val results = foundClaims.map { (claim, data) ->
+            block.invoke(data, claim).getOrElse { return Result.failure(it) }
+        }
+        return Result.success(Json.encodeToJsonElement(results.first()).jsonObject)
     }
 }

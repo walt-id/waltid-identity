@@ -51,7 +51,7 @@ class ExpirationDatePolicy(
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
-        return PolicyClaimChecker.checkClaim(credential, claims, requireField) { claim ->
+        return PolicyClaimChecker.checkClaim(credential, claims, requireField, checkAllClaims = true) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
             val rawLong = this.longOrNull
@@ -64,7 +64,7 @@ class ExpirationDatePolicy(
             val storedDate = rawLong?.let { Instant.fromEpochSeconds(it) } ?: Instant.parse(this.content)
             val now = Clock.System.now()
 
-            val isExpired = now > storedDate
+            val isExpired = now >= storedDate
 
             if (isExpired) {
                 val expiredSince = now - storedDate
