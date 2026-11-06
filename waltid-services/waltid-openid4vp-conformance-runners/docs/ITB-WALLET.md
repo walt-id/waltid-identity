@@ -1,7 +1,7 @@
 # WeBuild ITB wallet runs
 
 [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) covers the
-21 deployed CS-01, CS-02, CS-07 and TS12 cases. `itbWallet` drives their actual
+21 selected CS-01, CS-02, CS-07 and TS12 Wallet SUT cases. `itbWallet` drives their actual
 ITB interactions through the production wallet, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
@@ -50,6 +50,8 @@ Portal UI IDs are not API keys. The manifest pins the deployment to
 `https://dev-i4mlab.aegean.gr/itb`, the system name to `walt.id`, and the exact
 statement, suite and case labels. A different selected system or missing/ambiguous
 label fails before wallet execution. System and actor API keys are not needed.
+The pinned inventory was checked on 2026-11-06 and retains the deployed
+`[Wallet SUT]` qualifiers. Newly deployed cases are not selected automatically.
 
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers -Pplaywright.browser=chromium
@@ -173,6 +175,10 @@ The requirement references are WeBuild architecture commit
 [CS-07 v0.1 pre-flight](https://github.com/webuild-consortium/wp4-architecture/blob/da58a26a84ab3b5bd04c15cb63d5e9ab7479c292/conformance-specs/cs-07-credential-presentation-dc-api.md), and
 [CS-12 v1.0 (TS12 profile)](https://github.com/webuild-consortium/wp4-architecture/blob/da58a26a84ab3b5bd04c15cb63d5e9ab7479c292/conformance-specs/cs-12-sca-payments.md).
 The local check names identify requirement areas, not hosted ITB case IDs.
+These local requirements remain pinned independently of the live catalogue:
+the deployed CS-02 suite now advertises v1.2, and labels VP-007 as an mdoc
+interoperability extension outside its normative coverage. Running the selected
+cases does not establish full coverage of the updated profile.
 
 The [public ITB base-protocol inventory](https://github.com/webuild-consortium/wp4-interop-test-bed/tree/9cd45c78483766e7bc60d9028def9103214a4529/tests/base-protocols)
 at `9cd45c78483766e7bc60d9028def9103214a4529` contains eight issuance and seven

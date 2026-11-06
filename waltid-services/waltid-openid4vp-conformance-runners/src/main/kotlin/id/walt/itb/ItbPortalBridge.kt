@@ -13,7 +13,7 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
-    enum class Step { SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT }
+    enum class Step { NAVIGATION, SYSTEM, STATEMENT, EXECUTION_MODE, CASE, SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT }
 }
 
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
@@ -24,21 +24,31 @@ class ItbPortalBridge(
 ) : ItbInteractionBridge {
     override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
         // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
-        page.navigate("about:blank")
-        page.navigate(statementsUrl)
-        val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
-        check(system.innerText().trim() == systemName) { "The portal selected a different ITB system" }
-        page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
-        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
-            Pattern.compile("(?:Interactive|Parallel background|Sequential background) execution$"),
-        )).click()
-        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
-        val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
-            page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
-        ))
-        suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
-            page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
-        )).locator("button[ngbtooltip=Run]").click()
+        step(ItbPortalStepTimeout.Step.NAVIGATION) {
+            page.navigate("about:blank")
+            page.navigate(statementsUrl)
+        }
+        step(ItbPortalStepTimeout.Step.SYSTEM) {
+            val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
+            check(system.innerText().trim() == systemName) { "The portal selected a different ITB system" }
+        }
+        step(ItbPortalStepTimeout.Step.STATEMENT) {
+            page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
+        }
+        step(ItbPortalStepTimeout.Step.EXECUTION_MODE) {
+            page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
+                Pattern.compile("(?:Interactive|Parallel background|Sequential background) execution$"),
+            )).click()
+            page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
+        }
+        step(ItbPortalStepTimeout.Step.CASE) {
+            val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
+                page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
+            ))
+            suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
+                page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
+            )).locator("button[ngbtooltip=Run]").click()
+        }
         val id = step(ItbPortalStepTimeout.Step.SESSION) {
             page.waitForCondition { page.locator(".session-table-title-value .value").count() == 1 && sessionId().isNotBlank() }
             sessionId()
