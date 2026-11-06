@@ -355,14 +355,14 @@ class MobileWalletIntegrationTest {
         val defaultOffSession = DemoTestBackend.createVerifierSession(scenario)
         val defaultOffPreview = client.previewPresentation(defaultOffSession.authorizationRequestUri).requireReadyPreview()
         val defaultOffOption = defaultOffPreview.singleReceivedCredentialOption(credentialIds)
-        val defaultOffBirthDate = defaultOffOption.disclosures.singleOrNull { it.name == "birth_date" }
+        val defaultOffBirthDate = defaultOffOption.disclosures.singleOrNull { it.name == "birthdate" }
         assertNotNull(
             defaultOffBirthDate,
-            "Preview should expose optional birth_date from alternative DCQL claim_set: preview=$defaultOffPreview",
+            "Preview should expose optional birthdate from alternative DCQL claim_set: preview=$defaultOffPreview",
         )
-        assertTrue(defaultOffBirthDate.selectivelyDisclosable, "birth_date should be selectively disclosable")
-        assertTrue(defaultOffBirthDate.selectable, "birth_date should be selectable")
-        assertEquals(false, defaultOffBirthDate.required, "birth_date should not be required by the minimal claim_set")
+        assertTrue(defaultOffBirthDate.selectivelyDisclosable, "birthdate should be selectively disclosable")
+        assertTrue(defaultOffBirthDate.selectable, "birthdate should be selectable")
+        assertEquals(false, defaultOffBirthDate.required, "birthdate should not be required by the minimal claim_set")
         assertTrue(
             defaultOffOption.disclosures.filter { it.name == "given_name" || it.name == "family_name" }
                 .all { it.required && !it.selectable },
@@ -383,27 +383,27 @@ class MobileWalletIntegrationTest {
         val defaultOffInfo = DemoTestBackend.verifierSessionInfo(defaultOffSession.sessionId)
         assertEquals(
             false,
-            defaultOffInfo.verifiedPresentationData().containsKey("birth_date"),
-            "Default optional-off submission must not disclose birth_date",
+            defaultOffInfo.verifiedPresentationData().containsKey("birthdate"),
+            "Default optional-off submission must not disclose birthdate",
         )
         assertEquals(
             false,
-            defaultOffInfo.presentedCredentialData().any { it.containsKey("birth_date") },
-            "Default optional-off verifier credential data must not include birth_date",
+            defaultOffInfo.presentedCredentialData().any { it.containsKey("birthdate") },
+            "Default optional-off verifier credential data must not include birthdate",
         )
         assertEquals(
             false,
-            defaultOffInfo.presentedSdJwtDisclosureClaimNames().contains("birth_date"),
-            "Default optional-off VP token must not include a birth_date disclosure",
+            defaultOffInfo.presentedSdJwtDisclosureClaimNames().contains("birthdate"),
+            "Default optional-off VP token must not include a birthdate disclosure",
         )
 
         val selectedSession = DemoTestBackend.createVerifierSession(scenario)
         val selectedPreview = client.previewPresentation(selectedSession.authorizationRequestUri).requireReadyPreview()
         val selectedOption = selectedPreview.singleReceivedCredentialOption(credentialIds)
-        val selectedBirthDate = selectedOption.disclosures.singleOrNull { it.name == "birth_date" }
+        val selectedBirthDate = selectedOption.disclosures.singleOrNull { it.name == "birthdate" }
         assertNotNull(
             selectedBirthDate,
-            "Preview should expose optional birth_date before selected submission: preview=$selectedPreview",
+            "Preview should expose optional birthdate before selected submission: preview=$selectedPreview",
         )
 
         val selectedResult = client.submitPresentation(
@@ -425,12 +425,12 @@ class MobileWalletIntegrationTest {
         DemoTestBackend.waitForVerifierSuccess(selectedSession.sessionId)
         val selectedInfo = DemoTestBackend.verifierSessionInfo(selectedSession.sessionId)
         assertTrue(
-            selectedInfo.presentedSdJwtDisclosureClaimNames().contains("birth_date"),
-            "Selected optional submission must include birth_date in the VP token disclosures: info=$selectedInfo",
+            selectedInfo.presentedSdJwtDisclosureClaimNames().contains("birthdate"),
+            "Selected optional submission must include birthdate in the VP token disclosures: info=$selectedInfo",
         )
         assertTrue(
-            selectedInfo.presentedCredentialData().any { it["birth_date"]?.jsonPrimitive?.contentOrNull == "1971-09-01" },
-            "Selected optional submission must disclose birth_date in verifier credential data: info=$selectedInfo",
+            selectedInfo.presentedCredentialData().any { it["birthdate"]?.jsonPrimitive?.contentOrNull == "1971-09-01" },
+            "Selected optional submission must disclose birthdate in verifier credential data: info=$selectedInfo",
         )
     }
 

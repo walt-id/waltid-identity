@@ -217,7 +217,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
 
         val portraitDisclosure = presentation.substringBeforeLast('~').split('~').drop(1)
             .map { Json.parseToJsonElement(Base64.decode(it, Base64.URL_SAFE).decodeToString()).jsonArray }
-            .single { it[1].jsonPrimitive.content == "portrait" }
+            .single { it[1].jsonPrimitive.content == "picture" }
         assertArrayEquals(
             "SD-JWT must return the image as a selective disclosure",
             IMAGE_BYTES,
@@ -867,7 +867,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             assertEquals(IMAGE_BYTES.size, portrait.getValue("length").jsonPrimitive.int)
             Base64.decode(portrait.getValue("base64url").jsonPrimitive.content, Base64.URL_SAFE)
         } else {
-            Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
+            Base64.decode(presented.getValue("picture").jsonPrimitive.content, Base64.DEFAULT)
         }
         assertArrayEquals("Verifier received different image bytes for $presentedCredentialId", IMAGE_BYTES, returnedImage)
         assertTrue("Image fixture must exercise the large-response path", responseJson.length > 200_000)
@@ -888,13 +888,13 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     if (scenario.format == "mso_mdoc") {
                         put(MDL_NAMESPACE, buildJsonObject { put("portrait", portrait) })
                     } else {
-                        put("portrait", portrait)
+                        put("picture", portrait)
                     }
                 })
                 if (scenario.format == "dc+sd-jwt") {
                     put("selectiveDisclosure", buildJsonObject {
                         put("fields", buildJsonObject {
-                            listOf("birth_date", "portrait").forEach { name ->
+                            listOf("birthdate", "picture").forEach { name ->
                                 put(name, buildJsonObject { put("sd", JsonPrimitive(true)) })
                             }
                         })
@@ -961,7 +961,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 add(buildJsonObject {
                     put("path", buildJsonArray {
                         if (scenario.format == "mso_mdoc") add(JsonPrimitive(MDL_NAMESPACE))
-                        add(JsonPrimitive("portrait"))
+                        add(JsonPrimitive(if (scenario.format == "mso_mdoc") "portrait" else "picture"))
                     })
                 })
             }))
