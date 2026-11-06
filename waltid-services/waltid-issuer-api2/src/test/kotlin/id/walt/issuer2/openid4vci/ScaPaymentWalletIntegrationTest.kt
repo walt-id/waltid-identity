@@ -173,7 +173,7 @@ class ScaPaymentWalletIntegrationTest {
         }
         val response = http.post("$verifierBase/verification-session/create") {
             contentType(ContentType.Application.Json)
-            setBody(shipped.copy(core = shipped.core.copy(clientId = null, signedRequest = false, encryptedResponse = false),
+            setBody<VerificationSessionSetup>(shipped.copy(core = shipped.core.copy(clientId = null, signedRequest = false, encryptedResponse = false),
                 openid = openid.copy(transactionData = entries)))
         }
         assertEquals(HttpStatusCode.BadRequest, response.status,
