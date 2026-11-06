@@ -1,7 +1,8 @@
 # WeBuild ITB wallet runs
 
-[WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) covers the
-21 selected CS-01, CS-02, CS-07 and TS12 Wallet SUT cases. `itbWallet` drives their actual
+[WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) established the initial inventory;
+[WAL-1704](https://linear.app/walt-new/issue/WAL-1704/restore-itb-wallet-catalogue-selection) refreshes navigation and adds invocation cases. The runner selects 24 CS-01,
+CS-02, CS-07 and TS12 Wallet SUT cases. `itbWallet` drives their actual
 ITB interactions through the production wallet, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
@@ -59,15 +60,15 @@ within the configured statement. Newly deployed cases are not selected automatic
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet
 ```
 
-By default all 21 cases run in catalogue order. `ITB_CASES` can select comma-separated
+By default all 24 cases run in catalogue order. `ITB_CASES` can select comma-separated
 case IDs (for example `tc_vp_002`); required issuance cases are automatically
 included. A failed prerequisite does not skip its presentation cases. Unknown
 or empty selections are configuration errors.
 
-When `CI=true`, selection is restricted to the 15 cases that do not need a
-user-authentication prompt: seven CS-01, four CS-02, one CS-07 and three TS12
+When `CI=true`, selection is restricted to the 18 cases that do not need a
+user-authentication prompt: seven CS-01, seven CS-02, one CS-07 and three TS12
 issuance cases. Explicitly requesting any of the six TS12 payment cases fails
-before a session starts. The local default remains all 21; for the six payment
+before a session starts. The local default remains all 24; for the six payment
 cases with their three issuance prerequisites, use the [operator-assisted native
 setup](ITB-NATIVE.md) and select them explicitly:
 
@@ -94,6 +95,12 @@ have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved
 Reports contain identities, timestamps and error types/codes, not credentials,
 raw protocol messages, browser state or ITB service logs.
 
+Each fresh document waits up to 60 seconds for its login form or selected-system
+control after committing, without waiting for unrelated resources to finish loading.
+Ordinary DOM steps retain
+their 15-second limit. Login failures expose only the safe preparation-step code and
+leave initialized case reports as `NOT_RUN`; they do not start or retry a session.
+
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
@@ -113,8 +120,8 @@ file. Request `x5c` chains are never automatically trusted.
 The **WeBuild ITB live wallet cases** workflow is explicitly dispatched by an
 operator because it uses a shared external tenant. Runs share one concurrency
 group so their tenant sessions do not overlap. The six payment cases remain
-local, operator-assisted coverage; CI success means 15/15 selected cases, not
-21/21. The offline profile checks remain a separate PR check.
+local, operator-assisted coverage; CI success means 18/18 selected cases, not
+24/24. The offline profile checks remain a separate PR check.
 
 The portal bridge gives a started, owned session up to 45 seconds to display its
 wallet interaction and reports the portal's generic execution error separately.
@@ -141,11 +148,20 @@ switch does not change ITB outcomes.
 
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
-Dispatch becomes available once the workflow exists on the default branch. Its
+Dispatch is available from the default branch. Its
 `cases` input can select an unattended subset, such as `tc_vp_002` with its
-issuance prerequisite; an empty input runs all 15. An operator-required
+issuance prerequisite; an empty input runs all 18. An operator-required
 case is rejected before any tenant session starts. The checked-in workflow
 alone is not a successful hosted run.
+
+Live runs remain manual after assessing the repository's `ci:conformance` label
+convention. That label controls eligibility; it does not authorize ITB secrets for
+a particular PR revision. A future live label lane must reject forks, authorize an
+immutable head, recheck the label and current head before secrets, require renewed
+authorization after pushes, and serialize with this lane. Local operators must also
+check tenant idleness and reserve it while running; GitHub concurrency cannot lock
+local sessions. Do not run PR code with secrets under an unguarded
+`pull_request_target` workflow.
 
 ## Local profile checks
 
@@ -178,8 +194,11 @@ The requirement references are WeBuild architecture commit
 The local check names identify requirement areas, not hosted ITB case IDs.
 These local requirements remain pinned independently of the live catalogue:
 the deployed CS-02 suite now advertises v1.2, and labels VP-007 as an mdoc
-interoperability extension outside its normative coverage. Running the selected
-cases does not establish full coverage of the updated profile.
+interoperability extension outside its normative coverage. The
+[CS-02 v1.2 assessment](ITB-CS02-COVERAGE.md) maps the full profile and newly
+deployed cases to supported coverage and explicit gaps, including missing registrar
+data, registration trust and physical invocation/consent. The selected cases do not
+establish full coverage of the updated profile.
 
 The [public ITB base-protocol inventory](https://github.com/webuild-consortium/wp4-interop-test-bed/tree/9cd45c78483766e7bc60d9028def9103214a4529/tests/base-protocols)
 at `9cd45c78483766e7bc60d9028def9103214a4529` contains eight issuance and seven
@@ -189,7 +208,7 @@ Do not equate the eleven local profile checks with the deployed cases.
 
 ### Deployed catalogue
 
-The authenticated Walt.id catalogue on ITB 1.29.5 was inspected on 2026-09-21.
+The authenticated Walt.id catalogue on ITB 1.29.5 was inspected on 2026-11-06.
 The [case manifest](../src/main/resources/itb/wal-1423-catalogue.json) records the
 actual suite/case identifiers exposed by the portal's REST API configuration.
 It contains no API keys. Versions below are the suite's displayed descriptions;
@@ -197,13 +216,13 @@ the execution report must still record the version actually run.
 
 | Target | Deployed suite ID | Cases | Displayed version |
 | --- | --- | --- | --- |
-| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.0, December 2025 |
-| CS-02 | `cs02v1` | VP-001/002/003/007 (4) | 1.0, December 2025 |
+| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.0, October 2026 |
+| CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.2, October 2026 |
 | CS-07 | `cts07` | `tc15` (1) | Not exposed on the inspected configuration screen |
 | TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | Not exposed on the inspected configuration screen |
 
-The initial matrix therefore contains **21 cases**. The separate Trust Framework
-Integration suite (1.1, August 2026, optional WUA), QES suite and relying-party
+The selected matrix therefore contains **24 cases**. The separate Trust Framework
+Integration suite (1.3, October 2026, optional WUA), QES suite and relying-party
 tests are not additional initial wallet cases. Historical tenant results do not
 identify this branch's build and must not be reported as its results. Case titles
 and linked documentation are insufficient to infer interaction contracts: the
@@ -213,7 +232,7 @@ VCI-006 documentation popup still describes an unrelated AcademicID flow.
 
 Interactive portal startup is required by the deployed DC API cases: REST
 background startup completes their instruction steps before the wallet can act.
-The runner therefore uses one interactive execution path for all 21 cases and
+The runner therefore uses one interactive execution path for all 24 cases and
 uses REST only for authenticated status, terminal XML reports and cleanup. The
 hyphenated `ITB-API-KEY` header is required by the deployment. XML report requests
 send only `Accept: application/xml`; a combined JSON/XML header is rejected.

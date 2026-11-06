@@ -4,9 +4,7 @@ package id.walt.itb
 
 import com.microsoft.playwright.Browser
 import com.microsoft.playwright.BrowserType
-import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
-import com.microsoft.playwright.options.AriaRole
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
@@ -17,7 +15,6 @@ import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.regex.Pattern
 import kotlin.system.exitProcess
 
 /** Explicit opt-in entry point. Ordinary unit tests never sign in to or start sessions on the remote tenant. */
@@ -26,7 +23,8 @@ fun main(): Unit = runBlocking {
     loggingConfiguration {}
     val exit = try { runItb() } catch (error: Exception) {
         // Configuration errors and browser exceptions may carry authentication values.
-        System.err.println("ITB runner setup failed (${error::class.simpleName}); no passing result is implied.")
+        val code = (error as? ItbPortalStepTimeout)?.step?.let { ":$it" }.orEmpty()
+        System.err.println("ITB runner setup failed (${error::class.simpleName}$code); no passing result is implied.")
         2
     }
     exitProcess(exit)
@@ -74,11 +72,7 @@ private suspend fun runItb(): Int {
             browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000)).use { context ->
                 val page = context.newPage()
                 page.setDefaultTimeout(15_000.0)
-                page.navigate("${catalogue.testBed}/app#/login")
-                page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Username:")).fill(username)
-                page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Password:")).fill(password)
-                page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(Pattern.compile("Log in"))).click()
-                page.waitForURL("${catalogue.testBed}/app#/home")
+                ItbPortalLogin.login(page, catalogue.testBed, username, password)
                 itbHttpClient().use { client ->
                     val native = androidPort?.let {
                         ItbAndroidWalletDriver.connect(it, required("ITB_ANDROID_TOKEN"), origin, pem, Dispatchers.IO)
@@ -109,13 +103,14 @@ private suspend fun runItb(): Int {
 internal object ItbRunSelection {
     private val unattendedCases = setOf(
         "tc_vci_001", "tc_vci_002", "tc_vci_003", "tc_vci_005", "tc_vci_006", "tc_vci_007", "tc_vci_008",
-        "tc_vp_001", "tc_vp_002", "tc_vp_003", "tc_vp_007", "tc15",
+        "tc_vp_001", "tc_vp_002", "tc_vp_003", "tc_vp_007", "tc_vp_011", "tc_vp_012", "tc_vp_013", "tc15",
         "ts12_issue_01", "ts12_issue_02", "ts12_issue_03",
     )
 
     private val prerequisites = mapOf(
         "tc_vp_001" to "tc_vci_006", "tc_vp_002" to "tc_vci_006", "tc_vp_003" to "tc_vci_006",
         "tc_vp_007" to "tc_vci_008", "tc15" to "tc_vci_006",
+        "tc_vp_011" to "tc_vci_006", "tc_vp_012" to "tc_vci_006", "tc_vp_013" to "tc_vci_006",
         "ts12_pay_01" to "ts12_issue_01", "ts12_pay_02" to "ts12_issue_02", "ts12_pay_03" to "ts12_issue_03",
         "ts12_pay_dc_api_01" to "ts12_issue_01", "ts12_pay_dc_api_02" to "ts12_issue_02", "ts12_pay_dc_api_03" to "ts12_issue_03",
     )

@@ -48,6 +48,16 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun freshDocumentWaitsForApplicationReadinessBeyondTheOrdinaryDomTimeout() = runBlocking<Unit> {
+        withPage(applicationDelayMillis = 200) { page ->
+            page.setDefaultTimeout(100.0)
+            val session = ItbPortalBridge(page, statementsUrl, catalogue.systemName).prepare(suite, case)
+            assertEquals(case.id, session.testCase)
+            assertEquals(false, page.evaluate("window.started"))
+        }
+    }
+
+    @Test
     fun identifiesAStaleCaseLabelWithoutStartingASession() = runBlocking<Unit> {
         withPage { page ->
             page.setDefaultTimeout(1_000.0)
@@ -131,8 +141,63 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
+    @Test
+    fun loginWaitsForTheApplicationWithoutWaitingForUnrelatedResources() {
+        withLoginPage { page ->
+            page.setDefaultTimeout(100.0)
+            ItbPortalLogin.login(page, "https://itb.example", "test-user", "test-password", 3_000.0)
+            assertEquals("https://itb.example/app#/home", page.url())
+            assertEquals(1, page.evaluate("window.submits"))
+            assertEquals(false, page.evaluate("window.loaded"))
+        }
+    }
+
+    @Test
+    fun loginFailureReportsTheSafeStepWithoutRetryingOrLeakingInputs() {
+        for (showForm in listOf(false, true)) {
+            withLoginPage(showForm = showForm, acceptLogin = false) { page ->
+                page.setDefaultTimeout(500.0)
+                val failure = assertFailsWith<ItbPortalStepTimeout> {
+                    ItbPortalLogin.login(page, "https://itb.example", "private-user", "private-password", 500.0)
+                }
+                assertEquals(if (showForm) ItbPortalStepTimeout.Step.LOGIN_HOME else ItbPortalStepTimeout.Step.LOGIN_FORM, failure.step)
+                assertEquals(if (showForm) 1 else 0, page.evaluate("window.submits"))
+                assertFalse(failure.toString().contains("private"))
+            }
+        }
+    }
+
+    private fun withLoginPage(showForm: Boolean = true, acceptLogin: Boolean = true, block: (Page) -> Unit) {
+        Playwright.create().use { playwright ->
+            playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
+                browser.newContext().use { context ->
+                    context.route("**/*") { route ->
+                        if (route.request().url() == "https://itb.example/app") {
+                            route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody("""
+                                <img src="/slow-image">
+                                <script>
+                                window.submits = 0; window.loaded = false;
+                                window.addEventListener('load', () => window.loaded = true);
+                                if ($showForm) setTimeout(() => {
+                                    const form = document.createElement('div');
+                                    form.innerHTML = `<label>Username:<input></label><label>Password:<input></label>
+                                        <button onclick="window.submits++; if ($acceptLogin) location.hash='/home'">Log in</button>`;
+                                    document.body.append(form);
+                                }, 200);
+                                </script>
+                            """.trimIndent()))
+                        }
+                        // Deliberately leave the unrelated image pending. Context teardown closes it.
+                    }
+                    block(context.newPage())
+                }
+            }
+        }
+    }
+
     private suspend fun withPage(
         systemName: String = catalogue.systemName,
+        applicationDelayMillis: Int = 0,
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -148,7 +213,7 @@ class ItbPortalBridgeBrowserTest {
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
                             route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible)))
+                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible, applicationDelayMillis)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -161,9 +226,14 @@ class ItbPortalBridgeBrowserTest {
 
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
-        startNeverEnabled: Boolean, actorVisible: Boolean,
+        startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int,
     ) = """
-        <button>$systemName</button>
+        <script>
+        setTimeout(() => {
+            const system = document.createElement('button');
+            system.textContent = '$systemName'; document.body.prepend(system);
+        }, $applicationDelayMillis);
+        </script>
         <app-conformance-statement-item-display>
           <button onclick="selectStatement()">${suite.statement}</button><div id="actors"></div>
         </app-conformance-statement-item-display>

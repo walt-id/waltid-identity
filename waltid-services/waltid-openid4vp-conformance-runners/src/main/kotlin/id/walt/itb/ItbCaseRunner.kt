@@ -93,6 +93,11 @@ class ItbCaseRunner(
                 }
                 phase = ItbCaseResult.Phase.INTERACTION
                 val interaction = bridge.read(createdSession)
+                case.invocationScheme?.let { expected ->
+                    require((interaction as? ItbWalletInteraction.Presentation)?.url?.protocol?.name == expected) {
+                        "The ITB interaction does not use the case's invocation scheme"
+                    }
+                }
                 phase = ItbCaseResult.Phase.WALLET
                 adapterInvoked = true
                 executeWallet(interaction)
