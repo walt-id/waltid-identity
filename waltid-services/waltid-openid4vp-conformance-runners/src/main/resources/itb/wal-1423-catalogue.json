@@ -39,7 +39,8 @@
       "cases": [
         { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request" }
       ],
-      "statement": "Domain Specific and generic use cases"
+      "statement": "Domain Specific and generic use cases",
+      "actor": "User"
     },
     {
       "profile": "TS12",

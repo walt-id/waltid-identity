@@ -25,6 +25,7 @@ data class ItbCatalogue(
         val name: String,
         val publishedVersion: String? = null,
         val cases: List<Case>,
+        val actor: String? = null,
     )
 
     @Serializable
@@ -36,6 +37,7 @@ data class ItbCatalogue(
         require(suites.map { it.id }.distinct().size == suites.size) { "Duplicate ITB suite IDs" }
         suites.forEach { suite ->
             require(suite.id.isNotBlank() && suite.name.isNotBlank() && suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
+            require(suite.actor == null || suite.actor.isNotBlank()) { "Empty ITB actor label" }
             require(suite.cases.all { it.id.isNotBlank() && it.name.isNotBlank() }) { "Empty ITB case identity" }
             require(suite.cases.map { it.id }.distinct().size == suite.cases.size) {
                 "Duplicate ITB case IDs in ${suite.id}"

@@ -51,7 +51,8 @@ Portal UI IDs are not API keys. The manifest pins the deployment to
 statement, suite and case labels. A different selected system or missing/ambiguous
 label fails before wallet execution. System and actor API keys are not needed.
 The pinned inventory was checked on 2026-11-06 and retains the deployed
-`[Wallet SUT]` qualifiers. Newly deployed cases are not selected automatically.
+`[Wallet SUT]` qualifiers. CS-07 explicitly selects its visible `User` actor
+within the configured statement. Newly deployed cases are not selected automatically.
 
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers -Pplaywright.browser=chromium

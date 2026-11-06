@@ -13,7 +13,10 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
-    enum class Step { NAVIGATION, SYSTEM, STATEMENT, EXECUTION_MODE, CASE, SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT }
+    enum class Step {
+        NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
+        SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
+    }
 }
 
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
@@ -34,6 +37,13 @@ class ItbPortalBridge(
         }
         step(ItbPortalStepTimeout.Step.STATEMENT) {
             page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
+        }
+        suite.actor?.let { actor ->
+            step(ItbPortalStepTimeout.Step.ACTOR) {
+                page.getByText(suite.statement, Page.GetByTextOptions().setExact(true))
+                    .locator("xpath=ancestor::app-conformance-statement-item-display[1]")
+                    .getByText(actor, Locator.GetByTextOptions().setExact(true)).click()
+            }
         }
         step(ItbPortalStepTimeout.Step.EXECUTION_MODE) {
             page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
