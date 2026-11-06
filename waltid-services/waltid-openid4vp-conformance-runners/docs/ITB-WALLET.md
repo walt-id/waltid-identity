@@ -104,8 +104,10 @@ leave initialized case reports as `NOT_RUN`; they do not start or retry a sessio
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
-select another interaction. It downloads the owned session's offer/request/script
-input directly from its execution page. It reads declarative
+select another interaction. It reads short inline values or downloads the owned session's offer/request/script
+input directly from its execution page. The portal exposes Copy instead of Download
+for short inline values; the bridge reads only that exact row and never accesses
+the clipboard. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed
 immediately after reading. The deployed authorization-code issuer returns a
 direct redirect; the adapter validates its destination, state and code before
@@ -237,7 +239,7 @@ uses REST only for authenticated status, terminal XML reports and cleanup. The
 hyphenated `ITB-API-KEY` header is required by the deployment. XML report requests
 send only `Accept: application/xml`; a combined JSON/XML header is rejected.
 
-The REST reports omit the offers and request context. The bridge downloads these
+The REST reports omit the offers and request context. The bridge reads these
 from the owned session's pending interaction. It never substitutes a separate
 issuer offer or verifier request and attributes that to an ITB case. The initial
 standalone outcome and regression rationale are in the
