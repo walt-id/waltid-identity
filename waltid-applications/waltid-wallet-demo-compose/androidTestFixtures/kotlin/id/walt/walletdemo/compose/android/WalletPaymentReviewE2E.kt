@@ -19,8 +19,9 @@ internal object WalletPaymentReviewE2E {
             assertNotNull("Missing payment disclosure: $tag", waitForResourceAfterScrolling(device, tag, 10_000))
             clickByTag(device, tag)
         }
-        assertNotNull("Payment consent missing; check deployed issuer metadata",
-            waitForResourceAfterScrolling(device, "payment-consent", 60_000))
+        val consent = waitForResourceAfterScrolling(device, "payment-consent", 60_000)
+        assertFalse("Payment consent is blocked", device.hasObject(By.res("payment-consent-blocked")))
+        assertNotNull("Payment consent is missing", consent)
         listOf("Confirm this payment", "Super Store", "merchant-001", "Payee ID", "Amount", "11.56", "EUR",
             "Check the payee, amounts, timing and recurring terms before confirming.").forEach(::text)
         assertFalse("Failed logos must leave no placeholder", device.hasObject(By.res("payment-payee-logo")))

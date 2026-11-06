@@ -8,7 +8,11 @@ import TestHelpers
 extension XCTestCase {
     func reviewPublicPayment(_ app: XCUIApplication, payment: DemoPayment, capturePrefix: String) {
         let consent = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
-        XCTAssertTrue(consent.waitForExistence(timeout: 60), "Payment consent missing; check deployed issuer metadata")
+        guard consent.waitForExistence(timeout: 60) else {
+            let blocked = app.descendants(matching: .any).matching(identifier: "payment-consent-blocked").firstMatch
+            XCTFail(blocked.exists ? "Payment consent is blocked" : "Payment consent is missing")
+            return
+        }
         func text(_ value: String) -> XCUIElement {
             app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
         }
