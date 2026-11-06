@@ -50,27 +50,58 @@ class WalletIsolatedKeyAttestationTest {
             }
     }
 
-    @Test fun expectedAttestedKeysDoNotSelectOrRequireEveryWalletBinding() = runTest {
-        for (selected in listOf(listOf(0, 2), listOf(0, 1))) {
+    @Test fun incompleteStorageSelectionsFailBeforeAnyCredentialRequest() = runTest {
+        for (form in listOf("attestation", "jwk", "opaque")) for (wrongKey in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val proof = fixture.attestedProof(listOf(0, 1, 2))
-            val raw = listOf(0, 2).map { batchTestCredential(fixture.keys[it]) }
-            var callbacks = 0
-            batchTestClient(credential = { response(raw) }).use { http ->
-                val req = request(fixture, listOf(proof), true).copy(
-                    holderBindings = selected.map { CredentialHolderBinding(fixture.keys[it].keyId) })
-                if (selected == listOf(0, 2)) {
-                    val result = WalletIssuanceHandler.fetchCredentials(fixture.wallet, req, http)
-                    assertEquals(2, assertIs<WalletIssuanceOutcome.Stored>(result.storageOutcome).credentialIds.size)
-                } else {
-                    assertFailsWith<IllegalStateException> {
-                        WalletIssuanceHandler.fetchCredentials(fixture.wallet, req, http,
-                            beforeCredentialsStored = { callbacks++ }, onCredentialStored = { callbacks++ })
-                    }
-                    assertEquals(0, callbacks)
-                    assertTrue(fixture.store.listCredentials().toList().isEmpty())
-                }
+            val proofs = if (form == "attestation") listOf(fixture.attestedProof(listOf(0, 1, 2)))
+            else (0..1).map { index ->
+                CompactJws.sign("{}".encodeToByteArray(), fixture.keys[index].crypto2Key!!, JwsAlgorithm.ES256,
+                    buildJsonObject {
+                        put("typ", "openid4vci-proof+jwt")
+                        if (form == "jwk") put("jwk", fixture.keys[index].crypto2Key!!.exportPublicJwkObject())
+                        else put("kid", "registered-$index")
+                    })
             }
+            val selected = if (form == "attestation") {
+                if (wrongKey) listOf(0, 1, 3) else listOf(0, 1)
+            } else if (wrongKey) listOf(0, 3) else listOf(0)
+            var callbacks = 0
+            var requests = 0
+            batchTestClient(credential = { requests++; error("Must reject incomplete coverage before issuance") }).use { http ->
+                val req = request(fixture, proofs, true).copy(
+                    holderBindings = selected.map { CredentialHolderBinding(fixture.keys[it].keyId) })
+                val failure = assertFailsWith<IllegalArgumentException> {
+                    WalletIssuanceHandler.fetchCredentials(fixture.wallet, req, http,
+                        beforeCredentialsStored = { callbacks++ }, onCredentialStored = { callbacks++ })
+                }
+                assertEquals("Selected wallet bindings do not cover every expected holder key", failure.message)
+            }
+            assertEquals(0, requests, "$form / wrongKey=$wrongKey")
+            assertEquals(0, callbacks)
+            assertTrue(fixture.store.listCredentials().toList().isEmpty())
+        }
+    }
+
+    @Test fun moreCredentialsThanDistinctExpectedKeysFailBeforeAnyWriteOrCallback() = runTest {
+        for (store in listOf(false, true)) {
+            val fixture = batchTestFixture(true)
+            val proof = fixture.attestedProof(listOf(0, 1))
+            val raw = (0..2).map { batchTestCredential(fixture.keys[it]) }
+            var writes = 0
+            var callbacks = 0
+            val wallet = fixture.wallet.copy(credentialStores = listOf(object : WalletCredentialStore by fixture.store {
+                override suspend fun addCredential(entry: StoredCredential) { writes++; fixture.store.addCredential(entry) }
+            }))
+            batchTestClient(credential = { response(raw) }).use { http ->
+                val failure = assertFailsWith<IllegalArgumentException> {
+                    WalletIssuanceHandler.fetchCredentials(wallet, request(fixture, listOf(proof), store), http,
+                        beforeCredentialsStored = { callbacks++ }, onCredentialStored = { callbacks++ })
+                }
+                assertEquals("Issuer returned more credentials than distinct expected holder keys", failure.message)
+            }
+            assertEquals(0, writes)
+            assertEquals(0, callbacks)
+            assertTrue(fixture.store.listCredentials().toList().isEmpty())
         }
     }
 

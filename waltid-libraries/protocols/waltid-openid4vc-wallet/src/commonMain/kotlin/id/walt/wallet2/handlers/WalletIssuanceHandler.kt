@@ -2014,6 +2014,7 @@ object WalletIssuanceHandler {
         val bindings = wallet.resolveStoredCredentialBindings(
             request.holderBindings, request.keyId, proofRequired = request.effectiveProofs != null,
         )
+        request.effectiveProofs?.let { validateIsolatedStorageBindings(it, bindings) }
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
         val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
