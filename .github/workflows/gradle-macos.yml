@@ -88,7 +88,7 @@ on:
 # them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
 # yet when it runs. Scripts use the selected checkout.
 env:
-  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
   JOB_NAME_PREFIX: ${{ inputs.job_name_prefix != '' && format('{0} / ', inputs.job_name_prefix) || '' }}
 
