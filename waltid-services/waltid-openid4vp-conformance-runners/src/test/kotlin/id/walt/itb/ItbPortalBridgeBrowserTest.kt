@@ -14,6 +14,8 @@ class ItbPortalBridgeBrowserTest {
     private val catalogue = ItbCatalogue.initialWalletCases()
     private val suite = catalogue.suites.single { it.id == "cs02v1" }
     private val case = suite.cases.single { it.id == "tc_vp_001" }
+    // Observed portal label; keep independent from the catalogue under test.
+    private val deployedCaseName = "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]"
     private val statementsUrl = "https://itb.example/app#/organisation/conformance/20"
 
     @Test
@@ -31,6 +33,20 @@ class ItbPortalBridgeBrowserTest {
             assertEquals("selected", page.evaluate("window.selectedSuite"))
             bridge.complete()
             assertEquals(0, page.locator("ngb-modal-window").count())
+        }
+    }
+
+    @Test
+    fun identifiesAStaleCaseLabelWithoutStartingASession() = runBlocking<Unit> {
+        withPage { page ->
+            page.setDefaultTimeout(1_000.0)
+            val failure = assertFailsWith<ItbPortalStepTimeout> {
+                ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+                    .prepare(suite, case.copy(name = "VP-001: obsolete case label"))
+            }
+            assertEquals(ItbPortalStepTimeout.Step.CASE, failure.step)
+            assertNull(page.evaluate("window.selectedSuite"))
+            assertEquals(0, page.evaluate("window.startCount"))
         }
     }
 
@@ -145,10 +161,11 @@ class ItbPortalBridgeBrowserTest {
                 <button id="button-executionType">Actions...</button>
                 <button id="button-executionType" onclick="showModes()">Sequential background execution</button>
                 <div class="testSuite"><div>${suite.name}</div>
-                  <div class="mainLine"><div>${case.name}</div><button ngbtooltip="Run" onclick="prepare('selected')">Run</button></div>
+                  <div class="mainLine"><div>${deployedCaseName.replace("[Wallet SUT]", "[Verifier SUT]")}</div><button ngbtooltip="Run" onclick="prepare('wrong-actor')">Run</button></div>
+                  <div class="mainLine"><div>$deployedCaseName</div><button ngbtooltip="Run" onclick="prepare('selected')">Run</button></div>
                 </div>
                 <div class="testSuite"><div>Other suite</div>
-                  <div class="mainLine"><div>${case.name}</div><button ngbtooltip="Run" onclick="prepare('wrong')">Run</button></div>
+                  <div class="mainLine"><div>$deployedCaseName</div><button ngbtooltip="Run" onclick="prepare('wrong')">Run</button></div>
                 </div>`;
         }
         function showModes() {
