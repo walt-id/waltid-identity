@@ -4,6 +4,7 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
+import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.Url
 import java.util.regex.Pattern
 import java.nio.file.Files
@@ -14,6 +15,7 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
     enum class Step {
+        LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
         NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
         SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
     }
@@ -29,11 +31,14 @@ class ItbPortalBridge(
         // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
         step(ItbPortalStepTimeout.Step.NAVIGATION) {
             page.navigate("about:blank")
-            page.navigate(statementsUrl)
+            page.navigate(statementsUrl, Page.NavigateOptions().setWaitUntil(WaitUntilState.COMMIT))
         }
         step(ItbPortalStepTimeout.Step.SYSTEM) {
             val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
-            check(system.innerText().trim() == systemName) { "The portal selected a different ITB system" }
+            // Each fresh document must bootstrap the application before ordinary DOM steps can begin.
+            check(system.innerText(Locator.InnerTextOptions().setTimeout(APPLICATION_READY_TIMEOUT_MILLIS)).trim() == systemName) {
+                "The portal selected a different ITB system"
+            }
         }
         step(ItbPortalStepTimeout.Step.STATEMENT) {
             page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
@@ -149,6 +154,8 @@ class ItbPortalBridge(
     }
 
     companion object {
+        internal const val APPLICATION_READY_TIMEOUT_MILLIS = 60_000.0
+
         /** Read only the deployed script's declarative inputs; never execute supplied JavaScript in the wallet. */
         internal fun parseDigitalCredentials(script: String): ItbWalletInteraction.DigitalCredentials {
             fun string(name: String): String {

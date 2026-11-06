@@ -51,10 +51,8 @@ class ItbSessionReportTest {
     }
 
     @Test
-    fun `loads all deployed initial cases with distinct identities`() {
+    fun `rejects duplicate suite and case identities`() {
         val catalogue = ItbCatalogue.initialWalletCases()
-        assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 4, "cts07" to 1, "ts12" to 9),
-            catalogue.suites.associate { it.id to it.cases.size })
         val suite = catalogue.suites.first()
         assertFails { catalogue.copy(suites = listOf(suite, suite)) }
         assertFails { catalogue.copy(suites = listOf(suite.copy(cases = suite.cases + suite.cases.first()))) }

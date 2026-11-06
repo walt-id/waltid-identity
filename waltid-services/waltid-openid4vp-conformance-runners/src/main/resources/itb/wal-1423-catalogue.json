@@ -28,7 +28,10 @@
         { "id": "tc_vp_001", "name": "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]" },
         { "id": "tc_vp_002", "name": "VP-002: CS-02 hash presentation with explicit encrypted response mode [Wallet SUT]" },
         { "id": "tc_vp_003", "name": "VP-003: CS-02 hash presentation with GET request-URI retrieval [Wallet SUT]" },
-        { "id": "tc_vp_007", "name": "VP-007: Remote mdoc interoperability extension — outside CS-02 v1.2 normative coverage [Wallet SUT]" }
+        { "id": "tc_vp_007", "name": "VP-007: Remote mdoc interoperability extension — outside CS-02 v1.2 normative coverage [Wallet SUT]" },
+        { "id": "tc_vp_011", "name": "VP-011: CS-02 hash presentation invoked with OpenID4VP [Wallet SUT]", "invocationScheme": "openid4vp" },
+        { "id": "tc_vp_012", "name": "VP-012: CS-02 hash presentation invoked with eu-eaap [Wallet SUT]", "invocationScheme": "eu-eaap" },
+        { "id": "tc_vp_013", "name": "VP-013: CS-02 hash presentation invoked with haip-vp [Wallet SUT]", "invocationScheme": "haip-vp" }
       ],
       "statement": "Base Protocols"
     },
