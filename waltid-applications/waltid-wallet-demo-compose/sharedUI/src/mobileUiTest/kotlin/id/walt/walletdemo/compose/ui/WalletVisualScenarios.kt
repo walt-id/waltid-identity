@@ -826,7 +826,7 @@ internal class WalletVisualScenarios(
         }
         if (recurring) onNodeWithText("Payment terms").assertExists()
         if (compact) {
-            onNodeWithText("Payment terms").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("Payment terms").performScrollToContent(this, alignTop = true).assertIsDisplayed()
         }
         if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
             val results = mutableListOf<TextLayoutResult>()
@@ -841,7 +841,10 @@ internal class WalletVisualScenarios(
             if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
             onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
             onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
-            if (details) capture("$id.details")
+            if (details) {
+                onNodeWithTag("payment-details-toggle").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+                capture("$id.details")
+            }
             consent.fields.forEach { field ->
                 when (field.path) {
                     listOf("payee", "logo") -> onNodeWithTag("payment-payee-logo").performScrollToContent(this).assertIsDisplayed()
