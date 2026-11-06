@@ -259,4 +259,20 @@ contract does not attest a biometric modality or certified WSCD category. Record
 source revisions and backend endpoints with physical results; live ITB and formal
 conformance remain separate evidence.
 
-Public-demo scheduled/recurring acceptance is tracked separately in [WAL-1665](https://linear.app/walt-new/issue/WAL-1665) and remains blocked on independently approved service/metadata deployments and fresh credentials. Local integration and deterministic UI checks do not require that rollout.
+## Public rollout acceptance (WAL-1665)
+
+The post-rollout checks in [WAL-1665](https://linear.app/walt-new/issue/WAL-1665) intentionally fail until the independently approved deployments are live. They do not deploy services or metadata and must not be skipped or weakened to accommodate an older backend.
+
+`paymentDemoTest` requires the public Verifier2 `payloadSchema` and all 26 English/German issuer claim labels, then issues a fresh credential for each minimal, scheduled and recurring flow. It verifies German consent, exact decimal tokens, the original encoded transaction hashes and the executed verifier policies. Separate cases require a past execution date to fail at session creation, and a deadline crossed during review or asynchronous signing to prevent response release. The signing factors in this JVM suite are simulated; this is not native-authorisation evidence.
+
+The public minimal-payment cases now expect the timing/recurrence security hint. Existing preview-disabled Android coverage stays enabled; its system-sheet limitations remain under [WAL-1513](https://linear.app/walt-new/issue/WAL-1513).
+
+Both iOS demos add `PublicDemoBackendE2ETests/testScheduledPaymentReviewAgainstPublicDemo` and `testRecurringPaymentReviewAgainstPublicDemo`. Android adds the corresponding `PublicDemoBackendE2ETest#scheduledPaymentReviewAgainstPublicDemo` and `#recurringPaymentReviewAgainstPublicDemo`. These ordinary CI tests receive fresh payment credentials, review the issuer-labelled terms, expand and collapse details, visit the payee website and return, then cancel and require the verifier's `access_denied` without a proof. Missing or undecodable logos leave no placeholder. They use future timestamps generated when the request is created, and exact monetary tokens rather than binary floating-point conversions.
+
+The existing operator-assisted physical selectors above now approve minimal, scheduled and recurring requests in sequence, retaining their original proof/hash assertions. Run them only on fresh isolated, enrolled devices with an available operator. Cancellation-only simulator journeys do not qualify physical signing.
+
+Before removing the rollout block, record the deployed Community/Enterprise Verifier2 and Issuer2 versions, wallet source commits, metadata version and fresh-issuance provenance. Credentials pinned to an older metadata integrity value require coordinated versioning/reissuance; never bypass integrity checks. The suite accepts the existing issuer/verifier URL overrides for a compatible target; an authenticated Enterprise environment additionally needs its normal authenticated fixture setup. The default public Community run does not establish Enterprise deployment acceptance.
+
+The `wallet-payment-scheduled` and `wallet-payment-recurring` entries in `mobile-e2e-fixtures/wallet-gallery-drivers.json` declare optional main/details captures for all three renderers. Enable the existing gallery flags when executing those selectors. Registration does not mean the journeys passed: retain request digests, source/deployed-version receipts and results before publishing selected captures. Never publish credentials or replayable URLs.
+
+Remaining release evidence must include localized/large-text app runs, explicit remote-logo loading, and a controlled missing-optional-metadata rejection using the existing blocked-consent fixtures. The public issuer's metadata must not be modified to manufacture a negative case. Those checks, physical approvals and deployed Enterprise acceptance remain prerequisites to completing WAL-1665; they are not implied by a green JVM or simulator run.

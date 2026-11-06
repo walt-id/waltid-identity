@@ -280,7 +280,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
                     }
                     listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
-                        "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
+                        "Check the payee, amounts, timing and recurring terms before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
                         WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
                             "Payment review is missing issuer instruction '$label'")
                     }

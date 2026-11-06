@@ -36,6 +36,66 @@
         "native-ios-wallet-issuance-eudi-pid-mdoc-review",
         "native-ios-wallet-presentation-eudi-pid-mdoc-review"
       ]
+    },
+    {
+      "scenario": "wallet-payment-scheduled",
+      "platform": "compose-android",
+      "test": "id.walt.walletdemo.compose.android.PublicDemoBackendE2ETest#scheduledPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-compose/androidApp/src/androidTest/java/id/walt/walletdemo/compose/android/PublicDemoBackendE2ETest.kt",
+      "captures": [
+        "wallet-payment-scheduled-main",
+        "wallet-payment-scheduled-details"
+      ]
+    },
+    {
+      "scenario": "wallet-payment-scheduled",
+      "platform": "compose-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testScheduledPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "compose-ios-payment-scheduled-main",
+        "compose-ios-payment-scheduled-details"
+      ]
+    },
+    {
+      "scenario": "wallet-payment-scheduled",
+      "platform": "native-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testScheduledPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "native-ios-payment-scheduled-main",
+        "native-ios-payment-scheduled-details"
+      ]
+    },
+    {
+      "scenario": "wallet-payment-recurring",
+      "platform": "compose-android",
+      "test": "id.walt.walletdemo.compose.android.PublicDemoBackendE2ETest#recurringPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-compose/androidApp/src/androidTest/java/id/walt/walletdemo/compose/android/PublicDemoBackendE2ETest.kt",
+      "captures": [
+        "wallet-payment-recurring-main",
+        "wallet-payment-recurring-details"
+      ]
+    },
+    {
+      "scenario": "wallet-payment-recurring",
+      "platform": "compose-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testRecurringPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "compose-ios-payment-recurring-main",
+        "compose-ios-payment-recurring-details"
+      ]
+    },
+    {
+      "scenario": "wallet-payment-recurring",
+      "platform": "native-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testRecurringPaymentReviewAgainstPublicDemo",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "native-ios-payment-recurring-main",
+        "native-ios-payment-recurring-details"
+      ]
     }
   ]
 }
