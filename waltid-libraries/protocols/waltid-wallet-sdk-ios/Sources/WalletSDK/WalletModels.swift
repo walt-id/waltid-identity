@@ -570,21 +570,37 @@ public struct WalletProviderConfiguration: Equatable, Sendable {
         servicePath: "org4.demo.wallet-provider"
     )
 
+    /// Origin of the Enterprise API, without a service path.
     public var baseURL: String
+    /// Wallet-provider target, `organization.tenant.service`.
     public var servicePath: String
+    /// Bearer token for the wallet-provider API. Empty sends no Authorization header.
     public var bearerToken: String
+    /// Optional `Host` header override for tunneled local tests.
     public var hostHeader: String
+    /// `wia`, `ka`, or `wia_ka`. Must match a composition that provider is configured to mint.
+    public var composition: String
 
+    /// Creates wallet-provider settings.
+    ///
+    /// - Parameters:
+    ///   - baseURL: Origin of the Enterprise API, without a service path.
+    ///   - servicePath: Wallet-provider target, `organization.tenant.service`.
+    ///   - bearerToken: Bearer token for the wallet-provider API. Empty sends no Authorization header.
+    ///   - hostHeader: Optional `Host` header override for tunneled local tests.
+    ///   - composition: `wia`, `ka`, or `wia_ka`. Defaults to both.
     public init(
         baseURL: String,
         servicePath: String,
         bearerToken: String = "",
-        hostHeader: String = ""
+        hostHeader: String = "",
+        composition: String = "wia_ka"
     ) {
         self.baseURL = baseURL
         self.servicePath = servicePath
         self.bearerToken = bearerToken
         self.hostHeader = hostHeader
+        self.composition = composition
     }
 }
 

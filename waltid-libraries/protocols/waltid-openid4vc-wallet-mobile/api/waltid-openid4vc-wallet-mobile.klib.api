@@ -4969,12 +4969,14 @@ final class id.walt.wallet2.mobile/WalletAttestationConfig { // id.walt.wallet2.
 }
 
 final class id.walt.wallet2.mobile/WalletProviderConfig { // id.walt.wallet2.mobile/WalletProviderConfig|null[0]
-    constructor <init>(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...) // id.walt.wallet2.mobile/WalletProviderConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+    constructor <init>(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...) // id.walt.wallet2.mobile/WalletProviderConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
 
     final val baseUrl // id.walt.wallet2.mobile/WalletProviderConfig.baseUrl|{}baseUrl[0]
         final fun <get-baseUrl>(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.baseUrl.<get-baseUrl>|<get-baseUrl>(){}[0]
     final val bearerToken // id.walt.wallet2.mobile/WalletProviderConfig.bearerToken|{}bearerToken[0]
         final fun <get-bearerToken>(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.bearerToken.<get-bearerToken>|<get-bearerToken>(){}[0]
+    final val composition // id.walt.wallet2.mobile/WalletProviderConfig.composition|{}composition[0]
+        final fun <get-composition>(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.composition.<get-composition>|<get-composition>(){}[0]
     final val hostHeader // id.walt.wallet2.mobile/WalletProviderConfig.hostHeader|{}hostHeader[0]
         final fun <get-hostHeader>(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.hostHeader.<get-hostHeader>|<get-hostHeader>(){}[0]
     final val servicePath // id.walt.wallet2.mobile/WalletProviderConfig.servicePath|{}servicePath[0]
@@ -4984,7 +4986,8 @@ final class id.walt.wallet2.mobile/WalletProviderConfig { // id.walt.wallet2.mob
     final fun component2(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.component2|component2(){}[0]
     final fun component3(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.component3|component3(){}[0]
     final fun component4(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/WalletProviderConfig // id.walt.wallet2.mobile/WalletProviderConfig.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun component5(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/WalletProviderConfig // id.walt.wallet2.mobile/WalletProviderConfig.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/WalletProviderConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/WalletProviderConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/WalletProviderConfig.toString|toString(){}[0]

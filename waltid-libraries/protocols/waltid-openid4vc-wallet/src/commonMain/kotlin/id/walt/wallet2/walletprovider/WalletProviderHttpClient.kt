@@ -58,6 +58,8 @@ class WalletProviderHttpClient(
     private val servicePath: String,
     private val bearerToken: String = "",
     private val hostHeader: String = "",
+    /** `wia`, `ka`, or `wia_ka`. Must be a composition this provider is configured to mint. */
+    private val composition: String = "wia_ka",
     private val httpClient: HttpClient,
     private val verificationKeyFromJwt: suspend (String) -> Key,
 ) : WalletAttestationProvider, KeyAttestationProvider {
@@ -72,11 +74,15 @@ class WalletProviderHttpClient(
         mutex.withLock {
             val instanceJwk = publicJwk(instancePublicKeyJwk)
             val thumbprint = Jwk.sha256Thumbprint(instancePublicKeyJwk)
-            val current = binding
+            requireSupported("wia")
+            val current = binding?.takeIf { it.clientId == clientId }
             val jwt = when {
                 current == null -> {
-                    val created = post("units", activateBody(instanceJwk, listOf(instanceJwk), clientId))
-                    binding = Binding(created.unitId, thumbprint, created.attestedKeys.ifEmpty { listOf(instanceJwk) })
+                    val created = post(
+                        "units",
+                        activateBody(clientId, instanceJwk, if (includesKa()) listOf(instanceJwk) else emptyList(), "wia"),
+                    )
+                    binding = Binding(created.unitId, clientId, thumbprint, created.attestedKeys.ifEmpty { listOf(instanceJwk) })
                     created.wia
                 }
                 current.instanceThumbprint != thumbprint -> {
@@ -105,9 +111,20 @@ class WalletProviderHttpClient(
     override suspend fun attest(request: KeyAttestationRequest): String = mutex.withLock {
         val proofJwk = Jwk.parse(request.proofKey)
         val proofThumbprint = Jwk.sha256Thumbprint(request.proofKey)
-        val current = binding ?: run {
-            val created = post("units", activateBody(proofJwk, listOf(proofJwk), request.credentialIssuer))
-            Binding(created.unitId, proofThumbprint, listOf(proofJwk)).also { binding = it }
+        requireSupported("ka")
+        val clientId = request.clientId
+            ?: error("Wallet provider unit requires the wallet OAuth client id")
+        val current = binding?.takeIf { it.clientId == clientId } ?: run {
+            val created = post(
+                "units",
+                activateBody(
+                    clientId,
+                    if (includesWia()) proofJwk else null,
+                    listOf(proofJwk),
+                    if (includesWia()) "wia" else "ka",
+                ),
+            )
+            Binding(created.unitId, clientId, proofThumbprint, listOf(proofJwk)).also { binding = it }
         }
         val known = current.attestedKeys.map { Jwk.sha256Thumbprint(EncodedKey.Jwk(BinaryData(Json.encodeToString(it).encodeToByteArray()), false)) }
         val response = if (proofThumbprint !in known) {
@@ -138,12 +155,26 @@ class WalletProviderHttpClient(
         jwt
     }
 
-    private suspend fun activateBody(instanceJwk: JsonObject, attestedKeys: List<JsonObject>, clientId: String) = buildJsonObject {
-        put("instance_jwk", instanceJwk)
-        put("attested_keys", JsonArray(attestedKeys))
+    private fun includesWia(): Boolean = composition == "wia" || composition == "wia_ka"
+
+    private fun includesKa(): Boolean = composition == "ka" || composition == "wia_ka"
+
+    private fun requireSupported(kind: String) {
+        val supported = if (kind == "wia") includesWia() else includesKa()
+        if (!supported) error("Wallet provider composition '$composition' does not include $kind")
+    }
+
+    private fun activateBody(
+        clientId: String,
+        instanceJwk: JsonObject?,
+        attestedKeys: List<JsonObject>,
+        mint: String,
+    ) = buildJsonObject {
+        instanceJwk?.let { put("instance_jwk", it) }
+        if (attestedKeys.isNotEmpty()) put("attested_keys", JsonArray(attestedKeys))
         put("client_id", clientId)
-        put("composition", "wia_ka")
-        put("mint", "wia")
+        put("composition", composition)
+        put("mint", mint)
         put("sign_tokens", true)
     }
 
@@ -202,6 +233,7 @@ class WalletProviderHttpClient(
 
     private data class Binding(
         val unitId: String,
+        val clientId: String,
         val instanceThumbprint: String,
         val attestedKeys: List<JsonObject>,
     )
