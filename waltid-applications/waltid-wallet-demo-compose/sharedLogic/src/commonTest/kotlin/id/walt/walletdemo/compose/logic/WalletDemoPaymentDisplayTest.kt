@@ -34,6 +34,23 @@ class WalletDemoPaymentDisplayTest {
         assertEquals(fields.map { it.value }, display(fields).fields.map { it.item.rawValue })
     }
 
+    @Test fun paymentScheduleAndMonetaryTermsHaveSeparateGroupsWithoutChangingIssuerInstructions() {
+        val schedule = listOf(listOf("execution_date"), listOf("recurrence", "start_date"),
+            listOf("recurrence", "end_date"), listOf("recurrence", "number"), listOf("recurrence", "frequency"))
+        val terms = listOf("amount_variable", "min_amount", "max_amount", "total_amount", "initial_amount", "initial_amount_number", "apr")
+            .map { listOf("recurrence", "mit_options", it) }
+        val paths = schedule + terms + listOf(listOf("transaction_id"), listOf("recurrence", "unknown"))
+        for (placement in WalletDemoPaymentFieldPlacement.entries) {
+            val fields = paths.map { WalletDemoPaymentField("Issuer label", "Issuer description", "9007199254740993.01", placement, it) }
+            val actual = display(fields).fields
+            assertEquals(List(schedule.size) { PaymentDisplayGroup.Timing } + List(terms.size) { PaymentDisplayGroup.Terms } +
+                List(2) { PaymentDisplayGroup.Other }, actual.map { it.group })
+            assertEquals(paths, actual.map { it.paymentPath })
+            assertTrue(actual.all { it.placement == placement && it.description == "Issuer description" &&
+                it.item.label == "Issuer label" && it.item.rawValue == "9007199254740993.01" })
+        }
+    }
+
     private fun display(fields: List<WalletDemoPaymentField>) = WalletDemoPaymentReview.Ready(
         WalletDemoPaymentConsent("revision", "en", null, null, "Pay", null, false, fields)
     ).displays(emptyList()).single()

@@ -46,31 +46,55 @@ private fun PaymentReviewContent(payment: WalletDemoPaymentDisplay) {
             .sortedBy { if (it.paymentPath == listOf("amount")) 0 else 1 }
         if (money.isNotEmpty()) PaymentMoney(money)
         val remaining = fields.filter { it.group != PaymentDisplayGroup.Payee && it !in money }
-        remaining.filter { it.placement == WalletDemoPaymentFieldPlacement.Prominent }.forEach { field ->
-            Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                PaymentField(field, true, Modifier.fillMaxWidth().padding(16.dp))
-            }
+        val main = remaining.filter { it.placement != WalletDemoPaymentFieldPlacement.Details }
+        listOf(
+            PaymentDisplayGroup.Timing to stringResource(Res.string.payment_timing_title),
+            PaymentDisplayGroup.Terms to stringResource(Res.string.payment_terms_title),
+            PaymentDisplayGroup.Provider to stringResource(Res.string.payment_provider_title),
+        ).forEach { (group, title) ->
+            val grouped = main.filter { it.group == group }
+            if (grouped.isNotEmpty()) PaymentCard(title) { PaymentFields(grouped) }
         }
-        val main = remaining.filter { it.placement == WalletDemoPaymentFieldPlacement.Main }
-        val timing = main.filter { it.group == PaymentDisplayGroup.Timing }
-        if (timing.isNotEmpty()) {
-            Text(stringResource(Res.string.payment_timing_title), style = MaterialTheme.typography.titleSmall)
-            timing.forEach { PaymentField(it, false) }
-        }
-        main.filter { it.group != PaymentDisplayGroup.Timing }.forEach { PaymentField(it, false) }
+        val other = main.filter { it.group == PaymentDisplayGroup.Other }
+        if (other.isNotEmpty()) PaymentCard { PaymentFields(other) }
         val details = remaining.filter { it.placement == WalletDemoPaymentFieldPlacement.Details }
-        if (details.isNotEmpty()) MetadataDisclosure(stringResource(Res.string.payment_details_title), initiallyExpanded = false,
-            modifier = Modifier.testTag("payment-details-toggle")) {
+        if (details.isNotEmpty()) PaymentDetailsCard(stringResource(Res.string.payment_details_title), "payment-details-toggle") {
             val provider = details.filter { it.group == PaymentDisplayGroup.Provider }
             if (provider.isNotEmpty()) {
                 Text(stringResource(Res.string.payment_provider_title), style = MaterialTheme.typography.titleSmall)
-                provider.forEach { PaymentField(it, false) }
+                PaymentFields(provider)
             }
-            details.filter { it.group != PaymentDisplayGroup.Provider }.forEach { PaymentField(it, false) }
+            PaymentFields(details.filter { it.group != PaymentDisplayGroup.Provider })
         }
-        if (payment.technical.isNotEmpty()) MetadataDisclosure(stringResource(Res.string.credential_technical_details), initiallyExpanded = false) {
+        if (payment.technical.isNotEmpty()) PaymentDetailsCard(stringResource(Res.string.credential_technical_details)) {
             payment.technical.forEach { ClaimValueRow(it) }
         }
+    }
+}
+
+@Composable
+private fun PaymentCard(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    WalletSection(title, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+}
+
+@Composable
+private fun PaymentDetailsCard(title: String, tag: String = "", content: @Composable () -> Unit) {
+    WalletSection(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            MetadataDisclosure(title, initiallyExpanded = false, modifier = Modifier.testTag(tag)) {
+                Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentFields(fields: List<WalletDemoPaymentDisplayField>) {
+    fields.forEachIndexed { index, field ->
+        if (index > 0) MetadataRowDivider()
+        PaymentField(field, field.placement == WalletDemoPaymentFieldPlacement.Prominent)
     }
 }
 
@@ -103,7 +127,7 @@ private fun PaymentPayee(fields: List<WalletDemoPaymentDisplayField>) {
     var allowRemote by remember(source) { mutableStateOf(false) }
     val remoteLogo = source?.let(::paymentWebsite) != null
     val details = fields.filter { !it.isLogo && it.placement == WalletDemoPaymentFieldPlacement.Details }
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+    WalletSection(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -128,7 +152,7 @@ private fun PaymentPayee(fields: List<WalletDemoPaymentDisplayField>) {
 @Composable
 private fun PaymentMoney(fields: List<WalletDemoPaymentDisplayField>) {
     val primary = fields.first()
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
+    WalletSection(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Column(Modifier.fillMaxWidth().padding(16.dp).testTag(WalletUiTestTags.claim(primary.item.path.id)),
             verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(primary.item.label, style = MaterialTheme.typography.labelLarge)

@@ -10,6 +10,23 @@ import XCTest
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
 
+    func testPaymentScheduleAndMonetaryTermsKeepTheirGroupsAndIssuerPlacement() throws {
+        let fixtures = try WalletVisualFixtures()
+        let schedule: Set<[String]> = [["recurrence", "start_date"], ["recurrence", "end_date"],
+            ["recurrence", "number"], ["recurrence", "frequency"]]
+        let terms = Set(["amount_variable", "min_amount", "max_amount", "total_amount", "initial_amount", "initial_amount_number", "apr"]
+            .map { ["recurrence", "mit_options", $0] })
+        let consent = try fixtures.payment(recurring: true)
+        let fields = try XCTUnwrap(PaymentReviewState.ready(consent).displays(transactions: []).first).fields
+        XCTAssertEqual(Set(fields.filter { $0.group == .timing }.map(\.paymentPath)), schedule)
+        XCTAssertEqual(Set(fields.filter { $0.group == .terms }.map(\.paymentPath)), terms)
+        XCTAssertEqual(fields.map(\.placement), consent.fields.map(\.placement))
+        XCTAssertEqual(fields.map(\.item.label), consent.fields.map(\.label))
+        XCTAssertEqual(fields.map(\.item.rawValue), consent.fields.map { Optional($0.value) })
+        let scheduled = try XCTUnwrap(PaymentReviewState.ready(fixtures.payment(recurring: false)).displays(transactions: []).first)
+        XCTAssertEqual(scheduled.fields.filter { $0.group == .timing }.map(\.paymentPath), [["execution_date"]])
+    }
+
     func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
         let identity = option(queryID: "pid", credentialID: "one")
         let address = option(queryID: "address", credentialID: "two")

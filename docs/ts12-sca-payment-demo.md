@@ -62,7 +62,7 @@ Credential Manager's payment summary does not establish TS-12 display conformanc
 This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
 
 - Required payment values, optional timestamp, payee logo/website, PISP details,
-  payment flags, scheduled execution and recurring payment terms. Every supplied leaf needs a label; URIs remain plain text.
+  payment flags, scheduled execution and recurring payment terms. Every supplied leaf needs issuer claim metadata.
   Amounts use exact decimal handling and ISO 4217 minor units, without rounding.
 - Inline claims/UI labels or HTTPS references, with at most three documents,
   256 KiB each, three redirects each and ten seconds per document. Every redirect
@@ -136,7 +136,9 @@ Compose Android, Compose iOS and native SwiftUI group payee fields in one card, 
 level-3 fields under **Payee details**. The exact amount and ISO currency code share
 one row under the amount label, including at large text sizes.
 They wrap only when the content cannot fit the available width. Required recurring
-terms remain on the main review; PISP information is grouped within **Payment details**.
+terms remain on the main review in separate **Payment timing** and **Payment terms** cards.
+PISP information is grouped within expandable **Payment details**. Payment cards use
+neutral surfaces across all three demos; issuer main/prominent fields never start collapsed.
 Grouping never demotes a value from its issuer-defined visibility, and level-4 fields
 remain hidden. The demo's [caption policy](../waltid-applications/waltid-wallet-demo-test-fixtures/visual/payment-consent.md)
 documents the TS12 rulebook permission needed to omit the two redundant labels in production.
