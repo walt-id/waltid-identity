@@ -201,14 +201,23 @@ jobs:
       checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       tags: '[]'
       publish: true
+  # Same producer as main CI, checked out at the tagged revisions. sdk-docs restores
+  # this artifact and does not link WalletCore again.
+  wallet-core-framework:
+    needs: tag
+    uses: ./.github/workflows/wallet-core-framework.yml
+    secrets: inherit
+    with:
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     secrets: inherit
-    needs: [ version, tag ]
+    needs: [ version, tag, wallet-core-framework ]
     with:
       deploy: true
       version: ${{ needs.version.outputs.release_version }}
-      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
+      checkout-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
+      wallet-core-artifact: ${{ needs.wallet-core-framework.outputs.artifact-name }}
       tags: '[]'
   deploy-license:
     name: Deploy license (staging)

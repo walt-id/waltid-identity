@@ -88,6 +88,8 @@ on:
 # them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
 # yet when it runs. Scripts use the selected checkout.
 env:
+  # wallet-core-framework.yml and mobile-sdk-docs.yml set this same pin. Reusable
+  # workflows do not inherit it, and framework reuse compares `xcodebuild -version`.
   DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
   JOB_NAME_PREFIX: ${{ inputs.job_name_prefix != '' && format('{0} / ', inputs.job_name_prefix) || '' }}
@@ -174,66 +176,11 @@ jobs:
         with:
           renderer: compose-ios
 
+  # Shared producer. Callers still read checkout-refs and artifact-name from this job.
   wallet-core-framework:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs || inputs.run-visual-native }}
-    runs-on: xcode-27
-    timeout-minutes: 70
-    outputs:
-      checkout-refs: ${{ steps.revisions.outputs.refs }}
-      artifact-name: wallet-core-release-${{ github.run_attempt }}
-    steps:
-      - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
-        with:
-          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
-          ref: ${{ github.head_ref || github.ref_name }}
-          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Record the resolved source revisions
-        id: revisions
-        run: |
-          python3 - <<'PYTHON'
-          import json, os, subprocess
-          paths = {"unified": ".", "identity": "waltid-identity", "enterprise": "waltid-identity-enterprise", "enterprise_license": "waltid-identity-enterprise-license"}
-          refs = {key: subprocess.check_output(["git", "-C", path, "rev-parse", "HEAD"], text=True).strip() for key, path in paths.items()}
-          print(json.dumps(refs, indent=2))
-          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-              output.write("refs=" + json.dumps(refs) + "\n")
-          PYTHON
-      - name: Configure gradle
-        uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Cache Kotlin Native dependencies
-        uses: actions/cache@v5
-        with:
-          path: ~/.konan
-          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            konan-${{ runner.os }}-${{ runner.arch }}-
-      # Concurrent device/simulator links cause heavy swapping on the hosted runner.
-      - name: Build the full release WalletCore
-        timeout-minutes: 60
-        working-directory: waltid-identity
-        run: |
-          exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1
-      - name: Package the framework and its build identity
-        working-directory: waltid-identity
-        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
-      - name: Publish the full release framework
-        uses: actions/upload-artifact@v7
-        with:
-          name: wallet-core-release-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/wallet-core-artifact/
-          if-no-files-found: error
-          retention-days: 1
-      - name: Retain failed framework build logs
-        if: failure() || cancelled()
-        uses: actions/upload-artifact@v7
-        with:
-          name: wallet-core-framework-failure-logs
-          path: |
-            ${{ runner.temp }}/wallet-core-build/
-          retention-days: 7
+    uses: ./.github/workflows/wallet-core-framework.yml
+    secrets: inherit
 
   wallet-core-consumer-tests:
     name: wallet-core-consumer-tests (${{ matrix.consumer }})
