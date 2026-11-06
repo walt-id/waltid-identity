@@ -172,7 +172,7 @@
       ]
     },
     "visual-browser": {
-      "description": "Complete browser account visual catalogue",
+      "description": "Shared Wasm logic tests and complete browser visual catalogue",
       "patterns": [
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/src/wasmJsMain/*",
@@ -182,6 +182,8 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/webApp/*",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*"

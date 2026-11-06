@@ -97,7 +97,7 @@
     <string name="proximity_unavailable">Unavailable</string>
     <string name="proximity_use_case">Use case %1$d%2$s</string>
     <string name="proximity_use_supported_device">Use a supported device</string>
-    <string name="proximity_valid_until">Valid until %1$s</string>
+    <string name="proximity_valid_until">Valid until</string>
     <string name="proximity_validated_application_request">Validated application request</string>
     <string name="proximity_value_preview_unavailable">Value preview unavailable</string>
     <string name="proximity_whole_request">Whole request</string>

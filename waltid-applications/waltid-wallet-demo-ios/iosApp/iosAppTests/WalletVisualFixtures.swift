@@ -144,6 +144,10 @@ struct WalletVisualFixtures {
         try sharingReview(key: "sharingInformation", payment: false, includeAlternatives: true, multiple: multiple)
     }
 
+    func dateReview() throws -> SharingReviewModel {
+        try sharingReview(key: "sharingDates", payment: false)
+    }
+
     private func sharingReview(key: String, payment: Bool, includeAlternatives: Bool = false, multiple: Bool = false) throws -> SharingReviewModel {
         let value = try object(root, key)
         let origin = try text(value, "origin")
@@ -153,10 +157,11 @@ struct WalletVisualFixtures {
             PresentationCredentialOption(queryID: try text(item, "queryId"), credentialID: try text(item, "credentialId"),
                 format: try text(item, "format"), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"),
                 credentialDataJSON: try json(object(item, "data")), disclosures: try array(item, "disclosures").map { claim in
-                    let value = try text(claim, "value")
+                    let value = try XCTUnwrap(claim["value"])
                     let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
                     return PresentationDisclosure(path: try text(claim, "path"), name: try text(claim, "label"),
-                        valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)), displayValue: value,
+                        valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)),
+                        displayValue: (value as? String) ?? String(data: encoded, encoding: .utf8),
                         selectivelyDisclosable: try XCTUnwrap(claim["selective"] as? Bool),
                         required: try XCTUnwrap(claim["required"] as? Bool), selectable: try XCTUnwrap(claim["selectable"] as? Bool),
                         requested: try XCTUnwrap(claim["requested"] as? Bool))
