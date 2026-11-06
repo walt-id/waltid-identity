@@ -28,7 +28,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 70
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
       artifact-name: wallet-core-release-${{ github.run_attempt }}
