@@ -4,6 +4,8 @@ package id.walt.policies2.vc
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension
+import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseHeaders
@@ -12,6 +14,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.cose.toCoseSigner
 import id.walt.credentials.CredentialDetectorTypes
+import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
@@ -41,9 +44,11 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -64,14 +69,125 @@ class X509TrustPolicyTest {
         assertEquals(true, result.getValue("trusted").jsonPrimitive.boolean)
         assertEquals("CN=Credential issuer", result.getValue("signing_certificate").jsonPrimitive.content)
         assertEquals(1, result.getValue("chain_length").jsonPrimitive.int)
+        assertEquals("CERTIFICATE_SUBJECT", result.getValue("issuer_binding").jsonPrimitive.content)
+        assertNull(result["issuer"])
     }
 
     @Test
-    fun trustsJwtVcSignedByLeafUnderConfiguredRoot() = runTest {
+    fun bindsHttpsIssuerToUriSan() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addUri("https://issuer.example/credentials") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "https://issuer.example/credentials"))
+            .getOrThrow().jsonObject
+
+        assertEquals("https://issuer.example/credentials", result.getValue("issuer").jsonPrimitive.content)
+        assertEquals("URI", result.getValue("issuer_binding").jsonPrimitive.content)
+    }
+
+    @Test
+    fun bindsHttpsIssuerHostToDnsSan() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("Issuer.Example") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = false, issuer = "https://issuer.example/tenants/1"))
+            .getOrThrow().jsonObject
+
+        assertEquals("DNS", result.getValue("issuer_binding").jsonPrimitive.content)
+    }
+
+    @Test
+    fun rejectsIssuerTheSigningCertificateDoesNotName() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") {
+            addUri("https://other.example")
+            addDnsName("*.example")
+        }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "https://issuer.example"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "does not name issuer")
+    }
+
+    @Test
+    fun rejectsDidIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("issuer.example") }
+
+        // `vc.issuer` is the claimed issuer, but the key resolver reads only `iss`, so the key comes from x5c
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = false, issuer = "did:example:issuer"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "cannot be bound")
+    }
+
+    @Test
+    fun rejectsHttpIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("issuer.example") }
+
+        val result = X509TrustPolicy(listOf(der(root)))
+            .verify(jwtCredential(leaf, sdJwt = true, issuer = "http://issuer.example"))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "cannot be bound")
+    }
+
+    @Test
+    fun matchesUriSanExactly() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val uriOnly = issued(root, "CN=Credential issuer") { addUri("https://issuer.example/credentials") }
+        val withDns = issued(root, "CN=Credential issuer") {
+            addUri("https://issuer.example/credentials")
+            addDnsName("issuer.example")
+        }
+        val policy = X509TrustPolicy(listOf(der(root)))
+
+        for (issuer in listOf("https://issuer.example/credentials/", "https://issuer.example:443/credentials")) {
+            assertTrue(policy.verify(jwtCredential(uriOnly, sdJwt = true, issuer = issuer)).isFailure, issuer)
+            val result = policy.verify(jwtCredential(withDns, sdJwt = true, issuer = issuer)).getOrThrow().jsonObject
+            assertEquals("DNS", result.getValue("issuer_binding").jsonPrimitive.content, issuer)
+        }
+    }
+
+    @Test
+    fun requiresW3cIssToEqualVcIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("other.example") }
+        val policy = X509TrustPolicy(listOf(der(root)))
+
+        val conflicting = policy.verify(
+            jwtCredential(leaf, sdJwt = false, iss = "https://other.example", issuer = "https://victim.example")
+        )
+        assertContains(conflicting.exceptionOrNull()?.message.orEmpty(), "does not equal the credential issuer")
+
+        val agreeing = policy.verify(
+            jwtCredential(leaf, sdJwt = false, iss = "https://other.example", issuer = "https://other.example")
+        )
+        assertEquals("DNS", agreeing.getOrThrow().jsonObject.getValue("issuer_binding").jsonPrimitive.content)
+    }
+
+    @Test
+    fun bindsW3cIssWithoutVcIssuer() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addDnsName("other.example") }
+        val policy = X509TrustPolicy(listOf(der(root)))
+
+        assertTrue(policy.verify(jwtCredential(leaf, sdJwt = false, iss = "https://other.example")).isSuccess)
+        val result = policy.verify(jwtCredential(leaf, sdJwt = false, iss = "https://victim.example"))
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "does not name issuer 'https://victim.example'")
+    }
+
+    @Test
+    fun rejectsW3cCredentialWithoutIssuer() = runTest {
         val root = selfSigned("CN=Root CA")
         val leaf = issued(root, "CN=Credential issuer")
 
-        assertTrue(X509TrustPolicy(listOf(der(root))).verify(jwtCredential(leaf, sdJwt = false)).isSuccess)
+        val result = X509TrustPolicy(listOf(der(root))).verify(jwtCredential(leaf, sdJwt = false))
+
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "names no issuer")
     }
 
     @Test
@@ -79,16 +195,29 @@ class X509TrustPolicyTest {
         val root = selfSigned("CN=Root CA")
         val leaf = issued(root, "CN=Document signer")
 
-        assertTrue(X509TrustPolicy(listOf(der(root))).verify(mdocCredential(leaf)).isSuccess)
+        val result = X509TrustPolicy(listOf(der(root))).verify(mdocCredential(leaf)).getOrThrow().jsonObject
+        assertEquals("CERTIFICATE_SUBJECT", result.getValue("issuer_binding").jsonPrimitive.content)
     }
 
     @Test
     fun trustsCoseW3cCredentialOnlyUnderConfiguredRoot() = runTest {
         val root = selfSigned("CN=Root CA")
-        val credential = coseW3cCredential(issued(root, "CN=Credential issuer"))
+        val credential = coseW3cCredential(issued(root, "CN=Credential issuer") { addDnsName("issuer.example") })
 
         assertTrue(X509TrustPolicy(listOf(der(root))).verify(credential).isSuccess)
         assertTrue(X509TrustPolicy(listOf(der(selfSigned("CN=Other CA")))).verify(credential).isFailure)
+    }
+
+    @Test
+    fun bindsCoseW3cIssuerLikeJwt() = runTest {
+        val root = selfSigned("CN=Root CA")
+        val leaf = issued(root, "CN=Credential issuer") { addUri("https://issuer.example") }
+        val policy = X509TrustPolicy(listOf(der(root)))
+
+        val bound = policy.verify(coseW3cCredential(leaf)).getOrThrow().jsonObject
+        assertEquals("URI", bound.getValue("issuer_binding").jsonPrimitive.content)
+        val other = policy.verify(coseW3cCredential(leaf, issuer = "https://victim.example"))
+        assertContains(other.exceptionOrNull()?.message.orEmpty(), "does not name issuer")
     }
 
     @Test
@@ -208,24 +337,44 @@ class X509TrustPolicyTest {
         return Issued(key, X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) { subjectDn = dn })
     }
 
-    private suspend fun issued(issuer: Issued, dn: String, validity: X509Certificate.Validity? = null): Issued {
+    private suspend fun issued(
+        issuer: Issued,
+        dn: String,
+        validity: X509Certificate.Validity? = null,
+        san: (SubjectAlternativeNameExtension.Builder.() -> Unit)? = null,
+    ): Issued {
         val key = generateKey(dn)
         val certificate = X509CertificateUtil.createCertificate(issuer.key, issuer.certificate, sigAlg) {
             subjectDn = dn
             subjectPublicKey(key)
             validity?.let { this.validity = it }
+            san?.let { extensionSan(it) }
         }
         return Issued(key, certificate)
     }
 
-    private suspend fun jwtCredential(signer: Issued, sdJwt: Boolean, chain: List<Issued> = listOf(signer)): DigitalCredential {
+    /**
+     * [issuer] goes into `iss` for SD-JWT and `vc.issuer` for W3C; [iss] adds a W3C `iss`. W3C
+     * credentials go through [CredentialParser], which fills `issuer` from `iss` first.
+     */
+    private suspend fun jwtCredential(
+        signer: Issued,
+        sdJwt: Boolean,
+        chain: List<Issued> = listOf(signer),
+        issuer: String? = null,
+        iss: String? = null,
+    ): DigitalCredential {
         val payload = buildJsonObject {
             if (sdJwt) {
+                issuer?.let { put("iss", it) }
                 put("vct", "https://issuer.example/identity-credential")
                 put("_sd_alg", "sha-256")
             } else {
+                iss?.let { put("iss", it) }
                 put("vc", buildJsonObject {
+                    put("@context", JsonArray(listOf(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))))
                     put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+                    issuer?.let { put("issuer", it) }
                 })
             }
         }
@@ -243,17 +392,18 @@ class X509TrustPolicyTest {
             SdJwtCredential(
                 dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
                 credentialData = payload,
+                issuer = issuer,
                 signature = SdJwtCredentialSignature(signed, header),
                 signed = signed,
             )
         } else {
-            W3C11(credentialData = payload, signature = JwtCredentialSignature(signed, header), signed = signed)
+            CredentialParser.parseOnly(signed)
         }
     }
 
-    private suspend fun coseW3cCredential(signer: Issued): DigitalCredential {
+    private suspend fun coseW3cCredential(signer: Issued, issuer: String = "https://issuer.example"): DigitalCredential {
         val payload = buildJsonObject {
-            put("iss", "https://issuer.example")
+            put("issuer", issuer)
             put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
         }
         val coseSign1 = CoseSign1.createAndSign(
@@ -263,6 +413,7 @@ class X509TrustPolicyTest {
         )
         return W3C11(
             credentialData = payload,
+            issuer = issuer,
             signature = CoseCredentialSignature(
                 signerKey = DirectSerializedKey(JWKKey.importJWK(publicJwk(signer.key)).getOrThrow()),
                 x5cList = X5CList(listOf(X5CCertificateString(der(signer)))),
