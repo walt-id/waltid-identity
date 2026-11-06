@@ -12,12 +12,18 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.config.url.UrlProtocols
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.db.models.WalletKey
 import id.walt.webwallet.service.keys.KeysService
@@ -80,6 +86,14 @@ class OpenId4VpPresentationServiceTest {
         }
     }
 
+    private val requestSigningKey by lazy { runBlocking { JWKKey.generate(KeyType.Ed25519) } }
+    private val requestTrustConfiguration by lazy {
+        ClientIdTrustConfiguration(preRegisteredClients = mapOf(
+            "verifier2" to ClientMetadata(jwks = ClientMetadata.Jwks(listOf(
+                runBlocking { requestSigningKey.getPublicKey().exportJWKObject() },
+            ))),
+        ))
+    }
     private val json = Json { encodeDefaults = false }
     private val supportedTransactionDataType = SUPPORTED_TX_DATA_TYPE
 
@@ -330,12 +344,13 @@ class OpenId4VpPresentationServiceTest {
             val service = OpenId4VpPresentationService(
                 credentialService = mockk(relaxed = true),
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                clientIdTrustConfiguration = requestTrustConfiguration,
             )
 
             val resolvedRequest = runBlocking {
                 resolveNormalizedRequestUrl(
                     service,
-                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                    "openid4vp://authorize?client_id=verifier2&request_uri=$serverUrl/request-object&request_uri_method=post",
                 )
             }
             val resolvedUrl = Url(resolvedRequest)
@@ -361,8 +376,10 @@ class OpenId4VpPresentationServiceTest {
             assertEquals(sdJwtFormat["kb-jwt_alg_values"]?.jsonArray?.isNotEmpty(), true)
             assertEquals(mdocFormat["issuerauth_alg_values"]?.jsonArray?.isNotEmpty(), true)
             assertEquals(mdocFormat["deviceauth_alg_values"]?.jsonArray?.isNotEmpty(), true)
-            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            val resolvedPayload = requireNotNull(resolvedUrl.parameters["request"]).decodeJws().payload
+            assertEquals("verifier2", resolvedPayload["client_id"]?.jsonPrimitive?.content)
+            assertEquals("https://verifier.example/response", resolvedPayload["response_uri"]?.jsonPrimitive?.content)
+            assertEquals(walletNonce, resolvedPayload["wallet_nonce"]?.jsonPrimitive?.content)
         }
     }
 
@@ -388,12 +405,13 @@ class OpenId4VpPresentationServiceTest {
                 val service = OpenId4VpPresentationService(
                     credentialService = mockk(relaxed = true),
                     unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    clientIdTrustConfiguration = requestTrustConfiguration,
                 )
 
                 runBlocking {
                     resolveNormalizedRequestUrl(
                         service = service,
-                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                        request = "openid4vp://authorize?client_id=verifier2&request_uri=$serverUrl/request-object&request_uri_method=post",
                         walletId = walletId,
                     )
                 }
@@ -453,12 +471,13 @@ class OpenId4VpPresentationServiceTest {
                 val service = OpenId4VpPresentationService(
                     credentialService = mockk(relaxed = true),
                     unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                    clientIdTrustConfiguration = requestTrustConfiguration,
                 )
 
                 runBlocking {
                     resolveNormalizedRequestUrl(
                         service = service,
-                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                        request = "openid4vp://authorize?client_id=verifier2&request_uri=$serverUrl/request-object&request_uri_method=post",
                         walletId = walletId,
                     )
                 }
@@ -476,14 +495,14 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `normalized request URL requires request object wallet_nonce for request_uri_method post`() {
+    fun `normalized request URL rejects unsigned POST JWT even with matching wallet_nonce`() {
         withAuthorizationRequestServer(
             responseContentType = "application/oauth-authz-req+jwt",
             responseBodyFactory = { request ->
                 unsignedRequestObject(
                     """
                     {
-                      "client_id":"redirect_uri:https://verifier.example/response",
+                      "client_id":"verifier2",
                       "response_type":"vp_token",
                       "response_mode":"direct_post",
                       "response_uri":"https://verifier.example/response",
@@ -500,16 +519,14 @@ class OpenId4VpPresentationServiceTest {
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
             )
 
-            val resolvedRequest = runBlocking {
-                resolveNormalizedRequestUrl(
-                    service,
-                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
-                )
+            assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+                runBlocking {
+                    resolveNormalizedRequestUrl(
+                        service,
+                        "openid4vp://authorize?client_id=verifier2&request_uri=$serverUrl/request-object&request_uri_method=post",
+                    )
+                }
             }
-            val resolvedUrl = Url(resolvedRequest)
-
-            assertEquals(resolvedUrl.parameters["request"]?.isNotBlank(), true)
-            assertFalse(resolvedUrl.parameters.contains("dcql_query"))
         }
     }
 
@@ -839,7 +856,7 @@ class OpenId4VpPresentationServiceTest {
 
     private fun withAuthorizationRequestServer(
         responseBody: String? = null,
-        responseContentType: String = "application/json",
+        responseContentType: String? = null,
         responseBodyFactory: ((RecordedRequest) -> String)? = null,
         block: (serverUrl: String, receivedRequest: () -> RecordedRequest) -> Unit,
     ) {
@@ -860,18 +877,37 @@ class OpenId4VpPresentationServiceTest {
             contentType = exchange.requestHeaders.getFirst("Content-Type")
             accept = exchange.requestHeaders.getFirst("Accept")
             body = InputStreamReader(exchange.requestBody).readText()
+            val isPost = method == "POST"
             val response = responseBodyFactory?.invoke(RecordedRequest(method, contentType, accept, body))
                 ?: responseBody
-                ?: json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest)
-            exchange.responseHeaders.add("Content-Type", responseContentType)
+                ?: if (isPost) runBlocking {
+                    val payload = buildJsonObject {
+                        json.encodeToJsonElement(AuthorizationRequest.serializer(), authorizationRequest).jsonObject
+                            .forEach { (name, value) -> put(name, value) }
+                        put("response_type", OpenID4VPResponseType.VP_TOKEN.responseType)
+                        put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
+                        put("wallet_nonce", requireNotNull(parseFormBody(body)["wallet_nonce"]))
+                    }
+                    requestSigningKey.signJws(payload.toString().encodeToByteArray(),
+                        mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")))
+                } else json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest)
+            exchange.responseHeaders.add("Content-Type", responseContentType ?:
+                if (isPost) "application/oauth-authz-req+jwt" else "application/json")
             exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
             exchange.responseBody.use { it.write(response.toByteArray()) }
             exchange.close()
         }
         server.start()
+        val fetcherId = WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST.name
+        val previousConfig = WebDataFetcherManager.getConfigurationForId(fetcherId, null)
+        // This fixture uses a loopback HTTP server; deployed POST retrieval requires HTTPS.
+        WebDataFetcherManager.appendConfiguration(fetcherId, previousConfig.copy(
+            url = UrlConfiguration(protocols = UrlProtocols(allowHttp = true)),
+        ))
         try {
             block("http://127.0.0.1:${server.address.port}") { RecordedRequest(method, contentType, accept, body) }
         } finally {
+            WebDataFetcherManager.appendConfiguration(fetcherId, previousConfig)
             server.stop(0)
         }
     }
