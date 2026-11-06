@@ -46,9 +46,14 @@ Batch metadata limits the submitted proof array, including repeated proofs.
 Wallet parsing establishes expected public-key evidence and does not authenticate the attestation.
 The issuer remains responsible for attestation trust, signatures, lifetime, algorithms and nonces.
 For storage, explicitly select available wallet-owned keys through `holderBindings` (or `keyId` for
-a single key). Evidence does not select or create wallet keys. Every returned proof-bound credential must match
+a single key). The selection must cover every expected proof key before the credential request is
+sent; missing keys or a same-size selection containing different keys are rejected without consuming
+issuance. Opaque proof kids are matched against the selected public keys. Evidence does not select
+or create wallet keys. Every returned proof-bound credential must match
 the submitted evidence and, when storing, a selected wallet binding before any writes or storage
 callbacks. Missing credentials for some expected keys are allowed, as is any response order.
+Subject DIDs and `cnf.kid` references in returned credentials are resolved only when that DID was
+already identified by a submitted proof's DID `kid`; issuer-selected DIDs cannot add network lookups.
 
 This wallet profile rejects repeated holder keys and limits proof-bound immediate responses to the
 distinct expected keys. These are wallet product rules: OpenID4VCI leaves credential count to the
