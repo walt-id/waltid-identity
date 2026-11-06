@@ -1,5 +1,11 @@
 # Breaking changes since 0.3.1
 
+## waltid-sdjwt payload validation
+
+- `SDPayload.createSDPayload` (all overloads) now processes the payload it creates as a verifier would (RFC 9901 §7.1) and throws `SDJwtVerificationException` with the reason when that fails, for example a non-array `_sd`, `_sd` or `...` used as a claim name, or duplicate claim names. It previously returned a payload that verifiers reject.
+- It also rejects a top-level `_sd_alg` other than `sha-256`, the only algorithm it digests with.
+- Processing an `SDPayload` (`fullPayload`, `verifyDisclosures`, `withSelectiveDisclosures`), including payloads parsed from received tokens, now rejects `_sd_alg` in any nested object or disclosure (RFC 9901 §4.1.1).
+
 ## waltid-dcql identifier charset
 
 - `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).
