@@ -6,6 +6,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.activeWindow
 import androidx.test.uiautomator.waitForStable
+import id.walt.mobile.test.backend.DemoPayment
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
@@ -24,6 +25,8 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +38,37 @@ import java.util.regex.Pattern
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
+
+    @Test
+    fun scheduledPaymentReviewAgainstPublicDemo() = reviewAndCancelPayment(DemoPayment.SCHEDULED)
+
+    @Test
+    fun recurringPaymentReviewAgainstPublicDemo() = reviewAndCancelPayment(DemoPayment.RECURRING)
+
+    private fun reviewAndCancelPayment(payment: DemoPayment) = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        val offer = DemoTestBackend.createOffer(DemoTestBackend.scaPaymentSdJwtScenario)
+        WalletGalleryEvidence.request("issuance", offer.offerUrl)
+        launchAndUnlock(context, device)
+        sendDeepLink(context, offer.offerUrl)
+        assertReview(device, "wallet.offerAcceptButton")
+        clickByTag(device, "wallet.offerAcceptButton")
+        assertReview(device, "issuance-done")
+        clickByTag(device, "issuance-done")
+        assertHome(device)
+        val session = DemoTestBackend.createScaPaymentVerifierSession(payment)
+        WalletGalleryEvidence.request("presentation", session.authorizationRequestUri)
+        sendDeepLink(context, session.authorizationRequestUri)
+        assertReview(device, "wallet.presentationSubmitButton")
+        WalletPaymentReviewE2E.review(device, payment, "wallet-payment-${payment.name.lowercase()}")
+        clickByTag(device, "wallet.presentationRejectButton")
+        val info = DemoTestBackend.waitForVerifierFailure(session.sessionId, "access_denied", VERIFIER_POLLING_TIMEOUT)
+        val raw = info["presented_raw_data"]
+        assertTrue("Cancellation must not release a proof", raw == null || raw == JsonNull ||
+            raw.jsonObject["vpToken"].let { it == null || it == JsonNull })
+    }
 
     @Test
     fun automaticallyAttestsEudiIssuanceBeforeAndAfterRelaunch() = runBlocking {
