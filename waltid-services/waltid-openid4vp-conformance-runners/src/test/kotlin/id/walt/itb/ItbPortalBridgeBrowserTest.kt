@@ -37,6 +37,17 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun selectsTheVisibleActorWithinItsConfiguredStatement() = runBlocking<Unit> {
+        val actor = catalogue.suites.single { it.id == "cts07" }.actor
+        assertEquals("User", actor)
+        withPage(actorVisible = true) { page ->
+            ItbPortalBridge(page, statementsUrl, catalogue.systemName).prepare(suite.copy(actor = actor), case)
+            assertEquals("selected", page.evaluate("window.selectedSuite"))
+            assertEquals(false, page.evaluate("window.started"))
+        }
+    }
+
+    @Test
     fun identifiesAStaleCaseLabelWithoutStartingASession() = runBlocking<Unit> {
         withPage { page ->
             page.setDefaultTimeout(1_000.0)
@@ -126,6 +137,7 @@ class ItbPortalBridgeBrowserTest {
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
         startNeverEnabled: Boolean = false,
+        actorVisible: Boolean = false,
         block: suspend (Page) -> Unit,
     ) {
         Playwright.create().use { playwright ->
@@ -136,7 +148,7 @@ class ItbPortalBridgeBrowserTest {
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
                             route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled)))
+                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -149,13 +161,21 @@ class ItbPortalBridgeBrowserTest {
 
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
-        startNeverEnabled: Boolean,
+        startNeverEnabled: Boolean, actorVisible: Boolean,
     ) = """
-        <button>$systemName</button><button onclick="showTests()">${suite.statement}</button>
+        <button>$systemName</button>
+        <app-conformance-statement-item-display>
+          <button onclick="selectStatement()">${suite.statement}</button><div id="actors"></div>
+        </app-conformance-statement-item-display>
+        <app-conformance-statement-item-display><div>Other statement</div><button>User</button></app-conformance-statement-item-display>
         <script>
         window.started = false;
         window.startCount = 0;
         window.interactive = false;
+        function selectStatement() {
+            if ($actorVisible) document.querySelector('#actors').innerHTML = '<button onclick="showTests()">User</button>';
+            else showTests();
+        }
         function showTests() {
             document.body.innerHTML = `
                 <button id="button-executionType">Actions...</button>
