@@ -194,6 +194,9 @@ final class MockWalletUITests: XCTestCase {
         else { XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1) }
         let details = app.buttons["payment-details-toggle"]
         revealReviewElement(details, in: app)
+        XCTAssertTrue(app.staticTexts["Payment timing"].exists)
+        XCTAssertTrue(app.staticTexts["Payment terms"].exists)
+        XCTAssertFalse(app.staticTexts["Example Payments Ltd"].exists, "Supplementary fields start collapsed")
         XCTAssertTrue(app.staticTexts["9007199254740993.01"].exists)
         XCTAssertTrue(app.staticTexts["0.1234567890123456789"].exists)
         details.tap()

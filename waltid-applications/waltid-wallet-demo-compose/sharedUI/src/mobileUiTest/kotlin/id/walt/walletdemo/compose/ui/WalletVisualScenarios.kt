@@ -51,6 +51,7 @@ import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletOperationState
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentFieldPlacement
 
 /** Content and readiness are shared; the platform adapter owns the renderer and baseline path. */
 @OptIn(ExperimentalTestApi::class)
@@ -808,10 +809,24 @@ internal class WalletVisualScenarios(
         onNodeWithText("Payee logo").assertDoesNotExist()
         onNodeWithText("Currency").assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
-        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").assertExists()
         if (!recurring) {
-            onNodeWithText("(UTC)", substring = true).performScrollToContent(this).assertIsDisplayed()
             onNodeWithText("2099-01-01T12:00:00Z").assertDoesNotExist()
+            onNodeWithText("(UTC)", substring = true).assertExists()
+        }
+        onNodeWithText("Requested credentials").assertExists()
+        onNodeWithText("https://verifier.example").assertExists()
+        consent.fields.filter { it.path != listOf("payee", "logo") && it.path != listOf("currency") }.forEach { field ->
+            when (field.placement) {
+                WalletDemoPaymentFieldPlacement.Prominent, WalletDemoPaymentFieldPlacement.Main ->
+                    onNodeWithText(field.label).assertExists("Main payment field must not require expansion: ${field.label}")
+                WalletDemoPaymentFieldPlacement.Details, WalletDemoPaymentFieldPlacement.Omitted ->
+                    onNodeWithText(field.label).assertDoesNotExist()
+            }
+        }
+        if (recurring) onNodeWithText("Payment terms").assertExists()
+        if (compact) {
+            onNodeWithText("Payment terms").performScrollToContent(this).assertIsDisplayed()
         }
         if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
             val results = mutableListOf<TextLayoutResult>()

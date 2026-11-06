@@ -525,26 +525,45 @@ final class WalletVisualTests: XCTestCase {
     func testRecurringPaymentCompactLargeText() async throws { try await paymentTerms(recurring: true, compact: true) }
 
     private func paymentTerms(recurring: Bool, details: Bool = false, compact: Bool = false) async throws {
-        let consent = try WalletVisualFixtures().payment(recurring: recurring)
+        let fixtures = try WalletVisualFixtures()
+        let consent = try fixtures.payment(recurring: recurring)
         let state = PaymentReviewState.ready(consent)
+        let review = try fixtures.sharingReview(payment: true)
+        let expected = Set(review.credentialOptions.map { $0.selection.id })
         let id = "payment.\(recurring ? "recurring" : "scheduled")."
             + (compact ? "compact_large_text" : details ? "details" : "main")
         let sizeCategory: ContentSizeCategory = compact ? .accessibilityMedium : .large
         var logoReady = false
-        let content = WalletReviewScaffold {
-            PaymentConsentView(state: state, detailsInitiallyExpanded: details)
-        } actions: {
-            ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
-                onCancel: {}, paymentReview: state)
+        var rendered: Set<String> = []
+        var positioned = !details && !compact
+        let content = ScrollViewReader { proxy in
+            SharingReviewScreen(title: "Payment", review: review,
+                selection: SharingSelection(credentials: review.defaultCredentialSelection()),
+                selectionComplete: true, paymentReview: state,
+                onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+                .environment(\.paymentDetailsInitiallyExpanded, details)
+                .onPreferenceChange(SharingReviewReadinessKey.self) {
+                    rendered = Set($0.map { $0.selection.id })
+                    if logoReady && expected.isSubset(of: rendered) && !positioned {
+                        proxy.scrollTo(details ? "payment-details" : "payment-terms", anchor: .top)
+                        positioned = true
+                    }
+                }
+                .onPreferenceChange(CredentialImageReadinessKey.self) {
+                    logoReady = $0.contains("payment-payee-logo")
+                    if logoReady && expected.isSubset(of: rendered) && !positioned {
+                        proxy.scrollTo(details ? "payment-details" : "payment-terms", anchor: .top)
+                        positioned = true
+                    }
+                }
         }.environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
             .environment(\.colorScheme, .light).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
-            .onPreferenceChange(CredentialImageReadinessKey.self) { logoReady = $0.contains("payment-payee-logo") }
         try await captureWhenReady(content, id: id, config: compact ? .iPhoneSe : .iPhone13,
             sizeCategory: sizeCategory,
-            isReady: { state.canConfirm && logoReady }, failure: "Payment review did not become available",
-            scrollToBottom: recurring || details, scrollFraction: details || compact ? 1 : 0.4)
+            isReady: { state.canConfirm && logoReady && expected.isSubset(of: rendered) && positioned },
+            failure: "Full payment review did not become available")
     }
 
     func testPaymentConsent() throws {

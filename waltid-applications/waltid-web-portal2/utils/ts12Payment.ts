@@ -16,12 +16,16 @@ export const stringifyPaymentJson = (value: unknown, space?: number): string =>
 export const paymentJsonParser = { parse: parsePaymentJson, stringify };
 
 export const PAYMENT_TYPE = "urn:eudi:sca:payment:1";
-/** Reject unsupported entry fields before the full-request editor projects them into guided controls. */
+/** Reject unsupported entry fields and payload shapes before projecting a request into form controls. */
 export function assertPaymentTransactionFields(entry: Record<string, unknown>): void {
   if (entry.type !== PAYMENT_TYPE) return;
   const supported = ["type", "credential_ids", "require_cryptographic_holder_binding", "transaction_data_hashes_alg", "payload"];
   const unknown = Object.keys(entry).find(name => !supported.includes(name));
   if (unknown !== undefined) throw new Error(`Unsupported TS12 transaction-data field "${unknown}". Correct the JSON before using the form.`);
+  const payload = entry.payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload instanceof LosslessNumber) {
+    throw new Error("TS12 payment payload must be a JSON object. Correct the JSON before using the form.");
+  }
 }
 export type PaymentMode = "unscheduled" | "scheduled" | "recurring";
 type FieldKind = "text" | "timestamp" | "money" | "number" | "integer" | "boolean" | "frequency";

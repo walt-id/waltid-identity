@@ -20,7 +20,7 @@ struct PaymentDisplayField: Identifiable {
 
 // Keep these rendering groups aligned with the Compose demo; validated values, labels,
 // locale and placement continue to come from the same wallet core.
-enum PaymentDisplayGroup { case payee, amount, timing, provider, other }
+enum PaymentDisplayGroup { case payee, amount, timing, terms, provider, other }
 
 extension PaymentDisplayField {
     var paymentPath: [String] {
@@ -32,7 +32,13 @@ extension PaymentDisplayField {
         switch paymentPath.first {
         case "payee": .payee
         case "amount", "currency": .amount
-        case "execution_date", "recurrence": .timing
+        case "execution_date": .timing
+        case "recurrence":
+            switch paymentPath.dropFirst().first {
+            case "start_date", "end_date", "number", "frequency": .timing
+            case "mit_options": .terms
+            default: .other
+            }
         case "pisp": .provider
         default: .other
         }

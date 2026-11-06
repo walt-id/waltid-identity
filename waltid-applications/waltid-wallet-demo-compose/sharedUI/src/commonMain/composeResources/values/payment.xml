@@ -12,4 +12,5 @@
     <string name="payment_timing_title">Payment timing</string>
     <string name="payment_provider_title">Payment service provider</string>
     <string name="payment_load_logo">Load payee logo</string>
+    <string name="payment_terms_title">Payment terms</string>
 </resources>

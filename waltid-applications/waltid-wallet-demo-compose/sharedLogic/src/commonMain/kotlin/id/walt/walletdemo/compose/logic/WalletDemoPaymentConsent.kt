@@ -64,7 +64,7 @@ data class WalletDemoPaymentDisplayField(
 )
 
 /** Presentation grouping never changes issuer placement or recovers fields from the raw payload. */
-enum class PaymentDisplayGroup { Payee, Amount, Timing, Provider, Other }
+enum class PaymentDisplayGroup { Payee, Amount, Timing, Terms, Provider, Other }
 
 val WalletDemoPaymentDisplayField.paymentPath: List<String>
     get() = if (item.pathComponents.getOrNull(1) == "details")
@@ -75,7 +75,12 @@ val WalletDemoPaymentDisplayField.group: PaymentDisplayGroup
     get() = when (paymentPath.firstOrNull()) {
         "payee" -> PaymentDisplayGroup.Payee
         "amount", "currency" -> PaymentDisplayGroup.Amount
-        "execution_date", "recurrence" -> PaymentDisplayGroup.Timing
+        "execution_date" -> PaymentDisplayGroup.Timing
+        "recurrence" -> when (paymentPath.getOrNull(1)) {
+            "start_date", "end_date", "number", "frequency" -> PaymentDisplayGroup.Timing
+            "mit_options" -> PaymentDisplayGroup.Terms
+            else -> PaymentDisplayGroup.Other
+        }
         "pisp" -> PaymentDisplayGroup.Provider
         else -> PaymentDisplayGroup.Other
     }

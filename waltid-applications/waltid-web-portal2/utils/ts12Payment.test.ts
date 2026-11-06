@@ -153,3 +153,20 @@ test("scheduled leap seconds use the server's conservative deadline boundary", (
     assert.throws(() => paymentPayload(draft, midnight + 1), /must not lie in the past/);
   }
 });
+
+test("full-request imports retain rejected payload shapes before form hydration", () => {
+  const quoted = JSON.stringify(paymentExample("unscheduled"));
+  for (const token of [undefined, "null", quoted, "true", "0", "2.0", "[]"]) {
+    const raw = '{"openid":{"transactionData":[{"type":"urn:eudi:sca:payment:1","credential_ids":["payment"]'
+      + (token === undefined ? "" : ',"payload":' + token) + '}]}}';
+    const request = parsePaymentJson(raw);
+    const before = stringifyPaymentJson(request);
+    assert.throws(() => assertPaymentTransactionFields(request.openid.transactionData[0]), /payload must be a JSON object/);
+    assert.equal(stringifyPaymentJson(request), before, "Rejected input must stay intact");
+    assert.doesNotThrow(() => assertPaymentTransactionFields({ ...request.openid.transactionData[0], type: "org.example.custom" }));
+  }
+  const payload = parsePaymentJson(paymentExample("unscheduled").replace('11.56', '9007199254740993.01'));
+  const entry = { type: "urn:eudi:sca:payment:1", credential_ids: ["payment"], payload };
+  assert.doesNotThrow(() => assertPaymentTransactionFields(entry));
+  assert.match(stringifyPaymentJson(entry), /"amount":9007199254740993\.01/);
+});

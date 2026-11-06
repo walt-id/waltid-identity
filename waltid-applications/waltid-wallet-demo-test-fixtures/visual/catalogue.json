@@ -694,7 +694,7 @@
       "requirements": [
         "Issuer-labelled execution timestamp and pinned confirmation action"
       ],
-      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
     },
     {
       "id": "payment.scheduled.details",
@@ -704,7 +704,7 @@
       "requirements": [
         "Expanded transaction and PISP details with an actionable payee website"
       ],
-      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
     },
     {
       "id": "payment.recurring.main",
@@ -714,7 +714,7 @@
       "requirements": [
         "Recurring timing and merchant-initiated terms remain scrollable with pinned actions"
       ],
-      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
     },
     {
       "id": "payment.recurring.details",
@@ -724,7 +724,7 @@
       "requirements": [
         "Expanded transaction and PISP details remain reachable below all recurring terms"
       ],
-      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state."
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
     },
     {
       "id": "payment.recurring.compact_large_text",
@@ -734,7 +734,7 @@
       "requirements": [
         "Long recurring terms wrap and scroll without obscuring confirmation or cancellation"
       ],
-      "note": "Synthetic complete TS12 payment consent. Compose interacts with scrolling, details expansion and cancellation; native captures the production consent component with its requested disclosure state.",
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately.",
       "configuration": {
         "android": {
           "viewport": [
@@ -1243,16 +1243,16 @@
     }
   ],
   "galleryPreview": [
+    "payment.scheduled.main",
+    "payment.scheduled.details",
+    "payment.recurring.main",
+    "payment.recurring.details",
     "components.dates",
     "wallet.home.credential",
     "onboarding.pin.setup",
     "wallet.scan.empty",
     "batch.offer.two_targets_three_copies",
     "sharing.information.selected",
-    "payment.scheduled.main",
-    "payment.scheduled.details",
-    "payment.recurring.main",
-    "payment.recurring.details",
     "credential.details.identity",
     "nearby.ready.qr",
     "settings.root.default"

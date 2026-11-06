@@ -21,7 +21,8 @@ The renderers do not fetch payment metadata, validate signatures, choose a trans
 Android's additional-review preference remains intact. With wallet preview disabled, Credential Manager owns the confirmation UI; these wallet screenshots do not establish its TS-12 coverage. That platform limitation remains tracked by WAL-1513. Live signing, system sheets, physical hardware and formal conformance require separate evidence.
 
 `payment.scheduled.*` and `payment.recurring.*` use complete, synthetic consent fields from the
-shared fixture. Their main/details states cover timing, frequency, MIT terms, ordinary optional
+shared fixture. Every renderer uses the full sharing review, including the verifier and requested credentials.
+Main states start at the top; detail states show a scrolled continuation. They cover timing, frequency, MIT terms, ordinary optional
 fields, a valid embedded logo, clickable HTTPS website and localized Boolean values. The recurring compact/large-text state covers scrolling while the
 actions remain pinned. Compose tests also expand details, reach every field and cancel without
 submission; native disclosure interaction retains its separate app-host test. These fixtures do
@@ -30,7 +31,9 @@ not replace the shared validator, issuer-metadata or end-to-end proof tests.
 Payee identity and its details share a card. Amount and the ISO currency code share a row
 under the amount label, including at large text sizes. They wrap only when their actual
 content cannot fit the available width, without truncating either value. Timing
-and recurring terms keep their issuer-defined placement. Details group the PISP separately.
+and recurring monetary terms use separate neutral cards, preserving issuer placement.
+Level-1/2 terms remain visible in the main review; only supplementary fields start collapsed.
+Payment details group the PISP separately.
 
 Logos are optional display assets: a valid bounded PNG/JPEG is shown without a visible
 caption, retaining its issuer label for accessibility. Missing or failed images leave
