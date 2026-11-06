@@ -176,6 +176,34 @@ class WalletModuleApplicabilityTest {
     }
 
     @Test
+    fun `request uri POST is skipped only when the suite would return an unsigned object`() {
+        val module = "oid4vp-1final-wallet-request-uri-method-post"
+        val reason = WalletModuleApplicability.inapplicableReason(
+            module,
+            moduleMetadata = null,
+            variantSelection = variant(clientIdPrefix = "redirect_uri", requestMethod = "request_uri_unsigned"),
+        )
+        assertNotNull(reason)
+        assertTrue("5.10.1" in reason, "the reason must cite the signed POST requirement, was: $reason")
+        // A signed request can satisfy §5.10.1, so that variant still runs the module.
+        assertNull(
+            WalletModuleApplicability.inapplicableReason(
+                module,
+                moduleMetadata = null,
+                variantSelection = variant(clientIdPrefix = "x509_san_dns", requestMethod = "request_uri_signed"),
+            )
+        )
+        // Unsigned GET is a legal redirect_uri exchange and must not be caught by this skip.
+        assertNull(
+            WalletModuleApplicability.inapplicableReason(
+                "oid4vp-1final-wallet-happy-flow",
+                moduleMetadata = null,
+                variantSelection = variant(clientIdPrefix = "redirect_uri", requestMethod = "request_uri_unsigned"),
+            )
+        )
+    }
+
+    @Test
     fun `alternate-happy-flow is skipped until the suite can build the request`() {
         val reason = WalletModuleApplicability.inapplicableReason(
             "oid4vp-1final-wallet-alternate-happy-flow",
