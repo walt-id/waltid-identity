@@ -60,7 +60,7 @@ public enum DemoPayment: String, CaseIterable {
                     "max_amount": NSDecimalNumber(string: "9007199254740993.01"),
                     "total_amount": NSDecimalNumber(string: "120.00"),
                     "initial_amount": NSDecimalNumber(string: "-1.23"), "initial_amount_number": 2,
-                    "apr": NSDecimalNumber(string: "0.1234567890123456789")],
+                    "apr": NSDecimalNumber(string: "0.1234567890123456789")] as [String: Any],
             ]
         }
         return payload
