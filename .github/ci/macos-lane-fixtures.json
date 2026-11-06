@@ -384,6 +384,20 @@
         "waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/kotlin/WebWallet.kt"
       ],
       "lanes": ["enterprise", "visual-browser"]
+    },
+    {
+      "name": "shared wallet logic test changes select browser execution",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonTest/kotlin/id/walt/walletdemo/compose/logic/WalletDemoControllerTest.kt"
+      ],
+      "lanes": ["compose", "enterprise", "ios-simulator", "visual-browser"]
+    },
+    {
+      "name": "browser wallet logic test changes select browser execution",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/kotlin/id/walt/walletdemo/compose/logic/walletapi2/WalletApi2ClientTest.kt"
+      ],
+      "lanes": ["enterprise", "visual-browser"]
     }
   ]
 }

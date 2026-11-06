@@ -411,5 +411,42 @@
         ]
       }
     ]
+  },
+  "sharingDates": {
+    "origin": "https://verifier.example",
+    "credentials": [
+      {
+        "queryId": "identity",
+        "credentialId": "pid-dates",
+        "title": "PID (SD-JWT VC)",
+        "issuer": "Digital Credentials Issuer",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#2157A8",
+        "data": {
+          "iat": 1793318400,
+          "exp": 1801094400
+        },
+        "disclosures": [
+          {
+            "path": "iat",
+            "label": "Issued at",
+            "value": 1793318400,
+            "required": false,
+            "selective": false,
+            "selectable": false,
+            "requested": false
+          },
+          {
+            "path": "exp",
+            "label": "Expires",
+            "value": 1801094400,
+            "required": false,
+            "selective": false,
+            "selectable": false,
+            "requested": false
+          }
+        ]
+      }
+    ]
   }
 }

@@ -56,6 +56,26 @@ final class WalletVisualTests: XCTestCase {
         try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl", layoutDirection: .rightToLeft)
     }
 
+    func testDateValues() throws { try dateValues() }
+    func testDateValuesCompactRtl() throws { try dateValues(rtl: true) }
+
+    private func dateValues(rtl: Bool = false) throws {
+        let first = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T00:30:00Z"))
+        let second = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T01:30:00Z"))
+        let content = VStack(alignment: .leading, spacing: 20) {
+            ClaimValueRow(item: ClaimItem(path: .topLevel("iat"), label: "Issued at", value: .instant(first), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("exp"), label: "Expires", value: .instant(second), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("birth_date"), label: "Birth date", value: .text("1990-05-21"), rawValue: nil))
+        }
+        .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .environment(\.locale, Locale(identifier: rtl ? "ar@hours=h23" : "en_GB@hours=h23"))
+        .environment(\.timeZone, try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")))
+        .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+        try capture(content, id: rtl ? "components.dates.compact_large_text_rtl" : "components.dates",
+                    config: rtl ? .iPhoneSe : .iPhone13, sizeCategory: rtl ? .accessibilityMedium : .large,
+                    layoutDirection: rtl ? .rightToLeft : .leftToRight)
+    }
+
     func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
     func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
 
@@ -278,8 +298,10 @@ final class WalletVisualTests: XCTestCase {
             id: required ? "settings.reader_required.default" : "settings.reader.default")
     }
     func testReaderTrustImport() throws {
-        try capture(ReaderTrustImportReviewView(preview: WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {}),
-            id: "settings.reader.import_review")
+        let content = ReaderTrustImportReviewView(preview: try WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {})
+            .environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+        try capture(WalletVisualHostingController(rootView: content), id: "settings.reader.import_review")
     }
 
     func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }
@@ -371,12 +393,14 @@ final class WalletVisualTests: XCTestCase {
     }
 
     func testProviderSharingReview() async throws { try await providerSharingReview() }
+    func testSharingInformationDates() async throws { try await sharingInformation(dates: true) }
     func testSharingInformationSelected() async throws { try await sharingInformation() }
     func testSharingInformationAlternative() async throws { try await sharingInformation(alternative: true) }
     func testSharingInformationMultiple() async throws { try await sharingInformation(multiple: true) }
 
-    private func sharingInformation(alternative: Bool = false, multiple: Bool = false) async throws {
-        let review = try WalletVisualFixtures().informationReview(multiple: multiple)
+    private func sharingInformation(alternative: Bool = false, multiple: Bool = false, dates: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let review = try dates ? fixtures.dateReview() : fixtures.informationReview(multiple: multiple)
         var credentials = review.defaultCredentialSelection()
         if alternative { credentials = [review.credentialOptions[1].selection] }
         let selection = SharingSelection(credentials: credentials)
@@ -385,9 +409,13 @@ final class WalletVisualTests: XCTestCase {
         let groups = review.informationToShare(selection: selection, details: details)
         XCTAssertEqual(groups.count, multiple ? 2 : 1)
         if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }
+        if dates {
+            XCTAssertEqual(groups[0].fields.map { $0.item.value }, [.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)), .instant(WalletInstant(epochSeconds: 1801094400, nanoseconds: 0))])
+            XCTAssertTrue(groups[0].fields.allSatisfy { $0.alwaysIncluded })
+        }
         let screen = SharingReviewScreen(title: "Share credentials", review: review, selection: selection,
             selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
-        try await captureReview(screen, id: "sharing.information." + (multiple ? "multiple" : alternative ? "alternative" : "selected"),
+        try await captureReview(screen, id: "sharing.information." + (dates ? "dates" : multiple ? "multiple" : alternative ? "alternative" : "selected"),
             expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: multiple)
     }
 
@@ -615,6 +643,7 @@ final class WalletVisualTests: XCTestCase {
                                               expected: Set<String>, scrollToBottom: Bool = false) async throws {
         var ready: Set<String> = []
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = Set($0.map(\.selection.id)) }
@@ -715,6 +744,7 @@ final class WalletVisualTests: XCTestCase {
                                       layoutDirection: LayoutDirection = .leftToRight,
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)

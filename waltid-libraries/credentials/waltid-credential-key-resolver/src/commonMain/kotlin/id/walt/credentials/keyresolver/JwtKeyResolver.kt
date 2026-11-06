@@ -25,7 +25,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Resolution does not establish trust in the key. A key taken from `x5c` is chosen by the token
  * itself and must be anchored with [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors]
- * before it is relied on; see [resolvesFromX5c].
+ * before it is relied on.
  */
 object JwtKeyResolver {
 
@@ -69,14 +69,6 @@ object JwtKeyResolver {
             log.error { "Could not resolve JWT signer key: ${cause.stackTraceToString()}" }
             null
         }
-    }
-
-    /**
-     * Whether [resolveFromJwt] takes the key from the `x5c` header for this JWT.
-     */
-    fun resolvesFromX5c(jwtHeader: JsonObject?, jwtPayload: JsonObject): Boolean {
-        val signerIdentifier = extractSignerIdentifier(jwtPayload)
-        return !(signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier)) && jwtHeader?.contains("x5c") == true
     }
 
     /**
