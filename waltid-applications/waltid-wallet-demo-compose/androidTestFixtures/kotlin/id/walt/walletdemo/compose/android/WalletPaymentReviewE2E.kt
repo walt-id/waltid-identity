@@ -8,6 +8,8 @@ import id.walt.mobile.test.backend.DemoPayment
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForAnyResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
 import org.junit.Assert.*
 
@@ -19,9 +21,12 @@ internal object WalletPaymentReviewE2E {
             assertNotNull("Missing payment disclosure: $tag", waitForResourceAfterScrolling(device, tag, 10_000))
             clickByTag(device, tag)
         }
-        val consent = waitForResourceAfterScrolling(device, "payment-consent", 60_000)
-        assertFalse("Payment consent is blocked", device.hasObject(By.res("payment-consent-blocked")))
-        assertNotNull("Payment consent is missing", consent)
+        val consent = waitForAnyResourceAfterScrolling(device, listOf("payment-consent", "payment-consent-blocked"), 60_000)
+        if (consent == null) {
+            fail("Payment consent is unavailable.\n${foregroundWindowSnapshot(device)}")
+            return
+        }
+        assertEquals("Payment consent is blocked: ${consent.text}", "payment-consent", consent.resourceName)
         listOf("Confirm this payment", "Super Store", "merchant-001", "Payee ID", "Amount", "11.56", "EUR",
             "Check the payee, amounts, timing and recurring terms before confirming.").forEach(::text)
         assertFalse("Failed logos must leave no placeholder", device.hasObject(By.res("payment-payee-logo")))
