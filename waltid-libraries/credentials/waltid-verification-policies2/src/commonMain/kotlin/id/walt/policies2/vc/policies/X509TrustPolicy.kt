@@ -20,6 +20,8 @@ import kotlinx.serialization.json.put
  * `x5chain`. Certificates inside the credential are never used as anchors, and no system trust store
  * is consulted. Supports SD-JWT VC, W3C VCs secured as JWT or COSE, and mdoc. For ETSI trust lists,
  * use [ETSITrustListPolicy].
+ *
+ * It does not verify the credential signature; run it together with [CredentialSignaturePolicy].
  */
 @Serializable
 @SerialName("x509-trust")
@@ -31,7 +33,11 @@ data class X509TrustPolicy(
 
     init {
         require(trustRoots.isNotEmpty()) { "$ID: 'trustRoots' must not be empty" }
-        X5cTrustAnchors.requireParsable(trustRoots)
+        trustRoots.forEachIndexed { index, root ->
+            require(X5cTrustAnchors.isParsable(root)) {
+                "$ID: 'trustRoots'[$index] is not an X.509 certificate in PEM or base64-encoded DER"
+            }
+        }
     }
 
     override suspend fun verify(

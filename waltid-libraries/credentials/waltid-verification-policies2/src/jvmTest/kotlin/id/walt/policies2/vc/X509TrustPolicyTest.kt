@@ -43,6 +43,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -177,6 +178,14 @@ class X509TrustPolicyTest {
         assertFails { Json.decodeFromString<VCPolicyList>("""[{"policy":"x509-trust","trustRoots":[]}]""") }
         assertFails { Json.decodeFromString<VCPolicyList>("""[{"policy":"x509-trust","trustRoots":["not a certificate"]}]""") }
         assertFails { Json.decodeFromString<VCPolicyList>("""["x509-trust"]""") }
+    }
+
+    @Test
+    fun namesUnparsableTrustRoot() = runTest {
+        val root = selfSigned("CN=Root CA")
+
+        val failure = assertFailsWith<IllegalArgumentException> { X509TrustPolicy(listOf(der(root), "not a certificate")) }
+        assertEquals("x509-trust: 'trustRoots'[1] is not an X.509 certificate in PEM or base64-encoded DER", failure.message)
     }
 
     private class Issued(val key: Key, val certificate: X509Certificate)

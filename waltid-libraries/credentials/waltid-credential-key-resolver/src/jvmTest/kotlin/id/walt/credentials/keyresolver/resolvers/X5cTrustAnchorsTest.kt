@@ -14,7 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -135,8 +135,12 @@ class X5cTrustAnchorsTest {
     }
 
     @Test
-    fun unparsableTrustRootIsRejected() {
-        assertFailsWith<Exception> { X5cTrustAnchors.requireParsable(listOf("not a certificate")) }
+    fun recognizesParsableTrustRoots() = runTest {
+        val root = selfSigned("CN=Root CA")
+
+        assertTrue(X5cTrustAnchors.isParsable(root.certificate.encodedPem))
+        assertTrue(X5cTrustAnchors.isParsable(der(root.certificate)))
+        assertFalse(X5cTrustAnchors.isParsable("not a certificate"))
     }
 
     private class Issued(val key: Key, val certificate: X509Certificate)

@@ -42,10 +42,8 @@ object X5cTrustAnchors {
         }
     }
 
-    /** Throws if any of [certificates] is not an X.509 certificate in PEM or base64-encoded DER. */
-    fun requireParsable(certificates: List<String>) {
-        certificates.forEach(::parseCertificate)
-    }
+    /** Whether [certificate] is an X.509 certificate in PEM or base64-encoded DER. */
+    fun isParsable(certificate: String): Boolean = runCatching { parseCertificate(certificate) }.isSuccess
 
     private fun parseCertificate(value: String): X509Certificate {
         val trimmed = value.trim()

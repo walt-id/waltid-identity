@@ -8,7 +8,7 @@ New `x509-trust` credential policy (verification policies 2). It takes caller-su
 { "policy": "x509-trust", "trustRoots": ["-----BEGIN CERTIFICATE-----..."] }
 ```
 
-`signature` still checks only the signature: it does not check an `x5c` chain against any root. Pair it with `x509-trust`, `etsi-trust-list` or (for mdoc) `vical`.
+`signature` still checks only the signature: it does not check an `x5c` chain against any root. Pair it with `x509-trust`, `etsi-trust-list` or (for mdoc) `vical`. `x509-trust` in turn does not verify the signature, so run both.
 
 ### Wallet2 client attestation compatibility
 
