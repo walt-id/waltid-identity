@@ -903,14 +903,26 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             metadataService.credentialConfigurationIdsForScopes(tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()),
         ).map { it.credentialIdentifier }.toSet()
         return when (val collection = deferredIssuance.collect(session.sessionId, request.transactionId, authorized, tokenClaims.stringClaim("client_id")?.takeIf(String::isNotBlank))) {
-            is DeferredIssuance.Collection.Pending -> oauth2Provider.writeDeferredCredentialResponse(request, collection.response)
+            is DeferredIssuance.Collection.Pending -> when (
+                val creation = oauth2Provider.createDeferredCredentialResponse(request, collection.response)
+            ) {
+                is CredentialResponseResult.Success -> oauth2Provider.writeDeferredCredentialResponse(request, creation.response)
+                is CredentialResponseResult.Failure -> oauth2Provider.writeDeferredCredentialError(creation.error)
+            }
             is DeferredIssuance.Collection.Claimed -> {
                 val claim = collection.transaction
                 try {
-                    val prepared = claim.accepted.restore(request.credentialResponseEncryption)
+                    val prepared = claim.accepted.restore(
+                        request.credentialResponseEncryption, DeferredCredentialResponseContext(session.sessionId, claim, deferredIssuance),
+                    )
                     val response = deferredIssuance.withClaim(session.sessionId, claim) {
                         if (claim.response != null && claim.accepted.credentialIdentifier in sessionService.getSession(session.sessionId).issuanceResults) {
-                            oauth2Provider.writeCredentialResponse(prepared, requireNotNull(claim.response))
+                            when (val result = oauth2Provider.createDeferredCredentialResponse(
+                                request, requireNotNull(claim.response), DeferredCredentialResponseContext(session.sessionId, claim, deferredIssuance),
+                            )) {
+                                is CredentialResponseResult.Success -> oauth2Provider.writeCredentialResponse(prepared, result.response)
+                                is CredentialResponseResult.Failure -> oauth2Provider.writeDeferredCredentialError(result.error)
+                            }
                         } else processCredentialRequest(accessToken, requestId, claim) { CredentialRequestResult.Success(prepared) }
                     }
                     withContext(NonCancellable) {
@@ -1388,6 +1400,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val credentialResponse = when (credentialResponseResult) {
                 is CredentialResponseResult.Success -> credentialResponseResult.response
                 is CredentialResponseResult.Failure -> {
+                    if (deferredClaim != null && credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                        return oauth2Provider.writeDeferredCredentialError(credentialResponseResult.error)
+                    }
                     val response = if (credentialResponseResult.error.isRetryableProofFailure()) {
                         retryCredentialRequest(
                             requestWithSession,
@@ -1412,6 +1427,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
             if (deferredClaim != null && deferredClaim.response == null) {
                 deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
+            }
+
+            val responseToWrite = if (deferredClaim == null) credentialResponse else {
+                when (val creation = oauth2Provider.createDeferredCredentialResponse(
+                    DeferredCredentialRequest(deferredClaim.id, requestWithSession.credentialResponseEncryption), credentialResponse,
+                    DeferredCredentialResponseContext(sessionId, deferredClaim, deferredIssuance),
+                )) {
+                    is CredentialResponseResult.Success -> creation.response
+                    is CredentialResponseResult.Failure -> return oauth2Provider.writeDeferredCredentialError(creation.error)
+                }
             }
 
             credentialProofKeyCommitment?.let { commitment ->
@@ -1466,7 +1491,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 committedProofKeyJwks = proofPublicKeyJwks
             }
 
-            val response = oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
+            val response = oauth2Provider.writeCredentialResponse(requestWithSession, responseToWrite)
             if (deferredClaim != null && response.status != 200) {
                 // Keep the signed checkpoint for a later poll with valid response encryption.
                 claimFinalized = true
@@ -1552,6 +1577,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 )
             }
+            throw e
+        } catch (e: DeferredProtocolException) {
             throw e
         } catch (e: Exception) {
             if (claimFinalized) {
