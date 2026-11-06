@@ -320,7 +320,8 @@ class Issuer2PARRouteTest {
         val response = client.post("/openid4vci/nonce")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        assertEquals(listOf("no-store"), response.headers.getAll(HttpHeaders.CacheControl))
+        assertEquals(null, response.headers[HttpHeaders.Pragma])
         val requestId = assertNotNull(response.headers[HttpHeaders.XRequestId])
         val payload = response.body<JsonObject>()
         val nonce = assertNotNull(payload["c_nonce"]?.jsonPrimitive?.contentOrNull)

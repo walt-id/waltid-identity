@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
@@ -13,6 +14,9 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.dpop.DPoPProofVerificationRequest
+import id.walt.openid4vci.deferred.*
+import id.walt.openid4vci.requests.credential.*
+import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
@@ -67,6 +71,7 @@ import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -278,7 +283,7 @@ class DefaultOAuth2Provider(
         PushedAuthorizationResponseHttp(
             status = oauthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = error.responseHeaders + noStoreHeaders(),
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
         )
 
     override fun writePushedAuthorizationError(
@@ -297,7 +302,6 @@ class DefaultOAuth2Provider(
                 put("request_uri", JsonPrimitive(response.requestUri))
                 put("expires_in", JsonPrimitive(response.expiresIn))
             },
-            headers = noStoreHeaders(),
         )
 
     override suspend fun createAccessTokenRequest(
@@ -487,7 +491,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = oauthJsonErrorStatus(error),
-            headers = error.responseHeaders + TOKEN_RESPONSE_HEADERS,
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
@@ -503,7 +507,6 @@ class DefaultOAuth2Provider(
     ): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 200,
-            headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("token_type", JsonPrimitive(response.tokenType))
                 put("access_token", JsonPrimitive(response.accessToken))
@@ -535,11 +538,96 @@ class DefaultOAuth2Provider(
     private companion object {
         const val HTTP_POST = "POST"
         const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
-        val TOKEN_RESPONSE_HEADERS = mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
     }
+
+    override suspend fun acceptCredentialRequest(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        credentialIdentifier: String,
+        credentialConfigurationId: String,
+        proofValidationContext: CredentialProofValidationContext,
+    ): AcceptedCredentialRequest {
+        request.credentialResponseEncryption?.let { encryption ->
+            try {
+                config.credentialResponseEncryptor.validate(encryption)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw CredentialProofValidationException(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, "Invalid response encryption parameters")
+            }
+        }
+        val bindings = when (val result = verifyCredentialProofs(request, configuration, proofValidationContext)) {
+            is CredentialProofVerification.Success -> result.bindings
+            is CredentialProofVerification.Failure -> throw CredentialProofValidationException(result.error.error, result.error.description.orEmpty())
+        }
+        val handler = config.credentialEndpointHandlers.get(configuration.format)
+            ?: throw CredentialProofValidationException(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, "Unsupported credential format")
+        validateCredentialBindings(handler, configuration, bindings)?.let {
+            throw CredentialProofValidationException(it.error, it.description.orEmpty())
+        }
+        return request.accept(credentialIdentifier, credentialConfigurationId, configuration, bindings)
+    }
+
+    override suspend fun createDeferredCredentialRequest(
+        parameters: Map<String, List<String>>,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): DeferredCredentialRequestResult {
+        deferredAuthenticationError(accessTokenContext)?.let { return it }
+        return parseDeferredCredentialRequest(parameters, encrypted = false)
+    }
+
+    override suspend fun createDeferredCredentialRequest(
+        encryptedRequest: String,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): DeferredCredentialRequestResult {
+        deferredAuthenticationError(accessTokenContext)?.let { return it }
+        val decryptor = config.credentialRequestDecryptor ?: return DeferredCredentialRequestResult.Failure(
+            CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Credential request encryption is not supported")
+        )
+        return try {
+            parseDeferredCredentialRequest(decryptor.decrypt(encryptedRequest).toParametersMap(), encrypted = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            DeferredCredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Invalid encrypted deferred request"))
+        }
+    }
+
+    private suspend fun deferredAuthenticationError(context: CredentialAccessTokenContext): DeferredCredentialRequestResult? =
+        when (val result = verifyCredentialAccessToken(context)) {
+            is CredentialAccessTokenVerification.Success -> null
+            is CredentialAccessTokenVerification.Failure -> when (val failure = result.result) {
+                is CredentialRequestResult.OAuthFailure -> DeferredCredentialRequestResult.OAuthFailure(failure.error)
+                is CredentialRequestResult.Failure -> DeferredCredentialRequestResult.Failure(failure.error)
+                is CredentialRequestResult.Success -> error("Unexpected token validation result")
+            }
+        }
+
+    private fun parseDeferredCredentialRequest(parameters: Map<String, List<String>>, encrypted: Boolean): DeferredCredentialRequestResult {
+        val transactionId = parameters["transaction_id"]?.singleOrNull()?.takeIf(String::isNotBlank)
+            ?: return DeferredCredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "transaction_id is required"))
+        val encryptionValues = parameters["credential_response_encryption"]
+        val encryption = if (encryptionValues != null) {
+            if (!encrypted || encryptionValues.size != 1) return DeferredCredentialRequestResult.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "credential_response_encryption requires an encrypted Deferred Credential Request")
+            )
+            try {
+                Json.decodeFromString<CredentialResponseEncryptionParameters>(encryptionValues.single())
+            } catch (e: Exception) {
+                return DeferredCredentialRequestResult.Failure(CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, "Invalid response encryption parameters"))
+            }
+        } else null
+        return DeferredCredentialRequestResult.Success(DeferredCredentialRequest(transactionId, encryption))
+    }
+
+    override suspend fun writeDeferredCredentialResponse(request: DeferredCredentialRequest, response: CredentialResponse): CredentialResponseHttp =
+        writeCredentialResponse(
+            DefaultCredentialRequest(
+                client = id.walt.openid4vci.DefaultClient("", emptyList(), emptySet(), emptySet()), credentialIdentifier = null,
+                credentialConfigurationId = null, proofs = null,
+                credentialResponseEncryption = request.credentialResponseEncryption,
+            ), response,
+        )
 
     override suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,
@@ -723,7 +811,6 @@ class DefaultOAuth2Provider(
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
-            headers = noStoreHeaders(),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
@@ -733,7 +820,7 @@ class DefaultOAuth2Provider(
         CredentialResponseHttp(
             status = credentialOAuthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = noStoreHeaders() + credentialOAuthErrorHeaders(error),
+            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA + credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -744,8 +831,9 @@ class DefaultOAuth2Provider(
         response: CredentialResponse
     ): CredentialResponseHttp {
         val payload = response.toJsonObject()
+        val status = if (response.transactionId != null && response.credentials == null) 202 else 200
         val encryption = request.credentialResponseEncryption
-            ?: return CredentialResponseHttp(status = 200, payload = payload, headers = noStoreHeaders())
+            ?: return CredentialResponseHttp(status = status, payload = payload)
 
         val encrypted = try {
             config.credentialResponseEncryptor.encrypt(payload, encryption)
@@ -761,9 +849,8 @@ class DefaultOAuth2Provider(
             )
         }
         return CredentialResponseHttp(
-            status = 200,
+            status = status,
             body = CredentialResponseBody.EncryptedJwt(encrypted),
-            headers = noStoreHeaders(),
         )
     }
 
@@ -810,6 +897,12 @@ class DefaultOAuth2Provider(
         configuration: CredentialConfiguration,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialProofVerification {
+        if (request is PreparedCredentialRequest) {
+            if (request.acceptedConfiguration != configuration) return CredentialProofVerification.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Accepted credential configuration has changed")
+            )
+            return CredentialProofVerification.Success(request.bindings)
+        }
         return try {
             val collection = validateCredentialProofRequest(request.proofs, configuration, proofValidationContext)
             val shouldVerifyProofs = configuration.proofTypesSupported != null ||
@@ -1096,12 +1189,6 @@ class DefaultOAuth2Provider(
 
             else -> 400
         }
-
-    private fun noStoreHeaders(): Map<String, String> =
-        mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
 
     private fun Map<String, List<String>>.withAuthenticatedClientId(
         authenticatedClient: AuthenticatedClient?,

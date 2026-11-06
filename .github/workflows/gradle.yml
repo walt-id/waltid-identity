@@ -762,8 +762,23 @@ jobs:
             kill -0 "$ISSUER_PID" 2>/dev/null || { echo "::error::Issuer2 exited; ensure the batch compatibility implementation is merged"; exit 1; }
             sleep 1
           done
-          curl --fail --silent --show-error --retry 5 --retry-all-errors --connect-timeout 5 --max-time 15 \
-            "$TUNNEL_URL$METADATA_PATH" > "$ISSUER_DIAGNOSTICS_DIR/issuer-metadata.json"
+          # A fresh quick tunnel can resolve but refuse connections for over 30s; wait up to 2 minutes.
+          TUNNEL_READY=false
+          for attempt in $(seq 1 24); do
+            if curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+              "$TUNNEL_URL$METADATA_PATH" > "$ISSUER_DIAGNOSTICS_DIR/issuer-metadata.json"; then
+              TUNNEL_READY=true
+              break
+            fi
+            kill -0 "$CF_PID" 2>/dev/null || break
+            sleep 5
+          done
+          if [ "$TUNNEL_READY" != true ]; then
+            echo "::error::Issuer tunnel $TUNNEL_URL did not serve issuer metadata"
+            getent ahosts "${TUNNEL_URL#https://}" || true
+            cat "$TUNNEL_LOG"
+            exit 1
+          fi
           jq -e --arg issuer "$TUNNEL_URL/openid4vci" '
             .credential_issuer == $issuer
             and (.batch_credential_issuance.batch_size | type == "number" and . >= 2 and floor == .)

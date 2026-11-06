@@ -383,4 +383,43 @@ class DcqlMatcherTest {
         assertTrue(DcqlMatcher.match(query, listOf(cred1)).isFailure)
         assertTrue(DcqlMatcher.match(query, listOf(cred1)) { _, _ -> true }.isSuccess)
     }
+
+    @Test
+    fun matchCredentialNamesTheUnmetConstraint() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [{
+                "id": "id_card",
+                "format": "jwt_vc_json",
+                "meta": { "type_values": [["IDCard"]] },
+                "claims": [{ "path": ["credentialSubject", "given_name"], "values": ["Alice"] }]
+              }]
+            }
+            """.trimIndent()
+        ).getOrThrow().credentials.single()
+
+        assertEquals(cred1, DcqlMatcher.matchCredential(query, cred1).getOrThrow().credential)
+
+        val wrongType = DcqlMatcher.matchCredential(query, cred2).exceptionOrNull()
+        assertIs<DcqlMatchException>(wrongType)
+        assertTrue(wrongType.message.orEmpty().contains("type_values"), wrongType.message)
+
+        val wrongValue = cred1.copy(data = buildJsonObject {
+            put("type", buildJsonArray { add("VerifiableCredential"); add("IDCard") })
+            putJsonObject("credentialSubject") { put("given_name", "Bob") }
+        })
+        assertIs<DcqlMatchException>(DcqlMatcher.matchCredential(query, wrongValue).exceptionOrNull())
+    }
+
+    @Test
+    fun matchCredentialRejectsAnotherFormat() {
+        val query = DcqlParser.parse(
+            """{ "credentials": [{ "id": "mdl", "format": "mso_mdoc", "meta": { "doctype_value": "org.iso.18013.5.1.mDL" } }] }"""
+        ).getOrThrow().credentials.single()
+
+        assertTrue(DcqlMatcher.matchCredential(query, cred3_mdoc.copy(data = buildJsonObject { put("docType", "org.iso.18013.5.1.mDL") })).isSuccess)
+        val otherFormat = DcqlMatcher.matchCredential(query, cred1.copy(data = buildJsonObject { put("docType", "org.iso.18013.5.1.mDL") }))
+        assertTrue(otherFormat.exceptionOrNull()?.message.orEmpty().contains("format"), otherFormat.toString())
+    }
 }

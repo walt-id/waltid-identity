@@ -3,7 +3,10 @@ import Foundation
 extension CredentialDetails {
     public var systemInfoGroup: ClaimGroup? {
         let items = [
-            addedAt.map(Self.systemInfoDateFormatter.string(from:)).systemInfoItem(path: "system.added", label: "Added"),
+            addedAt.map { date in
+                ClaimItem(path: .topLevel("system").child("added"), label: "Added", value: .instant(WalletInstant(date)),
+                          rawValue: Self.systemInfoDateFormatter.string(from: date))
+            },
             id.systemInfoItem(path: "system.id", label: "Credential ID"),
             format.systemInfoItem(path: "system.format", label: "Format"),
             issuer.systemInfoItem(path: "system.issuer", label: "Issuer"),

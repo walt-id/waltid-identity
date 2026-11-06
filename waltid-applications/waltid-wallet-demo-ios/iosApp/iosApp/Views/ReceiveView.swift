@@ -6,6 +6,7 @@ struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     var onBack: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
+    @Environment(\.walletSheetLayoutReady) private var sheetLayoutReady
 
     var body: some View {
         WalletNavigationContainer {
@@ -85,6 +86,9 @@ struct ReceiveView: View {
                 pending: pendingCredentials,
                 busy: viewModel.isLoading, missingSavedCount: viewModel.missingReceivedCredentialIDs.count,
                 onResume: viewModel.resumeDeferredCredential)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier(sheetLayoutReady && !viewModel.isLoading
+                    ? "issuance-receipt-ready" : "issuance-receipt")
         } actions: {
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
                 finishReceiving()

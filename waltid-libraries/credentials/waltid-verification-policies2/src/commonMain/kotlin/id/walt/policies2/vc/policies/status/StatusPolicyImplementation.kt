@@ -99,11 +99,16 @@ object StatusPolicyImplementation {
         data: DigitalCredential,
         attributes: StatusPolicyArgument,
         signerAuthorizer: StatusListSignerAuthorizer? = null,
-    ): Result<JsonElement> =
-        getStatusEntryElementExtractor(attributes).extract(data)?.let {
-            processStatusEntry(it, attributes, data, signerAuthorizer)
+    ): Result<JsonElement> {
+        val statusEntry = try {
+            getStatusEntryElementExtractor(attributes).extract(data)
+        } catch (error: IllegalArgumentException) {
+            return Result.failure(error)
         }
-            ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+        return statusEntry?.let {
+            processStatusEntry(it, attributes, data, signerAuthorizer)
+        } ?: Result.success(JsonObject(mapOf("policy_available" to JsonPrimitive(false))))
+    }
 
     private suspend fun processStatusEntry(
         data: JsonElement,

@@ -18,7 +18,8 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         model.start()
         try await chooseConnectionAndWaitForStart(model, client: client, count: 1)
         await session.emit(.engagementReady([.qr(payload: "mdoc:test")]))
-        try await waitUntil { model.canChangeConnectionOptions }
+        try await waitUntil { model.qrPayload == "mdoc:test" }
+        XCTAssertTrue(model.canChangeConnectionOptions)
         model.requestClose()
         model.requestClose()
         try await waitUntilAsync { await session.closeCount == 1 }
@@ -42,7 +43,8 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         model.start()
         try await chooseConnectionAndWaitForStart(model, client: client, count: 1)
         await session.emit(.engagementReady([.qr(payload: "mdoc:test")]))
-        try await waitUntil { model.canChangeConnectionOptions }
+        try await waitUntil { model.qrPayload == "mdoc:test" }
+        XCTAssertTrue(model.canChangeConnectionOptions)
         model.requestClose()
         try await waitUntil { model.actionErrorMessage != nil }
         XCTAssertTrue(model.active)

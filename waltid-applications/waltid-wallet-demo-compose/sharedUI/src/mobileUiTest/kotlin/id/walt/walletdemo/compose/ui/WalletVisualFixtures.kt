@@ -127,6 +127,8 @@ internal object WalletVisualFixtures {
 
     val informationCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingInformation")
 
+    val dateCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingDates")
+
     private fun sharingCredentials(key: String): List<WalletDemoPresentationCredentialOption> =
         data.getValue(key).jsonObject.getValue("credentials").jsonArray.map { item ->
             val credential = item.jsonObject
@@ -142,7 +144,7 @@ internal object WalletVisualFixtures {
                 disclosures = credential.getValue("disclosures").jsonArray.map {
                     val claim = it.jsonObject
                     WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
-                        valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
+                        valueJson = claim.getValue("value").toString(), displayValue = claim.getValue("value").jsonPrimitive.content,
                         selectivelyDisclosable = claim.getValue("selective").jsonPrimitive.boolean,
                         required = claim.getValue("required").jsonPrimitive.boolean,
                         selectable = claim.getValue("selectable").jsonPrimitive.boolean,

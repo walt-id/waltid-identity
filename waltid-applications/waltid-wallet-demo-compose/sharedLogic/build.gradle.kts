@@ -19,7 +19,11 @@ kotlin {
         wasmJs {
             browser {
                 testTask {
-                    useKarma { useChromeHeadless() }
+                    useKarma {
+                        // The pinned browser CI container runs as root.
+                        if (providers.environmentVariable("CI").isPresent) useChromeHeadlessNoSandbox()
+                        else useChromeHeadless()
+                    }
                 }
             }
         }
