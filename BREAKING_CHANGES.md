@@ -6,6 +6,11 @@
 - It also rejects a top-level `_sd_alg` other than `sha-256`, the only algorithm it digests with.
 - Processing an `SDPayload` (`fullPayload`, `verifyDisclosures`, `withSelectiveDisclosures`), including payloads parsed from received tokens, now rejects `_sd_alg` in any nested object or disclosure (RFC 9901 §4.1.1).
 
+## SD-JWT VC issuance
+
+- Both signers (`SdJwtVcCredentialSigner`, `OpenID4VCI.generateSdJwtVC`) keep `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity`, `aka_vcts` and `status` in clear text even when the selective disclosure map marks them (SD-JWT VC §2.2.2.3, `SDJwtVC.NON_SELECTIVELY_DISCLOSABLE_CLAIMS`).
+- issuer2 answers credential data that breaks SD-JWT processing with `credential_request_denied` and the reason, instead of HTTP 500.
+
 ## waltid-dcql identifier charset
 
 - `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).

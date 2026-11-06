@@ -921,8 +921,42 @@ class OpenId4VciTest {
     fun sdJwtVcClaimsBreakingSdJwtProcessingAreRejectedBeforeSigning() = runTest {
         val malformed = buildJsonObject { putJsonObject("value") { put("_sd", "not-an-array") } }
 
-        assertFailsWith<SDJwtVerificationException> { issueSdJwtVc("""{"fields": {"value": {"sd": true}}}""", data = malformed) }
-        assertFailsWith<SDJwtVerificationException> { issueSdJwtVc("""{"fields": {}}""", data = malformed) }
+        for (sdMap in listOf("""{"fields": {"value": {"sd": true}}}""", """{"fields": {}}""")) {
+            val error = assertFailsWith<SDJwtVerificationException> { issueSdJwtVc(sdMap, data = malformed) }
+            assertEquals("_sd must be a JSON array", error.message)
+        }
+    }
+
+    @Test
+    fun sdJwtVcNestedHashAlgorithmIsRejectedBeforeSigning() = runTest {
+        val data = buildJsonObject { putJsonObject("value") { put("_sd_alg", "sha-512") } }
+
+        for (sdMap in listOf("""{"fields": {}}""", """{"fields": {"value": {"sd": true}}}""")) {
+            val error = assertFailsWith<SDJwtVerificationException> { issueSdJwtVc(sdMap, data = data) }
+            assertEquals("_sd_alg is only allowed at the top level of the payload", error.message)
+        }
+    }
+
+    @Test
+    fun sdJwtVcRegisteredClaimsStayInClearTextEvenWhenTheMapNamesThem() = runTest {
+        val sdJwt = issueSdJwtVc(
+            """{"fields": {"iss": {"sd": true}, "vct": {"sd": true}, "cnf": {"sd": true}, "nbf": {"sd": true}, "exp": {"sd": true},
+                "status": {"sd": true, "children": {"fields": {"idx": {"sd": true}}}}, "given_name": {"sd": true}}}""",
+            data = buildJsonObject {
+                put("nbf", 1)
+                put("exp", 2)
+                putJsonObject("status") { put("idx", 7) }
+                put("given_name", "John")
+            },
+        )
+
+        assertEquals("https://issuer.example", sdJwt.undisclosedPayload.getValue("iss").jsonPrimitive.content)
+        assertEquals("https://issuer.example/identity", sdJwt.undisclosedPayload.getValue("vct").jsonPrimitive.content)
+        assertTrue("jwk" in sdJwt.undisclosedPayload.getValue("cnf").jsonObject)
+        assertEquals(1, sdJwt.undisclosedPayload.getValue("nbf").jsonPrimitive.int)
+        assertEquals(2, sdJwt.undisclosedPayload.getValue("exp").jsonPrimitive.int)
+        assertEquals(buildJsonObject { put("idx", 7) }, sdJwt.undisclosedPayload.getValue("status"))
+        assertEquals(listOf("given_name"), sdJwt.disclosureObjects.filterIsInstance<ObjectPropertyDisclosure>().map { it.key })
     }
 
     private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {

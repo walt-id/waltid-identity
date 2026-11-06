@@ -17,6 +17,7 @@ import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -116,6 +117,42 @@ class SdJwtVcCredentialSignerTest {
     }
 
     @Test
+    fun clearObjectDecoysKeepTheFieldHidden() = runTest {
+        val sdJwt = issue(
+            """{"fields": {"address": {"sd": false, "children": {
+                "fields": {"street": {"sd": true}}, "decoyMode": "FIXED", "decoys": 2}}}}"""
+        )
+
+        val signed = sdJwt.undisclosedPayload.getValue("address").jsonObject
+        assertEquals(3, signed.getValue("_sd").jsonArray.size)
+        assertFalse("street" in signed)
+        assertEquals("Vienna", signed.getValue("locality").jsonPrimitive.content)
+        assertEquals("Main St 1", sdJwt.disclosureNamed("street").value.jsonPrimitive.content)
+        assertEquals(1, sdJwt.disclosureObjects.size)
+    }
+
+    @Test
+    fun registeredClaimsInCredentialDataStayInClearTextEvenWhenTheMapNamesThem() = runTest {
+        val sdJwt = issue(
+            """{"fields": {"nbf": {"sd": true}, "exp": {"sd": true}, "aka_vcts": {"sd": true},
+                "status": {"sd": true, "children": {"fields": {"idx": {"sd": true}}}}, "given_name": {"sd": true}}}""",
+            data = buildJsonObject {
+                put("nbf", 1)
+                put("exp", 2)
+                putJsonArray("aka_vcts") { add("https://issuer.example/old-identity") }
+                putJsonObject("status") { put("idx", 7) }
+                put("given_name", "John")
+            },
+        )
+
+        assertEquals(1, sdJwt.undisclosedPayload.getValue("nbf").jsonPrimitive.int)
+        assertEquals(2, sdJwt.undisclosedPayload.getValue("exp").jsonPrimitive.int)
+        assertTrue("aka_vcts" in sdJwt.undisclosedPayload)
+        assertEquals(buildJsonObject { put("idx", 7) }, sdJwt.undisclosedPayload.getValue("status"))
+        assertEquals(listOf("given_name"), sdJwt.disclosureObjects.filterIsInstance<ObjectPropertyDisclosure>().map { it.key })
+    }
+
+    @Test
     fun claimsTheIssuerAddsStayInClearTextEvenWhenTheMapNamesThem() = runTest {
         val sdJwt = issue(
             """{"fields": {"iss": {"sd": true}, "vct": {"sd": true}, "cnf": {"sd": true},
@@ -135,8 +172,32 @@ class SdJwtVcCredentialSignerTest {
     fun claimsBreakingSdJwtProcessingAreRejectedBeforeSigning() = runTest {
         val malformed = buildJsonObject { putJsonObject("value") { put("_sd", "not-an-array") } }
 
-        assertFailsWith<SDJwtVerificationException> { issue("""{"fields": {"value": {"sd": true}}}""", data = malformed) }
-        assertFailsWith<SDJwtVerificationException> { issue("""{"fields": {}}""", data = malformed) }
+        for (sdMap in listOf("""{"fields": {"value": {"sd": true}}}""", """{"fields": {}}""")) {
+            val error = assertFailsWith<SDJwtVerificationException> { issue(sdMap, data = malformed) }
+            assertEquals("_sd must be a JSON array", error.message)
+        }
+    }
+
+    @Test
+    fun nestedHashAlgorithmIsRejectedBeforeSigning() = runTest {
+        val data = buildJsonObject { putJsonObject("value") { put("_sd_alg", "sha-512") } }
+
+        for (sdMap in listOf("""{"fields": {}}""", """{"fields": {"value": {"sd": true}}}""")) {
+            val error = assertFailsWith<SDJwtVerificationException> { issue(sdMap, data = data) }
+            assertEquals("_sd_alg is only allowed at the top level of the payload", error.message)
+        }
+    }
+
+    @Test
+    fun unsupportedHashAlgorithmOverrideIsRejectedBeforeSigning() = runTest {
+        val sdMap = """{"fields": {"given_name": {"sd": true}}}"""
+
+        val error = assertFailsWith<SDJwtVerificationException> {
+            issue(sdMap, extraClaims = buildJsonObject { put("_sd_alg", "sha-512") })
+        }
+        assertContains(error.message.orEmpty(), "sha-512")
+        val sdJwt = issue(sdMap, extraClaims = buildJsonObject { put("_sd_alg", "sha-256") })
+        assertEquals("sha-256", sdJwt.undisclosedPayload.getValue("_sd_alg").jsonPrimitive.content)
     }
 
     private companion object {

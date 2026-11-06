@@ -32,7 +32,6 @@ import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
-import id.walt.sdjwt.SDJwtVerificationException
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
@@ -731,7 +730,7 @@ object OpenID4VCI {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 
-        val credentialClaims = credentialData.mergeSDJwtVCPayloadWithMapping(
+        val mappedCredentialData = credentialData.mergeSDJwtVCPayloadWithMapping(
             mapping = dataMapping ?: JsonObject(emptyMap()),
             context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
             data = issuanceDataFunctions()
@@ -761,18 +760,11 @@ object OpenID4VCI {
         }
 
 
-        // Always in clear text, overriding credential claims of the same name
-        val clearClaims = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
-        val disclosureMap = selectiveDisclosure
-            ?.let { SDMap(it.fields - clearClaims.keys, it.decoyMode, it.decoys) }
-            ?: SDMap(mapOf())
+        val alwaysDisclosedOverrides = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
         val sdPayload = SDPayload.createSDPayload(
-            fullPayload = JsonObject(credentialClaims + clearClaims),
-            disclosureMap = disclosureMap
+            fullPayload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides),
+            disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
         )
-        if (!sdPayload.verifyDisclosures()) {
-            throw SDJwtVerificationException("Credential claims break SD-JWT processing (RFC 9901 §7.1)")
-        }
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
