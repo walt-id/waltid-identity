@@ -1,6 +1,6 @@
 # Pinned ITB test configuration
 
-`wal-1423-catalogue.json` records the authenticated Walt.id catalogue inspected on 2026-09-21 (GITB 1.29.5). It contains public suite/case identifiers, not organisation/system/actor API keys.
+`wal-1423-catalogue.json` records the 21 selected Wallet SUT cases in the authenticated Walt.id catalogue inspected on 2026-11-06 (GITB 1.29.5). Case identifiers and labels were checked against the portal's conformance and test-case metadata. Labels use the portal's whitespace normalization and retain the actor qualifier for exact selection. Additional deployed cases are outside this pinned inventory. The file contains public suite/case identifiers, not organisation/system/actor API keys.
 
 `pidissuerca02-eu.pem` is the public **PID Issuer CA 02** certificate from the [official EUDI Android reference wallet](https://github.com/eu-digital-identity-wallet/eudi-app-android-wallet-ui/blob/5080ae099c59c38cbd8092a7b511efce31648de2/resources-logic/src/main/res/raw/pidissuerca02_eu.pem) (Git blob `afcd0cdf3672f9c3bbf4b4adccfd4386594b052f`).
 
