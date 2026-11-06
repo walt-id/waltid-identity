@@ -684,6 +684,34 @@ Each transaction can be collected once. One offer can contain multiple transacti
 including a batch of holder proofs for a selected credential. Completing an offer
 before its first Credential Request allows immediate issuance from that request.
 
+
+Deferred collection uses the WIA and KAs accepted for that transaction. Their verified
+validity bounds, original clock skew, client identity, and holder-key associations are
+retained privately. The shared library checks those lifetimes before signing and before
+delivering a saved response, including after a restart. Original PoP, proof age, and
+nonce checks are not replayed.
+
+The provider captures WIA evidence from verified access-token authentication and
+snapshots it automatically in `acceptCredentialRequest()`, together with the verified
+KA evidence. Issuers do not decode private token claims or infer WIA requirements.
+The provider uses its existing client-authentication configuration resolver when a
+legacy transaction has no recorded requirement; optional authentication methods do
+not make WIA mandatory. Originally anonymous pre-authorized grants retain that
+profile through refresh.
+
+If a required attestation has expired, or required evidence is missing, collection
+returns `credential_request_denied`. Denial is permanent for that transaction: one
+expired KA denies the entire holder-key batch. Other transactions and completed
+datasets retain their progress. This transaction denial does not change the offer's
+operator approval decision.
+
+Refreshing an access token preserves its original WIA evidence and never replaces a
+transaction's accepted evidence. Resubmitting a Credential Request also keeps the
+original acceptance. Transactions stored before evidence capture fail closed when
+their required profile cannot be enforced. Standalone KAs without `exp` retain the
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
+replacement and attestation status-list enforcement are separate work (status: F6).
+
 Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
 in the issuer service configuration):
 
