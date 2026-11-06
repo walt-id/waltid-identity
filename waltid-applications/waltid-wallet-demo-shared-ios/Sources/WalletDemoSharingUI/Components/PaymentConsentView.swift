@@ -87,9 +87,8 @@ private struct PaymentReviewContent: View {
                     let provider = details.filter { $0.group == .provider }
                     if !provider.isEmpty {
                         Text("Payment service provider", bundle: .module).font(.headline)
-                        PaymentFields(fields: provider)
                     }
-                    PaymentFields(fields: details.filter { $0.group != .provider })
+                    PaymentFields(fields: provider + details.filter { $0.group != .provider })
                 }.id("payment-details")
             }
             if !payment.technical.isEmpty {

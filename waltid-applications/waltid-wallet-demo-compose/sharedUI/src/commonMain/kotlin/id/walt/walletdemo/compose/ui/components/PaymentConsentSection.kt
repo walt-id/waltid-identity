@@ -62,9 +62,8 @@ private fun PaymentReviewContent(payment: WalletDemoPaymentDisplay) {
             val provider = details.filter { it.group == PaymentDisplayGroup.Provider }
             if (provider.isNotEmpty()) {
                 Text(stringResource(Res.string.payment_provider_title), style = MaterialTheme.typography.titleSmall)
-                PaymentFields(provider)
             }
-            PaymentFields(details.filter { it.group != PaymentDisplayGroup.Provider })
+            PaymentFields(provider + details.filter { it.group != PaymentDisplayGroup.Provider })
         }
         if (payment.technical.isNotEmpty()) PaymentDetailsCard(stringResource(Res.string.credential_technical_details)) {
             payment.technical.forEach { ClaimValueRow(it) }
