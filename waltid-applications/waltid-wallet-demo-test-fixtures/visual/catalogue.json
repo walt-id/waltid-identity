@@ -702,7 +702,7 @@
       "swiftTest": "testScheduledPaymentDetails",
       "title": "Scheduled payment details",
       "requirements": [
-        "Expanded transaction and PISP details with an actionable payee website"
+        "Expanded transaction and PISP details; the payee website remains reachable by scrolling"
       ],
       "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
     },
