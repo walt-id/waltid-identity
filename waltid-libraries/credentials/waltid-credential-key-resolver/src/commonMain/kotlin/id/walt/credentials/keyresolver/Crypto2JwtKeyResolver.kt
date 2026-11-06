@@ -9,7 +9,9 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
+import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
@@ -34,11 +36,12 @@ fun interface Crypto2JwtVerificationKeyResolver {
 }
 
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
-        DidService.resolveToCrypto2Keys(did).getOrThrow()
-    },
+    private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
+        resolveDocument = { did -> DidService.resolve(did) },
+    ),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
+    private val didVerificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
         val signerIdentifier = extractSignerIdentifier(jwtPayload)
@@ -47,7 +50,7 @@ class Crypto2JwtKeyResolver(
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val key = resolveFromDid(signerIdentifier, kid)
+                    val key = resolveFromDid(signerIdentifier, kid, didVerificationRelationship)
                     ResolvedJwtVerificationKey(key, JwtKeyResolutionSource.DID, signerIdentifier, kid)
                 }
                 // 2. Inline X.509 certificate chain.
@@ -88,8 +91,32 @@ class Crypto2JwtKeyResolver(
         }
     }
 
-    suspend fun resolveFromDid(did: String, keyId: String? = null): Key =
-        selectDidKey(didResolver.resolveToKeys(did), did, keyId)
+    suspend fun resolveFromDid(
+        did: String,
+        keyId: String? = null,
+        relationship: VerificationRelationshipType? = null,
+    ): Key = resolveFromDid(did, keyId, relationship, requireExactKeyId = false)
+
+    /** Resolves the exact DID verification method identified by [keyId]. */
+    suspend fun resolveFromDidStrict(
+        did: String,
+        keyId: String,
+        relationship: VerificationRelationshipType? = null,
+    ): Key = resolveFromDid(did, keyId, relationship, requireExactKeyId = true)
+
+    private suspend fun resolveFromDid(
+        did: String,
+        keyId: String?,
+        relationship: VerificationRelationshipType?,
+        requireExactKeyId: Boolean,
+    ): Key {
+        val resolutionKeyId = keyId.takeUnless {
+            !requireExactKeyId && (did.startsWith("did:jwk:") || (did.startsWith("did:key:") && keyId == did))
+        }
+        val keys = didResolver.resolveToKeys(did, resolutionKeyId, relationship)
+        return if (requireExactKeyId) selectExactDidKey(keys, did, requireNotNull(keyId))
+        else selectDidKey(keys, did, keyId)
+    }
 
     private suspend fun resolveX5c(
         x5c: JsonArray,
@@ -132,6 +159,15 @@ class Crypto2JwtKeyResolver(
             ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
     }
 
+    private fun selectExactDidKey(keys: Set<Key>, did: String, kid: String): Key {
+        require(keys.isNotEmpty()) { "No verification keys resolved for DID: $did" }
+        val normalizedKid = normalizeDidUrl(did, kid)
+        val matches = keys.filter { key -> normalizeDidUrl(did, key.id.value) == normalizedKid }
+        require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
+        return matches.singleOrNull()
+            ?: throw NoSuchElementException("No DID verification key exactly matches kid: $kid")
+    }
+
     /**
      * did:jwk always publishes a single verification method `{did}#0`.
      * Pre-2115 issuers wrote KMS-path or thumbprint fragments. Accept those as a
@@ -156,6 +192,19 @@ class Crypto2JwtKeyResolver(
         setOf(id, id.substringAfter('#', missingDelimiterValue = ""))
             .filter(String::isNotBlank)
             .toSet()
+
+    /**
+     * Normalizes a key ID to a full DID URL.
+     *
+     * Per DID Core spec, verification methods are typically referenced by fragment.
+     * Bare strings without a prefix are treated as fragments (most common case).
+     * Explicit path (/), query (?), or fragment (#) prefixes are preserved.
+     */
+    private fun normalizeDidUrl(did: String, id: String): String = when {
+        id.startsWith("did:") -> id // Already a full DID URL
+        id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id" // Explicit component
+        else -> "$did#$id" // Bare string treated as fragment (most common case)
+    }
 
     private fun extractSignerIdentifier(payload: JsonObject): String? =
         (payload["iss"] ?: payload["issuer"])?.let { element ->
