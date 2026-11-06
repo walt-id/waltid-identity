@@ -15,7 +15,7 @@ This package contains shared transaction-data primitives used by both wallet and
 Two entry points in `TransactionDataRequestValidator`:
 
 - `validateRequestTransactionData(transactionData, typeRegistry, credentialQueriesById)` — used by the **wallet**. Enforces both structural rules and that each type is in the registry.
-- `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Runs structural checks only (no type registry).
+- `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Does not apply a type registry.
 
 Both validate the built-in `urn:eudi:sca:payment:1` payload against the pinned TS12 schema,
 format assertions and product rules. Other types retain the structural checks below.
