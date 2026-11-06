@@ -2991,7 +2991,7 @@ object WalletIssuanceHandler {
             ?: keyMaterial.legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
         return effectiveCrypto2Key?.let {
             val keyAttestation = keyAttestationForProof(
-                keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms,
+                keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms, clientId,
             )
             proofBuilder.buildProof(
                 key = it,

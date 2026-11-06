@@ -86,6 +86,34 @@ class WalletProviderHttpClientTest {
     }
 
     @Test
+    fun `a key attestation uses the wallet client id rather than the issuer`() = runTest {
+        val requests = mutableListOf<String>()
+        val provider = provider(recordingClient(requests), softwareKey("provider"))
+        provider.attest(request(publicKey("holder-1"), "n-1"))
+        val activation = requests.first()
+        assertTrue(activation.contains(""""client_id":"wallet-client""""))
+        assertTrue(!activation.contains("issuer.example"))
+    }
+
+    @Test
+    fun `a key-only provider activates that composition`() = runTest {
+        val requests = mutableListOf<String>()
+        val provider = WalletProviderHttpClient(
+            baseUrl = "http://enterprise.example",
+            servicePath = "org.demo.wallet-provider",
+            composition = "ka",
+            httpClient = recordingClient(requests),
+            verificationKeyFromJwt = { softwareKey("provider") },
+        )
+        provider.attest(request(publicKey("holder-1"), "n-1"))
+        val body = requests.first()
+        assertTrue(body.contains(""""composition":"ka""""))
+        assertTrue(body.contains(""""mint":"ka""""))
+        assertTrue(!body.contains("instance_jwk"))
+        assertTrue(!body.contains("wia_ka"))
+    }
+
+    @Test
     fun `reports the provider status when activation fails`() = runTest {
         val provider = provider(
             HttpClient(MockEngine) { engine { addHandler { respond("missing", HttpStatusCode.NotFound) } } },
@@ -112,7 +140,17 @@ class WalletProviderHttpClientTest {
         proofKey = key,
         nonce = nonce,
         requirements = KeyAttestationsRequired(),
+        clientId = "wallet-client",
     )
+
+    private fun recordingClient(requests: MutableList<String>) = HttpClient(MockEngine) {
+        engine {
+            addHandler { request ->
+                requests += (request.body as TextContent).text
+                respond("""{"unit_id":"wu-1","state":"operational","ka":"ka-one","wia":"wia-one"}""", HttpStatusCode.OK)
+            }
+        }
+    }
 
     private fun provider(httpClient: HttpClient, verificationKey: Key) = WalletProviderHttpClient(
         baseUrl = "http://enterprise.example",

@@ -1542,7 +1542,8 @@ private extension WalletProviderConfiguration {
             baseUrl: baseURL,
             servicePath: servicePath,
             bearerToken: bearerToken,
-            hostHeader: hostHeader
+            hostHeader: hostHeader,
+            composition: composition
         )
     }
 }

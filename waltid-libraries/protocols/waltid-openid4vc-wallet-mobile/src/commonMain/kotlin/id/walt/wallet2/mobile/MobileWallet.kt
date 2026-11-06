@@ -204,12 +204,14 @@ public data class WalletAttestationConfig(
  * @property servicePath Wallet-provider target, `organization.tenant.service`.
  * @property bearerToken Optional bearer token for the wallet-provider API. Empty sends no Authorization header.
  * @property hostHeader Optional `Host` header override for tunneled local tests.
+ * @property composition `wia`, `ka`, or `wia_ka`. Must match a composition that provider is configured to mint.
  */
 public data class WalletProviderConfig(
     public val baseUrl: String = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.BASE_URL,
     public val servicePath: String = id.walt.wallet2.walletprovider.EnterpriseDemoWalletProvider.SERVICE_PATH,
     public val bearerToken: String = "",
     public val hostHeader: String = "",
+    public val composition: String = "wia_ka",
 )
 
 /** Registration adapters select their projection at platform factory wiring; presentation uses full records. */
@@ -279,6 +281,7 @@ public class MobileWallet internal constructor(
             servicePath = config.servicePath,
             bearerToken = config.bearerToken,
             hostHeader = config.hostHeader,
+            composition = config.composition,
             httpClient = issuanceHttpClient ?: HttpClient(),
             verificationKeyFromJwt = { jwt ->
                 walletProviderVerificationKey(jwt) { pem ->
