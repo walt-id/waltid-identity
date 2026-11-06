@@ -189,6 +189,7 @@ object VerificationSessionCreator {
         /** Verifier-level retention, overridden by the request and ignored when it is not finite. */
         retention: Duration? = null,
     ): Verification2Session {
+        require(setup !is ExternalReaderFlowSetup) { "Use proximity/device-response for external-reader submissions" }
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
             VerifierSigningKey.Crypto2(
@@ -484,14 +485,8 @@ object VerificationSessionCreator {
 
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
-        // Per-session first, then whatever the verifier is configured to retain for, then the historical
-        // default. A configured retention of Duration.INFINITE means keep indefinitely, which
-        // persistenceExpirationDate() expresses as null - no expiry date, so nothing ever discards it.
-        val retentionDate = when {
-            setup.core.retentionDate != null -> setup.core.retentionDate
-            retention != null -> retention.takeIf { it.isFinite() }?.let { now.plus(it) }
-            else -> now.plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC)
-        }
+        // see effectiveRetentionDate() for shared retention precedence.
+        val retentionDate = setup.core.effectiveRetentionDate(retention, now)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
