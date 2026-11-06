@@ -6,12 +6,32 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DemoTestBackendContractTest {
+
+    @Test
+    fun scheduledAndRecurringVectorsKeepExactNumbersAndRefreshDates() {
+        val now = Instant.parse("2026-11-06T12:00:00Z")
+        val scheduled = DemoPayment.SCHEDULED.payload(now)
+        assertEquals("2026-11-07T12:00:00Z", scheduled["execution_date"]?.jsonPrimitive?.content)
+        assertFalse("recurrence" in scheduled)
+        val recurring = DemoPayment.RECURRING.payload(now)
+        assertFalse("execution_date" in recurring)
+        val terms = recurring.getValue("recurrence").jsonObject
+        assertEquals("2027-11-06T12:00:00Z", terms["end_date"]?.jsonPrimitive?.content)
+        val mit = terms.getValue("mit_options").jsonObject
+        for ((key, expected) in mapOf("max_amount" to "9007199254740993.01", "apr" to "0.1234567890123456789",
+            "initial_amount" to "-1.23", "min_amount" to "0", "initial_amount_number" to "2.0")) {
+            assertEquals(expected, mit.getValue(key).jsonPrimitive.content)
+            assertFalse(mit.getValue(key).jsonPrimitive.isString)
+        }
+        assertEquals(JsonPrimitive(false), mit["amount_variable"])
+    }
 
     @Test
     fun dcApiVerifierSessionUsesCurrentAnnexDWireShape() {
