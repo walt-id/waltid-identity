@@ -37,6 +37,20 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun readsTheCompleteInlineInteractionWithoutADownloadControl() = runBlocking<Unit> {
+        val url = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort"
+        withPage(inlineInteraction = url) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite, case)
+            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            assertEquals("https://verifier.example/short", interaction.url.parameters["request_uri"])
+            assertEquals(0, page.locator("button[ngbtooltip=Download]").count())
+            assertEquals(0, page.evaluate("window.copyCount"))
+            assertEquals(1, page.evaluate("window.startCount"))
+        }
+    }
+
+    @Test
     fun selectsTheVisibleActorWithinItsConfiguredStatement() = runBlocking<Unit> {
         val actor = catalogue.suites.single { it.id == "cts07" }.actor
         assertEquals("User", actor)
@@ -198,6 +212,7 @@ class ItbPortalBridgeBrowserTest {
     private suspend fun withPage(
         systemName: String = catalogue.systemName,
         applicationDelayMillis: Int = 0,
+        inlineInteraction: String? = null,
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -213,7 +228,7 @@ class ItbPortalBridgeBrowserTest {
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
                             route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible, applicationDelayMillis)))
+                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -226,7 +241,7 @@ class ItbPortalBridgeBrowserTest {
 
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
-        startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int,
+        startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
     ) = """
         <script>
         setTimeout(() => {
@@ -241,6 +256,7 @@ class ItbPortalBridgeBrowserTest {
         <script>
         window.started = false;
         window.startCount = 0;
+        window.copyCount = 0;
         window.interactive = false;
         function selectStatement() {
             if ($actorVisible) document.querySelector('#actors').innerHTML = '<button onclick="showTests()">User</button>';
@@ -283,7 +299,10 @@ class ItbPortalBridgeBrowserTest {
                 }
                 const dialog = document.createElement('ngb-modal-window');
                 dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button>Download</button></app-any-content-view>
-                  <app-any-content-view><div> VP request </div><button ngbtooltip="Download" onclick="download()">Download</button></app-any-content-view>
+                  <app-any-content-view><div> VP request </div>${
+                      if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download()">Download</button>"""
+                      else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""
+                  }</app-any-content-view>
                   <button onclick="this.parentElement.remove()">Close</button>`;
                 document.body.append(dialog);
             }, $interactionDelayMillis);

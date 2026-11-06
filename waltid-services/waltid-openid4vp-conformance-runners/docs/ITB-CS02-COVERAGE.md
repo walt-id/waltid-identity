@@ -16,11 +16,11 @@ case version and normative profile version are separate identities.
 | VP-007 | Remote mdoc interoperability extension, explicitly outside CS-02 v1.2 normative coverage |
 
 The three invocation cases require VCI-006's issued PID. Before invoking the
-wallet, the runner checks that the downloaded request uses the advertised scheme;
+wallet, the runner checks that the portal-supplied request uses the advertised scheme;
 an unrelated offer or scheme fails the case and triggers owned-session cleanup.
 Passing requires both wallet success and that exact session's terminal ITB success.
 It does not prove operating-system URL registration, QR scanning or browser-to-app
-delivery: the harness passes the downloaded URL to the shared wallet directly.
+delivery: the harness passes the portal-supplied URL to the shared wallet directly.
 
 The deployed VP-011/012/013 descriptions explicitly limit their scope to the
 available protocol slice. They identify missing `verifier_info.registrar_dataset`

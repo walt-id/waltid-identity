@@ -129,6 +129,17 @@ class ItbPortalBridge(
         val row = dialog.locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
+        val control = row.locator("button[ngbtooltip=Download], button[ngbtooltip=Copy]")
+        step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
+            control.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
+        }
+        // GITB renders plain values up to 100 characters inline, with Copy instead of Download.
+        // Read that exact row's complete text without touching the clipboard or evaluating scripts.
+        if (control.getAttribute("ngbtooltip") == "Copy") {
+            return row.locator(".content-value").innerText().trim().also {
+                require(it.length in 1..100) { "The ITB inline interaction has an unexpected size" }
+            }
+        }
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
         val download = step(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT) {
             // The portal may prepare this one file after its interaction dialog appears.
