@@ -101,7 +101,8 @@ final class MockWalletUITests: XCTestCase {
         ui.openDeepLink("openid4vp://mock")
         ui.assertExists(identifier: "payment-unsigned-warning")
         XCTAssertTrue(app.staticTexts["Zahlung prüfen"].exists)
-        XCTAssertTrue(app.staticTexts["11.56 EUR"].exists)
+        XCTAssertTrue(app.staticTexts["11.56"].exists)
+        XCTAssertTrue(app.staticTexts["EUR"].exists)
         XCTAssertTrue(app.staticTexts["Super Store"].exists)
         XCTAssertFalse(app.staticTexts["txn-1"].exists)
         XCTAssertFalse(app.staticTexts["bound-but-hidden"].exists)
@@ -125,6 +126,112 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(alert.waitForExistence(timeout: 5))
         alert.buttons["payment-unsigned-confirm"].firstMatch.tap()
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Presentation sent", "Present failed"], timeout: 10), "Presentation sent")
+    }
+
+    func testPaymentActionsFitOneRowWithFullLabels() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "english"])
+        ui.openDeepLink("openid4vp://mock")
+        let confirm = app.buttons["wallet.presentationSubmitButton"]
+        let cancel = app.buttons["wallet.presentationRejectButton"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        XCTAssertTrue(cancel.exists)
+        XCTAssertEqual(confirm.label, "Confirm payment")
+        XCTAssertEqual(cancel.label, "Cancel payment")
+        XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1,
+            "Normal-width payment actions must stay on one row")
+        XCTAssertLessThanOrEqual(cancel.frame.maxX, confirm.frame.minX)
+        for action in [cancel, confirm] {
+            XCTAssertTrue(action.isHittable)
+            XCTAssertGreaterThanOrEqual(action.frame.minX, app.frame.minX)
+            XCTAssertLessThanOrEqual(action.frame.maxX, app.frame.maxX)
+        }
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "payment-actions-one-row"; capture.lifetime = .keepAlways; add(capture)
+    }
+
+    func testRecurringPaymentDetailsScrollAndCancelWithoutSubmitting() {
+        recurringPaymentDetailsScrollAndCancel(largeText: false)
+    }
+
+    func testRecurringPaymentLargeTextScrollAndCancelWithoutSubmitting() {
+        recurringPaymentDetailsScrollAndCancel(largeText: true)
+    }
+
+    private func recurringPaymentDetailsScrollAndCancel(largeText: Bool) {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"] }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "recurring"])
+        ui.openDeepLink("openid4vp://mock")
+        XCTAssertTrue(app.staticTexts["Super Store"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.images["payment-payee-logo"].exists, "An invalid logo must leave no placeholder")
+        XCTAssertFalse(app.links["https://shop.example ↗"].exists)
+        let cancel = app.buttons["wallet.presentationRejectButton"]
+        let confirm = app.buttons["wallet.presentationSubmitButton"]
+        let amount = app.staticTexts["11.56"].firstMatch
+        let currency = app.staticTexts["EUR"].firstMatch
+        XCTAssertFalse(app.staticTexts["Currency"].exists)
+        XCTAssertFalse(app.staticTexts["Payee logo"].exists)
+        revealReviewElement(amount, in: app)
+        XCTAssertEqual(amount.frame.midY, currency.frame.midY, accuracy: 1,
+            "Amount and currency stay on one line when they fit, including at large text sizes")
+        XCTAssertLessThanOrEqual(amount.frame.maxX, currency.frame.minX)
+        let payeeDetails = app.buttons["payment-payee-details-toggle"]
+        revealReviewElement(payeeDetails, in: app)
+        payeeDetails.tap()
+        XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5))
+        if !largeText {
+            app.links["https://shop.example ↗"].tap()
+            XCTAssertTrue(XCUIApplication(bundleIdentifier: "com.apple.mobilesafari").wait(for: .runningForeground, timeout: 10))
+            app.activate()
+            XCTAssertTrue(app.links["https://shop.example ↗"].waitForExistence(timeout: 5), "Browser return keeps the expanded consent")
+            XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
+        }
+        if largeText { XCTAssertLessThan(cancel.frame.maxY, confirm.frame.minY) }
+        else { XCTAssertEqual(cancel.frame.midY, confirm.frame.midY, accuracy: 1) }
+        let details = app.buttons["payment-details-toggle"]
+        revealReviewElement(details, in: app)
+        XCTAssertTrue(app.staticTexts["Payment timing"].exists)
+        XCTAssertTrue(app.staticTexts["Payment terms"].exists)
+        XCTAssertFalse(app.staticTexts["Example Payments Ltd"].exists, "Supplementary fields start collapsed")
+        XCTAssertTrue(app.staticTexts["9007199254740993.01"].exists)
+        XCTAssertTrue(app.staticTexts["0.1234567890123456789"].exists)
+        details.tap()
+        XCTAssertEqual(details.value as? String, "Expanded")
+        let transaction = app.staticTexts["recurring-ui-test"]
+        revealReviewElement(transaction, in: app)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "recurring-payment-expanded-details"; capture.lifetime = .keepAlways; add(capture)
+        XCTAssertTrue(transaction.isHittable, app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Example Payments Ltd"].exists)
+        XCTAssertTrue(cancel.isHittable, "Actions remain available below scrolling terms")
+        ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Cancel payment")
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
+    }
+
+    private func revealReviewElement(_ element: XCUIElement, in app: XCUIApplication) {
+        let header = app.navigationBars["Share credentials"]
+        let footer = app.otherElements["wallet.footer"]
+        XCTAssertTrue(header.exists && footer.exists)
+        func visible() -> Bool {
+            element.isHittable && element.frame.minY >= header.frame.maxY + 8
+                && element.frame.maxY <= footer.frame.minY - 8
+        }
+        // Hittability alone can include content underneath the fixed footer.
+        for _ in 0..<20 where !visible() {
+            let top = header.frame.maxY + 8
+            let bottom = footer.frame.minY - 8
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            let start = origin.withOffset(CGVector(dx: app.frame.midX, dy: (top + bottom) / 2))
+            let direction: CGFloat = element.frame.minY < top ? 1 : -1
+            let end = start.withOffset(CGVector(dx: 0, dy: direction * (bottom - top) / 3))
+            start.press(forDuration: 0.01, thenDragTo: end)
+        }
+        XCTAssertTrue(visible(), "Review control must be uncovered before interaction: \(element.identifier)")
     }
 
     func testMissingPaymentMetadataBlocksSharing() {
@@ -845,7 +952,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Review payment"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Amount"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["129.90"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Currency"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Currency"].exists)
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Payee"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Example Merchant"].waitForExistence(timeout: 10))
@@ -870,6 +977,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Portrait"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["$.portrait"].exists)
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
+        let image = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.claimImage.")).firstMatch
+        revealReviewElement(image, in: app)
         ui.tapElement(identifierPrefix: "wallet.claimImage.")
         ui.assertExists(identifierPrefix: "wallet.claimImageViewer.", timeout: 10)
         XCTAssertTrue(app.images["Full-screen credential image"].waitForExistence(timeout: 10))

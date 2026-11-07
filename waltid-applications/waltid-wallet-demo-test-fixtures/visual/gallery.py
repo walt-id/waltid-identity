@@ -299,7 +299,7 @@ def markdown(gallery, limit=8, check_budget=True):
                 or variants)[:min(2, limit)]
     repository, base, head = gallery["repository"], gallery["base"], gallery["head"]
     lines = [START, "<details>", f"<summary>Visual changes — {len(rows)} scenarios across {len(gallery['changes'])} platform references</summary>", "",
-        f"Committed expected appearance: [{base[:12]}](https://github.com/{repository}/commit/{base}) → [{head[:12]}](https://github.com/{gallery['headRepository']}/commit/{head}). App-journey captures are labelled separately.", ""]
+        f"Committed expected appearance: [{base[:12]}](https://github.com/{repository}/commit/{base}) → [{head[:12]}](https://github.com/{gallery['headRepository']}/commit/{head}). These are committed visual references, not app-journey captures.", ""]
     if selected:
         lines += ["**Main flows — default text size**", "", *preview_table(gallery, rows, selected, MOBILE)]
     if variants:

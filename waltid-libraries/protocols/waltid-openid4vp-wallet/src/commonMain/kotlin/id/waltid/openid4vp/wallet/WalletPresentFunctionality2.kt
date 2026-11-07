@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.verifier.openid.transactiondata.parseTs12PaymentEntries
 import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
@@ -69,6 +70,11 @@ fun interface CredentialPresentationKeyResolver {
     suspend fun resolve(credentialId: String, credential: DigitalCredential): CredentialPresentationKey?
 }
 
+internal fun paymentDeadlineCheck(request: AuthorizationRequest, clock: Clock = Clock.System): () -> Unit {
+    val payments = parseTs12PaymentEntries(decodeList(request.transactionData.orEmpty()), clock.now())
+    return { val now = clock.now(); payments.forEach { it.requireCurrent(now) } }
+}
+
 object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
@@ -101,7 +107,9 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         scaAuthorizer: ScaPresentationAuthorizer? = null,
         credentialHolderKeyResolver: CredentialPresentationKeyResolver? = null,
+        clock: Clock = Clock.System,
     ): String {
+        val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
         // OID4VP 1.0 Appendix A: DC API holder binding is to the platform-asserted origin.
         val holderBindingAudience = dcApiOrigin?.let { "origin:$it" }
@@ -192,6 +200,7 @@ object WalletPresentFunctionality2 {
         }
 
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
+        requireCurrentPayment()
         return Json.encodeToString(JsonObject(vpTokenMapContents))
     }
 
@@ -815,7 +824,18 @@ object WalletPresentFunctionality2 {
         vpToken: String,
         idToken: String? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+    ): Result<WalletPresentResult> = sendAuthorizationResponse(
+        authorizationRequest, vpToken, idToken, clientMetadata, Clock.System,
+    )
+
+    internal suspend fun sendAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        vpToken: String,
+        idToken: String?,
+        clientMetadata: ClientMetadata?,
+        clock: Clock,
     ): Result<WalletPresentResult> = runCatching {
+        val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         // Infer response_mode from response_type if not explicitly set
         if (authorizationRequest.responseMode == null) {
             require(authorizationRequest.responseType != null) { "Missing response_type" }
@@ -885,6 +905,7 @@ object WalletPresentFunctionality2 {
                     idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
+                requireCurrentPayment()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -908,6 +929,7 @@ object WalletPresentFunctionality2 {
                     contentEncryption = encryption.contentEncryption,
                 )
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
+                requireCurrentPayment()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -1531,6 +1553,8 @@ object WalletPresentFunctionality2 {
         }
         val sdHash = calculateSha256Base64Url(stringToHash)
         val decodedTransactionData = decodeList(transactionData.orEmpty())
+        val paymentClock = scaContext?.clock ?: Clock.System
+        val payments = parseTs12PaymentEntries(decodedTransactionData, paymentClock.now())
         val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
             calculateTransactionDataHashes(
@@ -1578,6 +1602,7 @@ object WalletPresentFunctionality2 {
             )
             context.authorizer.authorize(presentation).also { currentCoroutineContext().ensureActive() }
         }
+        payments.forEach { it.requireCurrent(paymentClock.now()) }
         val kbJwtPayload = buildJsonObject {
             if (scaContext != null) {
                 put("jti", requireNotNull(proofId))
@@ -1614,6 +1639,7 @@ object WalletPresentFunctionality2 {
         )
         // A native signer may finish after cancellation without observing the coroutine's Job.
         if (scaContext != null) currentCoroutineContext().ensureActive()
+        payments.forEach { it.requireCurrent(paymentClock.now()) }
         return proof
     }
 

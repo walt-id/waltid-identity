@@ -1,6 +1,7 @@
 """The release docs job must reuse the same WalletCore producer as main CI."""
 
 from pathlib import Path
+import re
 import unittest
 
 
@@ -13,8 +14,9 @@ CHECKOUT = (
 )
 
 
-def job_block(workflow, job_id, following_job):
-    return workflow.split(f"  {job_id}:\n", 1)[1].split(f"\n  {following_job}:\n", 1)[0]
+def job_block(workflow, job_id):
+    block = workflow.split(f"  {job_id}:\n", 1)[1]
+    return re.split(r"(?m)^  [A-Za-z0-9_-]+:", block, maxsplit=1)[0]
 
 
 class WalletCoreFrameworkWorkflowTest(unittest.TestCase):
@@ -67,7 +69,7 @@ class WalletCoreFrameworkWorkflowTest(unittest.TestCase):
         self.assertEqual(self.producer.count("assembleWalletCoreReleaseXCFramework"), 1)
 
     def test_main_ci_calls_the_producer_without_changing_downstream_outputs(self):
-        framework = job_block(self.macos, "wallet-core-framework", "wallet-core-consumer-tests")
+        framework = job_block(self.macos, "wallet-core-framework")
         self.assertIn("uses: ./.github/workflows/wallet-core-framework.yml", framework)
         self.assertIn("secrets: inherit", framework)
         self.assertNotIn("with:", framework)
@@ -90,7 +92,7 @@ class WalletCoreFrameworkWorkflowTest(unittest.TestCase):
         self.assertIn(f"DEVELOPER_DIR: {XCODE}", self.macos)
 
     def test_release_docs_depend_on_the_tagged_framework_build(self):
-        framework = job_block(self.release, "wallet-core-framework", "sdk-docs")
+        framework = job_block(self.release, "wallet-core-framework")
         docs = self.release.split("  sdk-docs:\n", 1)[1].split("\n  deploy-license:\n", 1)[0]
         self.assertIn("needs: tag", framework)
         self.assertIn("uses: ./.github/workflows/wallet-core-framework.yml", framework)

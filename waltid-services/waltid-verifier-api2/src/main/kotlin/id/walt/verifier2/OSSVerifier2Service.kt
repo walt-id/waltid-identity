@@ -9,7 +9,8 @@ import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.WebhookDestinationNotAllowedException
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfileResponse
+import id.walt.verifier.openid.transactiondata.toResponse
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -337,11 +338,11 @@ object Verifier2Service {
             tags("Transaction Data")
             summary = "List available transaction data type profiles"
             response {
-                HttpStatusCode.OK to { body<List<TransactionDataProfile>>() }
+                HttpStatusCode.OK to { body<List<TransactionDataProfileResponse>>() }
             }
         }) {
             val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
-            call.respond(config.transactionDataProfiles)
+            call.respond(config.transactionDataProfiles.map { it.toResponse() })
         }
 
         if (Verifier2RouteSurface.VICAL in surfaces) route(VICAL) {

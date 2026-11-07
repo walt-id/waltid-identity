@@ -8,11 +8,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performScrollTo
+import kotlin.math.abs
 import kotlin.test.assertTrue
 
 /** Scroll through the real viewport, including the area obscured by pinned review actions. */
 @OptIn(ExperimentalTestApi::class)
-internal fun SemanticsNodeInteraction.performScrollToContent(test: ComposeUiTest): SemanticsNodeInteraction {
+internal fun SemanticsNodeInteraction.performScrollToContent(test: ComposeUiTest, alignTop: Boolean = false): SemanticsNodeInteraction {
     test.waitUntil(timeoutMillis = 5_000) {
         try {
             fetchSemanticsNode()
@@ -31,12 +32,13 @@ internal fun SemanticsNodeInteraction.performScrollToContent(test: ComposeUiTest
         val visibleTop = scroll.positionInRoot.y
         val visibleBottom = footer.positionInRoot.y
         if (target.size.height > visibleBottom - visibleTop) return this
-        val overlap = target.positionInRoot.y + target.size.height - visibleBottom
-        if (overlap <= 1f) {
+        val distance = if (alignTop) target.positionInRoot.y - visibleTop
+            else target.positionInRoot.y + target.size.height - visibleBottom
+        if (if (alignTop) abs(distance) <= 1f else distance <= 1f) {
             assertTrue(target.positionInRoot.y >= visibleTop - 1f, "Content must fit above the pinned actions")
             return this
         }
-        test.runOnUiThread { scroll.config[SemanticsActions.ScrollBy].action?.invoke(0f, overlap) }
+        test.runOnUiThread { scroll.config[SemanticsActions.ScrollBy].action?.invoke(0f, distance) }
         test.waitForIdle()
     }
     error("Content could not be scrolled above the pinned actions")

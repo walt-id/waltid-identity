@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -49,6 +51,7 @@ import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletOperationState
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentFieldPlacement
 
 /** Content and readiness are shared; the platform adapter owns the renderer and baseline path. */
 @OptIn(ExperimentalTestApi::class)
@@ -58,13 +61,24 @@ internal class WalletVisualScenarios(
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
     private var layoutDirection = "ltr"
+    private val captureFailures = mutableListOf<AssertionError>()
+
+    fun execute(block: WalletVisualScenarios.() -> Unit) {
+        block()
+        captureFailures.firstOrNull()?.let { failure ->
+            captureFailures.drop(1).forEach(failure::addSuppressed)
+            throw failure
+        }
+    }
 
     private fun capture(id: String) {
         // Capture the settled Compose state after interactions and navigation.
         // Advancing virtual time keeps this independent of host rendering speed.
         test.mainClock.advanceTimeBy(1_000)
         test.waitForIdle()
-        captureImage(id, layoutDirection)
+        // Keep later states and interaction assertions in a journey reachable after a pixel diff.
+        // The platform test still fails after the scenario; references are never accepted here.
+        try { captureImage(id, layoutDirection) } catch (failure: AssertionError) { captureFailures += failure }
     }
 
     private fun content(body: @Composable () -> Unit) {
@@ -773,10 +787,76 @@ internal class WalletVisualScenarios(
                 onSubmit = {}, onCancel = {}, compact = false,
                 preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
         }
-        onNodeWithText("11.56 EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("11.56").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
         capture("payment.localized.compact_large_text")
+    }
+
+    fun paymentTerms(recurring: Boolean, compact: Boolean = false, details: Boolean = false) = with(test) {
+        val consent = WalletVisualFixtures.paymentTerms(recurring)
+        var cancelled = false
+        var submitted = false
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.paymentReview, title = "Payment",
+                onSubmit = { submitted = true }, onCancel = { cancelled = true }, compact = false,
+                preparePaymentConsent = { consent })
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag("payment-payee-logo").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Payee logo").assertDoesNotExist()
+        onNodeWithText("Currency").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").assertExists()
+        if (!recurring) {
+            onNodeWithText("2099-01-01T12:00:00Z").assertDoesNotExist()
+            onNodeWithText("(UTC)", substring = true).assertExists()
+        }
+        onNodeWithText("Requested credentials").assertExists()
+        onNodeWithText("https://verifier.example").assertExists()
+        consent.fields.filter { it.path != listOf("payee", "logo") && it.path != listOf("currency") }.forEach { field ->
+            when (field.placement) {
+                WalletDemoPaymentFieldPlacement.Prominent, WalletDemoPaymentFieldPlacement.Main ->
+                    onNodeWithText(field.label).assertExists("Main payment field must not require expansion: ${field.label}")
+                WalletDemoPaymentFieldPlacement.Details, WalletDemoPaymentFieldPlacement.Omitted ->
+                    onNodeWithText(field.label).assertDoesNotExist()
+            }
+        }
+        if (recurring) onNodeWithText("Payment terms").assertExists()
+        if (compact) {
+            onNodeWithText("Payment terms").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+        }
+        if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
+            val results = mutableListOf<TextLayoutResult>()
+            kotlin.test.assertTrue(layout(results))
+            kotlin.test.assertEquals(1.5f, results.single().layoutInput.density.fontScale)
+        }
+        val id = if (recurring) "payment.recurring" else "payment.scheduled"
+        if (!details) capture(if (compact) "$id.compact_large_text" else "$id.main")
+        if (details || compact) {
+            onNodeWithTag("payment-payee-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("https://shop.example ↗").performScrollToContent(this).assertIsDisplayed()
+            if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
+            if (details) {
+                onNodeWithTag("payment-details-toggle").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+                capture("$id.details")
+            }
+            consent.fields.forEach { field ->
+                when (field.path) {
+                    listOf("payee", "logo") -> onNodeWithTag("payment-payee-logo").performScrollToContent(this).assertIsDisplayed()
+                    listOf("currency") -> onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+                    else -> onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
+                        .performScrollToContent(this).assertIsDisplayed()
+                }
+            }
+        }
+        onNodeWithText("Cancel payment").assertIsDisplayed().performClick()
+        kotlin.test.assertTrue(cancelled)
+        kotlin.test.assertFalse(submitted)
     }
 
     fun paymentReview() = with(test) {
@@ -789,9 +869,9 @@ internal class WalletVisualScenarios(
             )
         }
         onNodeWithText("Confirm payment").performScrollTo().assertIsDisplayed()
-        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
-        onNodeWithText("bound-but-hidden").assertDoesNotExist()
+        onNodeWithText("Technical reference").assertDoesNotExist()
         capture("payment.mixed_credentials.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()

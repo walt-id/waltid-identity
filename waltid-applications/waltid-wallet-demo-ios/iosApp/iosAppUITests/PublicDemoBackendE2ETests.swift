@@ -96,7 +96,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
         let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
         XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
-        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Amount",
                       "Check the payee and amount before confirming."] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             for _ in 0..<8 where !text.isHittable { app.swipeDown() }
@@ -111,6 +111,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
         XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let unsignedWarning = app.alerts["Unsigned payment request"]
+        XCTAssertTrue(unsignedWarning.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
+        unsignedWarning.buttons["Confirm payment"].tap()
         let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
         XCTAssertNotNil(status)
         XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")

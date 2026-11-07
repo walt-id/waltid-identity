@@ -101,6 +101,11 @@ jobs:
           # adds annotations and dependency-graph_*.json artifacts.
           dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
 
+      - name: Check TS12 payment schema against upstream
+        run: |
+          python3 -m unittest discover -s waltid-identity/scripts/tests -p test_ts12_schema_sync.py
+          python3 waltid-identity/scripts/sync-ts12-payment-schema.py --check-upstream
+
       - name: Check default Kotlin configuration
         run: |
           # Mobile-enabled builds can hide modules included without any Kotlin targets.

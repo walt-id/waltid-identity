@@ -22,6 +22,13 @@ and `2026-10-31T01:30:00Z` display identically for the same viewer. In Budapest 
 Only explicit domain semantics override the device zone; no current wallet timestamp surface
 requires such an override. Unrecognized zoned-date syntaxes remain source text.
 
+TS12 payment consent interprets only the payload-relative `date_time`, `execution_date`,
+`recurrence.start_date` and `recurrence.end_date` paths as instants. All four use the schema's
+offset-bearing `date-time` format, including the recurrence fields described as dates in the
+prose. They use the same timestamp renderers and device settings as credential instants.
+An offset does not supply recurring IANA zone rules. Consent labels and the original string values
+stay unchanged; transaction identifiers and other timestamp-looking text are never inferred as dates.
+
 ## Formatting and ownership
 
 - Keep parsed instants typed until rendering. A cached credential must not cache a timezone or
