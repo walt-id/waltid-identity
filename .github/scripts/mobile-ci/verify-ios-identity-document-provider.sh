@@ -18,6 +18,7 @@ Usage: verify-ios-identity-document-provider.sh \
   --app-bundle-id <host bundle identifier> \
   --appex-bundle-id <provider bundle identifier> \
   --development-team <Team ID> \
+  [--test-products <path.xctestproducts>] \
   [--doctype <doctype>]... \
   [--build-setting KEY=VALUE]...
 USAGE
@@ -27,6 +28,7 @@ USAGE
 project_dir=""
 destination=""
 derived_data=""
+test_products=""
 expected_app_group=""
 expected_keychain_suffix=""
 expected_app_bundle_id=""
@@ -40,6 +42,7 @@ while (($#)); do
     --project-dir) project_dir="$2"; shift 2 ;;
     --destination) destination="$2"; shift 2 ;;
     --derived-data) derived_data="$2"; shift 2 ;;
+    --test-products) test_products="$2"; shift 2 ;;
     --app-group) expected_app_group="$2"; shift 2 ;;
     --keychain-group-suffix) expected_keychain_suffix="$2"; shift 2 ;;
     --app-bundle-id) expected_app_bundle_id="$2"; shift 2 ;;
@@ -101,7 +104,12 @@ done
 # The build settings expand through the `[@]+` form because macOS ships bash 3.2, where `"${array[@]}"`
 # on an empty array is an unbound-variable error under `set -u` - the Compose demo passes none.
 echo "==> Building scheme iosApp in $project_dir"
-xcodebuild build \
+build_action=(build)
+if [[ -n "$test_products" ]]; then
+  build_action=(build-for-testing -configuration Debug -enableCodeCoverage NO
+    -parallel-testing-enabled NO -testProductsPath "$test_products")
+fi
+xcodebuild "${build_action[@]}" \
   -project iosApp.xcodeproj \
   -scheme iosApp \
   -destination "$destination" \
