@@ -50,6 +50,38 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
     }
 
+    func testScheduledPaymentReviewAgainstPublicDemo() async throws {
+        try await reviewAndCancelPayment(.scheduled)
+    }
+
+    func testRecurringPaymentReviewAgainstPublicDemo() async throws {
+        try await reviewAndCancelPayment(.recurring)
+    }
+
+    private func reviewAndCancelPayment(_ payment: DemoPayment) async throws {
+        let offer = try await backend.createOffer(scenario: DemoBackend.scaPaymentScenario)
+        recordGalleryRequest("issuance", value: offer.offerUrl)
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: publicDemoEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        ui.openWalletLink(offer.offerUrl)
+        XCTAssertTrue(ui.waitForOfferReview(timeout: credentialOperationTimeout))
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout))
+        waitForIdleResultDismissal(app)
+        let session = try await backend.createScaPaymentVerifierSession(payment: payment)
+        recordGalleryRequest("presentation", value: session.authorizationRequestUri)
+        ui.openWalletLink(session.authorizationRequestUri)
+        XCTAssertTrue(ui.waitForPresentationReview(timeout: credentialOperationTimeout))
+        reviewPublicPayment(app, payment: payment, capturePrefix: "native-ios-payment-\(payment.rawValue)")
+        ui.tapButton(identifier: "wallet.presentationRejectButton", fallbackLabel: "Cancel payment")
+        let info = try await backend.waitForVerifierFailure(sessionID: session.sessionID,
+            expectedError: "access_denied", timeoutSeconds: verifierPollingTimeout)
+        XCTAssertNil((info["presented_raw_data"] as? [String: Any])?["vpToken"], "Cancellation must not release a proof")
+    }
+
     /// Run explicitly on enrolled physical hardware with WALLET_SCA_OPERATOR=approve.
     func testScaPaymentWithNativeAuthorization() async throws {
         continueAfterFailure = false
@@ -60,6 +92,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             throw XCTSkip("Select the operator-assisted SCA lane explicitly")
         }
         let offer = try await backend.createOffer(scenario: DemoBackend.scaPaymentScenario)
+        recordGalleryRequest("issuance", value: offer.offerUrl)
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         let ui = WalletE2EUI(app: app)
@@ -91,34 +124,30 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 180)
 
-        let session = try await backend.createScaPaymentVerifierSession()
-        ui.openWalletLink(session.authorizationRequestUri)
-        XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
-        let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
-        XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
-        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Amount",
-                      "Check the payee and amount before confirming."] {
-            let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
-            for _ in 0..<8 where !text.isHittable { app.swipeDown() }
-            for _ in 0..<12 where !text.isHittable { app.swipeUp() }
-            XCTAssertTrue(text.isHittable, "Missing visible payment value: \(value)")
+        for shape in DemoPayment.allCases {
+            let session = try await backend.createScaPaymentVerifierSession(payment: shape)
+            recordGalleryRequest("presentation", value: session.authorizationRequestUri)
+            ui.openWalletLink(session.authorizationRequestUri)
+            XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
+            reviewPublicPayment(app, payment: shape, capturePrefix: "native-ios-physical-\(shape.rawValue)")
+            let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            attachment.name = "SCA payment review before native signing"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            print("SCA_OPERATOR: approve iPhone payment signing")
+            XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
+            XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
+            ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+            let unsignedWarning = app.alerts["Unsigned payment request"]
+            XCTAssertTrue(unsignedWarning.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
+            unsignedWarning.buttons["Confirm payment"].tap()
+            let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
+            XCTAssertNotNil(status)
+            XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")
+            try await backend.verifyScaPayment(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
+            print("SCA_DEVICE_E2E shape=\(shape.rawValue) nativeApproved=true paymentReviewed=true verifier=SUCCESSFUL")
+            ui.returnToWallet()
         }
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.name = "SCA payment review before native signing"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        print("SCA_OPERATOR: approve iPhone payment signing")
-        XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
-        XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
-        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
-        let unsignedWarning = app.alerts["Unsigned payment request"]
-        XCTAssertTrue(unsignedWarning.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
-        unsignedWarning.buttons["Confirm payment"].tap()
-        let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
-        XCTAssertNotNil(status)
-        XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")
-        try await backend.verifyScaPayment(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
-        print("SCA_DEVICE_E2E nativeApproved=true paymentReviewed=true verifier=SUCCESSFUL session=\(session.sessionID)")
         #endif
     }
 

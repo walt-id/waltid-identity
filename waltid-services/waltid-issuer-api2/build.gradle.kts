@@ -7,6 +7,10 @@ plugins {
 
 group = "id.walt"
 
+kotlin.sourceSets.named("test") {
+    kotlin.srcDir("../../waltid-applications/mobile-e2e-fixtures/kotlin")
+}
+
 dependencies {
     api(project(":waltid-services:waltid-service-commons"))
 

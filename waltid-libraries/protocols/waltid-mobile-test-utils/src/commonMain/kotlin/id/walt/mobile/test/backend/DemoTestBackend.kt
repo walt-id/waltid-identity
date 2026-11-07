@@ -419,31 +419,24 @@ object DemoTestBackend {
      * The profile is fetched rather than assumed so that a deployment which still declares the old
      * `payment_details` type fails here, instead of producing an item the matcher silently drops.
      */
-    suspend fun scaPaymentTransactionData(credentialId: String): JsonObject {
+    suspend fun scaPaymentTransactionData(
+        credentialId: String,
+        payment: DemoPayment = DemoPayment.MINIMAL,
+    ): JsonObject {
         val fields = transactionDataProfileFields(SCA_PAYMENT_TYPE)
-        check(fields.contains("payload")) {
-            "Demo transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
-        }
+        check("payload" in fields) { "Public payment profile is missing payload" }
         return buildJsonObject {
-            put("type", JsonPrimitive(SCA_PAYMENT_TYPE))
-            putJsonArray("credential_ids") {
-                add(JsonPrimitive(credentialId))
-            }
-            put("require_cryptographic_holder_binding", JsonPrimitive(true))
-            putJsonArray("transaction_data_hashes_alg") {
-                add(JsonPrimitive("sha-256"))
-            }
-            putJsonObject("payload") {
-                put("transaction_id", JsonPrimitive(SCA_PAYMENT_TRANSACTION_ID))
-                putJsonObject("payee") {
-                    put("name", JsonPrimitive(SCA_PAYMENT_PAYEE_NAME))
-                    put("id", JsonPrimitive("merchant-001"))
-                }
-                put("currency", JsonPrimitive(SCA_PAYMENT_CURRENCY))
-                put("amount", JsonPrimitive(SCA_PAYMENT_AMOUNT))
-            }
+            put("type", SCA_PAYMENT_TYPE)
+            putJsonArray("credential_ids") { add(JsonPrimitive(credentialId)) }
+            put("require_cryptographic_holder_binding", true)
+            putJsonArray("transaction_data_hashes_alg") { add(JsonPrimitive("sha-256")) }
+            put("payload", payment.payload())
         }
     }
+
+    suspend fun createScaPaymentVerifierSession(payment: DemoPayment): VerifierSession =
+        createVerifierSession(scaPaymentSdJwtScenario.verifierCredentialQuery,
+            listOf(scaPaymentTransactionData("sca_payment", payment)))
 
     suspend fun transactionDataProfileFields(type: String): Set<String> {
         val response = client.get(TRANSACTION_DATA_PROFILES_URL) {

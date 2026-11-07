@@ -31,6 +31,42 @@ public struct DemoMetadataSigner {
     public let algorithm: String
 }
 
+/// Same public acceptance vectors as the Kotlin DemoPayment fixture; decimals never pass through Double.
+public enum DemoPayment: String, CaseIterable {
+    case minimal, scheduled, recurring
+
+    public func payload(now: Date = Date()) -> [String: Any] {
+        let timestamp = ISO8601DateFormatter()
+        var payload: [String: Any] = [
+            "transaction_id": self == .minimal ? "8D8AC610-566D-4EF0-9C22-186B2A5ED793" : "wal-1665-\(rawValue)",
+            "payee": ["name": "Super Store", "id": "merchant-001"],
+            "currency": "EUR", "amount": NSDecimalNumber(string: "11.56"),
+        ]
+        guard self != .minimal else { return payload }
+        payload["payee"] = ["name": "Super Store", "id": "merchant-001",
+                            "logo": "data:image/png;base64,AA==", "website": "https://example.com"]
+        payload["date_time"] = timestamp.string(from: now)
+        payload["pisp"] = ["legal_name": "Example Payments Ltd", "brand_name": "Example Payments", "domain_name": "payments.example"]
+        payload["amount_estimated"] = false
+        payload["amount_earmarked"] = false
+        payload["sct_inst"] = true
+        let tomorrow = timestamp.string(from: now.addingTimeInterval(86400))
+        if self == .scheduled { payload["execution_date"] = tomorrow }
+        else {
+            payload["recurrence"] = [
+                "start_date": tomorrow, "end_date": timestamp.string(from: now.addingTimeInterval(365 * 86400)),
+                "number": 12, "frequency": "MNTH",
+                "mit_options": ["amount_variable": false, "min_amount": 0,
+                    "max_amount": NSDecimalNumber(string: "9007199254740993.01"),
+                    "total_amount": NSDecimalNumber(string: "120.00"),
+                    "initial_amount": NSDecimalNumber(string: "-1.23"), "initial_amount_number": 2,
+                    "apr": NSDecimalNumber(string: "0.1234567890123456789")] as [String: Any],
+            ]
+        }
+        return payload
+    }
+}
+
 public final class DemoBackend {
     public static let shared = DemoBackend()
     private static let eudiPidSdJwtVct = "urn:eudi:pid:1"
@@ -91,12 +127,10 @@ public final class DemoBackend {
     )
 
     /// A URL payment request using the same nested TS-12 shape as the Android demo.
-    public func createScaPaymentVerifierSession() async throws -> DemoVerifierSession {
+    public func createScaPaymentVerifierSession(payment: DemoPayment = .minimal) async throws -> DemoVerifierSession {
         try await createVerifierSession(scenario: Self.scaPaymentScenario, transactionData: [[
             "type": "urn:eudi:sca:payment:1", "credential_ids": ["sca_payment"],
-            "transaction_data_hashes_alg": ["sha-256"],
-            "payload": ["transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
-                        "payee": ["name": "Super Store", "id": "merchant-001"], "currency": "EUR", "amount": 11.56],
+            "transaction_data_hashes_alg": ["sha-256"], "payload": payment.payload(),
         ]])
     }
 
