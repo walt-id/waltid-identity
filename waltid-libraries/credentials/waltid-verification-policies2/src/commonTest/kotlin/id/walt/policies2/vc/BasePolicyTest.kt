@@ -17,7 +17,7 @@ abstract class BasePolicyTest {
         println("Credential for policy (for expected Success): $credential")
         val res = policy.verify(credential)
         println("Policy result (should be Success): $res")
-        assertTrue("Policy should have succeeded, but failed!") { res.isSuccess }
+        assertTrue(res.isSuccess, "Policy should have succeeded, but failed!")
     }
 
     fun baseTestOk() = runTest { runBaseTestOk() }
@@ -28,7 +28,7 @@ abstract class BasePolicyTest {
         println("Credential for policy (for expected Failure): $credential")
         val res = policy.verify(credential)
         println("Policy result (should be Failure): $res")
-        assertTrue("Policy should have failed, but succeeded!") { res.isFailure }
+        assertTrue(res.isFailure, "Policy should have failed, but succeeded!")
     }
 
     fun baseTestNok() = runTest { runBaseTestNok() }

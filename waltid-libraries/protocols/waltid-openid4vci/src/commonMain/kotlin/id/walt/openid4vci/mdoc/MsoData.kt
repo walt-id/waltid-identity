@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.openid4vci.mdoc
 
 import kotlinx.serialization.KSerializer
@@ -21,6 +23,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable(with = MsoDataSerializer::class)
 data class MsoData(

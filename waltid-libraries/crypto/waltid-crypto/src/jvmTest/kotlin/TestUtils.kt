@@ -1,4 +1,4 @@
-import io.ktor.util.*
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import java.io.File
 import java.net.URLDecoder
 
@@ -15,5 +15,5 @@ object TestUtils {
         URLDecoder.decode(this::class.java.classLoader.getResource(relativePath)!!.path, "UTF-8")
             .let { File(it).readBytes() }
 
-    fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeBase64Bytes()
+    fun loadResourceBase64(relativePath: String): ByteArray = loadResource(relativePath).decodeFromBase64()
 }

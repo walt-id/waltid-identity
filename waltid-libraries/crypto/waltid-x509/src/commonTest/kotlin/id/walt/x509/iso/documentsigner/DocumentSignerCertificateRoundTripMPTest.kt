@@ -91,9 +91,9 @@ class DocumentSignerCertificateRoundTripMPTest {
             }
         }.awaitAll()
 
-        assertTrue {
+        assertTrue(
             dsBundles.all { it.certificateDer.bytes.size != 0 }
-        }
+        )
 
         //all serial numbers are unique -> hence all generated certificates different
         assertEquals(

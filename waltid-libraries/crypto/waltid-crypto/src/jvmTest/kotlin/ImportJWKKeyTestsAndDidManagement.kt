@@ -23,7 +23,7 @@ class ImportJWKKeyTestsAndDidManagement {
         // Importing
         val imported = JWKKey.importJWK(keyString)
         // Checking import success
-        assertTrue { imported.isSuccess }
+        assertTrue(imported.isSuccess)
         // Getting key
         val key = imported.getOrThrow()
         // Checking for private key
@@ -44,7 +44,7 @@ class ImportJWKKeyTestsAndDidManagement {
         // Importing
         val imported = JWKKey.importPEM(keyString)
         // Checking import success
-        assertTrue("Import of ${if (isPrivate) "private" else "public"} $keyType: ${imported.exceptionOrNull()}") { imported.isSuccess }
+        assertTrue(imported.isSuccess, "Import of ${if (isPrivate) "private" else "public"} $keyType: ${imported.exceptionOrNull()}")
         // Getting key
         val key = imported.getOrThrow()
         // Checking for private key
