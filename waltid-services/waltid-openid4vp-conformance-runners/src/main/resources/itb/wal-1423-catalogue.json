@@ -1,5 +1,5 @@
 {
-  "observedOn": "2026-09-22",
+  "observedOn": "2026-11-06",
   "testBed": "https://dev-i4mlab.aegean.gr/itb",
   "testBedVersion": "1.29.5",
   "suites": [
@@ -7,15 +7,15 @@
       "profile": "CS-01",
       "id": "cs01v1",
       "name": "WE BUILD CTS - CS-01 Issuance",
-      "publishedVersion": "1.0 (December 2025)",
+      "publishedVersion": "1.0 (October 2026)",
       "cases": [
-        { "id": "tc_vci_001", "name": "Test Case VCI-001: WE BUILD - Authorization code flow - sdjwt - x509 signature" },
-        { "id": "tc_vci_002", "name": "Test Case VCI-002: WE BUILD - Authorization code flow - sdjwt - jwk signature" },
-        { "id": "tc_vci_003", "name": "Test Case VCI-003: WE BUILD - Authorization code flow - sdjwt-kid signature" },
-        { "id": "tc_vci_005", "name": "Test Case VCI-005: WE BUILD - Authorization code flow - mdoc - X509" },
-        { "id": "tc_vci_006", "name": "Test Case VCI-006: WE BUILD - Pre-authorized code flow - sdjwt - X509" },
-        { "id": "tc_vci_007", "name": "Test Case VCI-007: WE BUILD - Pre-authorized code flow tx code- sdjwt - X509" },
-        { "id": "tc_vci_008", "name": "Test Case VCI-008: WE BUILD - Pre-authorized code flow - mdoc - X509" }
+        { "id": "tc_vci_001", "name": "Test Case VCI-001 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - x509 signature" },
+        { "id": "tc_vci_002", "name": "Test Case VCI-002 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - jwk signature" },
+        { "id": "tc_vci_003", "name": "Test Case VCI-003 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt-kid signature" },
+        { "id": "tc_vci_005", "name": "Test Case VCI-005 [Wallet SUT]: WE BUILD - Authorization code flow - mdoc - X509" },
+        { "id": "tc_vci_006", "name": "Test Case VCI-006 [Wallet SUT]: WE BUILD - Pre-authorized code flow - sdjwt - X509" },
+        { "id": "tc_vci_007", "name": "Test Case VCI-007 [Wallet SUT]: WE BUILD - Pre-authorized code flow tx code- sdjwt - X509" },
+        { "id": "tc_vci_008", "name": "Test Case VCI-008 [Wallet SUT]: WE BUILD - Pre-authorized code flow - mdoc - X509" }
       ],
       "statement": "Base Protocols"
     },
@@ -23,12 +23,15 @@
       "profile": "CS-02",
       "id": "cs02v1",
       "name": "WE BUILD CTS - CS-02 Presentation",
-      "publishedVersion": "1.0 (December 2025)",
+      "publishedVersion": "1.2 (October 2026)",
       "cases": [
-        { "id": "tc_vp_001", "name": "Test Case VP-001: WE BUILD - DCQL-based Verifiable Presentation request for urn:eu.europa.ec.eudi:pid:1 with family_name claim" },
-        { "id": "tc_vp_002", "name": "Test Case VP-002: WE BUILD - DCQL-based Verifiable Presentation request for urn:eu.europa.ec.eudi:pid:1 with family_name claim" },
-        { "id": "tc_vp_003", "name": "Test Case VP-003: WE BUILD - DCQL-based Verifiable Presentation request for urn:eu.europa.ec.eudi:pid:1 with family_name claim" },
-        { "id": "tc_vp_007", "name": "Test Case VP-007: WE BUILD - DCQL-based Verifiable Presentation request for urn:eu.europa.ec.eudi:pid:1:mso_mdoc, X509 client_id_scheme, direct_post, GET method for request URI" }
+        { "id": "tc_vp_001", "name": "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]" },
+        { "id": "tc_vp_002", "name": "VP-002: CS-02 hash presentation with explicit encrypted response mode [Wallet SUT]" },
+        { "id": "tc_vp_003", "name": "VP-003: CS-02 hash presentation with GET request-URI retrieval [Wallet SUT]" },
+        { "id": "tc_vp_007", "name": "VP-007: Remote mdoc interoperability extension — outside CS-02 v1.2 normative coverage [Wallet SUT]" },
+        { "id": "tc_vp_011", "name": "VP-011: CS-02 hash presentation invoked with OpenID4VP [Wallet SUT]", "invocationScheme": "openid4vp" },
+        { "id": "tc_vp_012", "name": "VP-012: CS-02 hash presentation invoked with eu-eaap [Wallet SUT]", "invocationScheme": "eu-eaap" },
+        { "id": "tc_vp_013", "name": "VP-013: CS-02 hash presentation invoked with haip-vp [Wallet SUT]", "invocationScheme": "haip-vp" }
       ],
       "statement": "Base Protocols"
     },
@@ -37,24 +40,25 @@
       "id": "cts07",
       "name": "WE BUILD DC APIs Test Suite",
       "cases": [
-        { "id": "tc15", "name": "DC API - CS-07 VP Request" }
+        { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request" }
       ],
-      "statement": "Domain Specific and generic use cases"
+      "statement": "Domain Specific and generic use cases",
+      "actor": "User"
     },
     {
       "profile": "TS12",
       "id": "ts12",
       "name": "WE BUILD TS12 Test Suite",
       "cases": [
-        { "id": "ts12_issue_01", "name": "TS12: Issue SCA-IBAN Credential" },
-        { "id": "ts12_issue_02", "name": "TS12: Issue SCA-User Credential" },
-        { "id": "ts12_issue_03", "name": "TS12: Issue SCA-Card DPC Credential" },
-        { "id": "ts12_pay_01", "name": "TS12: Authorize Payment with SCA-IBAN" },
-        { "id": "ts12_pay_02", "name": "TS12: Authorize Payment with SCA-User" },
-        { "id": "ts12_pay_03", "name": "TS12: Authorize Payment with SCA-Card DPC" },
-        { "id": "ts12_pay_dc_api_01", "name": "TS12: Authorize Payment over DC API with SCA-IBAN" },
-        { "id": "ts12_pay_dc_api_02", "name": "TS12: Authorize Payment over DC API with SCA-User" },
-        { "id": "ts12_pay_dc_api_03", "name": "TS12: Authorize Payment over DC API with SCA-Card DPC" }
+        { "id": "ts12_issue_01", "name": "TS12 [Wallet SUT]: Receive SCA-IBAN Credential" },
+        { "id": "ts12_issue_02", "name": "TS12 [Wallet SUT]: Receive SCA-User Credential" },
+        { "id": "ts12_issue_03", "name": "TS12 [Wallet SUT]: Receive SCA-Card DPC Credential" },
+        { "id": "ts12_pay_01", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-IBAN" },
+        { "id": "ts12_pay_02", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-User" },
+        { "id": "ts12_pay_03", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-Card DPC" },
+        { "id": "ts12_pay_dc_api_01", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-IBAN" },
+        { "id": "ts12_pay_dc_api_02", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-User" },
+        { "id": "ts12_pay_dc_api_03", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-Card DPC" }
       ],
       "statement": "Payment use cases"
     }
