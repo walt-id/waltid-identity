@@ -66,6 +66,9 @@ object Verifier2AuthorizationRequestHandler {
         verificationSession: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit
     ): AuthorizationRequestResponseFormat {
+        require(!verificationSession.setup.core.encryptedRequest) {
+            "Encrypted Request Objects require request_uri_method=post with wallet encryption metadata"
+        }
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
             updateSessionCallback.invoke(this, event, block)
 
