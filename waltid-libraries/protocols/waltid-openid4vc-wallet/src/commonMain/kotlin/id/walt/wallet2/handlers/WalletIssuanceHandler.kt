@@ -1380,7 +1380,8 @@ object WalletIssuanceHandler {
             grantedCredentialSelections(issuerMetadata, selections, tokenResponse.authorization_details, tokenResponse.scope),
             CredentialIssuanceAccess(tokenResponse.access_token, keyMaterial,
                 dpopAlgorithmsForToken(tokenResponse.token_type, dpopAlgorithms),
-                request.clientId.takeUnless { anonymousPreAuthorizedCode }),
+                request.clientId.takeUnless { anonymousPreAuthorizedCode },
+                walletClientId = request.clientId),
             sessions = wallet.issuanceSessions(httpClient), requestMetadata = requestMetadata, onEvent = onEvent,
             beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = { entry ->
@@ -1777,6 +1778,7 @@ object WalletIssuanceHandler {
         issuer: String,
         nonce: String?,
         clientId: String?,
+        providerClientId: String? = clientId,
     ): Proofs {
         val requirements = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired
         val provider = if (requirements != null) requireNotNull(wallet.keyAttestationProviderFor(issuer)) {
@@ -1790,6 +1792,7 @@ object WalletIssuanceHandler {
                 binding.did,
                 algorithms,
                 clientId = clientId,
+                providerClientId = providerClientId,
                 keyAttestationsRequired = requirements,
                 keyAttestationProvider = provider,
             ).jwt!!.single()
@@ -2981,6 +2984,7 @@ object WalletIssuanceHandler {
         did: String?,
         acceptedAlgorithms: Set<String>? = null,
         clientId: String? = null,
+        providerClientId: String? = clientId,
         keyAttestationsRequired: KeyAttestationsRequired? = null,
         keyAttestationProvider: KeyAttestationProvider? = null,
     ): Proofs {
@@ -2991,7 +2995,8 @@ object WalletIssuanceHandler {
             ?: keyMaterial.legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
         return effectiveCrypto2Key?.let {
             val keyAttestation = keyAttestationForProof(
-                keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms, clientId,
+                keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms,
+                providerClientId ?: clientId,
             )
             proofBuilder.buildProof(
                 key = it,
