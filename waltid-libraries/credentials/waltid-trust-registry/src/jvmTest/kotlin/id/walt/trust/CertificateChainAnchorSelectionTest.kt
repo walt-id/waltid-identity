@@ -13,6 +13,9 @@ import id.walt.trust.model.TrustedEntityType
 import id.walt.trust.model.TrustedService
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
+import id.walt.trust.store.TrustStore
+import id.walt.trust.utils.CanonicalSubjectHash
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.runTest
 import java.security.cert.X509Certificate
 import kotlin.test.Test
@@ -20,7 +23,10 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
-/** Resolve selects anchors by subject before building a path; none of these valid paths may be lost. */
+/**
+ * Resolve reads only the anchors whose stored subject key matches a presented certificate, then checks the parsed
+ * subject and builds the path. None of these valid paths may be lost, and a stored key must never add an anchor.
+ */
 class CertificateChainAnchorSelectionTest {
 
     @Test
@@ -70,11 +76,47 @@ class CertificateChainAnchorSelectionTest {
         assertTrusted("root", decision)
     }
 
+    @Test
+    fun anchorStoredWithoutASubjectKeyStillResolves() = runTest {
+        val chain = TestCertificates.createChain("Selection")
+
+        val decision = resolve(chain.leaf, anchors = mapOf("root" to der(chain.root)), storedKeys = mapOf("root" to null))
+
+        assertTrusted("root", decision)
+    }
+
+    @Test
+    fun subjectKeyThatDisagreesWithItsCertificateCannotAddAnAnchor() = runTest {
+        val chain = TestCertificates.createChain("Selection")
+        val unrelated = TestCertificates.createChain("Unrelated")
+
+        val decision = resolve(
+            chain.leaf,
+            anchors = mapOf("unrelated" to der(unrelated.root)),
+            storedKeys = mapOf("unrelated" to CanonicalSubjectHash.of(chain.leaf.issuerX500Principal)),
+        )
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision, decision.toString())
+    }
+
     private fun der(certificate: X509Certificate) = TestCertificates.derBase64(certificate)
 
-    /** One accepted, fresh LoTE with one wallet-provider entity per anchor, keyed by entity id. */
-    private suspend fun resolve(vararg presented: X509Certificate, anchors: Map<String, String>): TrustDecision {
-        val store = InMemoryTrustStore()
+    /** Fails the test if resolve reads every stored anchor instead of only the candidates. */
+    private class CandidateOnlyStore(inner: InMemoryTrustStore = InMemoryTrustStore()) : TrustStore by inner {
+        override suspend fun listCertificateIdentities(): Flow<ServiceIdentity> =
+            error("resolve must read only candidate anchors")
+    }
+
+    /**
+     * One accepted, fresh LoTE with one wallet-provider entity per anchor, keyed by entity id. Each identity carries
+     * its certificate's subject key, as loading a source sets it, unless [storedKeys] gives another (null: none).
+     */
+    private suspend fun resolve(
+        vararg presented: X509Certificate,
+        anchors: Map<String, String>,
+        storedKeys: Map<String, String?> = emptyMap(),
+    ): TrustDecision {
+        val store = CandidateOnlyStore()
         store.replaceSourceData(
             TrustSource(
                 SOURCE_ID, SourceFamily.LOTE, "Selection", nextUpdate = Clock.System.now() + 30.days,
@@ -83,7 +125,11 @@ class CertificateChainAnchorSelectionTest {
             anchors.keys.map { TrustedEntity(it, SOURCE_ID, TrustedEntityType.WALLET_PROVIDER, it) },
             anchors.keys.map { TrustedService("$it-service", SOURCE_ID, it, "wallet-provider", TrustStatus.GRANTED) },
             anchors.map { (entityId, derBase64) ->
-                ServiceIdentity("$entityId-identity", SOURCE_ID, entityId, "$entityId-service", certificateDerBase64 = derBase64)
+                ServiceIdentity(
+                    "$entityId-identity", SOURCE_ID, entityId, "$entityId-service", certificateDerBase64 = derBase64,
+                    canonicalSubjectSha256Hex = if (entityId in storedKeys) storedKeys[entityId]
+                    else CanonicalSubjectHash.ofCertificate(derBase64),
+                )
             },
         )
         return DefaultTrustRegistryService(store).resolveCertificateChain(
