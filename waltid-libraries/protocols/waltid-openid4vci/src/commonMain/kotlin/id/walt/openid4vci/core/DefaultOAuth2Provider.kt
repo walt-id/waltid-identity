@@ -603,6 +603,11 @@ class DefaultOAuth2Provider(
             )
         }
         acceptedStatusError(accepted)?.let { throw DeferredProtocolException(it) }
+        if (!deferredAttestationLifetimeValidator.isValid(accepted, Clock.System.now(), required)) {
+            throw CredentialProofValidationException(
+                CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence expired during status resolution",
+            )
+        }
         return accepted
     }
 
