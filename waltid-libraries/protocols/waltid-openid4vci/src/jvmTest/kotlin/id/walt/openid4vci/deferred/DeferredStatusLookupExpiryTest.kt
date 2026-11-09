@@ -10,6 +10,9 @@ import id.walt.openid4vci.attestation.*
 import id.walt.openid4vci.clientauth.attestation.VerifiedClientAttestation
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.metadata.issuer.*
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.requests.credential.*
 import id.walt.openid4vci.responses.credential.*
 import id.walt.statuslist.codec.TokenStatusListCodec
@@ -23,6 +26,41 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 class DeferredStatusLookupExpiryTest {
+    @Test fun initialAcceptanceRechecksLifetimeAfterStatusResolution() = runTest {
+        val signer = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("attester"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
+        val publicJwk = signer.exportPublicJwkObject()
+        val now = Clock.System.now()
+        val uri = "https://attester.example/status"
+        val attestation = VerifiedClientAttestation("wallet", publicJwk,
+            VerifiedAttestationLifetime(now.epochSeconds, now.epochSeconds + 2, clockSkewSeconds = 0),
+            VerifiedAttestationStatus(capturedAt = now.epochSeconds, policy = AttestationStatusPolicy(true),
+                reference = AttestationStatusReference(uri, 0), attesterPublicJwk = publicJwk))
+        var fetches = 0
+        val config = createTestConfig().copy(attestationStatusResolver = AttestationStatusResolver {
+            fetches++
+            withContext(Dispatchers.Default) { delay(2500) }
+            CompactJws.sign(buildJsonObject {
+                put("sub", uri); put("iat", now.epochSeconds); put("exp", now.epochSeconds + 3600)
+                putJsonObject("status_list") { put("bits", 1); put("lst", TokenStatusListCodec.encode(byteArrayOf(0))) }
+            }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", "statuslist+jwt") })
+        })
+        config.credentialEndpointHandlers.register(CredentialFormat.SD_JWT_VC,
+            CredentialEndpointHandler { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> error("Acceptance must not sign") })
+        val request = AuthenticatedCredentialRequest(DefaultCredentialRequest(
+            client = DefaultClient("wallet", emptyList(), emptySet(), emptySet()), credentialIdentifier = "credential",
+            credentialConfigurationId = null, proofs = null, credentialResponseEncryption = null, accessTokenClientId = "wallet"),
+            CredentialRequestAuthentication("wallet", false, attestation, true))
+        val failure = assertFailsWith<CredentialProofValidationException> {
+            buildOAuth2Provider(config).acceptCredentialRequest(request,
+                CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "identity"), "credential", "config",
+                CredentialProofValidationContext("https://issuer.example"))
+        }
+        assertEquals("credential_request_denied", failure.errorCode)
+        assertEquals(1, fetches, "Lifetime must be checked again after the lookup, not only before it")
+    }
+
     @Test fun cachedResponseRefusesExpiryDuringFinalLookupAndCanRetry() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         suspend fun key(id: String) = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
