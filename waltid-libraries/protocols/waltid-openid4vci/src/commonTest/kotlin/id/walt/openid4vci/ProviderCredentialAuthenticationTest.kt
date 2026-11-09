@@ -11,10 +11,12 @@ import id.walt.openid4vci.clientauth.attestation.*
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.deferred.DeferredAttestationLifetimeValidator
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -53,18 +55,32 @@ class ProviderCredentialAuthenticationTest {
         for (dynamic in listOf(false, true)) for (required in listOf(false, true)) {
             val methods = if (required) setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
                 else setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH, ClientAuthenticationMethods.PRIVATE_KEY_JWT)
-            val accepted = accept(provider(claims, methods, dynamic))
-            assertNull(accepted.clientAttestation)
-            assertEquals(required, accepted.clientAttestationRequired)
-            assertEquals(!required, DeferredAttestationLifetimeValidator().isValid(accepted, Clock.System.now()))
+            if (required) {
+                val error = assertFailsWith<CredentialProofValidationException> { accept(provider(claims, methods, dynamic)) }
+                assertEquals(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, error.errorCode)
+            } else {
+                val accepted = accept(provider(claims, methods, dynamic))
+                assertNull(accepted.clientAttestation)
+                assertEquals(false, accepted.clientAttestationRequired)
+                assertTrue(DeferredAttestationLifetimeValidator().isValid(accepted, Clock.System.now()))
+            }
         }
     }
 
     @Test fun originalAttestationAuthenticationRequiresEvidenceEvenWhenConfigurationChanges() = runTest {
         val claims = claimsFor(AuthenticatedClient(CLIENT, ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH))
-        val accepted = accept(provider(claims))
-        assertEquals(true, accepted.clientAttestationRequired)
-        assertFalse(DeferredAttestationLifetimeValidator().isValid(accepted, Clock.System.now()))
+        val error = assertFailsWith<CredentialProofValidationException> { accept(provider(claims)) }
+        assertEquals(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, error.errorCode)
+    }
+
+    @Test fun expiredOriginalAttestationIsRejectedBeforeAcceptance() = runTest {
+        val now = Clock.System.now().epochSeconds
+        val expired = evidence().let { it.copy(lifetime = it.lifetime.copy(issuedAt = now - 300, expiresAt = now - 120)) }
+        val claims = claimsFor(AuthenticatedClient(CLIENT, ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH, attestation = expired))
+        for (encrypted in listOf(false, true)) {
+            val error = assertFailsWith<CredentialProofValidationException> { accept(provider(claims), encrypted = encrypted) }
+            assertEquals(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, error.errorCode)
+        }
     }
 
     @Test fun malformedVerifiedAuthenticationClaimsReturnATypedTokenError() = runTest {

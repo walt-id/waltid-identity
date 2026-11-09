@@ -388,7 +388,9 @@ nonce checks are not replayed.
 
 The provider captures WIA evidence from verified access-token authentication and
 snapshots it automatically in `acceptCredentialRequest()`, together with the verified
-KA evidence. Issuers do not decode private token claims or infer WIA requirements.
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
 The provider uses its existing client-authentication configuration resolver when a
 legacy transaction has no recorded requirement; optional authentication methods do
 not make WIA mandatory. Originally anonymous pre-authorized grants retain that

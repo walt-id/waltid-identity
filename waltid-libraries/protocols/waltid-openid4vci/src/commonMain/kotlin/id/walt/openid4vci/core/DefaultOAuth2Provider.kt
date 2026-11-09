@@ -590,10 +590,16 @@ class DefaultOAuth2Provider(
         val authentication = (request as? AuthenticatedCredentialRequest)?.authentication
         val required = authentication?.clientAttestationRequired == true ||
             requiresClientAttestation(request.accessTokenClientId, request.anonymousPreAuthorizedAccess)
-        return request.accept(
+        val accepted = request.accept(
             credentialIdentifier, credentialConfigurationId, configuration, bindings, verification.proofs,
             authentication?.clientAttestation, required,
         )
+        if (!deferredAttestationLifetimeValidator.isValid(accepted, Clock.System.now(), required)) {
+            throw CredentialProofValidationException(
+                CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid",
+            )
+        }
+        return accepted
     }
 
     override suspend fun createDeferredCredentialRequest(
