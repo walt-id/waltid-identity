@@ -1,5 +1,8 @@
 package id.walt.trust.decision
 
+import id.walt.trust.model.AuthenticityState
+import id.walt.trust.model.FreshnessState
+import id.walt.trust.model.SourceAssurance
 import id.walt.trust.model.TrustDecision
 import id.walt.trust.model.TrustDecisionCode
 import id.walt.trust.model.TrustedEntityType
@@ -48,4 +51,64 @@ class AnyOfEntityTypesTest {
 
         assertEquals(TrustDecisionCode.UNKNOWN, decision.decision)
     }
+
+    @Test
+    fun stopsAtFirstTrustedDecisionThatSatisfiesEveryRequirement() = runTest {
+        val asked = mutableListOf<TrustedEntityType?>()
+        val types = arrayOf(
+            TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER,
+            TrustedEntityType.RELYING_PARTY_PROVIDER,
+            TrustedEntityType.OTHER,
+        )
+
+        val decision = request(*types).anyOfEntityTypes { type ->
+            asked += type
+            if (type == TrustedEntityType.RELYING_PARTY_PROVIDER) trusted(FreshnessState.FRESH)
+            else TrustDecision(TrustDecisionCode.NOT_TRUSTED)
+        }
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertEquals(listOf<TrustedEntityType?>(types[0], types[1]), asked)
+    }
+
+    @Test
+    fun freshTrustedDecisionWinsOverEarlierStaleOne() = runTest {
+        // PID_PROVIDER is asked before WALLET_PROVIDER
+        val decision = request(TrustedEntityType.PID_PROVIDER, TrustedEntityType.WALLET_PROVIDER).anyOfEntityTypes { type ->
+            trusted(if (type == TrustedEntityType.PID_PROVIDER) FreshnessState.STALE else FreshnessState.FRESH)
+        }
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertEquals(FreshnessState.FRESH, decision.sourceFreshness)
+    }
+
+    @Test
+    fun authenticatedSourceWinsOverEarlierUnverifiedOne() = runTest {
+        val decision = request(TrustedEntityType.PID_PROVIDER, TrustedEntityType.WALLET_PROVIDER).anyOfEntityTypes { type ->
+            trusted(
+                FreshnessState.FRESH,
+                if (type == TrustedEntityType.PID_PROVIDER) AuthenticityState.UNVERIFIED else AuthenticityState.AUTHENTICATED,
+            )
+        }
+
+        assertEquals(AuthenticityState.AUTHENTICATED, decision.authenticity)
+    }
+
+    @Test
+    fun staleTrustedDecisionIsKeptWhenNothingBetterFollows() = runTest {
+        val decision = request(TrustedEntityType.PID_PROVIDER, TrustedEntityType.WALLET_PROVIDER).anyOfEntityTypes { type ->
+            if (type == TrustedEntityType.PID_PROVIDER) trusted(FreshnessState.STALE)
+            else TrustDecision(TrustDecisionCode.STALE_SOURCE, sourceFreshness = FreshnessState.EXPIRED)
+        }
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertEquals(FreshnessState.STALE, decision.sourceFreshness)
+    }
+
+    private fun trusted(freshness: FreshnessState, authenticity: AuthenticityState = AuthenticityState.AUTHENTICATED) =
+        TrustDecision(
+            TrustDecisionCode.TRUSTED,
+            sourceFreshness = freshness,
+            sourceAssurance = SourceAssurance(authenticityState = authenticity, accepted = true),
+        )
 }

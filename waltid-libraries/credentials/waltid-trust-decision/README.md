@@ -42,7 +42,7 @@ Take the expected entity types and the requirement from your own configuration o
 | `TrustDecisionEvaluator { ... }` | Lambda for tests and fixtures. |
 | `TrustRegistryTrustDecisionEvaluator` (Enterprise) | The tenant's linked trust-registry service. |
 
-When a registry answers per entity type, use `anyOfEntityTypes` to ask once per expected type and keep the best answer.
+When a registry answers per entity type, use `anyOfEntityTypes` to ask once per expected type and keep the best answer. It stops early only on a `TRUSTED` answer from a fresh, accepted and authenticated source; otherwise it asks every type, so a fresh listing wins over a stale one.
 
 Never chain adapters so that a denial from one falls through to a more permissive one.
 
