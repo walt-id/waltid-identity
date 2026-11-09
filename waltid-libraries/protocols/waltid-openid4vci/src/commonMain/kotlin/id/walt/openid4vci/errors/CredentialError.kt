@@ -8,6 +8,8 @@ data class CredentialError(
     val error: String,
     @SerialName("error_description")
     val description: String? = null,
+    /** Internal response mapping; never part of the protocol error JSON. */
+    @kotlinx.serialization.Transient val retryAfterSeconds: Long? = null,
 )
 
 /**
