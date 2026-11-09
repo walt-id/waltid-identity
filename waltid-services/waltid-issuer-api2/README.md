@@ -747,3 +747,8 @@ Use Redis for persistence across OSS restarts. Atomic claims serialize collectio
 verified public holder bindings, allocated progress, and prepared credential responses
 are retained for recovery. A live worker renews its processing lease; an abandoned
 claim becomes recoverable after five minutes, without extending the offer deadline.
+
+### Deferred attestation status
+
+See [deferred attestation enforcement](docs/deferred-attestations.md) for WIA/KA status
+configuration, signer trust, checkpoint freshness, retries and legacy handling.
