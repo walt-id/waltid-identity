@@ -1,5 +1,9 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.attestation.*
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
+import id.walt.webdatafetching.ResponseSizeLimit
+import io.ktor.client.HttpClient
 import id.walt.openid4vci.proofs.attestation.*
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
@@ -65,6 +69,11 @@ data class OpenId4VciModule(
 ) {
 
     companion object {
+        private val statusResolver = HttpAttestationStatusResolver(HttpClient {
+            followRedirects = false
+            installPrivateNetworkGuard()
+            install(ResponseSizeLimit) { maxBytes = 2L * 1024 * 1024 }
+        })
         fun create(
             config: Issuer2ServiceConfig,
             authorizationCodeRepository: AuthorizationCodeRepository,
@@ -153,6 +162,8 @@ data class OpenId4VciModule(
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
+                    attestationStatusResolver = statusResolver,
+                    keyAttestationStatusPolicy = { config.keyAttestationConfig?.statusPolicy ?: AttestationStatusPolicy() },
                     authorizationServerIssuer = config.openId4VciBaseUrl(),
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
@@ -197,7 +208,7 @@ data class OpenId4VciModule(
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,
                 keyAttestation = runBlocking {
-                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver).also {
+                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver, statusResolver).also {
                         (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
                             require(requireNotNull(keyAttestationKeyResolver).resolve(method.reference).isNotEmpty()) {
                                 "Configured key attestation verification key is unavailable"
@@ -215,7 +226,7 @@ data class OpenId4VciModule(
             val clientAuthenticationConfig = config.clientAuthenticationConfig
                 ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService)
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService, statusResolver = statusResolver)
             }
         }
 

@@ -1414,7 +1414,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val credentialResponse = when (credentialResponseResult) {
                 is CredentialResponseResult.Success -> credentialResponseResult.response
                 is CredentialResponseResult.Failure -> {
-                    if (deferredClaim != null && credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                    if (deferredClaim != null && (credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED || credentialResponseResult.error.retryAfterSeconds != null)) {
                         return oauth2Provider.writeDeferredCredentialError(credentialResponseResult.error)
                     }
                     val response = if (credentialResponseResult.error.isRetryableProofFailure()) {
