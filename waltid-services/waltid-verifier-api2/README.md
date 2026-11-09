@@ -64,6 +64,23 @@ Backed by `waltid-digital-credentials` for parsing and validation.
 
 ## Offer lifecycle and callback correlation
 
+Set `core_flow.session_usage` on cross-device session creation requests (`core.session_usage`
+for same-device requests) to choose the lifecycle explicitly:
+
+| Value | After failure or wallet error | After success |
+| --- | --- | --- |
+| `single_attempt` | Final | Final |
+| `single_success` | Retry until expiry | Final |
+| `reusable` | Retry until expiry | Reusable until expiry |
+
+For strict final outcomes, add `"session_usage": "single_attempt"` alongside `dcql_query`.
+The option takes precedence over `reattemptable`. Closed sessions reject response submissions and
+request URI GET/POST fetches; their results remain available through the info endpoint until retention expires.
+An invalid request rejected before an attempt is admitted does not consume the session.
+This is a walt.id lifecycle policy, not an OpenID4VP protocol requirement.
+
+When `session_usage` is omitted, existing behavior is preserved:
+
 Set `core_flow.reattemptable` on cross-device session creation requests (`core.reattemptable`
 for same-device requests):
 
@@ -71,7 +88,7 @@ for same-device requests):
 - `false`: reject further presentations and request URI GET/POST fetches after the first successful
   presentation. Failed attempts can be retried until success or expiry.
 
-For example, add `"reattemptable": false` alongside `dcql_query` in `core_flow` for a single-use offer.
+For example, add `"reattemptable": false` alongside `dcql_query` in `core_flow` for a single-success offer.
 Result retention follows this release's existing storage behavior. Enterprise MongoDB TTL removes the
 session at its offer expiration time; the separate used-session retention policy is available on mainline.
 
