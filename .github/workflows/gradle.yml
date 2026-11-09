@@ -292,6 +292,7 @@ jobs:
       ROLE: ${{ matrix.role }}
       ROLE_PORT: ${{ matrix.port }}
       ROLE_REPORT_DIR: ${{ matrix.report_dir }}
+      ROLE_REPORT_PATH: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/${{ matrix.report_dir }}
       ROLE_TITLE: ${{ matrix.title }}
       ROLE_TESTS: ${{ matrix.tests }}
       ROLE_EXTRA_TESTS: ${{ matrix.extra_tests }}
@@ -380,6 +381,7 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
+          CONFORMANCE_REQUIRED: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           SKIP_LIVE_CONFORMANCE: "false"
@@ -388,6 +390,8 @@ jobs:
         run: |
           set -euo pipefail
           unset OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
+          # A restored or previous report must not qualify a run that executes no cases.
+          rm -rf "$ROLE_REPORT_PATH"
           case "$ROLE" in
             verifier)
               echo "Running OpenID4VP verifier conformance."
@@ -482,24 +486,10 @@ jobs:
             echo "No ${ROLE_TITLE} summary file was produced."
           fi
 
-      - name: Fail job on published role conformance failures
+      - name: Require executed and accepted role conformance results
         if: ${{ always() && !cancelled() }}
         run: |
-          set -euo pipefail
-          summary=""
-          candidate=""
-          while IFS= read -r candidate; do
-            summary="$candidate"
-            break
-          done < <(find . -path "*/build/reports/openid-conformance/${ROLE_REPORT_DIR}/summary.md" 2>/dev/null)
-          if [ -z "$summary" ] || [ ! -f "$summary" ]; then
-            exit 0
-          fi
-          count="$(awk -F': ' '/^- Failed: / { print $2; exit }' "$summary")"
-          if [ -n "${count:-}" ] && [ "$count" -gt 0 ]; then
-            echo "::error::${ROLE_TITLE} conformance reported ${count} failed test(s). See the job summary."
-            exit 1
-          fi
+          python3 waltid-identity/.github/scripts/ci/check_conformance_results.py "$ROLE_REPORT_PATH/results.json"
 
       - name: Stop role tunnel
         if: always()
@@ -526,8 +516,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       # Keep going after a missing artifact so the uploads below can still publish
-      # whatever arrived. The final check fails the job when the role jobs themselves
-      # succeeded and a required artifact did not.
+      # whatever arrived. The final check requires successful role jobs and artifacts.
       - name: Download verifier reports
         id: verifier-reports
         continue-on-error: true
@@ -584,8 +573,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p openid-conformance-summaries
-          # Copy every report that arrived. Missing roles are rejected below when
-          # the role jobs succeeded; a failed role still leaves its siblings here.
+          # Copy every report that arrived before rejecting failed or missing roles.
           for role in vp-verifier vp-wallet vci-wallet; do
             src="role-reports/$role"
             [ -d "$src" ] || continue
@@ -613,9 +601,10 @@ jobs:
           if-no-files-found: warn
           path: junit-conformance
 
-      - name: Require complete reports when role jobs succeeded
-        if: ${{ always() && !cancelled() && needs.wallet-conformance.result == 'success' }}
+      - name: Require successful role jobs and complete reports
+        if: ${{ always() && !cancelled() }}
         env:
+          ROLE_JOBS_RESULT: ${{ needs.wallet-conformance.result }}
           UPLOAD_TEST_RESULTS: ${{ inputs.upload-test-results }}
           VERIFIER_REPORTS: ${{ steps.verifier-reports.outcome }}
           VP_WALLET_REPORTS: ${{ steps.vp-wallet-reports.outcome }}
@@ -626,6 +615,10 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
+          if [ "$ROLE_JOBS_RESULT" != "success" ]; then
+            echo "::error::Required wallet/verifier conformance jobs did not succeed."
+            failed=1
+          fi
           require_success() {
             local name="$1"
             local outcome="$2"
