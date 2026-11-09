@@ -133,6 +133,8 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("sub", label = "Subject", group = ClaimGroupKind.Technical, displayOrder = 202),
         ClaimDescriptor("iat", label = "Issued at", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.Temporal), displayOrder = 203),
         ClaimDescriptor("issued_at", roles = setOf(ClaimRole.Temporal), displayOrder = 204),
+        ClaimDescriptor("issue_date", roles = setOf(ClaimRole.Temporal), displayOrder = 205),
+        ClaimDescriptor("portrait_capture_date", roles = setOf(ClaimRole.Temporal), displayOrder = 217),
         ClaimDescriptor("issuance_date", roles = setOf(ClaimRole.Temporal), displayOrder = 205),
         ClaimDescriptor("valid_from", aliases = setOf("Valid from"), roles = setOf(ClaimRole.Temporal), displayOrder = 206),
         ClaimDescriptor("nbf", label = "Valid from", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.Temporal), displayOrder = 207),
@@ -260,6 +262,9 @@ internal object CredentialDisplayVocabulary {
     fun roles(path: ClaimPath): Set<ClaimRole> {
         val leaf = path.leaf
         val roles = descriptorFor(leaf)?.roles.orEmpty().toMutableSet()
+        if (path.components == listOf("proof", "created") || path.components == listOf("vc", "proof", "created")) {
+            roles += ClaimRole.Temporal
+        }
         if (path.isCredentialTypeClaimPath()) roles += ClaimRole.CredentialType
         if (pathHasRole(path, ClaimRole.Image)) roles += ClaimRole.Image
         return roles

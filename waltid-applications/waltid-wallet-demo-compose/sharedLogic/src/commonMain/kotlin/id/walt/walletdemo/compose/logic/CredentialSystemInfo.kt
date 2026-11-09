@@ -2,7 +2,9 @@ package id.walt.walletdemo.compose.logic
 
 fun CredentialDetails.toSystemInfoGroup(): ClaimGroup? {
     val items = listOfNotNull(
-        summary.addedAt.toSystemInfoItem(path = "system.added", label = "Added"),
+        summary.addedAt.toSystemInfoItem(path = "system.added", label = "Added")?.let { item ->
+            WalletDateTime.parseTimestamp(item.rawValue.orEmpty())?.let { item.copy(value = DisplayValue.InstantValue(it)) } ?: item
+        },
         summary.id.toSystemInfoItem(path = "system.id", label = "Credential ID"),
         summary.format.toSystemInfoItem(path = "system.format", label = "Format"),
         summary.issuer.toSystemInfoItem(path = "system.issuer", label = "Issuer"),

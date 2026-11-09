@@ -1,9 +1,9 @@
-package id.walt.wallet2.consent
+package id.walt.verifier.openid.transactiondata
 
 /** ISO 4217 List One, SIX Maintenance Agency, published 2026-09-17.
  * Source: https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
  * Source SHA-256: 33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff
- * Codes without a defined minor unit are unsupported by this one-off payment renderer.
+ * Codes without a defined minor unit are unsupported by this payment contract.
  */
 internal fun paymentCurrencyMinorUnits(code: String): Int? = when (code) {
     "BIF", "CLP", "DJF", "GNF", "ISK", "JPY", "KMF", "KRW", "PYG", "RWF",

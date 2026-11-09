@@ -63,6 +63,7 @@ kotlin {
         }
 
         jvmTest.dependencies {
+            implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
