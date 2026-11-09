@@ -1,5 +1,8 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
@@ -17,6 +20,8 @@ class ClientAttestationConfig(
     private val clock: () -> Instant = { Clock.System.now() },
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
+    private val statusPolicy: AttestationStatusPolicy = AttestationStatusPolicy(),
+    private val statusResolver: AttestationStatusResolver? = null,
 ) {
     constructor(
         trustedAttesterKeys: suspend (
@@ -50,5 +55,7 @@ class ClientAttestationConfig(
             clockSkewSeconds = clockSkewSeconds,
             popMaxAgeSeconds = popMaxAgeSeconds,
             challengeService = challengeService,
+            statusPolicy = statusPolicy,
+            statusResolver = statusResolver,
         )
 }
