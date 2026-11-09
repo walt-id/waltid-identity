@@ -26,7 +26,7 @@ data class OSSVerifier2ServiceConfig @JvmOverloads constructor(
     /** Preferred encoded crypto2 StoredKey. Invalid values fail startup without falling back to [key]. */
     val requestSigningStoredKey: String? = null,
     /**
-     * How long a used verification session is kept, in Hoplite duration format, e.g. `30d`.
+     * How long a used verification session is kept, in Hoplite duration format, e.g. `30d` (ISO-8601 `P30D` is not supported in HOCON).
      *
      * A request may override it per session with `retention_duration`/`retention_date`. Omitted means the
      * historical ten years; Non-finite durations mean keep
