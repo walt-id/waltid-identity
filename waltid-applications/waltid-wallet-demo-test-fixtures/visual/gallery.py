@@ -83,8 +83,9 @@ def inventory(root, sha):
             ids.add(identifier)
             path = str(PurePosixPath(BROWSER_CATALOGUE_PATH).parent / "snapshots" / (identifier.replace(".", "-") + ".png"))
             cells[path] = {"id": identifier, "renderer": "browser", "path": path,
-                "test": f"account.spec.cjs::{identifier}", "requirements": browser["requirements"],
-                "configuration": {"viewport": [state["width"], state["height"]]},
+                "test": f"account.spec.cjs::{identifier}", "requirements": state.get("requirements", browser["requirements"]),
+                "configuration": {"viewport": [state["width"], state["height"]],
+                                  **{key: state[key] for key in ("locale", "timezoneId") if key in state}},
                 "environment": browser["environment"], "note": "Production Wasm host with synthetic HTTP responses"}
     return cells, {path: value for path, value in ((CATALOGUE_PATH, mobile), (BROWSER_CATALOGUE_PATH, browser)) if value is not None}
 
@@ -131,6 +132,8 @@ def configuration_label(cell):
         parts.append(config["theme"])
     if config.get("layoutDirection", "ltr") != "ltr":
         parts.append(config["layoutDirection"].upper())
+    if cell["renderer"] == "browser":
+        parts.extend(config[key] for key in ("locale", "timezoneId") if key in config)
     if parts and config.get("viewport"):
         parts.insert(0, "×".join(map(str, config["viewport"])))
     return ", ".join(parts)
@@ -296,7 +299,7 @@ def markdown(gallery, limit=8, check_budget=True):
                 or variants)[:min(2, limit)]
     repository, base, head = gallery["repository"], gallery["base"], gallery["head"]
     lines = [START, "<details>", f"<summary>Visual changes — {len(rows)} scenarios across {len(gallery['changes'])} platform references</summary>", "",
-        f"Committed expected appearance: [{base[:12]}](https://github.com/{repository}/commit/{base}) → [{head[:12]}](https://github.com/{gallery['headRepository']}/commit/{head}). App-journey captures are labelled separately.", ""]
+        f"Committed expected appearance: [{base[:12]}](https://github.com/{repository}/commit/{base}) → [{head[:12]}](https://github.com/{gallery['headRepository']}/commit/{head}). These are committed visual references, not app-journey captures.", ""]
     if selected:
         lines += ["**Main flows — default text size**", "", *preview_table(gallery, rows, selected, MOBILE)]
     if variants:
@@ -304,7 +307,7 @@ def markdown(gallery, limit=8, check_budget=True):
                   "These deliberately use the text size, theme and direction shown below each image.", "",
                   *preview_table(gallery, rows, variants, MOBILE), "</details>", ""]
     if browser and limit:
-        lines += ["<details>", "<summary>Browser account states</summary>", "",
+        lines += ["<details>", "<summary>Browser states</summary>", "",
                   "Production Wasm UI with synthetic HTTP responses.", "",
                   *preview_table(gallery, rows, browser[:2], ("browser",)), "</details>", ""]
     lines += ["<details>", "<summary>Every changed reference</summary>", "",

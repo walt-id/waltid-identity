@@ -20,6 +20,7 @@ kotlin {
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             /*
              * walt.id:

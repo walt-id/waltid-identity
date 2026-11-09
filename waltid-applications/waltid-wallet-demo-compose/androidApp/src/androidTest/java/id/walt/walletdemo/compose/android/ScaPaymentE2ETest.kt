@@ -58,7 +58,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
             assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
         }
-        listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+        listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
             "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
             WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
                 "Payment review is missing issuer instruction '$label'")

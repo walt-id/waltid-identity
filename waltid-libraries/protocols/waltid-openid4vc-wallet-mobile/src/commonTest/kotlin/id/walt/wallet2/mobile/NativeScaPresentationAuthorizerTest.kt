@@ -9,6 +9,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.consent.PaymentConsentException
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,6 +75,32 @@ class NativeScaPresentationAuthorizerTest {
                 assertEquals(1, fixture.signatures)
             }
         }
+    }
+
+    @Test
+    fun malformedPaymentIsRejectedBeforeConsentOnUrlAndPlatformConfirmedPaths() = test {
+        val fixture = fixture()
+        val entry = """{"type":"urn:eudi:sca:payment:1","credential_ids":["payment"],"payload":{"transaction_id":"test","payee":{"name":"Shop","id":"merchant"},"currency":"EUR","amount":12.5,"recurrence":{}}}"""
+            .encodeToByteArray().encodeToBase64Url()
+        val request = JsonObject(fixture.request + ("transaction_data" to buildJsonArray { add(entry) }))
+        // Preview admission must reject this even when the caller never requests additional app consent.
+        assertFails {
+            fixture.wallet.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
+                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
+            ))
+        }
+        val url = URLBuilder("openid4vp://authorize").apply {
+            request.forEach { (name, value) ->
+                parameters.append(name, if (value is JsonPrimitive) value.content else value.toString())
+            }
+            parameters["response_mode"] = "direct_post"
+            parameters["client_id"] = "redirect_uri:https://verifier.example/response"
+            parameters["response_uri"] = "https://verifier.example/response"
+        }.buildString()
+        assertIs<MobileWalletPresentationPreviewResult.Invalid>(fixture.wallet.previewPresentation(url))
+        assertEquals(0, fixture.provider.inspections)
+        assertEquals(0, fixture.signatures)
     }
 
     @Test
