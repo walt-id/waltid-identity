@@ -22,7 +22,7 @@ class KeyBasedClientAttestationVerifier(
 
         for (key in trustedKeys) {
             if (key.verifyJws(jwt).isSuccess) {
-                return ClientAttestationVerificationResult.Verified
+                return ClientAttestationVerificationResult.VerifiedWithSigner(key.getPublicKey().exportJWKObject())
             }
         }
 
