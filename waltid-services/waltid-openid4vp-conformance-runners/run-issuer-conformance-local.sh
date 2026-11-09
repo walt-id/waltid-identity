@@ -22,6 +22,12 @@ CONFORMANCE_PORT="8443"
 ISSUER_PROXY_HOST="$CONFORMANCE_HOST"
 ISSUER_PROXY_PORT="9443"
 ISSUER_HOST_PORT="7005"
+ISSUANCE_MODE="${OPENID4VCI_CONFORMANCE_ISSUANCE_MODE:-immediate}"
+case "$ISSUANCE_MODE" in
+  immediate|deferred) ;;
+  *) echo "OPENID4VCI_CONFORMANCE_ISSUANCE_MODE must be immediate or deferred" >&2; exit 1 ;;
+esac
+export OPENID4VCI_CONFORMANCE_ISSUANCE_MODE="$ISSUANCE_MODE"
 LOCAL_CREDENTIAL_ISSUER_URL="https://$ISSUER_PROXY_HOST:$ISSUER_PROXY_PORT/openid4vci"
 TRUSTSTORE_ALIAS="${CONFORMANCE_TRUSTSTORE_ALIAS:-conformance-test-localhost}"
 TRUSTSTORE_PASSWORD="${CONFORMANCE_TRUSTSTORE_PASSWORD:-changeit}"
@@ -39,7 +45,9 @@ export OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE="${OPENID4VCI_CONFORMANCE_K
 export OPENID4VCI_CONFORMANCE_PROOF_MODES="${OPENID4VCI_CONFORMANCE_PROOF_MODES:-jwt,attestation}"
 export OPENID4VCI_CONFORMANCE_MATRIX="${OPENID4VCI_CONFORMANCE_MATRIX:-all}"
 export OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES="${OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES:-240}"
-OPENID4VCI_CONFORMANCE_PRESET="${OPENID4VCI_CONFORMANCE_PRESET:-vci-client-attestation-dpop-simple-unsigned}"
+DEFAULT_ISSUER_PRESET=vci-client-attestation-dpop-simple-unsigned
+if [[ "$ISSUANCE_MODE" == "deferred" ]]; then DEFAULT_ISSUER_PRESET=vci-basic-haip; fi
+OPENID4VCI_CONFORMANCE_PRESET="${OPENID4VCI_CONFORMANCE_PRESET:-$DEFAULT_ISSUER_PRESET}"
 BROWSER_AUTOMATION_DEFAULT="false"
 
 clear_variant_filters() {
@@ -227,6 +235,15 @@ case "${OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION,,}" in
     ;;
 esac
 
+if [[ "$ISSUANCE_MODE" == "deferred" ]]; then
+  export OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS=issuer_initiated
+  export OPENID4VCI_CONFORMANCE_MODULE_GROUPS=positive
+  export OPENID4VCI_CONFORMANCE_MODULES=oid4vci-1_0-issuer-happy-flow-skip-notification,oid4vci-1_0-issuer-batch-issuance
+  export OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES=""
+  export OPENID4VCI_CONFORMANCE_DEFERRED_REPORT_DIR="${OPENID4VCI_CONFORMANCE_DEFERRED_REPORT_DIR:-$RUNNER_DIR/build/reports/issuer-ci/deferred}"
+  export OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE="$RUNNER_DIR/build/conformance/deferred-evidence.jsonl"
+fi
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required command: $1" >&2
@@ -375,12 +392,41 @@ if [[ "$OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL" == "$LOCAL_CREDENTIAL_ISSU
   fi
 fi
 
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [[ "$ISSUANCE_MODE" == "deferred" ]]; then
+  [[ "$OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL" == "$LOCAL_CREDENTIAL_ISSUER_URL" ]] || {
+    echo 'Deferred local launcher requires the local issuer URL; the proxy must observe the real traffic.' >&2
+    exit 1
+  }
+  (cd "$UNIFIED_ROOT" && ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installDist --no-configuration-cache)
+  mkdir -p "$RUNNER_DIR/build/conformance"
+  if ss -H -ltn 'sport = :7006' | read -r _; then
+    echo 'Port 7006 is already occupied; refusing to replace another proxy.' >&2
+    exit 1
+  fi
+  java -cp "$RUNNER_DIR/build/install/waltid-openid4vp-conformance-runners/lib/*" \
+    id.walt.openid4vp.conformance.testplans.http.IssuerDeferredProxy \
+    http://127.0.0.1:7005 7006 "$OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE" 0.0.0.0 \
+    > "$RUNNER_DIR/build/conformance/deferred-proxy.log" 2>&1 &
+  DEFERRED_PROXY_PID=$!
+  trap 'kill "$DEFERRED_PROXY_PID" 2>/dev/null || true' EXIT
+  sed 's/host.docker.internal:7005/host.docker.internal:7006/g' "$RUNNER_DIR/nginx/nginx.conf" \
+    > "$RUNNER_DIR/build/conformance/nginx-deferred.conf"
+  cat > "$RUNNER_DIR/build/conformance/compose-deferred.yml" <<EOF
+services:
+  nginx:
+    volumes:
+      - "$RUNNER_DIR/build/conformance/nginx-deferred.conf:/etc/nginx/nginx.conf:ro"
+EOF
+  COMPOSE_ARGS+=(-f "$RUNNER_DIR/build/conformance/compose-deferred.yml")
+fi
+
 prepare_exact_conformance_suite
 
 echo "Starting local OpenID conformance suite..."
-docker compose -f "$COMPOSE_FILE" up -d --build
+docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
-NGINX_ID="$(docker compose -f "$COMPOSE_FILE" ps -q nginx)"
+NGINX_ID="$(docker compose "${COMPOSE_ARGS[@]}" ps -q nginx)"
 if [[ -z "$NGINX_ID" ]]; then
   echo "Could not find running nginx container for conformance suite." >&2
   exit 1
@@ -453,7 +499,7 @@ if ! curl -ksf --connect-timeout 5 --max-time 15 "$ISSUER_METADATA_URL" >/dev/nu
   exit 1
 fi
 
-SERVER_ID="$(docker compose -f "$COMPOSE_FILE" ps -q server)"
+SERVER_ID="$(docker compose "${COMPOSE_ARGS[@]}" ps -q server)"
 if [[ -z "$SERVER_ID" ]]; then
   echo "Could not find running server container for conformance suite." >&2
   exit 1
@@ -516,7 +562,7 @@ echo "and trust this root certificate:"
 echo "$CLIENT_ATTESTER_TRUST_ROOT"
 echo
 
-cd "$IDENTITY_ROOT"
+cd "$UNIFIED_ROOT"
 
 PLAYWRIGHT_GRADLE_ARGS=(
   "-Pplaywright.browser=${PLAYWRIGHT_BROWSER:-chromium}"
@@ -560,11 +606,15 @@ case "${OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION,,}" in
     ;;
 esac
 
+ISSUER_TEST_TASK=test
+if [[ "$ISSUANCE_MODE" == "deferred" ]]; then
+  ISSUER_TEST_TASK=issuerDeferredConformanceTest
+  RESULT_XML="$RUNNER_DIR/build/test-results/issuerDeferredConformanceTest/TEST-id.walt.openid4vp.conformance.IssuerConformanceTests.xml"
+fi
 GRADLE_EXIT=0
 set +e
 ./gradlew "${TEST_GRADLE_ARGS[@]}" \
-  :waltid-services:waltid-openid4vp-conformance-runners:cleanTest \
-  :waltid-services:waltid-openid4vp-conformance-runners:test \
+  ":waltid-services:waltid-openid4vp-conformance-runners:$ISSUER_TEST_TASK" \
   --tests "id.walt.openid4vp.conformance.IssuerConformanceTests.runIssuerConformanceTests" \
   --rerun-tasks \
   --no-configuration-cache \

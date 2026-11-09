@@ -101,6 +101,11 @@ jobs:
           # adds annotations and dependency-graph_*.json artifacts.
           dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
 
+      - name: Check TS12 payment schema against upstream
+        run: |
+          python3 -m unittest discover -s waltid-identity/scripts/tests -p test_ts12_schema_sync.py
+          python3 waltid-identity/scripts/sync-ts12-payment-schema.py --check-upstream
+
       - name: Check default Kotlin configuration
         run: |
           # Mobile-enabled builds can hide modules included without any Kotlin targets.
@@ -702,6 +707,7 @@ jobs:
         if: ${{ !cancelled() && steps.issuer-suite.outcome == 'success' }}
         run: |
           ./gradlew :waltid-services:waltid-issuer-api2:installDist \
+            :waltid-services:waltid-openid4vp-conformance-runners:installDist \
             :waltid-services:waltid-openid4vp-conformance-runners:test -PskipLiveConformance=true \
             --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest \
             --tests id.walt.openid4vp.conformance.IssuerKeyAttestationTest \
@@ -720,8 +726,8 @@ jobs:
         run: |
           set -euo pipefail
           # Each proof job owns its issuer process, tunnel and port on a separate runner.
-          if [ -n "$(ss -H -ltn 'sport = :7005')" ]; then
-            echo '::error::Port 7005 is occupied; refusing to start Issuer2.'
+          if [ -n "$(ss -H -ltn '( sport = :7005 or sport = :7006 )')" ]; then
+            echo '::error::Port 7005 or 7006 is occupied; refusing to start Issuer2.'
             exit 1
           fi
           CLOUDFLARED="$RUNNER_TEMP/cloudflared-issuer2"
@@ -730,10 +736,22 @@ jobs:
           ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-conformance.conf"
           FIXTURES="$GITHUB_WORKSPACE/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2"
 
-          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 120 \
-            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o "$CLOUDFLARED"
+          echo "Downloading pinned cloudflared ${CLOUDFLARED_VERSION} for issuer conformance"
+          if ! curl --fail --silent --show-error --location \
+            --retry 4 --retry-delay 2 --retry-max-time 120 --retry-connrefused \
+            --connect-timeout 10 --max-time 120 \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o "$CLOUDFLARED"; then
+            echo '::error::Pinned cloudflared download failed after retries; issuer startup and conformance tests have not run.'
+            exit 1
+          fi
           chmod +x "$CLOUDFLARED"
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7005 > "$TUNNEL_LOG" 2>&1 &
+          export OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE="$RUNNER_TEMP/issuer-deferred-evidence.jsonl"
+          nohup java -cp 'waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/install/waltid-openid4vp-conformance-runners/lib/*' \
+            id.walt.openid4vp.conformance.testplans.http.IssuerDeferredProxy \
+            http://127.0.0.1:7005 7006 "$OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE" \
+            > "$RUNNER_TEMP/issuer-deferred-proxy.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/issuer-deferred-proxy.pid"
+          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7006 > "$TUNNEL_LOG" 2>&1 &
           CF_PID=$!
           echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
           TUNNEL_URL=""
@@ -862,6 +880,71 @@ jobs:
           PLAYWRIGHT_BROWSER: chromium
           PLAYWRIGHT_HEADLESS: "true"
 
+      - name: Run deferred issuer VCI conformance tests
+        id: deferred-conformance-tests
+        if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="$ISSUER_BASE_URL/openid4vci"
+          gradle_args=(--continue --console=plain --warning-mode=summary --no-configuration-cache -PskipLiveConformance=false)
+          if [ "$CACHELESS" = "true" ]; then
+            gradle_args+=(--rerun-tasks --no-daemon)
+          fi
+          # Rerun live tests, not every compile/dependency task in the normal cached path.
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:issuerDeferredConformanceTest --rerun \
+            --tests id.walt.openid4vp.conformance.IssuerConformanceTests "${gradle_args[@]}"
+        env:
+          CI: "true"
+          CACHELESS: ${{ inputs.cacheless }}
+          ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          CONFORMANCE_HOST: conformance.waltid.cloud
+          CONFORMANCE_PORT: "443"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          SKIP_LIVE_CONFORMANCE: "false"
+          OPENID4VCI_CONFORMANCE_MATRIX: all
+          OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY: "false"
+          OPENID4VCI_CONFORMANCE_STRICT: "true"
+          OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS: "true"
+          OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS: "true"
+          OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
+          OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
+          OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential
+          OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL
+          OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential_haip
+          OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
+          OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
+          OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
+          OPENID4VCI_CONFORMANCE_PROOF_MODES: ${{ matrix.proof }}
+          OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+          OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+          OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci,vci_haip
+          OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
+          OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code,pre_authorization_code
+          OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS: issuer_initiated
+          OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES: client_attestation
+          OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS: dpop
+          OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES: simple
+          OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS: unsigned
+          OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
+          OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
+          OPENID4VCI_CONFORMANCE_MODULES: oid4vci-1_0-issuer-happy-flow-skip-notification,oid4vci-1_0-issuer-batch-issuance
+          # CI-only: these TLS probes reach the Cloudflare Quick Tunnel edge, not Issuer2.
+          # Keep enabled locally; restore here when CI uses a compliant public TLS endpoint.
+          OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests
+          OPENID4VCI_CONFORMANCE_STATIC_TX_CODE: "493536"
+          OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
+          OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
+          OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
+          OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS: "90"
+          OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES: "90"
+          OPENID4VCI_CONFORMANCE_REPORT_DIR: ${{ env.ISSUER_REPORT_DIR }}/deferred
+          OPENID4VCI_CONFORMANCE_DEFERRED_REPORT_DIR: ${{ env.ISSUER_REPORT_DIR }}/deferred
+          OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE: ${{ runner.temp }}/issuer-deferred-evidence.jsonl
+          PLAYWRIGHT_BROWSER: chromium
+          PLAYWRIGHT_HEADLESS: "true"
+
       - name: Publish issuer test report
         uses: mikepenz/action-junit-report@v6
         if: always()
@@ -882,21 +965,31 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
+      - name: Collect issuer proxy diagnostics
+        if: always()
+        run: |
+          mkdir -p "$ISSUER_DIAGNOSTICS_DIR"
+          if [ -f "$RUNNER_TEMP/issuer-deferred-proxy.log" ]; then
+            cp "$RUNNER_TEMP/issuer-deferred-proxy.log" "$ISSUER_DIAGNOSTICS_DIR/proxy.log"
+          fi
+
       - name: Prepare issuer proof results
         if: always()
         env:
           PROOF_MODE: ${{ matrix.proof }}
           ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
           ISSUER_TEST_OUTCOME: ${{ steps.conformance-tests.outcome }}
+          ISSUER_DEFERRED_TEST_OUTCOME: ${{ steps.deferred-conformance-tests.outcome }}
         run: >-
           python3 waltid-identity/.github/scripts/ci/issuer_conformance_reports.py prepare
           --proof "$PROOF_MODE" --reports "$ISSUER_REPORT_DIR" --output "$ISSUER_DIAGNOSTICS_DIR"
           --setup-outcome "$ISSUER_SETUP_OUTCOME" --test-outcome "$ISSUER_TEST_OUTCOME"
+          --deferred-reports "$ISSUER_REPORT_DIR/deferred" --deferred-test-outcome "$ISSUER_DEFERRED_TEST_OUTCOME"
 
       - name: Stop Issuer2 conformance services
         if: always()
         run: |
-          for pid_file in "$RUNNER_TEMP/issuer2.pid" "$RUNNER_TEMP/cloudflared-issuer2.pid"; do
+          for pid_file in "$RUNNER_TEMP/issuer2.pid" "$RUNNER_TEMP/cloudflared-issuer2.pid" "$RUNNER_TEMP/issuer-deferred-proxy.pid"; do
             [ -f "$pid_file" ] || continue
             pid=$(cat "$pid_file")
             if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
@@ -914,6 +1007,8 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/suite-version.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/results.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/shard.json
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/proxy.log
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/deferred/
 
   issuer-conformance-results:
     name: issuer-conformance results
@@ -949,7 +1044,7 @@ jobs:
         if: ${{ always() && !cancelled() }}
         run: >-
           python3 waltid-identity/.github/scripts/ci/issuer_conformance_reports.py merge
-          --shards issuer-proof-results --output "$ISSUER_DIAGNOSTICS_DIR"
+          --shards issuer-proof-results --output "$ISSUER_DIAGNOSTICS_DIR" --require-deferred
 
       - name: Publish issuer conformance summary
         if: ${{ always() && !cancelled() }}
@@ -969,6 +1064,7 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/coverage.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/jwt/results.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/attestation/results.json
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/deferred/
 
   # Maven publish waits for the default Gradle job and, when requested, the live
   # verifier, wallet and issuer jobs. Leaving publish on the gradle job let release candidates upload

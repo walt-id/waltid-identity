@@ -4,6 +4,7 @@ package id.walt.verifier2
 
 import id.walt.commons.config.ConfigManager
 import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfileResponse
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.testing.E2ETest
@@ -57,7 +58,7 @@ class TransactionDataProfilesVerifier2IntegrationTest {
                 testAndReturn("Discovery includes payment_card") {
                     val discovered = http.get("/transaction-data-profiles")
                         .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<List<TransactionDataProfile>>()
+                        .body<List<TransactionDataProfileResponse>>()
                     assertTrue(discovered.any { it.type == paymentCard.type })
                     discovered
                 }

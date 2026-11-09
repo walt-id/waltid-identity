@@ -107,6 +107,7 @@ internal object WalletVisualFixtures {
 
     val payment: WalletDemoPaymentConsent get() = payment("payment")
     val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    fun paymentTerms(recurring: Boolean): WalletDemoPaymentConsent = payment(if (recurring) "paymentRecurring" else "paymentScheduled")
     private fun payment(key: String): WalletDemoPaymentConsent {
         val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(
@@ -117,7 +118,8 @@ internal object WalletVisualFixtures {
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),
-                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")))
+                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")),
+                    path = field["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList())
             },
         )
     }

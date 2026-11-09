@@ -200,10 +200,13 @@ object VerificationSessionCreator {
         val sessionId = setup.core.sessionId ?: Uuid.random().toString()
 
         val isAnnexC = setup is DcApiAnnexCFlowSetup
-        val isSignedRequest = setup.core.signedRequest
+        val isSignedRequest = setup.core.signedRequest || setup.core.encryptedRequest
         val isEncryptedResponse = setup.core.encryptedResponse || isAnnexC
         val isCrossDevice = setup is CrossDeviceFlowSetup
         val isDcApi = setup is DcApiAnnexDFlowSetup || isAnnexC
+        require(!setup.core.encryptedRequest || !isDcApi) {
+            "encrypted_request requires request_uri_method=post and is not supported for DC API"
+        }
         val isDcApiHaip = isDcApi && (setup is DcApiAnnexDFlowSetup && setup.haip)
         val openIdConfig = (setup as? OpenID4VP1FlowSetup)?.openid
         val responseType = openIdConfig?.responseType ?: OpenID4VPResponseType.VP_TOKEN
@@ -526,8 +529,11 @@ object VerificationSessionCreator {
         // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
         // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
         // DC API keeps request_uri-based authorizationRequestUrl construction.
+        // Encrypted requests must use POST key delivery, including the full URL returned by the API.
         val walletFacingAuthorizationRequest = authorizationRequest.withoutPreRegisteredInBandMetadata()
-        val authorizationRequestUrl = if (signedAuthorizationRequest != null && isCrossDevice) {
+        val authorizationRequestUrl = if (setup.core.encryptedRequest) {
+            requireNotNull(bootstrapAuthorizationRequest).toHttpUrl(URLBuilder(urlHost))
+        } else if (signedAuthorizationRequest != null && isCrossDevice) {
             walletFacingAuthorizationRequest.copy(
                 request = signedAuthorizationRequest,
                 requestUri = null,

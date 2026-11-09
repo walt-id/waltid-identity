@@ -124,10 +124,14 @@ class VerificationSessionRepositoryTest {
             repeat(8) {
                 launch {
                     assertEquals(HttpStatusCode.OK, client.get("/verification-session/fetch-during-processing/request").status)
-                    assertEquals(HttpStatusCode.OK, client.post("/verification-session/fetch-during-processing/request") {
-                        contentType(ContentType.Application.FormUrlEncoded)
-                        setBody("wallet_nonce=request-nonce")
-                    }.status)
+                    assertEquals(
+                        HttpStatusCode.BadRequest,
+                        client.post("/verification-session/fetch-during-processing/request") {
+                            contentType(ContentType.Application.FormUrlEncoded)
+                            setBody("wallet_nonce=request-nonce")
+                        }.status,
+                        "Unsigned sessions stay on GET; request_uri POST requires a signed Request Object",
+                    )
                 }
             }
         }
