@@ -8,6 +8,7 @@ plugins {
 group = "id.walt"
 
 dependencies {
+    implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
     api(project(":waltid-services:waltid-service-commons"))
 
     implementation(identityLibs.ktor.server.core)
