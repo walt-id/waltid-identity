@@ -38,7 +38,7 @@ jobs:
           sudo swapon /swapfile
 
       - name: Checkout all repos with ref fallback
-        uses: ./.github/actions/checkout-repos
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@042f68c2c680bdaa4a2e0840c0fea5c18c2c7ebd
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
