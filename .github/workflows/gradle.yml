@@ -736,8 +736,14 @@ jobs:
           ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-conformance.conf"
           FIXTURES="$GITHUB_WORKSPACE/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2"
 
-          curl --fail --silent --show-error --location --connect-timeout 10 --max-time 120 \
-            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o "$CLOUDFLARED"
+          echo "Downloading pinned cloudflared ${CLOUDFLARED_VERSION} for issuer conformance"
+          if ! curl --fail --silent --show-error --location \
+            --retry 4 --retry-delay 2 --retry-max-time 120 --retry-connrefused \
+            --connect-timeout 10 --max-time 120 \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o "$CLOUDFLARED"; then
+            echo '::error::Pinned cloudflared download failed after retries; issuer startup and conformance tests have not run.'
+            exit 1
+          fi
           chmod +x "$CLOUDFLARED"
           export OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE="$RUNNER_TEMP/issuer-deferred-evidence.jsonl"
           nohup java -cp 'waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/install/waltid-openid4vp-conformance-runners/lib/*' \
