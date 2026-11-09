@@ -153,6 +153,13 @@
       "lanes": ["sdk-docs"]
     },
     {
+      "name": "WalletCore producer workflow selects its consumers and SDK docs",
+      "files": [
+        ".github/workflows/wallet-core-framework.yml"
+      ],
+      "lanes": ["compose", "enterprise", "native", "sdk-docs", "visual-native"]
+    },
+    {
       "name": "backend API source selects no macOS lane",
       "files": [
         "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer2/api/status/StatusApi.kt"
