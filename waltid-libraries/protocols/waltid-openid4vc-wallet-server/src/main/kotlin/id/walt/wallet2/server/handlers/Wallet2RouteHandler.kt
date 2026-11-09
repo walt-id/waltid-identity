@@ -912,7 +912,10 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<FetchCredentialsResult>() }
                     HttpStatusCode.MultiStatus to { body<FetchCredentialsResult>() }
                     HttpStatusCode.InternalServerError to { body<FetchCredentialsResult>() }
-                    HttpStatusCode.BadRequest to { body<CredentialError>() }
+                    HttpStatusCode.BadRequest to {
+                        description = "The issuer rejected the credential request; preserves its error code and error_description"
+                        body<CredentialError>()
+                    }
                     HttpStatusCode.Unauthorized to {
                         description = "Issuer rejected the issuance access token; the CredentialError body identifies the issuer error"
                         body<CredentialError>()
@@ -928,8 +931,7 @@ object Wallet2RouteHandler {
                 try {
                     call.respondFetchCredentialResult(WalletIssuanceHandler.fetchCredentials(wallet, req), req)
                 } catch (error: CredentialEndpointException) {
-                    if (error.statusCode !in 400..499 || error.credentialError == null) throw error
-                    call.respond(HttpStatusCode.fromValue(error.statusCode), requireNotNull(error.credentialError))
+                    call.respondCredentialEndpointError(error)
                 }
             }
 

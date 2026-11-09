@@ -1,9 +1,13 @@
 package id.walt.wallet2.server
 
 import com.sun.net.httpserver.HttpServer
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.handlers.CredentialEndpointException
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -11,32 +15,45 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.routing.routing
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respond
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.json.*
+import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.json.Json
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.*
 
 class WalletCredentialErrorRoutesTest {
-    @Test fun isolatedFetchPreservesStructuredIssuerClientErrorsWithoutRetrying() = testApplication {
+    @Test
+    fun isolatedFetchPreservesStructuredIssuerClientErrorsWithoutRetryingOrStorage() = testApplication {
+        val upstream = AtomicReference(400 to "{}")
+        val credentialRequests = AtomicInteger()
+        val writes = AtomicInteger()
         val issuer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        val calls = AtomicInteger()
-        issuer.createContext("/") { exchange ->
-            calls.incrementAndGet()
+        issuer.createContext("/credential") { exchange ->
+            credentialRequests.incrementAndGet()
             exchange.requestBody.use { it.readBytes() }
-            val code = exchange.requestURI.path.removePrefix("/")
-            val status = when (code) { "invalid_token" -> 401; "server_error" -> 502; else -> 400 }
-            val body = """{"error":"$code","error_description":"Issuer rejected the request"}""".toByteArray()
+            val (status, body) = upstream.get()
+            val bytes = body.toByteArray()
             exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(status, body.size.toLong())
-            exchange.responseBody.use { it.write(body) }
+            exchange.sendResponseHeaders(status, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
         }
         issuer.start()
         try {
-            val wallets = InMemoryWalletStore().also { it.saveWallet(Wallet("wallet")) }
+            val stored = InMemoryCredentialStore()
+            val wallet = Wallet("credential-errors", credentialStores = listOf(object : WalletCredentialStore by stored {
+                override suspend fun addCredential(entry: StoredCredential) {
+                    writes.incrementAndGet()
+                    stored.addCredential(entry)
+                }
+            }))
+            val wallets = InMemoryWalletStore()
+            wallets.saveWallet(wallet)
+            wallets.linkWalletToAccount("owner", wallet.id)
             val resolver = object : WalletResolver {
                 override val publicBaseUrl = Url("https://wallet.example")
                 override val walletStore = wallets
@@ -44,34 +61,65 @@ class WalletCredentialErrorRoutesTest {
             application {
                 install(ContentNegotiation) { json() }
                 install(StatusPages) {
-                    exception<CredentialEndpointException> { call, cause ->
-                        assertEquals(502, cause.statusCode)
-                        assertEquals("server_error", cause.credentialError?.error)
-                        call.respond(HttpStatusCode.InternalServerError, "Wallet upstream failure")
+                    exception<CredentialEndpointException> { call, _ ->
+                        call.respond(HttpStatusCode.InternalServerError, "Unhandled credential endpoint error")
                     }
                 }
-                routing { registerWallet2Routes(resolver) }
+                routing { registerWallet2Routes(resolver, getAccountId = { "owner" }) }
             }
-            for (code in listOf("invalid_proof", "invalid_nonce", "invalid_token")) {
-                val response = client.post("/wallet/wallet/credentials/receive/fetch-credential") {
-                    contentType(ContentType.Application.Json)
-                    setBody("""{"credentialEndpoint":"http://127.0.0.1:${issuer.address.port}/$code",
-                        "accessToken":"token","credentialConfigurationId":"identity","proofJwt":"rejected-proof"}""")
-                }
-                assertEquals(if (code == "invalid_token") HttpStatusCode.Unauthorized else HttpStatusCode.BadRequest,
-                    response.status, response.bodyAsText())
-                val error = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                assertEquals(code, error.getValue("error").jsonPrimitive.content)
-                assertEquals("Issuer rejected the request", error.getValue("error_description").jsonPrimitive.content)
-            }
-            val upstreamFailure = client.post("/wallet/wallet/credentials/receive/fetch-credential") {
+            suspend fun fetch(storeInWallet: Boolean) = client.post("/wallet/${wallet.id}/credentials/receive/fetch-credential") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"credentialEndpoint":"http://127.0.0.1:${issuer.address.port}/server_error",
-                    "accessToken":"token","credentialConfigurationId":"identity","proofJwt":"rejected-proof"}""")
+                setBody("""{"credentialEndpoint":"http://127.0.0.1:${issuer.address.port}/credential",
+                    "accessToken":"private-access-token","credentialConfigurationId":"identity","storeInWallet":$storeInWallet}""")
             }
-            assertEquals(HttpStatusCode.InternalServerError, upstreamFailure.status)
-            assertEquals("Wallet upstream failure", upstreamFailure.bodyAsText())
-            assertEquals(4, calls.get())
-        } finally { issuer.stop(0) }
+
+            val codes = listOf("invalid_proof", "invalid_credential_request", "invalid_encryption_parameters",
+                "invalid_nonce", "unknown_credential_configuration", "unknown_credential_identifier",
+                "credential_request_denied", "issuer_extension_error")
+            val structured = codes.map { 400 to it } + listOf(
+                401 to "invalid_token",
+                // WAL-1657's former 401 -> 500 case now deliberately follows the structured 4xx policy.
+                401 to "invalid_proof",
+                403 to "credential_request_denied",
+                429 to "issuer_extension_error",
+            )
+            for (store in listOf(false, true)) for ((status, code) in structured)
+                for (description in listOf(null, "Issuer rejected $code")) {
+                    val expected = CredentialError(code, description)
+                    upstream.set(status to Json.encodeToString(expected))
+                    val before = credentialRequests.get()
+                    val response = fetch(store)
+                    assertEquals(HttpStatusCode.fromValue(status), response.status,
+                        "$status / $code (store=$store): ${response.bodyAsText()}")
+                    assertEquals(expected, Json.decodeFromString<CredentialError>(response.bodyAsText()))
+                    assertEquals(before + 1, credentialRequests.get(), "Isolated fetch must not retry issuer errors")
+                    assertEquals(0, writes.get())
+                    assertTrue(stored.listCredentials().toList().isEmpty())
+                }
+
+            // Invalid bodies and all upstream 5xx retain the existing exception path, even for invalid_nonce.
+            for (store in listOf(false, true)) for ((status, body) in listOf(
+                400 to "not-json",
+                400 to "{}",
+                401 to "not-json",
+                401 to "{}",
+                403 to "not-json",
+                403 to "{}",
+                500 to """{"error":"invalid_nonce"}""",
+                502 to """{"error":"server_error"}""",
+                503 to """{"error":"temporarily_unavailable"}""",
+            )) {
+                upstream.set(status to body)
+                val before = credentialRequests.get()
+                val response = fetch(store)
+                assertEquals(HttpStatusCode.InternalServerError, response.status)
+                assertEquals("Unhandled credential endpoint error", response.bodyAsText())
+                assertEquals(before + 1, credentialRequests.get(), "Fallback errors must not trigger a retry")
+                assertEquals(0, writes.get())
+                assertTrue(stored.listCredentials().toList().isEmpty())
+            }
+        } finally {
+            issuer.stop(0)
+        }
     }
 }
