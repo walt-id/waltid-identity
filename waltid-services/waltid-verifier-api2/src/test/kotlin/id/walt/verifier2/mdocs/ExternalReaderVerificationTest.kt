@@ -84,6 +84,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -163,7 +164,7 @@ class ExternalReaderVerificationTest {
         application { installRoutes(secure) }
     }
 
-    private suspend fun fixture(nfc: Boolean = false, familyName: String = "Doe", docType: String = "org.iso.18013.5.1.mDL"): ExternalReaderDeviceResponse {
+    private suspend fun fixture(nfc: Boolean = false, familyName: String = "Doe", docType: String = "org.iso.18013.5.1.mDL", staticHandover: Boolean = false): ExternalReaderDeviceResponse {
         val holder = releaseHolderKey()
         val readerKey = holder.getPublicKey().getCosePublicKey()
         val engagement = DeviceEngagement("1.0", DeviceEngagementSecurity(1u, ByteStringWrapper(readerKey, coseCompliantCbor.encodeToByteArray(readerKey))))
@@ -171,7 +172,7 @@ class ExternalReaderVerificationTest {
         val readerBytes = coseCompliantCbor.encodeToByteArray(readerKey)
         val select = byteArrayOf(1, 2, 3)
         val request = byteArrayOf(4, 5, 6)
-        val handover = if (nfc) MdocSessionHandover.NfcConnection(ByteString(select), ByteString(request)) else MdocSessionHandover.Qr
+        val handover = if (nfc) MdocSessionHandover.NfcConnection(ByteString(select), if (staticHandover) null else ByteString(request)) else MdocSessionHandover.Qr
         val transcript = handover.createTranscript(ByteString(engagementBytes), ByteString(readerBytes))
         val credential = mdlFixtureCredential(buildJsonObject {
             put("docType", docType)
@@ -193,7 +194,7 @@ class ExternalReaderVerificationTest {
             handover = if (nfc) buildJsonObject {
                 put("type", "nfc")
                 put("handoverSelect", Base64.encode(select))
-                put("handoverRequest", Base64.encode(request))
+                if (!staticHandover) put("handoverRequest", Base64.encode(request))
             } else JsonPrimitive("qr"),
         )
     }
@@ -204,7 +205,7 @@ class ExternalReaderVerificationTest {
         routes()
         val http = createClient { install(ClientContentNegotiation) { json() }; install(ClientSSE) }
         for (nfc in listOf(false, true)) {
-            val request = fixture(nfc)
+            val request = fixture(nfc).let { it.copy(core = it.core.copy(reattemptable = nfc)) }
             val response = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(request) }
             assertEquals(HttpStatusCode.OK, response.status)
             val session = response.body<Verification2Session>()
@@ -217,6 +218,40 @@ class ExternalReaderVerificationTest {
             val second = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(request) }.body<Verification2Session>()
             assertEquals(VerificationSessionStatus.SUCCESSFUL, second.status)
             assertNotEquals(session.id, second.id)
+        }
+    }
+
+    @Test
+    fun `static NFC accepts absent or null request and binds the exact select bytes`() = testApplication {
+        startup()
+        routes()
+        val http = createClient { install(ClientContentNegotiation) { json() } }
+        val request = fixture(nfc = true, staticHandover = true)
+        Verifier2WebhookRecorder().start().use { webhook ->
+            for (explicitNull in listOf(false, true)) {
+                val handover = buildJsonObject {
+                    request.handover.jsonObject.forEach { (key, value) -> put(key, value) }
+                    if (explicitNull) put("handoverRequest", JsonNull)
+                }
+                val accepted = http.post(ENDPOINT) {
+                    contentType(ContentType.Application.Json)
+                    setBody(request.copy(handover = handover, core = request.core.copy(notifications = webhook.notifications())))
+                }
+                assertEquals(HttpStatusCode.OK, accepted.status)
+                val session = accepted.body<Verification2Session>()
+                assertEquals(VerificationSessionStatus.SUCCESSFUL, session.status, session.failure.toString())
+                webhook.assertReceivedInOrder(session.id, listOf(SessionEvent.credential_policy_results_available))
+            }
+            val changed = request.copy(handover = buildJsonObject {
+                put("type", "nfc")
+                put("handoverSelect", "AQIE")
+            }, core = request.core.copy(notifications = webhook.notifications()))
+            val response = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(changed) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val failed = response.body<Verification2Session>()
+            assertEquals(VerificationSessionStatus.FAILED, failed.status)
+            assertNull(failed.policyResults)
+            webhook.assertReceivedInOrder(failed.id, listOf(SessionEvent.presentation_validation_failed))
         }
     }
 
