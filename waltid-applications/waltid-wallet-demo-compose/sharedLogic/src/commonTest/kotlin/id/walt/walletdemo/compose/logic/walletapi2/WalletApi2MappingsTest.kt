@@ -2,10 +2,12 @@ package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
+import id.walt.walletdemo.compose.logic.claimDisplayGroups
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -15,6 +17,39 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WalletApi2MappingsTest {
+    @Test
+    fun typedClaimMetadataReachesOfferPreview() {
+        val response = walletApi2Json.decodeFromString<ResolveOfferDetailedResponseDto>(
+            """
+            {
+              "credentialIssuer":"https://issuer.example",
+              "credentialEndpoint":"https://issuer.example/credential",
+              "issuer":{"credentialIssuer":"https://issuer.example"},
+              "offeredCredentials":[{
+                "configurationId":"pid","format":"dc+sd-jwt",
+                "claims":[
+                  {"path":["given_name"],"displayName":"Given name"},
+                  {"path":["nationalities",null],"mandatory":true,"displayName":"Nationality"},
+                  {"path":["other_nationalities",0],"mandatory":false,"displayName":"First nationality"}
+                ]
+              }]
+            }
+            """.trimIndent()
+        )
+        val preview = response.toDemoPreview()
+        assertEquals(listOf("pid"), preview.offeredCredentials.map { it.configurationId })
+        val offered = preview.offeredCredentials.single()
+        assertEquals(listOf("Given name", "Nationality", "First nationality"), offered.claims.map { it.displayName })
+        assertEquals(listOf(null, true, false), offered.claims.map { it.mandatory })
+        assertEquals(Json.parseToJsonElement("""["nationalities",null]""").jsonArray.toList(), offered.claims[1].path)
+        assertEquals(Json.parseToJsonElement("""["other_nationalities",0]""").jsonArray.toList(), offered.claims[2].path)
+        assertEquals(listOf("May be included", "Always included", "May be included"), offered.claimDisplayGroups().single().claims.map { it.inclusion })
+        assertEquals(
+            listOf("Given name", "Nationality", "First nationality"),
+            offered.claimDisplayGroups().single().claims.map { it.label },
+        )
+    }
+
     @Test
     fun preAuthorizedGrantWhenCodePresent() {
         val response = ResolveOfferDetailedResponseDto(

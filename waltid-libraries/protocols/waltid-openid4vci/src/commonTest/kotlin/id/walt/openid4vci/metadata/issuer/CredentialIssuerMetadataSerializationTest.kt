@@ -27,6 +27,34 @@ class CredentialIssuerMetadataSerializationTest {
         explicitNulls = false
     }
 
+    @Test
+    fun `claim paths preserve wildcards array indexes and mdoc integer keys`() {
+        for (path in listOf(
+            """["org.iso.18013.5.1","driving_privileges",null,"vehicle_category_code"]""",
+            """["nationalities",0]""",
+            """["nationalities","0"]""",
+            """["", " "]""",
+            """["namespace","element",-7]""",
+            """["namespace","element",9223372036854775807]""",
+            """["namespace","element",18446744073709551615]""",
+            """["namespace","element",-18446744073709551616]""",
+        )) {
+            val claim = json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            val encoded = json.parseToJsonElement(json.encodeToString(claim)).jsonObject
+            assertEquals(json.parseToJsonElement(path), encoded["path"])
+            assertEquals(claim.path.map { it.toString() }, encoded.getValue("path").jsonArray.map { it.toString() })
+        }
+    }
+
+    @Test
+    fun `claim paths reject invalid components`() {
+        for (path in listOf("[]", "[true]", "[1.5]", "[1e2]", "[{}]", "[[]]")) {
+            assertFailsWith<IllegalArgumentException>(path) {
+                json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            }
+        }
+    }
+
     // 1) Required fields: credential_issuer, credential_endpoint, credential_configurations_supported
     @Test
     fun `serializes required issuer fields`() {

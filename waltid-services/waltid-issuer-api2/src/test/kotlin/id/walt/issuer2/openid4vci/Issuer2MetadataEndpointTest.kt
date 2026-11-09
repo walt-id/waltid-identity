@@ -565,7 +565,7 @@ class Issuer2MetadataEndpointTest {
                 )
             }
             if (configuration.format == CredentialFormat.MSO_MDOC) {
-                val ageOver = claims.mapNotNull { it.path.lastOrNull() }.filter { it.startsWith("age_over_") }
+                val ageOver = claims.mapNotNull { it.path.lastOrNull()?.jsonPrimitive?.content }.filter { it.startsWith("age_over_") }
                 val unexpected = ageOver.filterNot { it in allowedMdocAgeOverClaims }
                 assertTrue(
                     unexpected.isEmpty(),

@@ -230,6 +230,104 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             [.key("object"), .key(specialKey)])
     }
 
+    func testTypedMetadataPreservesMixedDefinitionsAndMandatoryHints() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["given_name"],"display":[{"name":"Given name"}]},
+            {"path":["nationalities",null],"mandatory":true,"display":[{"name":"Nationality"}]},
+            {"path":["addresses",0,"city"],"mandatory":false,"display":[{"name":"Primary city"}]}
+        ]}
+        """#)
+        XCTAssertEqual(metadata.map(\.name), ["Given name", "Nationality", "Primary city"])
+        XCTAssertEqual(metadata.map(\.mandatory), [nil, true, false])
+    }
+
+    func testTypedMetadataFallbackOmitsPathSyntaxWhileKeepingTypedPaths() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["nationalities",null]}, {"path":["nationalities",0]},
+            {"path":["element",-7]}, {"path":["element",18446744073709551615]},
+            {"path":["element",-18446744073709551616]}, {"path":[""]},
+            {"path":[" "],"mandatory":"true"}
+        ]}
+        """#)
+        XCTAssertEqual(metadata.map { $0.displayLabel(format: "dc+sd-jwt") },
+            ["Nationalities", "Nationalities", "Element", "Element", "Element", "Claim", "Claim"])
+        XCTAssertEqual(metadata.map(\.path), [
+            [.key("nationalities"), .wildcard], [.key("nationalities"), .integer("0")],
+            [.key("element"), .integer("-7")], [.key("element"), .integer("18446744073709551615")],
+            [.key("element"), .integer("-18446744073709551616")], [.key("")], [.key(" ")]
+        ])
+        XCTAssertNil(metadata.last?.mandatory)
+    }
+
+    func testTypedMetadataMatchesWholePathsWithoutAliasingKeysOrParents() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["people",null,"name"],"display":[{"name":"Person name"}]},
+            {"path":["address",0,"city"],"display":[{"name":"Primary city"}]},
+            {"path":["object_address","0","city"],"display":[{"name":"Object city"}]},
+            {"path":["a.b"],"display":[{"name":"Dotted key"}]},
+            {"path":[""],"display":[{"name":"Empty key"}]},
+            {"path":["*"],"display":[{"name":"Star key"}]}
+        ]}
+        """#)
+        let item = ClaimItem(path: .topLevel("claim"), label: "Fallback", value: .text("Value"), rawValue: #""Value""#)
+        for (path, expected) in [
+            ("people[0].name", "Person name"), ("people[2].name", "Person name"),
+            ("people[*].name", "Person name"), ("people[-1].name", "Fallback"),
+            ("people.name", "Fallback"), ("people[0]", "Fallback"),
+            (#"people["0"].name"#, "Fallback"), ("address[0].city", "Primary city"),
+            ("address[1].city", "Fallback"), (#"address["0"].city"#, "Fallback"),
+            (#"object_address["0"].city"#, "Object city"), ("object_address[0].city", "Fallback"),
+            (#"["a.b"]"#, "Dotted key"), ("a.b", "Fallback"),
+            (#"[""]"#, "Empty key"), (#"["*"]"#, "Star key"), ("[*]", "Fallback")
+        ] {
+            let actual = item.applyingClaimMetadata(metadata, format: "dc+sd-jwt", expression: .parse(path))
+            XCTAssertEqual(actual.label, expected, path)
+            XCTAssertEqual(actual.value, item.value, path)
+            XCTAssertEqual(actual.rawValue, item.rawValue, path)
+            XCTAssertEqual(actual.path, item.path, path)
+        }
+        let wrapped = StoredCredentialMetadataParser.claims(from: #"{"credentialClaims":[{"path":["given_name"],"display":[{"name":"First name"}]}]}"#)
+        XCTAssertEqual(item.applyingClaimMetadata(wrapped, format: "jwt_vc_json", expression: .parse("vc.given_name")).label, "First name")
+        let mdoc = StoredCredentialMetadataParser.claims(from: #"{"credentialClaims":[{"path":["ns","given_name"],"display":[{"name":"First name"}]}]}"#)
+        XCTAssertEqual(item.applyingClaimMetadata(mdoc, format: "mso_mdoc", expression: .parse("ns.given_name.elementValue")).label, "First name")
+    }
+
+    func testInvalidTypedMetadataAndExpressionsNeverDropSegments() {
+        for path in ["[]", "[true]", "[1.5]", "[1e2]", "[{}]", "[[]]"] {
+            XCTAssertTrue(StoredCredentialMetadataParser.claims(from: "{\"credentialClaims\":[{\"path\":\(path)}]}").isEmpty, path)
+        }
+        for token in ["true", "1.5", "1e2", "18446744073709551615", "{}", "[]"] {
+            XCTAssertEqual(ClaimPathExpression.parse("[\"people\",\(token),\"name\"]").segments, [], token)
+        }
+        let duplicate = #"{"credentialClaims":[{"path":["people",null]},{"path":["people",null]}]}"#
+        XCTAssertTrue(StoredCredentialMetadataParser.claims(from: duplicate).isEmpty)
+    }
+
+    func testTypedMetadataLabelsNestedStoredAndRequestedValuesWithoutChangingData() throws {
+        let metadata = #"{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person name"}]}]}"#
+        let credential = Credential(id: "typed", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "People", addedAt: nil,
+            credentialDataJSON: #"{"people":[{"name":"Alice"},{"name":"Bob"}]}"#, metadataJSON: metadata)
+        let people = try XCTUnwrap(CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items).first { $0.path.id == "people" })
+        guard case .list(let values) = people.value else { return XCTFail("Expected the original list") }
+        let rows = try values.map { value -> ClaimItem in
+            guard case .object(let items) = value else { throw NSError(domain: "Expected object", code: 1) }
+            return try XCTUnwrap(items.first)
+        }
+        XCTAssertEqual(rows.map(\.label), ["Person name", "Person name"])
+        XCTAssertEqual(rows.map(\.value), [.text("Alice"), .text("Bob")])
+        XCTAssertEqual(rows.map { $0.path.id }, ["people[0].name", "people[1].name"])
+        let option = PresentationCredentialOption(queryID: "people", credentialID: "typed", format: "dc+sd-jwt",
+            issuer: nil, subject: nil, label: "People", credentialDataJSON: credential.credentialDataJSON,
+            disclosures: [PresentationDisclosure(path: #"["people",0,"name"]"#, name: "Fallback",
+                valueJSON: #""Alice""#, displayValue: nil, selectivelyDisclosable: false)], metadataJSON: metadata)
+        let requested = try XCTUnwrap(CredentialDisplayNormalizer.details(for: option).groups.first { $0.id == "requested" })
+        XCTAssertEqual(requested.items.map(\.label), ["Person name"])
+        XCTAssertEqual(requested.items.map(\.value), [.text("Alice")])
+    }
+
     func testArrayIndexDoesNotMatchPropertyMetadata() {
         let metadata = #"{"credentialClaims":[{"path":["jobs","name"],"display":[{"name":"Company name"}]}]}"#
         let option = PresentationCredentialOption(queryID: "job", credentialID: "job-card", format: "dc+sd-jwt",

@@ -18,6 +18,8 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -50,6 +52,44 @@ class SignedIssuerMetadataResolverTest {
         assertEquals(
             MetadataSigner(key.getKeyId(), "EdDSA", MetadataSignerTrustType.TRUSTED_ISSUER),
             signed.signer,
+        )
+    }
+
+    @Test
+    fun trustedSignedMetadataPreservesTypedClaimPaths() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        // Sign an independent wire fixture: do not parse it through the metadata model first.
+        val configurations = Json.parseToJsonElement("""
+            {
+              "pid": {"format":"dc+sd-jwt","vct":"urn:example:pid","credential_metadata":{"claims":[
+                {"path":["nationalities",null]},
+                {"path":["addresses",0,"city"]},
+                {"path":["by_code","0","country"]}
+              ]}},
+              "mdl": {"format":"mso_mdoc","doctype":"org.iso.18013.5.1.mDL","credential_metadata":{"claims":[
+                {"path":["org.iso.18013.5.1","driving_privileges",null,"vehicle_category_code"]},
+                {"path":["org.iso.18013.5.1","example_map",18446744073709551615]}
+              ]}}
+            }
+        """.trimIndent())
+        val claims = buildJsonObject {
+            payload().forEach { (name, value) -> put(name, value) }
+            put("credential_configurations_supported", configurations)
+        }
+        val jwt = key.signJws(claims.toString().encodeToByteArray(), signedMetadataHeaders())
+
+        val resolved = assertIs<ResolvedCredentialIssuerMetadata.Signed>(
+            trustedResolver(key, jwt).resolveCredentialIssuerMetadata(issuer)
+        )
+        assertEquals(jwt, resolved.compactJwt)
+        val metadata = resolved.metadata.credentialConfigurationsSupported
+        assertEquals(
+            listOf("[\"nationalities\",null]", "[\"addresses\",0,\"city\"]", "[\"by_code\",\"0\",\"country\"]"),
+            metadata.getValue("pid").credentialMetadata!!.claims!!.map { JsonArray(it.path).toString() },
+        )
+        assertEquals(
+            listOf("[\"org.iso.18013.5.1\",\"driving_privileges\",null,\"vehicle_category_code\"]", "[\"org.iso.18013.5.1\",\"example_map\",18446744073709551615]"),
+            metadata.getValue("mdl").credentialMetadata!!.claims!!.map { JsonArray(it.path).toString() },
         )
     }
 

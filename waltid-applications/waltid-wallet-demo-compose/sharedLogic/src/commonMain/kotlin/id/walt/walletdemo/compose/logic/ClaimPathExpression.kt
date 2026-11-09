@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 
 internal data class ClaimPathExpression(
     val segments: List<Segment>,
@@ -33,7 +32,11 @@ internal data class ClaimPathExpression(
 
             val array = runCatching { json.parseToJsonElement(rawValue) as? JsonArray }.getOrNull()
                 ?: return null
-            return ClaimPathExpression(array.mapNotNull { element -> element.toSegment() })
+            val segments = array.map { element ->
+                // An unsupported segment must not turn a longer path into a different valid path.
+                element.toSegment() ?: return ClaimPathExpression(emptyList())
+            }
+            return ClaimPathExpression(segments)
         }
 
         private fun JsonElement.toSegment(): Segment? =
@@ -41,9 +44,8 @@ internal data class ClaimPathExpression(
                 JsonNull -> Segment.Wildcard
                 is JsonPrimitive -> when {
                     isString -> contentOrNull
-                        ?.takeIf { it.isNotBlank() }
                         ?.let(Segment::Key)
-                    intOrNull != null -> Segment.Index(intOrNull!!)
+                    content.toIntOrNull() != null -> Segment.Index(content.toInt())
                     else -> null
                 }
                 else -> null

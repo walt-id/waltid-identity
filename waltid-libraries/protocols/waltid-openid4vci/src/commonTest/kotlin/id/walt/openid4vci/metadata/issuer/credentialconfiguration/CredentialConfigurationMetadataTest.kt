@@ -10,6 +10,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplayLogo
 import id.walt.openid4vci.metadata.issuer.CredentialMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
+import kotlinx.serialization.json.JsonElement
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -171,14 +172,7 @@ class CredentialConfigurationMetadataTest {
     @Test
     fun `claim description path must not be empty`() {
         assertFailsWith<IllegalArgumentException> {
-            ClaimDescription(path = emptyList())
-        }
-    }
-
-    @Test
-    fun `claim description path must not contain blank segments`() {
-        assertFailsWith<IllegalArgumentException> {
-            ClaimDescription(path = listOf("credentialSubject", " "))
+            ClaimDescription(path = emptyList<JsonElement>())
         }
     }
 

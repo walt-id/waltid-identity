@@ -1,11 +1,13 @@
 package id.walt.wallet2.server.models
 
+import id.walt.openid4vci.metadata.issuer.ClaimDescriptionPathSerializer
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
 import id.walt.openid4vci.offers.TxCode
 import id.walt.wallet2.handlers.WalletOfferResolution
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Enriched, UI-facing response for the isolated `credentials/receive/resolve-offer` endpoint.
@@ -71,7 +73,8 @@ data class OfferedCredentialMetadata(
 /** Display metadata for one claim declared by an offered credential configuration. */
 @Serializable
 data class OfferClaimMetadata(
-    val path: List<String>,
+    @Serializable(with = ClaimDescriptionPathSerializer::class)
+    val path: List<JsonElement>,
     val mandatory: Boolean? = null,
     val displayName: String? = null,
 )

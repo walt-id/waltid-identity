@@ -8,6 +8,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
@@ -16,11 +17,14 @@ import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -289,17 +293,28 @@ data class CredentialMetadata(
 }
 
 /**
- * Claim description object (Appendix B.2).
+ * Claim description object (Appendix B.2). Paths use string keys, integer indexes/map keys,
+ * and null array wildcards (Appendix C). Format-specific path semantics apply when resolving a claim.
  */
 @Serializable
 data class ClaimDescription(
-    val path: List<String>,
+    @Serializable(with = ClaimDescriptionPathSerializer::class)
+    val path: List<JsonElement>,
     val mandatory: Boolean? = null,
     val display: List<ClaimDisplay>? = null,
 ) {
+    /** Convenience constructor for paths containing only object keys. */
+    constructor(
+        path: Collection<String>,
+        mandatory: Boolean? = null,
+        display: List<ClaimDisplay>? = null,
+    ) : this(path.map { JsonPrimitive(it) }, mandatory, display)
+
     init {
         require(path.isNotEmpty()) { "claim description path must not be empty" }
-        require(path.none { it.isBlank() }) { "claim description path must not contain blank segments" }
+        require(path.all { it.isValidPathSegment() }) {
+            "claim description path must contain only strings, integers, or null wildcards"
+        }
         display?.let { entries ->
             require(entries.isNotEmpty()) { "claim description display must not be empty" }
             val locales = entries.mapNotNull { it.locale }
@@ -307,6 +322,33 @@ data class ClaimDescription(
                 "claim description display entries must not duplicate locales"
             }
         }
+    }
+}
+
+private fun JsonElement.isValidPathSegment(): Boolean = when (this) {
+    JsonNull -> true
+    is JsonPrimitive -> isString || integerPathSegment.matches(content)
+    else -> false
+}
+
+private val integerPathSegment = Regex("-?(0|[1-9][0-9]*)")
+
+/** Preserve integer literals without conversion through a platform numeric type. */
+@OptIn(ExperimentalSerializationApi::class)
+object ClaimDescriptionPathSerializer : KSerializer<List<JsonElement>> {
+    private val delegate = ListSerializer(JsonElement.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<JsonElement> = delegate.deserialize(decoder)
+
+    override fun serialize(encoder: Encoder, value: List<JsonElement>) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("Claim description paths only support JSON encoding")
+        jsonEncoder.encodeJsonElement(JsonArray(value.map { segment ->
+            if (segment is JsonPrimitive && segment != JsonNull && !segment.isString) {
+                JsonUnquotedLiteral(segment.content)
+            } else segment
+        }))
     }
 }
 
