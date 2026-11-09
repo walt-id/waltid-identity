@@ -292,8 +292,11 @@ public class MobileWallet internal constructor(
         )
     }
 
+    private val walletProviderComposition = walletProviderConfig?.composition
+
     private val attestationAssembler: ClientAttestationAssembler? = when {
-        walletProviderClient != null -> ClientAttestationAssembler(walletProviderClient)
+        walletProviderClient != null && walletProviderComposition?.includesWalletInstanceAttestation() == true ->
+            ClientAttestationAssembler(walletProviderClient)
         attestationProvider != null -> ClientAttestationAssembler(attestationProvider)
         attestationConfig != null -> ClientAttestationAssembler(
             HttpWalletAttestationProvider(
@@ -314,7 +317,9 @@ public class MobileWallet internal constructor(
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     ).attachIssuanceSessionState(issuanceSessionState).also { created ->
-        walletProviderClient?.let { created.attachKeyAttestationProvider(it) }
+        if (walletProviderClient != null && walletProviderComposition?.includesKeyAttestation() == true) {
+            created.attachKeyAttestationProvider(walletProviderClient)
+        }
     }
 
     /**
@@ -329,7 +334,9 @@ public class MobileWallet internal constructor(
     public fun attachKeyAttestationProviderResolver(
         resolver: KeyAttestationProviderResolver,
     ): MobileWallet = apply {
-        val fallback = walletProviderClient
+        val fallback = walletProviderClient?.takeIf {
+            walletProviderComposition?.includesKeyAttestation() == true
+        }
         wallet.attachKeyAttestationProviderResolver(
             if (fallback == null) resolver else KeyAttestationProviderResolver { issuer ->
                 resolver.resolve(issuer) ?: fallback
@@ -1467,3 +1474,7 @@ internal fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): Mo
     WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA -> MobileWalletPresentationErrorCode.invalidTransactionData
     WalletPresentFunctionality2.OID4VPErrorCode.WALLET_UNAVAILABLE -> MobileWalletPresentationErrorCode.walletUnavailable
 }
+
+private fun String.includesWalletInstanceAttestation(): Boolean = this == "wia" || this == "wia_ka"
+
+private fun String.includesKeyAttestation(): Boolean = this == "ka" || this == "wia_ka"
