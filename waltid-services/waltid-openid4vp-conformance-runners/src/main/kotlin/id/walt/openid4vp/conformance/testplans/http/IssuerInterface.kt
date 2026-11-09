@@ -36,12 +36,14 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
         profileId: String,
         authMethod: CredentialOfferAuthMethod,
         staticTxCode: String? = null,
+        deferred: Boolean = false,
     ): CredentialOfferResponse {
         val preAuthorizedTxCode = staticTxCode.takeIf { authMethod == CredentialOfferAuthMethod.PRE_AUTHORIZED }
         val response = httpClient.post("$issuerBaseUrl/issuer2/credential-offers") {
             contentType(ContentType.Application.Json)
             setBody(CredentialOfferRequest(
                 profileId = profileId,
+                deferred = deferred,
                 authMethod = authMethod,
                 txCode = preAuthorizedTxCode?.toTxCodeMetadata(),
                 txCodeValue = preAuthorizedTxCode,
@@ -69,6 +71,7 @@ data class CredentialOfferRequest(
     val authMethod: CredentialOfferAuthMethod,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
+    val deferred: Boolean = false,
 )
 
 @Serializable
