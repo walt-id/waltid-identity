@@ -1,6 +1,7 @@
 package id.walt.openid4vci.proofs.attestation
 
-import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
+import id.walt.openid4vci.attestation.*
+import id.walt.openid4vci.deferred.DeferredProtocolException
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
@@ -21,6 +22,7 @@ data class VerifiedKeyAttestation(
     val attesterKey: Key,
     val attestedKeys: List<Key>,
     val lifetime: VerifiedAttestationLifetime? = null,
+    val status: VerifiedAttestationStatus? = null,
 )
 
 enum class KeyAttestationUsage { JWT_HEADER, STANDALONE_PROOF }
@@ -132,9 +134,13 @@ class KeyAttestationVerifier(
                 throw invalidCredentialProof("Key attestation exceeds the configured attested-key limit")
             }
         }
+        val status = try {
+            captureAttestationStatus(payload, signer.exportPublicJwkObject(), options.statusPolicy, now())
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (cause: Exception) { throw invalidCredentialProof(cause.message ?: "Invalid key attestation status reference", cause) }
         val verified = VerifiedKeyAttestation(jwt, header, payload, signer, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))
-        }, lifetime)
+        }, lifetime, status)
         val accepted = try {
             options.policy?.accepts(verified, context, configuration) ?: true
         } catch (e: CancellationException) {
@@ -145,6 +151,9 @@ class KeyAttestationVerifier(
             throw KeyAttestationServiceException("Key attestation policy evaluation failed", e)
         }
         if (!accepted) throw invalidCredentialProof("Key attestation rejected by issuer policy")
+        AttestationStatusValidator(options.statusResolver, now).validate(listOf(status to options.statusPolicy.requireStatusReference))
+            .error()?.let { throw DeferredProtocolException(it) }
+        if (!lifetime.keyAttestationValidAt(now())) throw invalidCredentialProof("Key attestation expired during status resolution")
         return verified
     }
 }
