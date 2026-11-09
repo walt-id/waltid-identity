@@ -1,5 +1,8 @@
 package id.walt.policies2.vc.policies.status.signature
 
+import id.walt.cose.CoseContentType
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.policies2.vc.policies.status.model.StatusVerificationError
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -120,12 +123,51 @@ class IetfStatusListTokenClaimsTest {
         assertFailsWith<StatusVerificationError> {
             IetfStatusListTokenClaims.requireJwtType(jwtWithTyp("JWT"))
         }.also { assertEquals("IETF status-list JWT typ must be statuslist+jwt", it.message) }
+
+        assertFailsWith<StatusVerificationError> {
+            IetfStatusListTokenClaims.requireJwtType(jwtWithHeader("""{"alg":"EdDSA"}"""))
+        }.also { assertEquals("IETF status-list JWT typ must be statuslist+jwt", it.message) }
     }
 
-    private fun jwtWithTyp(typ: String): String {
-        val encode = { json: String -> base64Url.encode(json.encodeToByteArray()) }
-        return "${encode("""{"alg":"EdDSA","typ":"$typ"}""")}.${encode("{}")}.${encode("signature")}"
+    @Test
+    fun `cwt type must be the status-list media type in protected header 16`() {
+        IetfStatusListTokenClaims.requireCwtType(
+            statusListCwt(CoseContentType.AsString("Application/statuslist+cwt")),
+        )
+
+        listOf(
+            "missing" to statusListCwt(type = null),
+            "other media type" to statusListCwt(CoseContentType.AsString("application/cose")),
+            "integer" to statusListCwt(CoseContentType.AsInt(16)),
+            "content type header" to statusListCwt(
+                type = null,
+                contentType = CoseContentType.AsString("application/statuslist+cwt"),
+            ),
+        ).forEach { (name, token) ->
+            val error = assertFailsWith<StatusVerificationError>(name) {
+                IetfStatusListTokenClaims.requireCwtType(token)
+            }
+            assertEquals("IETF status-list CWT type must be application/statuslist+cwt", error.message, name)
+        }
     }
+
+    private fun jwtWithTyp(typ: String): String = jwtWithHeader("""{"alg":"EdDSA","typ":"$typ"}""")
+
+    private fun jwtWithHeader(header: String): String {
+        val encode = { json: String -> base64Url.encode(json.encodeToByteArray()) }
+        return "${encode(header)}.${encode("{}")}.${encode("signature")}"
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun statusListCwt(type: CoseContentType?, contentType: CoseContentType? = null): ByteArray =
+        CoseSign1(
+            protected = coseCompliantCbor.encodeToByteArray(
+                CoseHeaders(contentType = contentType, type = type),
+            ),
+            unprotected = CoseHeaders(),
+            payload = byteArrayOf(),
+            signature = byteArrayOf(0),
+        ).toTagged()
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun cwt(sub: String, exp: Long, nbf: Long? = null, iat: Long? = this.iat): ByteArray =
