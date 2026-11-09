@@ -86,26 +86,36 @@ After decrypting SessionData, submit:
 }
 ```
 
-For NFC, replace `handover` with an object containing `type: "nfc"`, `handoverSelect`, and
-`handoverRequest`. Both byte fields contain standard base64 of the exact observed messages.
+For static NFC handover, use an object with `type: "nfc"` and `handoverSelect`; omit
+`handoverRequest` or set it to null. Negotiated handover also supplies `handoverRequest`.
+Each byte field contains standard base64 of the exact observed message.
 Preserve transcript and signed inner bytes; do not reconstruct them from decoded objects.
 Malformed CBOR and encrypted SessionData return 400 without creating a session. A valid outer CBOR
 re-encoding cannot in general be distinguished from the original; changing signed bytes fails verification.
 
 `core_flow` also supports `dcql_query`, `policies`, `notifications.webhook`, and ISO duration/date retention overrides.
 The service-level HOCON `sessionRetention` uses Hoplite duration syntax, for example `30d`.
+ISO-8601 strings such as `P30D` are not accepted in HOCON; request JSON retention durations use ISO-8601.
 The verifier evaluates returned claims; it does not receive or attest to the kiosk's DeviceRequest.
 
 Both verified and rejected presentations return 200 with a terminal public `Verification2Session`.
 Decide access from `status` and `policy_results`. Each submission receives a fresh session id, including
-an authenticated replay of an identical body. The session is available through the usual info, events,
+an authenticated replay of an identical body. This endpoint requires session-creation authorization;
+`reattemptable` does not deduplicate separate create-and-verify calls, and the completed session cannot receive another attempt.
+The session is available through the usual info, events,
 deletion, and PII-purge endpoints. Enterprise also includes it in session lists and honors
 `persistSessionResult=false`, returning the result but discarding it before a later info lookup.
 
 The session emits one terminal update: `presentation_validation_failed` for mdoc check failures,
 or `credential_policy_results_available` after checks pass and policies decide the outcome.
 The events stream replays the stored outcome when the kiosk subscribes after the POST.
-The kiosk sends termination SessionData itself; successful termination uses session status 0.
+The kiosk sends termination SessionData itself with status 20 (`SESSION_TERMINATION`).
+`DeviceResponse.status` 0 means the wallet returned documents; it is not a SessionData close status.
+
+On `release/v0.23.x`, the small external-reader adapter lives in `waltid-mdoc-credentials2`;
+no standalone proximity module or reader transport engine is required. It uses this release's mdoc
+verifier, adds the MSO signing-time ordering and document-signer chain checks, and runs the existing
+DCQL fulfillment and policy-result storage paths. Mainline uses the shared proximity module.
 
 ## Offer lifecycle and callback correlation
 
