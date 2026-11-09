@@ -119,11 +119,10 @@ class NativeScaPresentationAuthorizerTest {
     }
 
     @Test
-    fun ambiguousReusableAndUnprotectedPoliciesAreRejectedBeforeSigning() = test {
+    fun ambiguousAndUnprotectedPoliciesAreRejectedBeforeSigning() = test {
         for (policy in listOf(
             KeyUseAuthorizationPolicy.None,
             KeyUseAuthorizationPolicy.BiometricAny,
-            KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
             KeyUseAuthorizationPolicy.DeviceCredential(),
             KeyUseAuthorizationPolicy.BiometricOrDeviceCredential(),
         )) {
@@ -134,6 +133,41 @@ class NativeScaPresentationAuthorizerTest {
             assertEquals(0, fixture.signatures, "$policy must not sign")
             assertEquals(0, fixture.provider.inspections)
         }
+    }
+
+    @Test
+    fun timedKeyRequiresFreshAuthorizationForEveryPaymentAndUsesItsSigner() = test {
+        val fixture = fixture()
+        fixture.provider.policy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10)
+        fixture.provider.freshSupported = true
+        repeat(2) {
+            val response = fixture.submit(fixture.preview())
+            val vp = Json.parseToJsonElement(response.dataJson).jsonObject.getValue("vp_token")
+                .jsonObject.getValue("payment").jsonArray.single().jsonPrimitive.content
+            val verified = CompactJws.verify(vp.substringAfterLast('~'), fixture.key, JwsAlgorithm.ES256)
+            val claims = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
+            assertEquals(2, claims.getValue("amr").jsonArray.size)
+        }
+        assertEquals(2, fixture.provider.freshAuthorizations)
+        assertEquals(2, fixture.provider.freshSignatures)
+        assertEquals(0, fixture.signatures) // The ordinary signer must not silently reuse cached approval.
+    }
+
+    @Test
+    fun timedKeyWithoutFreshCapabilityOrWithFailedApprovalCannotProduceAProof() = test {
+        val fixture = fixture()
+        fixture.provider.policy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10)
+        val preview = fixture.preview()
+        assertFailsWith<KeyUseAuthorizationException> { fixture.submit(preview) }
+        fixture.provider.freshSupported = true
+        fixture.provider.freshFailure = KeyUseAuthorizationException(KeyUseAuthorizationFailure.AuthorizationNotCompleted, "Cancelled")
+        assertFailsWith<KeyUseAuthorizationException> { fixture.submit(preview) }
+        assertEquals(0, fixture.signatures)
+        assertEquals(0, fixture.provider.freshSignatures)
+        fixture.provider.freshFailure = null
+        fixture.submit(preview)
+        assertEquals(3, fixture.provider.freshAuthorizations)
+        assertEquals(1, fixture.provider.freshSignatures)
     }
 
     @Test
@@ -234,7 +268,7 @@ class NativeScaPresentationAuthorizerTest {
                 },
             )
         }
-        val provider = FakeProvider()
+        val provider = FakeProvider().apply { nativeSigner = requireNotNull(software.capabilities.signer) }
         val walletFixture = scaWalletFixture(key, provider)
         fixture = Fixture(key, provider, walletFixture.request)
         fixture.wallet = walletFixture.wallet
@@ -245,6 +279,17 @@ class NativeScaPresentationAuthorizerTest {
         var policy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet
         var facts = eligibleFacts()
         var inspections = 0
+        var freshSupported = false
+        var freshFailure: Throwable? = null
+        var freshAuthorizations = 0
+        var freshSignatures = 0
+        lateinit var nativeSigner: Signer
+        override suspend fun <T> withFreshBiometricAuthorization(stored: StoredKey.Managed, operation: suspend (Signer) -> T): T {
+            freshAuthorizations++
+            if (!freshSupported) return super.withFreshBiometricAuthorization(stored, operation)
+            freshFailure?.let { throw it }
+            return operation(Signer { data, algorithm -> freshSignatures++; nativeSigner.sign(data, algorithm) })
+        }
         override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed) = policy
         override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts { inspections++; return facts }
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport = error("Not used")
