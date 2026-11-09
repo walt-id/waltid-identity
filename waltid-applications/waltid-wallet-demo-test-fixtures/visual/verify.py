@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -22,8 +23,14 @@ def checked_output(*command):
 
 
 def check_apple_environment(simulator, native):
-    if checked_output("xcodebuild", "-version") != "Xcode 27.0\nBuild version 27A266a":
-        raise SystemExit("Wallet baselines require Xcode 27.0 (27A266a). Review an environment update explicitly.")
+    xcode = checked_output("xcodebuild", "-version")
+    is_ci = any(key in os.environ for key in
+                ("CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION"))
+    if is_ci:
+        if xcode != "Xcode 27.2\nBuild version 27B52":
+            raise SystemExit(f"CI visual comparisons require Xcode 27.2 (27B52); selected {xcode!r}.")
+    elif not re.fullmatch(r"Xcode 27\.\d+(?:\.\d+)?\nBuild version [A-Za-z0-9]+", xcode):
+        raise SystemExit(f"Local visual comparisons require Xcode 27.x; selected {xcode!r}.")
     if native and checked_output("xcodebuildmcp", "--version") != "2.7.0":
         raise SystemExit("Use XcodeBuildMCP 2.7.0 for the catalogue's native result schema.")
     devices = json.loads(checked_output("xcrun", "simctl", "list", "devices", "available", "--json"))
