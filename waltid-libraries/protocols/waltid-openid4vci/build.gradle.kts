@@ -14,6 +14,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
 
             // walt.id
+            implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-jose"))
