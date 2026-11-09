@@ -97,6 +97,9 @@ class AttestationBasedClientAuthenticationMethod(
         clock = clock,
         clockSkewSeconds = clockSkewSeconds,
         popMaxAgeSeconds = popMaxAgeSeconds,
+        challengeService = challengeService,
+        statusPolicy = statusPolicy,
+        statusResolver = statusResolver,
     )
 
     @Suppress("UNUSED_PARAMETER")
