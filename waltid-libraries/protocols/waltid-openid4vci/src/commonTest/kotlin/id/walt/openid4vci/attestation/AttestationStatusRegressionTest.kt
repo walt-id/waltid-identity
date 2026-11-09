@@ -7,6 +7,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.clientauth.*
 import id.walt.openid4vci.clientauth.attestation.*
+import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.verifier.Crypto2KeyBasedClientAttestationVerifier
 import id.walt.statuslist.codec.TokenStatusListCodec
 import kotlinx.coroutines.CancellationException
@@ -128,11 +129,46 @@ class AttestationStatusRegressionTest {
         assertFailsWith<CancellationException> { authenticate(cancelled, signer, holder, suppliedStatus = true) }
     }
 
+    @Test fun wrappingAVerifierPreservesRequiredStatusOmissionPolicy() = runTest {
+        val signer = key("attester")
+        val result = assertIs<ClientAuthenticationResult.Failure>(authenticate(signer, signer, key("holder"),
+            requiredStatus = true, wrapVerifier = true))
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Attestation status reference is required", result.error.description)
+    }
+
+    @Test fun wrappingAVerifierPreservesStatusResolutionAndSignerEvidence() = runTest {
+        val signer = key("attester")
+        val result = assertIs<ClientAuthenticationResult.Authenticated>(authenticate(signer, signer, key("holder"),
+            suppliedStatus = true, requiredStatus = true, wrapVerifier = true, statusJwt = listJwt(signer, wiaUri)))
+        val status = assertNotNull(result.client.attestation?.status)
+        assertTrue(status.policy.requireStatusReference)
+        assertEquals(signer.exportPublicJwkObject(), status.attesterPublicJwk)
+    }
+
+    @Test fun wrappingAVerifierPreservesChallengeValidation() = runTest {
+        var validations = 0
+        val challenge = object : AttestationChallengeService {
+            override suspend fun issue(authorizationServerIssuer: String) = "challenge"
+            override suspend fun validate(challenge: String, authorizationServerIssuer: String): Boolean {
+                validations++
+                return challenge == "challenge" && authorizationServerIssuer == "https://issuer.example"
+            }
+        }
+        val signer = key("attester")
+        assertIs<ClientAuthenticationResult.Authenticated>(authenticate(signer, signer, key("holder"),
+            wrapVerifier = true, challengeService = challenge))
+        assertEquals(1, validations)
+    }
+
     private fun referencePayload(uri: String) = buildJsonObject {
         putJsonObject("status") { putJsonObject("status_list") { put("idx", 0); put("uri", uri) } }
     }
 
-    private suspend fun authenticate(trustedKey: Key, signer: Key, holder: Key, suppliedStatus: Boolean = false, requiredStatus: Boolean = false): ClientAuthenticationResult {
+    private suspend fun authenticate(
+        trustedKey: Key, signer: Key, holder: Key, suppliedStatus: Boolean = false, requiredStatus: Boolean = false,
+        wrapVerifier: Boolean = false, statusJwt: String? = null, challengeService: AttestationChallengeService? = null,
+    ): ClientAuthenticationResult {
         val holderJwk = holder.exportPublicJwkObject()
         val wia = CompactJws.sign(buildJsonObject {
             put("sub", "wallet"); put("iat", start.epochSeconds); put("exp", start.epochSeconds + 3600)
@@ -141,17 +177,20 @@ class AttestationStatusRegressionTest {
         }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", "oauth-client-attestation+jwt") })
         val pop = CompactJws.sign(buildJsonObject {
             put("aud", "https://issuer.example"); put("iat", start.epochSeconds); put("jti", "pop")
+            if (challengeService != null) put("challenge", "challenge")
         }.toString().encodeToByteArray(), holder, JwsAlgorithm.ES256, buildJsonObject { put("typ", "oauth-client-attestation-pop+jwt") })
         var fetches = 0
-        val method = AttestationBasedClientAuthenticationMethod(
+        val configured = AttestationBasedClientAuthenticationMethod(
             Crypto2KeyBasedClientAttestationVerifier { _, _ -> listOf(trustedKey) }, clock = { start },
             statusPolicy = AttestationStatusPolicy(requiredStatus),
-            statusResolver = AttestationStatusResolver { fetches++; error("Signer context is unavailable; no fetch should be attempted") },
+            statusResolver = AttestationStatusResolver { fetches++; statusJwt ?: error("Signer context is unavailable; no fetch should be attempted") },
+            challengeService = challengeService,
         )
+        val method = if (wrapVerifier) configured.withAttestationVerifier { it } else configured
         val result = method.authenticate(ClientAuthenticationEndpoint.TOKEN, emptyMap(), mapOf(
             ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(wia), ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(pop),
         ), ClientAuthenticationContext(authorizationServerIssuer = "https://issuer.example"))
-        assertEquals(0, fetches)
+        assertEquals(if (statusJwt != null) 1 else 0, fetches)
         return result
     }
 }
