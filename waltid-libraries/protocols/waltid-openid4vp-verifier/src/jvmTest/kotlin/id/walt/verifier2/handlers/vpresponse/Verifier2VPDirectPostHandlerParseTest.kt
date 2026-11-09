@@ -3,6 +3,8 @@ package id.walt.verifier2.handlers.vpresponse
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.VerificationSessionUsage
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -138,6 +140,20 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertFailsWith<Throwable> {
             session.handleWalletError(state = null)
         }
+    }
+
+    @Test
+    fun strictModeMakesAWalletErrorFinalWithoutReplacingTheOutcomeOnRetry() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession("expected-state").copy(
+            setup = CrossDeviceFlowSetup(core = GeneralFlowConfig(sessionUsage = VerificationSessionUsage.SINGLE_ATTEMPT)),
+        )
+        session.handleWalletError(state = "expected-state")
+        val previousId = session.presentationId
+        val previousFailure = session.failure
+        assertFailsWith<IllegalArgumentException> { session.handleWalletError(state = "expected-state", error = "invalid_request") }
+        assertEquals(previousId, session.presentationId)
+        assertEquals(previousFailure, session.failure)
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
     }
 
     @Test
