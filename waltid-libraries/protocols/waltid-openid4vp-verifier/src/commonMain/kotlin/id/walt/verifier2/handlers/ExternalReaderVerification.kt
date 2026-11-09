@@ -60,6 +60,7 @@ object ExternalReaderVerification {
             status = VerificationSessionStatus.FAILED,
             creationDate = now,
             attempted = true,
+            // This call creates a completed result, not a reusable wallet offer.
             reattemptable = false,
             notifications = setup.core.notifications,
             retentionDate = setup.core.effectiveRetentionDate(retention, now),
