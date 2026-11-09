@@ -117,6 +117,7 @@ internal suspend fun CredentialRequest.accept(
                 AcceptedKeyAttestation(
                     requireNotNull(it.lifetime) { "Verified key attestation is missing lifetime evidence" },
                     it.attestedKeys.map { key -> Jwk.sha256Thumbprint(key.exportPublicJwk()) }.toSet(),
+                    it.status,
                 )
             },
         )
