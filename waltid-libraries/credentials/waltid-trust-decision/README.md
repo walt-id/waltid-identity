@@ -37,7 +37,7 @@ Take the expected entity types and the requirement from your own configuration o
 | Adapter | Use |
 |---|---|
 | `StaticTrustDecisionEvaluator(anchors per purpose)` | PKIX validation against configured anchors. Freshness `UNKNOWN`. A purpose without anchors is `UNSUPPORTED_SOURCE`. |
-| `HttpTrustDecisionEvaluator(resolveUrl, headers)` | Remote registry over the `resolve/certificate-chain` contract (OSS route, Enterprise route with a bearer token, or a compatible resolver). Unavailable is `UNKNOWN`. |
+| `HttpTrustDecisionEvaluator(resolveUrl, headers)` | Remote registry over the `resolve/certificate-chain` contract: the Enterprise route with a bearer token, or a compatible resolver such as the one `ETSITrustListPolicy` calls (no OSS service serves it). Unavailable is `UNKNOWN`. |
 | `InsecureAllowAllTrustDecisionEvaluator` | Development only. Trusts everything with `UNKNOWN` freshness, so `RegistryFresh` still rejects. |
 | `TrustDecisionEvaluator { ... }` | Lambda for tests and fixtures. |
 | `TrustRegistryTrustDecisionEvaluator` (Enterprise) | The tenant's linked trust-registry service. |

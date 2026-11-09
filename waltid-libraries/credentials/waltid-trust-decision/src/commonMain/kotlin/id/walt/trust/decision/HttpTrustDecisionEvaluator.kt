@@ -19,10 +19,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * Asks a remote trust registry over HTTP: one `POST` per expected entity type to a
  * certificate-chain resolve endpoint, combined with [anyOfEntityTypes].
  *
- * Works with the OSS trust-registry route (`{base}/trust-registry/resolve/certificate-chain`), the
- * Enterprise route (`{base}/v1/{target}/trust-registry-api/resolve/certificate-chain`, which needs a
- * bearer token with resolve permission, passed through [headers]) and any resolver serving the same
- * contract.
+ * Works with the Enterprise route (`{base}/v1/{target}/trust-registry-api/resolve/certificate-chain`,
+ * which needs a bearer token with resolve permission, passed through [headers]) and with any resolver
+ * serving the same contract, such as the bring-your-own resolver path that `ETSITrustListPolicy` calls
+ * (`{base}/trust-registry/resolve/certificate-chain`). No OSS service serves that path.
  *
  * Requests go through [WebDataFetcher] id [WebDataFetcherId.TRUST_DECISION_RESOLVE], so the
  * private-network guard applies: a resolver on a loopback or private address must be allowed through
@@ -89,7 +89,7 @@ class HttpTrustDecisionEvaluator internal constructor(
 
     private fun unknown(warning: String) = TrustDecision(TrustDecisionCode.UNKNOWN, warnings = listOf(warning))
 
-    /** Request body shared by the OSS and Enterprise resolve endpoints. */
+    /** Request body of the `resolve/certificate-chain` contract. */
     @Serializable
     private data class ResolveCertificateChainBody(
         val certificateChainPemOrDer: List<String>,
