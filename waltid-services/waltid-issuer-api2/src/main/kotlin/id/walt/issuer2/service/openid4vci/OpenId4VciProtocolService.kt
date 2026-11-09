@@ -925,6 +925,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             }
                         } else processCredentialRequest(accessToken, requestId, claim) { CredentialRequestResult.Success(prepared) }
                     }
+                    // Later polls of a denied transaction are rejected before acquiring a claim.
+                    if (response.payload["error"]?.jsonPrimitive?.contentOrNull == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                        notificationService.notify(
+                            requestId = requestId,
+                            session = session,
+                            event = credentialRequestEvent(claim.accepted.configuration.format, succeeded = false),
+                            error = CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
+                            errorDescription = response.payload["error_description"]?.jsonPrimitive?.contentOrNull,
+                        )
+                    }
                     withContext(NonCancellable) {
                         if (response.status == 200) deferredIssuance.consume(session.sessionId, claim)
                         else deferredIssuance.release(session.sessionId, claim)

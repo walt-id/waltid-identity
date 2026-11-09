@@ -693,7 +693,9 @@ nonce checks are not replayed.
 
 The provider captures WIA evidence from verified access-token authentication and
 snapshots it automatically in `acceptCredentialRequest()`, together with the verified
-KA evidence. Issuers do not decode private token claims or infer WIA requirements.
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
 The provider uses its existing client-authentication configuration resolver when a
 legacy transaction has no recorded requirement; optional authentication methods do
 not make WIA mandatory. Originally anonymous pre-authorized grants retain that
@@ -704,6 +706,10 @@ returns `credential_request_denied`. Denial is permanent for that transaction: o
 expired KA denies the entire holder-key batch. Other transactions and completed
 datasets retain their progress. This transaction denial does not change the offer's
 operator approval decision.
+
+A transaction's first lifetime denial emits a credential-request failure notification;
+later polls return the persisted denial without another notification. Response-encryption
+errors retain the signed checkpoint so a later poll can retry delivery.
 
 Refreshing an access token preserves its original WIA evidence and never replaces a
 transaction's accepted evidence. Resubmitting a Credential Request also keeps the
