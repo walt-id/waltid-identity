@@ -92,8 +92,9 @@ the persisted claim fence and lifetimes are checked again after resolution.
 A confirmed INVALID entry takes precedence over another entry's unavailable lookup.
 Suspension and technical failure do not consume or deny the transaction. Processing claims
 and uncommitted usage reservations are released; a retry reacquires reservations as needed,
-including for a previously signed checkpoint. Coroutine cancellation propagates, with cleanup
-performed outside cancellation. The offer's absolute deadline still limits retries.
+including for a previously signed checkpoint. Coroutine cancellation propagates, with claim
+cleanup performed outside cancellation. Cancellation after a durable signing checkpoint
+preserves its reservation for F5 recovery. The offer's absolute deadline still limits retries.
 
 Initial invalid WIA is an OAuth client-authentication failure. Malformed or missing required
 KA status evidence is a proof-validation failure. Initial status lookup failures are technical
