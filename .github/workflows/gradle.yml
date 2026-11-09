@@ -177,6 +177,7 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
 
       - name: Clean and build with all tests
         if: ${{ inputs.cacheless }}
@@ -190,6 +191,7 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
 
       - name: Require public SD-JWT payment acceptance
         if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
@@ -725,6 +727,7 @@ jobs:
         if: ${{ !cancelled() && steps.issuer-build.outcome == 'success' }}
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
+          ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           # Each proof job owns its issuer process, tunnel and port on a separate runner.
