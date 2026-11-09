@@ -5,7 +5,7 @@ consumers, Enterprise integration tests and SDK docs independently. A docs-only 
 Enterprise-only selection also runs the framework producer; simulator-only runs
 do not need it. Linux docs and Kotlin simulator tests can start independently.
 
-The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.0
+The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.2 (27B52)
 on GitHub's [`xcode-27` arm64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md).
 The image currently uses macOS 27 and remains in public preview. Demo, bridge and
 Enterprise tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
@@ -15,6 +15,13 @@ caller env, so `wallet-core-framework.yml` and `mobile-sdk-docs.yml` set the sam
 pin themselves. Composite actions inherit the pin from the job that calls them.
 Keep the producer and SDK-docs toolchain pins aligned because framework reuse
 requires an exact Xcode match.
+
+The [image release](https://github.com/actions/runner-images/releases/tag/xcode-27-arm64/20261104.0337)
+includes Xcode 27.2 final. A [main-branch simulator job](https://github.com/walt-id/waltid-identity/actions/runs/42063244489/job/127396832815)
+received that image on 5 November 2026; allocations were still mixed during rollout.
+Older allocations may resolve `Xcode_27.2.app` to the release candidate. Visual
+comparisons require the final build, and framework reuse still requires an exact
+Xcode match between producer and consumer.
 
 ## Shared release framework
 

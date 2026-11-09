@@ -78,7 +78,7 @@ jobs:
     timeout-minutes: 120
     env:
       # Must match wallet-core-framework.yml. Restore rejects an Xcode version mismatch.
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
