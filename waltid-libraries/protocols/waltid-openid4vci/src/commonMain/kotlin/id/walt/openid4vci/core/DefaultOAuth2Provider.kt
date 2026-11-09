@@ -1,5 +1,7 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.attestation.*
+import id.walt.openid4vci.clientauth.attestation.AttestationBasedClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAttestation
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAuthentication
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -103,6 +105,7 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
     private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
+    private val attestationStatusValidator = AttestationStatusValidator(config.attestationStatusResolver)
 
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
@@ -579,7 +582,7 @@ class DefaultOAuth2Provider(
         }
         val verification = when (val result = verifyCredentialProofs(request, configuration, proofValidationContext)) {
             is CredentialProofVerification.Success -> result
-            is CredentialProofVerification.Failure -> throw CredentialProofValidationException(result.error.error, result.error.description.orEmpty())
+            is CredentialProofVerification.Failure -> throw DeferredProtocolException(result.error)
         }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: throw CredentialProofValidationException(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, "Unsupported credential format")
@@ -599,6 +602,7 @@ class DefaultOAuth2Provider(
                 CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid",
             )
         }
+        acceptedStatusError(accepted)?.let { throw DeferredProtocolException(it) }
         return accepted
     }
 
@@ -873,7 +877,9 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = 400,
+            status = if (error.retryAfterSeconds != null) 503 else 400,
+            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA +
+                (error.retryAfterSeconds?.let { mapOf("Retry-After" to it.toString()) } ?: emptyMap()),
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
@@ -974,6 +980,10 @@ class DefaultOAuth2Provider(
         request.deferredContext?.let { return deferredClaimError(it) }
         val required = request.accepted.clientAttestationRequired ?:
             requiresClientAttestation(request.accessTokenClientId, request.anonymousPreAuthorizedAccess)
+        if (!deferredAttestationLifetimeValidator.isValid(request.accepted, Clock.System.now(), required)) {
+            return CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid")
+        }
+        acceptedStatusError(request.accepted)?.let { return it }
         return if (deferredAttestationLifetimeValidator.isValid(request.accepted, Clock.System.now(), required)) null
         else CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid")
     }
@@ -982,11 +992,28 @@ class DefaultOAuth2Provider(
         val accepted = context.transaction.accepted
         val required = accepted.clientAttestationRequired ?:
             requiresClientAttestation(accepted.request.accessTokenClientId, accepted.request.anonymousPreAuthorizedAccess)
-        context.deferredIssuance.validateClaim(context.sessionId, context.transaction, required)
+        context.deferredIssuance.validateClaim(
+            context.sessionId, context.transaction, required, attestationStatusValidator,
+            legacyClientStatusRequired(accepted), config.keyAttestationStatusPolicy().requireStatusReference,
+        )
         null
     } catch (e: DeferredProtocolException) {
         e.error
     }
+
+    private suspend fun legacyClientStatusRequired(accepted: AcceptedCredentialRequest): Boolean {
+        if (accepted.request.anonymousPreAuthorizedAccess) return false
+        return resolveClientAuthentication(
+            ClientAuthenticationEndpoint.TOKEN,
+            accepted.request.accessTokenClientId?.let { mapOf("client_id" to listOf(it)) }.orEmpty(), emptyMap(),
+        ).serviceConfig.methods.filterIsInstance<AttestationBasedClientAuthenticationMethod>()
+            .any { it.statusPolicy.requireStatusReference }
+    }
+
+    private suspend fun acceptedStatusError(accepted: AcceptedCredentialRequest): CredentialError? =
+        attestationStatusValidator.validate(accepted.statusEvidence(
+            legacyClientStatusRequired(accepted), config.keyAttestationStatusPolicy().requireStatusReference,
+        )).error()
 
     private suspend fun verifyCredentialProofs(
         request: CredentialRequest,
@@ -1017,6 +1044,8 @@ class DefaultOAuth2Provider(
             CredentialProofVerification.Success(verification.bindings, verification.proofs)
         } catch (e: CancellationException) {
             throw e
+        } catch (e: DeferredProtocolException) {
+            CredentialProofVerification.Failure(e.error)
         } catch (e: CredentialProofValidationException) {
             CredentialProofVerification.Failure(CredentialError(e.errorCode, e.message))
         } catch (e: CredentialProofServiceException) {
