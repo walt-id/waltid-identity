@@ -1,5 +1,8 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
@@ -76,6 +79,9 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+    val attestationStatusResolver: AttestationStatusResolver? = null,
+    /** Consulted only for legacy KA evidence; newly accepted evidence carries its own policy. */
+    val keyAttestationStatusPolicy: suspend () -> AttestationStatusPolicy = { AttestationStatusPolicy() },
 )
 
 data class PushedAuthorizationConfig(
