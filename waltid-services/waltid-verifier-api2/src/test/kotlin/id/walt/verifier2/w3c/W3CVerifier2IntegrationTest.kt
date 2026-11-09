@@ -1,5 +1,9 @@
 package id.walt.verifier2.w3c
 
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.credentials.formats.DigitalCredential
@@ -22,6 +26,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.VerificationSessionUsage
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
@@ -85,7 +90,8 @@ class W3CVerifier2IntegrationTest {
     private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = w3cDcqlQuery,
-            policies = w3cPolicies
+            policies = w3cPolicies,
+            sessionUsage = VerificationSessionUsage.SINGLE_ATTEMPT,
         )
     )
 
@@ -355,6 +361,12 @@ class W3CVerifier2IntegrationTest {
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
+                assertEquals(HttpStatusCode.BadRequest, http.get("/verification-session/$sessionId/request").status)
+                assertEquals(HttpStatusCode.BadRequest, http.post("/verification-session/$sessionId/response") {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("error=access_denied&state=${info2.authorizationRequest.state}")
+                }.status)
+
 
                 assertNotNull(info2.presentedCredentials)
                 assertEquals(2, info2.presentedCredentials!!.size)
