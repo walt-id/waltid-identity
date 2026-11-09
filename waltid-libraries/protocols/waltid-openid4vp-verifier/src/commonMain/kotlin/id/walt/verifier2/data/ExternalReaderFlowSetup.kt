@@ -41,7 +41,7 @@ data class ExternalReaderDeviceResponse(
     val deviceResponse: String,
     val deviceEngagement: String,
     val eReaderKey: String,
-    /** The string "qr", or {"type":"nfc","handoverSelect":"...","handoverRequest":"..."}. */
+    /** The string "qr", or {"type":"nfc","handoverSelect":"..."} with optional handoverRequest for negotiated NFC. */
     val handover: JsonElement,
 ) {
     init {
@@ -56,7 +56,7 @@ data class ExternalReaderDeviceResponse(
             require(nfc.type == "nfc") { "Expected qr or nfc handover" }
             MdocSessionHandover.NfcConnection(
                 ByteString(Base64.decode(nfc.handoverSelect)),
-                ByteString(Base64.decode(nfc.handoverRequest)),
+                nfc.handoverRequest?.let { ByteString(Base64.decode(it)) },
             )
         }
         return MdocProximityVerifier.parse(
@@ -66,4 +66,4 @@ data class ExternalReaderDeviceResponse(
 }
 
 @Serializable
-private data class NfcHandoverInput(val type: String, val handoverSelect: String, val handoverRequest: String)
+private data class NfcHandoverInput(val type: String, val handoverSelect: String, val handoverRequest: String? = null)
