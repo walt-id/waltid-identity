@@ -52,8 +52,8 @@ data class ItbCatalogue(
     }
 
     companion object {
-        fun initialWalletCases(): ItbCatalogue = requireNotNull(
-            ItbCatalogue::class.java.getResourceAsStream("/itb/wal-1423-catalogue.json")
+        fun walletCases(): ItbCatalogue = requireNotNull(
+            ItbCatalogue::class.java.getResourceAsStream("/itb/wallet-catalogue.json")
         ) { "The deployed ITB case catalogue is missing" }.bufferedReader().use {
             Json.decodeFromString<ItbCatalogue>(it.readText())
         }

@@ -1,7 +1,6 @@
 # WeBuild ITB wallet runs
 
-[WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) established the initial inventory;
-[WAL-1704](https://linear.app/walt-new/issue/WAL-1704/restore-itb-wallet-catalogue-selection) refreshes navigation and adds invocation cases. The runner selects 24 CS-01,
+The runner selects 24 CS-01,
 CS-02, CS-07 and TS12 Wallet SUT cases. `itbWallet` drives their actual
 ITB interactions through the production wallet, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
@@ -16,8 +15,8 @@ real status service or WE BUILD assurance level. This fixture is confined to
 the conformance runner and its device test, not the production wallet.
 
 Neither entry point proves native platform delivery, consent UX or full EUDI
-conformance. Use per-run reports and [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests)
-for current qualification; [ITB-BASELINE.md](ITB-BASELINE.md) is a dated historical result.
+conformance. Use reports tied to the exact source revision for current qualification;
+[ITB-BASELINE.md](ITB-BASELINE.md) is a dated historical result.
 
 ## Batch issuance evidence
 
@@ -144,9 +143,8 @@ access them; manual dispatch does not create an additional secret boundary.
 
 The JVM version and JSON/JUnit/Markdown reporting follow the existing conformance
 setup. ITB uses an outbound portal bridge, so it does not need the other suites'
-inbound tunnels or coordinated enterprise checkout. Its strict results follow
-WAL-1423's explicit requirement; the older suites' `CONFORMANCE_ALLOW_FAILURE`
-switch does not change ITB outcomes.
+inbound tunnels or coordinated enterprise checkout. ITB results are always strict;
+`CONFORMANCE_ALLOW_FAILURE` does not change their outcomes.
 
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
@@ -211,7 +209,7 @@ Do not equate the eleven local profile checks with the deployed cases.
 ### Deployed catalogue
 
 The authenticated Walt.id catalogue on ITB 1.29.5 was inspected on 2026-11-06.
-The [case manifest](../src/main/resources/itb/wal-1423-catalogue.json) records the
+The [case manifest](../src/main/resources/itb/wallet-catalogue.json) records the
 actual suite/case identifiers exposed by the portal's REST API configuration.
 It contains no API keys. Versions below are the suite's displayed descriptions;
 the execution report must still record the version actually run.
@@ -225,7 +223,7 @@ the execution report must still record the version actually run.
 
 The selected matrix therefore contains **24 cases**. The separate Trust Framework
 Integration suite (1.3, October 2026, optional WUA), QES suite and relying-party
-tests are not additional initial wallet cases. Historical tenant results do not
+tests are not additional selected wallet cases. Historical tenant results do not
 identify this branch's build and must not be reported as its results. Case titles
 and linked documentation are insufficient to infer interaction contracts: the
 VCI-006 documentation popup still describes an unrelated AcademicID flow.

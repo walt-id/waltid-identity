@@ -33,7 +33,7 @@ fun main(): Unit = runBlocking {
 private suspend fun runItb(): Int {
     fun required(name: String) = requireNotNull(System.getenv(name)?.takeIf(String::isNotBlank)) { "$name is required" }
     val revision = required("ITB_BUILD_REVISION").also { require(it.matches(Regex("[0-9a-f]{40}(\\+dirty)?"))) }
-    val catalogue = ItbCatalogue.initialWalletCases()
+    val catalogue = ItbCatalogue.walletCases()
     val origin = catalogue.origin
     val directory = Path.of(System.getenv("ITB_REPORT_DIR") ?: "build/reports/itb-wallet")
     val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"), unattendedOnly = System.getenv("CI") == "true")

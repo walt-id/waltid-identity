@@ -70,7 +70,7 @@ class IssuanceProfileTest {
         assertEquals(issuer, proof["aud"]?.jsonPrimitive?.content)
         assertEquals("itb-proof-nonce", proof["nonce"]?.jsonPrimitive?.content)
         // OpenID4VCI makes iss optional here. This pins the stricter observed ITB interoperability
-        // requirement, not a new universal issuer validation rule. External fix: WAL-495 / #2246.
-        assertEquals(clientId, proof["iss"]?.jsonPrimitive?.content, "WAL-495 / Identity #2246")
+        // requirement, not a new universal issuer validation rule.
+        assertEquals(clientId, proof["iss"]?.jsonPrimitive?.content, "The ITB proof must identify the wallet client")
     }
 }

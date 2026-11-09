@@ -15,7 +15,7 @@ import java.net.ServerSocket
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
-    private val suite = ItbCatalogue.initialWalletCases().suites.first()
+    private val suite = ItbCatalogue.walletCases().suites.first()
     private val case = suite.cases.single { it.id == "tc_vci_006" }
     private val session = "00000000-0000-0000-0000-000000000001"
     private val report = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
@@ -61,7 +61,14 @@ class ItbCaseRunnerTest {
 
     @Test
     fun invocationSchemeMustMatchBeforeWalletExecution() = runBlocking<Unit> {
-        for (scheme in listOf("openid4vp", "eu-eaap", "haip-vp", "https", null)) {
+        for ((expected, scheme, valid) in listOf(
+            Triple("openid4vp", "openid4vp", true),
+            Triple("eu-eaap", "eu-eaap", true),
+            Triple("haip-vp", "haip-vp", true),
+            Triple("openid4vp", "eu-eaap", false),
+            Triple("openid4vp", "https", false),
+            Triple("openid4vp", null, false),
+        )) {
             val bridge = Bridge().apply {
                 if (scheme != null) interaction = ItbWalletInteraction.Presentation(Url("$scheme://authorize?request_uri=https://verifier.example/request"))
             }
@@ -75,10 +82,8 @@ class ItbCaseRunnerTest {
                     else -> error("Unexpected request")
                 }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
             }).use { client ->
-                val expected = scheme?.takeIf { it != "https" } ?: "openid4vp"
                 val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, { walletCalls++ })
                     .run(suite, case.copy(invocationScheme = expected))
-                val valid = scheme != null && scheme != "https"
                 assertEquals(if (valid) ItbCaseResult.Outcome.PASSED else ItbCaseResult.Outcome.ERROR, result.outcome)
                 assertEquals(if (valid) 1 else 0, walletCalls)
                 assertEquals(!valid, stopped)

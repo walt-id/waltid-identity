@@ -52,7 +52,7 @@ class ItbSessionReportTest {
 
     @Test
     fun `rejects duplicate suite and case identities`() {
-        val catalogue = ItbCatalogue.initialWalletCases()
+        val catalogue = ItbCatalogue.walletCases()
         val suite = catalogue.suites.first()
         assertFails { catalogue.copy(suites = listOf(suite, suite)) }
         assertFails { catalogue.copy(suites = listOf(suite.copy(cases = suite.cases + suite.cases.first()))) }

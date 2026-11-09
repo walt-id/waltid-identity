@@ -39,3 +39,19 @@ of Wallet Provider assurance or certification.
 The fixture binds only to device loopback and accepts the approved Aegean tenant origin. A fresh token authenticates the coordinator before key creation. Messages are size-bounded and strictly sequenced; disconnect cancels pending work and a broken channel is never retried. Keep the ADB transport restricted to the operator's machine. The token is a local test-channel credential, not an ITB organisation key.
 
 Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They still require wallet success and correlated terminal ITB `SUCCESS`. All issuer, JOSE, certificate, audience, nonce and verifier-result checks remain strict. A native prompt or successful signature alone is not a passing ITB case.
+
+## SCA-User audience compatibility
+
+The reference issuer and verifier must agree on the RP identifier authorized by
+the SCA-User credential's `aud` claim. [CS-12 §7.2](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#72-attestation-provider-requirements-issuance)
+requires the issuer to bind that credential to its RP identifier(s). An
+`x509_san_dns` identifier does not authorize a different `x509_hash` identifier
+merely because both refer to the same deployment. Align the reference issuer's
+audience configuration with the verifier request; never rewrite an issuer-signed
+claim or substitute an unrelated request to obtain a passing result.
+
+The credential audience is distinct from the KB-JWT audience, which binds the
+proof to the current verifier or DC API origin. Native key authorization does
+not itself qualify the complete SCA RP-permission policy. Verifier rejections
+remain failing wallet results; reports retain only allowlisted error identifiers
+or a bounded HTTP status, never the response body.

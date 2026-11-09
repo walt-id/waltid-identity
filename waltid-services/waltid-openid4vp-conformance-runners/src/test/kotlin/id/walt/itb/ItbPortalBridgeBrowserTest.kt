@@ -11,7 +11,7 @@ import kotlin.test.*
 /** Offline DOM contract tests. All browser requests are intercepted; no tenant credentials are used. */
 @Tag("itb-portal")
 class ItbPortalBridgeBrowserTest {
-    private val catalogue = ItbCatalogue.initialWalletCases()
+    private val catalogue = ItbCatalogue.walletCases()
     private val suite = catalogue.suites.single { it.id == "cs02v1" }
     private val case = suite.cases.single { it.id == "tc_vp_001" }
     // Observed portal label; keep independent from the catalogue under test.

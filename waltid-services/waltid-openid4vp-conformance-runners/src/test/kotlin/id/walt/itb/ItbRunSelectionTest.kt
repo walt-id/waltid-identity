@@ -3,10 +3,10 @@ package id.walt.itb
 import kotlin.test.*
 
 class ItbRunSelectionTest {
-    private val catalogue = ItbCatalogue.initialWalletCases()
+    private val catalogue = ItbCatalogue.walletCases()
 
     @Test
-    fun defaultSelectionIncludesEveryDeployedInitialCase() {
+    fun defaultSelectionIncludesEverySelectedCase() {
         assertEquals("https://dev-i4mlab.aegean.gr", catalogue.origin.toString().trimEnd('/'))
         val selected = ItbRunSelection.select(catalogue, null)
         assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "ts12" to 9),
