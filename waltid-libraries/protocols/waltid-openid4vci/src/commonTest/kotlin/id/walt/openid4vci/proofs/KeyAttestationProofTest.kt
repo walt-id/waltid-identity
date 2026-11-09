@@ -568,7 +568,7 @@ class KeyAttestationProofTest {
         val config = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key().exportPublicJwkObject()))
         val json = Json { encodeDefaults = true }
         val encoded = json.encodeToJsonElement(config)
-        assertEquals(setOf("verificationMethod", "maxAttestedKeys"), encoded.jsonObject.keys)
+        assertEquals(setOf("verificationMethod", "maxAttestedKeys", "statusPolicy"), encoded.jsonObject.keys)
         assertEquals(config, json.decodeFromJsonElement<KeyAttestationConfig>(encoded))
         assertFailsWith<IllegalArgumentException> { validateKeyAttestationConfiguration(listOf(configuration), null) }
         validateKeyAttestationConfiguration(listOf(configuration), config)
