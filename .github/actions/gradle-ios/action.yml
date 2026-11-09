@@ -24,6 +24,10 @@ inputs:
     description: 'Restored release artifact directory to verify and reuse for WalletSDK bridge tests'
     required: false
     default: ''
+  test-products-artifact:
+    description: 'Verified app test-products artifact directory; empty builds the selected demo locally'
+    required: false
+    default: ''
   run-native-demo-tests:
     description: 'Run native iOS WalletSDK demo tests'
     required: false
@@ -66,6 +70,7 @@ runs:
   using: "composite"
   steps:
     - name: Configure iOS build environment
+      if: ${{ inputs.test-products-artifact == '' || inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
       uses: ./waltid-identity/.github/actions/ios-build-setup
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
@@ -172,6 +177,7 @@ runs:
       shell: bash
       env:
         XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
+        TEST_PRODUCTS_ARTIFACT: ${{ inputs.test-products-artifact }}
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
@@ -197,20 +203,23 @@ runs:
         # Finish cold startup before XCTest starts its application-launch deadline.
         xcrun simctl bootstatus "$simulator" -b
 
-        xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
-          -project iosApp.xcodeproj \
-          -scheme iosApp \
-          -configuration Debug \
+        if [[ -n "$TEST_PRODUCTS_ARTIFACT" ]]; then
+          python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/ios-test-products.py" \
+            verify --demo native --artifact-dir "$TEST_PRODUCTS_ARTIFACT"
+          test_build=(test-without-building -testProductsPath "$TEST_PRODUCTS_ARTIFACT/native.xctestproducts")
+        else
+          test_build=(test -project iosApp.xcodeproj -scheme iosApp -configuration Debug
+            -derivedDataPath /tmp/xcode-derived OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES)
+        fi
+        xcodebuild "${test_build[@]}" -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -destination "platform=iOS Simulator,id=$simulator" \
           -skip-testing:iosAppEnterpriseTests \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
           -skip-testing:iosAppTests/WalletVisualTests \
           -resultBundlePath TestResults \
-          -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
-          -parallel-testing-enabled NO \
-          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+          -parallel-testing-enabled NO
         TESTS
 
     - name: Execute Compose iOS demo app tests
@@ -221,6 +230,7 @@ runs:
       shell: bash
       env:
         XCODE_TEST_DIAGNOSTICS: ${{ inputs.collect-test-diagnostics }}
+        TEST_PRODUCTS_ARTIFACT: ${{ inputs.test-products-artifact }}
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" compose-demo \
@@ -246,18 +256,21 @@ runs:
         trap 'exit 143' TERM
         xcrun simctl bootstatus "$simulator" -b
 
-        xcodebuild test -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
-          -project iosApp.xcodeproj \
-          -scheme iosApp \
-          -configuration Debug \
+        if [[ -n "$TEST_PRODUCTS_ARTIFACT" ]]; then
+          python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/ios-test-products.py" \
+            verify --demo compose --artifact-dir "$TEST_PRODUCTS_ARTIFACT"
+          test_build=(test-without-building -testProductsPath "$TEST_PRODUCTS_ARTIFACT/compose.xctestproducts")
+        else
+          test_build=(test -project iosApp.xcodeproj -scheme iosApp -configuration Debug
+            -derivedDataPath /tmp/xcode-derived-compose "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false")
+        fi
+        xcodebuild "${test_build[@]}" -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
           -destination "platform=iOS Simulator,id=$simulator" \
           -resultBundlePath TestResults \
-          -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
-          -parallel-testing-enabled NO \
-          "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false"
+          -parallel-testing-enabled NO
         TESTS
 
     - name: Collect and publish iOS test reports

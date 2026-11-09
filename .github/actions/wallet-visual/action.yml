@@ -10,6 +10,9 @@ inputs:
   derived-data:
     description: Existing native app build directory
     default: /tmp/xcode-derived
+  test-products-artifact:
+    description: Verified native app test-products artifact directory
+    default: ''
 runs:
   using: composite
   steps:
@@ -46,6 +49,7 @@ runs:
         RENDERER: ${{ inputs.renderer }}
         FRAMEWORK: ${{ inputs.framework-artifact }}
         DERIVED_DATA: ${{ inputs.derived-data }}
+        TEST_PRODUCTS_ARTIFACT: ${{ inputs.test-products-artifact }}
         SIMULATOR: ${{ steps.prepare.outputs.simulator }}
       run: |
         set -euo pipefail
@@ -53,6 +57,7 @@ runs:
         arguments=(--renderers "$RENDERER" --gradle-root "$GITHUB_WORKSPACE" --output "$output")
         [[ -z "$SIMULATOR" ]] || arguments+=(--simulator "$SIMULATOR")
         [[ -z "$FRAMEWORK" ]] || arguments+=(--reuse-framework "$FRAMEWORK" --derived-data "$DERIVED_DATA")
+        [[ -z "$TEST_PRODUCTS_ARTIFACT" ]] || arguments+=(--test-products-artifact "$TEST_PRODUCTS_ARTIFACT")
         exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
           --output-dir "$output" visual-comparison \
           python3 waltid-identity/waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py "${arguments[@]}"

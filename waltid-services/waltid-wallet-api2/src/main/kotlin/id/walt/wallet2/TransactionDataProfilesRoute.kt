@@ -1,7 +1,8 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
-import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfileResponse
+import id.walt.verifier.openid.transactiondata.toResponse
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import io.github.smiley4.ktoropenapi.get
@@ -19,9 +20,9 @@ fun Route.registerTransactionDataProfilesRoute() {
     get("transaction-data-profiles", {
         tags = listOf("Transaction Data")
         summary = "List available transaction data type profiles"
-        response { HttpStatusCode.OK to { body<List<TransactionDataProfile>>() } }
+        response { HttpStatusCode.OK to { body<List<TransactionDataProfileResponse>>() } }
     }) {
         val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
-        call.respond(config.transactionDataProfiles)
+        call.respond(config.transactionDataProfiles.map { it.toResponse() })
     }
 }

@@ -319,7 +319,11 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
             } else {
                 assertNotEquals(originalId, latest.presentationId)
                 assertEquals(HttpStatusCode.OK, http.get("/verification-session/$sessionId/request").status)
-                assertEquals(HttpStatusCode.OK, http.submitForm("/verification-session/$sessionId/request").status)
+                assertEquals(
+                    HttpStatusCode.BadRequest,
+                    http.submitForm("/verification-session/$sessionId/request").status,
+                    "Unsigned sessions stay on GET; request_uri POST requires a signed Request Object",
+                )
                 val afterRequest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
                 assertEquals(latest.presentationId, afterRequest.presentationId)
                 assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, afterRequest.status)
