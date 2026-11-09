@@ -38,7 +38,7 @@ data class GeneralFlowConfig(
 
     val notifications: KtorSessionNotifications? = null,
 
-    /** Allow further presentations until expiry. False consumes the session after its first success. */
+    /** Allow further presentations until expiry. False consumes the session after its first success. Ignored when [sessionUsage] is set. */
     val reattemptable: Boolean = true,
 
     /** Expiration duration in ISO-8601 duration format. Used to calculate expiration date. */
@@ -60,7 +60,10 @@ data class GeneralFlowConfig(
     /** certificate chain for signed request */
     val x5c: List<String>? = null,
 
-    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null
+    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null,
+
+    /** Overrides reattemptable. Omitted preserves its existing single-success or reusable behavior. */
+    @SerialName("session_usage") val sessionUsage: VerificationSessionUsage? = null,
 ) {
     init {
         // Verify if DCQL Query is correct
