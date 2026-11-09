@@ -40,6 +40,8 @@ kotlin {
              * walt.id:
              */
             api(project(":waltid-libraries:crypto:waltid-cose"))
+            api(identityLibs.kotlinx.io.bytestring)
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         commonTest.dependencies {
