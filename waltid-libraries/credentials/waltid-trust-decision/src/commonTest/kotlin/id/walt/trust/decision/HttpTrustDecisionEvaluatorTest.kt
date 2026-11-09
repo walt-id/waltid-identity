@@ -16,8 +16,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class HttpTrustDecisionEvaluatorTest {
@@ -26,13 +30,16 @@ class HttpTrustDecisionEvaluatorTest {
     private val at = Instant.parse("2026-11-09T10:00:00Z")
     private val requests = mutableListOf<HttpRequestData>()
 
-    private fun evaluator(headers: Map<String, String> = emptyMap(), handler: MockRequestHandler): HttpTrustDecisionEvaluator {
+    private fun evaluator(
+        headers: suspend () -> Map<String, String> = { emptyMap() },
+        handler: MockRequestHandler,
+    ): HttpTrustDecisionEvaluator {
         val engine = MockEngine { request ->
             requests += request
             handler(request)
         }
         val fetcher = WebDataFetcher.wrapping(HttpClient(engine), WebDataFetcherId.TRUST_DECISION_RESOLVE.name)
-        return HttpTrustDecisionEvaluator(url, { headers }, fetcher)
+        return HttpTrustDecisionEvaluator(url, headers, fetcher)
     }
 
     private fun request(vararg types: TrustedEntityType) = TrustDecisionRequest(
@@ -51,7 +58,7 @@ class HttpTrustDecisionEvaluatorTest {
 
     @Test
     fun postsResolveRequestWithHeadersAndReturnsRemoteDecision() = runTest {
-        val evaluator = evaluator(mapOf(HttpHeaders.Authorization to "Bearer test-token")) {
+        val evaluator = evaluator({ mapOf(HttpHeaders.Authorization to "Bearer test-token") }) {
             decision(TrustDecisionCode.TRUSTED)
         }
 
@@ -80,11 +87,48 @@ class HttpTrustDecisionEvaluatorTest {
     }
 
     @Test
-    fun nonSuccessStatusIsUnknown() = runTest {
-        val decision = evaluator { json("{}", HttpStatusCode.ServiceUnavailable) }
+    fun nonSuccessStatusIsUnknownAndNamesTheStatus() = runTest {
+        for (status in listOf(HttpStatusCode.Unauthorized, HttpStatusCode.ServiceUnavailable)) {
+            val decision = evaluator { json("{}", status) }
+                .evaluate(request(TrustedEntityType.WALLET_PROVIDER))
+
+            assertEquals(TrustDecisionCode.UNKNOWN, decision.decision)
+            assertTrue(decision.warnings.single().contains("${status.value}"), decision.warnings.toString())
+        }
+    }
+
+    @Test
+    fun failingHeaderProviderIsUnknownAndSendsNothing() = runTest {
+        val decision = evaluator(headers = { error("token source is down") }) { decision(TrustDecisionCode.TRUSTED) }
             .evaluate(request(TrustedEntityType.WALLET_PROVIDER))
 
         assertEquals(TrustDecisionCode.UNKNOWN, decision.decision)
+        assertTrue(requests.isEmpty())
+    }
+
+    @Test
+    fun minimalLegacyAnswerIsTrustedButNotRegistryFresh() = runTest {
+        val evaluator = evaluator { json("""{"decision":"TRUSTED"}""") }
+        val request = request(TrustedEntityType.WALLET_PROVIDER)
+
+        assertIs<TrustCheck.Accepted>(evaluator.check(request, TrustRequirement.Trusted))
+        assertIs<TrustCheck.Rejected>(evaluator.check(request, TrustRequirement.RegistryFresh()))
+    }
+
+    @Test
+    fun unknownFreshnessValueIsReadAsUnknown() = runTest {
+        val decision = evaluator { json("""{"decision":"TRUSTED","sourceFreshness":"EVERGREEN"}""") }
+            .evaluate(request(TrustedEntityType.WALLET_PROVIDER))
+
+        assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+        assertEquals(FreshnessState.UNKNOWN, decision.sourceFreshness)
+    }
+
+    @Test
+    fun cancellationIsNotTurnedIntoADecision() = runTest {
+        val evaluator = evaluator { throw CancellationException("caller went away") }
+
+        assertFailsWith<CancellationException> { evaluator.evaluate(request(TrustedEntityType.WALLET_PROVIDER)) }
     }
 
     @Test
