@@ -1,6 +1,7 @@
 package id.walt.wallet2.server.handlers
 
 import id.walt.wallet2.handlers.CredentialIssuanceStage
+import id.walt.wallet2.handlers.CredentialEndpointException
 import id.walt.wallet2.handlers.FetchCredentialResult
 import id.walt.wallet2.handlers.FetchCredentialsResult
 import id.walt.wallet2.handlers.FetchCredentialRequest
@@ -50,6 +51,13 @@ suspend fun ApplicationCall.respondFetchCredentialResult(result: FetchCredential
         respond(if (legacy && result.deferredCredential != null) HttpStatusCode.Conflict
             else storageOutcomeStatus(result.storageOutcome, legacy), result)
     }
+}
+
+/** Preserve structured issuer rejections at the isolated fetch API boundary. */
+suspend fun ApplicationCall.respondCredentialEndpointError(error: CredentialEndpointException) {
+    val credentialError = error.credentialError
+    if (error.statusCode != HttpStatusCode.BadRequest.value || credentialError == null) throw error
+    respond(HttpStatusCode.BadRequest, credentialError)
 }
 
 /** Preserve local recovery after an isolated deferred response was already received. */
