@@ -256,6 +256,24 @@ tasks.register<JavaExec>("installPlaywrightBrowsers") {
     args(playwrightInstallArgs())
 }
 
+// Separate task keeps the immediate run's JUnit XML and HTML reports intact.
+tasks.register<Test>("issuerDeferredConformanceTest") {
+    group = "verification"
+    description = "Run OSS issuer deferred VCI happy-flow and batch coverage for the selected proof mode."
+    testClassesDirs = tasks.test.get().testClassesDirs
+    classpath = tasks.test.get().classpath
+    useJUnitPlatform()
+    filter { includeTestsMatching("id.walt.openid4vp.conformance.IssuerConformanceTests") }
+    environment("OPENID4VCI_CONFORMANCE_ISSUANCE_MODE", "deferred")
+    environment("OPENID4VCI_CONFORMANCE_REPORT_DIR",
+        providers.environmentVariable("OPENID4VCI_CONFORMANCE_DEFERRED_REPORT_DIR")
+            .getOrElse(layout.buildDirectory.dir("reports/issuer-ci/deferred").get().asFile.absolutePath))
+    // Suite logs contain credential requests and fixture keys; export outcomes/evidence separately.
+    reports.junitXml.includeSystemOutLog.set(false)
+    reports.junitXml.includeSystemErrLog.set(false)
+    outputs.upToDateWhen { false }
+}
+
 fun registerWalletProfileTestTask(taskName: String, testFilter: String, descriptionText: String) {
     tasks.register<Test>(taskName) {
         group = "verification"

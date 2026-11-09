@@ -905,7 +905,10 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<FetchCredentialsResult>() }
                     HttpStatusCode.MultiStatus to { body<FetchCredentialsResult>() }
                     HttpStatusCode.InternalServerError to { body<FetchCredentialsResult>() }
-                    HttpStatusCode.BadRequest to { body<CredentialError>() }
+                    HttpStatusCode.BadRequest to {
+                        description = "The issuer rejected the credential request; preserves its error code and error_description"
+                        body<CredentialError>()
+                    }
                 }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
@@ -913,8 +916,7 @@ object Wallet2RouteHandler {
                 try {
                     call.respondFetchCredentialResult(WalletIssuanceHandler.fetchCredentials(wallet, req), req)
                 } catch (error: CredentialEndpointException) {
-                    if (!error.isInvalidNonce) throw error
-                    call.respond(HttpStatusCode.BadRequest, requireNotNull(error.credentialError))
+                    call.respondCredentialEndpointError(error)
                 }
             }
 

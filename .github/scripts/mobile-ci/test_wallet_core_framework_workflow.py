@@ -7,7 +7,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 GITHUB = ROOT / ".github"
-XCODE = "/Applications/Xcode_27.0.app/Contents/Developer"
+XCODE = "/Applications/Xcode_27.2.app/Contents/Developer"
 CHECKOUT = (
     "walt-id/waltid-identity/.github/actions/checkout-repos@"
     "cba255efcba637f429422c132ccaf46b13b9572b"
