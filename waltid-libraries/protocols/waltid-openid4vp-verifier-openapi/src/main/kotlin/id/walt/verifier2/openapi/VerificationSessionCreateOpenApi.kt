@@ -30,6 +30,8 @@ object VerificationSessionCreateOpenApi {
             - Supports multiple verification policies including signature, revocation, status list, and VICAL validation
             - DCQL query allows requesting specific claims from credentials using JSON path notation
             - Sessions expire after 10 minutes if unused and are retained for 10 years by default
+            - session_usage selects single_attempt (any outcome final), single_success (failures retry), or reusable
+            - session_usage overrides reattemptable; omitting it preserves existing behavior
             - Session status can be tracked via SSE events endpoint
             
             For more information, see: $DOCUMENTATION_URL_PLACEHOLDER
