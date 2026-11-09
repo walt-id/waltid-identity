@@ -26,16 +26,25 @@ object ExternalReaderDeviceResponseOpenApi {
             The reader owns engagement, its private key, session encryption, DeviceRequest and termination.
             Submit the decrypted DeviceResponse CBOR and exact transcript inputs as standard base64, without re-encoding them.
             No session is created ahead of the exchange. Every authenticated submission creates a new session, including replays.
+            reattemptable does not deduplicate separate calls; each returned session is completed and accepts no further attempts.
             Both SUCCESSFUL and FAILED outcomes return 200 with the same public session view as info.
             A malformed request returns 400 and creates no session. Cryptographic failures are stored FAILED outcomes.
             core_flow carries dcql_query or requestedElements, policies, notifications.webhook and retention overrides.
             The reader makes the access decision from status and policy_results, and writes termination SessionData itself.
-            A successful termination uses session status 0. No private reader key or encrypted SessionData is accepted.
+            A successful close uses SessionData status 20 (SESSION_TERMINATION); DeviceResponse status 0 means OK.
+            No private reader key or encrypted SessionData is accepted.
+            NFC static handover sends handoverSelect only; negotiated handover also sends handoverRequest. Preserve both exactly.
         """.trimIndent()
         request {
             body<ExternalReaderDeviceResponse> {
                 example("QR null handover") { value = qr }
-                example("NFC handover") {
+                example("NFC static handover") {
+                    value = qr.copy(handover = buildJsonObject {
+                        put("type", "nfc")
+                        put("handoverSelect", "<base64 exact handover-select bytes>")
+                    })
+                }
+                example("NFC negotiated handover") {
                     value = qr.copy(handover = buildJsonObject {
                         put("type", "nfc")
                         put("handoverSelect", "<base64 exact handover-select bytes>")
