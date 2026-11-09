@@ -25,6 +25,18 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class AndroidDigitalCredentialRegistryTest {
+    @Test fun paymentExtensionPreservesAndroidXIconsAndCredentialDocument() {
+        val json = "{\"credentials\":{\"dc+sd-jwt\":{}},\"supported_protocols\":[\"openid4vp-v1-signed\"]}"
+        val prefix = byteArrayOf(8, 0, 0, 0, 11, 22, 33, 44)
+        val encoded = withPaymentInstructions(prefix + json.encodeToByteArray(), emptyMap(), listOf("en"))
+        kotlin.test.assertContentEquals(prefix, encoded.copyOfRange(0, 8))
+        val document = Json.parseToJsonElement(encoded.copyOfRange(8, encoded.size).decodeToString()).jsonObject
+        assertEquals(Json.parseToJsonElement(json), kotlinx.serialization.json.JsonObject(document - "walt_payment_instructions_v1" - "walt_payment_number_formats_v1"))
+        assertTrue(document.getValue("walt_payment_instructions_v1").jsonObject.isEmpty())
+        assertEquals(".", document.getValue("walt_payment_number_formats_v1").jsonObject.getValue("en").jsonObject.getValue("decimal_separator").jsonPrimitive.content)
+        kotlin.test.assertFailsWith<IllegalArgumentException> { withPaymentInstructions(byteArrayOf(99, 0, 0, 0), emptyMap(), emptyList()) }
+    }
+
     private val registry = AndroidDigitalCredentialRegistry(RuntimeEnvironment.getApplication())
 
     @Test

@@ -30,6 +30,35 @@ class PaymentConsentResolverTest {
         }
     }
 
+    @Test fun unsupportedPlatformClaimPathsDoNotChangeWalletOwnedPaymentReview() = test {
+        metadata = JsonObject(metadata + ("claims" to buildJsonArray { add(buildJsonObject {
+            put("path", buildJsonArray { add("accounts"); add(JsonNull) })
+        }) }))
+        val instructions = resolver.resolveMetadata(credential())
+        assertEquals("Pay", instructions.resolve(payload, listOf("en")).affirmativeAction)
+        assertFailsWith<PaymentConsentException> { instructions.document }
+    }
+
+    @Test fun platformProjectionUsesAuthenticatedLabelsAndRechecksMetadata() = test {
+        val credential = credential()
+        val first = resolver.resolveMetadata(credential)
+        val amount = first.document.getValue("claims").jsonArray.single { it.jsonObject["path"] == buildJsonArray { add("amount") } }.jsonObject
+        assertEquals("amount", amount.getValue("labels").jsonObject.getValue("en").jsonObject["label"]?.jsonPrimitive?.content)
+        assertEquals(3, amount.getValue("visualisation").jsonPrimitive.int)
+        assertEquals("Pay", first.resolve(payload, listOf("en-US")).affirmativeAction)
+        val changed = metadata.toString().replace("\"Pay\"", "\"Authorize\"")
+        metadata = Json.parseToJsonElement(changed).jsonObject
+        val second = resolver.resolveMetadata(credential)
+        assertNotEquals(first.document, second.document)
+        assertEquals("Pay", first.resolve(payload, listOf("en")).affirmativeAction)
+        assertEquals("Authorize", second.resolve(payload, listOf("en")).affirmativeAction)
+        assertEquals(listOf("/vct", "/vct"), requests)
+        assertFailure(PaymentConsentFailure.UNTRUSTED_CREDENTIAL) {
+            resolver.resolveMetadata(credential.copy(credentialData = JsonObject(credential.credentialData + ("vct" to JsonPrimitive("https://attacker.example")))))
+        }
+        assertEquals(2, requests.size)
+    }
+
     @Test fun configuredRequestHeadersCookiesAndAuthReachPaymentMetadata() = test {
         val public = issuerKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(issuerKey.spec)
         val trust = listOf(PaymentCredentialIssuer(ISSUER, public.data.toByteArray().decodeToString()))

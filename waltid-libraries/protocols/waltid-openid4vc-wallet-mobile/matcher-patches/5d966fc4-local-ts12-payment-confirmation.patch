@@ -1,0 +1,930 @@
+diff --git a/CredentialProvider/wasm/matcher-rs/Cargo.lock b/CredentialProvider/wasm/matcher-rs/Cargo.lock
+index cf25380..9c4d436 100644
+--- a/CredentialProvider/wasm/matcher-rs/Cargo.lock
++++ b/CredentialProvider/wasm/matcher-rs/Cargo.lock
+@@ -8,6 +8,12 @@ version = "1.0.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
+
++[[package]]
++name = "foldhash"
++version = "0.2.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
++
+ [[package]]
+ name = "hashbrown"
+ version = "0.17.1"
+@@ -24,6 +30,12 @@ dependencies = [
+  "hashbrown",
+ ]
+
++[[package]]
++name = "itoa"
++version = "1.0.19"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
++
+ [[package]]
+ name = "log"
+ version = "0.4.29"
+@@ -38,8 +50,15 @@ dependencies = [
+  "log",
+  "nanoserde",
+  "rustc-hash",
++ "serde_json",
+ ]
+
++[[package]]
++name = "memchr"
++version = "2.8.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
++
+ [[package]]
+ name = "nanoserde"
+ version = "0.1.37"
+@@ -55,8 +74,93 @@ version = "0.1.22"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "e943b2c21337b7e3ec6678500687cdc741b7639ad457f234693352075c082204"
+
++[[package]]
++name = "proc-macro2"
++version = "1.0.107"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
++dependencies = [
++ "unicode-ident",
++]
++
++[[package]]
++name = "quote"
++version = "1.0.47"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001"
++dependencies = [
++ "proc-macro2",
++]
++
+ [[package]]
+ name = "rustc-hash"
+ version = "2.1.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "94300abf3f1ae2e2b8ffb7b58043de3d399c73fa6f4b73826402a5c457614dbe"
++
++[[package]]
++name = "serde"
++version = "1.0.229"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
++dependencies = [
++ "serde_core",
++]
++
++[[package]]
++name = "serde_core"
++version = "1.0.229"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48"
++dependencies = [
++ "serde_derive",
++]
++
++[[package]]
++name = "serde_derive"
++version = "1.0.229"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn",
++]
++
++[[package]]
++name = "serde_json"
++version = "1.0.154"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
++dependencies = [
++ "foldhash",
++ "indexmap",
++ "itoa",
++ "memchr",
++ "serde",
++ "serde_core",
++ "zmij",
++]
++
++[[package]]
++name = "syn"
++version = "3.0.10"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "4ae9ccbea3a7b0b09443036490c8f34a8b1b760fd345e5c0dae0aac718faea79"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "unicode-ident",
++]
++
++[[package]]
++name = "unicode-ident"
++version = "1.0.27"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
++
++[[package]]
++name = "zmij"
++version = "1.0.23"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+diff --git a/CredentialProvider/wasm/matcher-rs/Cargo.toml b/CredentialProvider/wasm/matcher-rs/Cargo.toml
+index 8d2a3ca..3461848 100644
+--- a/CredentialProvider/wasm/matcher-rs/Cargo.toml
++++ b/CredentialProvider/wasm/matcher-rs/Cargo.toml
+@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
+
+ [dependencies]
+ nanoserde = "0.1"
++serde_json = { version = "1", features = ["arbitrary_precision", "preserve_order"] }
+ log = "0.4"
+ indexmap = { version = "2.2", features = ["std"] }
+ rustc-hash = "2.0"
+diff --git a/CredentialProvider/wasm/matcher-rs/src/lib.rs b/CredentialProvider/wasm/matcher-rs/src/lib.rs
+index 43097df..1d76e36 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/lib.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/lib.rs
+@@ -14,3 +14,4 @@ pub mod reporter;
+ pub mod simple_allocator;
+ #[cfg(test)]
+ pub mod test_utils;
++pub mod payment;
+diff --git a/CredentialProvider/wasm/matcher-rs/src/openid4vp.rs b/CredentialProvider/wasm/matcher-rs/src/openid4vp.rs
+index b3ec3e8..a299e50 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/openid4vp.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/openid4vp.rs
+@@ -173,7 +173,7 @@ pub fn openid4vp_main(credman: &mut impl CredmanApi) -> Result<(), Box<dyn std::
+             if has_matches {
+                 // If there are multiple requests of the same preferred protocol,
+                 // we only process the first request that yields a match.
+-                report_match_result(credman, &match_result, i, &data_json, &matcher_data_buffer)?;
++                report_match_result(credman, &match_result, i, &data_json, &matcher_data_buffer, pr.protocol == "openid4vp-v1-unsigned")?;
+                 return Ok(());
+             }
+         }
+diff --git a/CredentialProvider/wasm/matcher-rs/src/reporter.rs b/CredentialProvider/wasm/matcher-rs/src/reporter.rs
+index 853dd43..54dd494 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/reporter.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/reporter.rs
+@@ -13,6 +13,7 @@ fn report_payment_transaction_entry(
+     selection_metadata_json: &str,
+     merchant_name: &str,
+     transaction_amount: &str,
++    subtitle: &str,
+     additional_info: &str,
+     credentials_blob: &[u8],
+ ) -> Result<(), Box<dyn std::error::Error>> {
+@@ -32,7 +33,7 @@ fn report_payment_transaction_entry(
+         matched_credential.id,
+         merchant_name,
+         &matched_credential.display.verification.title,
+-        &matched_credential.display.verification.subtitle,
++        subtitle,
+         icon_bytes,
+         transaction_amount,
+         &[], // bank_icon (empty for now)
+@@ -153,6 +154,10 @@ fn report_matched_credential(
+     dcql_option_idx: Option<&str>,
+     credentials_blob: &[u8],
+     transaction_info: &Option<(Vec<String>, String, String, String)>,
++    payment_subtitles: &std::collections::BTreeMap<
++        (String, String),
++        crate::payment::PaymentDisplay,
++    >,
+ ) -> Result<(), Box<dyn std::error::Error>> {
+     log::debug!(
+         "Reporting matched credential: id={}, dcql_id={}, doc_idx={}",
+@@ -180,7 +185,21 @@ fn report_matched_credential(
+                     credential_set_id,
+                     &metadata_str,
+                     merchant,
+-                    amount,
++                    payment_subtitles
++                        .get(&(
++                            matched_credential_id.to_owned(),
++                            matched_credential.id.to_owned(),
++                        ))
++                        .map_or(amount.as_str(), |display| display.amount.as_str()),
++                    payment_subtitles
++                        .get(&(
++                            matched_credential_id.to_owned(),
++                            matched_credential.id.to_owned(),
++                        ))
++                        .map_or(
++                            matched_credential.display.verification.subtitle.as_str(),
++                            |display| display.subtitle.as_str(),
++                        ),
+                     additional,
+                     credentials_blob,
+                 )?;
+@@ -218,31 +237,13 @@ fn extract_transaction_info(
+     if !td.transaction_type.is_empty() {
+         log::trace!("Transaction type: {}", td.transaction_type);
+         if td.transaction_type == "urn:eudi:sca:payment:1" {
+-            if let Some(payload) = &td.payload {
+-                let merchant_name = payload
+-                    .payee
+-                    .as_ref()
+-                    .map(|p| p.name.clone())
+-                    .unwrap_or_default();
+-                let transaction_amount = if !payload.amount_display.is_empty() {
+-                    payload.amount_display.clone()
+-                } else if !payload.currency.is_empty() {
+-                    format!("{} {:.2}", payload.currency, payload.amount.unwrap_or(0.0))
+-                } else {
+-                    format!("{:.2}", payload.amount.unwrap_or(0.0))
+-                };
+-                log::info!(
+-                    "Found transaction data (sca): merchant={}, amount={}",
+-                    merchant_name,
+-                    transaction_amount
+-                );
+-                return Ok(Some((
+-                    td.credential_ids,
+-                    merchant_name,
+-                    transaction_amount,
+-                    td.additional_info.clone(),
+-                )));
+-            }
++            let payment = crate::payment::parse(openid4vp_data)?.ok_or("Missing payment")?;
++            return Ok(Some((
++                payment.ids,
++                payment.merchant,
++                payment.amount,
++                String::new(),
++            )));
+         } else if td.transaction_type == "payment_details" {
+             let merchant_name = td.payee_name.clone();
+             let transaction_amount = format!("{} {}", td.payment_currency, td.payment_amount);
+@@ -281,12 +282,57 @@ pub fn report_match_result(
+     request_idx: usize,
+     openid4vp_data: &OpenId4VpData,
+     credentials_blob: &[u8],
++    unsigned: bool,
+ ) -> Result<(), Box<dyn std::error::Error>> {
+     let wasm_version = credman.get_wasm_version();
+     log::info!("Reporting match results. Wasm version: {}", wasm_version);
+
+     if !match_result.matched_credential_sets.is_empty() {
+-        let transaction_info = extract_transaction_info(openid4vp_data)?;
++        // Validate and prepare every payment before declaring any candidate set. Unsupported TS-12
++        // must never fall through to ordinary sharing, including the multiple-transaction boundary.
++        let prepared = (|| -> Result<_, Box<dyn std::error::Error>> {
++            let payment = crate::payment::parse(openid4vp_data)?;
++            let transaction_info = extract_transaction_info(openid4vp_data)?;
++            let mut payment_subtitles = std::collections::BTreeMap::new();
++            if let Some(payment) = &payment {
++                let offset = u32::from_le_bytes(
++                    credentials_blob
++                        .get(..4)
++                        .ok_or("Missing registry")?
++                        .try_into()?,
++                ) as usize;
++                let registry: serde_json::Value = serde_json::from_slice(
++                    credentials_blob
++                        .get(offset..)
++                        .ok_or("Invalid registry offset")?,
++                )?;
++                for (query_id, entry) in match_result.matched_credentials.iter() {
++                    if !payment.ids.iter().any(|id| id == query_id) {
++                        continue;
++                    }
++                    let query = openid4vp_data
++                        .dcql_query
++                        .as_ref()
++                        .and_then(|q| q.credentials.iter().find(|c| c.id == *query_id))
++                        .ok_or("Missing payment query")?;
++                    for credential in &entry.matched {
++                        if query.format == "dc+sd-jwt" || query.format == "vc+sd-jwt" {
++                            let subtitle =
++                                crate::payment::subtitle(payment, credential, &registry, unsigned)?;
++                            payment_subtitles
++                                .insert((query_id.to_string(), credential.id.to_owned()), subtitle);
++                        }
++                    }
++                }
++            }
++
++            Ok((transaction_info, payment_subtitles))
++        })();
++        let Ok((transaction_info, payment_subtitles)) = prepared else {
++            // Unsupported consent is an ordinary empty match, not a matcher execution error.
++            // No entry set has been declared at this point.
++            return Ok(());
++        };
+
+         // Recursive helper to generate Cartesian product.
+         fn report_combinations(
+@@ -298,6 +344,10 @@ pub fn report_match_result(
+             candidate_matched_credentials: &DeterministicMap<&str, DcqlMatchedCredentialEntry<'_>>,
+             credentials_blob: &[u8],
+             transaction_info: &Option<(Vec<String>, String, String, String)>,
++            payment_subtitles: &std::collections::BTreeMap<
++                (String, String),
++                crate::payment::PaymentDisplay,
++            >,
+         ) -> Result<(), Box<dyn std::error::Error>> {
+             if selected_option_indices.len() == credential_sets.len() {
+                 // We have selected one option from each set. Now report this combination.
+@@ -344,6 +394,7 @@ pub fn report_match_result(
+                             Some(&option.option_id),
+                             credentials_blob,
+                             transaction_info,
++                            payment_subtitles,
+                         )?;
+                         document_index += 1;
+                     }
+@@ -364,6 +415,7 @@ pub fn report_match_result(
+                     candidate_matched_credentials,
+                     credentials_blob,
+                     transaction_info,
++                    payment_subtitles,
+                 )?;
+                 selected_option_indices.pop();
+             }
+@@ -381,6 +433,7 @@ pub fn report_match_result(
+             &match_result.matched_credentials,
+             credentials_blob,
+             &transaction_info,
++            &payment_subtitles,
+         )?;
+     }
+
+@@ -506,11 +559,7 @@ mod tests {
+             _set_index: i32,
+         ) {
+         }
+-        fn self_declare_package_info(
+-            &mut self,
+-            _package_display_name: &str,
+-            _package_icon: &[u8],
+-        ) {
++        fn self_declare_package_info(&mut self, _package_display_name: &str, _package_icon: &[u8]) {
+         }
+     }
+
+@@ -531,7 +580,7 @@ mod tests {
+         };
+         let openid4vp_data = OpenId4VpData::default();
+
+-        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[]).unwrap();
++        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[], true).unwrap();
+
+         assert!(mock.added_entries.is_empty());
+     }
+@@ -583,7 +632,7 @@ mod tests {
+         };
+         let openid4vp_data = OpenId4VpData::default();
+
+-        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[]).unwrap();
++        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[], true).unwrap();
+
+         assert_eq!(mock.added_entries, vec!["cred1"]);
+     }
+@@ -614,7 +663,7 @@ mod tests {
+         };
+         let openid4vp_data = OpenId4VpData::default();
+
+-        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[]).unwrap();
++        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[], true).unwrap();
+
+         assert_eq!(mock.inline_entries, vec!["inline_cred"]);
+     }
+@@ -694,7 +743,7 @@ mod tests {
+
+         let openid4vp_data = OpenId4VpData::default();
+
+-        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[]).unwrap();
++        report_match_result(&mut mock, &match_result, 0, &openid4vp_data, &[], true).unwrap();
+
+         // We expect 2^3 = 8 calls to add_entry_set
+         assert_eq!(mock.added_entry_sets.len(), 8);
+diff --git a/CredentialProvider/wasm/matcher-rs/testdata/TC32_ExtractPaymentSca1_request.json b/CredentialProvider/wasm/matcher-rs/testdata/TC32_ExtractPaymentSca1_request.json
+index f450e60..6cfb7a2 100644
+--- a/CredentialProvider/wasm/matcher-rs/testdata/TC32_ExtractPaymentSca1_request.json
++++ b/CredentialProvider/wasm/matcher-rs/testdata/TC32_ExtractPaymentSca1_request.json
+@@ -14,10 +14,10 @@
+           ]
+         },
+         "transaction_data": [
+-          "eyJ0eXBlIjoidXJuOmV1ZGk6c2NhOnBheW1lbnQ6MSIsInBheWxvYWQiOnsicGF5ZWUiOnsibmFtZSI6Ik1lcmNoYW50IFgifSwiYW1vdW50X2Rpc3BsYXkiOiJFVVIgNTAuMDAifSwiY3JlZGVudGlhbF9pZHMiOlsibWRsIl19"
++          "eyJ0eXBlIjogInVybjpldWRpOnNjYTpwYXltZW50OjEiLCAiY3JlZGVudGlhbF9pZHMiOiBbIm1kbCJdLCAicGF5bG9hZCI6IHsidHJhbnNhY3Rpb25faWQiOiAidHhuLTEiLCAicGF5ZWUiOiB7Im5hbWUiOiAiTWVyY2hhbnQgWCIsICJpZCI6ICJtZXJjaGFudC14In0sICJhbW91bnQiOiA1MCwgImN1cnJlbmN5IjogIkVVUiJ9fQ"
+         ]
+       },
+       "protocol": "openid4vp-v1-unsigned"
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/CredentialProvider/wasm/matcher-rs/testdata/TC36_WasmPaymentV2_request.json b/CredentialProvider/wasm/matcher-rs/testdata/TC36_WasmPaymentV2_request.json
+index f450e60..6cfb7a2 100644
+--- a/CredentialProvider/wasm/matcher-rs/testdata/TC36_WasmPaymentV2_request.json
++++ b/CredentialProvider/wasm/matcher-rs/testdata/TC36_WasmPaymentV2_request.json
+@@ -14,10 +14,10 @@
+           ]
+         },
+         "transaction_data": [
+-          "eyJ0eXBlIjoidXJuOmV1ZGk6c2NhOnBheW1lbnQ6MSIsInBheWxvYWQiOnsicGF5ZWUiOnsibmFtZSI6Ik1lcmNoYW50IFgifSwiYW1vdW50X2Rpc3BsYXkiOiJFVVIgNTAuMDAifSwiY3JlZGVudGlhbF9pZHMiOlsibWRsIl19"
++          "eyJ0eXBlIjogInVybjpldWRpOnNjYTpwYXltZW50OjEiLCAiY3JlZGVudGlhbF9pZHMiOiBbIm1kbCJdLCAicGF5bG9hZCI6IHsidHJhbnNhY3Rpb25faWQiOiAidHhuLTEiLCAicGF5ZWUiOiB7Im5hbWUiOiAiTWVyY2hhbnQgWCIsICJpZCI6ICJtZXJjaGFudC14In0sICJhbW91bnQiOiA1MCwgImN1cnJlbmN5IjogIkVVUiJ9fQ"
+         ]
+       },
+       "protocol": "openid4vp-v1-unsigned"
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/CredentialProvider/wasm/matcher-rs/src/payment.rs b/CredentialProvider/wasm/matcher-rs/src/payment.rs
+new file mode 100644
+--- /dev/null
++++ b/CredentialProvider/wasm/matcher-rs/src/payment.rs
+@@ -0,0 +1,478 @@
++//! Local TS-12 system-sheet projection. Trust is established by the wallet before registration;
++//! the sandbox only selects authenticated labels and renders the original request's values.
++use crate::base64url::decode_base64url;
++use crate::openid4vp_models::{MatchedCredential, OpenId4VpData};
++use serde_json::{Map, Value};
++use std::collections::BTreeMap;
++
++type Error = Box<dyn std::error::Error>;
++const TYPE: &str = "urn:eudi:sca:payment:1";
++pub struct PaymentDisplay {
++    pub subtitle: String,
++    pub amount: String,
++}
++
++pub struct Payment {
++    pub ids: Vec<String>,
++    pub merchant: String,
++    pub amount: String,
++    pub payload: Value,
++}
++
++/// Decimal expansion is bounded and never passes through IEEE-754. Input is a JSON number token.
++pub fn exact_amount(token: &str, currency: &str) -> Result<String, Error> {
++    let units = minor_units(currency).ok_or("Unsupported payment currency")?;
++    if token.len() > 128 {
++        return Err("Payment number too long".into());
++    }
++    let (negative, unsigned) = token
++        .strip_prefix('-')
++        .map_or((false, token), |v| (true, v));
++    let mut parts = unsigned.split(['e', 'E']);
++    let mantissa = parts.next().ok_or("Missing number")?;
++    let exponent = parts
++        .next()
++        .map(str::parse::<i32>)
++        .transpose()?
++        .unwrap_or(0);
++    if parts.next().is_some() || !(-128..=128).contains(&exponent) {
++        return Err("Unsupported exponent".into());
++    }
++    let mut components = mantissa.split('.');
++    let whole = components.next().ok_or("Missing whole number")?;
++    let fraction = components.next().unwrap_or("");
++    if components.next().is_some()
++        || whole.is_empty()
++        || !whole.bytes().all(|c| c.is_ascii_digit())
++        || !fraction.bytes().all(|c| c.is_ascii_digit())
++    {
++        return Err("Invalid number".into());
++    }
++    let digits = format!("{whole}{fraction}");
++    let point = whole.len() as i32 + exponent;
++    let (whole, fraction) = if point <= 0 {
++        (
++            "0".to_owned(),
++            format!("{}{digits}", "0".repeat((-point) as usize)),
++        )
++    } else if point as usize >= digits.len() {
++        (
++            format!("{digits}{}", "0".repeat(point as usize - digits.len())),
++            String::new(),
++        )
++    } else {
++        (
++            digits[..point as usize].to_owned(),
++            digits[point as usize..].to_owned(),
++        )
++    };
++    let whole = whole.trim_start_matches('0');
++    let whole = if whole.is_empty() { "0" } else { whole };
++    let fraction = fraction.trim_end_matches('0');
++    if fraction.len() > units {
++        return Err("Payment exceeds currency precision".into());
++    }
++    let fraction = format!("{fraction:0<units$}");
++    Ok(format!(
++        "{}{whole}{}",
++        if negative { "-" } else { "" },
++        if units == 0 {
++            String::new()
++        } else {
++            format!(".{fraction}")
++        }
++    ))
++}
++
++pub fn parse(data: &OpenId4VpData) -> Result<Option<Payment>, Error> {
++    let entries: Vec<Value> = data
++        .transaction_data
++        .iter()
++        .map(|raw| Ok(serde_json::from_slice(&decode_base64url(raw)?)?))
++        .collect::<Result<_, Error>>()?;
++    if !entries.iter().any(|v| v["type"] == TYPE) {
++        return Ok(None);
++    }
++    if entries.len() != 1 {
++        return Err("System payment confirmation supports exactly one transaction".into());
++    }
++    let entry = &entries[0];
++    let object = entry.as_object().ok_or("Invalid transaction")?;
++    if object.keys().any(|k| {
++        ![
++            "type",
++            "credential_ids",
++            "transaction_data_hashes_alg",
++            "payload",
++        ]
++        .contains(&k.as_str())
++    }) {
++        return Err("Unsupported transaction extension".into());
++    }
++    let ids: Vec<String> = entry["credential_ids"]
++        .as_array()
++        .ok_or("Missing credential IDs")?
++        .iter()
++        .map(|id| {
++            id.as_str()
++                .filter(|s| !s.is_empty())
++                .map(str::to_owned)
++                .ok_or("Invalid credential ID".into())
++        })
++        .collect::<Result<_, Error>>()?;
++    if ids.is_empty() {
++        return Err("Missing credential IDs".into());
++    }
++    let payload = &entry["payload"];
++    let values = payload.as_object().ok_or("Missing payment payload")?;
++    let required = ["transaction_id", "payee", "currency", "amount"];
++    if required.iter().any(|k| !values.contains_key(*k)) {
++        return Err("Missing required payment parameter".into());
++    }
++    for (key, value) in values {
++        match key.as_str() {
++            "payee" => string_object(value, &["name", "id", "logo", "website"], &["name", "id"])?,
++            "pisp" => string_object(
++                value,
++                &["legal_name", "brand_name", "domain_name"],
++                &["legal_name", "brand_name", "domain_name"],
++            )?,
++            "amount" => {
++                if !value.is_number() {
++                    return Err("Amount must be a number".into());
++                }
++            }
++            "amount_estimated" | "amount_earmarked" | "sct_inst" => {
++                if !value.is_boolean() {
++                    return Err("Invalid payment flag".into());
++                }
++            }
++            "transaction_id" | "date_time" | "currency" => {
++                nonblank(value)?;
++            }
++            _ => {
++                return Err(
++                    "System payment confirmation supports only unscheduled one-off payments".into(),
++                );
++            }
++        }
++    }
++    if nonblank(&payload["transaction_id"])?.chars().count() > 36 {
++        return Err("Invalid transaction ID".into());
++    }
++    let currency = nonblank(&payload["currency"])?;
++    let amount = exact_amount(&payload["amount"].to_string(), currency)?;
++    Ok(Some(Payment {
++        ids,
++        merchant: single_line(nonblank(&payload["payee"]["name"])?),
++        amount: format!("{currency} {amount}"),
++        payload: payload.clone(),
++    }))
++}
++fn string_object(value: &Value, allowed: &[&str], required: &[&str]) -> Result<(), Error> {
++    let object = value.as_object().ok_or("Invalid payment object")?;
++    if required.iter().any(|k| !object.contains_key(*k)) {
++        return Err("Missing payment parameter".into());
++    }
++    for (key, value) in object {
++        if !allowed.contains(&key.as_str()) {
++            return Err("Unsupported payment parameter".into());
++        }
++        nonblank(value)?;
++    }
++    Ok(())
++}
++fn nonblank(value: &Value) -> Result<&str, Error> {
++    value
++        .as_str()
++        .filter(|s| !s.trim().is_empty())
++        .ok_or("Missing payment text".into())
++}
++fn at<'a>(mut value: &'a Value, path: &[String]) -> Option<&'a Value> {
++    for part in path {
++        value = value.as_object()?.get(part)?;
++    }
++    Some(value)
++}
++fn path(rule: &Value) -> Result<Vec<String>, Error> {
++    rule["path"]
++        .as_array()
++        .ok_or("Missing label path")?
++        .iter()
++        .map(|p| Ok(nonblank(p)?.to_owned()))
++        .collect()
++}
++fn leaves(value: &Value, prefix: Vec<String>, result: &mut BTreeMap<Vec<String>, Value>) {
++    if let Some(object) = value.as_object() {
++        for (key, child) in object {
++            let mut path = prefix.clone();
++            path.push(key.clone());
++            leaves(child, path, result);
++        }
++    } else {
++        result.insert(prefix, value.clone());
++    }
++}
++fn matching<'a>(labels: &'a Map<String, Value>, range: &str) -> Option<&'a Value> {
++    labels.get(range).or_else(|| {
++        labels
++            .iter()
++            .find(|(key, _)| key.starts_with(&format!("{range}-")))
++            .map(|(_, value)| value)
++    })
++}
++fn single_line(value: &str) -> String {
++    value
++        .chars()
++        .map(|c| {
++            if c.is_control() || matches!(c, '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}') {
++                format!("\\u{:04x}", c as u32)
++            } else {
++                c.to_string()
++            }
++        })
++        .collect()
++}
++fn value_text(value: &Value, locale: &str) -> String {
++    let text = match value {
++        Value::String(s) => s.clone(),
++        Value::Bool(v) => match (locale.split('-').next().unwrap_or(""), v) {
++            ("de", true) => "Ja",
++            ("de", false) => "Nein",
++            (_, true) => "Yes",
++            (_, false) => "No",
++        }
++        .to_owned(),
++        _ => value.to_string(),
++    };
++    // Isolate each request/claim value; it must not inject a new instruction line or reorder labels.
++    format!("\u{2068}{}\u{2069}", single_line(&text))
++}
++
++/// Returns issuer-labelled transaction parameters and selected attributes for one payment candidate.
++/// Missing metadata or a common translation means there is no truthful system payment candidate.
++pub fn subtitle(
++    payment: &Payment,
++    credential: &MatchedCredential<'_>,
++    registry: &Value,
++    unsigned: bool,
++) -> Result<PaymentDisplay, Error> {
++    let configuration = &registry["walt_payment_instructions_v1"][credential.id];
++    let document = &configuration["document"];
++    let claims = document["claims"]
++        .as_array()
++        .ok_or("No authenticated payment instructions")?;
++    let credential_rules = document["credential_claims"]
++        .as_array()
++        .ok_or("No authenticated claim instructions")?;
++    let ui = document["ui_labels"]
++        .as_object()
++        .ok_or("No authenticated UI instructions")?;
++    if !ui.contains_key("affirmative_action_label") {
++        return Err("Missing action label".into());
++    }
++    let mut values = BTreeMap::new();
++    leaves(&payment.payload, vec![], &mut values);
++    let mut fields: Vec<(&Value, Value)> = vec![];
++    for rule in claims {
++        let path = path(rule)?;
++        if let Some(value) = values.remove(&path) {
++            fields.push((rule, value));
++        } else if rule["mandatory"] == true && at(&payment.payload, &path).is_none() {
++            return Err("Missing mandatory payment parameter".into());
++        }
++    }
++    if !values.is_empty() {
++        return Err("Payment parameter has no authenticated label".into());
++    }
++    let record = registry["credentials"]["dc+sd-jwt"]
++        .as_object()
++        .and_then(|types| {
++            types
++                .values()
++                .filter_map(Value::as_array)
++                .flatten()
++                .find(|r| r["id"].as_str() == Some(credential.id))
++        })
++        .ok_or("Missing registered payment credential")?;
++    for path in &credential.matched_claim_metadata {
++        let rule = credential_rules
++            .iter()
++            .find(|r| self::path(r).is_ok_and(|p| p.as_slice() == *path))
++            .ok_or("Requested attribute has no authenticated label")?;
++        let field = at(&record["paths"], path).ok_or("Missing selected attribute")?;
++        fields.push((
++            rule,
++            field.get("value").ok_or("Missing selected value")?.clone(),
++        ));
++    }
++    let label_sets: Vec<&Map<String, Value>> = fields
++        .iter()
++        .map(|(r, _)| r["labels"].as_object().ok_or("Missing labels"))
++        .chain(
++            ui.values()
++                .map(|v| v.as_object().ok_or("Missing UI translations")),
++        )
++        .collect::<Result<_, _>>()?;
++    let mut candidates: Vec<String> = vec![];
++    for preference in configuration["locales"]
++        .as_array()
++        .ok_or("Missing languages")?
++    {
++        let mut range = nonblank(preference)?.to_ascii_lowercase();
++        loop {
++            if !candidates.contains(&range) {
++                candidates.push(range.clone());
++            }
++            let Some((parent, _)) = range.rsplit_once('-') else {
++                break;
++            };
++            range = parent.to_owned();
++            if range.rsplit('-').next().is_some_and(|p| p.len() == 1) {
++                range = range.rsplit_once('-').map_or("", |p| p.0).to_owned();
++            }
++            if range.is_empty() {
++                break;
++            }
++        }
++    }
++    let needs_wallet_translation = unsigned || fields.iter().any(|(_, v)| v.is_boolean());
++    let locale = candidates
++        .iter()
++        .find(|c| {
++            (!needs_wallet_translation || ["en", "de"].contains(&c.split('-').next().unwrap_or("")))
++                && label_sets
++                    .iter()
++                    .all(|labels| matching(labels, c).is_some())
++        })
++        .ok_or("Missing preferred language")?;
++    let number_format = &registry["walt_payment_number_formats_v1"][locale];
++    let separator = nonblank(&number_format["decimal_separator"])?;
++    let zero = nonblank(&number_format["zero_digit"])?
++        .chars()
++        .next()
++        .ok_or("Missing number format")? as u32;
++    let amount: String = payment
++        .amount
++        .chars()
++        .map(|c| {
++            if c == '.' {
++                Ok(separator.to_owned())
++            } else if c.is_ascii_digit() {
++                char::from_u32(zero + (c as u32 - '0' as u32))
++                    .map(|v| v.to_string())
++                    .ok_or("Invalid digit format")
++            } else {
++                Ok(c.to_string())
++            }
++        })
++        .collect::<Result<_, _>>()?;
++    let mut lines = vec![];
++    if unsigned {
++        lines.push(
++            if locale.starts_with("de") {
++                "Unsignierte Anfrage. Prüfen Sie die Zahlungsdaten vor dem Bestätigen."
++            } else {
++                "Unsigned request. Check the payment details before confirming."
++            }
++            .to_owned(),
++        );
++    }
++    if !credential.display.verification.subtitle.is_empty() {
++        lines.push(single_line(&credential.display.verification.subtitle));
++    }
++    for key in ["transaction_title", "security_hint"] {
++        if let Some(labels) = ui.get(key).and_then(Value::as_object) {
++            lines.push(single_line(nonblank(
++                matching(labels, locale).ok_or("Missing UI label")?,
++            )?));
++        }
++    }
++    for (rule, mut value) in fields {
++        if rule["visualisation"] == 4 {
++            continue;
++        }
++        let label = matching(rule["labels"].as_object().ok_or("Missing labels")?, locale)
++            .ok_or("Missing label")?;
++        if path(rule)? == ["amount"] {
++            value = Value::String(amount.clone());
++        }
++        lines.push(format!(
++            "{}: {}",
++            single_line(nonblank(&label["label"])?),
++            value_text(&value, locale)
++        ));
++        if let Some(description) = label.get("description") {
++            lines.push(single_line(nonblank(description)?));
++        }
++    }
++    let subtitle = lines.join("\n");
++    if subtitle.len() > 16384 {
++        return Err("Payment instructions exceed system projection limit".into());
++    }
++    Ok(PaymentDisplay { subtitle, amount })
++}
++
++// Same ISO 4217 snapshot as the wallet PaymentCurrency.kt (2026-09-17).
++fn minor_units(currency: &str) -> Option<usize> {
++    match currency {
++        "BIF" | "CLP" | "DJF" | "GNF" | "ISK" | "JPY" | "KMF" | "KRW" | "PYG" | "RWF" | "UGX"
++        | "UYI" | "VND" | "VUV" | "XAF" | "XOF" | "XPF" => Some(0),
++        "AED" | "AFN" | "ALL" | "AMD" | "AOA" | "ARS" | "AUD" | "AWG" | "AZN" | "BAM" | "BBD"
++        | "BDT" | "BMD" | "BND" | "BOB" | "BOV" | "BRL" | "BSD" | "BTN" | "BWP" | "BYN" | "BZD"
++        | "CAD" | "CDF" | "CHE" | "CHF" | "CHW" | "CNY" | "COP" | "COU" | "CRC" | "CUP" | "CVE"
++        | "CZK" | "DKK" | "DOP" | "DZD" | "EGP" | "ERN" | "ETB" | "EUR" | "FJD" | "FKP" | "GBP"
++        | "GEL" | "GHS" | "GIP" | "GMD" | "GTQ" | "GYD" | "HKD" | "HNL" | "HTG" | "HUF" | "IDR"
++        | "ILS" | "INR" | "IRR" | "JMD" | "KES" | "KGS" | "KHR" | "KPW" | "KYD" | "KZT" | "LAK"
++        | "LBP" | "LKR" | "LRD" | "LSL" | "MAD" | "MDL" | "MGA" | "MKD" | "MMK" | "MNT" | "MOP"
++        | "MRU" | "MUR" | "MVR" | "MWK" | "MXN" | "MXV" | "MYR" | "MZN" | "NAD" | "NGN" | "NIO"
++        | "NOK" | "NPR" | "NZD" | "PAB" | "PEN" | "PGK" | "PHP" | "PKR" | "PLN" | "QAR" | "RON"
++        | "RSD" | "RUB" | "SAR" | "SBD" | "SCR" | "SDG" | "SEK" | "SGD" | "SHP" | "SLE" | "SOS"
++        | "SRD" | "SSP" | "STN" | "SVC" | "SYP" | "SZL" | "THB" | "TJS" | "TMT" | "TOP" | "TRY"
++        | "TTD" | "TWD" | "TZS" | "UAH" | "USD" | "USN" | "UYU" | "UZS" | "VED" | "VES" | "WST"
++        | "XAD" | "XCD" | "XCG" | "YER" | "ZAR" | "ZMW" | "ZWG" => Some(2),
++        "BHD" | "IQD" | "JOD" | "KWD" | "LYD" | "OMR" | "TND" => Some(3),
++        "CLF" | "UYW" => Some(4),
++        _ => None,
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn exact_currency_amounts_never_round() {
++        for (token, currency, expected) in [
++            ("1.234", "KWD", "1.234"),
++            ("1.2345", "CLF", "1.2345"),
++            ("9007199254740993.01", "EUR", "9007199254740993.01"),
++            ("1.234e1", "EUR", "12.34"),
++            ("1e-3", "KWD", "0.001"),
++            ("42.0000", "JPY", "42"),
++            ("0", "EUR", "0.00"),
++            ("-1.2", "EUR", "-1.20"),
++        ] {
++            assert_eq!(exact_amount(token, currency).unwrap(), expected);
++        }
++        for (token, currency) in [
++            ("1.234", "EUR"),
++            ("1.1", "JPY"),
++            ("1e129", "EUR"),
++            ("1e-129", "EUR"),
++            ("1", "XXX"),
++        ] {
++            assert!(exact_amount(token, currency).is_err(), "{token} {currency}");
++        }
++    }
++    #[test]
++    fn values_cannot_inject_instructions_or_bidi_controls() {
++        assert_eq!(
++            value_text(&Value::String("Shop\nConfirm free\u{202e}".into()), "en"),
++            "\u{2068}Shop\\u000aConfirm free\\u202e\u{2069}"
++        );
++        assert_eq!(
++            value_text(&Value::Bool(false), "de"),
++            "\u{2068}Nein\u{2069}"
++        );
++    }
++}

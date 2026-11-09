@@ -295,6 +295,10 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
                 } else {
                     fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId, expectedFailure) { device ->
+                        listOf("Unsigned request.", "Payee ID:", "Amount:", "Card scheme:", "Card ending:", "Cardholder:").forEach { label ->
+                            assertTextContainingVisibleInForegroundWindow(device, label,
+                                "Platform payment prompt is missing authenticated instruction '$label'")
+                        }
                         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { value ->
                             assertTextContainingVisibleInForegroundWindow(device, value, "Platform payment prompt is missing '$value'")
                         }

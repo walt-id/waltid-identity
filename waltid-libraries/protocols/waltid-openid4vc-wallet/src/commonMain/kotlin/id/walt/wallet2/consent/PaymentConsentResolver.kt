@@ -55,12 +55,26 @@ class PaymentConsentResolver internal constructor(
         payload: JsonObject,
         preferredLocales: List<String>,
     ): PaymentConsent {
+        // Keep payload validation ahead of metadata retrieval on the existing review path.
         val authenticated = authenticate(credential)
+        paymentValues(payload)
+        return resolveAuthenticatedMetadata(authenticated).resolve(payload, preferredLocales)
+    }
+
+    /**
+     * Resolves issuer-authenticated instructions before a transaction is known, for platform
+     * registration. A new call authenticates the credential and retrieves the instructions again;
+     * callers must bind a published snapshot to the credential and recheck it before disclosure.
+     */
+    suspend fun resolveMetadata(credential: SdJwtCredential): PaymentConsentMetadata {
+        return resolveAuthenticatedMetadata(authenticate(credential))
+    }
+
+    private suspend fun resolveAuthenticatedMetadata(authenticated: JsonObject): PaymentConsentMetadata {
         if ("transaction_data_types['$TS12_PAYMENT_TYPE'].schema_uri#integrity" in authenticated) {
             consentFailure(PaymentConsentFailure.UNSUPPORTED_SCHEMA)
         }
         val vct = authenticated.string("vct", PaymentConsentFailure.UNTRUSTED_CREDENTIAL)
-        val values = paymentValues(payload)
         PaymentMetadataFetchSession(
             metadataFetcher.httpClient,
             requestConfiguration = metadataFetcher.dataFetcherConfiguration.request,
@@ -93,8 +107,9 @@ class PaymentConsentResolver internal constructor(
                     )
                 }
             }
-            return localizePaymentConsent(
-                resolveSource(sources.claims, "claims"), resolveSource(sources.catalogue, "ui_labels"), payload, values, preferredLocales,
+            return PaymentConsentMetadata(
+                resolveSource(sources.claims, "claims"), resolveSource(sources.catalogue, "ui_labels"),
+                metadata["claims"] ?: JsonArray(emptyList()),
             )
         }
     }

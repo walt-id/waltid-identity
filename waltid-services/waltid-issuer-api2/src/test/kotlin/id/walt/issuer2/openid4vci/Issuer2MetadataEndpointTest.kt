@@ -701,6 +701,19 @@ class Issuer2MetadataEndpointTest {
                     assertEquals(configured.copy(vct = publishedVct), vctTypeMetadata)
                     val document = vctTypeMetadata.toJSON()
                     assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
+                    val attributeLabels = document.getValue("claims").jsonArray.associate { claim ->
+                        val item = claim.jsonObject
+                        item.getValue("path").jsonArray.single().jsonPrimitive.content to
+                            item.getValue("display").jsonArray.associate { display ->
+                                display.jsonObject.getValue("locale").jsonPrimitive.content to
+                                    display.jsonObject.getValue("label").jsonPrimitive.content
+                            }
+                    }
+                    assertEquals(mapOf(
+                        "card_scheme" to mapOf("en" to "Card scheme", "de" to "Kartensystem"),
+                        "card_last4" to mapOf("en" to "Card ending", "de" to "Kartenende"),
+                        "card_holder_name" to mapOf("en" to "Cardholder", "de" to "Karteninhaber"),
+                    ), attributeLabels)
                     val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
                     assertPaymentClaimMetadata(payment.getValue("claims").jsonArray)
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray

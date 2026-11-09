@@ -9,6 +9,7 @@ import id.walt.wallet2.handlers.CredentialHolderBinding
 import id.walt.wallet2.handlers.WalletCredentialSelection
 import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
@@ -82,6 +83,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -236,9 +239,8 @@ public class MobileWallet internal constructor(
 ) {
     private val lifecycle = MobileWalletLifecycle()
     private var localStoresCleared = false
-    private val paymentConsentPolicy = PaymentConsentPolicy(
-        PaymentConsentResolver(paymentCredentialIssuers, paymentMetadataHttpClient), preferredLocales,
-    )
+    private val paymentConsentResolver = PaymentConsentResolver(paymentCredentialIssuers, paymentMetadataHttpClient)
+    private val paymentConsentPolicy = PaymentConsentPolicy(paymentConsentResolver, preferredLocales)
     private val eventStream = MobileWalletEventStream()
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -661,8 +663,9 @@ public class MobileWallet internal constructor(
 
     private suspend fun updateDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult = registrationMutex.withLock {
         currentCoroutineContext().ensureActive()
+        val paymentMetadata = mutableMapOf<String, PaymentConsentMetadata>()
         val records = try {
-            registryRecords(registrationProjection)
+            registryRecords(registrationProjection, paymentMetadata.takeIf { credentialRegistry is MobileWalletPaymentCredentialRegistry })
         } catch (failure: Exception) {
             if (failure is CancellationException) throw failure
             lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
@@ -674,7 +677,9 @@ public class MobileWallet internal constructor(
         }
         currentCoroutineContext().ensureActive()
         val presentationResult = runCatching {
-            credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
+            if (credentialRegistry is MobileWalletPaymentCredentialRegistry) {
+                credentialRegistry.replaceWithPaymentMetadata(digitalCredentialRegistryId(), records, paymentMetadata, preferredLocales)
+            } else credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
             MobileWalletCredentialRegistrationResult(
@@ -746,7 +751,10 @@ public class MobileWallet internal constructor(
         val currentRecords = registryRecords()
         val credentialIdsByRegistryId = currentRecords.associate { it.registryEntryId to it.credentialId }
         val selectedCredentialIds = request.selectedRegistryEntryIds.map { registryId ->
-            credentialIdsByRegistryId[registryId] ?: throw MobileWalletStaleRegistryEntryException(registryId)
+            // The suffix binds payment instructions. Ordinary sharing needs only credential identity
+            // and must remain usable without fetching payment metadata.
+            credentialIdsByRegistryId[registryId.substringBefore('~')]
+                ?: throw MobileWalletStaleRegistryEntryException(registryId)
         }.toSet()
 
         val result = WalletPresentationHandler.previewDcApiPresentation(
@@ -765,6 +773,25 @@ public class MobileWallet internal constructor(
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             onEvent = ::emitSessionEvent,
         )
+        try {
+            if (credentialRegistry is MobileWalletPaymentCredentialRegistry &&
+                result.transactionData.any { it.type == "urn:eudi:sca:payment:1" }) {
+                // Authenticate the request first, then reauthenticate issuer instructions. A changed
+                // credential, metadata document or locale invalidates the system's previous selection.
+                val paymentRecords = registryRecords(paymentMetadata = mutableMapOf())
+                    .map { it.registryEntryId }.toSet()
+                request.selectedRegistryEntryIds.forEach { registryId ->
+                    if (registryId !in paymentRecords) throw MobileWalletStaleRegistryEntryException(registryId)
+                }
+            }
+        } catch (failure: Throwable) {
+            // The core has already retained a preview. No caller receives its handle on rejection.
+            withContext(NonCancellable) {
+                runCatching { WalletPresentationHandler.discardDcApiPreview(wallet, result.requestId) }
+                    .onFailure(failure::addSuppressed)
+            }
+            throw failure
+        }
         val authorizationRequest = result.resolvedRequest.authorizationRequest
         val profilesByType = transactionDataProfiles.associateBy { it.type }
 
@@ -1129,13 +1156,35 @@ public class MobileWallet internal constructor(
 
     private suspend fun registryRecords(
         projection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+        paymentMetadata: MutableMap<String, PaymentConsentMetadata>? = null,
     ): List<MobileWalletCredentialRegistryRecord> =
         wallet.streamAllCredentials().mapNotNull { stored ->
             val credential = stored.credential
             if (projection == MobileWalletRegistryProjection.MdocIdentity && credential !is MdocsCredential) {
                 return@mapNotNull null
             }
-            val registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
+            var registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
+            if (paymentMetadata != null && credential is SdJwtCredential) {
+                val instructions = try {
+                    paymentConsentResolver.resolveMetadata(credential).also { it.document }
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    // Ordinary sharing remains available; the matcher cannot offer an SD-JWT
+                    // payment without independently authenticated instructions.
+                    null
+                }
+                if (instructions != null) {
+                    val revision = buildJsonArray {
+                        add(JsonPrimitive(registryEntryId))
+                        add(JsonPrimitive(credential.signedWithDisclosures))
+                        add(instructions.document)
+                        add(JsonArray(preferredLocales.map(::JsonPrimitive)))
+                    }.toString()
+                    // AndroidX entry IDs must stay below 64 characters (35 + 1 + 24 = 60).
+                    registryEntryId += "~${ShaUtils.calculateSha256Base64Url(revision).take(24)}"
+                    paymentMetadata[registryEntryId] = instructions
+                }
+            }
             if (projection == MobileWalletRegistryProjection.MdocIdentity) {
                 // IdentityDocumentServices indexes only identity and type. Do not read metadata,
                 // serialize claims, or decode images that the native adapter would discard.
