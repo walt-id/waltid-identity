@@ -40,7 +40,10 @@ class DeferredStatusLookupExpiryTest {
         var fetches = 0
         val config = createTestConfig().copy(attestationStatusResolver = AttestationStatusResolver {
             fetches++
-            withContext(Dispatchers.Default) { delay(2500) }
+            withContext(Dispatchers.Default) {
+                // F5 accepts the entire WIA expiration second, including its clock tolerance.
+                while (Clock.System.now().epochSeconds <= requireNotNull(attestation.lifetime.expiresAt)) delay(25)
+            }
             CompactJws.sign(buildJsonObject {
                 put("sub", uri); put("iat", now.epochSeconds); put("exp", now.epochSeconds + 3600)
                 putJsonObject("status_list") { put("bits", 1); put("lst", TokenStatusListCodec.encode(byteArrayOf(0))) }
