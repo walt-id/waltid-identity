@@ -21,6 +21,10 @@ on:
         description: "Visible GitHub check run name to update with the JUnit report"
         required: true
         type: string
+      job-name-prefix:
+        description: "Full caller job name, including enclosing workflows, custom names and matrix values, used to locate conformance checks"
+        required: true
+        type: string
       enable-android-build:
         description: "Enable Android targets during the Gradle build"
         required: false
@@ -176,7 +180,6 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
           KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
 
       - name: Clean and build with all tests
@@ -190,7 +193,6 @@ jobs:
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
           KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
 
       - name: Require public SD-JWT payment acceptance
@@ -418,6 +420,9 @@ jobs:
         uses: mikepenz/action-junit-report@v6
         if: always()
         with:
+          update_check: true
+          job_name: ${{ inputs.job-name-prefix }} / ${{ matrix.role }}-conformance
+          fail_on_failure: true
           check_name: ${{ matrix.title }} conformance
           report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           detailed_summary: true
@@ -727,7 +732,7 @@ jobs:
         if: ${{ !cancelled() && steps.issuer-build.outcome == 'success' }}
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
-          ISSUER2_KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+          KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           # Each proof job owns its issuer process, tunnel and port on a separate runner.
@@ -954,6 +959,9 @@ jobs:
         uses: mikepenz/action-junit-report@v6
         if: always()
         with:
+          update_check: true
+          job_name: ${{ inputs.job-name-prefix }} / issuer-conformance (proof-${{ matrix.proof }})
+          fail_on_failure: true
           check_name: Issuer2 conformance (${{ matrix.proof }})
           report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           detailed_summary: true
