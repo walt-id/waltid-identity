@@ -387,6 +387,7 @@ class CredentialDisplayNormalizerTest {
                       "iat": 1736899200,
                       "exp": 1894699800,
                       "vct": "eu.europa.ec.eudi.pid.1",
+                      "vct#integrity": "sha256-test",
                       "_sd_alg": "sha-256",
                       "cnf": {
                         "jwk": {
@@ -424,6 +425,7 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Document number", credentialData.items.first { it.path.id == "document_number" }.label)
 
         val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
+        assertEquals(DisplayValue.Text("sha256-test"), technical.items.single { it.label == "Type metadata integrity" }.value)
         assertEquals(DisplayValue.Text("2 undisclosed claim values"), technical.items.first { it.path.id == "_sd" }.value)
         assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), technical.items.first { it.path.id == "cnf" }.value)
         assertEquals(DisplayValue.InstantValue(Instant.parse("2025-01-15T00:00:00Z")), technical.items.first { it.path.id == "iat" }.value)

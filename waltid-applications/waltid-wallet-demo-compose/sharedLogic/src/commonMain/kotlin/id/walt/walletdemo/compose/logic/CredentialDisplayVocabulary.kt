@@ -129,6 +129,7 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("attestation_legal_category", label = "Attestation legal category", displayOrder = 124),
         ClaimDescriptor("issuer", label = "Issuer", displayOrder = 130),
         ClaimDescriptor("vct", label = "Credential type", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.CredentialType), displayOrder = 200),
+        ClaimDescriptor("vct#integrity", label = "Type metadata integrity", group = ClaimGroupKind.Technical, displayOrder = 232),
         ClaimDescriptor("iss", label = "Issuer", group = ClaimGroupKind.Technical, displayOrder = 201),
         ClaimDescriptor("sub", label = "Subject", group = ClaimGroupKind.Technical, displayOrder = 202),
         ClaimDescriptor("iat", label = "Issued at", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.Temporal), displayOrder = 203),

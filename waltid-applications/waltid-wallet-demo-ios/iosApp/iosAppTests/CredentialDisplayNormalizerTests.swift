@@ -668,6 +668,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
               "iat": 1736899200,
               "exp": 1894699800,
               "vct": "eu.europa.ec.eudi.pid.1",
+              "vct#integrity": "sha256-test",
               "_sd_alg": "sha-256",
               "cnf": {
                 "jwk": {
@@ -704,6 +705,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(credentialData.items.first { $0.path.id == "document_number" }?.label, "Document number")
 
         let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
+        XCTAssertEqual(technical.items.first { $0.label == "Type metadata integrity" }?.value, .text("sha256-test"))
         XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 undisclosed claim values"))
         XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
         XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .instant(WalletInstant(epochSeconds: 1736899200, nanoseconds: 0)))
