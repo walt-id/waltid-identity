@@ -4,6 +4,7 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
+import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.Url
 import java.util.regex.Pattern
 import java.nio.file.Files
@@ -13,7 +14,11 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
-    enum class Step { SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT }
+    enum class Step {
+        LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
+        NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
+        SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
+    }
 }
 
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
@@ -24,21 +29,41 @@ class ItbPortalBridge(
 ) : ItbInteractionBridge {
     override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
         // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
-        page.navigate("about:blank")
-        page.navigate(statementsUrl)
-        val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
-        check(system.innerText().trim() == systemName) { "The portal selected a different ITB system" }
-        page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
-        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
-            Pattern.compile("(?:Interactive|Parallel background|Sequential background) execution$"),
-        )).click()
-        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
-        val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
-            page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
-        ))
-        suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
-            page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
-        )).locator("button[ngbtooltip=Run]").click()
+        step(ItbPortalStepTimeout.Step.NAVIGATION) {
+            page.navigate("about:blank")
+            page.navigate(statementsUrl, Page.NavigateOptions().setWaitUntil(WaitUntilState.COMMIT))
+        }
+        step(ItbPortalStepTimeout.Step.SYSTEM) {
+            val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
+            // Each fresh document must bootstrap the application before ordinary DOM steps can begin.
+            check(system.innerText(Locator.InnerTextOptions().setTimeout(APPLICATION_READY_TIMEOUT_MILLIS)).trim() == systemName) {
+                "The portal selected a different ITB system"
+            }
+        }
+        step(ItbPortalStepTimeout.Step.STATEMENT) {
+            page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
+        }
+        suite.actor?.let { actor ->
+            step(ItbPortalStepTimeout.Step.ACTOR) {
+                page.getByText(suite.statement, Page.GetByTextOptions().setExact(true))
+                    .locator("xpath=ancestor::app-conformance-statement-item-display[1]")
+                    .getByText(actor, Locator.GetByTextOptions().setExact(true)).click()
+            }
+        }
+        step(ItbPortalStepTimeout.Step.EXECUTION_MODE) {
+            page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
+                Pattern.compile("(?:Interactive|Parallel background|Sequential background) execution$"),
+            )).click()
+            page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
+        }
+        step(ItbPortalStepTimeout.Step.CASE) {
+            val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
+                page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
+            ))
+            suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
+                page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
+            )).locator("button[ngbtooltip=Run]").click()
+        }
         val id = step(ItbPortalStepTimeout.Step.SESSION) {
             page.waitForCondition { page.locator(".session-table-title-value .value").count() == 1 && sessionId().isNotBlank() }
             sessionId()
@@ -104,6 +129,17 @@ class ItbPortalBridge(
         val row = dialog.locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
+        val control = row.locator("button[ngbtooltip=Download], button[ngbtooltip=Copy]")
+        step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
+            control.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
+        }
+        // GITB renders plain values up to 100 characters inline, with Copy instead of Download.
+        // Read that exact row's complete text without touching the clipboard or evaluating scripts.
+        if (control.getAttribute("ngbtooltip") == "Copy") {
+            return row.locator(".content-value").innerText().trim().also {
+                require(it.length in 1..100) { "The ITB inline interaction has an unexpected size" }
+            }
+        }
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
         val download = step(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT) {
             // The portal may prepare this one file after its interaction dialog appears.
@@ -129,6 +165,8 @@ class ItbPortalBridge(
     }
 
     companion object {
+        internal const val APPLICATION_READY_TIMEOUT_MILLIS = 60_000.0
+
         /** Read only the deployed script's declarative inputs; never execute supplied JavaScript in the wallet. */
         internal fun parseDigitalCredentials(script: String): ItbWalletInteraction.DigitalCredentials {
             fun string(name: String): String {

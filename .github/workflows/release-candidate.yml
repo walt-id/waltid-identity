@@ -134,6 +134,7 @@ jobs:
       run-issuer-conformance: true
       run-haip-conformance: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
+      job-name-prefix: gradle
       conformance-report-check-name: 'gradle / wallet/verifier-conformance'
       upload-test-results: true
   integration-test-aws:

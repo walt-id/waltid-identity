@@ -338,7 +338,7 @@ tasks.register<Test>("itbTest") {
 
 tasks.register<JavaExec>("itbWallet") {
     group = "verification"
-    description = "Run the deployed WAL-1423 ITB cases through the production wallet and portal interaction bridge."
+    description = "Run the selected deployed ITB wallet cases through the production wallet and portal interaction bridge."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("id.walt.itb.ItbMainKt")
 }
