@@ -24,6 +24,7 @@ import androidx.compose.ui.window.ComposeViewport
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.incomingWalletPageLink
 import id.walt.walletdemo.compose.logic.walletapi2.WalletApi2BrowserSessionStore
 import id.walt.walletdemo.compose.logic.walletapi2.WalletApi2Session
 import id.walt.walletdemo.compose.logic.walletapi2.createWalletApi2DemoWallet
@@ -76,7 +77,7 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
         val aligned = WalletApi2BrowserSessionStore.prepareIncomingAuthorizationWallet(currentSession, available)
         if (aligned == null) {
             authorizationNotice = "This authorization was started for a different wallet, and that wallet is no longer available."
-            clearAuthorizationCallbackFromAddressBar()
+            clearPageQueryFromAddressBar()
         } else if (aligned.walletId != currentSession.walletId) {
             session = aligned
         }
@@ -174,9 +175,13 @@ private fun WebWalletSession(
 
     LaunchedEffect(controller) {
         val href = window.location.href
+        val incomingLink = incomingWalletPageLink(href)
         if (isAuthorizationCallbackHref(href)) {
             controller.handleDeepLink(href)
-            clearAuthorizationCallbackFromAddressBar()
+            clearPageQueryFromAddressBar()
+        } else if (incomingLink != null) {
+            controller.handleDeepLink(incomingLink)
+            clearPageQueryFromAddressBar()
         }
     }
 
@@ -239,6 +244,6 @@ private fun isAuthorizationCallbackHref(href: String): Boolean {
 }
 
 @OptIn(ExperimentalWasmJsInterop::class)
-private fun clearAuthorizationCallbackFromAddressBar() {
+private fun clearPageQueryFromAddressBar() {
     window.history.replaceState(null, "", window.location.pathname)
 }
