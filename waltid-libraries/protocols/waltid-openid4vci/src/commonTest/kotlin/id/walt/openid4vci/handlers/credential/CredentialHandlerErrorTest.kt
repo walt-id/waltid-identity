@@ -126,6 +126,19 @@ class CredentialHandlerErrorTest {
     }
 
     @Test
+    fun `sd jwt credential data breaking sd jwt processing is denied with the reason in both APIs`() = runTest {
+        val fixture = fixture()
+        val malformed = buildJsonObject { putJsonObject("value") { put("_sd", "not-an-array") } }
+        for (crypto2 in listOf(false, true)) {
+            val failure = assertIs<CredentialResponseResult.Failure>(
+                fixture.issue(CredentialFormat.SD_JWT_VC, crypto2, credentialData = malformed), "crypto2=$crypto2",
+            )
+            assertEquals(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, failure.error.error)
+            assertContains(failure.error.description.orEmpty(), "_sd must be a JSON array")
+        }
+    }
+
+    @Test
     fun `holder key export failures are operational in both APIs`() = runTest {
         val fixture = fixture()
         for (format in listOf(CredentialFormat.SD_JWT_VC, CredentialFormat.MSO_MDOC)) {
@@ -217,6 +230,7 @@ class CredentialHandlerErrorTest {
             proofs: Proofs? = null,
             bindings: List<VerifiedCredentialBinding> = listOf(VerifiedCredentialBinding(issuer, holderDid = "did:example:holder")),
             signingFailure: Exception? = null,
+            credentialData: JsonObject? = null,
             configuration: CredentialConfiguration = CredentialConfiguration(format, vct = "identity", doctype = "org.example.identity"),
             handler: CredentialEndpointHandler = when (format) {
                 CredentialFormat.SD_JWT_VC -> SdJwtVcCredentialHandler()
@@ -229,7 +243,7 @@ class CredentialHandlerErrorTest {
                 credentialIdentifier = null, credentialConfigurationId = "identity",
                 proofs = proofs, credentialResponseEncryption = null,
             )
-            val data = when (format) {
+            val data = credentialData ?: when (format) {
                 CredentialFormat.MSO_MDOC -> buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } }
                 CredentialFormat.JWT_VC_JSON -> buildJsonObject {
                     put("@context", JsonArray(listOf(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))))
