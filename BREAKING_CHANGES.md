@@ -5,6 +5,17 @@
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.
 - Existing construction with a collection of strings remains supported through a convenience constructor. String-only paths retain their existing JSON representation.
 
+## waltid-sdjwt payload validation
+
+- `SDPayload.createSDPayload` (all overloads) now processes the payload it creates as a verifier would (RFC 9901 §7.1) and throws `SDJwtVerificationException` with the reason when that fails, for example a non-array `_sd`, `_sd` or `...` used as a claim name, or duplicate claim names. It previously returned a payload that verifiers reject.
+- It also rejects a top-level `_sd_alg` other than `sha-256`, the only algorithm it digests with.
+- Processing an `SDPayload` (`fullPayload`, `verifyDisclosures`, `withSelectiveDisclosures`), including payloads parsed from received tokens, now rejects `_sd_alg` in any nested object or disclosure (RFC 9901 §4.1.1).
+
+## SD-JWT VC issuance
+
+- Both signers (`SdJwtVcCredentialSigner`, `OpenID4VCI.generateSdJwtVC`) keep `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity`, `aka_vcts` and `status` in clear text even when the selective disclosure map marks them (SD-JWT VC §2.2.2.3, `SDJwtVC.NON_SELECTIVELY_DISCLOSABLE_CLAIMS`).
+- issuer2 answers credential data that breaks SD-JWT processing with `credential_request_denied` and the reason, instead of HTTP 500.
+
 ## waltid-dcql identifier charset
 
 - `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).

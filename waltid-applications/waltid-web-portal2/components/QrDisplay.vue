@@ -1,20 +1,15 @@
 <script setup lang="ts">
 import QrcodeVue from "qrcode.vue";
+import { webWalletHref as walletHref } from "~/utils/webWalletLink";
 
 const props = defineProps<{
   value: string; // raw openid4vp:// or openid-credential-offer:// URL (for QR)
   walletUrl: string; // web wallet base URL
-  walletPath: string; // e.g. 'api/siop/initiatePresentation' or 'api/siop/initiateIssuance'
 }>();
 
 const copied = ref(false);
 
-// Mirrors sendToWebWallet from the old portal:
-// walletUrl/walletPath + query string from the raw value
-const webWalletHref = computed(() => {
-  const qs = props.value.substring(props.value.indexOf("?"));
-  return `${props.walletUrl}/${props.walletPath}${qs}`;
-});
+const webWalletHref = computed(() => walletHref(props.walletUrl, props.value));
 
 async function copyToClipboard() {
   await navigator.clipboard.writeText(props.value);
@@ -34,7 +29,7 @@ async function copyToClipboard() {
     <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
       <a
         :href="webWalletHref"
-        class="hidden btn btn-primary"
+        class="btn btn-primary w-full sm:w-auto"
         target="_blank"
         rel="noopener noreferrer"
       >

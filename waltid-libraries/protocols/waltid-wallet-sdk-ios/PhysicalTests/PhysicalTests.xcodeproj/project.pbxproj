@@ -5,6 +5,16 @@
 	};
 	"objectVersion" = 56;
 	"objects" = {
+		"E15770000000000000000001" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "ProximityPhysicalDeviceTests/ScaPhysicalDeviceTests.swift";
+			"sourceTree" = "<group>";
+		};
+		"E15770000000000000000002" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "E15770000000000000000001";
+		};
 		"D575DA62FF0412A7D99F873D" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
@@ -59,6 +69,7 @@
 				"ECC5504CD63DFE20A8B67FBB",
 				"4A7AF4C7554F10881222A588",
 				"253C304FA8EDB5C6D9B703F8",
+				"E15770000000000000000001",
 				"0A3E27B8CA818264D75C8D81",
 			);
 			"sourceTree" = "<group>";
@@ -267,6 +278,7 @@
 			"files" = (
 				"556D72DBE9F6FC1606C54C88",
 				"65E6087C69A6660AC4B0EDA2",
+				"E15770000000000000000002",
 			);
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};

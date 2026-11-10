@@ -1,5 +1,6 @@
 package id.waltid.openid4vp.wallet.presentation
 
+import id.walt.crypto2.keys.Signer
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -20,6 +21,17 @@ import kotlin.time.Clock
  */
 fun interface ScaPresentationAuthorizer {
     suspend fun authorize(presentation: ScaPresentation): ScaAuthenticationMethods
+
+    /**
+     * Keeps native authorization alive only while building this proof. An override may supply a
+     * single-use signer for the same key; it must fail on expiry/cancellation and close it on exit.
+     * The default retains key-enforced authentication during signing.
+     */
+    suspend fun withAuthorizedSigner(
+        presentation: ScaPresentation,
+        signer: Signer,
+        operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+    ): String = operation(authorize(presentation), signer)
 }
 
 /** Values are derived by the presenter from the selected credential and resolved request. */
