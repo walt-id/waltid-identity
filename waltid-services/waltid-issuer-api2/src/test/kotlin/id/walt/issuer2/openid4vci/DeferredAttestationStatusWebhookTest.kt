@@ -136,12 +136,13 @@ class DeferredAttestationStatusWebhookTest {
             val resolved = wallet.resolve(offer)
             val configurationId = resolved.offer.credentialConfigurationIds.single()
             val instance = JWKKey.generate(KeyType.secp256r1)
+            val instanceJwk = instance.getPublicKey().exportJWKObject()
             val now = Clock.System.now().epochSeconds
             val clientId = "issuer2-wallet-test"
             val wia = wiaAttester.signJws(buildJsonObject {
                 put("sub", clientId); put("iat", now); put("exp", now + 300)
                 put("status", publisher.reference("wia", 0))
-                putJsonObject("cnf") { put("jwk", instance.getPublicKey().exportJWKObject()) }
+                putJsonObject("cnf") { put("jwk", instanceJwk) }
             }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("oauth-client-attestation+jwt")))
             val pop = instance.signJws(buildJsonObject {
                 put("aud", resolved.authorizationServerMetadata.issuer); put("iat", now); put("jti", UUID.randomUUID().toString())
