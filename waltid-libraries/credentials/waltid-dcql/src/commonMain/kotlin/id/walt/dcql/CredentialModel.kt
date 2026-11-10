@@ -37,4 +37,15 @@ data class RawDcqlCredential(
     // A place to pass a reference to the original (using which this class was created)
     val originalCredential: Any? = null
 //    override val issuer: String? = null,
-) : DcqlCredential
+) : DcqlCredential {
+    /** Operation-local type context, supplied by the caller after independently resolving metadata. */
+    var resolvedVctTypes: Set<String> = emptySet()
+        private set
+
+    var typeMetadataSnapshot: JsonObject? = null
+        private set
+
+    fun withResolvedVctTypes(types: Set<String>): RawDcqlCredential = apply { resolvedVctTypes = types.toSet() }
+
+    fun withTypeMetadataSnapshot(snapshot: JsonObject?): RawDcqlCredential = apply { typeMetadataSnapshot = snapshot }
+}

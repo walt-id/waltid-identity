@@ -44,9 +44,51 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
     val issuer = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
         GenerateSoftwareKeyRequest(KeyId("synthetic-issuer"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
     )
-    val vct = "https://webuildconsortium.eu/sca/sca-iban/1.0"
+    val vct = "https://issuer.example/sca-leaf"
+    val parentVct = "https://webuildconsortium.eu/sca/sca-iban/1.0"
+    val rootVct = "https://webuildconsortium.eu/sca/1.0"
+    val rootMetadata = buildJsonObject {
+        put("vct", rootVct)
+        put("category", "urn:eu:europa:ec:eudi:sua:sca")
+        put("transaction_data_types", buildJsonObject {
+            put("urn:eudi:sca:payment:1", buildJsonObject {
+                put("schema", "urn:eudi:sca:payment:1")
+                put("claims", buildJsonArray {
+                    for (path in listOf(listOf("transaction_id"), listOf("amount"), listOf("currency"),
+                        listOf("payee", "name"), listOf("payee", "id"))) {
+                        add(buildJsonObject {
+                            put("path", JsonArray(path.map(::JsonPrimitive)))
+                            put("display", buildJsonArray { add(buildJsonObject {
+                                put("locale", "en"); put("label", path.last())
+                            }) })
+                        })
+                    }
+                })
+                put("ui_labels", buildJsonObject {
+                    put("affirmative_action_label", buildJsonArray { add(buildJsonObject {
+                        put("lang", "en"); put("value", "Pay")
+                    }) })
+                })
+            })
+        })
+    }
+    val parentMetadata = buildJsonObject {
+        put("vct", parentVct); put("extends", rootVct)
+        put("extends#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(rootMetadata.toString().encodeToByteArray()))
+    }
+    val leafMetadata = buildJsonObject {
+        put("vct", vct); put("extends", parentVct)
+        put("extends#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(parentMetadata.toString().encodeToByteArray()))
+        put("display", buildJsonArray { add(buildJsonObject { put("locale", "en"); put("name", "Inherited SCA attestation") }) })
+    }
+    val metadataDocuments = mapOf(vct to leafMetadata, parentVct to parentMetadata, rootVct to rootMetadata)
+    val metadataSnapshot = id.walt.sdjwt.metadata.type.TypeMetadataResolver(
+        { uri -> metadataDocuments.getValue(uri).toString().encodeToByteArray() }
+    ).resolve(vct, id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()), true).snapshot()
+
     val payload = SDPayload.createSDPayload(buildJsonObject {
         put("iss", "https://issuer.example"); put("vct", vct)
+        put("vct#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()))
         put("cnf", buildJsonObject {
             put("jwk", Json.parseToJsonElement(requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()))
         })
@@ -62,7 +104,7 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         put("dcql_query", buildJsonObject { put("credentials", buildJsonArray {
             add(buildJsonObject {
                 put("id", "payment"); put("format", "dc+sd-jwt")
-                put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(vct) }) })
+                put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(parentVct) }) })
                 put("claims", buildJsonArray { add(buildJsonObject { put("path", buildJsonArray { add("masked_iban") }) }) })
             })
         }) })
@@ -75,7 +117,8 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
             }
     }
     val credentials = InMemoryCredentialStore().also {
-        it.addCredential(StoredCredential("synthetic-sca", CredentialParser.detectAndParse(credential.toString()).second))
+        it.addCredential(StoredCredential("synthetic-sca", CredentialParser.detectAndParse(credential.toString()).second,
+            metadata = buildJsonObject { put("sdJwtVcTypeMetadata", metadataSnapshot) }))
     }
     val wallet = MobileWallet(
         walletId = "synthetic-sca-wallet", keyStore = keys, didStore = InMemoryDidStore(), credentialStore = credentials,
@@ -86,32 +129,7 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
             requireNotNull(issuer.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(issuer.spec)
                 .data.toByteArray().decodeToString())),
         paymentMetadataHttpClient = HttpClient(MockEngine { request ->
-            check(request.url.toString() == vct) { "Unexpected metadata request: ${request.url}" }
-            respond(buildJsonObject {
-                put("vct", vct)
-                put("category", "urn:eu:europa:ec:eudi:sua:sca")
-                put("transaction_data_types", buildJsonObject {
-                    put("urn:eudi:sca:payment:1", buildJsonObject {
-                        put("schema", "urn:eudi:sca:payment:1")
-                        put("claims", buildJsonArray {
-                            for (path in listOf(listOf("transaction_id"), listOf("amount"), listOf("currency"),
-                                listOf("payee", "name"), listOf("payee", "id"))) {
-                                add(buildJsonObject {
-                                    put("path", JsonArray(path.map(::JsonPrimitive)))
-                                    put("display", buildJsonArray { add(buildJsonObject {
-                                        put("locale", "en"); put("label", path.last())
-                                    }) })
-                                })
-                            }
-                        })
-                        put("ui_labels", buildJsonObject {
-                            put("affirmative_action_label", buildJsonArray { add(buildJsonObject {
-                                put("lang", "en"); put("value", "Pay")
-                            }) })
-                        })
-                    })
-                })
-            }.toString(), headers = headersOf(HttpHeaders.ContentType, "application/json"))
+            respond(metadataDocuments.getValue(request.url.toString()).toString(), headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }),
     )
     return ScaWalletFixture(wallet, request)
