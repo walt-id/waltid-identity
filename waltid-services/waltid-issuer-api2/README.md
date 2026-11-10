@@ -61,10 +61,10 @@ Configuration files live in `config/`:
 
 Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
 external OAuth authentication. The service and Docker Compose configuration files
-contain an inert placeholder that HOCON replaces from this environment variable.
-Without the variable, Keycloak authentication cannot complete. The issuer2 Kubernetes deployments read this
-variable from the `client-secret` key of the `issuer2-keycloak` Secret in their
-namespace. 
+read `clientSecret` from this environment variable. Without it, the secret is
+empty and Keycloak authentication cannot complete. The issuer2 Kubernetes
+deployments read this variable from the `client-secret` key of the
+`issuer2-keycloak` Secret in their namespace.
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
 

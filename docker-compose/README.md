@@ -203,12 +203,12 @@ Each API service reads the configuration files mounted from its own directory:
 - wallet API2: `wallet-api2/config` (including `_features.conf` and `auth.conf` when `auth` is enabled)
 - ingress: `Caddyfile`
 
-Issuer API2's `authentication-service.conf` contains a placeholder for the
-Keycloak client secret. Set `KEYCLOAK_CLIENT_SECRET` in the shell or a
+Issuer API2's `authentication-service.conf` reads the Keycloak client secret
+from the environment. Set `KEYCLOAK_CLIENT_SECRET` in the shell or a
 secret manager before running `docker compose up`: Compose forwards it to the
 container, and the mounted HOCON file resolves it at startup. The tracked
 `docker-compose/.env` does not contain this secret; do not add it there. If the
-variable is absent, the placeholder remains and Keycloak login cannot complete.
+variable is absent, the secret is empty and Keycloak login cannot complete.
 
 ## How to
 
