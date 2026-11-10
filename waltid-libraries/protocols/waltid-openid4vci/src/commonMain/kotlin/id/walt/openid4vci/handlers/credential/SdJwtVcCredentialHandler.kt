@@ -56,7 +56,7 @@ class SdJwtVcCredentialHandler(
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
-            issuerKey = issuerKey,
+            issuerSigningKey = SdJwtVcCredentialSigner.IssuerSigningKey.Legacy(issuerKey),
             vct = vct,
             selectiveDisclosure = selectiveDisclosure,
             dataMapping = effectiveMapping,
@@ -64,6 +64,11 @@ class SdJwtVcCredentialHandler(
             display = display,
             sdJwtTypeHeader = configuration.format.value,
             verifiedBinding = instance.verifiedBinding,
+            validatePayload = instance.input.sdJwtPayloadValidator,
+            sdJwtCredentialClaims = instance.input.sdJwtTypeMetadata?.let { metadata ->
+                require(metadata.vct == vct) { "Type metadata publication does not match the issued VCT" }
+                JsonObject(mapOf("vct#integrity" to JsonPrimitive(metadata.integrity)))
+            },
         )
     }
 
@@ -87,8 +92,7 @@ class SdJwtVcCredentialHandler(
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
-            issuerKey = issuerKey.key,
-            algorithm = issuerKey.requireJwsAlgorithm(),
+            issuerSigningKey = SdJwtVcCredentialSigner.IssuerSigningKey.Crypto2(issuerKey.key, issuerKey.requireJwsAlgorithm()),
             vct = vct,
             selectiveDisclosure = selectiveDisclosure,
             dataMapping = effectiveMapping,
@@ -96,6 +100,11 @@ class SdJwtVcCredentialHandler(
             display = display,
             sdJwtTypeHeader = configuration.format.value,
             verifiedBinding = instance.verifiedBinding,
+            validatePayload = instance.input.sdJwtPayloadValidator,
+            sdJwtCredentialClaims = instance.input.sdJwtTypeMetadata?.let { metadata ->
+                require(metadata.vct == vct) { "Type metadata publication does not match the issued VCT" }
+                JsonObject(mapOf("vct#integrity" to JsonPrimitive(metadata.integrity)))
+            },
         )
     }
 

@@ -173,6 +173,13 @@ object Verifier2Service {
     fun Route.registerRoute(
         repository: VerificationSessionRepository = defaultSessionRepository,
         surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+    ) = registerRoute(repository, surfaces) { id.walt.policies2.vc.policies.PolicyExecutionContext.Empty }
+
+    /** Host-owned policy services are created per response, including metadata transport snapshots. */
+    fun Route.registerRoute(
+        repository: VerificationSessionRepository = defaultSessionRepository,
+        surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+        policyContextFactory: () -> id.walt.policies2.vc.policies.PolicyExecutionContext,
     ) {
         require(surfaces.isNotEmpty()) { "At least one verifier route surface must be registered" }
         val updateSessionCallback = updateSessionCallback(repository)
@@ -316,6 +323,7 @@ object Verifier2Service {
                         try {
                             call.respondHandleDirectPostResponse(
                                 verificationSession = claim.original.session,
+                                policyContext = policyContextFactory(),
                                 updateSessionCallback = updateSessionCallback,
                                 failSessionCallback = failSessionCallback,
                                 beforeRespond = {

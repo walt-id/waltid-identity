@@ -82,7 +82,7 @@ object SdJwtVcCredentialSigner {
         verifiedBinding = verifiedBinding,
     )
 
-    private suspend fun generateSdJwtVC(
+    internal suspend fun generateSdJwtVC(
         verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
@@ -94,6 +94,7 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>?,
         sdJwtTypeHeader: String?,
         sdJwtCredentialClaims: JsonObject?,
+        validatePayload: ((JsonObject) -> Unit)? = null,
     ): String {
         val binding = verifiedBinding
             ?: throw invalidCredentialProof("SD-JWT VC issuance requires a verified credential binding")
@@ -126,8 +127,10 @@ object SdJwtVcCredentialSigner {
 
 
         val alwaysDisclosedOverrides = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val payload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides)
+        validatePayload?.invoke(payload)
         val sdPayload = SDPayload.createSDPayload(
-            fullPayload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides),
+            fullPayload = payload,
             disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
         )
 
@@ -174,7 +177,7 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to holderKey.id.value.toJsonElement(),
         ).toJsonObject()
 
-    private sealed interface IssuerSigningKey {
+    internal sealed interface IssuerSigningKey {
         data class Legacy(val key: Key) : IssuerSigningKey
         data class Crypto2(val key: Crypto2Key, val algorithm: JwsAlgorithm) : IssuerSigningKey
     }

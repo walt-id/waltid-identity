@@ -27,6 +27,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-jose"))
         }
+        commonTest.get().kotlin.srcDir("src/typeMetadataTestFixtures/kotlin")
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)

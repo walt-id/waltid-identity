@@ -574,9 +574,6 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val isolatedCredentialsById = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored }.toMap()
-        val rawCredentials = isolatedCredentialsById.mapNotNull { (id, stored) ->
-            stored.credential.toRawDcqlCredential(id)
-        }
 
         val result = presentWithKeyMaterial(
             wallet = wallet,
@@ -584,6 +581,7 @@ object WalletPresentationHandler {
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
+                val rawCredentials = isolatedCredentialsById.mapNotNull { (id, stored) -> stored.toRawDcqlCredential(id, query) }
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
@@ -1452,7 +1450,7 @@ object WalletPresentationHandler {
         // Build index: rawCredential index → wallet credential id
         val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
         val rawCredentials = request.credentials.mapIndexedNotNull { idx, stored ->
-            stored.credential.toRawDcqlCredential(idx.toString())
+            stored.toRawDcqlCredential(idx.toString(), request.dcqlQuery)
         }
         val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
         return buildMatchResult(matched, idByIndex)
@@ -1731,7 +1729,7 @@ object WalletPresentationHandler {
      * `multiple=false` query rematches the OS-selected credential instead of collapsing to the first
      * store match.
      */
-    private fun selectFromSnapshot(
+    private suspend fun selectFromSnapshot(
         wallet: Wallet,
         query: DcqlQuery,
         storedCredentials: List<StoredCredential>,
@@ -1747,8 +1745,9 @@ object WalletPresentationHandler {
         }
         val rawCredentials = candidates.mapIndexedNotNull { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            stored.credential.toRawDcqlCredential(
+            stored.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
+                query = query,
             )
         }
 
@@ -2351,21 +2350,26 @@ object WalletPresentationHandler {
     }
 
     /** Null for a stored credential whose disclosures cannot be located, so it cannot fail matching for the others. */
-    private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential? {
-        val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+    private suspend fun StoredCredential.toRawDcqlCredential(id: String, query: DcqlQuery? = null): RawDcqlCredential? {
+        val credential = this.credential
+        val sdvc = credential as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
         val disclosures = try {
             sdvc?.locatedDisclosures()
         } catch (e: IllegalArgumentException) {
             log.warn { "Skipping credential $id: its disclosures cannot be located in the issuer-signed payload (${e.message})" }
             return null
         }
+        val resolved = resolveTypeMetadata(fetchIfMissing = query?.credentials?.any { item ->
+            val meta = item.meta as? id.walt.dcql.models.meta.SdJwtVcMeta
+            meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
+        } == true)
         return RawDcqlCredential(
             id = id,
-            format = format,
-            data = credentialData,
-            originalCredential = this,
+            format = credential.format,
+            data = credential.credentialData,
+            originalCredential = credential,
             disclosures = disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
-        )
+        ).withResolvedVctTypes(resolved?.types.orEmpty()).withTypeMetadataSnapshot(resolved?.snapshot())
     }
 }
 

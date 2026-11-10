@@ -55,6 +55,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -81,6 +83,55 @@ import org.junit.runner.RunWith
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
     override val wallet: MobileWallet get() = provisionedWallet
     override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
+    /** Real platform matcher boundary: one entry indexed by two allowed VCTs remains one candidate. */
+    @Test
+    fun ancestorAndLeafIndexesShowOneCredentialManagerCandidate() = runBlocking {
+        val fixture = fixture()
+        val registry = id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry(fixture.context)
+        val registryId = "wal-1607-type-index"
+        val leaf = "https://issuer.example/wal1607/leaf"
+        val parent = "https://types.example/wal1607/parent"
+        val title = "Inherited metadata fixture"
+        val record = id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord(
+            registryEntryId = "one-logical-credential", credentialId = "one-stored-credential",
+            format = id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+            type = leaf, fields = listOf(id.walt.wallet2.mobile.MobileWalletCredentialRegistryField(
+                path = listOf("given_name"), valueJson = "\"Ada\"", selectivelyDisclosable = false,
+            )), displayName = title,
+        )
+        val registration = registry.replace(registryId, listOf(record, record.copy(type = parent)))
+        assertTrue("Registry unavailable: ${registration.reason}", registration.available)
+        assertEquals(1, registration.registeredEntryCount)
+        val requestJson = buildJsonObject {
+            put("requests", buildJsonArray { add(buildJsonObject {
+                put("protocol", "openid4vp-v1-unsigned")
+                put("data", buildJsonObject {
+                    put("response_type", "vp_token"); put("response_mode", "dc_api"); put("nonce", "wal1607-fixture")
+                    put("dcql_query", buildJsonObject { put("credentials", buildJsonArray { add(buildJsonObject {
+                        put("id", "identity"); put("format", "dc+sd-jwt")
+                        put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(leaf); add(parent) }) })
+                        put("claims", buildJsonArray { add(buildJsonObject { put("path", buildJsonArray { add("given_name") }) }) })
+                    }) }) })
+                })
+            }) })
+        }.toString()
+        val request = fixture.startCredentialRequest(requestJson)
+        try {
+            assertNotNull("Inherited type candidate did not appear", fixture.device.wait(
+                Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text(title)), UI_ELEMENT_TIMEOUT,
+            ))
+            assertEquals(1, fixture.device.findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text(title)).size)
+        } finally {
+            // Close the owned picker before withdrawing its registry entries; otherwise GMS can
+            // switch the still-open request to its cross-device QR fallback during teardown.
+            fixture.device.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text("Cancel"))?.click()
+                ?: fixture.device.pressBack()
+            request.abandon()
+            withTimeout(10_000L) { request.awaitSettled() }
+            registry.replace(registryId, emptyList())
+        }
+    }
+
     /**
      * A small platform gate before the protocol assertions: registration has to be visible to the
      * platform and a real Digital Credentials request has to open Google's selector. The remaining

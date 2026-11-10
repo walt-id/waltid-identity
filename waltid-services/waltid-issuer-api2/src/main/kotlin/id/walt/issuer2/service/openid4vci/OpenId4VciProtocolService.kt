@@ -1380,7 +1380,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     CredentialIssuanceInput(
                         credentialData = credentialDataWithStatus,
                         credentialStatus = mDocStatus,
-                    )
+                    ).withTypeMetadata(metadataService.getIssuanceTypeMetadata(issuanceRequest.credentialConfigurationId))
                 }
             }
             val credentialResponseResult = deferredClaim?.response?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {

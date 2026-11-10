@@ -107,7 +107,7 @@ internal suspend fun executeCredentialTargets(
                     val value = it.credential
                     if (value is JsonPrimitive) value.content else value.toString()
                 }, selected.bindings, label, metadata, proofRequired = algorithms != null,
-                    expectedConfiguration = configuration)
+                    expectedConfiguration = configuration, typeMetadataHttpClient = httpClient)
                 stage = CredentialIssuanceStage.STORAGE
                 ensureOwned()
                 val outcome = sessions.storeReceivedCredentials(
