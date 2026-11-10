@@ -135,13 +135,15 @@ class AttestationBasedClientAuthenticationMethod(
             return failure("client_id does not match client attestation subject")
         }
 
-        val verification = attestationVerifier.verifyAttestationJwt(
+        val verifiedSignerPublicJwk = when (val verification = attestationVerifier.verifyAttestationJwt(
             jwt = attestationJwt,
             header = attestation.header,
             payload = attestation.payload,
-        )
-        if (verification is ClientAttestationVerificationResult.Rejected) {
-            return failure(verification.reason ?: "Client attestation is not trusted")
+        )) {
+            ClientAttestationVerificationResult.Verified -> null
+            is ClientAttestationVerificationResult.VerifiedWithSigner -> verification.publicJwk
+            is ClientAttestationVerificationResult.Rejected ->
+                return failure(verification.reason ?: "Client attestation is not trusted")
         }
 
         val confirmationJwk = (attestation.payload[JwtPayloadClaims.CONFIRMATION] as? JsonObject)
@@ -231,7 +233,7 @@ class AttestationBasedClientAuthenticationMethod(
 
         val status = try {
             captureAttestationStatus(
-                attestation.payload, (verification as? ClientAttestationVerificationResult.VerifiedWithSigner)?.publicJwk,
+                attestation.payload, verifiedSignerPublicJwk,
                 statusPolicy, clock(),
             )
         } catch (cancelled: CancellationException) { throw cancelled }
