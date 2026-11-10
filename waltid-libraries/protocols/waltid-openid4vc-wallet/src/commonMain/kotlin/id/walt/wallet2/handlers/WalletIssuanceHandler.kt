@@ -639,7 +639,10 @@ data class FetchCredentialRequest(
      * When storing, pass [credentialIssuerBaseUrl] (and optionally [metadata]/[label])
      * so issuer display metadata and credential labels are persisted the same way as
      * the full pre-authorized receive path. [holderBindings] must identify the stored wallet keys
-     * used for [proofs]; inline holder keys are rejected, and copies require distinct public keys.
+     * selected for storage. Expected public keys come separately from [proofs], including all keys
+     * in a nested key attestation. Each returned proof-bound credential must match its evidence and
+     * a selected wallet key; fewer or reordered credentials are accepted. Inline holder keys are
+     * rejected, and copies require distinct public keys. Attestation authentication belongs to the issuer.
      */
     val storeInWallet: Boolean = false,
     /**
@@ -1814,21 +1817,18 @@ object WalletIssuanceHandler {
         require(request.tokenType.equals(if (dpop == null) "Bearer" else "DPoP", ignoreCase = true)) {
             "A DPoP token requires its sender-constraining key and a wallet"
         }
-        val requestedCount = request.effectiveProofs?.jwt?.size ?: 1
-        val issuerMetadata = if (requestedCount > 1 || request.credentialIssuerBaseUrl != null) {
+        val proofCount = request.effectiveProofs?.jwt?.size ?: 0
+        val issuerMetadata = if (proofCount > 1 || request.credentialIssuerBaseUrl != null) {
             val issuer = requireNotNull(request.credentialIssuerBaseUrl) {
                 "credentialIssuerBaseUrl is required to validate batch support"
             }
             val metadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer).metadata
             require(request.credentialEndpoint.toString() == metadata.credentialEndpoint) { "Credential endpoint does not match issuer metadata" }
             require(request.credentialConfigurationId in metadata.credentialConfigurationsSupported) { "Unknown credential configuration" }
-            CredentialRequestBuilder.validateBatchSize(metadata, requestedCount)
+            CredentialRequestBuilder.validateBatchSize(metadata, maxOf(1, proofCount))
             metadata
         } else {
             null
-        }
-        if (request.storeInWallet) require(request.holderBindings.size == requestedCount) {
-            "Supply one holder binding for each proof when storing credentials"
         }
         val exchange = requestCredential(request, httpClient, dpop, issuerMetadata)
         val credentialResponse = exchange.response
@@ -1842,9 +1842,8 @@ object WalletIssuanceHandler {
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
             ?: error("Credential response contained no credentials")
-        require(rawCredentials.isNotEmpty() && (request.effectiveProofs == null || rawCredentials.size <= requestedCount)) {
-            "Invalid credential response count"
-        }
+        require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
+        request.effectiveProofs?.let { validateIsolatedCredentialKeys(rawCredentials, it) }
         return FetchCredentialsResult(rawCredentials = rawCredentials)
     }
 
@@ -2047,6 +2046,7 @@ object WalletIssuanceHandler {
         val bindings = wallet.resolveStoredCredentialBindings(
             request.holderBindings, request.keyId, proofRequired = request.effectiveProofs != null,
         )
+        request.effectiveProofs?.let { validateIsolatedStorageBindings(it, bindings) }
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
         val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,

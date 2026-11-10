@@ -59,6 +59,13 @@ Configuration files live in `config/`:
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
 | `authentication-service.conf` | Optional external OAuth authentication configuration |
 
+Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
+external OAuth authentication. The service and Docker Compose configuration files
+read `clientSecret` from this environment variable. Without it, the secret is
+empty and Keycloak authentication cannot complete. The issuer2 Kubernetes
+deployments read this variable from the `client-secret` key of the
+`issuer2-keycloak` Secret in their namespace.
+
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.

@@ -1,5 +1,16 @@
 # Breaking changes since 0.3.1
 
+## waltid-sdjwt payload validation
+
+- `SDPayload.createSDPayload` (all overloads) now processes the payload it creates as a verifier would (RFC 9901 §7.1) and throws `SDJwtVerificationException` with the reason when that fails, for example a non-array `_sd`, `_sd` or `...` used as a claim name, or duplicate claim names. It previously returned a payload that verifiers reject.
+- It also rejects a top-level `_sd_alg` other than `sha-256`, the only algorithm it digests with.
+- Processing an `SDPayload` (`fullPayload`, `verifyDisclosures`, `withSelectiveDisclosures`), including payloads parsed from received tokens, now rejects `_sd_alg` in any nested object or disclosure (RFC 9901 §4.1.1).
+
+## SD-JWT VC issuance
+
+- Both signers (`SdJwtVcCredentialSigner`, `OpenID4VCI.generateSdJwtVC`) keep `iss`, `nbf`, `exp`, `cnf`, `vct`, `vct#integrity`, `aka_vcts` and `status` in clear text even when the selective disclosure map marks them (SD-JWT VC §2.2.2.3, `SDJwtVC.NON_SELECTIVELY_DISCLOSABLE_CLAIMS`).
+- issuer2 answers credential data that breaks SD-JWT processing with `credential_request_denied` and the reason, instead of HTTP 500.
+
 ## waltid-dcql identifier charset
 
 - `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).
@@ -12,6 +23,16 @@
 - `DcqlDisclosure` gained optional `location: List<JsonElement>? = null` so SD-JWT claim paths can be carried through matching and holder-policy checks.
 - Kotlin source that constructed or copied `DcqlDisclosure` with two arguments remains valid via the default parameter.
 - JVM binary consumers compiled against published `waltid-dcql-jvm` 1.0.0 must rebuild against this identity head. The descriptors for `<init>` and `copy` change from `(String, JsonElement)` to three-argument forms. There is no `@JvmOverloads` / synthetic two-arg compatibility shim.
+
+## waltid-dcql SD-JWT claim selection
+
+- SD-JWT claims paths are processed per OpenID4VP §7.1.1. A path selects only the claim it ends on, never its selectively disclosable children: `["nationalities"]` releases the array without its element disclosures; use `["nationalities", null]` or an index for the elements.
+- `null` selects every array element instead of the first match. A path component that does not fit the selected element (for example a key on a string) fails the claim, so the credential no longer matches.
+- `DcqlMatchResult.disclosuresByPath` lists, per claims path, the disclosures to present: those of the selected claims plus the disclosures containing them (RFC 9901 §4.2.6). Presenters now attach these by location instead of looking disclosures up by claim name.
+- JVM ABI: `DcqlMatchResult` gained `disclosuresByPath`. Kotlin source stays valid through the defaults; JVM binary consumers must rebuild, as the `<init>` and `copy` descriptors change.
+- Wallet2 presentation preview: rows for array elements now carry their array's claim name in `name` (for example `nationalities`) instead of `null`.
+- Wallet2 presentation preview: rows for requested clear-text claims now carry the plain claim name in `name` (for example `address`, previously `"address"` with quotes, or the index for array elements), and their `value` leaves out selectively disclosable children that are not presented, matching what the verifier receives.
+- Wallet2 presentation preview: `required` now means the value is presented whatever the user selects. An optional claim whose disclosures are all needed by a required claim (for example clear text inside a required claim's parent element) is reported as `required = true, selectable = false` instead of offered as a choice.
 
 ## Configuration:
 

@@ -124,3 +124,74 @@ of variant-level strictness. Unaccepted issuer modules still fail the run.
 Certification mode always remains strict. Issuer reports default to
 `build/reports/openid-conformance/vci-issuer` (override with
 `OPENID4VCI_CONFORMANCE_REPORT_DIR`).
+
+## OSS issuer deferred issuance
+
+Deferred coverage uses OSS issuer-api2 from `feat/issuer2-deferred-issuance` and the
+pinned suite `db1080a` (release-v5.2.3 / version 5.2.4). It runs separately from the
+immediate suite in both `proof-jwt` and `proof-attestation` Actions jobs.
+
+The added matrix has 12 issuer-initiated variants per proof mode: Basic VCI with
+both grants, HAIP with authorization code, SD-JWT and mdoc, and plain/encrypted
+requests and responses. Only `oid4vci-1_0-issuer-happy-flow-skip-notification` and
+`oid4vci-1_0-issuer-batch-issuance` execute, for 24 modules per proof mode. Deferred
+runs use the generic VCI issuer plan with the matching Basic/HAIP profile; this
+makes both single-request and encrypted HAIP batch modules available. The immediate
+run still uses the dedicated HAIP plan and reports its encrypted batch omission.
+
+The ordinary encrypted happy-flow module also makes another credential request
+after collection. On this branch that request is rejected as a consumed deferred
+transaction. The added deferred phase uses the suite's single-request module
+instead: repeated issuance after deferred collection is a separate finding, and
+notifications/compression remain in the existing immediate coverage.
+Enterprise issuer2, wallet-initiated deferred issuance and FAPI2 modules are not
+part of this phase.
+
+The suite makes only one deferred collection attempt. A test-only proxy forwards
+the original initial credential request to the issuer, observes its real `202`,
+approves the corresponding offer with the management `/deferred/complete` endpoint,
+and then releases the original response unchanged. The suite subsequently collects
+from the advertised deferred endpoint. The proxy never decrypts or manufactures
+credentials; it preserves JWE bodies and DPoP headers and uses the verified access
+token's session subject only to correlate test traffic with registered offer IDs.
+Cloudflare requests compressed origin responses, so the proxy decodes a copy of
+gzip/deflate management receipts to read the offer ID. The original encoded receipt
+and its headers are forwarded unchanged. Proxy diagnostics contain only the method,
+known route, and exception class; CI includes this log in each proof artifact.
+
+For the existing local Docker/nginx setup, start issuer-api2 on host port 7005 with
+the conformance profiles and public base URL described above, then run from the
+unified build root:
+
+```bash
+OPENID4VCI_CONFORMANCE_ISSUANCE_MODE=deferred \
+OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation \
+  bash waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/run-issuer-conformance-local.sh
+```
+
+The launcher starts the proxy on port 7006 and mounts a generated nginx configuration
+that routes issuer traffic through it. The local proxy binds all host interfaces so
+Docker can reach it; CI binds loopback. Both upstream management and credential
+requests go to the real local issuer. The launcher stops its proxy on exit.
+Re-running in immediate mode restores the normal compose configuration.
+
+For an already prepared runtime/tunnel through the proxy, run
+`:waltid-services:waltid-openid4vp-conformance-runners:issuerDeferredConformanceTest`
+with `-PskipLiveConformance=false`, the usual issuer/suite/profile environment,
+`OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt` or `attestation`, and
+`OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE` pointing at that proxy's receipt file.
+`OPENID4VCI_CONFORMANCE_DEFERRED_REPORT_DIR` optionally overrides the default
+`build/reports/issuer-ci/deferred` directory. The ordinary `test` task defaults to
+immediate issuance; `OPENID4VCI_CONFORMANCE_ISSUANCE_MODE` can select either mode.
+
+A required deferred module must finish `PASSED`, demonstrate its selected proof
+generator, and have ordered initial-202 / approval-204 / collection-200 receipts
+for every offer it used. Skips, missing variants/modules, missing receipts and failed
+approval do not pass. Receipts contain offer hashes and event names only; CI exports
+counts, plan/test IDs and sanitized failure summaries, with separate immediate and
+deferred results and JUnit XML. No tokens, protocol bodies or raw receipt files are
+uploaded by the result aggregation.
+
+Repeated pending polling, denial, expiry, refresh, replay and restart recovery
+remain separate integration-test concerns. A passing deferred phase establishes
+issuance and collection for this matrix, not every deferred lifecycle behavior.
