@@ -636,7 +636,7 @@ class DefaultOAuth2Provider(
 
     override suspend fun createDeferredCredentialRequest(
         parameters: Map<String, List<String>>,
-        accessTokenContext: CredentialAccessTokenContext,
+        accessTokenContext: ProtectedResourceAccessTokenContext,
     ): DeferredCredentialRequestResult {
         deferredAuthenticationError(accessTokenContext)?.let { return it }
         return parseDeferredCredentialRequest(parameters, encrypted = false)
@@ -644,7 +644,7 @@ class DefaultOAuth2Provider(
 
     override suspend fun createDeferredCredentialRequest(
         encryptedRequest: String,
-        accessTokenContext: CredentialAccessTokenContext,
+        accessTokenContext: ProtectedResourceAccessTokenContext,
     ): DeferredCredentialRequestResult {
         deferredAuthenticationError(accessTokenContext)?.let { return it }
         val decryptor = config.credentialRequestDecryptor ?: return DeferredCredentialRequestResult.Failure(
@@ -659,14 +659,10 @@ class DefaultOAuth2Provider(
         }
     }
 
-    private suspend fun deferredAuthenticationError(context: CredentialAccessTokenContext): DeferredCredentialRequestResult? =
-        when (val result = verifyCredentialAccessToken(context)) {
-            is CredentialAccessTokenVerification.Success -> null
-            is CredentialAccessTokenVerification.Failure -> when (val failure = result.result) {
-                is CredentialRequestResult.OAuthFailure -> DeferredCredentialRequestResult.OAuthFailure(failure.error)
-                is CredentialRequestResult.Failure -> DeferredCredentialRequestResult.Failure(failure.error)
-                is CredentialRequestResult.Success -> error("Unexpected token validation result")
-            }
+    private suspend fun deferredAuthenticationError(context: ProtectedResourceAccessTokenContext): DeferredCredentialRequestResult? =
+        when (val result = verifyAccessToken(context)) {
+            is AccessTokenVerification.Success -> null
+            is AccessTokenVerification.Failure -> DeferredCredentialRequestResult.OAuthFailure(result.error)
         }
 
     private fun parseDeferredCredentialRequest(parameters: Map<String, List<String>>, encrypted: Boolean): DeferredCredentialRequestResult {

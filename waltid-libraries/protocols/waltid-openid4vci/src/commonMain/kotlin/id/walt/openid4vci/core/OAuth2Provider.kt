@@ -139,12 +139,12 @@ interface OAuth2Provider {
 
     suspend fun createDeferredCredentialRequest(
         parameters: Map<String, List<String>>,
-        accessTokenContext: CredentialAccessTokenContext,
+        accessTokenContext: ProtectedResourceAccessTokenContext,
     ): id.walt.openid4vci.deferred.DeferredCredentialRequestResult
 
     suspend fun createDeferredCredentialRequest(
         encryptedRequest: String,
-        accessTokenContext: CredentialAccessTokenContext,
+        accessTokenContext: ProtectedResourceAccessTokenContext,
     ): id.walt.openid4vci.deferred.DeferredCredentialRequestResult
 
     /** Validate persisted acceptance and prepare fresh or checkpointed credentials for delivery. */

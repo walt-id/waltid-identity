@@ -931,10 +931,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ): CredentialResponseHttp {
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return invalidCredentialAuthorization(requestId)
-        val context = CredentialAccessTokenContext(
+        val context = ProtectedResourceAccessTokenContext(
             authorization = authorization, expectedIssuer = metadataService.issuerBaseUrl(),
             dpopProofHeaderValues = dpopProofHeaderValues,
-            credentialEndpointUri = endpointUri("deferred_credential"),
+            targetUri = endpointUri("deferred_credential"),
         )
         val result = if (encryptedRequest != null) oauth2Provider.createDeferredCredentialRequest(encryptedRequest, context)
             else oauth2Provider.createDeferredCredentialRequest(requireNotNull(parameters).toParametersMap(), context)

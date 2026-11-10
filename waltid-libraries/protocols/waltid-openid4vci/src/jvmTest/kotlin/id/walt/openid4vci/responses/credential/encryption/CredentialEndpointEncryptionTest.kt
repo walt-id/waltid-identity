@@ -244,7 +244,7 @@ class CredentialEndpointEncryptionTest {
                 override suspend fun verify(token: String, expectedIssuer: String?, expectedAudience: String?) = buildJsonObject { put("sub", "offer") }
             },
         ))
-        val context = id.walt.openid4vci.tokens.access.CredentialAccessTokenContext(
+        val context = id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext(
             id.walt.openid4vci.tokens.access.AccessTokenAuthorization(id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme.BEARER, "token"),
             expectedIssuer = "https://issuer.example",
         )

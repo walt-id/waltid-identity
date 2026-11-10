@@ -232,8 +232,8 @@ class DPoPProviderTest {
         val endpoint = "$ISSUER/deferred_credential"
         suspend fun poll(token: String, proof: String) = provider.createDeferredCredentialRequest(
             mapOf("transaction_id" to listOf("transaction")),
-            CredentialAccessTokenContext(AccessTokenAuthorization(AccessTokenAuthorizationScheme.DPOP, token),
-                expectedIssuer = ISSUER, dpopProofHeaderValues = listOf(proof), credentialEndpointUri = endpoint),
+            ProtectedResourceAccessTokenContext(AccessTokenAuthorization(AccessTokenAuthorizationScheme.DPOP, token),
+                expectedIssuer = ISSUER, dpopProofHeaderValues = listOf(proof), targetUri = endpoint),
         )
         assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Success>(poll(ACCESS_TOKEN, createProof(walletKey, endpoint, ACCESS_TOKEN)))
         assertIs<id.walt.openid4vci.deferred.DeferredCredentialRequestResult.Success>(poll("refreshed-token", createProof(walletKey, endpoint, "refreshed-token")))
