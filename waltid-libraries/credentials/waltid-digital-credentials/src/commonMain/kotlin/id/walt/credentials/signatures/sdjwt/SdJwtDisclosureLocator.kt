@@ -1,6 +1,9 @@
 package id.walt.credentials.signatures.sdjwt
 
 import id.walt.credentials.UnreachableDisclosuresException
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.utils.JwtUtils
+import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
 import id.walt.credentials.utils.SdJwtUtils.appendClaimName
 import kotlinx.serialization.json.*
@@ -66,8 +69,23 @@ internal object SdJwtDisclosureLocator {
     }
 }
 
-/** Recompute stale persisted locations using the complete available disclosure set, before selecting a subset. */
+/**
+ * Recompute stale persisted locations using the complete available disclosure set, before selecting a subset.
+ * Without [SelectivelyDisclosableVerifiableCredential.originalCredentialData], the payload is decoded from the
+ * issuer-signed JWT; stored locations are never trusted.
+ */
 fun SelectivelyDisclosableVerifiableCredential.locatedDisclosures(): List<SdJwtSelectiveDisclosure> {
     val available = disclosures.orEmpty()
-    return originalCredentialData?.let { SdJwtDisclosureLocator.locate(it, available) } ?: available
+    val payload = originalCredentialData ?: issuerSignedPayload()
+        ?: if (available.isEmpty()) return available
+        else throw UnreachableDisclosuresException("Invalid disclosures: no issuer-signed payload to locate them in")
+    return SdJwtDisclosureLocator.locate(payload, available)
+}
+
+/** The payload the credential parser locates disclosures in: the `vc` object when it holds `_sd`, else the JWT body. */
+private fun SelectivelyDisclosableVerifiableCredential.issuerSignedPayload(): JsonObject? {
+    val issuerJwt = (signedWithDisclosures ?: (this as? DigitalCredential)?.signed)
+        ?.substringBefore("~")?.takeIf { it.isJwt() } ?: return null
+    val body = JwtUtils.parseJwt(issuerJwt).second
+    return (body["vc"] as? JsonObject)?.takeIf { "_sd" in it } ?: body
 }

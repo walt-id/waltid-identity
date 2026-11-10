@@ -1,9 +1,11 @@
 package id.walt.credentials
 
+import id.walt.credentials.formats.W3C11
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.credentials.signatures.sdjwt.SdJwtDisclosureLocator
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
@@ -60,6 +62,38 @@ class SdJwtDecoyTest {
         assertEquals(listOf(JsonPrimitive("nationalities")), located.single { it.name == "nationalities" }.location)
         assertEquals(path(0), located.single { it.encoded == row.encoded }.location)
         assertEquals(path(0) + listOf(JsonPrimitive("documents"), JsonPrimitive(0)), located.single { it.encoded == leaf.encoded }.location)
+    }
+
+    @Test
+    fun storedW3cCredentialWithoutOriginalPayloadIsLocatedFromItsSignedJwt() {
+        val india = disclosure("IN")
+        val france = disclosure("FR")
+        fun encode(value: JsonObject) = value.toString().encodeToByteArray().encodeToBase64Url()
+        val header = buildJsonObject { put("alg", "ES256"); put("typ", "JWT") }
+        val vc = buildJsonObject {
+            putJsonArray("nationalities") {
+                add(reference("decoy")); add(reference(india.asHashedFromEncoded())); add(reference(france.asHashedFromEncoded()))
+            }
+            putJsonArray("_sd") {}
+        }
+        val issuerJwt = "${encode(header)}.${encode(buildJsonObject { put("vc", vc) })}.c2ln"
+        // Locations persisted by older code count the decoy, so ["nationalities", 1] names IN instead of FR
+        val credential = W3C11(
+            disclosables = emptyMap(),
+            disclosures = listOf(india.copy(location = path(1)), france.copy(location = path(2))),
+            signedWithDisclosures = "$issuerJwt~${india.encoded}~${france.encoded}~",
+            credentialData = buildJsonObject { putJsonArray("nationalities") { add("IN"); add("FR") } },
+            originalCredentialData = null,
+            signature = null,
+            signed = issuerJwt,
+        )
+
+        val located = credential.locatedDisclosures()
+        assertEquals(path(0), located.single { it.value == india.value }.location)
+        assertEquals(path(1), located.single { it.value == france.value }.location)
+
+        val withoutIssuerJwt = credential.copy(signedWithDisclosures = null, signed = null)
+        assertFailsWith<UnreachableDisclosuresException> { withoutIssuerJwt.locatedDisclosures() }
     }
 
     @Test
