@@ -79,9 +79,13 @@ class PaymentConsentResolver internal constructor(
             val metadata = try {
                 val pin = authenticated.integrity("vct#integrity").singleOrNull()
                 val cached = if (pin != null && snapshot != null) TypeMetadataResolver.snapshotDocuments(snapshot) else emptyMap()
-                TypeMetadataResolver({ uri -> cached[uri] ?: session.readBytes(uri) }).resolve(
+                val resolved = TypeMetadataResolver({ uri -> cached[uri] ?: session.readBytes(uri) }).resolve(
                     vct, pin, requireParentIntegrity = true,
-                ).effective
+                )
+                if (resolved.documents.any { document ->
+                    document.metadata["category"]?.let { it != JsonPrimitive(SCA_ATTESTATION_CATEGORY) } == true
+                }) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+                resolved.effective
             } catch (cause: TypeMetadataException) {
                 consentFailure(when (cause.reason) {
                     TypeMetadataFailure.INTEGRITY_MISMATCH -> PaymentConsentFailure.INTEGRITY_MISMATCH

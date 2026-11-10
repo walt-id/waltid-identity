@@ -128,6 +128,17 @@ class PaymentConsentResolverTest {
             metadata = JsonObject(base + (name to value))
             assertFailure(reason) { resolver.resolve(credential(), payload, listOf("en")) }
         }
+        for (category in listOf("other", SCA_ATTESTATION_CATEGORY)) {
+            val parent = """{"vct":"$ISSUER/base","category":"$category"}"""
+            documents["/base"] = parent
+            metadata = JsonObject(base + mapOf(
+                "extends" to JsonPrimitive("$ISSUER/base"),
+                "extends#integrity" to JsonPrimitive("sha256-" + ShaUtils.sha256Base64Url(parent.encodeToByteArray())),
+            ))
+            if (category == SCA_ATTESTATION_CATEGORY) {
+                assertEquals("Pay", resolver.resolve(credential(), payload, listOf("en")).affirmativeAction)
+            } else assertFailure(PaymentConsentFailure.INVALID_METADATA) { resolver.resolve(credential(), payload, listOf("en")) }
+        }
     }
 
     @Test fun unknownReferenceExtensionsAreIgnoredWithoutFetchingOrWeakeningKnownIntegrity() = test {
