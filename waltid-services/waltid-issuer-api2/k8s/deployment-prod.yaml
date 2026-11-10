@@ -38,7 +38,7 @@ spec:
           env:
             - name: ISSUER2_BASE_URL
               value: "https://issuer2.demo.walt.id"
-            - name: ISSUER2_KEYCLOAK_CLIENT_SECRET
+            - name: KEYCLOAK_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: issuer2-keycloak
