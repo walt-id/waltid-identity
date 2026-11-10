@@ -54,8 +54,9 @@ class Edition2CompatibilityTest {
             coseCompliantCbor.encodeToByteArray(DeviceResponse.serializer(), response),
             coseCompliantCbor.encodeToByteArray(DeviceResponse.serializer(), decoded),
         )
-        assertEquals("org.example", decoded.documents!!.single().docType)
-        assertNotNull(decoded.documents!!.single().deviceSigned!!.deviceAuth.deviceMac)
+        val decodedDocument = assertNotNull(decoded.documents).single()
+        assertEquals("org.example", decodedDocument.docType)
+        assertNotNull(decodedDocument.deviceSigned!!.deviceAuth.deviceMac)
         val serializer: TransformingSerializerTemplate<ByteArray, String> = ByteArrayBase64UrlSerializer
         assertEquals(ByteArrayBase64UrlSerializer, serializer)
     }
