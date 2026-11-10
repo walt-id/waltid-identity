@@ -5,7 +5,6 @@ plugins {
     id("com.android.application")
     kotlin("plugin.compose")
     alias(identityLibs.plugins.google.services)
-    id("waltid.kotlin-warnings")
 }
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()

@@ -62,10 +62,12 @@ These conventions enable their Android targets through `enableAndroidBuild`. And
 
 ## Kotlin compiler warnings
 
-The Identity and Unified Build roots apply `waltid.kotlin-warnings` to their Kotlin modules.
+The Identity and Unified Build roots apply `waltid.kotlin-warnings` once for all projects.
 The convention makes missing experimental opt-ins errors in production and test
 compilations, including enabled JVM, JS, Android, and native targets. A module that
-applies Kotlin directly receives the same policy as a convention-based module.
+applies Kotlin directly receives the same policy as a convention-based module,
+without declaring another plugin. Keep explicit plugin versions in the root's
+`plugins` block when those plugins are also dependencies of build logic.
 
 Use a local `@OptIn` when an implementation intentionally uses an experimental API.
 Applying the experimental marker itself makes the declaration experimental for its

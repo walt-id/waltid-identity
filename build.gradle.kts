@@ -10,11 +10,7 @@ plugins {
     alias(identityLibs.plugins.sqldelight) apply false
     id("waltid.licensereport") apply false
     alias(identityLibs.plugins.google.services) apply false
-    id("waltid.kotlin-warnings") apply false
-}
-
-allprojects {
-    apply(plugin = "waltid.kotlin-warnings")
+    id("waltid.kotlin-warnings")
 }
 
 // License reporting resolves every runtime classpath and downloads every POM in the parent

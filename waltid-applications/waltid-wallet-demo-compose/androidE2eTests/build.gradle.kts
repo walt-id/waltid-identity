@@ -1,5 +1,4 @@
 plugins {
-    id("waltid.kotlin-warnings")
     id("com.android.test")
 }
 
