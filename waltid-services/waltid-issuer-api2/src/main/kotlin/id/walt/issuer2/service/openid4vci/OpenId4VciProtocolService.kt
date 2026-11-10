@@ -1133,18 +1133,26 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         if (observedSession.deferredState != null && deferredClaim == null) {
             try {
-                val accepted = oauth2Provider.acceptCredentialRequest(
-                    requestWithSession, configuration, authorization.credentialIdentifier,
-                    authorization.credentialConfigurationId,
-                    CredentialProofValidationContext(
-                        keyAttestation = keyAttestation,
-                        credentialIssuer = nonceBinding.credentialIssuer,
-                        clientId = requestWithSession.accessTokenClientId,
-                        anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
-                        nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
-                        batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-                    ),
-                )
+                val accepted = try {
+                    oauth2Provider.acceptCredentialRequest(
+                        requestWithSession, configuration, authorization.credentialIdentifier,
+                        authorization.credentialConfigurationId,
+                        CredentialProofValidationContext(
+                            keyAttestation = keyAttestation,
+                            credentialIssuer = nonceBinding.credentialIssuer,
+                            clientId = requestWithSession.accessTokenClientId,
+                            anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                            nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
+                            batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
+                        ),
+                    )
+                } catch (e: DeferredProtocolException) {
+                    // Collection notifications apply only after a transaction has been accepted.
+                    if (e.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                        return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, e.error)
+                    }
+                    throw e
+                }
                 validateExpectedCredentialProofKeys(accepted.bindings.map { it.publicJwk }, observedIssuanceRequest)?.let {
                     return oauth2Provider.writeCredentialError(it)
                 }
