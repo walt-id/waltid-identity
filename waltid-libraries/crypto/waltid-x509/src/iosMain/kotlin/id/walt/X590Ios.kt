@@ -1,6 +1,7 @@
 package id.walt.x509
 
 import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
@@ -152,7 +153,7 @@ actual fun validateCertificateChain(
     }
 }
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private fun CertificateDer.toSecCertificate(description: String): SecCertificateRef {
     val byteArray = bytes.toByteArray()
     val data = CFBridgingRetain(

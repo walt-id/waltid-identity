@@ -1,6 +1,7 @@
 package id.walt.crypto.utils
 
 import id.walt.crypto.utils.Base64Utils.base64Decode
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
@@ -36,7 +37,7 @@ import platform.Security.kSecClassKey
 import platform.Security.kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
 import platform.posix.memcpy
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
 
     memScoped {

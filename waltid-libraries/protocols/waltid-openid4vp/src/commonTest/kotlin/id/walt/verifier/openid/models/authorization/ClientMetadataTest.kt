@@ -8,7 +8,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 // Client metadata is a stable protocol model. Its serializer's experimental
-// implementation details must not require an opt-in from callers.
+// implementation details must not require an opt-in from callers. The compiler
+// warning policy makes a missing caller opt-in fail test compilation.
 class ClientMetadataTest {
     @Test
     fun metadataRoundTripsWithoutSerializationOptIn() {

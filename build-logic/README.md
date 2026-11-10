@@ -59,3 +59,33 @@ These conventions enable their Android targets through `enableAndroidBuild`. And
 
 - `waltid.base.gradle.kts` - Base for all types
 - `waltid.licensereport.gradle.kts` - Use mocking
+
+## Kotlin compiler warnings
+
+The Identity and Unified Build roots apply `waltid.kotlin-warnings` to their Kotlin modules.
+The convention makes missing experimental opt-ins errors in production and test
+compilations, including enabled JVM, JS, Android, and native targets. A module that
+applies Kotlin directly receives the same policy as a convention-based module.
+
+Use a local `@OptIn` when an implementation intentionally uses an experimental API.
+Applying the experimental marker itself makes the declaration experimental for its
+callers. Avoid module-wide opt-ins: they also hide accidental experimental API use
+in consumer tests such as `ClientMetadataTest`.
+
+Once a module's remaining warnings are resolved, enable the stricter policy in its
+build script:
+
+```kotlin
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+```
+
+This also rejects new deprecated API usages. Migrate legacy APIs deliberately;
+compatibility tests and adapters may need to keep exercising deprecated entry
+points. Any necessary suppression should be local and explain the compatibility
+contract it preserves.
+
+Compiler options are described in the [Kotlin warning documentation](https://kotlinlang.org/docs/compiler-reference.html#warning-management).
