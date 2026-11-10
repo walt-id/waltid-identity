@@ -11,6 +11,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Embedding services own the fetcher and its lifecycle. Raw fetching bypasses its result cache;
  * shared URL restrictions, SSRF protection and response limits still apply. A deployment may
  * tighten the 2 MiB response cap, but cannot disable it or enable redirects for status lookups.
+ * A fetcher created with `WebDataFetcher.wrapping` must already enforce those settings and install
+ * the SSRF guard and response-size plugin on its client; wrapping does not configure that client.
+ * The supplied client must also disable response caching and plugins that inject credentials.
  */
 class HttpAttestationStatusResolver(private val fetcher: WebDataFetcher) : AttestationStatusResolver {
     init {

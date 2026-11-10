@@ -42,12 +42,14 @@ be in bounds. Signed dates and optional positive numeric TTL are validated.
 
 Version 1 authorizes the same public key that verified the original attestation. Static
 JWK, key-reference and x509 verification capture that key after successful verification.
+KA verification retains the public material used for the successful signature check; it
+does not retrieve the key again from a provider for status capture.
 The wallet confirmation/holder key, an `iss` string, an arbitrary response JWK or a response
 certificate does not authorize a status signer. A different delegated signer or signing-key
 rotation is not supported by this version; it fails closed. Public signer context stays in
 private token/session evidence and is never returned in management responses.
 
-The crypto2 verifier does not require public-key export when an optional status reference
+The WIA verifiers do not require public-key export when an optional status reference
 is omitted. If a reference is supplied but the verified attester's public key cannot be
 exported, status verification returns a retryable technical failure; it does not report an
 invalid attestation signature. A missing required reference remains an authentication error.
@@ -163,7 +165,9 @@ reference. Legacy optional-status profiles are explicitly grandfathered under F5
 lifetime enforcement; their original status cannot be reconstructed. They retain the null
 legacy marker, rather than being rewritten as a known optional omission. Newly captured
 transactions retain their accepted policy through configuration changes, refresh and
-resubmission. Unknown evidence versions fail closed.
+resubmission. Only uncaptured legacy evidence consults current client-authentication trust and legacy
+KA policy callbacks. New snapshots, including known optional omission, use their captured
+policy without resolving current attester keys for status checks. Unknown evidence versions fail closed.
 
 Auto-revoke scheduling, Wallet Provider minting, fresh-attestation replacement and
 TrustDecision changes remain separate work.
