@@ -51,6 +51,12 @@ class IssuanceSessionService(
 
     suspend fun createSession(session: IssuanceSession): IssuanceSession = repository.save(session)
 
+    /**
+     * Writes a session already removed by [claimSession].
+     * The snapshot keeps the deferred checkpoint it held at the claim; the stored row is gone until this write.
+     */
+    suspend fun saveClaimedSession(session: IssuanceSession): IssuanceSession = repository.save(session)
+
     suspend fun saveSession(session: IssuanceSession): IssuanceSession {
         if (session.deferredState == null) return repository.save(session)
         while (true) {

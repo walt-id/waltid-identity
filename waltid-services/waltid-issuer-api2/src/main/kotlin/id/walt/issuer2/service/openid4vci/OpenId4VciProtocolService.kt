@@ -1739,7 +1739,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                     val change = (response as? NotificationResponseResult.Success)?.change
                     val saved = withContext(NonCancellable) {
-                        val saved = sessionService.saveSession(
+                        val saved = sessionService.saveClaimedSession(
                             change?.let { claimed.applyWalletNotification(it) } ?: claimed,
                         )
                         // Save releases the claim. Record that fact before cancellation can resume.
@@ -1755,7 +1755,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     }
                     return oauth2Provider.writeNotificationResponse(response)
                 } finally {
-                    if (!claimFinalized) restoreClaimedSession(claimed)
+                    if (!claimFinalized) {
+                        withContext(NonCancellable) { sessionService.saveClaimedSession(claimed) }
+                    }
                 }
             }
         }

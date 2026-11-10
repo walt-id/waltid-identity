@@ -15,6 +15,8 @@ import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.deferred.DeferredIssuanceState
+import id.walt.openid4vci.deferred.DeferredStatus
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
@@ -64,6 +66,27 @@ class WalletNotificationCommitTest {
         assertEquals(204, retry.status)
         val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
         assertEquals(emptyList(), events.replayCache.filter { it.requestId == "retry" })
+    }
+
+    @Test
+    fun `deferred session notification keeps the claimed checkpoint`() = runTest {
+        val repository = RecordingRepository()
+        val checkpoint = DeferredIssuanceState(status = DeferredStatus.READY)
+        repository.current = assertNotNull(repository.current).copy(
+            deferredState = checkpoint,
+            deferredStatus = DeferredStatus.READY,
+        )
+        val response = protocolService(repository).processNotificationRequest(
+            listOf("Bearer token"), emptyList(), "{}", "deferred-notification",
+        )
+        assertEquals(204, response.status)
+        val saved = assertNotNull(repository.current)
+        assertEquals(checkpoint, saved.deferredState)
+        assertEquals(DeferredStatus.READY, saved.deferredStatus)
+        assertEquals(
+            NotificationEvent.CREDENTIAL_ACCEPTED,
+            saved.issuanceResults.getValue("credential").walletNotification?.event,
+        )
     }
 
     @Test
