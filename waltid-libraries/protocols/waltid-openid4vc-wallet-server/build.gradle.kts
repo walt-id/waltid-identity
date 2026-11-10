@@ -5,6 +5,12 @@ plugins {
 
 group = "id.walt.protocols"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     // The base wallet library — all protocol logic
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))

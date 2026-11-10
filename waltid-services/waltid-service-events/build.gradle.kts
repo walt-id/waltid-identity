@@ -5,6 +5,12 @@ plugins {
 
 group = "id.walt"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     api(identityLibs.kotlinx.serialization.json)
 

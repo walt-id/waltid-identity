@@ -33,7 +33,6 @@ class AWSKey(
     @Transient
     private val log = KotlinLogging.logger { }
 
-    @Transient
     override var keyType: KeyType
         get() = _keyType ?: throw IllegalStateException("Key type not initialized. Call init() first or provide _keyType.")
         set(value) {
@@ -81,7 +80,6 @@ class AWSKey(
      * Lazily initialized failover client for multi-region keys.
      * Only created when failover is enabled and replica regions are configured.
      */
-    @Transient
     private val failoverClient: FailoverKmsClient? by lazy {
         if (config.enableFailover == true && !config.replicaRegions.isNullOrEmpty()) {
             FailoverKmsClient(

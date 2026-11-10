@@ -156,8 +156,10 @@ class E2ETest(
     }
 
     suspend fun <T> testAndReturn(name: String, function: suspend () -> T): T {
-        val res = test(name, function)
-        return (res as Result<T>).getOrThrow()
+        // The reporting helper forwards the callback's value unchanged.
+        @Suppress("UNCHECKED_CAST")
+        val res = test(name, function) as Result<T>
+        return res.getOrThrow()
     }
 
     suspend fun test(name: String, function: suspend () -> Any?): Result<Any?> {

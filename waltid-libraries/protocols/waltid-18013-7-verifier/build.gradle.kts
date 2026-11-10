@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
 
     sourceSets {
         commonMain.dependencies {

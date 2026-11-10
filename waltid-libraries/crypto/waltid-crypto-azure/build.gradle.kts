@@ -5,6 +5,12 @@ plugins {
 
 group = "id.walt.crypto"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.junit.jupiter.api)

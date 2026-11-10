@@ -19,6 +19,10 @@ waltidMobile {
 }
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     explicitApi()
 
     abiValidation {

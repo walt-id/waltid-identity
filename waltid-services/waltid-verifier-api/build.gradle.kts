@@ -8,6 +8,12 @@ plugins {
 
 group = "id.walt"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     api(project(":waltid-services:waltid-service-commons"))
 

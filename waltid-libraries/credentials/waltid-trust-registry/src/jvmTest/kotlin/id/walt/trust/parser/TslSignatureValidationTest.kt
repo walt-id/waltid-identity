@@ -101,7 +101,7 @@ class TslSignatureValidationTest {
         )
         assertNotNull(result.signatureValidation, "Should have signature validation result")
         assertTrue(result.signatureValidation!!.signatureValid, "Signature should be valid")
-        assertTrue(result.signatureValidation!!.referencesValid, "References should be valid")
+        assertTrue(result.signatureValidation.referencesValid, "References should be valid")
 
         // Note: The EU LoTL is a List of Trusted Lists, not a regular trust list.
         // It contains pointers to member state TLs, not TSPs directly.

@@ -22,6 +22,10 @@ val generateBundledJsonLdContexts = tasks.register<GenerateBundledJsonLdContexts
 }
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName = "dcql"
     }
