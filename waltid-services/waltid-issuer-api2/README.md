@@ -714,7 +714,9 @@ expired KA denies the entire holder-key batch. Other transactions and completed
 datasets retain their progress. This transaction denial does not change the offer's
 operator approval decision.
 
-A transaction's first lifetime denial emits a credential-request failure notification;
+An acceptance-time `credential_request_denied` emits one credential-request failure
+notification for that request.
+A transaction's first lifetime denial emits one credential-request failure notification;
 later polls return the persisted denial without another notification. Response-encryption
 errors retain the signed checkpoint so a later poll can retry delivery.
 

@@ -239,6 +239,11 @@ class DeferredAttestationExpiryTest {
             assertEquals("credential_request_denied", error.getValue("error").jsonPrimitive.content)
             assertFalse("transaction_id" in error)
             assertTrue(assertNotNull(repository.get(offer.offerId)?.deferredState).transactions.isEmpty())
+            val failure = notificationServer.awaitEvent(offer.offerId, IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED)
+            assertEquals("credential_request_denied", failure.error)
+            assertEquals(1, notificationServer.getReceivedUpdates().count {
+                it.target == offer.offerId && it.event.startsWith("credential_request_") && it.event.endsWith("_failed")
+            }, "A rejected Credential Request must emit one failure event before returning")
             return@testApplication
         }
         assertEquals(HttpStatusCode.Accepted, pending.status, pending.bodyAsText())

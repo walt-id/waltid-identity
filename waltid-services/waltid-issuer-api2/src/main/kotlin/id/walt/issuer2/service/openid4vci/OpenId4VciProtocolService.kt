@@ -1159,7 +1159,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     tokenClaims, requestId,
                 )
             } catch (e: CredentialProofValidationException) {
-                return oauth2Provider.writeCredentialError(CredentialError(e.errorCode, e.message))
+                val error = CredentialError(e.errorCode, e.message)
+                if (error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                    return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, error)
+                }
+                return oauth2Provider.writeCredentialError(error)
             } catch (e: DeferredProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
             }
@@ -1949,7 +1953,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
     }
 
-    /** Reports a retryable rejection without changing the issuance-session lifecycle. */
+    /** Reports a rejection without changing the issuance-session lifecycle. */
     private suspend fun rejectCredentialRequest(
         request: CredentialRequest,
         session: IssuanceSession,
