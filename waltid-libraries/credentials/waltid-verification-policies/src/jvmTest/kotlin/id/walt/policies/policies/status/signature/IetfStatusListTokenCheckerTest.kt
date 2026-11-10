@@ -1,7 +1,7 @@
 package id.walt.policies.policies.status.signature
 
 import id.walt.cose.CoseHeaders
-import id.walt.cose.toCoseSigner
+import id.walt.cose.CoseSigner
 import id.walt.credentials.formats.W3C11
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -41,7 +41,7 @@ class IetfStatusListTokenCheckerTest {
 
         val cwt = IetfStatusListTokens.signedCwt(
             uri = uri,
-            signer = key.toCoseSigner(),
+            signer = CoseSigner { key.signRaw(it) },
             protectedHeaders = CoseHeaders(algorithm = -8, kid = keyId.encodeToByteArray()),
             index = 0,
             status = 0u,
