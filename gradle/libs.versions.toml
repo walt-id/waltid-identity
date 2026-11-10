@@ -1,6 +1,6 @@
 [versions]
 # Build/compilation versions
-# SKIE 0.10.15 supports Kotlin through 2.4.20.
+# Keep Kotlin aligned with suspend-transform and supported by SKIE.
 kotlin = "2.4.20"
 binary-compatibility-validator = "0.18.2"
 suspend-transform = "2.4.20-0.15.0"
@@ -19,14 +19,13 @@ android-gradle = "9.3.3"
 gradle-shadow = "9.6.1"
 buildconfig = "6.1.2"
 licensee = "1.14.1"
-# 1.12.2 changes recorded iOS Compose snapshot pixels.
-compose-multiplatform = "1.12.1"
+# Haze 2.1.0 requires Compose 1.12.2; keep the plugin and runtime aligned.
+compose-multiplatform = "1.12.2"
 compose-material3 = "1.12.0-alpha03"
 compose-material-icons = "1.7.3"
 easyqrscan = "0.7.2"
 zxing = "3.5.4"
 zxing-cpp = "3.1.1"
-# Held with the Compose baseline pin.
 compose-navigation3 = "1.1.2"
 dokka = "2.3.0"
 coil = "3.6.3"
@@ -194,8 +193,9 @@ hikaricp-wallet = "6.3.3"
 mockk-wallet = "1.14.11"
 sqlite-migration = "3.54.1.0"
 postgres-migration = "42.7.3"
-kotlin-web3login = "2.4.20"
-ktor-web3login = "3.6.1"
+# The unmaintained standalone service needs its build and wallet integration restored before migration.
+kotlin-web3login = "2.0.0"
+ktor-web3login = "3.3.3"
 nftkit-web3login = "1.2311291144.0"
 
 [libraries]
