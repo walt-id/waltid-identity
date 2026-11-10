@@ -27,7 +27,7 @@ const registry = {
           display: {
             verification: {
               title: "Example Bank card",
-              subtitle: "Card ending 1234",
+              subtitle: "Payment",
               explainer: "AUTHENTICATED EXPLAINER",
               warning: "REGISTERED WARNING",
               metadata_display_text: "REGISTERED METADATA",
@@ -260,10 +260,10 @@ const document = {
       en: "Authorize payment",
       de: "Zahlung freigeben",
     },
-    transaction_title: { en: "Confirm this payment", de: "Zahlung bestätigen" },
+    transaction_title: { en: "Authorize bank transfer", de: "Banküberweisung freigeben" },
     security_hint: {
-      en: "Check the payee and amount.",
-      de: "Empfänger und Betrag prüfen.",
+      en: "Verify the recipient account before authorizing.",
+      de: "Prüfen Sie das Empfängerkonto vor der Freigabe.",
     },
   },
 };
@@ -302,13 +302,13 @@ const unsigned = run(
 assert.equal(unsigned.find((c) => c.call === "set").length, 2);
 assert.equal(unsigned.filter((c) => c.call === "verification").length, 1);
 assert.equal(payment(unsigned).amount, "EUR 42.00");
+assert.equal(payment(unsigned).title, "Example Bank card");
 assert.equal(
   payment(unsigned).subtitle,
   [
     "Unsigned request. Check the payment details before confirming.",
-    "Card ending 1234",
-    "Confirm this payment",
-    "Check the payee and amount.",
+    "Authorize bank transfer",
+    "Verify the recipient account before authorizing.",
     "Reference: \u2068local-research-payment-1\u2069",
     "Payee: \u2068ACME Corp\u2069",
     "Payee ID: \u2068merchant-42\u2069",
@@ -322,6 +322,15 @@ assert.deepEqual(payment(unsigned).metadata.claims, [
   ["cardholder"],
   ["account"],
 ]);
+const issuerUiLabels = document.ui_labels;
+document.ui_labels = { affirmative_action_label: issuerUiLabels.affirmative_action_label };
+const withoutOptionalUi = run("optional-title-and-hint-absent", make([transaction(payload)]), "openid4vp-v1-signed");
+assert(payment(withoutOptionalUi).subtitle.startsWith("Reference: \u2068local-research-payment-1\u2069\nPayee:"));
+assert(payment(withoutOptionalUi).subtitle.endsWith("Cardholder: \u2068Ada Example\u2069\nAccount: \u20681234\u2069"));
+assert(!payment(withoutOptionalUi).subtitle.includes("Authorize bank transfer"));
+assert(!payment(withoutOptionalUi).subtitle.includes("Verify the recipient account"));
+assert(!payment(withoutOptionalUi).subtitle.split("\n").includes("Payment"));
+document.ui_labels = issuerUiLabels;
 const signed = run(
   "signed-wrapper-matcher-does-not-authenticate",
   make([transaction(payload)]),
@@ -360,6 +369,7 @@ const optional = run(
   ]),
 );
 assert.equal(payment(optional).amount, "EUR 42,00");
+assert(payment(optional).subtitle.includes("Banküberweisung freigeben\nPrüfen Sie das Empfängerkonto vor der Freigabe."));
 assert(payment(optional).subtitle.includes("Sofortzahlung: \u2068Nein\u2069"));
 assert(
   payment(optional).subtitle.includes("Karteninhaber: \u2068Ada Example\u2069"),

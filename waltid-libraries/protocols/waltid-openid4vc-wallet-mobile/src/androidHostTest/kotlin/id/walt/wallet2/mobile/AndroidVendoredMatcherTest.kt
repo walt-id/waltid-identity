@@ -63,7 +63,7 @@ class AndroidVendoredMatcherTest {
             .use { it.readBytes() }
 
         assertEquals(
-            "48c69d1d6e1c1a8ed7025dbb45007776f4f834c19a329f371ce7e2b79fe0b03d",
+            "beaf679bbb20f157f9fc68742a0f75d60527027e1ce84594983059b61a300462",
             MessageDigest.getInstance("SHA-256").digest(matcher).joinToString("") { "%02x".format(it) },
             "vendored matcher content changed; see OPENID4VP-MATCHER.md before repinning",
         )

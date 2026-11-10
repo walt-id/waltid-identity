@@ -470,10 +470,10 @@ index f450e60..6cfb7a2 100644
 +}
 diff --git a/CredentialProvider/wasm/matcher-rs/src/payment.rs b/CredentialProvider/wasm/matcher-rs/src/payment.rs
 new file mode 100644
-index 0000000..e723b1d
+index 0000000..2744d15
 --- /dev/null
 +++ b/CredentialProvider/wasm/matcher-rs/src/payment.rs
-@@ -0,0 +1,489 @@
+@@ -0,0 +1,488 @@
 +//! Local TS-12 system-sheet projection. Trust is established by the wallet before registration;
 +//! the sandbox only selects authenticated labels and renders the original request's values.
 +use crate::base64url::decode_base64url;
@@ -865,9 +865,8 @@ index 0000000..e723b1d
 +            .to_owned(),
 +        );
 +    }
-+    if !credential.display.verification.subtitle.is_empty() {
-+        lines.push(single_line(&credential.display.verification.subtitle));
-+    }
++    // The ordinary credential caption is a type label, not a payment instruction.
++    // Card identity remains in the title and issuer-labelled requested attributes below.
 +    for key in ["transaction_title", "security_hint"] {
 +        if let Some(labels) = ui.get(key).and_then(Value::as_object) {
 +            lines.push(single_line(nonblank(

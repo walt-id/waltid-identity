@@ -111,6 +111,10 @@ class Issuer2MetadataEndpointTest {
         loadIssuer2ConfigFiles()
         val servicePayment = ConfigManager.getConfig<Issuer2MetadataConfig>()
             .sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+        val paymentUiLabels = servicePayment.customParameters!!.getValue("transaction_data_types").jsonObject
+            .getValue("urn:eudi:sca:payment:1").jsonObject.getValue("ui_labels").jsonObject
+        assertFalse("transaction_title" in paymentUiLabels, "Demo metadata must not add a generic transaction title")
+        assertFalse("security_hint" in paymentUiLabels, "Demo metadata must not add a generic security hint")
         val dockerMetadata = issuer2ConfigDir().parent.parent.parent
             .resolve("docker-compose/issuer-api2/config/credential-issuer-metadata.conf")
         loadIssuer2ConfigFiles(metadataConfigFile = dockerMetadata)

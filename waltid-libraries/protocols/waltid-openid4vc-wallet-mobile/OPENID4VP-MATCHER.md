@@ -41,8 +41,8 @@ upstream ships the Rust sources only.
 | Upstream path | `CredentialProvider/wasm/matcher-rs` |
 | Source modifications | `matcher-patches/5d966fc4-local-ts12-payment-confirmation.patch` |
 | Built artifact | `target/wasm32-unknown-unknown/release/presentation.wasm`, built here |
-| Size | 194,468 bytes |
-| SHA-256 | `48c69d1d6e1c1a8ed7025dbb45007776f4f834c19a329f371ce7e2b79fe0b03d` |
+| Size | 194,413 bytes |
+| SHA-256 | `beaf679bbb20f157f9fc68742a0f75d60527027e1ce84594983059b61a300462` |
 | Toolchain | `rustc 1.99.0-nightly (12c36e253 2026-08-10)`, target `wasm32-unknown-unknown` |
 | License | Apache-2.0 |
 
@@ -130,8 +130,11 @@ transaction labels, UI labels and requested-attribute labels from that authentic
 copies verifier text into issuer instructions. The matcher requires labels for every applicable
 parameter and requested attribute, including a common preferred language. It displays levels 1–3 in
 the multiline subtitle and omits level 4. Optional descriptions, title and security hint are shown only
-when the issuer supplied them. Request values are isolated for bidirectional text and control characters
-are escaped to prevent injected instruction lines. Unsigned warning text and Boolean translations are
+when the issuer supplied them. The ordinary picker caption is not repeated in the payment subtitle;
+card identity remains in the title and issuer-labelled requested attributes. The demo issuer omits
+generic optional titles and hints; issuers can still supply meaningful instructions. Request values are
+isolated for bidirectional text and control characters are escaped to prevent injected instruction lines.
+Unsigned warning text and Boolean translations are
 wallet-owned English/German text; unsupported languages fail closed when these are needed.
 
 The standard `require_cryptographic_holder_binding` transaction parameter is accepted when absent
