@@ -10,6 +10,7 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ProviderId
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.serialization.BinaryData
 
 interface SignumPlatformBackend {
@@ -54,6 +55,10 @@ interface SignumPlatformKey {
     val keyAgreementAlgorithms: Set<KeyAgreementAlgorithm>
 
     suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray
+
+    /** Fresh biometric-only authorization for one signature, with no implicit reauthentication. */
+    suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T =
+        throw SignumAuthorizationException("Fresh biometric signing is unavailable for this key")
     suspend fun verify(data: ByteArray, signature: ByteArray, algorithm: SignatureAlgorithm): Boolean
     suspend fun generateSharedSecret(peerPublicKey: EncodedKey, algorithm: KeyAgreementAlgorithm): BinaryData
 }

@@ -1277,7 +1277,7 @@ object WalletPresentationHandler {
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 scaAuthorizer = scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(crypto2Key, it) }
+                    authorizer.forKey(crypto2Key)
                 },
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById, scaAuthorizer),
             )
@@ -1313,7 +1313,7 @@ object WalletPresentationHandler {
                 ?: resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))).keyMaterial.requireCrypto2SigningKey()
             CredentialPresentationKey(key, credential.subject,
                 scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(key, it) }
+                    authorizer.forKey(key)
                 })
         }
     }
@@ -1383,7 +1383,7 @@ object WalletPresentationHandler {
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 scaAuthorizer = scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(holderKey, it) }
+                    authorizer.forKey(holderKey)
                 },
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
             ).getOrElse { error ->

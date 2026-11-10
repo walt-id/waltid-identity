@@ -379,4 +379,4 @@ Chrome acts as the authorization browser and the test Activity calls Credential 
 
 ## SD-JWT SCA payment demo
 
-See the [payment demo guide](../../docs/ts12-sca-payment-demo.md) for issuer/verifier setup, per-use biometric provisioning and the physical-device acceptance lane.
+See the [payment demo guide](../../docs/ts12-sca-payment-demo.md) for issuer/verifier setup, biometric key provisioning and the physical-device acceptance lane.
