@@ -10,6 +10,8 @@ services:
       - caddy
     env_file:
       - .env
+    environment:
+      - ISSUER2_KEYCLOAK_CLIENT_SECRET
     extra_hosts:
       - "$SERVICE_HOST:host-gateway"
     volumes:

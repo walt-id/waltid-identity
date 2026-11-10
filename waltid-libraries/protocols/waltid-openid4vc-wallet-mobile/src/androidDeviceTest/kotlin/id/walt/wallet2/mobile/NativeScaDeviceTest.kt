@@ -36,7 +36,7 @@ class ScaAuthorizationTestActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(android.widget.TextView(this).apply {
-            text = "WAL-1423 synthetic payment proof. Follow the operator instructions in Codex."
+            text = "Synthetic payment proof test. Follow the operator instructions in Codex."
         })
     }
 }
