@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.ktor.http.Url
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 import java.net.InetAddress
@@ -156,6 +157,36 @@ class ItbDeviceWireTest {
             payload - "statusCode",
         )) {
             assertFailsWith<IllegalArgumentException> { ItbTokenFailure.decode(JsonObject(invalid)) }
+        }
+    }
+
+    @Test
+    fun `verifier rejection reaches the host as a bounded code`() = runBlocking {
+        for ((body, expected) in listOf(
+            """{"error":"missing_sca_credential","details":"private response"}""" to "missing_sca_credential",
+            """{"error":"private_response_value"}""" to "verifier_http_400",
+        )) {
+            withTimeout(5_000) {
+                ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+                    val peer = launch(Dispatchers.IO) {
+                        listener.accept().use { socket ->
+                            ItbDeviceWire.authenticate(ItbDeviceWire.read(socket), token)
+                            ItbDeviceWire.write(socket, ready())
+                            ItbDeviceWire.serve(socket) {
+                                throw ItbVerifierRejection(Json.parseToJsonElement(body), HttpStatusCode.BadRequest)
+                            }
+                        }
+                    }
+                    ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use {
+                        val failure = assertFailsWith<ItbWalletRejection> {
+                            it.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture")))
+                        }
+                        assertEquals(expected, failure.code)
+                        assertFalse(failure.toString().contains("private"))
+                    }
+                    peer.join()
+                }
+            }
         }
     }
 
