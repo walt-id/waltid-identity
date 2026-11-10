@@ -23,7 +23,10 @@ class CredentialTypeMetadataResolver(private val httpClient: io.ktor.client.Http
         val pin = reference.integrity
         val key = vct to pin
         results[key] ?: try {
-            val session = httpClient?.let { BoundedDocumentSession(it) } ?: BoundedDocumentSession(fetcher)
+            val transport = httpClient?.let {
+                WebDataFetcher.wrapping(it, WebDataFetcherId.VCT_INTEGRITY_POLICY.name)
+            } ?: fetcher
+            val session = BoundedDocumentSession(transport)
             val result = session.use { documents ->
                 Result.success(TypeMetadataResolver(documents::read).resolve(vct, pin))
             }

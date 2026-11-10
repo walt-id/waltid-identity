@@ -57,6 +57,8 @@ class TypeMetadataResolverTest {
         assertEquals(TypeMetadataFailure.LIMIT_EXCEEDED, assertFailsWith<TypeMetadataException> { resolver(depth = 2).resolve(leaf) }.reason)
         assertEquals(3, resolver(depth = 3).resolve(leaf).documents.size)
         assertEquals(TypeMetadataFailure.UNAVAILABLE, assertFailsWith<TypeMetadataException> { resolver(emptyMap()).resolve(leaf) }.reason)
+        val missingParent = TypeMetadataFixture.documents - "https://types.example/sca-user"
+        assertEquals(TypeMetadataFailure.UNAVAILABLE, assertFailsWith<TypeMetadataException> { resolver(missingParent).resolve(leaf) }.reason)
         assertFailsWith<CancellationException> { TypeMetadataResolver({ throw CancellationException() }).resolve(leaf) }
     }
 

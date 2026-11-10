@@ -1,7 +1,16 @@
 package id.walt.verifier2.verification2
 
+import id.walt.credentials.CredentialParser
+import id.walt.dcql.models.DcqlQuery
+import id.walt.policies2.vc.policies.CredentialTypeMetadataResolver
+import id.walt.sdjwt.metadata.type.TypeMetadataFixture
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import kotlin.io.encoding.Base64
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import id.walt.verifier2.data.DcqlFulfillmentFailure
 import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.UnsatisfiedSet
@@ -9,6 +18,8 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -113,6 +124,37 @@ class DcqlQueryBindingTest {
     private val administratorQuery = """
         {"credentials": [{"id": "admin", "format": "jwt_vc_json", "meta": {"type_values": [["AdministratorCredential"]]}}]}
     """.trimIndent()
+
+    @Test
+    fun `independently resolved ancestry must satisfy the requested query id`() = runTest { withContext(Dispatchers.Default) {
+        val wire = listOf("""{"alg":"ES256","typ":"dc+sd-jwt"}""", """{
+            "vct":"https://issuer.example/leaf","vct#integrity":"${TypeMetadataFixture.LEAF_PIN}","_sd":[],"_sd_alg":"sha-256"
+        }""", "synthetic-signature").joinToString(".") {
+            Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(it.encodeToByteArray())
+        } + "~"
+        val credential = CredentialParser.detectAndParse(wire).second
+        val fetched = mutableListOf<String>()
+        val http = HttpClient(MockEngine { request ->
+            fetched += request.url.toString()
+            respond(TypeMetadataFixture.documents.getValue(request.url.toString()))
+        })
+        try {
+            val types = CredentialTypeMetadataResolver(http).resolve(credential).getOrThrow().types
+            assertEquals(setOf("https://issuer.example/leaf", "https://types.example/sca-user", "https://types.example/sca"), types)
+            assertEquals(3, fetched.size)
+            fun query(type: String) = Json.decodeFromString<DcqlQuery>("""{
+                "credentials":[{"id":"legitimate-query","format":"dc+sd-jwt","meta":{"vct_values":["$type"]}}]
+            }""")
+            fun match(type: String) = PresentationVerificationEngine.matchCredentialsToQueries(
+                query(type), mapOf("legitimate-query" to listOf(credential)), true, mapOf(credential to types),
+            )
+            assertEquals(setOf("legitimate-query"), match("https://types.example/sca").getOrThrow())
+            val failure = assertIs<DcqlFulfillmentChecker.DcqlFulfillmentException>(
+                match("https://types.example/unrelated").exceptionOrNull(),
+            )
+            assertEquals(setOf("legitimate-query"), failure.details.missingQueryIds)
+        } finally { http.close() }
+    } }
 
     @Test
     fun `a credential of another type under a query id is rejected`() = runTest {

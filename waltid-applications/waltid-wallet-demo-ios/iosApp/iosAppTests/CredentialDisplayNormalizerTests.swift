@@ -4,6 +4,18 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
+    func testProjectedArraySelectorsRetainUniqueLabelsAndRestrictions() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json"))
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let metadata = String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayClaims"]!), as: UTF8.self)
+        let claims = StoredCredentialMetadataParser.claims(from: metadata, preferredLocales: ["en"])
+        XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
+        XCTAssertEqual(claims.map(\.path), [["accounts", "0", "iban"], ["name"]])
+        XCTAssertEqual(claims.first?.mandatory, true)
+    }
+
     func testTimestampOffsetsAndUninterpretedCalendarValues() {
         let expected = WalletInstant(epochSeconds: 1793410200, nanoseconds: 123456789)
         for source in ["2026-10-30T23:30:00.123456789-02:00", "2026-10-31T03:30:00.123456789+02:00", "2026-10-31t01:30:00.123456789z", "2026-10-31T01:30:00.123456789-00:00"] {
