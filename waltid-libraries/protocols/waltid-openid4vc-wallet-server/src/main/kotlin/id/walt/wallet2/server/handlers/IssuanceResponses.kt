@@ -53,11 +53,15 @@ suspend fun ApplicationCall.respondFetchCredentialResult(result: FetchCredential
     }
 }
 
-/** Preserve structured issuer rejections at the isolated fetch API boundary. */
-suspend fun ApplicationCall.respondCredentialEndpointError(error: CredentialEndpointException) {
+/** Wallet2 API policy: preserve structured issuer 4xx; leave other errors to existing handlers. */
+suspend fun ApplicationCall.respondCredentialEndpointError(
+    error: CredentialEndpointException,
+) {
     val credentialError = error.credentialError
-    if (error.statusCode != HttpStatusCode.BadRequest.value || credentialError == null) throw error
-    respond(HttpStatusCode.BadRequest, credentialError)
+    if (error.statusCode !in 400..499 || credentialError == null) {
+        throw error
+    }
+    respond(HttpStatusCode.fromValue(error.statusCode), credentialError)
 }
 
 /** Preserve local recovery after an isolated deferred response was already received. */

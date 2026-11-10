@@ -730,13 +730,10 @@ object OpenID4VCI {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 
-        val sdPayload = SDPayload.createSDPayload(
-            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
-                mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
-                data = issuanceDataFunctions()
-            ),
-            disclosureMap = selectiveDisclosure ?: SDMap(mapOf()),
+        val mappedCredentialData = credentialData.mergeSDJwtVCPayloadWithMapping(
+            mapping = dataMapping ?: JsonObject(emptyMap()),
+            context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
+            data = issuanceDataFunctions()
         )
 
         val holderKeyJson = holderKey.exportJWKObject().plus(
@@ -763,10 +760,11 @@ object OpenID4VCI {
         }
 
 
-        val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
-
-        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val alwaysDisclosedOverrides = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val sdPayload = SDPayload.createSDPayload(
+            fullPayload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides),
+            disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
+        )
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
@@ -777,20 +775,15 @@ object OpenID4VCI {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf())
 
-        val finalSdPayload = SDPayload.createSDPayload(
-            fullPayload = fullPayload,
-            undisclosedPayload = undisclosedPayload
-        )
-
         val jwt = issuerKey.signJws(
-            plaintext = finalSdPayload.undisclosedPayload.toString().encodeToByteArray(),
+            plaintext = sdPayload.undisclosedPayload.toString().encodeToByteArray(),
             headers = headers.mapValues { it.value.toJsonElement() }
         )
 
         val sdJwtVC = SDJwtVC(
             sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
-                sdPayload = finalSdPayload
+                sdPayload = sdPayload
             )
         )
 
