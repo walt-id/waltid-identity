@@ -141,6 +141,7 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("attestation_legal_category", label: "Attestation legal category", displayOrder: 124),
         ClaimDescriptor("issuer", label: "Issuer", displayOrder: 130),
         ClaimDescriptor("vct", label: "Credential type", group: .technical, roles: [.credentialType], displayOrder: 200),
+        ClaimDescriptor("vct#integrity", label: "Type metadata integrity", group: .technical, displayOrder: 232),
         ClaimDescriptor("iss", label: "Issuer", group: .technical, displayOrder: 201),
         ClaimDescriptor("sub", label: "Subject", group: .technical, displayOrder: 202),
         ClaimDescriptor("iat", label: "Issued at", group: .technical, roles: [.temporal], displayOrder: 203),
