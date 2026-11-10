@@ -89,7 +89,7 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
 
     private fun findRootCA(cert: X509Certificate, additionalTrustedRootCAs: List<X509Certificate>): X509Certificate? {
         val tm = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        tm.init(null as? KeyStore)
+        tm.init(null as KeyStore?)
         return tm.trustManagers
             .filterIsInstance<X509TrustManager>()
             .flatMap { it.acceptedIssuers.toList() }

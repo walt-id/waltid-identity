@@ -180,7 +180,6 @@ data class AuthorizationRequest(
                 is JsonPrimitive -> value.content
                 is JsonObject -> json.encodeToString(JsonObject.serializer(), value)
                 is JsonArray -> json.encodeToString(JsonArray.serializer(), value)
-                else -> value.toString()
             }
             url.parameters.append(key, paramValue)
         }
