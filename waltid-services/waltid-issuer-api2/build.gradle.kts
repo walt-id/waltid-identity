@@ -62,6 +62,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-status-list"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(identityLibs.bundles.smiley4.schema.kenerator)
