@@ -16,7 +16,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
-import kotlin.test.assertIs
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -54,7 +53,8 @@ class ReferencedClientAttestationVerifierTest {
             legacyResolver = resolver,
         )
 
-        assertIs<ClientAttestationVerificationResult.VerifiedWithSigner>(
+        assertEquals(
+            ClientAttestationVerificationResult.Verified,
             verifier.verifyAttestationJwt(jwt, decoded.protectedHeader, payload(decoded.payload)),
         )
     }
