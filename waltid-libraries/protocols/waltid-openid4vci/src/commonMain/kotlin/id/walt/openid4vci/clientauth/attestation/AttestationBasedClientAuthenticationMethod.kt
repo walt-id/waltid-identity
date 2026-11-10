@@ -1,5 +1,6 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -229,6 +230,15 @@ class AttestationBasedClientAuthenticationMethod(
                 registered = false,
                 confirmationJwk = confirmationJwk,
                 claims = attestation.payload,
+                attestation = VerifiedClientAttestation(
+                    subject = clientId,
+                    confirmationJwk = confirmationJwk,
+                    lifetime = VerifiedAttestationLifetime(
+                        issuedAt = attestation.payload.longClaim(JwtPayloadClaims.ISSUED_AT),
+                        expiresAt = attestation.payload.longClaim(JwtPayloadClaims.EXPIRATION),
+                        clockSkewSeconds = clockSkewSeconds,
+                    ),
+                ),
             ),
         )
     }
@@ -248,11 +258,14 @@ class AttestationBasedClientAuthenticationMethod(
         }
         val exp = jwt.payload.longClaim(JwtPayloadClaims.EXPIRATION)
             ?: return "Client attestation ${JwtPayloadClaims.EXPIRATION} claim is required"
-        if (now.epochSeconds > exp + clockSkewSeconds) {
+        val lifetime = VerifiedAttestationLifetime(
+            expiresAt = exp, clockSkewSeconds = clockSkewSeconds,
+        )
+        if (!lifetime.clientAttestationValidAt(now)) {
             return "Client attestation is expired"
         }
         val iat = jwt.payload.longClaim(JwtPayloadClaims.ISSUED_AT)
-        if (iat != null && iat > now.epochSeconds + clockSkewSeconds) {
+        if (!lifetime.copy(issuedAt = iat).clientAttestationValidAt(now)) {
             return "Client attestation ${JwtPayloadClaims.ISSUED_AT} claim is in the future"
         }
         if (
