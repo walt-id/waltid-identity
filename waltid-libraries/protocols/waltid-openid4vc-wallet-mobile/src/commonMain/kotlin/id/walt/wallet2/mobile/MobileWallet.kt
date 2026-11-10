@@ -1342,7 +1342,7 @@ public class MobileWallet internal constructor(
          * declaration is not, so it has to be excluded here.
          */
         private val SD_JWT_INFRASTRUCTURE_CLAIMS = setOf(
-            "vct", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
+            "vct", "vct#integrity", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
         )
     }
 }
