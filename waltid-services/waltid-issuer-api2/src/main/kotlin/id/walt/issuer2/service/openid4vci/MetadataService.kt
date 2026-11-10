@@ -29,7 +29,10 @@ import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
-import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.*
+import id.walt.webdatafetching.BoundedDocumentSession
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.runBlocking
@@ -119,6 +122,23 @@ class MetadataService @JvmOverloads constructor(
             require(previous == null || previous == resolved) { "Conflicting type metadata for VCT '$vct'" }
         }
     }
+
+    private val publishedTypeMetadata: Map<String, PublishedTypeMetadata> = runBlocking {
+        BoundedDocumentSession(
+            WebDataFetcher(WebDataFetcherId.VCT_INTEGRITY_POLICY), initialCredentialOrigin = baseUrl,
+        ).use { documents ->
+            TypeMetadataPublisher(documents::read).publish(credentialConfigurations.mapNotNull { (id, configuration) ->
+                configuration.vct?.takeIf { it == selfHostedVct(id) || vctKind(it) == VctKind.URN }
+                    ?.let { vct -> vct to (configuredTypeMetadata[vct] ?: defaultTypeMetadata(id, vct)).toJSON() }
+            }.toMap())
+        }
+    }
+
+    fun getPublishedTypeMetadata(credentialType: String): PublishedTypeMetadata =
+        publishedTypeMetadata.getValue(requireNotNull(getVctTypeMetadata(credentialType).vct))
+
+    fun getIssuanceTypeMetadata(configurationId: String): PublishedTypeMetadata? =
+        credentialConfigurations[configurationId]?.vct?.let { publishedTypeMetadata[it] }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->

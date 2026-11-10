@@ -34,6 +34,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -137,12 +138,12 @@ class OpenId4VciController(
 
             route.get(".well-known/vct/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respond(metadataService.getVctTypeMetadata(credentialType))
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), io.ktor.http.ContentType.Application.Json)
             }
 
             route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respond(metadataService.getVctTypeMetadata(credentialType))
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), io.ktor.http.ContentType.Application.Json)
             }
         }
 

@@ -9,6 +9,9 @@ package id.walt.policies2.vc.policies
  * it up by key; policies that do not simply ignore the context.
  */
 enum class PolicyServiceKey {
+    /** Operation-local type metadata resolution shared with DCQL matching. */
+    TYPE_METADATA_RESOLVER,
+
     /** Key for a [TrustRegistryServiceResolver] used by [ETSITrustListPolicy]. */
     TRUST_REGISTRY_RESOLVER,
 

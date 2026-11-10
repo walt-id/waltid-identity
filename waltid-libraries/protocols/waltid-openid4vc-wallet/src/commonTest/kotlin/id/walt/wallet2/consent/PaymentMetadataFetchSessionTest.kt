@@ -117,12 +117,30 @@ class PaymentMetadataFetchSessionTest {
     }
 
     @Test
+    fun parentDocumentsDoNotReceiveTheLeafOriginsConfiguredCredentials() = networkTest {
+        val seen = mutableListOf<Headers>()
+        val client = HttpClient(MockEngine { request -> seen += request.headers; respond("{}") })
+        try {
+            PaymentMetadataFetchSession(client, requestConfiguration = RequestConfiguration(
+                headers = mapOf("X-Tenant" to "private"),
+                auth = RequestConfiguration.HttpAuthConfiguration.BearerAuth("private"),
+            )).use { session ->
+                session.read("https://issuer.example/leaf")
+                session.read("https://types.example/parent")
+            }
+            assertEquals("Bearer private", seen.first()[HttpHeaders.Authorization])
+            assertNull(seen.last()[HttpHeaders.Authorization])
+            assertNull(seen.last()["X-Tenant"])
+        } finally { client.close() }
+    }
+
+    @Test
     fun boundsDocumentCountAndStreamedBodyWithoutContentLength() = networkTest {
         val small = HttpClient(MockEngine { respond("{}") })
         try {
             PaymentMetadataFetchSession(small).use { session ->
-                repeat(3) { session.read("https://issuer.example/$it") }
-                assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/fourth") }
+                repeat(16) { session.read("https://issuer.example/$it") }
+                assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/seventeenth") }
             }
         } finally { small.close() }
         val oversized = HttpClient(MockEngine { respond("x".repeat(262_145)) })

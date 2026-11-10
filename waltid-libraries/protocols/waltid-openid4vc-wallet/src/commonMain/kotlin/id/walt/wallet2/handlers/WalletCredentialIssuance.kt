@@ -196,6 +196,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
     proofRequired: Boolean,
     holderBindingKnown: Boolean = true,
     expectedConfiguration: CredentialConfiguration? = null,
+    typeMetadataHttpClient: io.ktor.client.HttpClient? = null,
 ): List<StoredCredential> {
     require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
     require(!proofRequired || rawCredentials.size <= bindings.size) { "Issuer returned more credentials than requested" }
@@ -220,7 +221,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
         if (bindings.isEmpty()) {
             require(parsed !is MdocsCredential) { "Exact issuance holder-key material is required when storing an mdoc" }
             require(identities.isEmpty()) { "Issued credential is bound to an unrequested holder key" }
-            return@map StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
+            return@map StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata).withTypeMetadata(typeMetadataHttpClient)
         }
         val match = if (identities.isEmpty()) {
             require(!proofRequired) { "Issued credential contains no verifiable holder binding" }
@@ -230,7 +231,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
                 ?: error("Issued credential is bound to an unrequested holder key")
         }
         if (proofRequired) remaining.remove(match)
-        val stored = StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
+        val stored = StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata).withTypeMetadata(typeMetadataHttpClient)
         if (identities.isEmpty()) stored else withVerifiedIssuanceHolderKeyBinding(stored, match.material)
     }
 }

@@ -1,5 +1,18 @@
 package id.walt.wallet2.handlers
 
+import id.walt.wallet2.consent.PaymentConsentFixture
+import id.walt.wallet2.data.StoredCredential
+import id.walt.sdjwt.metadata.type.TypeMetadataFixture
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
+import kotlin.time.Clock
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.metadata.issuer.ClaimDescription
 import id.walt.openid4vci.metadata.issuer.ClaimDisplay
@@ -23,6 +36,38 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class WalletDisplayMetadataTest {
+    @Test
+    fun inheritedDisplayAndPathsSurvivePersistenceAndPinnedOfflineResolution() = runTest { withContext(Dispatchers.Default) {
+        val fixture = PaymentConsentFixture.create()
+        var requests = 0
+        val http = HttpClient(MockEngine { request ->
+            requests++
+            respond(TypeMetadataFixture.documents.getValue(request.url.toString()))
+        })
+        try {
+            val credential = fixture.credential(buildJsonObject {
+                put("vct", "https://issuer.example/leaf")
+                put("vct#integrity", TypeMetadataFixture.LEAF_PIN)
+                put("accounts", buildJsonArray { add(buildJsonObject { put("iban", "DE123") }) })
+            })
+            val stored = StoredCredential("id", credential, "My label", Clock.System.now(), buildJsonObject { put("custom", "retained") })
+                .withTypeMetadata(http)
+            assertEquals("My label", stored.label)
+            assertEquals(JsonPrimitive("retained"), stored.metadata?.get("custom"))
+            assertEquals("Bank attestation", stored.metadata?.get("credentialDisplay")?.jsonArray?.single()?.jsonObject?.get("name")?.jsonPrimitive?.content)
+            val claim = stored.metadata!!.getValue("credentialClaims").jsonArray.single().jsonObject
+            assertEquals(listOf("accounts", "0", "iban"), claim.getValue("path").jsonArray.map { it.jsonPrimitive.content })
+            assertEquals("IBAN", claim.getValue("display").jsonArray.single().jsonObject.getValue("name").jsonPrimitive.content)
+            val restored = Json.decodeFromString(StoredCredential.serializer(), Json.encodeToString(StoredCredential.serializer(), stored))
+            assertEquals(3, requests)
+            val before = requests
+            assertEquals(listOf("https://issuer.example/leaf", "https://types.example/sca-user", "https://types.example/sca"), restored.resolvedSdJwtVcTypes())
+            assertEquals(before, requests)
+            val forged = credential.copy(credentialData = JsonObject(credential.credentialData + ("vct" to JsonPrimitive("https://wrong.example/type"))))
+            assertFailsWith<IllegalArgumentException> { restored.copy(credential = forged).resolvedSdJwtVcTypes() }
+        } finally { http.close(); fixture.close() }
+    } }
+
 
     @Test
     fun storedClaimMetadataRetainsArrayPaths() {

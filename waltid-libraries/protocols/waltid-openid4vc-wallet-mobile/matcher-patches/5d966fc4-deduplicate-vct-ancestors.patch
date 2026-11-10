@@ -1,0 +1,59 @@
+diff --git a/CredentialProvider/wasm/matcher-rs/src/dcql.rs b/CredentialProvider/wasm/matcher-rs/src/dcql.rs
+index 8ca7feb..715de6a 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/dcql.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/dcql.rs
+@@ -1,4 +1,4 @@
+-use crate::json_value::{DeterministicMap, JsonValue};
++use crate::json_value::{DeterministicMap, DeterministicSet, JsonValue};
+ pub use crate::openid4vp_models::*;
+ 
+ use std::borrow::Cow;
+@@ -284,11 +284,13 @@ pub fn match_credential<'a>(
+         "Found {} potential candidates after meta filtering",
+         filtered_candidates.len()
+     );
++    let mut matched_ids = DeterministicSet::default();
+     let matched_creds = filtered_candidates
+         .into_iter()
+         .filter_map(|candidate| {
+             match_candidate_claims(candidate, &credential.claims, &credential.claim_sets)
+         })
++        .filter(|matched| matched_ids.insert(matched.id))
+         .collect();
+ 
+     MatchCredentialResult {
+@@ -567,6 +569,34 @@ pub fn dcql_query<'a>(query: &'a DcqlQuery, registry: &'a Registry) -> DcqlMatch
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn ancestor_indexes_return_one_logical_credential() {
++        let candidate = RegistryCredential {
++            id: "same-credential".to_string(),
++            display: RegistryDisplay::default(),
++            paths: DeterministicMap::new(),
++        };
++        let mut types = DeterministicMap::new();
++        types.insert("https://issuer.example/leaf".to_string(), vec![candidate.clone()]);
++        types.insert("https://types.example/parent".to_string(), vec![candidate]);
++        let mut registry = Registry::default();
++        registry.credentials.sd_jwt = Some(types);
++        let query = DcqlCredential {
++            id: "query".to_string(),
++            format: "dc+sd-jwt".to_string(),
++            meta: Some(DcqlMeta {
++                doctype_value: String::new(),
++                vct_values: vec!["https://issuer.example/leaf".to_string(), "https://types.example/parent".to_string()],
++            }),
++            claims: vec![],
++            claim_sets: vec![],
++        };
++        let result = match_credential(&query, &registry);
++        assert_eq!(result.matched_creds.len(), 1);
++        assert_eq!(result.matched_creds[0].id, "same-credential");
++    }
++
++
+     #[test]
+     fn test_dcql_query_simple() {
+         let mut registry = Registry::default();

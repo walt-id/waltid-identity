@@ -117,14 +117,13 @@ class PaymentConsentResolverTest {
         assertTrue(requests.isEmpty())
     }
 
-    @Test fun vctCategoryAndUnsupportedInheritedSchemaNeverBecomeConsent() = test {
+    @Test fun invalidVctCategoryAndUnpinnedParentNeverBecomeConsent() = test {
         val base = metadata
         for ((name, value, reason) in listOf(
             Triple("vct", JsonPrimitive("https://issuer.example/other"), PaymentConsentFailure.INVALID_METADATA),
             Triple("category", JsonPrimitive("other"), PaymentConsentFailure.INVALID_METADATA),
             Triple("transaction_data_types", JsonObject(emptyMap()), PaymentConsentFailure.INVALID_METADATA),
-            Triple("extends", JsonPrimitive("https://issuer.example/base"), PaymentConsentFailure.UNSUPPORTED_SCHEMA),
-            Triple("schema_uri", JsonPrimitive("https://issuer.example/schema"), PaymentConsentFailure.UNSUPPORTED_SCHEMA),
+            Triple("extends", JsonPrimitive("https://issuer.example/base"), PaymentConsentFailure.INVALID_METADATA),
         )) {
             metadata = JsonObject(base + (name to value))
             assertFailure(reason) { resolver.resolve(credential(), payload, listOf("en")) }

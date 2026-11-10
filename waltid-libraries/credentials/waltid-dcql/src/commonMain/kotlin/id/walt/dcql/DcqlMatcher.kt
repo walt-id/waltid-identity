@@ -538,7 +538,7 @@ object DcqlMatcher {
                 }
                 // Spec B.3.5: "vct_values: REQUIRED. A non-empty array of strings..."
                 // The init block in SdJwtVcMeta now enforces non-empty.
-                metaQuery.vctValues.contains(vctClaim)
+                metaQuery.vctValues.any { it == vctClaim || it in (credential as? RawDcqlCredential)?.resolvedVctTypes.orEmpty() }
             }
 
             is MsoMdocMeta -> {
