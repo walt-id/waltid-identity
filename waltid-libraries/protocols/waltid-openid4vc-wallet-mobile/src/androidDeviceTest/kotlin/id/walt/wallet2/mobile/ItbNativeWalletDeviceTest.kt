@@ -54,7 +54,7 @@ class ItbNativeWalletDeviceTest {
         ) as ScaAuthorizationTestActivity
         instrumentation.runOnMainSync {
             activity.setContentView(android.widget.TextView(activity).apply {
-                text = "WAL-1423 live ITB test. Approve only the synthetic test operations requested by the operator."
+                text = "Live ITB wallet test. Approve only the synthetic test operations requested by the operator."
             })
         }
         val provider = AndroidPlatformKeyProvider(activity) { activity }
@@ -84,8 +84,8 @@ class ItbNativeWalletDeviceTest {
                         )
                         check(provider.preflight(requirements) is KeyUseAuthorizationSupport.Supported)
                         val key = provider.generateManagedKey(WalletKeyCreationRequest(
-                            KeyId("wal1423-itb-${UUID.randomUUID()}"), requirements,
-                            KeyUseAuthorizationPrompt("Authorize this WAL-1423 ITB test operation"),
+                            KeyId("itb-test-${UUID.randomUUID()}"), requirements,
+                            KeyUseAuthorizationPrompt("Authorize this ITB wallet test operation"),
                         )).also { generated = it }
                         val restored = provider.restoreManagedKey(key.storedKey) as PlatformManagedKeyRestoration.Restored
                         val wallet = Wallet(
