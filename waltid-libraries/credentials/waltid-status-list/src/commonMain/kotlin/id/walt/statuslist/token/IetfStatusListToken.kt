@@ -66,10 +66,10 @@ class IetfStatusListToken private constructor(
                 "Status-list subject mismatch"
             }
             val validity = Validity(
-                issuedAt = payload.numericDate("iat", required = true)!!,
-                expiresAt = payload.numericDate("exp"),
-                notBefore = payload.numericDate("nbf"),
-                ttl = payload.numericDate("ttl"),
+                issuedAt = numericDate(payload, "iat", required = true)!!,
+                expiresAt = numericDate(payload, "exp"),
+                notBefore = numericDate(payload, "nbf"),
+                ttl = numericDate(payload, "ttl"),
             )
             require(validity.expiresAt == null || validity.expiresAt > validity.issuedAt) { "Status-list expiry must follow issuance" }
             require(validity.ttl == null || validity.ttl > 0) { "Status-list TTL must be positive" }
@@ -83,13 +83,13 @@ class IetfStatusListToken private constructor(
             val bytes = TokenStatusListCodec.decode(encoded, maximumOutputBytes)
             return IetfStatusListToken(validity, requireNotNull(bits), bytes)
         }
-    }
-}
 
-private fun JsonObject.numericDate(name: String, required: Boolean = false): Double? {
-    val value = get(name) ?: return if (required) throw IllegalArgumentException("Status-list $name is required") else null
-    return (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
-        ?: throw IllegalArgumentException("Status-list $name must be a finite JSON number")
+        private fun numericDate(payload: JsonObject, name: String, required: Boolean = false): Double? {
+            val value = payload[name] ?: return if (required) throw IllegalArgumentException("Status-list $name is required") else null
+            return (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
+                ?: throw IllegalArgumentException("Status-list $name must be a finite JSON number")
+        }
+    }
 }
 
 private fun Instant.fractionalEpochSeconds(): Double = epochSeconds.toDouble() + nanosecondsOfSecond / 1_000_000_000.0
