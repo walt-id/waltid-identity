@@ -135,7 +135,7 @@ class IetfStatusListTokenClaimsTest {
     }
 
     @Test
-    fun `cwt type must be protected header 16, as text or content format 279`() {
+    fun `cwt type must be protected header 16 as text or content format 279`() {
         IetfStatusListTokenClaims.requireCwtType(
             statusListCwt(CoseContentType.AsString("Application/statuslist+cwt")),
         )
