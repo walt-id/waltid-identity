@@ -5,6 +5,14 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
+    @Test fun projectedArraySelectorsRetainUniqueLabelsAndRestrictions() {
+        val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
+        val claims = StoredCredentialMetadataParser.claims(fixture.getValue("projectedArrayClaims").toString(), listOf("en"))
+        assertEquals(fixture.getValue("projectedArrayLabels").jsonArray.map { it.jsonPrimitive.content }, claims.map { it.displayName })
+        assertEquals(listOf(listOf("accounts", "0", "iban"), listOf("name")), claims.map { it.path })
+        assertEquals(true, claims.first().mandatory)
+    }
+
     @Test fun sharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() {
         val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
         fixture.getValue("sharingVisibility").jsonArray.forEach { row ->

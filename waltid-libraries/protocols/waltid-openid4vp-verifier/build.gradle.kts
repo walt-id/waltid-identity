@@ -10,6 +10,7 @@ group = "id.walt.protocols"
 kotlin {
 
     sourceSets {
+        jvmTest.get().kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
         commonMain.dependencies {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -63,6 +64,7 @@ kotlin {
         }
 
         jvmTest.dependencies {
+            implementation(identityLibs.ktor.client.mock)
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
