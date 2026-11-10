@@ -4,6 +4,11 @@ import id.walt.cose.CoseContentType
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborFloat
+import kotlinx.serialization.cbor.CborInteger
+import kotlinx.serialization.cbor.CborMap
+import kotlinx.serialization.cbor.CborString
 import id.walt.policies2.vc.policies.status.model.StatusVerificationError
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -130,18 +135,30 @@ class IetfStatusListTokenClaimsTest {
     }
 
     @Test
-    fun `cwt type must be the status-list media type in protected header 16`() {
+    fun `cwt type must be protected header 16, as text or content format 279`() {
         IetfStatusListTokenClaims.requireCwtType(
             statusListCwt(CoseContentType.AsString("Application/statuslist+cwt")),
         )
+        IetfStatusListTokenClaims.requireCwtType(statusListCwt(CoseContentType.AsInt(279)))
 
         listOf(
             "missing" to statusListCwt(type = null),
             "other media type" to statusListCwt(CoseContentType.AsString("application/cose")),
-            "integer" to statusListCwt(CoseContentType.AsInt(16)),
+            "other integer" to statusListCwt(CoseContentType.AsInt(16)),
             "content type header" to statusListCwt(
                 type = null,
                 contentType = CoseContentType.AsString("application/statuslist+cwt"),
+            ),
+            "text typ alias" to cwtWithProtected(
+                CborMap(mapOf(CborString("typ") to CborString("application/statuslist+cwt"))),
+            ),
+            "label 16 disagrees with typ alias" to cwtWithProtected(
+                CborMap(
+                    mapOf(
+                        CborInteger(16) to CborString("application/cose"),
+                        CborString("typ") to CborString("application/statuslist+cwt"),
+                    ),
+                ),
             ),
         ).forEach { (name, token) ->
             val error = assertFailsWith<StatusVerificationError>(name) {
@@ -149,6 +166,42 @@ class IetfStatusListTokenClaimsTest {
             }
             assertEquals("IETF status-list CWT type must be application/statuslist+cwt", error.message, name)
         }
+    }
+
+    @Test
+    fun `jwt iat must be a finite json number`() {
+        IetfStatusListTokenClaims.validate(
+            buildJsonObject {
+                put("sub", uri)
+                put("iat", 1_700_000_000.5)
+            },
+            uri,
+            now,
+        )
+
+        listOf("NaN", "1700000000").forEach { value ->
+            val error = assertFailsWith<StatusVerificationError>(value) {
+                IetfStatusListTokenClaims.validate(
+                    buildJsonObject {
+                        put("sub", uri)
+                        put("iat", value)
+                    },
+                    uri,
+                    now,
+                )
+            }
+            assertEquals("IETF status-list token iat is not a number", error.message, value)
+        }
+    }
+
+    @Test
+    fun `cwt iat may be a fractional numeric date`() {
+        IetfStatusListTokenClaims.validate(cwtIssuedAt(CborFloat(1_700_000_000.5)), uri, now)
+
+        val error = assertFailsWith<StatusVerificationError> {
+            IetfStatusListTokenClaims.validate(cwtIssuedAt(CborFloat(Double.NaN)), uri, now)
+        }
+        assertEquals("IETF status-list token iat is not a number", error.message)
     }
 
     private fun jwtWithTyp(typ: String): String = jwtWithHeader("""{"alg":"EdDSA","typ":"$typ"}""")
@@ -160,14 +213,33 @@ class IetfStatusListTokenClaimsTest {
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun statusListCwt(type: CoseContentType?, contentType: CoseContentType? = null): ByteArray =
+        cwtWithProtectedBytes(
+            coseCompliantCbor.encodeToByteArray(CoseHeaders(contentType = contentType, type = type)),
+        )
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun cwtWithProtected(header: CborMap): ByteArray =
+        cwtWithProtectedBytes(coseCompliantCbor.encodeToByteArray(CborElement.serializer(), header))
+
+    private fun cwtWithProtectedBytes(protected: ByteArray): ByteArray =
         CoseSign1(
-            protected = coseCompliantCbor.encodeToByteArray(
-                CoseHeaders(contentType = contentType, type = type),
-            ),
+            protected = protected,
             unprotected = CoseHeaders(),
             payload = byteArrayOf(),
             signature = byteArrayOf(0),
         ).toTagged()
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun cwtIssuedAt(iat: CborFloat): ByteArray =
+        coseCompliantCbor.encodeToByteArray(
+            CborElement.serializer(),
+            CborMap(
+                mapOf(
+                    CborInteger(2) to CborString(uri),
+                    CborInteger(6) to iat,
+                ),
+            ),
+        )
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun cwt(sub: String, exp: Long, nbf: Long? = null, iat: Long? = this.iat): ByteArray =

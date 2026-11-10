@@ -301,9 +301,9 @@ Checks credential status using W3C or IETF status list formats.
 The policy rejects a status list unless its signature verifies and its signer is authorized for the
 referenced credential. Without a custom status-list signer authorizer, the signer must use the same
 DID or `https` issuer, the same embedded certificate key, or a certificate issued by the credential's
-CA with `id-kp-oauthStatusSigning`. An IETF Status List Token must also carry the `statuslist+jwt` or
-`application/statuslist+cwt` type, an `iat`, and a `sub` equal to the referenced URI, and must not be
-expired.
+CA with `id-kp-oauthStatusSigning`. An IETF Status List Token must also carry the `statuslist+jwt` type, or for a CWT the
+`application/statuslist+cwt` type or CoAP content-format 279. It needs a numeric `iat` and a `sub`
+equal to the referenced URI, and must not be expired.
 
 **Example (Multiple BitstringStatusList entries):**
 ```json
