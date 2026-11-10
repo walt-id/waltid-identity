@@ -14,6 +14,22 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
         XCTAssertEqual(claims.map(\.path), [["accounts", "0", "iban"], ["name"]])
         XCTAssertEqual(claims.first?.mandatory, true)
+        let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
+            credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayCredentialData"]!), as: UTF8.self), metadataJSON: metadata)
+        let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: ["en"]).groups.flatMap(\.items)
+        guard case .list(let accounts) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
+              accounts.count == 2, case .object(let first) = accounts[0], case .object(let second) = accounts[1] else {
+            return XCTFail("Expected two structured accounts")
+        }
+        XCTAssertEqual(first.first?.label, "First IBAN")
+        XCTAssertEqual(first.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(second.first?.label, "Iban")
+        XCTAssertNotEqual(second.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(rows.first { $0.path.id == "name" }?.label, "Full name")
+        let option = PresentationCredentialOption(queryID: "account", credentialID: credential.id, format: credential.format,
+            issuer: nil, subject: nil, label: "Account", credentialDataJSON: credential.credentialDataJSON,
+            disclosures: [PresentationDisclosure(path: #"["accounts",0,"iban"]"#, name: "Iban", valueJSON: #""DE123""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
+        XCTAssertEqual(CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"]).groups.first { $0.id == "requested" }?.items.first?.label, "First IBAN")
     }
 
     func testTimestampOffsetsAndUninterpretedCalendarValues() {
