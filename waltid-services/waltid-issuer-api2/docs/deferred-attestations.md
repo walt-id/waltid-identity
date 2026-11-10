@@ -33,7 +33,8 @@ Unsupported or malformed supplied mechanisms are rejected at acceptance. The sig
 must contain an explicit HTTP(S) scheme and authority; relative references are rejected
 before URL normalization. The response
 must be a compact signed JWT with media type `application/statuslist+jwt`, JWT type
-`statuslist+jwt`, required `sub`, `iat`, and `status_list` claims. Subject must exactly
+`statuslist+jwt` (also `application/statuslist+jwt`, case-insensitively), and required
+`sub`, `iat`, and `status_list` claims. Subject must exactly
 match the accepted URI. Supported bit widths are 1, 2, 4 and 8; the referenced index must
 be in bounds. Signed dates and optional positive numeric TTL are validated.
 
@@ -51,12 +52,46 @@ is omitted. If a reference is supplied but the verified attester's public key ca
 exported, status verification returns a retryable technical failure; it does not report an
 invalid attestation signature. A missing required reference remains an authentication error.
 
-Embedding applications supply `AttestationStatusResolver`. Both issuer editions use the
-shared HTTP adapter with their existing private-network guard, disabled redirects, a 2 MiB
-HTTP response limit and a ten-second lookup timeout. Signed list decompression is bounded
-at 16 MiB by the status-list library on every supported platform. Production status transport uses HTTPS;
-loopback HTTP supports local development and still requires the deployment network guard's
-loopback opt-in. Public status requests carry no administrative bearer token.
+Embedding applications supply `AttestationStatusResolver`. Both issuer editions provide
+`HttpAttestationStatusResolver` with a service-owned `WebDataFetcher` using the dedicated
+`OPENID4VCI_ATTESTATION_STATUS` identifier. This reuses the HTTP engine, URL restrictions,
+private-network guard and response limits. The adapter uses uncached raw fetching,
+`Accept: application/statuslist+jwt` and `Cache-Control: no-cache`; it clears configured
+request headers, cookies and authentication and always uses GET. URL credentials are
+rejected. A fetcher's result cache never authorizes a later checkpoint.
+
+The default HTTP response cap is 2 MiB and the total lookup timeout is ten seconds,
+including any configured retries. `WebDataFetcherManager` configuration for this ID can
+apply a stricter response cap, timeouts and URL allowlists. Configurations that disable or
+increase the cap above 2 MiB, or enable redirects, are rejected when the adapter is created.
+In the shared `httpclient` configuration, place per-ID settings under `service`:
+
+```json
+{
+  "service": {
+    "OPENID4VCI_ATTESTATION_STATUS": {
+      "maxResponseBytes": 1048576,
+      "engine": { "followRedirects": false },
+      "timeouts": { "requestTimeout": "PT5S" },
+      "url": { "hosts": { "whitelist": ["provider.example"] } }
+    }
+  }
+}
+```
+
+Production status transport requires HTTPS. Loopback HTTP supports local development and
+still requires the deployment network guard's loopback opt-in. An alternative implementation
+of `AttestationStatusResolver` can provide another transport while retaining shared protocol
+enforcement. It must return freshly resolved signed JWTs, preserve cancellation and never
+substitute a cached VALID decision.
+
+Generic token claims, validity and entry decoding live in `waltid-status-list` common code;
+bounded decompression is limited to 16 MiB on every supported platform. `crypto2` verifies
+the original compact JWT against the accepted attester key in `waltid-openid4vci` before
+those claims are used. OpenID4VCI retains signer authorization, original accepted evidence,
+policy, delivery checkpoints and outcome mapping. The generic status-list API provides no
+signature verification or trust discovery. Attestation profile and OpenAPI request shapes
+are unchanged by this library refactor.
 
 ## Freshness and delivery checkpoints
 
