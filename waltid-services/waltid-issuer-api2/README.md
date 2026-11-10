@@ -59,7 +59,7 @@ Configuration files live in `config/`:
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
 | `authentication-service.conf` | Optional external OAuth authentication configuration |
 
-Set `ISSUER2_KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
+Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
 external OAuth authentication. The service and Docker Compose configuration files
 contain an inert placeholder that HOCON replaces from this environment variable.
 Without the variable, Keycloak authentication cannot complete. The issuer2 Kubernetes deployments read this
