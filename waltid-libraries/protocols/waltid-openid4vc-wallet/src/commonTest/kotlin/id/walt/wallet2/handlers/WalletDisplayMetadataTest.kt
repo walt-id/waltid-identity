@@ -2,6 +2,13 @@ package id.walt.wallet2.handlers
 
 import id.walt.wallet2.consent.PaymentConsentFixture
 import id.walt.wallet2.data.StoredCredential
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.config.AllowList
+import id.walt.webdatafetching.config.RequestConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.config.url.UrlProtocols
 import id.walt.sdjwt.metadata.type.TypeMetadataFixture
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -63,6 +70,15 @@ class WalletDisplayMetadataTest {
             val before = requests
             assertEquals(listOf("https://issuer.example/leaf", "https://types.example/sca-user", "https://types.example/sca"), restored.resolvedSdJwtVcTypes())
             assertEquals(before, requests)
+            val snapshot = restored.metadata!!.getValue(TYPE_METADATA_SNAPSHOT).jsonObject
+            val oldVersion = JsonObject(restored.metadata!! + (TYPE_METADATA_SNAPSHOT to JsonObject(snapshot + ("version" to JsonPrimitive(0)))))
+            assertTrue(restored.copy(metadata = oldVersion).resolvedSdJwtVcTypes().isEmpty())
+            val changedPin = fixture.credential(buildJsonObject {
+                put("vct", "https://issuer.example/leaf")
+                put("vct#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256("replacement document".encodeToByteArray()))
+            })
+            assertTrue(restored.copy(credential = changedPin).resolvedSdJwtVcTypes().isEmpty())
+            assertEquals(before, requests)
             val forged = credential.copy(credentialData = JsonObject(credential.credentialData + ("vct" to JsonPrimitive("https://wrong.example/type"))))
             assertFailsWith<IllegalArgumentException> { restored.copy(credential = forged).resolvedSdJwtVcTypes() }
         } finally { http.close(); fixture.close() }
@@ -102,6 +118,64 @@ class WalletDisplayMetadataTest {
         assertNull(stored["credentialClaims"])
         assertNotNull(stored["credentialDisplay"])
         assertNotNull(stored["issuerDisplay"])
+    }
+
+    @Test
+    fun injectedIssuanceTransportRetainsMetadataPolicyAndRequestConfiguration() = runTest { withContext(Dispatchers.Default) {
+        val id = WebDataFetcherId.WALLET2_PAYMENT_METADATA.name
+        val previous = WebDataFetcherManager.getConfigurationForId(id, null)
+        val fixture = PaymentConsentFixture.create()
+        val requests = mutableListOf<String>()
+        val client = HttpClient(MockEngine { request ->
+            requests += request.url.toString()
+            assertEquals("test-bank", request.headers["X-Metadata-Tenant"])
+            respond("""{"vct":"${request.url}"}""")
+        })
+        suspend fun enrich(vct: String) = StoredCredential("policy", fixture.credential(buildJsonObject { put("vct", vct) }))
+            .withTypeMetadata(client)
+        try {
+            WebDataFetcherManager.appendConfiguration(id, previous.copy(url = UrlConfiguration(), request = RequestConfiguration(headers = mapOf("X-Metadata-Tenant" to "test-bank"))))
+            assertNull(enrich("http://metadata.example/type").metadata?.get(TYPE_METADATA_SNAPSHOT))
+            assertTrue(requests.isEmpty())
+            WebDataFetcherManager.appendConfiguration(id, previous.copy(url = UrlConfiguration(hosts = AllowList(whitelist = listOf("allowed.example")))))
+            assertNull(enrich("https://blocked.example/type").metadata?.get(TYPE_METADATA_SNAPSHOT))
+            assertTrue(requests.isEmpty())
+            WebDataFetcherManager.appendConfiguration(id, previous.copy(
+                url = UrlConfiguration(protocols = UrlProtocols(allowHttp = true)),
+                request = RequestConfiguration(headers = mapOf("X-Metadata-Tenant" to "test-bank")),
+            ))
+            assertTrue(TYPE_METADATA_SNAPSHOT in enrich("http://metadata.example/type").metadata.orEmpty())
+            assertEquals(listOf("http://metadata.example/type"), requests)
+        } finally {
+            WebDataFetcherManager.appendConfiguration(id, previous)
+            client.close(); fixture.close()
+        }
+    } }
+
+    @Test
+    fun overlappingSelectorsProduceUniquePathsWithoutWeakeningRestrictionsOrDroppingOtherLabels() = runTest {
+        val fixture = PaymentConsentFixture.create()
+        val vct = "https://issuer.example/type"
+        val metadata = """{"vct":"$vct","claims":[
+            {"path":["accounts",0,"iban"],"display":[{"locale":"en","label":"First IBAN"}]},
+            {"path":["accounts",null,"iban"],"mandatory":true,"sd":"always","display":[{"locale":"en","label":"IBAN"}]},
+            {"path":["name"],"display":[{"locale":"en","label":"Full name"}]}
+        ]}""".encodeToByteArray()
+        try {
+            val credential = fixture.credential(buildJsonObject {
+                put("vct", vct); put("name", "Ada")
+                put("accounts", buildJsonArray { add(buildJsonObject { put("iban", "DE123") }) })
+            })
+            val resolved = TypeMetadataResolver({ metadata }).resolve(vct)
+            val claims = projectTypeMetadata(resolved, credential, null).getValue("credentialClaims").jsonArray
+            assertEquals(listOf(listOf("accounts", "0", "iban"), listOf("name")), claims.map { it.jsonObject.getValue("path").jsonArray.map { it.jsonPrimitive.content } })
+            assertEquals(listOf("First IBAN", "Full name"), claims.map { it.jsonObject.getValue("display").jsonArray.single().jsonObject.getValue("name").jsonPrimitive.content })
+            assertEquals(JsonPrimitive(true), claims.first().jsonObject["mandatory"])
+            assertEquals(JsonPrimitive("always"), claims.first().jsonObject["sd"])
+            val conflicting = metadata.decodeToString().replace("\"path\":[\"accounts\",0,\"iban\"]", "\"path\":[\"accounts\",0,\"iban\"],\"sd\":\"never\"").encodeToByteArray()
+            val incompatible = TypeMetadataResolver({ conflicting }).resolve(vct)
+            assertFailsWith<IllegalArgumentException> { projectTypeMetadata(incompatible, credential, null) }
+        } finally { fixture.close() }
     }
 
     @Test

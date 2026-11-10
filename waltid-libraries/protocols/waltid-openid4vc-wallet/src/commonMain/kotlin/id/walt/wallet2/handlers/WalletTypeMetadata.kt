@@ -35,7 +35,10 @@ internal suspend fun StoredCredential.resolveTypeMetadata(httpClient: HttpClient
         } catch (_: Exception) { /* A cache miss cannot establish a type relationship. Fetch independently. */ }
     }
     if (!fetchIfMissing) return null
-    val session = if (httpClient != null) BoundedDocumentSession(httpClient, allowHttp = true) else BoundedDocumentSession(typeMetadataFetcher)
+    val fetcher = httpClient?.let {
+        WebDataFetcher.wrapping(it, WebDataFetcherId.WALLET2_PAYMENT_METADATA.name)
+    } ?: typeMetadataFetcher
+    val session = BoundedDocumentSession(fetcher)
     return session.use {
         try { TypeMetadataResolver(it::read).resolve(vct, pin)
         } catch (cause: CancellationException) { throw cause
@@ -64,18 +67,30 @@ internal fun projectTypeMetadata(resolved: ResolvedTypeMetadata, credential: Dig
         })
     }
     (resolved.effective["claims"] as? JsonArray)?.let {
-        result["credentialClaims"] = JsonArray(resolved.claims.flatMap { entry ->
+        // More specific selectors supply display metadata; restrictions from every selector survive.
+        // Equal specificity follows document order. This is a projection policy, not inheritance.
+        val claims = linkedMapOf<List<String>, JsonObject>()
+        for (entry in resolved.claims.sortedByDescending { it.path.count { part -> part == MetadataClaimPathComponent.AnyIndex } }) {
             val claim = entry.json
             val display = (claim["display"] as? JsonArray)?.let { values -> JsonArray(values.map { value ->
                 JsonObject(value.jsonObject.toMutableMap().apply { remove("label")?.let { put("name", it) } })
             }) }
-            concretePaths(credential.credentialData, claim.getValue("path").jsonArray).map { path ->
-                JsonObject(claim.toMutableMap().apply {
+            for (path in concretePaths(credential.credentialData, claim.getValue("path").jsonArray)) {
+                val previous = claims[path]
+                claims[path] = JsonObject((previous.orEmpty() + claim).toMutableMap().apply {
                     put("path", JsonArray(path.map(::JsonPrimitive)))
                     display?.let { put("display", it) }
+                    if (previous?.get("mandatory") == JsonPrimitive(true)) put("mandatory", JsonPrimitive(true))
+                    val previousSd = previous?.get("sd")?.jsonPrimitive?.content?.takeUnless { it == "allowed" }
+                    val currentSd = claim["sd"]?.jsonPrimitive?.content?.takeUnless { it == "allowed" }
+                    require(previousSd == null || currentSd == null || previousSd == currentSd) {
+                        "Overlapping claim selectors have incompatible disclosure restrictions"
+                    }
+                    (currentSd ?: previousSd)?.let { put("sd", JsonPrimitive(it)) }
                 })
             }
-        })
+        }
+        result["credentialClaims"] = JsonArray(claims.values.toList())
     }
     return JsonObject(result)
 }
