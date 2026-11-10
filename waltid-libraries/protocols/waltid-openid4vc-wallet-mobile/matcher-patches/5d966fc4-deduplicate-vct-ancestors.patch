@@ -2,30 +2,14 @@ diff --git a/CredentialProvider/wasm/matcher-rs/src/dcql.rs b/CredentialProvider
 index 8ca7feb..715de6a 100644
 --- a/CredentialProvider/wasm/matcher-rs/src/dcql.rs
 +++ b/CredentialProvider/wasm/matcher-rs/src/dcql.rs
-@@ -1,4 +1,4 @@
+@@ -1 +1 @@
 -use crate::json_value::{DeterministicMap, JsonValue};
 +use crate::json_value::{DeterministicMap, DeterministicSet, JsonValue};
- pub use crate::openid4vp_models::*;
- 
- use std::borrow::Cow;
-@@ -284,11 +284,13 @@ pub fn match_credential<'a>(
-         "Found {} potential candidates after meta filtering",
-         filtered_candidates.len()
-     );
+@@ -286,0 +287 @@ pub fn match_credential<'a>(
 +    let mut matched_ids = DeterministicSet::default();
-     let matched_creds = filtered_candidates
-         .into_iter()
-         .filter_map(|candidate| {
-             match_candidate_claims(candidate, &credential.claims, &credential.claim_sets)
-         })
+@@ -291,0 +293 @@ pub fn match_credential<'a>(
 +        .filter(|matched| matched_ids.insert(matched.id))
-         .collect();
- 
-     MatchCredentialResult {
-@@ -567,6 +569,34 @@ pub fn dcql_query<'a>(query: &'a DcqlQuery, registry: &'a Registry) -> DcqlMatch
- mod tests {
-     use super::*;
- 
+@@ -569,0 +572,28 @@ mod tests {
 +    #[test]
 +    fn ancestor_indexes_return_one_logical_credential() {
 +        let candidate = RegistryCredential {
@@ -54,6 +38,3 @@ index 8ca7feb..715de6a 100644
 +    }
 +
 +
-     #[test]
-     fn test_dcql_query_simple() {
-         let mut registry = Registry::default();

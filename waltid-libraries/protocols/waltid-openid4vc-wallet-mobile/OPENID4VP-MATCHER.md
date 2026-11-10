@@ -63,7 +63,7 @@ git clone https://github.com/android/identity-samples
 git -C identity-samples checkout <pinned-commit>
 cd identity-samples/CredentialProvider/wasm/matcher-rs
 rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
-git apply <this-module>/matcher-patches/5d966fc4-deduplicate-vct-ancestors.patch
+git apply --unidiff-zero <this-module>/matcher-patches/5d966fc4-deduplicate-vct-ancestors.patch
 bash build.sh
 cp target/wasm32-unknown-unknown/release/presentation.wasm \
   <this-module>/src/androidMain/assets/id/walt/wallet2/mobile/openid4vpmatcher.wasm

@@ -88,5 +88,9 @@ class TypeMetadataResolverTest {
         assertContentEquals(publication.bytes(), second.bytes())
         MetadataIntegrity.verify(publication.bytes(), publication.integrity)
         assertEquals(3, resolver(TypeMetadataFixture.documents + (leaf to publication.bytes())).resolve(leaf, publication.integrity).documents.size)
+        val external = PublishedTypeMetadata.fromRetrieved("https://types.example/sca", TypeMetadataFixture.ROOT.encodeToByteArray())
+        assertEquals(Json.parseToJsonElement(TypeMetadataFixture.PARENT).jsonObject.getValue("extends#integrity").jsonPrimitive.content, external.integrity)
+        val spaced = (TypeMetadataFixture.ROOT + " ").encodeToByteArray()
+        assertContentEquals(spaced, PublishedTypeMetadata.fromRetrieved("https://types.example/sca", spaced).bytes())
     }
 }
