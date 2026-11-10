@@ -66,6 +66,20 @@ class DeferredAttestationStatusTest {
         assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validator.validate(listOf(evidence(key("other")) to false)).outcome)
     }
 
+    @Test fun normalizedStatusTokenTypesStillRequireTheAcceptedAttesterSigner() = runTest {
+        val signer = key("signer")
+        val attacker = key("attacker")
+        val accepted = evidence(signer)
+        for (type in listOf("STATUSLIST+JWT", "application/statuslist+jwt", "Application/StatusList+JWT")) {
+            for (key in listOf(signer, attacker)) {
+                val jwt = token(key, typ = type)
+                val result = AttestationStatusValidator(AttestationStatusResolver { jwt }, now = { time })
+                    .validate(listOf(accepted to false))
+                assertEquals(if (key == signer) AttestationStatusOutcome.VALID else AttestationStatusOutcome.UNVERIFIABLE, result.outcome)
+            }
+        }
+    }
+
     @Test fun rejectsMalformedUntrustedStaleAndOutOfBoundsStatusWithoutRecordingRevocation() = runTest {
         val signer = key("signer")
         val entry = evidence(signer)

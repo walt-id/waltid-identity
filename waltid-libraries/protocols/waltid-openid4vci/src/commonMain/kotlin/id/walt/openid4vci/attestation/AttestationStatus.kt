@@ -7,7 +7,7 @@ import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.proofs.attestation.restoreAttestedKey
 import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
-import id.walt.statuslist.codec.TokenStatusListCodec
+import id.walt.statuslist.token.IetfStatusListToken
 import io.ktor.http.Url
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
@@ -131,7 +131,7 @@ class AttestationStatusValidator(
                     try {
                         parseAttestationStatusListUrl(uri)
                         val jwt = requireNotNull(resolver) { "Attestation status resolver is not configured" }.resolve(uri)
-                        Result.success(ResolvedList(jwt, now().fractionalEpochSeconds()))
+                        Result.success(ResolvedList(jwt, now()))
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (cause: Exception) { Result.failure(cause) }
                 }
@@ -147,61 +147,36 @@ class AttestationStatusValidator(
             if (priority(next) > priority(outcome)) outcome = next
         }
         // Earlier lists may have expired while later lookups or signature checks were suspended.
-        val checkedAt = now().fractionalEpochSeconds()
+        val checkedAt = now()
         if (validityChecks.any { !it.isValidAt(checkedAt) } && priority(AttestationStatusOutcome.UNVERIFIABLE) > priority(outcome)) {
             outcome = AttestationStatusOutcome.UNVERIFIABLE
         }
         return AttestationStatusResult(outcome)
     }
 
-    private data class ResolvedList(val jwt: String, val resolvedAt: Double)
+    private data class ResolvedList(val jwt: String, val resolvedAt: Instant)
     private data class ValidatedList(val outcome: AttestationStatusOutcome, val validity: ListValidity)
     private data class ListValidity(
-        val issuedAt: Double,
+        val claims: IetfStatusListToken.Validity,
+        val resolvedAt: Instant,
         val maximumAgeSeconds: Long,
-        val expiresAt: Double?,
-        val notBefore: Double?,
-        val ttl: Double?,
-        val resolvedAt: Double,
     ) {
-        fun isValidAt(current: Double): Boolean =
-            issuedAt <= current && current - issuedAt <= maximumAgeSeconds &&
-                (expiresAt == null || current < expiresAt) &&
-                (notBefore == null || current >= notBefore) &&
-                (ttl == null || current - resolvedAt < ttl)
+        fun isValidAt(current: Instant): Boolean = claims.isValidAt(current, resolvedAt, maximumAgeSeconds)
     }
 
     private suspend fun validateList(resolved: ResolvedList, evidence: VerifiedAttestationStatus): ValidatedList {
         val jwt = resolved.jwt
         require(jwt.length <= 2 * 1024 * 1024) { "Status-list JWT is too large" }
         val decoded = CompactJws.decodeUnverified(jwt)
-        require((decoded.protectedHeader["typ"] as? JsonPrimitive)?.content == "statuslist+jwt") { "Invalid status-list JWT type" }
         val signer = restoreAttestedKey(requireNotNull(evidence.attesterPublicJwk) { "Verified attester signer context is unavailable" })
         // Status-response jwk/kid/x5c never authorize a different key. Delegation is not enabled.
         CompactJws.verify(jwt, signer, JwsAlgorithm.parse(requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.content)))
         val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
         val reference = requireNotNull(evidence.reference)
-        require((payload["sub"] as? JsonPrimitive)?.takeIf { it.isString }?.content == reference.uri) { "Status-list subject mismatch" }
-        val validity = ListValidity(
-            issuedAt = payload.numericDate("iat", required = true)!!,
-            maximumAgeSeconds = evidence.policy.maximumListAgeSeconds,
-            expiresAt = payload.numericDate("exp"),
-            notBefore = payload.numericDate("nbf"),
-            ttl = payload.numericDate("ttl"),
-            resolvedAt = resolved.resolvedAt,
-        )
-        require(validity.expiresAt == null || validity.expiresAt > validity.issuedAt) { "Status-list expiry must follow issuance" }
-        require(validity.ttl == null || validity.ttl > 0) { "Status-list TTL must be positive" }
-        require(validity.isValidAt(now().fractionalEpochSeconds())) { "Status list is stale, expired or not yet valid" }
-        val list = payload["status_list"] as? JsonObject ?: error("Status list is missing")
-        val bits = (list["bits"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
-        require(bits in setOf(1, 2, 4, 8)) { "Unsupported status bit width" }
-        val encoded = (list["lst"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: error("Status list encoding is missing")
-        require(encoded.isNotEmpty() && encoded.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' }) {
-            "Status list must use unpadded base64url encoding"
-        }
-        val bytes = TokenStatusListCodec.decode(encoded, maximumOutputBytes = 16 * 1024 * 1024)
-        val outcome = when (TokenStatusListCodec.readStatus(bytes, reference.index, requireNotNull(bits))) {
+        val list = IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
+        val validity = ListValidity(list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
+        require(validity.isValidAt(now())) { "Status list is stale, expired or not yet valid" }
+        val outcome = when (list.readStatus(reference.index)) {
             0u -> AttestationStatusOutcome.VALID
             1u -> AttestationStatusOutcome.INVALID
             2u -> AttestationStatusOutcome.SUSPENDED
@@ -217,14 +192,6 @@ class AttestationStatusValidator(
         AttestationStatusOutcome.MISSING_EVIDENCE -> 3
         AttestationStatusOutcome.INVALID -> 4
     }
-}
-
-private fun Instant.fractionalEpochSeconds(): Double = epochSeconds.toDouble() + nanosecondsOfSecond / 1_000_000_000.0
-
-private fun JsonObject.numericDate(name: String, required: Boolean = false): Double? {
-    val value = this[name] ?: return if (required) error("Status-list $name is required") else null
-    return (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
-        ?: error("Status-list $name must be a finite JSON number")
 }
 
 internal fun AcceptedCredentialRequest.statusEvidence(
