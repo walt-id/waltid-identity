@@ -18,15 +18,14 @@ private val typeMetadataFetcher by lazy { WebDataFetcher(WebDataFetcherId.WALLET
 /** Revalidates stored bytes against signed pins. Persisted ancestor lists are never trusted. */
 internal suspend fun StoredCredential.resolveTypeMetadata(httpClient: HttpClient? = null, fetchIfMissing: Boolean = true): ResolvedTypeMetadata? {
     if (credential.format != "dc+sd-jwt") return null
-    if (!fetchIfMissing && metadata?.get(TYPE_METADATA_SNAPSHOT) == null) return null
-    val wire = (credential as? SdJwtCredential)?.signedWithDisclosures
-        ?: throw TypeMetadataException(TypeMetadataFailure.INVALID_METADATA, "Missing signed credential")
+    val snapshot = metadata?.get(TYPE_METADATA_SNAPSHOT) as? JsonObject
+    if (!fetchIfMissing && snapshot?.get("version") != JsonPrimitive(1)) return null
+    val wire = (credential as? SdJwtCredential)?.signedWithDisclosures ?: return null
     val parsed = CredentialParser.detectAndParse(wire).second
     require(parsed.credentialData == credential.credentialData) { "Stored metadata reference differs from signed credential" }
     val reference = TypeMetadataReference.fromCredential(parsed.credentialData)
     val vct = reference.vct
     val pin = reference.integrity
-    val snapshot = metadata?.get(TYPE_METADATA_SNAPSHOT) as? JsonObject
     if (pin != null && snapshot != null) {
         try {
             val bytes = TypeMetadataResolver.snapshotDocuments(snapshot)

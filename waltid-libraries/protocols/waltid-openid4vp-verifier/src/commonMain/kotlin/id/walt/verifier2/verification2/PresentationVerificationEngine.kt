@@ -620,7 +620,7 @@ object PresentationVerificationEngine {
                     val meta = dcqlQuery.credentials.single { it.id == queryId }.meta as? SdJwtVcMeta ?: continue
                     for (credential in credentials) {
                         val vct = (credential.credentialData["vct"] as? JsonPrimitive)?.content
-                        if (vct !in meta.vctValues) {
+                        if (credential.format == "dc+sd-jwt" && vct !in meta.vctValues) {
                             typeMetadataResolver.resolve(credential).getOrNull()?.let { resolvedTypes[credential] = it.types }
                         }
                     }

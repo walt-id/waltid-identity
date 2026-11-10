@@ -36,6 +36,8 @@ import id.walt.webdatafetching.WebDataFetcherId
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.URI
 
 class MetadataService @JvmOverloads constructor(
@@ -123,9 +125,11 @@ class MetadataService @JvmOverloads constructor(
         }
     }
 
+    private val typeMetadataFetcher = WebDataFetcher(WebDataFetcherId.VCT_INTEGRITY_POLICY)
+
     private val publishedTypeMetadata: Map<String, PublishedTypeMetadata> = runBlocking {
         BoundedDocumentSession(
-            WebDataFetcher(WebDataFetcherId.VCT_INTEGRITY_POLICY), initialCredentialOrigin = baseUrl,
+            typeMetadataFetcher, initialCredentialOrigin = baseUrl,
         ).use { documents ->
             TypeMetadataPublisher(documents::read).publish(credentialConfigurations.mapNotNull { (id, configuration) ->
                 configuration.vct?.takeIf { it == selfHostedVct(id) || vctKind(it) == VctKind.URN }
@@ -137,8 +141,24 @@ class MetadataService @JvmOverloads constructor(
     fun getPublishedTypeMetadata(credentialType: String): PublishedTypeMetadata =
         publishedTypeMetadata.getValue(requireNotNull(getVctTypeMetadata(credentialType).vct))
 
-    fun getIssuanceTypeMetadata(configurationId: String): PublishedTypeMetadata? =
-        credentialConfigurations[configurationId]?.vct?.let { publishedTypeMetadata[it] }
+    private val externalTypeMetadataMutex = Mutex()
+    private val externalTypeMetadata = mutableMapOf<String, PublishedTypeMetadata>()
+
+    suspend fun getIssuanceTypeMetadata(configurationId: String): PublishedTypeMetadata? {
+        val vct = credentialConfigurations[configurationId]?.vct ?: return null
+        publishedTypeMetadata[vct]?.let { return it }
+        // An external type is opt-in through its metadata configuration; unrelated configurations
+        // do not acquire a new network dependency during issuance.
+        if (vct !in configuredTypeMetadata) return null
+        return externalTypeMetadataMutex.withLock {
+            externalTypeMetadata[vct] ?: BoundedDocumentSession(
+                typeMetadataFetcher, initialCredentialOrigin = baseUrl,
+            ).use { documents ->
+                val resolved = TypeMetadataResolver(documents::read).resolve(vct)
+                PublishedTypeMetadata.fromRetrieved(vct, resolved.documents.first().bytes())
+            }.also { externalTypeMetadata[vct] = it }
+        }
+    }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->

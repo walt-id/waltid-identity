@@ -3,8 +3,8 @@ package id.walt.sdjwt.metadata.type
 import kotlinx.serialization.json.*
 
 /** Reproducible hosted representation. External documents are always hashed as retrieved. */
-class PublishedTypeMetadata private constructor(val metadata: JsonObject) {
-    private val content = metadata.toString().encodeToByteArray()
+class PublishedTypeMetadata private constructor(val metadata: JsonObject, bytes: ByteArray) {
+    private val content = bytes.copyOf()
     val vct: String = metadata.getValue("vct").jsonPrimitive.content
     val integrity: String = MetadataIntegrity.sha256(content)
     fun bytes(): ByteArray = content.copyOf()
@@ -12,9 +12,16 @@ class PublishedTypeMetadata private constructor(val metadata: JsonObject) {
     companion object {
         fun create(metadata: JsonObject): PublishedTypeMetadata {
             require((metadata["vct"] as? JsonPrimitive)?.let { it.isString && it.content.isNotBlank() } == true) { "Publication requires a VCT string" }
-            return PublishedTypeMetadata(Json.parseToJsonElement(metadata.toString()).jsonObject)
+            val bytes = metadata.toString().encodeToByteArray()
+            return PublishedTypeMetadata(Json.parseToJsonElement(bytes.decodeToString()).jsonObject, bytes)
         }
 
+        /** External hosting owns its representation: do not reserialize it before pinning. */
+        fun fromRetrieved(vct: String, bytes: ByteArray): PublishedTypeMetadata {
+            val metadata = Json.parseToJsonElement(bytes.decodeToString(throwOnInvalidSequence = true)).jsonObject
+            require(metadata["vct"] == JsonPrimitive(vct)) { "Retrieved type identity mismatch" }
+            return PublishedTypeMetadata(metadata, bytes)
+        }
     }
 }
 
