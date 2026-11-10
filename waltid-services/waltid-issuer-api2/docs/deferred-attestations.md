@@ -96,9 +96,18 @@ including for a previously signed checkpoint. Coroutine cancellation propagates,
 cleanup performed outside cancellation. Cancellation after a durable signing checkpoint
 preserves its reservation for F5 recovery. The offer's absolute deadline still limits retries.
 
-Initial invalid WIA is an OAuth client-authentication failure. Malformed or missing required
+An INVALID WIA during OAuth client authentication is a client-authentication failure. Malformed or missing required
 KA status evidence is a proof-validation failure. Initial status lookup failures are technical
 failures; they create no accepted transaction or successful issuance.
+
+At credential-request acceptance, a confirmed INVALID WIA or KA emits the existing
+format-specific credential-request failure notification with `credential_request_denied`,
+the request ID and an error description; no transaction is created. After acceptance, the
+first permanent status denial emits that failure notification once for the transaction,
+including when a signed checkpoint is recovered. Later polls return the persisted denial
+without emitting it again. A suspended or unverifiable status emits no permanent-denial or
+credential-success notification; a successful retry emits the normal success notification.
+These notifications use the offer's existing webhook configuration and event payloads.
 
 One invalid required attestation denies every credential in that transaction. Failed
 validation delivers no credentials and commits no new successful issuance result or usage.
