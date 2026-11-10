@@ -38,7 +38,7 @@
       dependencyDashboardApproval: true,
     },
     {
-      description: 'SKIE 0.10.15 supports Kotlin through 2.4.20. Raise this together with the SKIE pin.',
+      description: 'Keep Kotlin aligned with suspend-transform and supported by SKIE. Raise the coordinated pins together.',
       matchPackageNames: [
         '/^org\\.jetbrains\\.kotlin(\\.|:|$)/',
       ],
@@ -67,9 +67,14 @@
       allowedVersions: '/^1\\.27.*alpine/',
     },
     {
-      description: 'Compose 1.12.2 changes recorded iOS snapshot pixels. Update the baselines in the same change.',
+      description: 'Compose 1.12.2 is paired with Haze 2.1.0 and the recorded wallet baselines. Upgrade them together.',
       matchPackageNames: ['/^org\\.jetbrains\\.compose/'],
-      allowedVersions: '1.12.1',
+      allowedVersions: '1.12.2',
+    },
+    {
+      description: 'Haze 2.1.0 is paired with Compose 1.12.2 and the recorded wallet baselines. Upgrade them together.',
+      matchPackageNames: ['/^dev\\.chrisbanes\\.haze:/'],
+      allowedVersions: '2.1.0',
     },
     {
       description: 'Navigation 1.2.0 stays held until the iOS Compose baselines are updated with it.',
