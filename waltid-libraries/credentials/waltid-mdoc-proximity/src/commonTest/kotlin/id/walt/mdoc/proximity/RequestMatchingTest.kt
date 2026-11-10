@@ -206,7 +206,7 @@ class RequestMatchingTest {
 
             assertEquals(scenario.expected, selected?.reference?.elementIdentifier, "DM_AGE_POLICY:${scenario.id}")
             assertEquals(
-                scenario.expected?.let { setOf(requested) }.orEmpty(),
+                setOf(requested),
                 selected?.satisfiesAlternativesFor.orEmpty(),
                 "DM_AGE_POLICY:${scenario.id}:binding",
             )

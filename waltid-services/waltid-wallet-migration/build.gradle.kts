@@ -5,6 +5,12 @@ plugins {
 
 group = "id.walt"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 application {
     mainClass.set("id.walt.wallet.migration.WalletMigrationKt")
 }
