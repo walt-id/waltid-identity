@@ -102,7 +102,6 @@ internal class WalletApi2DemoWallet(
             nonceEndpoint = resolved.nonceEndpoint,
             tokenEndpoint = resolved.tokenEndpoint,
             preAuthorizedCode = resolved.preAuthorizedCode,
-            credentialConfigurationId = resolved.credentialConfigurationIds.firstOrNull(),
         )
         issuanceSessions[session.id] = session
         WalletDemoIssuanceSession(
