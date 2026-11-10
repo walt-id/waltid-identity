@@ -67,16 +67,6 @@
       allowedVersions: '/^1\\.27.*alpine/',
     },
     {
-      description: 'Compose 1.12.2 is paired with Haze 2.1.0 and the recorded wallet baselines. Upgrade them together.',
-      matchPackageNames: ['/^org\\.jetbrains\\.compose/'],
-      allowedVersions: '1.12.2',
-    },
-    {
-      description: 'Haze 2.1.0 is paired with Compose 1.12.2 and the recorded wallet baselines. Upgrade them together.',
-      matchPackageNames: ['/^dev\\.chrisbanes\\.haze:/'],
-      allowedVersions: '2.1.0',
-    },
-    {
       description: 'Navigation 1.2.0 stays held until the iOS Compose baselines are updated with it.',
       matchPackageNames: ['/^org\\.jetbrains\\.androidx\\.navigation3:/'],
       allowedVersions: '1.1.2',
