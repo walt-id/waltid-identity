@@ -10,6 +10,7 @@ import id.walt.verifier2.data.SessionEvent
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.assertEquals
@@ -58,6 +59,31 @@ class Verifier2WebhookRecorder : AutoCloseable {
         )
 
     fun received(): List<KtorSessionUpdate> = receivedInEnqueueOrder()
+
+    fun awaitPresentationEvents(
+        sessionId: String,
+        presentationId: String,
+        expected: List<SessionEvent>,
+        timeoutMillis: Long = 8_000,
+    ): List<KtorSessionUpdate> {
+        val expectedNames = expected.map { it.name }
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        var updates = emptyList<KtorSessionUpdate>()
+        while (System.currentTimeMillis() < deadline) {
+            updates = receivedUpdates.filter {
+                it.update.target == sessionId &&
+                    it.update.session["presentationId"]?.jsonPrimitive?.content == presentationId &&
+                    it.update.event != SessionEvent.authorization_request_requested.name
+            }.sortedBy { it.sequence }.map { it.update }
+            if (updates.map { it.event } == expectedNames) return updates
+            if (updates.size > expectedNames.size) break
+            Thread.sleep(50)
+        }
+        throw AssertionError(
+            "Presentation '$presentationId' did not emit callback events $expectedNames. " +
+                "Received: ${updates.map { it.event }}"
+        )
+    }
 
     fun awaitEvents(sessionId: String, timeoutMillis: Long = 5_000): List<KtorSessionUpdate> {
         val deadline = System.currentTimeMillis() + timeoutMillis
