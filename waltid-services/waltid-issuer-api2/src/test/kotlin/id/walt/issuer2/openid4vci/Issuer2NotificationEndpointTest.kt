@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -19,6 +20,7 @@ import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.KTOR_TEST_APPLICATION_BASE_URL
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
+import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.getSession
@@ -31,6 +33,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -45,6 +48,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.contentOrNull
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -378,6 +382,49 @@ class Issuer2NotificationEndpointTest {
         assertEquals(
             NotificationEvent.CREDENTIAL_ACCEPTED,
             client.getSession(createdOffer.offerId).walletNotificationEvent,
+        )
+    }
+
+    @Test
+    fun deferredCollectionAcceptsWalletNotificationWithoutDroppingTheSession() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val wallet = Issuer2WalletFlowDriver(client)
+        val offer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_DEFERRED_OFFER)
+        val resolved = wallet.resolve(offer)
+        val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val pending = client.post(resolved.issuerMetadata.credentialEndpoint) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(credentialRequest(configurationId, wallet.buildJwtProofs(resolved.issuerMetadata, configurationId)))
+        }
+        assertEquals(HttpStatusCode.Accepted, pending.status, pending.bodyAsText())
+        val transactionId = pending.body<JsonObject>().getValue("transaction_id").jsonPrimitive.content
+        assertEquals(
+            HttpStatusCode.NoContent,
+            client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status,
+        )
+        val issued = client.post(assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject { put("transaction_id", transactionId) })
+        }
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        val notificationId = issued.body<JsonObject>().getValue("notification_id").jsonPrimitive.content
+        val accepted = client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(notificationBody(notificationId, "credential_accepted", "stored"))
+        }
+        assertEquals(HttpStatusCode.NoContent, accepted.status, accepted.bodyAsText())
+        val session = client.getSession(offer.offerId)
+        assertEquals(IssuanceSessionStatus.SUCCESSFUL, session.status)
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, session.walletNotificationEvent)
+        assertEquals("stored", session.walletNotificationEventDescription)
+        assertEquals(
+            "READY",
+            client.get("/issuer2/sessions/${offer.offerId}").body<JsonObject>()["deferredStatus"]?.jsonPrimitive?.contentOrNull,
         )
     }
 
