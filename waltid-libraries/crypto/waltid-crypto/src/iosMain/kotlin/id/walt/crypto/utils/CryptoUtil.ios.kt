@@ -10,11 +10,11 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArrayOf
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
-import platform.CoreFoundation.CFDataRef
 import platform.CoreFoundation.CFDictionaryAddValue
 import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFErrorRefVar
@@ -68,7 +68,7 @@ actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
         return try {
             val secKeyRef = checkErrorResult { error ->
                 SecKeyCreateWithData(
-                    keyCfData as CFDataRef, keyCfAttributes, error
+                    checkNotNull(keyCfData).reinterpret(), keyCfAttributes, error
                 )
             }
 
@@ -76,7 +76,7 @@ actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
                 SecKeyCreateSignature(
                     secKeyRef,
                     kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256,
-                    cfData as CFDataRef,
+                    checkNotNull(cfData).reinterpret(),
                     error
                 )
             }

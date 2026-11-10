@@ -1,4 +1,3 @@
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import TSEKeyTest.Config.TESTABLE_KEY_TYPES
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.tse.TSEKey
@@ -79,8 +78,8 @@ class TSEKeyTest {
 
     private suspend fun tse3TestSignRaw() {
         keys.forEach { key ->
-            val signed = key.signRaw(Config.payload.toString().encodeToByteArray()) as String
-            val verificationResult = key.verifyRaw(signed.decodeFromBase64(), Config.payload.toString().encodeToByteArray())
+            val signed = key.signRaw(Config.payload.toString().encodeToByteArray())
+            val verificationResult = key.verifyRaw(signed, Config.payload.toString().encodeToByteArray())
             assertTrue(verificationResult.isSuccess)
             assertEquals(Config.payload.toString(), verificationResult.getOrThrow().decodeToString())
         }
