@@ -237,7 +237,7 @@ class StatusListSignatureVerifierTest {
         val payloadB64 = Json.encodeToString(JsonObject.serializer(), payload).encodeToByteArray().encodeToBase64Url()
         
         val signable = "$headerB64.$payloadB64"
-        val signature = key.signRaw(signable.encodeToByteArray()) as ByteArray
+        val signature = key.signRaw(signable.encodeToByteArray())
         val signatureB64 = signature.encodeToBase64Url()
         
         return "$signable.$signatureB64"
@@ -256,7 +256,7 @@ class StatusListSignatureVerifierTest {
         val payloadB64 = Json.encodeToString(JsonObject.serializer(), payload).encodeToByteArray().encodeToBase64Url()
         
         val signable = "$headerB64.$payloadB64"
-        val signature = key.signRaw(signable.encodeToByteArray()) as ByteArray
+        val signature = key.signRaw(signable.encodeToByteArray())
         val signatureB64 = signature.encodeToBase64Url()
         
         return "$signable.$signatureB64"

@@ -11,7 +11,7 @@ class JwkKeyImportTest {
         assertTrue(key.hasPrivateKey)
 
         val payload = "private-pem-import".encodeToByteArray()
-        val signature = key.signRaw(payload) as ByteArray
+        val signature = key.signRaw(payload)
         assertTrue(key.getPublicKey().verifyRaw(signature, payload).isSuccess)
     }
 

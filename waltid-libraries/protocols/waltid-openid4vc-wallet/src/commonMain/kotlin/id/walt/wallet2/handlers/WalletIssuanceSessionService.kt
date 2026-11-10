@@ -1412,8 +1412,8 @@ class WalletIssuanceSessionService(
             "Credential issuer metadata identifier does not match the offer"
         }
         val grantAuthorizationServer = when (offer?.getGrantType()) {
-            is GrantType.AuthorizationCode -> offer?.grants?.authorizationCode?.authorizationServer
-            is GrantType.PreAuthorizedCode -> offer?.grants?.preAuthorizedCode?.authorizationServer
+            is GrantType.AuthorizationCode -> offer.grants?.authorizationCode?.authorizationServer
+            is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
             else -> null
         }
         val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)

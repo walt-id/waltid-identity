@@ -52,7 +52,7 @@ class ProviderRefreshTokenFlowTest {
         val corrected = refresh(provider, initial.refreshToken, options = options, scope = "alpha")
         assertTrue(corrected is AccessTokenResponseResult.Success)
         assertEquals(listOf("A"), assertNotNull(corrected.credentialAuthorization).credentialIdentifiers)
-        assertEquals(Json.encodeToJsonElement(corrected.credentialAuthorization!!.authorizationDetails), signer.claims.last()["authorization_details"])
+        assertEquals(Json.encodeToJsonElement(corrected.credentialAuthorization.authorizationDetails), signer.claims.last()["authorization_details"])
         val restored = refresh(provider, assertNotNull(corrected.response.refreshToken), options = options)
         assertTrue(restored is AccessTokenResponseResult.Success)
         assertEquals(listOf("A", "B"), assertNotNull(restored.credentialAuthorization).credentialIdentifiers)
@@ -99,7 +99,7 @@ class ProviderRefreshTokenFlowTest {
         val refreshed = refresh(provider, initial.refreshToken, options = options)
         assertTrue(refreshed is AccessTokenResponseResult.Success)
         assertEquals(listOf("A"), assertNotNull(refreshed.credentialAuthorization).credentialIdentifiers)
-        assertEquals(Json.encodeToJsonElement(refreshed.credentialAuthorization!!.authorizationDetails), signer.claims.last()["authorization_details"])
+        assertEquals(Json.encodeToJsonElement(refreshed.credentialAuthorization.authorizationDetails), signer.claims.last()["authorization_details"])
 
         val rejected = refresh(provider, assertNotNull(refreshed.response.refreshToken), options = options, scope = "beta")
         assertTrue(rejected is AccessTokenResponseResult.Failure)
@@ -144,7 +144,7 @@ class ProviderRefreshTokenFlowTest {
 
         val narrowed = refresh(provider, initial.refreshToken, options = options, scope = "openid") as AccessTokenResponseResult.Success
         assertEquals(listOf("A"), assertNotNull(narrowed.credentialAuthorization).credentialIdentifiers)
-        val narrowDetails = Json.encodeToJsonElement(narrowed.credentialAuthorization!!.authorizationDetails)
+        val narrowDetails = Json.encodeToJsonElement(narrowed.credentialAuthorization.authorizationDetails)
         assertEquals(narrowDetails, signer.claims[1]["authorization_details"])
         assertEquals(narrowDetails, narrowed.response.extra["authorization_details"])
         assertEquals(Json.encodeToJsonElement(original), signer.claims[0]["authorization_details"])

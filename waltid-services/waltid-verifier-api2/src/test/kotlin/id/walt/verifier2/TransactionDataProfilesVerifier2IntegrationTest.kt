@@ -60,7 +60,6 @@ class TransactionDataProfilesVerifier2IntegrationTest {
                         .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<List<TransactionDataProfileResponse>>()
                     assertTrue(discovered.any { it.type == paymentCard.type })
-                    discovered
                 }
             }
         } finally {

@@ -1,10 +1,5 @@
 package id.walt.did.dids.registrar.local.key
 
-import kotlin.js.ExperimentalJsExport
-import kotlin.js.JsExport
-
-@OptIn(ExperimentalJsExport::class)
-@JsExport
 internal data class IdentifierComponents(
     val multiCodecKeyCode: UInt,
     val pubKeyBytes: ByteArray,

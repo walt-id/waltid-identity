@@ -177,7 +177,6 @@ class TransactionDataProfilesIntegrationTest {
                         preview.error?.message.orEmpty().contains("Unsupported transaction_data type", ignoreCase = true),
                         "Expected unsupported-type rejection, got: ${preview.error}",
                     )
-                    preview
                 }
             }
         } finally {
@@ -224,7 +223,6 @@ class TransactionDataProfilesIntegrationTest {
                     val registry = OSSWallet2Service.configuredTransactionDataTypeRegistry()
                     assertTrue(registry.types.isEmpty())
                     assertFailsWith<IllegalArgumentException> { registry.requireKnown(paymentType) }
-                    registry
                 }
             }
         } finally {

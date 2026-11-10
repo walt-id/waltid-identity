@@ -133,7 +133,7 @@ class WalletModuleApplicabilityTest {
         assertEquals(
             "client_id_prefix=x509_hash, applies only to redirect_uri, web-origin",
             WalletModuleApplicability.inapplicableReason(
-                responseUriNotClientId.testName!!,
+                responseUriNotClientId.testName,
                 responseUriNotClientId,
                 variant(clientIdPrefix = "x509_hash", requestMethod = "request_uri_unsigned"),
             )
@@ -238,7 +238,7 @@ class WalletModuleApplicabilityTest {
         // ...while an unencrypted mode was never applicable in the first place.
         assertNotNull(
             WalletModuleApplicability.inapplicableReason(
-                ignoresUnusableEncryptionKey.testName!!,
+                ignoresUnusableEncryptionKey.testName,
                 ignoresUnusableEncryptionKey,
                 variant(responseMode = "direct_post", vpProfile = "plain_vp"),
             )

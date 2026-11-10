@@ -263,7 +263,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 // No account for this issuer + subject yet: provision one, with a new id - never the IdP's `sub`, which
                 // another IdP could also use, and which need not have the store's id format.
-                val accountId = accountFor(session, identifier) { registerAccount(details = userInfo ?: idTokenPayload) { identifier(it) } }
+                val accountId = accountFor(session, identifier) { registerAccount(details = userInfo) { identifier(it) } }
 
                 val authContext = authContext(call)
 
