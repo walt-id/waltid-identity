@@ -1,9 +1,10 @@
 package id.walt.issuer2.application.openid4vci
 
 import id.walt.openid4vci.attestation.*
-import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
-import id.walt.webdatafetching.ResponseSizeLimit
-import io.ktor.client.HttpClient
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestEngineConfiguration
 import id.walt.openid4vci.proofs.attestation.*
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
@@ -69,11 +70,15 @@ data class OpenId4VciModule(
 ) {
 
     companion object {
-        private val statusResolver = HttpAttestationStatusResolver(HttpClient {
-            followRedirects = false
-            installPrivateNetworkGuard()
-            install(ResponseSizeLimit) { maxBytes = 2L * 1024 * 1024 }
-        })
+        private val statusResolver = HttpAttestationStatusResolver(
+            WebDataFetcher(
+                WebDataFetcherId.OPENID4VCI_ATTESTATION_STATUS,
+                WebDataFetchingConfiguration(
+                    maxResponseBytes = HttpAttestationStatusResolver.MAXIMUM_RESPONSE_BYTES,
+                    engine = RequestEngineConfiguration(followRedirects = false),
+                ),
+            ),
+        )
         fun create(
             config: Issuer2ServiceConfig,
             authorizationCodeRepository: AuthorizationCodeRepository,
