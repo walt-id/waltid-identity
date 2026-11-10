@@ -15,6 +15,7 @@ kotlin {
 
             // walt.id
             implementation(project(":waltid-libraries:credentials:waltid-status-list"))
+            api(project(":waltid-libraries:web:waltid-web-data-fetching"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-jose"))
@@ -52,6 +53,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.ktor.client.mock)
         }
         jvmMain.dependencies {
             implementation(identityLibs.ktor.client.java)
