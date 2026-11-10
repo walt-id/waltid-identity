@@ -45,7 +45,8 @@ class PaymentMetadataFetchSessionTest {
         })
         try {
             PaymentMetadataFetchSession(client).use { session ->
-                for (url in listOf("http://issuer.example/vct", "http://127.0.0.1:8080/vct",
+                for (url in listOf("identity", "/vct", "//issuer.example/vct", "https:issuer.example/vct",
+                    "urn:example:credential", "http://issuer.example/vct", "http://127.0.0.1:8080/vct",
                     "https://user:password@issuer.example/vct", "https://issuer.example/vct#fragment")) {
                     assertFailsWith<PaymentConsentException> { session.read(url) }
                 }
@@ -152,13 +153,20 @@ class PaymentMetadataFetchSessionTest {
     }
 
     @Test
-    fun propagatesCancellation() = networkTest {
+    fun normalizesPlatformTransportErrorsAndPropagatesCancellation() = networkTest {
         val cancelled = HttpClient(MockEngine { throw CancellationException("User cancelled") })
         try {
             PaymentMetadataFetchSession(cancelled).use { session ->
                 assertFailsWith<CancellationException> { session.read("https://issuer.example/vct") }
             }
         } finally { cancelled.close() }
+        val failed = HttpClient(MockEngine { throw Error("Platform fetch failed") })
+        try {
+            PaymentMetadataFetchSession(failed).use { session ->
+                assertEquals(PaymentConsentFailure.METADATA_UNAVAILABLE,
+                    assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/vct") }.reason)
+            }
+        } finally { failed.close() }
     }
     @Test
     fun relativeHttpsRedirectsResolveBeforeIntegrityVerification() = networkTest {

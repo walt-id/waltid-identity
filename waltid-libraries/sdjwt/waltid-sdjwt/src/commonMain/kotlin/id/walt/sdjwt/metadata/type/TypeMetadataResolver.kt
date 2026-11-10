@@ -152,9 +152,6 @@ private fun normalizedDisplay(value: JsonElement?, claimLabels: Boolean = false)
 
 private fun merge(parent: JsonObject, child: JsonObject): JsonObject {
     val result = parent.toMutableMap().apply { putAll(child) }
-    if (parent["category"] != null && child["category"] != null && parent["category"] != child["category"]) {
-        fail(TypeMetadataFailure.INVALID_METADATA, "Conflicting inherited category")
-    }
     normalizedDisplay(child["display"])?.let { result["display"] = it }
     val claims = linkedMapOf<JsonElement, JsonObject>()
     for (metadata in listOf(parent, child)) (metadata["claims"] as? JsonArray)?.forEach { value ->

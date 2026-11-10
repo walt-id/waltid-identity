@@ -18,7 +18,11 @@ class BoundedDocumentSession(
     private val allowHttp: Boolean = false,
     initialCredentialOrigin: String? = null,
 ) : AutoCloseable {
-    constructor(fetcher: WebDataFetcher, allowHttp: Boolean = false, initialCredentialOrigin: String? = null) : this(
+    constructor(
+        fetcher: WebDataFetcher,
+        allowHttp: Boolean = fetcher.dataFetcherConfiguration.url?.protocols?.allowHttp == true,
+        initialCredentialOrigin: String? = null,
+    ) : this(
         fetcher.httpClient, fetcher.dataFetcherConfiguration.request,
         { uri -> fetcher.dataFetcherConfiguration.url?.requireUrlAllowed(uri) }, allowHttp, initialCredentialOrigin,
     )
@@ -40,8 +44,9 @@ class BoundedDocumentSession(
         bytes.copyOf()
     } catch (cause: CancellationException) {
         throw cause
-    } catch (_: Exception) {
-        throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded")
+    } catch (cause: Throwable) {
+        // Ktor's JavaScript fetch engine can throw a platform Error rather than an Exception.
+        throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded", cause)
     }
 
     private suspend fun retrieve(originalUri: String): ByteArray {
@@ -81,6 +86,10 @@ class BoundedDocumentSession(
     }
 
     private fun checkedUrl(value: String): Url {
+        require(value.startsWith("https://", ignoreCase = true) ||
+            (allowHttp && value.startsWith("http://", ignoreCase = true))) {
+            "Metadata document requires an absolute HTTP(S) URL"
+        }
         val url = Url(value)
         if ((url.protocol != URLProtocol.HTTPS && !(allowHttp && url.protocol == URLProtocol.HTTP)) || url.host.isBlank() ||
             url.user != null || url.password != null || url.fragment.isNotEmpty()) {
