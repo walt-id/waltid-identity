@@ -76,7 +76,7 @@ object IetfStatusListTokenClaims {
      * §5.2: protected header 16 must be `application/statuslist+cwt` or CoAP content-format 279.
      * The text key `typ` is not that header.
      */
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     fun requireCwtType(cwt: ByteArray) {
         val type = try {
             protectedHeader(cwt)[CborInteger(TYPE_LABEL)]
