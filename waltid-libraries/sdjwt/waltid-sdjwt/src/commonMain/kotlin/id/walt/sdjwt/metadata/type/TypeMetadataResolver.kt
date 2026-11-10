@@ -103,7 +103,10 @@ class TypeMetadataResolver(
                 val encoded = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
                     ?: fail(TypeMetadataFailure.INVALID_METADATA, "Invalid metadata snapshot bytes")
                 if (encoded.length > 349_528) fail(TypeMetadataFailure.LIMIT_EXCEEDED, "Metadata snapshot document is too large")
-                Base64.Default.decode(encoded).also {
+                val decoded = try { Base64.Default.decode(encoded) } catch (cause: IllegalArgumentException) {
+                    throw TypeMetadataException(TypeMetadataFailure.INVALID_METADATA, "Invalid metadata snapshot bytes", cause)
+                }
+                decoded.also {
                     total += it.size
                     if (total > 2_097_152) fail(TypeMetadataFailure.LIMIT_EXCEEDED, "Metadata snapshot is too large")
                 }
