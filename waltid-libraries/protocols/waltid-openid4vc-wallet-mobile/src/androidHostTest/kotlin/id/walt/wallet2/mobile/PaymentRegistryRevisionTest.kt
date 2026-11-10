@@ -76,7 +76,7 @@ class PaymentRegistryRevisionTest {
             assertFailsWith<MobileWalletStaleRegistryEntryException> {
                 fixture.wallet.previewDigitalCredentialPresentation(request)
             }
-            assertEquals(retainedBeforeRejection, retainedPreviewIds(), "Rejected selections must not retain preview sessions")
+            assertNoNewPreviews(retainedBeforeRejection, preview.requestId)
             fixture.wallet.refreshDigitalCredentialRegistration()
             assertNotEquals(originalId, registry.records.single().registryEntryId)
             unavailable = true
@@ -84,12 +84,12 @@ class PaymentRegistryRevisionTest {
             assertFailsWith<MobileWalletStaleRegistryEntryException> {
                 fixture.wallet.previewDigitalCredentialPresentation(current)
             }
-            assertEquals(retainedBeforeRejection, retainedPreviewIds())
+            assertNoNewPreviews(retainedBeforeRejection, preview.requestId)
             cancelled = true
             assertFailsWith<CancellationException> {
                 fixture.wallet.previewDigitalCredentialPresentation(current)
             }
-            assertEquals(retainedBeforeRejection, retainedPreviewIds(), "Cancelled metadata retrieval must release its preview")
+            assertNoNewPreviews(retainedBeforeRejection, preview.requestId)
             cancelled = false
             fixture.wallet.refreshDigitalCredentialRegistration()
             assertEquals(1, registry.records.size) // Ordinary disclosure remains registered.
@@ -97,6 +97,14 @@ class PaymentRegistryRevisionTest {
             fixture.wallet.discardDigitalCredentialPreview(preview.requestId)
             runtime.close()
         }
+    }
+
+    private fun assertNoNewPreviews(before: Set<*>, validPreviewId: String) {
+        val retained = retainedPreviewIds()
+        // Creating the rejected preview can evict an unrelated entry from the bounded store.
+        // It must not leak a new handle or discard this wallet's existing, valid preview.
+        assertTrue((retained - before).isEmpty(), "Rejected or cancelled selections must not retain new previews")
+        assertTrue(validPreviewId in retained, "The existing valid preview must remain available")
     }
 
     // Observe resource retention without adding a production diagnostic API solely for this test.

@@ -70,6 +70,7 @@ const query = {
 const transaction = (payload) => ({
   type: "urn:eudi:sca:payment:1",
   credential_ids: ["pay"],
+  require_cryptographic_holder_binding: true,
   payload,
 });
 const payload = {
@@ -283,6 +284,17 @@ function run(name, data, protocol) {
   return r.calls;
 }
 const payment = (calls) => calls.find((c) => c.call === "payment");
+for (const binding of [false, "true", null]) {
+  assert.deepEqual(
+    run("invalid-holder-binding-" + binding, make([
+      { ...transaction(payload), require_cryptographic_holder_binding: binding },
+    ])),
+    [],
+  );
+}
+const implicitBinding = transaction(payload);
+delete implicitBinding.require_cryptographic_holder_binding;
+assert.equal(payment(run("implicit-holder-binding", make([implicitBinding]))).amount, "EUR 42.00");
 const unsigned = run(
   "authenticated-payment-plus-ordinary",
   make([transaction(payload)]),
@@ -407,6 +419,21 @@ assert.equal(
   3,
 );
 registry.walt_payment_instructions_v1 = config;
+const paymentRecords = registry.credentials["dc+sd-jwt"]["https://issuer.example/payment"];
+paymentRecords.unshift({ ...paymentRecords[0], id: "payment-without-instructions" });
+const alternative = run("unlabelled-alternative-does-not-hide-valid-card", make([transaction(payload)]));
+assert.deepEqual(alternative.filter((c) => c.call === "payment").map((c) => c.id), ["payment-credential"]);
+assert.equal(alternative.filter((c) => c.call === "verification").length, 1);
+paymentRecords.shift();
+paymentRecords[0].paths.amount = field("99.00", "Account balance");
+document.credential_claims.push(rule(["amount"], "Account balance", "Kontostand"));
+query.credentials[0].claims.push({ path: ["amount"] });
+const amountAttribute = run("credential-amount-is-not-transaction-amount", make([transaction(payload)]));
+assert(payment(amountAttribute).subtitle.includes("Account balance: \u206899.00\u2069"));
+assert(payment(amountAttribute).subtitle.includes("Amount: \u2068EUR 42.00\u2069"));
+delete paymentRecords[0].paths.amount;
+document.credential_claims.pop();
+query.credentials[0].claims.pop();
 const injection = run(
   "request-value-line-injection",
   make([

@@ -17,8 +17,8 @@ Provenance
   Source modifications WAL-1513 payment patch (see OPENID4VP-MATCHER.md)
   Built artifact       target/wasm32-unknown-unknown/release/presentation.wasm (built here, not
                        published upstream)
-  Size                 191162 bytes
-  SHA-256              9bd1b41f515047e1bc8b2737a1f81f8dbf7cb067852a9ed57ae2be7ce96de8d5
+  Size                 194468 bytes
+  SHA-256              48c69d1d6e1c1a8ed7025dbb45007776f4f834c19a329f371ce7e2b79fe0b03d
   Matcher sources      CredentialProvider/wasm/matcher-rs/src/ (Rust 2024, nightly -Z build-std)
   Toolchain            rustc 1.99.0-nightly (12c36e253 2026-08-10), target wasm32-unknown-unknown
 

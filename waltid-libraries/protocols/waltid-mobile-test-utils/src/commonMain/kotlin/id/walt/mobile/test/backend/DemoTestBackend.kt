@@ -165,6 +165,16 @@ object DemoTestBackend {
 
     val presentationScenarios = scenarios
 
+    /** Deployment observation only; the wallet independently authenticates and resolves this VCT. */
+    suspend fun scaPaymentCardAttributeLabelsDeployed(): Boolean {
+        val response = client.get("$ISSUER_IDENTIFIER/sca_payment_card_sd_jwt")
+        check(response.status.isSuccess()) { "Cannot inspect the public demo payment VCT: ${response.status}" }
+        val metadata = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        // Only the known, pre-WAL-1513 catalogue with no attribute claims uses the rejection path.
+        // A present but malformed/incomplete catalogue must still fail the positive device checks.
+        return "claims" in metadata
+    }
+
     val optionalBirthDatePresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }.copy(
         id = "eudi-pid-sdjwt-optional-birth-date",
         verifierCredentialQuery = sdJwtOptionalBirthDateQuery(

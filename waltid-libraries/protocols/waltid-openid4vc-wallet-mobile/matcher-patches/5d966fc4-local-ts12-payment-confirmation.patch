@@ -173,7 +173,7 @@ index b3ec3e8..a299e50 100644
              }
          }
 diff --git a/CredentialProvider/wasm/matcher-rs/src/reporter.rs b/CredentialProvider/wasm/matcher-rs/src/reporter.rs
-index 853dd43..54dd494 100644
+index 853dd43..df6bb56 100644
 --- a/CredentialProvider/wasm/matcher-rs/src/reporter.rs
 +++ b/CredentialProvider/wasm/matcher-rs/src/reporter.rs
 @@ -13,6 +13,7 @@ fn report_payment_transaction_entry(
@@ -266,7 +266,7 @@ index 853dd43..54dd494 100644
          } else if td.transaction_type == "payment_details" {
              let merchant_name = td.payee_name.clone();
              let transaction_amount = format!("{} {}", td.payment_currency, td.payment_amount);
-@@ -281,12 +282,57 @@ pub fn report_match_result(
+@@ -281,12 +282,73 @@ pub fn report_match_result(
      request_idx: usize,
      openid4vp_data: &OpenId4VpData,
      credentials_blob: &[u8],
@@ -277,6 +277,7 @@ index 853dd43..54dd494 100644
 
      if !match_result.matched_credential_sets.is_empty() {
 -        let transaction_info = extract_transaction_info(openid4vp_data)?;
++        let mut eligible = match_result.clone();
 +        // Validate and prepare every payment before declaring any candidate set. Unsupported TS-12
 +        // must never fall through to ordinary sharing, including the multiple-transaction boundary.
 +        let prepared = (|| -> Result<_, Box<dyn std::error::Error>> {
@@ -295,7 +296,7 @@ index 853dd43..54dd494 100644
 +                        .get(offset..)
 +                        .ok_or("Invalid registry offset")?,
 +                )?;
-+                for (query_id, entry) in match_result.matched_credentials.iter() {
++                for (query_id, entry) in eligible.matched_credentials.iter_mut() {
 +                    if !payment.ids.iter().any(|id| id == query_id) {
 +                        continue;
 +                    }
@@ -304,13 +305,20 @@ index 853dd43..54dd494 100644
 +                        .as_ref()
 +                        .and_then(|q| q.credentials.iter().find(|c| c.id == *query_id))
 +                        .ok_or("Missing payment query")?;
-+                    for credential in &entry.matched {
-+                        if query.format == "dc+sd-jwt" || query.format == "vc+sd-jwt" {
-+                            let subtitle =
-+                                crate::payment::subtitle(payment, credential, &registry, unsigned)?;
-+                            payment_subtitles
-+                                .insert((query_id.to_string(), credential.id.to_owned()), subtitle);
-+                        }
++                    if query.format == "dc+sd-jwt" || query.format == "vc+sd-jwt" {
++                        // Reject only the credential lacking valid instructions. A second card
++                        // with a complete issuer catalogue must remain selectable.
++                        entry.matched.retain(|credential| {
++                            match crate::payment::subtitle(payment, credential, &registry, unsigned) {
++                                Ok(display) => {
++                                    payment_subtitles.insert(
++                                        (query_id.to_string(), credential.id.to_owned()), display,
++                                    );
++                                    true
++                                }
++                                Err(_) => false,
++                            }
++                        });
 +                    }
 +                }
 +            }
@@ -322,10 +330,18 @@ index 853dd43..54dd494 100644
 +            // No entry set has been declared at this point.
 +            return Ok(());
 +        };
++        for options in &mut eligible.matched_credential_sets {
++            options.retain(|option| option.matched_credential_ids.iter().all(|id| {
++                eligible.matched_credentials.get(*id).is_some_and(|entry| !entry.matched.is_empty())
++            }));
++        }
++        if eligible.matched_credential_sets.iter().any(Vec::is_empty) {
++            return Ok(());
++        }
 
          // Recursive helper to generate Cartesian product.
          fn report_combinations(
-@@ -298,6 +344,10 @@ pub fn report_match_result(
+@@ -298,6 +360,10 @@ pub fn report_match_result(
              candidate_matched_credentials: &DeterministicMap<&str, DcqlMatchedCredentialEntry<'_>>,
              credentials_blob: &[u8],
              transaction_info: &Option<(Vec<String>, String, String, String)>,
@@ -336,7 +352,7 @@ index 853dd43..54dd494 100644
          ) -> Result<(), Box<dyn std::error::Error>> {
              if selected_option_indices.len() == credential_sets.len() {
                  // We have selected one option from each set. Now report this combination.
-@@ -344,6 +394,7 @@ pub fn report_match_result(
+@@ -344,6 +410,7 @@ pub fn report_match_result(
                              Some(&option.option_id),
                              credentials_blob,
                              transaction_info,
@@ -344,7 +360,7 @@ index 853dd43..54dd494 100644
                          )?;
                          document_index += 1;
                      }
-@@ -364,6 +415,7 @@ pub fn report_match_result(
+@@ -364,6 +431,7 @@ pub fn report_match_result(
                      candidate_matched_credentials,
                      credentials_blob,
                      transaction_info,
@@ -352,15 +368,22 @@ index 853dd43..54dd494 100644
                  )?;
                  selected_option_indices.pop();
              }
-@@ -381,6 +433,7 @@ pub fn report_match_result(
-             &match_result.matched_credentials,
+@@ -376,11 +444,12 @@ pub fn report_match_result(
+             credman,
+             wasm_version,
+             request_idx,
+-            &match_result.matched_credential_sets,
++            &eligible.matched_credential_sets,
+             &mut selected_option_indices,
+-            &match_result.matched_credentials,
++            &eligible.matched_credentials,
              credentials_blob,
              &transaction_info,
 +            &payment_subtitles,
          )?;
      }
 
-@@ -506,11 +559,7 @@ mod tests {
+@@ -506,11 +575,7 @@ mod tests {
              _set_index: i32,
          ) {
          }
@@ -373,7 +396,7 @@ index 853dd43..54dd494 100644
          }
      }
 
-@@ -531,7 +580,7 @@ mod tests {
+@@ -531,7 +596,7 @@ mod tests {
          };
          let openid4vp_data = OpenId4VpData::default();
 
@@ -382,7 +405,7 @@ index 853dd43..54dd494 100644
 
          assert!(mock.added_entries.is_empty());
      }
-@@ -583,7 +632,7 @@ mod tests {
+@@ -583,7 +648,7 @@ mod tests {
          };
          let openid4vp_data = OpenId4VpData::default();
 
@@ -391,7 +414,7 @@ index 853dd43..54dd494 100644
 
          assert_eq!(mock.added_entries, vec!["cred1"]);
      }
-@@ -614,7 +663,7 @@ mod tests {
+@@ -614,7 +679,7 @@ mod tests {
          };
          let openid4vp_data = OpenId4VpData::default();
 
@@ -400,7 +423,7 @@ index 853dd43..54dd494 100644
 
          assert_eq!(mock.inline_entries, vec!["inline_cred"]);
      }
-@@ -694,7 +743,7 @@ mod tests {
+@@ -694,7 +759,7 @@ mod tests {
 
          let openid4vp_data = OpenId4VpData::default();
 
@@ -447,9 +470,10 @@ index f450e60..6cfb7a2 100644
 +}
 diff --git a/CredentialProvider/wasm/matcher-rs/src/payment.rs b/CredentialProvider/wasm/matcher-rs/src/payment.rs
 new file mode 100644
+index 0000000..e723b1d
 --- /dev/null
 +++ b/CredentialProvider/wasm/matcher-rs/src/payment.rs
-@@ -0,0 +1,478 @@
+@@ -0,0 +1,489 @@
 +//! Local TS-12 system-sheet projection. Trust is established by the wallet before registration;
 +//! the sandbox only selects authenticated labels and renders the original request's values.
 +use crate::base64url::decode_base64url;
@@ -555,11 +579,18 @@ new file mode 100644
 +            "type",
 +            "credential_ids",
 +            "transaction_data_hashes_alg",
++            "require_cryptographic_holder_binding",
 +            "payload",
 +        ]
 +        .contains(&k.as_str())
 +    }) {
 +        return Err("Unsupported transaction extension".into());
++    }
++    if object
++        .get("require_cryptographic_holder_binding")
++        .is_some_and(|value| value.as_bool() != Some(true))
++    {
++        return Err("Payment requires cryptographic holder binding".into());
 +    }
 +    let ids: Vec<String> = entry["credential_ids"]
 +        .as_array()
@@ -726,9 +757,13 @@ new file mode 100644
 +    let mut values = BTreeMap::new();
 +    leaves(&payment.payload, vec![], &mut values);
 +    let mut fields: Vec<(&Value, Value)> = vec![];
++    let mut transaction_amount_index = None;
 +    for rule in claims {
 +        let path = path(rule)?;
 +        if let Some(value) = values.remove(&path) {
++            if path == ["amount"] {
++                transaction_amount_index = Some(fields.len());
++            }
 +            fields.push((rule, value));
 +        } else if rule["mandatory"] == true && at(&payment.payload, &path).is_none() {
 +            return Err("Missing mandatory payment parameter".into());
@@ -840,13 +875,13 @@ new file mode 100644
 +            )?));
 +        }
 +    }
-+    for (rule, mut value) in fields {
++    for (index, (rule, mut value)) in fields.into_iter().enumerate() {
 +        if rule["visualisation"] == 4 {
 +            continue;
 +        }
 +        let label = matching(rule["labels"].as_object().ok_or("Missing labels")?, locale)
 +            .ok_or("Missing label")?;
-+        if path(rule)? == ["amount"] {
++        if transaction_amount_index == Some(index) {
 +            value = Value::String(amount.clone());
 +        }
 +        lines.push(format!(

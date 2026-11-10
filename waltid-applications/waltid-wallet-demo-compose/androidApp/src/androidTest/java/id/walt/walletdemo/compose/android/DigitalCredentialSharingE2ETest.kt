@@ -254,11 +254,12 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         )
     }
 
-    /** Both preview settings retain native SCA authorization; ordinary fixture keys must never sign. */
+    /** Missing issuer labels block selection; otherwise both preview settings retain native SCA authorization. */
     @Test
-    fun scaSdJwtRespectsPreviewSettingAndRejectsUnprotectedSigning() = runBlocking {
+    fun scaSdJwtHonorsIssuerLabelsAndPreviewSetting() = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.scaPaymentSdJwtScenario
+        val attributeLabelsDeployed = DemoTestBackend.scaPaymentCardAttributeLabelsDeployed()
         val paymentIds = issueFromDemoIssuer(wallet, scenario)
         try {
             val registration = wallet.refreshDigitalCredentialRegistration()
@@ -272,6 +273,17 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment")),
                 )
                 val request = fixture.startCredentialRequest(session.requestJson)
+                if (!attributeLabelsDeployed) {
+                    // Until the public issuer deploys WAL-1513's authenticated card labels, the
+                    // safe result is no candidate for either preview setting, not invented labels.
+                    fixture.awaitUnsupportedRequestEmptyState(request, "TS-12 without issuer attribute labels",
+                        scenario.credentialConfigurationId)
+                    val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
+                    assertTrue("Missing issuer labels must not return a credential", outcome.isFailure)
+                    assertFalse("Unsupported payment must not reach the verifier",
+                        DemoTestBackend.verifierSessionInfo(session.sessionId).getValue("attempted").jsonPrimitive.boolean)
+                    continue
+                }
                 val confirmationStarted = System.currentTimeMillis() / 1000.0
                 val expectedFailure = "TS12 authentication evidence is unavailable:"
                 val outcome = if (showPreview) {

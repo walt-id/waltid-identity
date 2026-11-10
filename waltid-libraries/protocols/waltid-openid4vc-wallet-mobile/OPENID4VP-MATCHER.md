@@ -41,8 +41,8 @@ upstream ships the Rust sources only.
 | Upstream path | `CredentialProvider/wasm/matcher-rs` |
 | Source modifications | `matcher-patches/5d966fc4-local-ts12-payment-confirmation.patch` |
 | Built artifact | `target/wasm32-unknown-unknown/release/presentation.wasm`, built here |
-| Size | 191,162 bytes |
-| SHA-256 | `9bd1b41f515047e1bc8b2737a1f81f8dbf7cb067852a9ed57ae2be7ce96de8d5` |
+| Size | 194,468 bytes |
+| SHA-256 | `48c69d1d6e1c1a8ed7025dbb45007776f4f834c19a329f371ce7e2b79fe0b03d` |
 | Toolchain | `rustc 1.99.0-nightly (12c36e253 2026-08-10)`, target `wasm32-unknown-unknown` |
 | License | Apache-2.0 |
 
@@ -134,6 +134,11 @@ when the issuer supplied them. Request values are isolated for bidirectional tex
 are escaped to prevent injected instruction lines. Unsigned warning text and Boolean translations are
 wallet-owned English/German text; unsupported languages fail closed when these are needed.
 
+The standard `require_cryptographic_holder_binding` transaction parameter is accepted when absent
+or `true`; `false` and malformed values are rejected. Missing instructions exclude the affected card,
+while another card with valid instructions remains selectable. Credential attributes retain their own
+values even when their names also occur in the transaction payload.
+
 Payment entry IDs bind the authenticated document, credential wire representation and locale preferences.
 The wallet verifies the Request Object first, then re-resolves metadata and rejects a stale system
 selection before disclosure. Ordinary disclosure does not fetch payment metadata. Unavailable or
@@ -165,7 +170,7 @@ are authenticated only by the wallet after selection; the sheet cannot certify t
 These require a Google platform enhancement or an explicit product-policy decision. Wallet preview
 remains user-controlled; its existing issuer-led review and native signing authorization are preserved.
 
-Run `node matcher-tests/payment.mjs` to exercise the actual vendored binary, including exact decimal
+CI runs `node matcher-tests/payment.mjs` against the actual vendored binary, including exact decimal
 vectors, multilingual labels, selected attributes, ordinary companion entries, signed/unsigned routing,
 missing instructions and unsupported boundaries. This ABI evidence complements real system-sheet
 captures; it does not substitute for them. New upstream matcher HEAD was inspected for WAL-1513;
@@ -181,6 +186,11 @@ separate `credential_metadata.claims[].display[].name` is not a substitute for t
 `claims[].display[].label`. A deployment still serving the previous VCT without these labels intentionally
 has no SD-JWT system-payment candidate. Other issuers, including separately configured Enterprise
 fixtures, must publish equivalent authenticated labels for their requested attributes.
+
+The unattended public-demo device check verifies rejection for both preview settings while the
+deployed VCT has no attribute `claims`. Once that property is deployed, it requires the complete
+system-sheet labels and native-policy rejection path; malformed or incomplete labels do not select
+the legacy-deployment expectation. Positive matcher coverage remains unconditional.
 
 A physical Android 12 signed-request check used a synthetic verifier whose public key was configured
 independently in the isolated wallet. The actual wallet accepted the valid signature, audience and
