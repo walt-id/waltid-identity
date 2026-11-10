@@ -13,7 +13,7 @@ transaction-code retention, stale-consent rejection, correlated callbacks and no
 
 ## Compare
 
-Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on an iPhone 17 simulator running iOS 27.0 with Xcode 27.0, matching CI. The snapshot viewport does not replace the host hardware's safe areas, so the runner rejects other simulator models for SwiftUI. Choose a test-owned simulator. Do not reuse baselines on another runtime or native simulator model without an explicit environment review.
+Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on an iPhone 17 simulator running iOS 27.0. CI uses Xcode 27.2 (27B52); local comparisons accept Xcode 27.x minor, patch and build updates. The snapshot viewport does not replace the host hardware's safe areas, so the runner rejects other simulator models for SwiftUI. Choose a test-owned simulator. Do not reuse baselines on another runtime or native simulator model without an explicit environment review.
 
 The existing build workflow runs reporting contracts on Linux and selects complete renderer comparisons through its platform eligibility rules. Android comparisons run on Linux. Compose iOS comparisons share the Kotlin simulator job's compilation cache; SwiftUI comparisons reuse the consumer job's verified release WalletCore artifact and native build directory. Native comparisons run serially on one test-owned simulator. Functional suites keep their own selection. Drafts can use `ci:visual` for comparisons alone; `ci:mobile` and `ci:macos` retain their wider gates. Forks require maintainer dispatch. Path selection chooses renderers, never a subset of their catalogue cells.
 
@@ -40,13 +40,13 @@ unified checkout. Its `waltid-identity` directory must resolve to this exact Ide
 the runner rejects another source tree. Record the companion revisions with the local evidence.
 
 The existing platform jobs retain the gallery, JUnit results, timings and differences as job
-artifacts. Apple comparisons require **Xcode 27.0 (27A266a) and iOS 27.0**; SwiftUI also uses
+artifacts. CI Apple comparisons require **Xcode 27.2 (27B52) and iOS 27.0**; SwiftUI also uses
 **XcodeBuildMCP 2.7.0**. Android and browser comparisons run on Linux;
 all fixture clocks use UTC, and the native nearby receipt pins its locale's 24-hour cycle independently
 of the simulator's user preference. Its [official `xcode-27` runner](https://github.com/actions/runner-images/issues/14404)
 is currently a public preview. The [image inventory](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
 provides the pinned Xcode and iOS 27 runtime. Each comparison creates its own simulator.
-An unavailable runtime or changed Xcode fails explicitly; the workflow never
+An unavailable runtime or a different CI Xcode version/build fails explicitly; the workflow never
 falls back to another OS or records replacement references. This pipeline requires hosted
 verification before it can establish CI portability; local success alone is insufficient.
 
@@ -92,9 +92,9 @@ Add shared data only for a distinct risk. Render the real component through `Wal
 
 Simulator pixels do not prove external activity/scene lifecycle, OS-owned DC API sheets, signing, physical BLE/NFC or TS-12 conformance. Keep those evidence lanes explicit.
 
-The [browser account pilot](../../waltid-wallet-demo-compose/webApp/visual/README.md) separately
-compares six web-specific account states in the production Wasm host, including compact/wide
-viewports and actual form requests against synthetic HTTP responses. Its native Playwright report
+The [browser wallet checks](../../waltid-wallet-demo-compose/webApp/visual/README.md) separately
+compare six account states and compact/wide credential dates in the production Wasm host,
+including actual form requests and card navigation against synthetic HTTP responses. Its native Playwright report
 stays separate from the three-renderer mobile manifest.
 
 Payment display responsibilities, placement, explicit unsigned confirmation and evidence boundaries are described in [the payment review contract](payment-consent.md). The localized compact variant uses 320×568 with large text; it checks wrapping, not translation of wallet-owned strings.

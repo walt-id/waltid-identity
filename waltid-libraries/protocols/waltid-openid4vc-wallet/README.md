@@ -38,6 +38,30 @@ contains the complete collection. Both entry points share the same proof validat
 On the wire, one JWT keeps the released `{"proofJwt":"..."}` response; multiple JWTs use
 `{"proofs":{"jwt":["...","..."]}}`. The plural result decoder accepts either shape.
 
+Isolated `fetchCredentials` separates submitted proof count from expected credential keys. A JWT
+proof can contain a nested `key_attestation` covering several keys; shared or overlapping
+attestations contribute distinct public-key identities rather than multiplying credential copies.
+Batch metadata limits the submitted proof array, including repeated proofs.
+
+Wallet parsing establishes expected public-key evidence and does not authenticate the attestation.
+The issuer remains responsible for attestation trust, signatures, lifetime, algorithms and nonces.
+For storage, explicitly select available wallet-owned keys through `holderBindings` (or `keyId` for
+a single key). The selection must cover every expected proof key before the credential request is
+sent; missing keys or a same-size selection containing different keys are rejected without consuming
+issuance. Opaque proof kids are matched against the selected public keys. Evidence does not select
+or create wallet keys. Every returned proof-bound credential must match
+the submitted evidence and, when storing, a selected wallet binding before any writes or storage
+callbacks. Missing credentials for some expected keys are allowed, as is any response order.
+Subject DIDs and `cnf.kid` references in returned credentials are resolved only when that DID was
+already identified by a submitted proof's DID `kid`; issuer-selected DIDs cannot add network lookups.
+
+This wallet profile rejects repeated holder keys and limits proof-bound immediate responses to the
+distinct expected keys. These are wallet product rules: OpenID4VCI leaves credential count to the
+issuer ([section 14.6](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#section-14.6))
+and recommends issuing for each attested key ([Appendix F.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#appendix-F.1)).
+Proofless requests retain their existing response-array behavior. Deferred responses preserve the
+selected wallet bindings and existing polling behavior; this does not add deferred claim-time rules.
+
 ### Credential Presentation (OpenID4VP 1.0)
 
 - **DCQL matching** — Digital Credentials Query Language for credential selection

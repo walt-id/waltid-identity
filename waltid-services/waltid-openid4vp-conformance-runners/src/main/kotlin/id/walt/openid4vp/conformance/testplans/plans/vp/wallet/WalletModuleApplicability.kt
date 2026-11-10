@@ -84,6 +84,14 @@ object WalletModuleApplicability {
     private const val ALTERNATE_HAPPY_FLOW = "oid4vp-1final-wallet-alternate-happy-flow"
 
     /**
+     * The suite publishes this for `request_method=request_uri_unsigned` and then returns an
+     * `alg: none` Request Object. OpenID4VP 1.0 §5.10.1 requires the `request_uri` POST response to
+     * be a signed Request Object, and §5.9.3 says a `redirect_uri` client cannot sign one. The wallet
+     * is right to stop; the interrupted suite run is not a wallet failure. Signed POST variants stay.
+     */
+    private const val REQUEST_URI_METHOD_POST = "oid4vp-1final-wallet-request-uri-method-post"
+
+    /**
      * Why [testModule] does not apply to [variantSelection], or `null` if it does.
      *
      * [variantSelection] must describe every axis - see [WalletTestPlan.axisValues].
@@ -98,7 +106,7 @@ object WalletModuleApplicability {
     ): String? = suiteLimitationReason(testModule, variantSelection)
         ?: metadataReason(moduleMetadata, variantSelection)
 
-    /** See [ERROR_PAGE_GATED_MODULES] and [ALTERNATE_HAPPY_FLOW]. */
+    /** See [ERROR_PAGE_GATED_MODULES], [ALTERNATE_HAPPY_FLOW], and [REQUEST_URI_METHOD_POST]. */
     private fun suiteLimitationReason(
         testModule: String,
         variantSelection: Map<String, String>,
@@ -106,6 +114,14 @@ object WalletModuleApplicability {
         if (testModule == ALTERNATE_HAPPY_FLOW) {
             return "suite cannot build the authorization request: CreateAuthorizationRequestSteps " +
                 "requests missing condition AddVP1FinalEncryptionParametersToClientMetadata"
+        }
+        if (
+            testModule == REQUEST_URI_METHOD_POST &&
+            variantSelection["request_method"] == "request_uri_unsigned"
+        ) {
+            return "OpenID4VP 1.0 §5.10.1 requires a signed request_uri POST response, and §5.9.3 " +
+                "says a redirect_uri client cannot sign one; the suite still returns alg:none for " +
+                "request_uri_unsigned"
         }
         if (variantSelection["request_method"] != "url_query") return null
         if (testModule !in ERROR_PAGE_GATED_MODULES) return null

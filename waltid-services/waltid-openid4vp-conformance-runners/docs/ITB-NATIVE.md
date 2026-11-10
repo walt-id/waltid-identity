@@ -38,4 +38,32 @@ of Wallet Provider assurance or certification.
 
 The fixture binds only to device loopback and accepts the approved Aegean tenant origin. A fresh token authenticates the coordinator before key creation. Messages are size-bounded and strictly sequenced; disconnect cancels pending work and a broken channel is never retried. Keep the ADB transport restricted to the operator's machine. The token is a local test-channel credential, not an ITB organisation key.
 
-Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They still require wallet success and correlated terminal ITB `SUCCESS`. All issuer, JOSE, certificate, audience, nonce and verifier-result checks remain strict. A native prompt or successful signature alone is not a passing ITB case.
+Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They require wallet success and correlated terminal ITB `SUCCESS`. The fixture uses the production wallet's issuance, request-validation and proof-generation paths; verifier rejections remain failures. A native prompt or successful signature alone is not a passing ITB case.
+
+## SCA-User audience compatibility
+
+The [SCA-User rulebook §§4.1 and 5.1](https://github.com/webuild-consortium/webuild-attestation-rulebooks-catalog/blob/f9b1812b19277e68f56ae64351783fa05c433cd5/rulebooks/rb-sca-user/README.md#41-mandatory-metadata)
+requires the issuer-signed credential's `aud` to contain the issuing bank's RP
+URL(s). [CS-02 §5](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-02-credential-presentation.md#L111)
+uses `x509_hash` to identify the request signer's certificate. These values have
+different meanings: comparing the credential audience directly with `client_id`,
+or issuing a certificate-hash audience to make them equal, does not implement the
+rulebook's URL audience requirement.
+
+The verifier must enforce its bank RP URL against the credential audience. The
+wallet must separately check permission before disclosure, as described in
+[CS-12 §6.1](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#61-issuer-requested-flow).
+The authenticated association between the allowed bank URL and the request signer
+is under clarification in [architecture #381](https://github.com/webuild-consortium/wp4-architecture/issues/381)
+and remains unqualified by this runner. Request authentication and a verifier's
+acceptance do not establish the wallet's RP-permission enforcement.
+
+The reference issuer/verifier correction is tracked in
+[ITB #58](https://github.com/webuild-consortium/wp4-interop-test-bed/issues/58).
+Confirm its live behavior with fresh SCA-User issuance followed by both payment
+cases; published source alone does not establish deployment. Preserve signed
+credential claims and request/proof bindings when investigating failures.
+
+The credential audience is also distinct from the KB-JWT audience, which binds
+the proof to the current verifier or DC API origin. Reports retain only allowlisted
+verifier error identifiers or a bounded HTTP status, never the response body.

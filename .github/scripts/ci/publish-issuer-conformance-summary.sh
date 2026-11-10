@@ -73,4 +73,60 @@ CONFORMANCE_TEST_OUTCOME=$(jq -r 'map("\(.proofType)=\(.testOutcome)") | join(",
     fi
   fi
   echo
+  if [ -f "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json" ]; then
+    echo '## Deferred issuance'
+    echo
+    echo 'VCI single-request happy-flow (without notification) and batch modules only. Both proof modes require initial 202, approval 204, deferred collection 200, and suite proof evidence.'
+    echo
+    deferred_total="$(jq 'length' "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json")"
+    echo "- Total: $deferred_total"
+    echo "- Passed: $(jq '[.[] | select(.status == "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json")"
+    echo "- Failed: $(jq '[.[] | select(.status != "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json")"
+    echo
+    echo '| Proof mode | Variants | Passed | Failed |'
+    echo '|------------|----------|--------|--------|'
+    jq -r '. as $results | ["jwt", "attestation"][] as $proof |
+      [$results[] | select(.proofType == $proof)] |
+      "| \($proof) | \(length) | \([.[] | select(.status == "PASSED")] | length) | \([.[] | select(.status != "PASSED")] | length) |"' \
+      "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json"
+    echo
+    echo 'Expected: 12 deferred variants per proof mode. Deferred uses the generic VCI plan for both Basic/HAIP profiles, including encrypted HAIP batch. Repeated issuance, pending polling and lifecycle recovery are not covered here.'
+    echo
+    echo '<details>'
+    echo '<summary>OpenID4VCI Issuer deferred results</summary>'
+    echo
+    echo '| Variant | Status | Plan | Batch coverage |'
+    echo '|---------|--------|------|----------------|'
+    jq -r '
+      def cell: (. // "" | tostring | gsub("[\r\n]+"; " ") | @html | gsub("\\|"; "&#124;"));
+      .[] | "| \(.variantId | cell) | \(.status | cell) | \(if .planId != null and .planId != "" and .planId != "N/A" then "[\(.planId | cell)](https://conformance.waltid.cloud/plan-detail.html?plan=\(.planId | @uri))" else "—" end) | \(.batchCoverage | cell) |"' \
+      "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json"
+    echo
+    echo '| Test | Status | Suite | Log | Error |'
+    echo '|------|--------|-------|-----|-------|'
+    jq -r '
+      def cell: (. // "" | tostring | gsub("[\r\n]+"; " ") | @html | gsub("\\|"; "&#124;"));
+      .[] as $variant |
+      if ($variant.modules | length) == 0 then
+        [($variant.variantId | cell), ($variant.status // "UNKNOWN" | ascii_downcase | cell), "", "",
+         "No module results were produced; see proof-job setup/test logs."]
+      else
+        $variant.modules[] |
+        [(($variant.variantId + "/" + .testModule) | cell),
+         (if .accepted == true then "passed" else "failed" end), ((.result // .status) | cell),
+         (if .testId != null and .testId != "" and .testId != "N/A" then
+            "[log](https://conformance.waltid.cloud/log-detail.html?log=\(.testId | @uri))"
+          else "" end),
+         ((.failureSummary // (if .accepted == true then "" else
+           "Module was not accepted; see suite log and proof evidence." end)) | cell)]
+      end | "| " + join(" | ") + " |"' \
+      "$ISSUER_DIAGNOSTICS_DIR/deferred/results.json"
+    echo
+    echo '</details>'
+    if [ "$deferred_total" -eq 0 ]; then
+      echo
+      echo '_No deferred issuer results were produced. See the proof-job outcomes and validation errors above; this does not establish deferred coverage._'
+    fi
+  fi
+  echo
 } >> "$GITHUB_STEP_SUMMARY"
