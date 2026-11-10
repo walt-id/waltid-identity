@@ -69,18 +69,19 @@ class KeyAttestationVerifier(
         } catch (e: Exception) {
             throw KeyAttestationServiceException("Key attestation trust resolution failed", e)
         }
-        val signer = keys.firstOrNull { key ->
+        val signer = keys.firstNotNullOfOrNull { key ->
             // Preserve configured algorithm restrictions before restoring public material.
             val declaredAlgorithm = (key as? StorableKey)?.storedKey?.metadata?.get(JWK_ALGORITHM_METADATA_KEY)
             if (declaredAlgorithm != null && declaredAlgorithm != decoded.algorithm.identifier ||
                 !key.spec.supportsJwsAlgorithm(decoded.algorithm) ||
                 !key.capabilities.supportsSignatureAlgorithm(decoded.algorithm.toSignatureAlgorithm())
-            ) return@firstOrNull false
+            ) return@firstNotNullOfOrNull null
             // Remote verifier errors can be indistinguishable from invalid signatures.
             // Retrieve trusted public material outside the wallet-input error boundary,
             // then use the local software provider for cryptographic verification.
-            val publicKey = try {
-                restoreAttestedKey(key.exportPublicJwkObject())
+            val (publicJwk, publicKey) = try {
+                val publicJwk = key.exportPublicJwkObject()
+                publicJwk to restoreAttestedKey(publicJwk)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -88,11 +89,11 @@ class KeyAttestationVerifier(
             }
             try {
                 CompactJws.verify(jwt, publicKey, decoded.algorithm)
-                true
+                VerifiedSigner(key, publicJwk)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                false
+                null
             }
         } ?: throw invalidCredentialProof("Key attestation signature is invalid or its signer is not trusted")
         val payload = attestationInput {
@@ -135,10 +136,10 @@ class KeyAttestationVerifier(
             }
         }
         val status = try {
-            captureAttestationStatus(payload, signer.exportPublicJwkObject(), options.statusPolicy, now())
+            captureAttestationStatus(payload, signer.publicJwk, options.statusPolicy, now())
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (cause: Exception) { throw invalidCredentialProof(cause.message ?: "Invalid key attestation status reference", cause) }
-        val verified = VerifiedKeyAttestation(jwt, header, payload, signer, attestedKeys.map {
+        val verified = VerifiedKeyAttestation(jwt, header, payload, signer.key, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))
         }, lifetime, status)
         val accepted = try {
@@ -156,6 +157,9 @@ class KeyAttestationVerifier(
         if (!lifetime.keyAttestationValidAt(now())) throw invalidCredentialProof("Key attestation expired during status resolution")
         return verified
     }
+
+    /** Public material used for the successful signature check, never a second provider lookup. */
+    private data class VerifiedSigner(val key: Key, val publicJwk: JsonObject)
 }
 
 private val publicKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
