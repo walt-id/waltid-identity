@@ -17,6 +17,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.proofs.CredentialProofValidationException
+import id.walt.sdjwt.SDJwtVerificationException
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -135,6 +136,10 @@ class SdJwtVcCredentialHandler(
             issuanceBatch.signEach { instance -> issue(vct, instance, effectiveMapping) }
         } catch (e: CredentialProofValidationException) {
             CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
+        } catch (e: SDJwtVerificationException) {
+            CredentialResponseResult.Failure(
+                CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential data breaks SD-JWT processing: ${e.message}")
+            )
         }
     }
 
