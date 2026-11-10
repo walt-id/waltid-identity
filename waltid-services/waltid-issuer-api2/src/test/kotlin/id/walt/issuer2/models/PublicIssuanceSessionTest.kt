@@ -73,7 +73,10 @@ class PublicIssuanceSessionTest {
             val internal = json.encodeToJsonElement(batch).jsonObject
             val result = internal.getValue("issuanceResults").jsonObject.getValue("configuration").jsonObject
             val publicResult = JsonObject(result - "walletNotification" + report)
-            val publicBatch = JsonObject(internal + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
+            val publicBatch = JsonObject((internal - buildSet {
+                add("deferredState")
+                if (batch.deferredStatus == null) add("deferredStatus")
+            }) + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))
             assertEquals(publicBatch, batch.toPublicJson(json))
             assertEquals(publicBatch, json.encodeToJsonElement(PublicIssuanceSession(batch)))
