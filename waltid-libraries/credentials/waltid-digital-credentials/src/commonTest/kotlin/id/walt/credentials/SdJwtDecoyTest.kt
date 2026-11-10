@@ -1,6 +1,8 @@
 package id.walt.credentials
 
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.formats.W3C11
+import id.walt.credentials.formats.W3C2
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.credentials.signatures.sdjwt.SdJwtDisclosureLocator
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
@@ -94,6 +96,64 @@ class SdJwtDecoyTest {
 
         val withoutIssuerJwt = credential.copy(signedWithDisclosures = null, signed = null)
         assertFailsWith<UnreachableDisclosuresException> { withoutIssuerJwt.locatedDisclosures() }
+    }
+
+    @Test
+    fun locationsRecoveredFromTheIssuerJwtMatchTheParsedOnes() = runTest {
+        fun encode(value: JsonObject) = value.toString().encodeToByteArray().encodeToBase64Url()
+        val context = buildJsonArray { add("https://www.w3.org/2018/credentials/v1") }
+        val shapes = mapOf(
+            "SD-JWT VC" to ("dc+sd-jwt" to { d: List<SdJwtSelectiveDisclosure> -> buildJsonObject {
+                put("iss", "https://issuer.example"); put("vct", "https://issuer.example/pid"); put("_sd_alg", "sha-256")
+                putJsonArray("_sd") { add(d[0].asHashedFromEncoded()) }
+                putJsonArray("nationalities") { add(reference("decoy")); add(reference(d[1].asHashedFromEncoded())) }
+            } }),
+            "W3C with top-level _sd" to ("vc+sd-jwt" to { d: List<SdJwtSelectiveDisclosure> -> buildJsonObject {
+                put("@context", context); putJsonArray("type") { add("VerifiableCredential") }; put("_sd_alg", "sha-256")
+                putJsonArray("_sd") { add(d[0].asHashedFromEncoded()) }
+                putJsonObject("credentialSubject") { putJsonArray("nationalities") { add(reference("decoy")); add(reference(d[1].asHashedFromEncoded())) } }
+            } }),
+            "W3C vc wrapper" to ("JWT" to { d: List<SdJwtSelectiveDisclosure> -> buildJsonObject {
+                put("_sd_alg", "sha-256")
+                putJsonObject("vc") {
+                    put("@context", context); putJsonArray("type") { add("VerifiableCredential") }
+                    putJsonArray("_sd") { add(d[0].asHashedFromEncoded()) }
+                    putJsonObject("credentialSubject") { putJsonArray("nationalities") { add(reference("decoy")); add(reference(d[1].asHashedFromEncoded())) } }
+                }
+            } }),
+            "W3C vc wrapper with a nested vc extension" to ("JWT" to { d: List<SdJwtSelectiveDisclosure> -> buildJsonObject {
+                put("_sd_alg", "sha-256")
+                putJsonObject("vc") {
+                    put("@context", context); putJsonArray("type") { add("VerifiableCredential") }
+                    putJsonArray("_sd") { add("decoy-digest") }
+                    putJsonObject("credentialSubject") { putJsonArray("_sd") { add(d[0].asHashedFromEncoded()) } }
+                    putJsonObject("vc") { putJsonObject("credentialSubject") { putJsonArray("nationalities") { add(reference(d[1].asHashedFromEncoded())) } } }
+                }
+            } }),
+        )
+        for ((shape, typedPayload) in shapes) {
+            val (typ, payload) = typedPayload
+            val disclosures = listOf(SdJwtSelectiveDisclosure("salt-name", "given_name", JsonPrimitive("John")), disclosure("FR"))
+            val header = buildJsonObject { put("alg", "ES256"); put("typ", typ) }
+            val parsed = CredentialParser.parseOnly(
+                "${encode(header)}.${encode(payload(disclosures))}.c2ln~${disclosures.joinToString("~") { it.encoded }}~"
+            ) as SelectivelyDisclosableVerifiableCredential
+            val withoutOriginalData = when (parsed) {
+                // SD-JWT VC enforces the original payload when constructed, so only W3C credentials can lack it
+                is SdJwtCredential -> {
+                    assertFailsWith<IllegalArgumentException>(shape) { parsed.copy(originalCredentialData = null) }
+                    continue
+                }
+                is W3C11 -> parsed.copy(originalCredentialData = null)
+                is W3C2 -> parsed.copy(originalCredentialData = null)
+                else -> fail("$shape parsed as ${parsed::class.simpleName}")
+            }
+            assertEquals(
+                parsed.locatedDisclosures().associate { it.encoded to it.location },
+                withoutOriginalData.locatedDisclosures().associate { it.encoded to it.location },
+                shape,
+            )
+        }
     }
 
     @Test

@@ -82,10 +82,9 @@ fun SelectivelyDisclosableVerifiableCredential.locatedDisclosures(): List<SdJwtS
     return SdJwtDisclosureLocator.locate(payload, available)
 }
 
-/** The payload the credential parser locates disclosures in: the `vc` object when it holds `_sd`, else the JWT body. */
+/** The complete issuer-signed JWT body; [SdJwtDisclosureLocator.locate] selects the W3C credential root itself. */
 private fun SelectivelyDisclosableVerifiableCredential.issuerSignedPayload(): JsonObject? {
     val issuerJwt = (signedWithDisclosures ?: (this as? DigitalCredential)?.signed)
         ?.substringBefore("~")?.takeIf { it.isJwt() } ?: return null
-    val body = JwtUtils.parseJwt(issuerJwt).second
-    return (body["vc"] as? JsonObject)?.takeIf { "_sd" in it } ?: body
+    return JwtUtils.parseJwt(issuerJwt).second
 }

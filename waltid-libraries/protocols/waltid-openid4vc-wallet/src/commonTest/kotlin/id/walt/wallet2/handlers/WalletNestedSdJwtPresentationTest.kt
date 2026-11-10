@@ -158,13 +158,22 @@ class WalletNestedSdJwtPresentationTest {
         fun previewName(path: String): String? = preview.single { it.path == path }.name
     }
 
-    private suspend fun wallet(sdJwt: String, staleLocations: Boolean = false, alsoStored: List<StoredCredential> = emptyList()): Wallet {
+    private suspend fun wallet(
+        sdJwt: String,
+        staleLocations: Boolean = false,
+        alsoStored: List<StoredCredential> = emptyList(),
+        withoutOriginalData: Boolean = false,
+    ): Wallet {
         val (_, credential) = CredentialParser.detectAndParse(sdJwt)
-        val storedCredential = if (staleLocations) {
+        val storedCredential = when {
             // Simulate a credential persisted before decoy-aware indexing, without reimporting it.
-            val sd = assertIs<SdJwtCredential>(credential)
-            sd.copy(disclosures = sd.disclosures!!.map { it.copy(location = listOf(JsonPrimitive("outdated"))) })
-        } else credential
+            staleLocations -> assertIs<SdJwtCredential>(credential).let { sd ->
+                sd.copy(disclosures = sd.disclosures.orEmpty().map { it.copy(location = listOf(JsonPrimitive("outdated"))) })
+            }
+            // Simulate a stored W3C credential that lost its original payload, keeping only the issuer JWT.
+            withoutOriginalData -> assertIs<W3C11>(credential).copy(originalCredentialData = null)
+            else -> credential
+        }
         val store = InMemoryCredentialStore().also {
             it.addCredential(StoredCredential(id = CREDENTIAL_ID, credential = storedCredential))
             alsoStored.forEach { stored -> it.addCredential(stored) }
@@ -208,8 +217,9 @@ class WalletNestedSdJwtPresentationTest {
         did: String? = null,
         staleLocations: Boolean = false,
         alsoStored: List<StoredCredential> = emptyList(),
+        withoutOriginalData: Boolean = false,
     ): Presented {
-        val wallet = wallet(credential, staleLocations, alsoStored)
+        val wallet = wallet(credential, staleLocations, alsoStored, withoutOriginalData)
         val preview = WalletPresentationHandler.previewPresentationStateless(
             wallet = wallet,
             request = PreviewPresentationRequest(REQUEST_URL),
@@ -255,11 +265,12 @@ class WalletNestedSdJwtPresentationTest {
 
     @Test
     fun w3cWrapperPathDoesNotPresentAnUnrequestedNestedVcDisclosure() = runTest {
-        val credential = sdJwt(typ = "JWT") {
+        fun credential(outerDecoy: Boolean) = sdJwt(typ = "JWT") {
             buildJsonObject {
                 put("iss", "https://issuer.example")
                 put("_sd_alg", "sha-256")
                 putJsonObject("vc") {
+                    if (outerDecoy) putJsonArray("_sd") { add("decoy-digest") }
                     putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
                     putJsonArray("type") { add("VerifiableCredential") }
                     put("issuer", "https://issuer.example")
@@ -272,19 +283,24 @@ class WalletNestedSdJwtPresentationTest {
                 }
             }
         }
-        assertIs<W3C11>(CredentialParser.detectAndParse(credential).second)
-
         // The parser locates Secret relative to the outer vc, at vc.credentialSubject.given_name.
-        // Requesting the outer subject must not also select that distinct nested extension.
-        val presented = present(
-            request(claim("credentialSubject", "given_name"), format = "jwt_vc_json"),
-            credential = credential,
-            did = "did:example:holder",
-        )
-        assertEquals(JsonPrimitive("Alice"), presented.previewValue("\"credentialSubject\".\"given_name\""))
-        val vc = presented.verifierView.getValue("vc").jsonObject
-        assertEquals(json("""{"given_name":"Alice"}"""), vc.getValue("credentialSubject"))
-        assertFalse("given_name" in vc.getValue("vc").jsonObject.getValue("credentialSubject").jsonObject)
+        // Requesting the outer subject must not also select that distinct nested extension, also when a stored
+        // credential without its original payload recovers it from the issuer JWT and the outer vc holds a decoy.
+        for ((outerDecoy, withoutOriginalData) in listOf(false to false, true to false, true to true)) {
+            val sdJwt = credential(outerDecoy)
+            assertIs<W3C11>(CredentialParser.detectAndParse(sdJwt).second)
+            val presented = present(
+                request(claim("credentialSubject", "given_name"), format = "jwt_vc_json"),
+                credential = sdJwt,
+                did = "did:example:holder",
+                withoutOriginalData = withoutOriginalData,
+            )
+            val case = "outerDecoy=$outerDecoy, withoutOriginalData=$withoutOriginalData"
+            assertEquals(JsonPrimitive("Alice"), presented.previewValue("\"credentialSubject\".\"given_name\""), case)
+            val vc = presented.verifierView.getValue("vc").jsonObject
+            assertEquals(json("""{"given_name":"Alice"}"""), vc.getValue("credentialSubject"), case)
+            assertFalse("given_name" in vc.getValue("vc").jsonObject.getValue("credentialSubject").jsonObject, case)
+        }
     }
 
     @Test
