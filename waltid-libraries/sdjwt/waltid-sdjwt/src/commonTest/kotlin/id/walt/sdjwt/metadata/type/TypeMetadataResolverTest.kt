@@ -93,4 +93,14 @@ class TypeMetadataResolverTest {
         val spaced = (TypeMetadataFixture.ROOT + " ").encodeToByteArray()
         assertContentEquals(spaced, PublishedTypeMetadata.fromRetrieved("https://types.example/sca", spaced).bytes())
     }
+
+    @Test fun profileExtensionsUseTheChildValueWithoutDeepMerging() = runTest {
+        val parent = "https://types.example/base"
+        val result = resolver(mapOf(
+            parent to """{"vct":"$parent","category":"parent","transaction_data_types":{"allowed":{},"removed":{}}}""".encodeToByteArray(),
+            leaf to """{"vct":"$leaf","extends":"$parent","category":"child","transaction_data_types":{"allowed":{}}}""".encodeToByteArray(),
+        )).resolve(leaf)
+        assertEquals(JsonPrimitive("child"), result.effective["category"])
+        assertEquals(setOf("allowed"), result.effective.getValue("transaction_data_types").jsonObject.keys)
+    }
 }

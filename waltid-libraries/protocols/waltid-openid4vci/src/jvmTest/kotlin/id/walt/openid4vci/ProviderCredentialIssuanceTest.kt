@@ -40,6 +40,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.metadata.type.PublishedTypeMetadata
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
@@ -391,6 +392,35 @@ class ProviderCredentialIssuanceTest {
         }
     }
 
+    @Test
+    fun `metadata pins and final payload validation apply to every signing input`() = runBlocking {
+        val publication = PublishedTypeMetadata.create(buildJsonObject { put("vct", "https://issuer.example/identity") })
+        val mapping = buildJsonObject {
+            put("given_name", "Mapped name")
+            put("vct", "https://attacker.example/type")
+            put("vct#integrity", "sha256-attacker")
+        }
+        for (legacy in listOf(false, true)) {
+            var validated = 0
+            val input = CredentialIssuanceInput(buildJsonObject { put("given_name", "Original name") })
+                .withTypeMetadata(publication).withSdJwtPayloadValidator { payload ->
+                    assertEquals(JsonPrimitive("Mapped name"), payload["given_name"])
+                    assertEquals(JsonPrimitive("https://issuer.example"), payload["iss"])
+                    assertEquals(JsonPrimitive(publication.vct), payload["vct"])
+                    assertEquals(JsonPrimitive(publication.integrity), payload["vct#integrity"])
+                    assertNotNull(payload["cnf"])
+                    validated++
+                }
+            val payloads = timeMappedPayloads(issueTimeMappedSdJwt(mapping, "2026-09-10T17:43:28Z", count = 2, legacy = legacy, input = input))
+            assertEquals(2, validated)
+            payloads.forEach { assertEquals(JsonPrimitive(publication.integrity), it["vct#integrity"]) }
+            val rejected = input.withSdJwtPayloadValidator { throw IllegalArgumentException("Inherited schema rejected payload") }
+            assertEquals("Inherited schema rejected payload", assertFailsWith<IllegalArgumentException> {
+                issueTimeMappedSdJwt(mapping, "2026-09-10T17:43:28Z", legacy = legacy, input = rejected)
+            }.message)
+        }
+    }
+
     private fun timeMappedPayloads(result: CredentialResponseResult): List<JsonObject> =
         assertNotNull(assertIs<CredentialResponseResult.Success>(result).response.credentials).map {
             SDJwt.parse(it.credential.jsonPrimitive.content).fullPayload
@@ -402,6 +432,7 @@ class ProviderCredentialIssuanceTest {
         count: Int = 1,
         legacy: Boolean = false,
         round: Boolean = true,
+        input: CredentialIssuanceInput = CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }),
     ): CredentialResponseResult {
         suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -413,7 +444,7 @@ class ProviderCredentialIssuanceTest {
             credentialResponseEncryption = null,
         )
         val batch = CredentialIssuanceBatch(
-            inputs = List(count) { CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }) },
+            inputs = List(count) { input },
             bindings = List(count) { index ->
                 VerifiedJwtProof("", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null).binding(index)
             },
