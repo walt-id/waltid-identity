@@ -999,7 +999,7 @@ class DefaultOAuth2Provider(
             requiresClientAttestation(accepted.request.accessTokenClientId, accepted.request.anonymousPreAuthorizedAccess)
         context.deferredIssuance.validateClaim(
             context.sessionId, context.transaction, required, attestationStatusValidator,
-            legacyClientStatusRequired(accepted), config.keyAttestationStatusPolicy().requireStatusReference,
+            legacyClientStatusRequired(accepted), legacyKeyStatusRequired(accepted),
         )
         null
     } catch (e: DeferredProtocolException) {
@@ -1008,6 +1008,11 @@ class DefaultOAuth2Provider(
 
     private suspend fun legacyClientStatusRequired(accepted: AcceptedCredentialRequest): Boolean {
         if (accepted.request.anonymousPreAuthorizedAccess) return false
+        // A captured policy (including optional omission) is sufficient on its own. Do not
+        // resolve today's client-authentication keys or configuration for an accepted snapshot.
+        if (accepted.clientAttestation?.status != null ||
+            accepted.clientAttestation == null && accepted.clientAttestationRequired != null
+        ) return false
         return resolveClientAuthentication(
             ClientAuthenticationEndpoint.TOKEN,
             accepted.request.accessTokenClientId?.let { mapOf("client_id" to listOf(it)) }.orEmpty(), emptyMap(),
@@ -1015,9 +1020,15 @@ class DefaultOAuth2Provider(
             .any { it.statusPolicy.requireStatusReference }
     }
 
+    private suspend fun legacyKeyStatusRequired(accepted: AcceptedCredentialRequest): Boolean {
+        val proofs = accepted.proofs
+        if (proofs != null && proofs.none { it.keyAttestation != null && it.keyAttestation.status == null }) return false
+        return config.keyAttestationStatusPolicy().requireStatusReference
+    }
+
     private suspend fun acceptedStatusError(accepted: AcceptedCredentialRequest): CredentialError? =
         attestationStatusValidator.validate(accepted.statusEvidence(
-            legacyClientStatusRequired(accepted), config.keyAttestationStatusPolicy().requireStatusReference,
+            legacyClientStatusRequired(accepted), legacyKeyStatusRequired(accepted),
         )).error()
 
     private suspend fun verifyCredentialProofs(

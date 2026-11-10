@@ -259,6 +259,40 @@ class DeferredAttestationStatusTest {
         }
     }
 
+    @Test fun capturedClientStatusDoesNotRebuildCurrentClientAuthentication() = runTest {
+        assertCapturedStatusSkipsLegacyPolicies(clientPolicy = true)
+    }
+
+    @Test fun capturedKeyStatusDoesNotResolveTheLegacyKeyPolicy() = runTest {
+        assertCapturedStatusSkipsLegacyPolicies(clientPolicy = false)
+    }
+
+    private suspend fun assertCapturedStatusSkipsLegacyPolicies(clientPolicy: Boolean) {
+        for (optionalOmission in listOf(false, true)) {
+            val fixture = fixture()
+            if (optionalOmission) {
+                val absent = VerifiedAttestationStatus(capturedAt = time.epochSeconds, policy = AttestationStatusPolicy())
+                val accepted = fixture.accepted.copy(
+                    clientAttestation = fixture.accepted.clientAttestation!!.copy(status = absent),
+                    proofs = fixture.accepted.proofs!!.map { it.copy(keyAttestation = it.keyAttestation!!.copy(status = absent)) },
+                )
+                fixture.state = fixture.state.copy(transactions = mapOf("transaction" to fixture.transaction().copy(accepted = accepted)))
+            }
+            val base = createTestConfig().copy(attestationStatusResolver = AttestationStatusResolver { token(fixture.signer) })
+            val config = if (clientPolicy) base.copy(clientAuthenticationServiceResolver = ClientAuthenticationServiceResolver { _, _, _ ->
+                error("Captured evidence must not rebuild current client-authentication trust")
+            }) else base.copy(keyAttestationStatusPolicy = {
+                error("Captured evidence must not resolve a legacy policy")
+            })
+            val claim = fixture.claim()
+            val response = buildOAuth2Provider(config).createDeferredCredentialResponse(
+                DeferredCredentialRequest("transaction"), fixture.response,
+                DeferredCredentialResponseContext("offer", claim, fixture.deferred),
+            )
+            assertIs<CredentialResponseResult.Success>(response)
+        }
+    }
+
     private suspend fun fixture(): Fixture {
         val signer = key("attester")
         val holders = (0..2).map { key("holder-$it") }
