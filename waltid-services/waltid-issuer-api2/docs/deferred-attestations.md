@@ -149,11 +149,22 @@ including for a previously signed checkpoint. Coroutine cancellation propagates,
 cleanup performed outside cancellation. Cancellation after a durable signing checkpoint
 preserves its reservation for F5 recovery. The offer's absolute deadline still limits retries.
 
-An INVALID WIA during OAuth client authentication is a client-authentication failure. Malformed or missing required
-KA status evidence is a proof-validation failure. Before a transaction is accepted, an initial
-Credential Request whose status lookup is unavailable remains an HTTP 503 technical failure;
-it creates no transaction or successful issuance. Token-endpoint OAuth error mapping is
-separate from the deferred-poll response contract.
+An INVALID WIA during OAuth client authentication is a client-authentication failure. Malformed
+or missing required KA status evidence is a proof-validation failure. For a deferred flow,
+the initial Credential Request must pass every proof signature, nonce, lifetime and key-binding
+check before its evidence is captured. The provider then checks status once for the complete
+batch, deduplicating shared list URIs. A confirmed INVALID attestation prevents acceptance;
+suspended or unverifiable status may remain pending. If delivery is still blocked, the service
+persists the transaction and returns HTTP 202 with its new `transaction_id` and a positive
+`interval`, even when the offer was already marked ready. Every later delivery rechecks the
+original status references and lifetimes. Direct proof-verifier callers retain status checking.
+
+Without a deferred flow, suspended or unverifiable status encountered during credential-proof
+verification returns HTTP 400 `credential_request_denied`; no transaction is created. Attestation-status credential errors do not use
+`temporarily_unavailable`, HTTP 503 or a `Retry-After` header. At the token endpoint, suspended
+or unverifiable WIA status returns HTTP 400 `temporarily_unavailable` without issuing tokens.
+The client may retry the same unexpired grant with a fresh client-attestation proof of possession
+after status becomes usable. This token-specific mapping does not change PAR error handling.
 
 At credential-request acceptance, a confirmed INVALID WIA or KA emits the existing
 format-specific credential-request failure notification with `credential_request_denied`,
