@@ -65,10 +65,7 @@ class SdJwtVcCredentialHandler(
             sdJwtTypeHeader = configuration.format.value,
             verifiedBinding = instance.verifiedBinding,
             validatePayload = instance.input.sdJwtPayloadValidator,
-            sdJwtCredentialClaims = instance.input.sdJwtTypeMetadata?.let { metadata ->
-                require(metadata.vct == vct) { "Type metadata publication does not match the issued VCT" }
-                JsonObject(mapOf("vct#integrity" to JsonPrimitive(metadata.integrity)))
-            },
+            sdJwtCredentialClaims = instance.typeMetadataClaims(vct),
         )
     }
 
@@ -101,16 +98,17 @@ class SdJwtVcCredentialHandler(
             sdJwtTypeHeader = configuration.format.value,
             verifiedBinding = instance.verifiedBinding,
             validatePayload = instance.input.sdJwtPayloadValidator,
-            sdJwtCredentialClaims = instance.input.sdJwtTypeMetadata?.let { metadata ->
-                require(metadata.vct == vct) { "Type metadata publication does not match the issued VCT" }
-                JsonObject(mapOf("vct#integrity" to JsonPrimitive(metadata.integrity)))
-            },
+            sdJwtCredentialClaims = instance.typeMetadataClaims(vct),
         )
     }
 
-    /**
-     * Issues one credential per ordered batch instance.
-     */
+    private fun CredentialIssuanceInstance.typeMetadataClaims(vct: String): JsonObject? =
+        input.sdJwtTypeMetadata?.let { metadata ->
+            require(metadata.vct == vct) { "Type metadata publication does not match the issued VCT" }
+            JsonObject(mapOf("vct#integrity" to JsonPrimitive(metadata.integrity)))
+        }
+
+    /** Issues one credential per ordered batch instance. */
     private suspend fun sign(
         configuration: CredentialConfiguration,
         issuanceBatch: CredentialIssuanceBatch,

@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
+import id.walt.sdjwt.metadata.type.PublishedTypeMetadata
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -25,11 +26,11 @@ data class CredentialIssuanceInput(
     fun withSdJwtPayloadValidator(validator: (JsonObject) -> Unit): CredentialIssuanceInput =
         copy().also { it.metadataBinding = metadataBinding; it.payloadValidator = validator }
 
-    private var metadataBinding: id.walt.sdjwt.metadata.type.PublishedTypeMetadata? = null
-    val sdJwtTypeMetadata: id.walt.sdjwt.metadata.type.PublishedTypeMetadata? get() = metadataBinding
+    private var metadataBinding: PublishedTypeMetadata? = null
+    val sdJwtTypeMetadata: PublishedTypeMetadata? get() = metadataBinding
 
     /** Bind server-owned publication bytes without placing authoritative pins in caller claim data. */
-    fun withTypeMetadata(metadata: id.walt.sdjwt.metadata.type.PublishedTypeMetadata?): CredentialIssuanceInput =
+    fun withTypeMetadata(metadata: PublishedTypeMetadata?): CredentialIssuanceInput =
         copy().also { it.metadataBinding = metadata; it.payloadValidator = payloadValidator }
 }
 

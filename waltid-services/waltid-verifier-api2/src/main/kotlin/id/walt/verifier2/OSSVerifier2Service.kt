@@ -7,6 +7,7 @@ import id.walt.verifier2.data.externalReaderOutcomeUpdate
 import id.walt.verifier2.data.ExternalReaderDeviceResponse
 import id.walt.verifier2.handlers.ExternalReaderVerification
 import io.ktor.server.plugins.BadRequestException
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
@@ -180,13 +181,13 @@ object Verifier2Service {
     fun Route.registerRoute(
         repository: VerificationSessionRepository = defaultSessionRepository,
         surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
-    ) = registerRoute(repository, surfaces) { id.walt.policies2.vc.policies.PolicyExecutionContext.Empty }
+    ) = registerRoute(repository, surfaces) { PolicyExecutionContext.Empty }
 
     /** Host-owned policy services are created per response, including metadata transport snapshots. */
     fun Route.registerRoute(
         repository: VerificationSessionRepository = defaultSessionRepository,
         surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
-        policyContextFactory: () -> id.walt.policies2.vc.policies.PolicyExecutionContext,
+        policyContextFactory: () -> PolicyExecutionContext,
     ) {
         require(surfaces.isNotEmpty()) { "At least one verifier route surface must be registered" }
         val updateSessionCallback = updateSessionCallback(repository)

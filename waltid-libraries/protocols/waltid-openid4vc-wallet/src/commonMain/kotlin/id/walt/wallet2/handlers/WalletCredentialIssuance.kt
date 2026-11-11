@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import io.ktor.client.HttpClient
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.DigitalCredential
@@ -196,7 +197,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
     proofRequired: Boolean,
     holderBindingKnown: Boolean = true,
     expectedConfiguration: CredentialConfiguration? = null,
-    typeMetadataHttpClient: io.ktor.client.HttpClient? = null,
+    typeMetadataHttpClient: HttpClient? = null,
 ): List<StoredCredential> {
     require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
     require(!proofRequired || rawCredentials.size <= bindings.size) { "Issuer returned more credentials than requested" }

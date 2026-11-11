@@ -138,12 +138,12 @@ class OpenId4VciController(
 
             route.get(".well-known/vct/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), io.ktor.http.ContentType.Application.Json)
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), ContentType.Application.Json)
             }
 
             route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), io.ktor.http.ContentType.Application.Json)
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), ContentType.Application.Json)
             }
         }
 
