@@ -80,5 +80,16 @@ class PkceServiceTest {
             assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to listOf("x".repeat(43))), binding)).error.error)
     }
 
+    @Test
+    fun tokenRejectsDowngradesUnknownRecordsAndInvalidStoredBindings() {
+        for (invalidBinding in listOf(null, PkceBinding.NotUsed, PkceBinding.Challenge("", "S256"),
+            PkceBinding.Challenge(challenge, "plain"), PkceBinding.Challenge(challenge, "s256"))) {
+            assertEquals(OAuthErrorCodes.INVALID_GRANT,
+                assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to listOf(verifier)), invalidBinding)).error.error)
+        }
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(emptyMap(), null)).error.error)
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
