@@ -14,14 +14,24 @@ Both `keyAttestationConfig.statusPolicy` and the OAuth client-attestation method
 ```json
 {
   "requireStatusReference": false,
-  "maximumListAgeSeconds": 300
+  "maximumListAgeSeconds": null
 }
 ```
 
 The policy is independent of requiring WIA or KA. Supplied status references are checked
 with either policy setting. `requireStatusReference: true` also rejects an omitted
-reference. Existing profiles that permit omission retain that behavior. The maximum age
-must be positive and is measured from the signed status-list `iat`.
+reference. Existing profiles that permit omission retain that behavior.
+
+`maximumListAgeSeconds` is optional and defaults to `null`. Omitting it or supplying
+`null` adds no age limit measured from the signed status-list `iat`. An issuer operator
+can configure a positive number, such as `300`, when its attestation profile requires a
+stricter freshness bound. Choose that value to match the status provider's republication
+guarantees; fetching an unchanged signed list does not renew its `iat`. The wallet cannot
+choose or weaken this policy in a Credential Request or deferred poll.
+
+Signature, signer authorization, signed validity, TTL and status checks always run for
+supplied references, including when no additional age limit is configured. Attestation
+expiry checks also remain automatic and independent of this policy.
 
 Supported attestations carry a JWT Token Status List reference:
 
@@ -40,8 +50,9 @@ be in bounds. Signed dates and optional positive numeric TTL are validated.
 
 ## Signer trust
 
-Version 1 authorizes the same public key that verified the original attestation. Static
-JWK, key-reference and x509 verification capture that key after successful verification.
+The supported trust profile authorizes the same public key that verified the original
+attestation. Static JWK, key-reference and x509 verification capture that key after
+successful verification.
 KA verification retains the public material used for the successful signature check; it
 does not retrieve the key again from a provider for status capture.
 The wallet confirmation/holder key, an `iss` string, an arbitrary response JWK or a response
@@ -101,14 +112,15 @@ Each checkpoint fetches the signed lists afresh. No acceptance-time VALID decisi
 previous checkpoint's list authorizes later delivery, even if its signed TTL remains valid.
 Within one checkpoint, HTTP requests are deduplicated by URI, while every index and each
 accepted attester's signer authorization are checked. The signed `exp` and `nbf`, when
-present, must permit current use. `iat` must not be in the future or older than the accepted
-`maximumListAgeSeconds`. `exp` and `ttl` may be omitted; the finite local age bound still
-applies. TTL is a cache limit rather than an independent token expiry. This adapter keeps
-no status-list cache between checkpoints. Within a checkpoint, each deduplicated list's
+present, must permit current use. `iat` must not be in the future. When the accepted
+`maximumListAgeSeconds` is non-null, the list must also be no older than that bound;
+omission or `null` imposes no additional age cap. `exp` and `ttl` may be omitted under
+the supported profile. TTL is a cache limit rather than an independent token expiry.
+This adapter keeps no status-list cache between checkpoints. Within a checkpoint, each deduplicated list's
 resolution time is retained. After all lookups and signature checks finish, every list is
-checked again against signed expiry, local maximum age, validity start and resolution time
-plus TTL. If any bound no longer permits use, the checkpoint returns a retryable technical
-failure and the next claim fetches new lists.
+checked again against signed expiry, any configured maximum age, validity start and
+resolution time plus TTL. If any bound no longer permits use, the checkpoint returns a
+retryable technical failure and the next claim fetches new lists.
 
 Checks run at acceptance, before signing, after signing, before response preparation and
 after encryption. Cached responses undergo the same delivery checks after recovery or
@@ -167,7 +179,13 @@ legacy marker, rather than being rewritten as a known optional omission. Newly c
 transactions retain their accepted policy through configuration changes, refresh and
 resubmission. Only uncaptured legacy evidence consults current client-authentication trust and legacy
 KA policy callbacks. New snapshots, including known optional omission, use their captured
-policy without resolving current attester keys for status checks. Unknown evidence versions fail closed.
+policy without resolving current attester keys for status checks.
+
+Newly captured status evidence uses version 2 and retains its optional age limit, including
+no additional age cap, through refresh, resubmission and restart. Existing version 1
+snapshots keep their explicit age limit or the original implicit 300-second limit when
+that field was omitted. Changing the service default does not weaken those transactions.
+Unknown evidence versions fail closed.
 
 Auto-revoke scheduling, Wallet Provider minting, fresh-attestation replacement and
 TrustDecision changes remain separate work.
