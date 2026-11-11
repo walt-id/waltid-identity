@@ -1,6 +1,9 @@
 {
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
@@ -13,7 +16,7 @@
     "@unocss/nuxt": "^66.4.2",
     "nuxt": "^3.10.0",
     "@nuxt/icon": "^1.11.0",
-    "nuxt-security": "2.6.0",
+    "nuxt-security": "2.7.0",
     "tailwindcss": "^4.1.11",
     "vue-router": "^4.5.1"
   },
