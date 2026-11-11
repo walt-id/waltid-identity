@@ -154,6 +154,20 @@ class ProviderPkceFlowTest {
         assertIs<AccessTokenResponseResult.Success>(redeem(fixture, code, listOf(verifier)))
     }
 
+    @Test
+    fun oldOrMalformedCodeRecordsFailClosed() = runTest {
+        for (removeBinding in listOf(true, false)) {
+            val fixture = Fixture()
+            val code = authorize(fixture.provider, null)
+            val document = Json.parseToJsonElement(fixture.codes.records.getValue(code)).jsonObject
+            fixture.codes.records[code] = if (removeBinding) JsonObject(document - "pkceBinding").toString() else "{}"
+            assertEquals(OAuthErrorCodes.INVALID_GRANT,
+                assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, code, null)).error.error)
+            assertEquals(0, fixture.tokenCalls)
+            assertEquals(0, fixture.refreshWrites)
+        }
+    }
+
     private fun authorizationForm(verifier: String?) = mapOf(
         "response_type" to listOf("code"), "client_id" to listOf("wallet"), "redirect_uri" to listOf(redirect),
     ) + (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)), "code_challenge_method" to listOf("S256")) } ?: emptyMap())
