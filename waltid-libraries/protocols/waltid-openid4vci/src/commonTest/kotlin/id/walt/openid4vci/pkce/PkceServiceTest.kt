@@ -1,6 +1,8 @@
 package id.walt.openid4vci.pkce
 
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,10 +31,10 @@ class PkceServiceTest {
     }
 
     @Test
-    fun optionalAndRequiredPoliciesAreEnforcedAtBothStages() {
+    fun optionalAndRequiredPoliciesAreEnforcedAtBothStages() = runTest {
         assertEquals(PkceAuthorizationResult.Success(PkceBinding.NotUsed), service.validateAuthorizationRequest(emptyMap()))
         assertIs<PkceVerificationResult.Success>(service.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed))
-        val required = PkceService(PkceServiceConfig(requirePkce = true))
+        val required = PkceService(PkceServiceConfig(requirePkce = { true }))
         assertEquals(OAuthErrorCodes.INVALID_REQUEST,
             assertIs<PkceAuthorizationResult.Failure>(required.validateAuthorizationRequest(emptyMap())).error.error)
         assertEquals(OAuthErrorCodes.INVALID_GRANT,
@@ -42,7 +44,7 @@ class PkceServiceTest {
     }
 
     @Test
-    fun authorizationRejectsMalformedRepeatedAndUnsupportedParameters() {
+    fun authorizationRejectsMalformedRepeatedAndUnsupportedParameters() = runTest {
         val invalid = listOf(
             parameters() + ("code_challenge" to emptyList()),
             parameters() + ("code_challenge" to listOf(challenge, "")),
@@ -63,7 +65,7 @@ class PkceServiceTest {
     }
 
     @Test
-    fun tokenRejectsMissingDuplicateAndInvalidVerifiers() {
+    fun tokenRejectsMissingDuplicateAndInvalidVerifiers() = runTest {
         assertEquals(OAuthErrorCodes.INVALID_REQUEST,
             assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(emptyMap(), binding)).error.error)
         for (values in listOf(emptyList(), listOf(verifier, ""), listOf("", verifier))) {
@@ -81,7 +83,7 @@ class PkceServiceTest {
     }
 
     @Test
-    fun tokenRejectsDowngradesUnknownRecordsAndInvalidStoredBindings() {
+    fun tokenRejectsDowngradesUnknownRecordsAndInvalidStoredBindings() = runTest {
         for (invalidBinding in listOf(null, PkceBinding.NotUsed, PkceBinding.Challenge("", "S256"),
             PkceBinding.Challenge(challenge, "plain"), PkceBinding.Challenge(challenge, "s256"))) {
             assertEquals(OAuthErrorCodes.INVALID_GRANT,
@@ -92,7 +94,7 @@ class PkceServiceTest {
     }
 
     @Test
-    fun configurationIsExplicitAndMethodsAreExtensible() {
+    fun configurationIsExplicitAndMethodsAreExtensible() = runTest {
         val custom = object : PkceCodeChallengeMethod {
             override val name = "test-method"
             override fun isValidChallenge(codeChallenge: String) = codeChallenge == verifier
