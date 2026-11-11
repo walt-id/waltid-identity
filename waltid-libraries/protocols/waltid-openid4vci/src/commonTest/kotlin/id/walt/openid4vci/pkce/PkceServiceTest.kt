@@ -122,6 +122,27 @@ class PkceServiceTest {
     }
 
     @Test
+    fun requirementIsResolvedForEachRequestAndNeverDisablesAnExistingBinding() = runTest {
+        var required = false
+        val configured = PkceService(PkceServiceConfig(requirePkce = {
+            yield()
+            required
+        }))
+        assertIs<PkceAuthorizationResult.Success>(configured.validateAuthorizationRequest(emptyMap()))
+        assertIs<PkceVerificationResult.Success>(configured.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed))
+        required = true
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+            assertIs<PkceAuthorizationResult.Failure>(configured.validateAuthorizationRequest(emptyMap())).error.error)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<PkceVerificationResult.Failure>(configured.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed)).error.error)
+        required = false
+        assertIs<PkceVerificationResult.Success>(configured.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed))
+        assertIs<PkceVerificationResult.Failure>(configured.verifyTokenRequest(emptyMap(), binding))
+        assertIs<PkceVerificationResult.Success>(configured.verifyTokenRequest(
+            mapOf("code_verifier" to listOf(verifier)), binding))
+    }
+
+    @Test
     fun bindingsRoundTripWithAnExplicitNonPkceState() {
         for (value in listOf(PkceBinding.NotUsed, binding)) {
             assertEquals(value, Json.decodeFromString<PkceBinding>(Json.encodeToString<PkceBinding>(value)))
