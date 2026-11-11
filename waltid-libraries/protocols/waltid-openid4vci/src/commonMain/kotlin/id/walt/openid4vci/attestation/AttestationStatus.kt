@@ -20,15 +20,24 @@ import kotlin.time.Instant
 @Serializable
 data class AttestationStatusPolicy(
     val requireStatusReference: Boolean = false,
-    val maximumListAgeSeconds: Long = 300,
+    /** Optional extra age bound from signed iat; signed validity checks apply with either setting. */
+    val maximumListAgeSeconds: Long? = null,
 ) {
-    init { require(maximumListAgeSeconds > 0) }
+    init {
+        require(maximumListAgeSeconds == null || maximumListAgeSeconds > 0) {
+            "maximumListAgeSeconds must be positive when configured"
+        }
+    }
 }
 
 @Serializable
 data class AttestationStatusReference(val uri: String, val index: Int)
 
-/** Private, verified evidence. Null evidence means an older verifier did not capture status. */
+/**
+ * Private, verified evidence. Null evidence means an older verifier did not capture status.
+ * Version defaults to 1 for old snapshots that omitted it; new verification captures version 2.
+ * Version 1 retains its implicit 300-second age limit, while version 2 permits an absent age cap.
+ */
 @Serializable
 data class VerifiedAttestationStatus(
     val version: Int = 1,
@@ -79,7 +88,7 @@ internal fun captureAttestationStatus(
     require(!policy.requireStatusReference || reference != null) { "Attestation status reference is required" }
     require(signer == null || !Jwk.containsPrivateMaterial(signer)) { "Attester context must contain only public material" }
     return VerifiedAttestationStatus(
-        capturedAt = now.epochSeconds, policy = policy, reference = reference,
+        version = 2, capturedAt = now.epochSeconds, policy = policy, reference = reference,
         attesterIssuer = (payload["iss"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
         attesterPublicJwk = signer,
     )
@@ -119,7 +128,7 @@ class AttestationStatusValidator(
             val next = if (accepted == null) {
                 // Explicit compatibility: legacy optional-status profiles retain F5 lifetime checks.
                 if (required) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
-            } else if (accepted.version != 1) {
+            } else if (accepted.version !in 1..2) {
                 AttestationStatusOutcome.MISSING_EVIDENCE
             } else if (accepted.reference == null) {
                 if (accepted.policy.requireStatusReference || required) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
@@ -159,7 +168,7 @@ class AttestationStatusValidator(
     private data class ListValidity(
         val claims: IetfStatusListToken.Validity,
         val resolvedAt: Instant,
-        val maximumAgeSeconds: Long,
+        val maximumAgeSeconds: Long?,
     ) {
         fun isValidAt(current: Instant): Boolean = claims.isValidAt(current, resolvedAt, maximumAgeSeconds)
     }
@@ -174,7 +183,11 @@ class AttestationStatusValidator(
         val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
         val reference = requireNotNull(evidence.reference)
         val list = IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
-        val validity = ListValidity(list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
+        // Version 1 could omit its former default of 300. A new configuration default must
+        // not weaken that transaction's accepted policy when its snapshot is restored.
+        val maximumAgeSeconds = if (evidence.version == 1) evidence.policy.maximumListAgeSeconds ?: 300L
+            else evidence.policy.maximumListAgeSeconds
+        val validity = ListValidity(list.validity, resolved.resolvedAt, maximumAgeSeconds)
         require(validity.isValidAt(now())) { "Status list is stale, expired or not yet valid" }
         val outcome = when (list.readStatus(reference.index)) {
             0u -> AttestationStatusOutcome.VALID

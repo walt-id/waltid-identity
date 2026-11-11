@@ -47,7 +47,8 @@ class DeferredAttestationStatusTest {
     }.let { JsonObject(it.filterKeys { name -> name !in omit }) }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", typ) })
 
     private suspend fun evidence(signer: Key, index: Int = 0) = VerifiedAttestationStatus(
-        capturedAt = time.epochSeconds, policy = AttestationStatusPolicy(requireStatusReference = true),
+        version = 2, capturedAt = time.epochSeconds,
+        policy = AttestationStatusPolicy(requireStatusReference = true, maximumListAgeSeconds = 300),
         reference = AttestationStatusReference(uri, index), attesterIssuer = "https://attester.example",
         attesterPublicJwk = signer.exportPublicJwkObject(),
     )
@@ -114,7 +115,7 @@ class DeferredAttestationStatusTest {
         val validator = AttestationStatusValidator(AttestationStatusResolver { error("No network request expected") })
         assertEquals(AttestationStatusOutcome.VALID, validator.validate(listOf(optional to false, null to false)).outcome)
         assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE, validator.validate(listOf(null to true)).outcome)
-        assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE, validator.validate(listOf(optional.copy(version = 2) to false)).outcome)
+        assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE, validator.validate(listOf(optional.copy(version = 3) to false)).outcome)
         assertFailsWith<IllegalArgumentException> { captureAttestationStatus(empty, null, AttestationStatusPolicy(true), time) }
         for (status in listOf(JsonNull, JsonObject(emptyMap()), buildJsonObject {
             put("status_list", buildJsonObject { put("idx", -1); put("uri", uri) })

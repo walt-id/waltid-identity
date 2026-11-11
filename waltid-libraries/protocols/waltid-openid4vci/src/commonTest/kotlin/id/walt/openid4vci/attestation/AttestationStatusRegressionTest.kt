@@ -45,8 +45,8 @@ class AttestationStatusRegressionTest {
             val validator = AttestationStatusValidator(AttestationStatusResolver { uri ->
                 if (uri == kaUri) { now += 2.seconds; second } else first
             }, now = { now })
-            fun evidence(uri: String) = VerifiedAttestationStatus(capturedAt = start.epochSeconds,
-                policy = AttestationStatusPolicy(true, if (uri == wiaUri && boundary == "maximum-age") 1 else 300),
+            fun evidence(uri: String) = VerifiedAttestationStatus(version = 2, capturedAt = start.epochSeconds,
+                policy = AttestationStatusPolicy(true, if (uri == wiaUri && boundary == "maximum-age") 1 else null),
                 reference = AttestationStatusReference(uri, 0), attesterPublicJwk = publicJwk)
             val result = validator.validate(listOf(evidence(wiaUri) to false, evidence(kaUri) to false))
             assertEquals(if (boundary == "still-valid") AttestationStatusOutcome.VALID else AttestationStatusOutcome.UNVERIFIABLE,
