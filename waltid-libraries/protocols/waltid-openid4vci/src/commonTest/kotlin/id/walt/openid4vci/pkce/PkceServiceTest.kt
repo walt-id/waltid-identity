@@ -143,6 +143,16 @@ class PkceServiceTest {
     }
 
     @Test
+    fun requirementResolutionFailuresAndCancellationPropagate() = runTest {
+        for (failure in listOf(IllegalStateException("policy unavailable"),
+            kotlinx.coroutines.CancellationException("request cancelled"))) {
+            val configured = PkceService(PkceServiceConfig(requirePkce = { throw failure }))
+            assertEquals(failure, kotlin.test.assertFails { configured.validateAuthorizationRequest(emptyMap()) })
+            assertEquals(failure, kotlin.test.assertFails { configured.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed) })
+        }
+    }
+
+    @Test
     fun bindingsRoundTripWithAnExplicitNonPkceState() {
         for (value in listOf(PkceBinding.NotUsed, binding)) {
             assertEquals(value, Json.decodeFromString<PkceBinding>(Json.encodeToString<PkceBinding>(value)))
