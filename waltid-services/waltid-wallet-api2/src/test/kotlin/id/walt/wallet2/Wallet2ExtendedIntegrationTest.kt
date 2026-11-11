@@ -23,7 +23,7 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
-import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -323,15 +323,7 @@ class Wallet2ExtendedIntegrationTest {
         )
 
         // Set up the same in-process issuer as in the E2E test
-        val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
-            private val records = java.util.concurrent.ConcurrentHashMap<String, PreAuthorizedCodeRecord>()
-            override suspend fun save(record: PreAuthorizedCodeRecord) {
-                if (records.containsKey(record.code)) throw DuplicateCodeException(); records[record.code] = record
-            }
-
-            override suspend fun get(code: String) = records[code]
-            override suspend fun consume(code: String) = records.remove(code)
-        }
+        val preAuthRepo: PreAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
         val authCodeRepo: AuthorizationCodeRepository = object : AuthorizationCodeRepository {
             private val records = java.util.concurrent.ConcurrentHashMap<String, AuthorizationCodeRecord>()
             override suspend fun save(record: AuthorizationCodeRecord) {

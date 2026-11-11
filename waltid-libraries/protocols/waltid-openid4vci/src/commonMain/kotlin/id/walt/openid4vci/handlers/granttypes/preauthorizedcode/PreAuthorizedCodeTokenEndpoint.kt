@@ -12,7 +12,10 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.preauthorized.hashTxCode
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodePolicy
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemption
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.redeem
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
@@ -35,7 +38,7 @@ import kotlin.time.Instant
 /**
  * Token endpoint handler for the OpenID4VCI pre-authorized code grant.
  *
- * Consumes a stored pre-authorized code session. The business logic will be modified, is just the skeleton that is working.
+ * Redeems a stored pre-authorized code at most once.
  */
 class PreAuthorizedCodeTokenEndpoint(
     private val codeRepository: PreAuthorizedCodeRepository,
@@ -43,6 +46,7 @@ class PreAuthorizedCodeTokenEndpoint(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val refreshTokenIssuer: RefreshTokenIssuer,
     private val refreshTokenLifetimeSeconds: Long = DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS,
+    private val policy: PreAuthorizedCodePolicy = PreAuthorizedCodePolicy(),
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -114,27 +118,22 @@ class PreAuthorizedCodeTokenEndpoint(
             )
         }
 
-        if (!record.txCodeValue.isNullOrBlank() &&
-            providedTxCode != null &&
-            record.txCodeValue != hashTxCode(providedTxCode)
-        ) {
-            return AccessTokenResponseResult.Failure(
+        val consumed = when (val redemption = codeRepository.redeem(
+            record, providedTxCode?.let(::hashTxCode), policy.maxFailedTxCodeAttempts,
+        )) {
+            is PreAuthorizedCodeRedemption.Redeemed -> redemption.record
+            PreAuthorizedCodeRedemption.WrongTxCode -> return AccessTokenResponseResult.Failure(
                 resolvedRequest,
-                OAuthError(
-                    error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "tx_code is invalid",
-                ),
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, "tx_code is invalid"),
             )
-        }
-
-        val consumed = codeRepository.consume(code)
-            ?: return AccessTokenResponseResult.Failure(
+            PreAuthorizedCodeRedemption.Invalid -> return AccessTokenResponseResult.Failure(
                 resolvedRequest,
                 OAuthError(
                     error = OAuthErrorCodes.INVALID_GRANT,
                     description = "Pre-authorized code is invalid or has already been used",
                 ),
             )
+        }
 
         val session = consumed.session.copy()
         val updatedRequest = resolvedRequest

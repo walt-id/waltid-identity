@@ -12,6 +12,7 @@ import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHand
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.pkce.PkceServiceConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodePolicy
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -85,6 +86,7 @@ data class OAuth2ProviderConfig(
     val attestationStatusResolver: AttestationStatusResolver? = null,
 
     val notificationRequestValidator: NotificationRequestValidator = DefaultNotificationRequestValidator(),
+    val preAuthorizedCodePolicy: PreAuthorizedCodePolicy = PreAuthorizedCodePolicy(),
 )
 
 data class PushedAuthorizationConfig(
