@@ -125,14 +125,14 @@ class DefaultOAuth2Provider(
                 AuthorizationRequestResult.Failure(resolution.error)
         }
 
-    private fun validateAuthorizationParameters(parameters: Map<String, List<String>>): AuthorizationRequestResult =
+    private suspend fun validateAuthorizationParameters(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val result = config.authorizationRequestValidator.validate(parameters)) {
             is AuthorizationRequestResult.Failure -> result
             is AuthorizationRequestResult.Success -> validatePkce(result.request)
                 ?.let { AuthorizationRequestResult.Failure(it) } ?: result
         }
 
-    private fun validatePkce(request: AuthorizationRequest): OAuthError? {
+    private suspend fun validatePkce(request: AuthorizationRequest): OAuthError? {
         if (ResponseType.CODE.value !in request.responseTypes) return null
         return when (val result = pkceService.validateAuthorizationRequest(request.requestForm)) {
             is PkceAuthorizationResult.Success -> null
