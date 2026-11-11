@@ -100,6 +100,7 @@ class Issuer2RefreshAuthorizationTest {
         // Start at the persisted authorization-code boundary; no external login/browser is needed.
         val code = UUID.randomUUID().toString()
         authorizationCodes.save(DefaultAuthorizationCodeRecord(
+            pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
             code = code, clientId = "issuer2-wallet-test", redirectUri = "https://wallet.example/callback",
             grantedScopes = setOf("openid", a.authorizationScope, b.authorizationScope), grantedAudience = emptySet(),
             session = DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt)),
