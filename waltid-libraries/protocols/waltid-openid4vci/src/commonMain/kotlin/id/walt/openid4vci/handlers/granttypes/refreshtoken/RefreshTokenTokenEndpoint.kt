@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.granttypes.refreshtoken
 
+import id.walt.openid4vci.clientauth.attestation.clientAuthenticationClaims
 import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
@@ -199,6 +200,7 @@ class RefreshTokenTokenEndpoint(
                     issuedAt = now,
                     expiresAt = accessTokenExpiresAt,
                     additional = buildMap {
+                        putAll(session.clientAuthenticationClaims())
                         putAll(updatedRequest.dpopAccessTokenClaims())
                         credentialAuthorization?.let { putAll(it.tokenClaims()) }
                         effectiveClientId?.let { put("client_id", it) }

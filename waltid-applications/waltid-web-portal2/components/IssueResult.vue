@@ -19,7 +19,6 @@ const walletUrl = config.public.walletUrl as string;
         "
         :value="session.result.value.credentialOffer"
         :wallet-url="walletUrl"
-        wallet-path="api/siop/initiateIssuance"
       />
 
       <div
