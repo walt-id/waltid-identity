@@ -8,7 +8,8 @@ import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 internal object ItbQrFixtures {
-    fun qr(value: String): ByteArray = png(QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, 350, 350))
+    fun qr(value: String, width: Int = 350, height: Int = 350): ByteArray =
+        png(QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, width, height))
 
     fun png(bits: BitMatrix): ByteArray = png(BufferedImage(bits.width, bits.height, BufferedImage.TYPE_INT_RGB).apply {
         for (y in 0 until height) for (x in 0 until width) setRGB(x, y, if (bits[x, y]) 0 else 0xffffff)
