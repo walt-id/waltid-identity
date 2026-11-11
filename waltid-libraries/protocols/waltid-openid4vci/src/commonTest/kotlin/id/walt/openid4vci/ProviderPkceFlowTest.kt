@@ -89,6 +89,25 @@ class ProviderPkceFlowTest {
         }
     }
 
+    @Test
+    fun codesSharingOneSessionRetainTheirOwnPkceState() = runTest {
+        val fixture = Fixture()
+        val secondVerifier = "b".repeat(64)
+        val first = authorize(fixture.provider, verifier)
+        val second = authorize(fixture.provider, secondVerifier)
+        val mustStillRequireVerifier = authorize(fixture.provider, verifier)
+        val withoutPkce = authorize(fixture.provider, null)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, mustStillRequireVerifier, listOf("x".repeat(43)))).error.error)
+        assertIs<AccessTokenResponseResult.Success>(redeem(fixture, first, listOf(verifier)))
+        assertIs<AccessTokenResponseResult.Success>(redeem(fixture, second, listOf(secondVerifier)))
+        assertIs<AccessTokenResponseResult.Success>(redeem(fixture, withoutPkce, null))
+        val downgrade = authorize(fixture.provider, null)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, downgrade, listOf(verifier))).error.error)
+        assertEquals(3, fixture.tokenCalls)
+    }
+
     private fun authorizationForm(verifier: String?) = mapOf(
         "response_type" to listOf("code"), "client_id" to listOf("wallet"), "redirect_uri" to listOf(redirect),
     ) + (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)), "code_challenge_method" to listOf("S256")) } ?: emptyMap())
