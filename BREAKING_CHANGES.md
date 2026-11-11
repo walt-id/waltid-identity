@@ -1,5 +1,12 @@
 # Breaking changes since 0.3.1
 
+## OpenID4VCI pre-authorized code redemption
+
+- Custom `PreAuthorizedCodeRepository` implementations must replace `consume` with an atomic
+  `compareAndSetRedemptionState` and persist `PreAuthorizedCodeRedemptionState` through the grant's original expiry.
+- New issuer2 pre-authorized offers require a positive lifetime within the configured maximum (300 seconds by default).
+  Existing grants retain their stored expiry. A rolling deployment enforces the new attempt limit after all token handlers are upgraded.
+
 ## waltid-sdjwt payload validation
 
 - `SDPayload.createSDPayload` (all overloads) now processes the payload it creates as a verifier would (RFC 9901 §7.1) and throws `SDJwtVerificationException` with the reason when that fails, for example a non-array `_sd`, `_sd` or `...` used as a claim name, or duplicate claim names. It previously returned a payload that verifiers reject.

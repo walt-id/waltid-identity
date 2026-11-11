@@ -16,6 +16,8 @@ class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
 
     override suspend fun save(record: PreAuthorizedCodeRecord) {
         synchronized(lock) {
+            val now = Clock.System.now()
+            records.values.removeAll { it.expiresAt <= now }
             if (records.containsKey(record.code)) {
                 throw DuplicateCodeException()
             }
@@ -25,12 +27,23 @@ class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
 
     override suspend fun get(code: String): PreAuthorizedCodeRecord? =
         synchronized(lock) {
-            records[code]
+            records[code]?.takeIf { it.isRedeemableAt(Clock.System.now()) }
         }
 
-    override suspend fun consume(code: String): PreAuthorizedCodeRecord? =
+    override suspend fun compareAndSetRedemptionState(
+        expected: PreAuthorizedCodeRecord,
+        replacement: PreAuthorizedCodeRedemptionState,
+    ): Boolean =
         synchronized(lock) {
-            val record = records.remove(code) ?: return@synchronized null
-            record.takeIf { Clock.System.now() <= it.expiresAt }
+            val record = records[expected.code]
+            if (record !== expected || !expected.isRedeemableAt(Clock.System.now())) return@synchronized false
+            val grant = (expected as? RecordWithRedemptionState)?.grant ?: expected
+            records[expected.code] = RecordWithRedemptionState(grant, replacement)
+            true
         }
+
+    private class RecordWithRedemptionState(
+        val grant: PreAuthorizedCodeRecord,
+        override val redemptionState: PreAuthorizedCodeRedemptionState,
+    ) : PreAuthorizedCodeRecord by grant
 }

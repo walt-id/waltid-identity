@@ -4,6 +4,8 @@ import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -12,13 +14,15 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 class ConfiguredPreAuthorizedCodeRepositoryTest {
 
     @Test
-    fun saveGetRejectDuplicateAndConsumeIsOneTime() = runTest {
+    fun saveGetRejectDuplicateAndRedemptionIsOneTime() = runTest {
         val repository = ConfiguredPreAuthorizedCodeRepository()
         val record = testRecord()
 
@@ -29,25 +33,26 @@ class ConfiguredPreAuthorizedCodeRepositoryTest {
             repository.save(record)
         }
 
-        assertEquals(record, repository.consume(record.code))
+        assertTrue(repository.compareAndSetRedemptionState(record, redeemed))
         assertNull(repository.get(record.code))
-        assertNull(repository.consume(record.code))
+        assertFalse(repository.compareAndSetRedemptionState(record, redeemed))
     }
 
     @Test
-    fun concurrentConsumeReturnsRecordOnce() = runTest {
+    fun concurrentClaimHasOneWinner() = runTest {
         val repository = ConfiguredPreAuthorizedCodeRepository()
         val record = testRecord()
 
         repository.save(record)
 
         val results = (1..20)
-            .map { async(Dispatchers.Default) { repository.consume(record.code) } }
+            .map { async(Dispatchers.Default) { repository.compareAndSetRedemptionState(record, redeemed) } }
             .awaitAll()
 
-        assertEquals(1, results.count { it != null })
-        assertEquals(record, results.filterNotNull().single())
+        assertEquals(1, results.count { it })
     }
+
+    private val redeemed = PreAuthorizedCodeRedemptionState(0, PreAuthorizedCodeStatus.REDEEMED)
 
     private fun testRecord() = DefaultPreAuthorizedCodeRecord(
         code = "pre-auth-code-${Clock.System.now().toEpochMilliseconds()}",

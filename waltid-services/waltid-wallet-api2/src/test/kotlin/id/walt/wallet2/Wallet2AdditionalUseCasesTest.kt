@@ -29,7 +29,7 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
-import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -317,15 +317,7 @@ class Wallet2AdditionalUseCasesTest {
             proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
         )
 
-        val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
-            private val r = java.util.concurrent.ConcurrentHashMap<String, PreAuthorizedCodeRecord>()
-            override suspend fun save(record: PreAuthorizedCodeRecord) {
-                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
-            }
-
-            override suspend fun get(code: String) = r[code]
-            override suspend fun consume(code: String) = r.remove(code)
-        }
+        val preAuthRepo: PreAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
         val authCodeRepo: AuthorizationCodeRepository = object : AuthorizationCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, AuthorizationCodeRecord>()
             override suspend fun save(record: AuthorizationCodeRecord) {
@@ -645,15 +637,7 @@ class Wallet2AdditionalUseCasesTest {
             proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
         )
 
-        val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
-            private val r = java.util.concurrent.ConcurrentHashMap<String, PreAuthorizedCodeRecord>()
-            override suspend fun save(record: PreAuthorizedCodeRecord) {
-                if (r.containsKey(record.code)) throw DuplicateCodeException(); r[record.code] = record
-            }
-
-            override suspend fun get(code: String) = r[code]
-            override suspend fun consume(code: String) = r.remove(code)
-        }
+        val preAuthRepo: PreAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
         val authCodeRepo: AuthorizationCodeRepository = object : AuthorizationCodeRepository {
             private val r = java.util.concurrent.ConcurrentHashMap<String, AuthorizationCodeRecord>()
             override suspend fun save(record: AuthorizationCodeRecord) {
