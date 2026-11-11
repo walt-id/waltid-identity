@@ -152,8 +152,10 @@ class KeyAttestationVerifier(
             throw KeyAttestationServiceException("Key attestation policy evaluation failed", e)
         }
         if (!accepted) throw invalidCredentialProof("Key attestation rejected by issuer policy")
-        AttestationStatusValidator(options.statusResolver, now).validate(listOf(status to options.statusPolicy.requireStatusReference))
-            .error()?.let { throw DeferredProtocolException(it) }
+        if (!context.deferKeyAttestationStatusValidation) {
+            AttestationStatusValidator(options.statusResolver, now).validate(listOf(status to options.statusPolicy.requireStatusReference))
+                .error()?.let { throw DeferredProtocolException(it) }
+        }
         if (!lifetime.keyAttestationValidAt(now())) throw invalidCredentialProof("Key attestation expired during status resolution")
         return verified
     }

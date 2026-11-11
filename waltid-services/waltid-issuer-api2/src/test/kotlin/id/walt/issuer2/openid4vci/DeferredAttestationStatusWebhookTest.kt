@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicIntegerArray
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.*
 import kotlin.time.Clock
 
@@ -69,6 +70,18 @@ class DeferredAttestationStatusWebhookTest {
     @Test fun suspendedAttestationRetriesWithoutPermanentDenialNotification() = verify(false, "wia", "suspended")
     @Test fun authorizationCodeLookupFailureReturnsPendingAndCanRetry() = verify(true, "wia", "unavailable")
     @Test fun authorizationCodeSuspensionReturnsPendingAndCanRetry() = verify(true, "wia", "suspended")
+    @Test fun preAuthorizedInitialWiaOutageCreatesPendingTransaction() = verify(false, "wia", "initial-unavailable")
+    @Test fun authorizationCodeInitialWiaOutageCreatesPendingTransaction() = verify(true, "wia", "initial-unavailable")
+    @Test fun preAuthorizedInitialKaOutageCreatesPendingTransaction() = verify(false, "ka", "initial-unavailable")
+    @Test fun authorizationCodeInitialKaOutageCreatesPendingTransaction() = verify(true, "ka", "initial-unavailable")
+    @Test fun preAuthorizedInitialWiaSuspensionCreatesPendingTransaction() = verify(false, "wia", "initial-suspended")
+    @Test fun authorizationCodeInitialWiaSuspensionCreatesPendingTransaction() = verify(true, "wia", "initial-suspended")
+    @Test fun preAuthorizedInitialKaSuspensionCreatesPendingTransaction() = verify(false, "ka", "initial-suspended")
+    @Test fun authorizationCodeInitialKaSuspensionCreatesPendingTransaction() = verify(true, "ka", "initial-suspended")
+    @Test fun preAuthorizedTokenOutageReturns400AndFreshPopCanRetry() = verify(false, "wia", "token-unavailable")
+    @Test fun authorizationCodeTokenOutageReturns400AndFreshPopCanRetry() = verify(true, "wia", "token-unavailable")
+    @Test fun preAuthorizedTokenSuspensionReturns400AndFreshPopCanRetry() = verify(false, "wia", "token-suspended")
+    @Test fun authorizationCodeTokenSuspensionReturns400AndFreshPopCanRetry() = verify(true, "wia", "token-suspended")
 
     private fun assertDenialNotification(offerId: String) {
         val failure = notificationServer.awaitEvent(offerId, IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED)
@@ -146,9 +159,6 @@ class DeferredAttestationStatusWebhookTest {
                 put("status", publisher.reference("wia", 0))
                 putJsonObject("cnf") { put("jwk", instanceJwk) }
             }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("oauth-client-attestation+jwt")))
-            val pop = instance.signJws(buildJsonObject {
-                put("aud", resolved.authorizationServerMetadata.issuer); put("iat", now); put("jti", UUID.randomUUID().toString())
-            }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("oauth-client-attestation-pop+jwt")))
             val code = UUID.randomUUID().toString()
             if (authorizationCode) {
                 val session = assertNotNull(repository.get(offer.offerId))
@@ -161,7 +171,7 @@ class DeferredAttestationStatusWebhookTest {
                     DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt)), session.expiresAt,
                 ))
             }
-            val tokenResponse = client.submitForm(assertNotNull(resolved.authorizationServerMetadata.tokenEndpoint), Parameters.build {
+            val tokenParameters = Parameters.build {
                 append("client_id", clientId)
                 if (authorizationCode) {
                     append("grant_type", "authorization_code"); append("code", code)
@@ -170,11 +180,36 @@ class DeferredAttestationStatusWebhookTest {
                     append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
                     append("pre-authorized_code", assertNotNull(resolved.offer.grants?.preAuthorizedCode?.preAuthorizedCode))
                 }
-            }) {
-                header("OAuth-Client-Attestation", wia); header("OAuth-Client-Attestation-PoP", pop)
             }
+            suspend fun requestToken(): io.ktor.client.statement.HttpResponse {
+                val pop = instance.signJws(buildJsonObject {
+                    put("aud", resolved.authorizationServerMetadata.issuer); put("iat", Clock.System.now().epochSeconds)
+                    put("jti", UUID.randomUUID().toString())
+                }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("oauth-client-attestation-pop+jwt")))
+                return client.submitForm(assertNotNull(resolved.authorizationServerMetadata.tokenEndpoint), tokenParameters) {
+                    header("OAuth-Client-Attestation", wia); header("OAuth-Client-Attestation-PoP", pop)
+                }
+            }
+            if (stage.startsWith("token-")) {
+                publisher.unavailable.set(stage == "token-unavailable")
+                if (stage == "token-suspended") publisher.states.set(0, 2)
+                val failed = requestToken()
+                assertEquals(HttpStatusCode.BadRequest, failed.status, failed.bodyAsText())
+                val body = failed.body<JsonObject>()
+                assertEquals("temporarily_unavailable", body.getValue("error").jsonPrimitive.content)
+                assertFalse("access_token" in body)
+                val stored = assertNotNull(repository.get(offer.offerId))
+                assertTrue(stored.deferredState!!.transactions.isEmpty())
+                assertTrue(stored.issuanceResults.isEmpty())
+                publisher.unavailable.set(false); publisher.states.set(0, 0)
+            }
+            val tokenResponse = requestToken()
             assertEquals(HttpStatusCode.OK, tokenResponse.status, tokenResponse.bodyAsText())
             val accessToken = tokenResponse.body<JsonObject>().getValue("access_token").jsonPrimitive.content
+            if (stage.startsWith("token-")) {
+                assertTrue(accessToken.isNotBlank(), "The original grant must still be redeemable with a fresh PoP")
+                return@testApplication
+            }
             val nonce = client.post(assertNotNull(resolved.issuerMetadata.nonceEndpoint)).body<JsonObject>().getValue("c_nonce")
             val proofs = List(3) { index ->
                 val holder = JWKKey.generate(KeyType.secp256r1)
@@ -192,6 +227,11 @@ class DeferredAttestationStatusWebhookTest {
             }
             val revokedIndex = if (kind == "wia") 0 else 3
             if (stage == "acceptance") publisher.states.set(revokedIndex, 1)
+            if (stage.startsWith("initial-")) {
+                assertEquals(HttpStatusCode.NoContent, client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status)
+                if (stage == "initial-unavailable") publisher.unavailableKind.set(kind)
+                else publisher.states.set(revokedIndex, 2)
+            }
             val pending = client.post(resolved.issuerMetadata.credentialEndpoint) {
                 bearerAuth(accessToken); contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
@@ -211,8 +251,20 @@ class DeferredAttestationStatusWebhookTest {
                 return@testApplication
             }
             assertEquals(HttpStatusCode.Accepted, pending.status, pending.bodyAsText())
-            val transactionId = pending.body<JsonObject>().getValue("transaction_id").jsonPrimitive.content
-            assertEquals(HttpStatusCode.NoContent, client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status)
+            val initialBody = pending.body<JsonObject>()
+            val transactionId = initialBody.getValue("transaction_id").jsonPrimitive.content
+            assertTrue(initialBody.getValue("interval").jsonPrimitive.long > 0)
+            assertFalse("credentials" in initialBody); assertFalse("error" in initialBody)
+            if (stage.startsWith("initial-")) {
+                val stored = assertNotNull(repository.get(offer.offerId))
+                val transaction = stored.deferredState!!.transactions.getValue(transactionId)
+                assertNull(transaction.claimId); assertNull(transaction.response)
+                assertFalse(transaction.denied); assertFalse(transaction.consumed)
+                assertEquals(3, transaction.accepted.proofs!!.size)
+                assertTrue(transaction.accepted.proofs!!.all { it.keyAttestation?.status != null })
+                assertNotNull(transaction.accepted.clientAttestation?.status)
+                assertTrue(stored.issuanceResults.isEmpty())
+            } else assertEquals(HttpStatusCode.NoContent, client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status)
             when (stage) {
                 "collection" -> publisher.states.set(revokedIndex, 1)
                 "unavailable" -> publisher.unavailable.set(true)
@@ -222,7 +274,7 @@ class DeferredAttestationStatusWebhookTest {
                 bearerAuth(accessToken); contentType(ContentType.Application.Json)
                 setBody(buildJsonObject { put("transaction_id", transactionId) })
             }
-            if (stage in setOf("unavailable", "suspended")) {
+            if (stage in setOf("unavailable", "suspended") || stage.startsWith("initial-")) {
                 val blocked = poll()
                 assertEquals(HttpStatusCode.Accepted, blocked.status, blocked.bodyAsText())
                 val pendingBody = blocked.body<JsonObject>()
@@ -236,7 +288,7 @@ class DeferredAttestationStatusWebhookTest {
                 val stored = assertNotNull(repository.get(offer.offerId))
                 assertTrue(stored.issuanceResults.isEmpty())
                 assertFalse(stored.deferredState!!.transactions.getValue(transactionId).denied)
-                publisher.unavailable.set(false); publisher.states.set(revokedIndex, 0)
+                publisher.unavailable.set(false); publisher.unavailableKind.set(null); publisher.states.set(revokedIndex, 0)
                 val retried = poll()
                 assertEquals(HttpStatusCode.OK, retried.status, retried.bodyAsText())
                 assertEquals(3, retried.body<JsonObject>().getValue("credentials").jsonArray.size)
@@ -259,14 +311,15 @@ class DeferredAttestationStatusWebhookTest {
     private class StatusPublisher(private val wia: Key, private val ka: Key) {
         val states = AtomicIntegerArray(4)
         val unavailable = AtomicBoolean()
+        val unavailableKind = AtomicReference<String?>(null)
         private lateinit var base: String
         private val server = embeddedServer(CIO, host = "127.0.0.1", port = 0) {
             routing {
                 get("/{kind}") {
-                    if (unavailable.get()) {
+                    val kind = call.parameters["kind"]!!
+                    if (unavailable.get() || unavailableKind.get() == kind) {
                         call.respondText("Unavailable", status = HttpStatusCode.ServiceUnavailable)
                     } else {
-                        val kind = call.parameters["kind"]!!
                         val entries = if (kind == "wia") byteArrayOf(states.get(0).toByte()) else ByteArray(3) { states.get(it + 1).toByte() }
                         val now = Clock.System.now().epochSeconds
                         val jwt = (if (kind == "wia") wia else ka).signJws(buildJsonObject {

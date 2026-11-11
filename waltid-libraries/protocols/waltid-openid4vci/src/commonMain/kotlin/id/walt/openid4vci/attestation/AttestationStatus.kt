@@ -63,8 +63,8 @@ data class AttestationStatusResult(val outcome: AttestationStatusOutcome) {
         AttestationStatusOutcome.VALID -> null
         AttestationStatusOutcome.INVALID -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation has been revoked")
         AttestationStatusOutcome.MISSING_EVIDENCE -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Required attestation status evidence is missing")
-        AttestationStatusOutcome.SUSPENDED -> CredentialError("temporarily_unavailable", "Accepted attestation is suspended; retry the same transaction", retryAfterSeconds = 1)
-        AttestationStatusOutcome.UNVERIFIABLE -> CredentialError("temporarily_unavailable", "Attestation status could not be verified; retry the same transaction", retryAfterSeconds = 1)
+        AttestationStatusOutcome.SUSPENDED -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Attestation is suspended", retryAfterSeconds = 1)
+        AttestationStatusOutcome.UNVERIFIABLE -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Attestation status could not be verified", retryAfterSeconds = 1)
     }
 }
 

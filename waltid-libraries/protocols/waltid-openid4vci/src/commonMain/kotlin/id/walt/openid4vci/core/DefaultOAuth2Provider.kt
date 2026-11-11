@@ -514,7 +514,7 @@ class DefaultOAuth2Provider(
 
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
-            status = oauthJsonErrorStatus(error),
+            status = if (error.error == OAuthErrorCodes.TEMPORARILY_UNAVAILABLE) 400 else oauthJsonErrorStatus(error),
             headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
@@ -580,7 +580,9 @@ class DefaultOAuth2Provider(
                 throw CredentialProofValidationException(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, "Invalid response encryption parameters")
             }
         }
-        val verification = when (val result = verifyCredentialProofs(request, configuration, proofValidationContext)) {
+        val verification = when (val result = verifyCredentialProofs(
+            request, configuration, proofValidationContext, deferKeyAttestationStatusValidation = true,
+        )) {
             is CredentialProofVerification.Success -> result
             is CredentialProofVerification.Failure -> throw DeferredProtocolException(result.error)
         }
@@ -602,7 +604,10 @@ class DefaultOAuth2Provider(
                 CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid",
             )
         }
-        acceptedStatusError(accepted)?.let { throw DeferredProtocolException(it) }
+        // Acceptance captures verified proofs, not permission to deliver. Temporary status
+        // failures may remain pending; every delivery still checks the original evidence.
+        val status = acceptedStatus(accepted)
+        if (status.permanentlyDenied) throw DeferredProtocolException(requireNotNull(status.error()))
         if (!deferredAttestationLifetimeValidator.isValid(accepted, Clock.System.now(), required)) {
             throw CredentialProofValidationException(
                 CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence expired during status resolution",
@@ -903,9 +908,8 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = if (error.retryAfterSeconds != null) 503 else 400,
-            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA +
-                (error.retryAfterSeconds?.let { mapOf("Retry-After" to it.toString()) } ?: emptyMap()),
+            status = 400,
+            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             retryable = error.retryAfterSeconds != null,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
@@ -1048,15 +1052,18 @@ class DefaultOAuth2Provider(
         return config.keyAttestationStatusPolicy().requireStatusReference
     }
 
-    private suspend fun acceptedStatusError(accepted: AcceptedCredentialRequest): CredentialError? =
+    private suspend fun acceptedStatus(accepted: AcceptedCredentialRequest): AttestationStatusResult =
         attestationStatusValidator.validate(accepted.statusEvidence(
             legacyClientStatusRequired(accepted), legacyKeyStatusRequired(accepted),
-        )).error()
+        ))
+
+    private suspend fun acceptedStatusError(accepted: AcceptedCredentialRequest): CredentialError? = acceptedStatus(accepted).error()
 
     private suspend fun verifyCredentialProofs(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         proofValidationContext: CredentialProofValidationContext?,
+        deferKeyAttestationStatusValidation: Boolean = false,
     ): CredentialProofVerification {
         if (request is PreparedCredentialRequest) {
             deferredCredentialError(request)?.let { return CredentialProofVerification.Failure(it) }
@@ -1076,7 +1083,7 @@ class DefaultOAuth2Provider(
             val verification = config.credentialProofVerifier.verify(
                 credentialRequest = request,
                 credentialConfiguration = configuration,
-                context = context,
+                context = context.copy(deferKeyAttestationStatusValidation = deferKeyAttestationStatusValidation),
             )
             validateCredentialProofResult(collection, verification)
             CredentialProofVerification.Success(verification.bindings, verification.proofs)

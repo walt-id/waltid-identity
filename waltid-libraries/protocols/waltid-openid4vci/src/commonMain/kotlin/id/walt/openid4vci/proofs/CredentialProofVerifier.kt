@@ -38,6 +38,8 @@ data class CredentialProofValidationContext(
     val nonceValidation: CredentialNonceValidationContext? = null,
     val batchCredentialIssuance: BatchCredentialIssuance? = null,
     val keyAttestation: KeyAttestationVerificationOptions? = null,
+    /** The provider checks captured status once after verifying the complete acceptance batch. */
+    internal val deferKeyAttestationStatusValidation: Boolean = false,
 ) {
     init {
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
