@@ -152,7 +152,7 @@ data class OpenId4VciModule(
                     }
                 )
             } ?: JwtRefreshTokenVerifier(verificationKeyResolver)
-            val pkceServiceConfig = PkceServiceConfig()
+            val pkceServiceConfig = PkceServiceConfig(requirePkce = { config.requirePkce })
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
