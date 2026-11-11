@@ -103,10 +103,15 @@ leave initialized case reports as `NOT_RUN`; they do not start or retry a sessio
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
-select another interaction. It reads short inline values or downloads the owned session's offer/request/script
-input directly from its execution page. The portal exposes Copy instead of Download
-for short inline values; the bridge reads only that exact row and never accesses
-the clipboard. It reads declarative
+select another interaction. For URL-based presentations it downloads the owned
+session's **VP request QR code** and decodes only QR format. This uses the actual
+wallet invocation even when ITB's separately generated request text contains a
+false EAN/UPC decode. It never falls back to that text after a QR error. The
+existing case-specific invocation-scheme check and wallet verification still apply.
+QR downloads are limited to 1 MiB and image dimensions to 2048 by 2048 pixels.
+Offers and scripts use short inline values or downloads from the exact labelled
+row. The portal exposes Copy instead of Download for short inline values; the
+bridge never accesses the clipboard. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed
 immediately after reading. The deployed authorization-code issuer returns a
 direct redirect; the adapter validates its destination, state and code before
