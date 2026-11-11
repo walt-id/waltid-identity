@@ -1,9 +1,10 @@
 package id.walt.openid4vci.pkce
 
-/** Immutable method registry shared by runtime validation and authorization-server metadata. */
+/** Method registry and request-scoped requirement shared by the OAuth provider's PKCE checks. */
 class PkceServiceConfig(
     methods: List<PkceCodeChallengeMethod> = listOf(S256PkceCodeChallengeMethod),
-    val requirePkce: Boolean = false,
+    /** Evaluated when validating an authorization request or redeeming a code issued without PKCE. */
+    val requirePkce: suspend () -> Boolean = { false },
 ) {
     val methods: List<PkceCodeChallengeMethod> = methods.toList()
     val supportedCodeChallengeMethods: List<String> = this.methods.map { it.name }
