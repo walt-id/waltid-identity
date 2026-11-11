@@ -41,5 +41,26 @@ class PkceServiceTest {
         assertIs<PkceVerificationResult.Success>(required.verifyTokenRequest(mapOf("code_verifier" to listOf(verifier)), binding))
     }
 
+    @Test
+    fun authorizationRejectsMalformedRepeatedAndUnsupportedParameters() {
+        val invalid = listOf(
+            parameters() + ("code_challenge" to emptyList()),
+            parameters() + ("code_challenge" to listOf(challenge, "")),
+            parameters() + ("code_challenge_method" to emptyList()),
+            parameters() + ("code_challenge_method" to listOf("S256", "")),
+            parameters() + ("code_challenge_method" to listOf("plain")),
+            parameters() + ("code_challenge_method" to listOf("s256")),
+            parameters() + ("code_challenge_method" to listOf("unknown")),
+            parameters() + ("code_challenge_method" to listOf("")),
+            parameters() - "code_challenge_method",
+            parameters() - "code_challenge",
+        ) + listOf("", "a".repeat(42), "a".repeat(44), "a".repeat(42) + "=", ".".repeat(43), "é".repeat(43))
+            .map { parameters() + ("code_challenge" to listOf(it)) }
+        for (form in invalid) {
+            val failure = assertIs<PkceAuthorizationResult.Failure>(service.validateAuthorizationRequest(form), form.toString())
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST, failure.error.error)
+        }
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
