@@ -104,7 +104,7 @@ The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
 select another interaction. For URL-based presentations it downloads the owned
-session's **VP request QR code** and decodes only QR format. This uses the actual
+session's **Credential QR code** and decodes only QR format. This uses the actual
 wallet invocation even when ITB's separately generated request text contains a
 false EAN/UPC decode. It never falls back to that text after a QR error. The
 existing case-specific invocation-scheme check and wallet verification still apply.

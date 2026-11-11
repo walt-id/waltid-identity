@@ -116,7 +116,7 @@ class ItbPortalBridge(
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
             text.contains("VP request") -> ItbWalletInteraction.Presentation(
-                Url(ItbPresentationQr.decode(download(row("VP request QR code")))),
+                Url(ItbPresentationQr.decode(download(row("Credential QR code")))),
             )
             text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
                 preview("TS12 payment Digital Credentials API presentation request"),
