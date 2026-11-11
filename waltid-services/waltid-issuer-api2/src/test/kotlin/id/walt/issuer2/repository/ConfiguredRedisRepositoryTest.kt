@@ -86,7 +86,10 @@ class ConfiguredRedisRepositoryTest {
         val refreshTokenRepository = ConfiguredRefreshTokenRepository()
 
         val session = testSession(suffix)
-        val authorizationCode = testAuthorizationCode(suffix)
+        val authorizationCode = testAuthorizationCode(suffix).copy(
+            pkceBinding = id.walt.openid4vci.pkce.PkceBinding.Challenge(
+                "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "S256"),
+        )
         val preAuthorizedCode = testPreAuthorizedCode(suffix)
         val pushedAuthorizationRequest = testPushedAuthorizationRequest(suffix)
         val refreshToken = testRefreshToken(suffix)
@@ -101,7 +104,8 @@ class ConfiguredRedisRepositoryTest {
             assertNull(sessionRepository.take(session.sessionId))
 
             authorizationCodeRepository.save(authorizationCode)
-            assertEquals(authorizationCode, authorizationCodeRepository.consume(authorizationCode.code))
+            val restartedAuthorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
+            assertEquals(authorizationCode, restartedAuthorizationCodeRepository.consume(authorizationCode.code))
             assertNull(authorizationCodeRepository.consume(authorizationCode.code))
 
             preAuthorizedCodeRepository.save(preAuthorizedCode)
@@ -222,6 +226,7 @@ class ConfiguredRedisRepositoryTest {
     )
 
     private fun testAuthorizationCode(suffix: String) = DefaultAuthorizationCodeRecord(
+        pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
         code = "redis-auth-code-$suffix",
         clientId = "wallet-client",
         redirectUri = "https://wallet.example/callback",
