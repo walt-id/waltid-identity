@@ -6,6 +6,7 @@ import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
 import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.Url
+import java.nio.ByteBuffer
 import java.util.regex.Pattern
 import java.nio.file.Files
 
@@ -113,7 +114,10 @@ class ItbPortalBridge(
                 require(session.testCase != "tc_vci_007" || pin != null) { "The ITB interaction did not supply its transaction code" }
                 ItbWalletInteraction.Offer(Url(preview("VCI request")), pin)
             }
-            text.contains("VP request") -> ItbWalletInteraction.Presentation(Url(preview("VP request")))
+            // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
+            text.contains("VP request") -> ItbWalletInteraction.Presentation(
+                Url(ItbPresentationQr.decode(download(row("VP request QR code")))),
+            )
             text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
                 preview("TS12 payment Digital Credentials API presentation request"),
             )
@@ -124,11 +128,15 @@ class ItbPortalBridge(
         }
     }
 
-    private fun preview(label: String): String {
+    private fun row(label: String): Locator {
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
-        val row = dialog.locator("app-any-content-view").filter(
+        return dialog.locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
+    }
+
+    private fun preview(label: String): String {
+        val row = row(label)
         val control = row.locator("button[ngbtooltip=Download], button[ngbtooltip=Copy]")
         step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
             control.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
@@ -140,6 +148,10 @@ class ItbPortalBridge(
                 require(it.length in 1..100) { "The ITB inline interaction has an unexpected size" }
             }
         }
+        return Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(download(row))).toString().trim()
+    }
+
+    private fun download(row: Locator): ByteArray {
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
         val download = step(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT) {
             // The portal may prepare this one file after its interaction dialog appears.
@@ -153,7 +165,7 @@ class ItbPortalBridge(
         return try {
             val path = download.path()
             require(Files.size(path) <= 1024 * 1024) { "The ITB interaction exceeds the size limit" }
-            Files.readString(path).trim()
+            Files.readAllBytes(path)
         } finally {
             download.delete()
         }
