@@ -41,7 +41,9 @@ import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceValidationResult
-import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
+import id.walt.openid4vci.pkce.Pkce
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
@@ -77,6 +79,57 @@ import kotlin.time.Duration.Companion.minutes
 class Issuer2AttestationChallengeTest {
     @AfterEach
     fun clear() = clearIssuer2TestEnvironment()
+
+    @Test
+    fun `PKCE token exchange is enforced by the provider through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val verifier = id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs.PKCE_VERIFIER_EXAMPLE
+        val cases = listOf(
+            listOf(verifier) to null,
+            null to "invalid_request",
+            listOf(verifier, "") to "invalid_request",
+            listOf("") to "invalid_grant",
+            listOf("x".repeat(43)) to "invalid_grant",
+            listOf("é".repeat(43)) to "invalid_grant",
+        )
+        for ((values, expectedError) in cases) {
+            val code = fixture.authorizationCode(verifier)
+            val response = client.token(fixture, Parameters.build {
+                append("grant_type", "authorization_code"); append("client_id", "wallet")
+                append("redirect_uri", REDIRECT); append("code", code)
+                values?.forEach { append("code_verifier", it) }
+            }, null)
+            if (expectedError == null) response.assertToken() else {
+                assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+                assertEquals(expectedError, response.body<JsonObject>().string("error"))
+                assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+            }
+        }
+    }
+
+    @Test
+    fun `PKCE downgrade and invalid PAR challenge are rejected through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val code = fixture.authorizationCode()
+        val response = client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code)
+            append("code_verifier", "x".repeat(43))
+        }, null)
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertEquals("invalid_grant", response.body<JsonObject>().string("error"))
+        val headers = fixture.headers(null)
+        val par = client.submitForm("/openid4vci/par", Parameters.build {
+            appendAll(parParameters()); append("code_challenge", "bad"); append("code_challenge_method", "S256")
+        }) {
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION, headers.attestationJwt)
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, headers.popJwt)
+        }
+        assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
+        assertEquals("invalid_request", par.body<JsonObject>().string("error"))
+    }
 
     @Test
     fun `production module starts with challenges and includes endpoint in signed discovery`() = testApplication {
@@ -390,7 +443,8 @@ class Issuer2AttestationChallengeTest {
             override suspend fun take(sessionId: String) = records.remove(sessionId)
         })
         val metadata = MetadataService(config, metadataConfig, profiles, sessions,
-            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported)
+            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
+            pkceServiceConfig = module.pkceServiceConfig)
         val notifications = IssuanceNotificationService()
         val nonceBinding = CredentialNonceBinding(issuer, "$issuer/credential", "$issuer/nonce")
 
@@ -418,12 +472,15 @@ class Issuer2AttestationChallengeTest {
             return DefaultSession(subject = session.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt))
         }
 
-        suspend fun authorizationCode(): String {
+        suspend fun authorizationCode(verifier: String? = null): String {
             val session = session(AuthenticationMethod.AUTHORIZED)
-            val code = UUID.randomUUID().toString()
-            codes.save(DefaultAuthorizationCodeRecord(code, "wallet", REDIRECT, setOf("identity"), emptySet(), session,
-                session.expiresAt.getValue(TokenType.ACCESS_TOKEN)))
-            return code
+            val request = assertIs<AuthorizationRequestResult.Success>(module.oauth2Provider.createAuthorizationRequest(
+                mapOf("response_type" to listOf("code"), "client_id" to listOf("wallet"),
+                    "redirect_uri" to listOf(REDIRECT), "scope" to listOf("identity")) +
+                    (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)),
+                        "code_challenge_method" to listOf("S256")) } ?: emptyMap())
+            )).request
+            return assertIs<AuthorizationResponseResult.Success>(module.oauth2Provider.createAuthorizationResponse(request, session)).response.code
         }
 
         suspend fun preAuthorizedCode(clientId: String?) = module.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
