@@ -152,11 +152,14 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun waitsForTheSamePreviewDownloadBeyondTheOrdinaryDomTimeout() = runBlocking<Unit> {
-        withPage(downloadDelayMillis = 200) { page ->
+        withPage(downloadDelayMillis = 200, interactionLabel = "VCI request") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite, case)
             page.setDefaultTimeout(100.0)
-            assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            val offer = assertIs<ItbWalletInteraction.Offer>(bridge.read(session))
+            assertEquals("https://issuer.example/request", offer.url.parameters["credential_offer_uri"])
+            assertEquals(1, page.evaluate("window.textDownloadCount"))
+            assertEquals(0, page.evaluate("window.qrDownloadCount"))
             assertEquals(1, page.evaluate("window.startCount"))
         }
     }
@@ -337,7 +340,9 @@ class ItbPortalBridgeBrowserTest {
                     return;
                 }
                 const dialog = document.createElement('ngb-modal-window');
-                dialog.innerHTML = `<app-any-content-view><div> $interactionLabel QR code </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                // Exact QR label observed in the deployed interaction, independent of the bridge selector.
+                dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> Credential QR code </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
                   <app-any-content-view><div> $interactionLabel </div>${
                       if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download(false)">Download</button>"""
                       else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""
@@ -350,7 +355,10 @@ class ItbPortalBridgeBrowserTest {
             if (qr) window.qrDownloadCount++; else window.textDownloadCount++;
             setTimeout(() => {
                 const a = document.createElement('a');
-                a.href = qr ? 'data:image/png;base64,$qrBase64' : URL.createObjectURL(new Blob(['openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest']));
+                a.href = qr ? 'data:image/png;base64,$qrBase64' : URL.createObjectURL(new Blob(['${
+                    if (interactionLabel == "VCI request") "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Frequest"
+                    else "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+                }']));
                 a.download = qr ? 'interaction.png' : 'interaction.txt';
                 a.click();
             }, $downloadDelayMillis);
