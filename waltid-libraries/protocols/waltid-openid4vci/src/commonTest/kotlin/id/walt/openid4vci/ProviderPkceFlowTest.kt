@@ -138,6 +138,22 @@ class ProviderPkceFlowTest {
         assertTrue(fixture.codes.records.isEmpty())
     }
 
+    @Test
+    fun parPreservesOriginalPkceAndRequiredConfigurationIsEnforced() = runTest {
+        val fixture = Fixture(required = true)
+        assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createAuthorizationRequest(authorizationForm(null)))
+        assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createPushedAuthorizationRequest(authorizationForm(null)))
+        val pushed = assertIs<AuthorizationRequestResult.Success>(fixture.provider.createPushedAuthorizationRequest(authorizationForm(verifier))).request
+        val response = assertIs<PushedAuthorizationResponseResult.Success>(fixture.provider.createPushedAuthorizationResponse(pushed)).response
+        val restored = assertIs<AuthorizationRequestResult.Success>(fixture.provider.createAuthorizationRequest(mapOf(
+            "client_id" to listOf("wallet"), "request_uri" to listOf(response.requestUri),
+            "code_challenge" to listOf("tampered"), "code_challenge_method" to listOf("plain"),
+        ))).request
+        assertEquals(pushed.id, restored.id)
+        val code = assertIs<AuthorizationResponseResult.Success>(fixture.provider.createAuthorizationResponse(restored, session)).response.code
+        assertIs<AccessTokenResponseResult.Success>(redeem(fixture, code, listOf(verifier)))
+    }
+
     private fun authorizationForm(verifier: String?) = mapOf(
         "response_type" to listOf("code"), "client_id" to listOf("wallet"), "redirect_uri" to listOf(redirect),
     ) + (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)), "code_challenge_method" to listOf("S256")) } ?: emptyMap())
