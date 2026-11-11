@@ -155,6 +155,40 @@ class ProviderPkceFlowTest {
     }
 
     @Test
+    fun changingRequirementIsAppliedAtEveryProviderBoundary() = runTest {
+        var required = false
+        val fixture = Fixture(requirePkce = {
+            kotlinx.coroutines.yield()
+            required
+        })
+        val code = authorize(fixture.provider, null)
+        val accepted = assertIs<AuthorizationRequestResult.Success>(
+            fixture.provider.createAuthorizationRequest(authorizationForm(null))).request
+        val pushed = assertIs<PushedAuthorizationResponseResult.Success>(
+            fixture.provider.createPushedAuthorizationResponse(accepted)).response
+
+        required = true
+        assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createAuthorizationRequest(authorizationForm(null)))
+        assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createPushedAuthorizationRequest(authorizationForm(null)))
+        assertIs<AuthorizationResponseResult.Failure>(fixture.provider.createAuthorizationResponse(accepted, session))
+        assertIs<PushedAuthorizationResponseResult.Failure>(fixture.provider.createPushedAuthorizationResponse(accepted))
+        assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createAuthorizationRequest(mapOf(
+            "client_id" to listOf("wallet"), "request_uri" to listOf(pushed.requestUri),
+        )))
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, code, null)).error.error)
+        assertEquals(0, fixture.resolverCalls)
+        assertEquals(0, fixture.tokenCalls)
+        assertEquals(0, fixture.refreshWrites)
+
+        val protected = authorize(fixture.provider, verifier)
+        required = false
+        assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, protected, null))
+        val optional = authorize(fixture.provider, null)
+        assertIs<AccessTokenResponseResult.Success>(redeem(fixture, optional, null))
+    }
+
+    @Test
     fun oldOrMalformedCodeRecordsFailClosed() = runTest {
         for (removeBinding in listOf(true, false)) {
             val fixture = Fixture()
