@@ -121,17 +121,24 @@ class DeferredStatusLookupExpiryTest {
         val firstClaim = claim()
         val request = DeferredCredentialRequest("transaction")
         val result = provider.createDeferredCredentialResponse(request, response, DeferredCredentialResponseContext("offer", firstClaim, deferred))
-        val failure = assertIs<CredentialResponseResult.Failure>(result)
+        val pending = assertIs<CredentialResponseResult.Success>(result).response
         assertEquals(2, wiaFetches, "The first checkpoint must pass, then the final checkpoint must catch expiry")
         assertTrue(Clock.System.now().epochSeconds >= lastWiaExpiry)
-        assertEquals(503, provider.writeDeferredCredentialError(failure.error).status)
+        val pendingHttp = provider.writeDeferredCredentialResponse(request, pending)
+        assertEquals(202, pendingHttp.status)
+        assertTrue(pendingHttp.retryable)
+        assertEquals("transaction", pending.transactionId)
+        assertTrue(pending.interval!! > 0)
+        assertNull(pending.credentials)
         assertFalse(state.transactions.getValue("transaction").denied)
         assertFalse(state.transactions.getValue("transaction").consumed)
         assertEquals(response, state.transactions.getValue("transaction").response)
         deferred.release("offer", firstClaim)
         expireDuringFinalLookup = false
         val retryClaim = claim()
-        assertIs<CredentialResponseResult.Success>(provider.createDeferredCredentialResponse(
-            request, response, DeferredCredentialResponseContext("offer", retryClaim, deferred)))
+        val delivered = assertIs<CredentialResponseResult.Success>(provider.createDeferredCredentialResponse(
+            request, response, DeferredCredentialResponseContext("offer", retryClaim, deferred))).response
+        assertEquals(response.credentials, delivered.credentials)
+        assertEquals(200, provider.writeDeferredCredentialResponse(request, delivered).status)
     }
 }

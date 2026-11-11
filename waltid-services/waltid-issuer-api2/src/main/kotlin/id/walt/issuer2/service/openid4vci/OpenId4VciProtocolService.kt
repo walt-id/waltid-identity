@@ -1447,6 +1447,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
+            if (credentialResponse.isDeferred) {
+                return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
+            }
             if (deferredClaim != null && deferredClaim.response == null) {
                 deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
             }
@@ -1461,6 +1464,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
+            if (responseToWrite.isDeferred) {
+                return oauth2Provider.writeCredentialResponse(requestWithSession, responseToWrite)
+            }
             credentialProofKeyCommitment?.let { commitment ->
                 val committed = try {
                     commitment.commit(session, requireNotNull(proofPublicKeyJwks))

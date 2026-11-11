@@ -67,6 +67,8 @@ class DeferredAttestationStatusWebhookTest {
     @Test fun revocationAfterSigningNotifiesOnceAcrossPolls() = verify(false, "ka", "checkpoint")
     @Test fun unavailableLookupRetriesWithoutPermanentDenialNotification() = verify(false, "wia", "unavailable")
     @Test fun suspendedAttestationRetriesWithoutPermanentDenialNotification() = verify(false, "wia", "suspended")
+    @Test fun authorizationCodeLookupFailureReturnsPendingAndCanRetry() = verify(true, "wia", "unavailable")
+    @Test fun authorizationCodeSuspensionReturnsPendingAndCanRetry() = verify(true, "wia", "suspended")
 
     private fun assertDenialNotification(offerId: String) {
         val failure = notificationServer.awaitEvent(offerId, IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED)
@@ -222,8 +224,12 @@ class DeferredAttestationStatusWebhookTest {
             }
             if (stage in setOf("unavailable", "suspended")) {
                 val blocked = poll()
-                assertEquals(HttpStatusCode.ServiceUnavailable, blocked.status, blocked.bodyAsText())
-                assertEquals("temporarily_unavailable", blocked.body<JsonObject>().getValue("error").jsonPrimitive.content)
+                assertEquals(HttpStatusCode.Accepted, blocked.status, blocked.bodyAsText())
+                val pendingBody = blocked.body<JsonObject>()
+                assertEquals(transactionId, pendingBody.getValue("transaction_id").jsonPrimitive.content)
+                assertTrue(pendingBody.getValue("interval").jsonPrimitive.long > 0)
+                assertFalse("credentials" in pendingBody)
+                assertFalse("error" in pendingBody)
                 assertFalse(notificationServer.getReceivedUpdates().any {
                     it.target == offer.offerId && it.event.startsWith("credential_request_")
                 })

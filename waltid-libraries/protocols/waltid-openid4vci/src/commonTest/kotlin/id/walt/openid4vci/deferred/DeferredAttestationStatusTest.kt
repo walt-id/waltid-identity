@@ -26,6 +26,7 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class DeferredAttestationStatusTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -191,14 +192,93 @@ class DeferredAttestationStatusTest {
             fixture.unavailable = !suspended
             if (suspended) fixture.states[0] = 2
             val claim = fixture.claim()
-            val result = assertIs<CredentialResponseResult.Failure>(fixture.deliver(claim))
-            assertEquals(503, fixture.provider.writeDeferredCredentialError(result.error).status)
+            val result = assertIs<CredentialResponseResult.Success>(fixture.deliver(claim))
+            val pending = fixture.provider.writeDeferredCredentialResponse(DeferredCredentialRequest("transaction"), result.response)
+            assertEquals(202, pending.status)
+            assertTrue(pending.retryable)
+            assertEquals("transaction", pending.payload.getValue("transaction_id").jsonPrimitive.content)
+            assertTrue(pending.payload.getValue("interval").jsonPrimitive.long > 0)
+            assertFalse("credentials" in pending.payload)
+            assertFalse("error" in pending.payload)
             assertFalse(fixture.transaction().denied)
             assertFalse(fixture.transaction().consumed)
             fixture.deferred.release("offer", claim)
             fixture.unavailable = false
             fixture.states[0] = 0
-            assertIs<CredentialResponseResult.Success>(fixture.deliver())
+            val delivered = assertIs<CredentialResponseResult.Success>(fixture.deliver())
+            val http = fixture.provider.writeDeferredCredentialResponse(DeferredCredentialRequest("transaction"), delivered.response)
+            assertEquals(200, http.status)
+            assertFalse(http.retryable)
+            assertEquals(3, delivered.response.credentials!!.size)
+        }
+    }
+
+    @Test fun cachedResponseCanReturnPendingAfterRestartAndLaterDeliver() = runTest {
+        val fixture = fixture()
+        val claim = fixture.claim()
+        fixture.deferred.checkpoint("offer", claim, fixture.response)
+        fixture.deferred.release("offer", claim)
+        fixture.state = Json.decodeFromString(Json.encodeToString(fixture.state))
+        fixture.unavailable = true
+        val pendingClaim = fixture.claim()
+        val pending = assertIs<CredentialResponseResult.Success>(fixture.deliver(pendingClaim)).response
+        assertTrue(pending.isDeferred)
+        assertEquals("transaction", pending.transactionId)
+        assertEquals(fixture.response, fixture.transaction().response)
+        assertFalse(fixture.transaction().denied)
+        fixture.deferred.release("offer", pendingClaim)
+        fixture.unavailable = false
+        val delivered = assertIs<CredentialResponseResult.Success>(fixture.deliver()).response
+        assertEquals(fixture.response.credentials, delivered.credentials)
+        assertFalse(delivered.isDeferred)
+    }
+
+    @Test fun statusFailureDuringEncryptionReturnsOnlyAnEncryptedPendingResponse() = runTest {
+        val fixture = fixture()
+        fixture.unavailableDuringEncryption = true
+        val encryption = fixture.encryption()
+        val request = DeferredCredentialRequest("transaction", encryption)
+        val claim = fixture.claim()
+        val pending = assertIs<CredentialResponseResult.Success>(fixture.deliver(claim, encryption)).response
+        val http = fixture.provider.writeDeferredCredentialResponse(request, pending)
+        assertEquals(202, http.status)
+        assertTrue(http.retryable)
+        assertEquals("encrypted", http.encryptedJwt)
+        assertTrue(http.payload.isEmpty())
+        assertEquals(setOf("transaction_id", "interval"), fixture.encryptedPayloads.last().keys)
+        assertEquals("transaction", fixture.encryptedPayloads.last().getValue("transaction_id").jsonPrimitive.content)
+        assertNull(pending.credentials)
+        assertFalse(fixture.transaction().denied)
+        fixture.deferred.release("offer", claim)
+        fixture.unavailableDuringEncryption = false
+        fixture.unavailable = false
+        val delivered = assertIs<CredentialResponseResult.Success>(fixture.deliver(encryption = encryption)).response
+        assertEquals(200, fixture.provider.writeDeferredCredentialResponse(request, delivered).status)
+        assertEquals(3, delivered.credentials!!.size)
+    }
+
+    @Test fun attestationExpiryWhilePreparingPendingStillPermanentlyDenies() = runTest {
+        val fixture = fixture(lifetimeSeconds = 1)
+        fixture.unavailable = true
+        fixture.expireDuringEncryption = true
+        val result = assertIs<CredentialResponseResult.Failure>(fixture.deliver(encryption = fixture.encryption()))
+        assertEquals("credential_request_denied", result.error.error)
+        assertTrue(fixture.transaction().denied)
+    }
+
+    @Test fun pendingEncryptionPropagatesCancellationAndChecksTheClaimFence() = runTest {
+        for (cancel in listOf(false, true)) {
+            val fixture = fixture()
+            fixture.unavailable = true
+            fixture.cancelEncryption = cancel
+            fixture.loseClaimDuringEncryption = !cancel
+            val encryption = fixture.encryption()
+            if (cancel) assertFailsWith<CancellationException> { fixture.deliver(encryption = encryption) }
+            else {
+                assertFailsWith<IllegalStateException> { fixture.deliver(encryption = encryption) }
+                assertEquals("successor", fixture.transaction().claimId)
+            }
+            assertFalse(fixture.transaction().denied)
         }
     }
 
@@ -294,10 +374,10 @@ class DeferredAttestationStatusTest {
         }
     }
 
-    private suspend fun fixture(): Fixture {
+    private suspend fun fixture(lifetimeSeconds: Long = 3600): Fixture {
         val signer = key("attester")
         val holders = (0..2).map { key("holder-$it") }
-        val lifetime = VerifiedAttestationLifetime(time.epochSeconds - 10, time.epochSeconds + 3600, clockSkewSeconds = 60)
+        val lifetime = VerifiedAttestationLifetime(time.epochSeconds - 10, time.epochSeconds + lifetimeSeconds, clockSkewSeconds = 60)
         val accepted = AcceptedCredentialRequest(
             DefaultCredentialRequest(client = DefaultClient("wallet", emptyList(), emptySet(), emptySet()),
                 credentialIdentifier = "credential", credentialConfigurationId = null, proofs = null,
@@ -320,8 +400,14 @@ class DeferredAttestationStatusTest {
         var cancelLookup = false
         var loseClaim = false
         var revokeDuringEncryption = false
+        var unavailableDuringEncryption = false
+        var expireDuringEncryption = false
+        var cancelEncryption = false
+        var loseClaimDuringEncryption = false
+        var currentTime = time
+        val encryptedPayloads = mutableListOf<JsonObject>()
         var state = DeferredIssuanceState(status = DeferredStatus.READY, transactions = mapOf("transaction" to DeferredTransaction("transaction", accepted)))
-        val deferred = DeferredIssuance(this)
+        val deferred = DeferredIssuance(this, now = { currentTime })
         val response = CredentialResponse(credentials = List(3) { IssuedCredential(JsonPrimitive("signed-$it")) })
         fun transaction() = state.transactions.getValue("transaction")
         override suspend fun get(id: String) = DeferredSessionSnapshot(id, time + 60.minutes, state)
@@ -337,11 +423,20 @@ class DeferredAttestationStatusTest {
                 if (loseClaim) state = state.copy(transactions = state.transactions + ("transaction" to transaction().copy(claimId = "successor")))
                 token(signer, states)
             },
-            credentialResponseEncryptor = CredentialResponseEncryptor { _, _ ->
+            credentialResponseEncryptor = CredentialResponseEncryptor { payload, _ ->
+                encryptedPayloads += payload
+                if (cancelEncryption) throw CancellationException("cancelled during pending encryption")
+                if (loseClaimDuringEncryption) state = state.copy(transactions = state.transactions + ("transaction" to transaction().copy(claimId = "successor")))
+                if (expireDuringEncryption) currentTime = time + 62.seconds
                 if (revokeDuringEncryption) states[3] = 1
+                if (unavailableDuringEncryption) unavailable = true
                 "encrypted"
             },
         ))
+        suspend fun encryption() = CredentialResponseEncryptionParameters(
+            JsonObject(signer.exportPublicJwkObject().filterKeys { it in setOf("kty", "crv", "x", "y") } + ("alg" to JsonPrimitive("ECDH-ES"))),
+            "A128GCM",
+        )
         suspend fun claim() = assertIs<DeferredIssuance.Collection.Claimed>(deferred.collect("offer", "transaction", setOf("credential"), "wallet")).transaction
         suspend fun deliver(claim: DeferredTransaction? = null, encryption: CredentialResponseEncryptionParameters? = null): CredentialResponseResult {
             val current = claim ?: claim()
