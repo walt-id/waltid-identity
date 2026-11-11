@@ -2,7 +2,9 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.wallet2.consent.*
 
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
@@ -2173,7 +2175,7 @@ object WalletPresentationHandler {
     private fun DcqlMatcher.DcqlMatchResult.alwaysIncludedPresentationClaims(): List<PresentationDisclosure> {
         if (credential.format == "mso_mdoc") return emptyList()
         val original = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
-        val selective = original as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        val selective = original as? SelectivelyDisclosableVerifiableCredential
         // Only the original signed payload proves which SD-JWT values are unconditionally visible.
         val payload = if (!credential.disclosures.isNullOrEmpty()) selective?.originalCredentialData
             ?: return emptyList() else selective?.originalCredentialData ?: credential.data
@@ -2352,7 +2354,7 @@ object WalletPresentationHandler {
     /** Null for a stored credential whose disclosures cannot be located, so it cannot fail matching for the others. */
     private suspend fun StoredCredential.toRawDcqlCredential(id: String, query: DcqlQuery? = null): RawDcqlCredential? {
         val credential = this.credential
-        val sdvc = credential as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        val sdvc = credential as? SelectivelyDisclosableVerifiableCredential
         val disclosures = try {
             sdvc?.locatedDisclosures()
         } catch (e: IllegalArgumentException) {
@@ -2360,7 +2362,7 @@ object WalletPresentationHandler {
             return null
         }
         val resolved = resolveTypeMetadata(fetchIfMissing = query?.credentials?.any { item ->
-            val meta = item.meta as? id.walt.dcql.models.meta.SdJwtVcMeta
+            val meta = item.meta as? SdJwtVcMeta
             meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
         } == true)
         return RawDcqlCredential(

@@ -1,5 +1,6 @@
 package id.walt.webdatafetching
 
+import kotlin.time.TimeSource
 import id.walt.webdatafetching.config.RequestConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
@@ -31,7 +32,7 @@ class BoundedDocumentSession(
     private val documents = mutableMapOf<String, ByteArray>()
     private var credentialOrigin: Url? = initialCredentialOrigin?.let(::Url)
     private var requests = 0
-    private val started = kotlin.time.TimeSource.Monotonic.markNow()
+    private val started = TimeSource.Monotonic.markNow()
 
     suspend fun read(uri: String): ByteArray = try {
         val bytes = documents[uri] ?: withTimeoutOrNull(minOf(10_000L, (30_000L - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L))) {

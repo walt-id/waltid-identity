@@ -2,6 +2,10 @@
 
 package id.walt.walletdemo.compose.android
 
+import id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.MobileWalletCredentialRegistryField
+import id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
 import android.content.Context
@@ -87,15 +91,15 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
     @Test
     fun ancestorAndLeafIndexesShowOneCredentialManagerCandidate() = runBlocking {
         val fixture = fixture()
-        val registry = id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry(fixture.context)
-        val registryId = "wal-1607-type-index"
-        val leaf = "https://issuer.example/wal1607/leaf"
-        val parent = "https://types.example/wal1607/parent"
+        val registry = AndroidDigitalCredentialRegistry(fixture.context)
+        val registryId = "inherited-type-index"
+        val leaf = "https://issuer.example/credentials/leaf"
+        val parent = "https://types.example/credentials/parent"
         val title = "Inherited metadata fixture"
-        val record = id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord(
+        val record = MobileWalletCredentialRegistryRecord(
             registryEntryId = "one-logical-credential", credentialId = "one-stored-credential",
-            format = id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-            type = leaf, fields = listOf(id.walt.wallet2.mobile.MobileWalletCredentialRegistryField(
+            format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+            type = leaf, fields = listOf(MobileWalletCredentialRegistryField(
                 path = listOf("given_name"), valueJson = "\"Ada\"", selectivelyDisclosable = false,
             )), displayName = title,
         )
@@ -106,7 +110,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             put("requests", buildJsonArray { add(buildJsonObject {
                 put("protocol", "openid4vp-v1-unsigned")
                 put("data", buildJsonObject {
-                    put("response_type", "vp_token"); put("response_mode", "dc_api"); put("nonce", "wal1607-fixture")
+                    put("response_type", "vp_token"); put("response_mode", "dc_api"); put("nonce", "inherited-type-request")
                     put("dcql_query", buildJsonObject { put("credentials", buildJsonArray { add(buildJsonObject {
                         put("id", "identity"); put("format", "dc+sd-jwt")
                         put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(leaf); add(parent) }) })
