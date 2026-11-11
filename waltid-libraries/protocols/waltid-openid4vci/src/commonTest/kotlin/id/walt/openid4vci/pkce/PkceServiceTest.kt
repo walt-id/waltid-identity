@@ -91,5 +91,33 @@ class PkceServiceTest {
             assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(emptyMap(), null)).error.error)
     }
 
+    @Test
+    fun configurationIsExplicitAndMethodsAreExtensible() {
+        val custom = object : PkceCodeChallengeMethod {
+            override val name = "test-method"
+            override fun isValidChallenge(codeChallenge: String) = codeChallenge == verifier
+            override fun calculateChallenge(codeVerifier: String) = codeVerifier
+        }
+        val methods = mutableListOf<PkceCodeChallengeMethod>(S256PkceCodeChallengeMethod, custom)
+        val config = PkceServiceConfig(methods)
+        methods.clear()
+        assertEquals(listOf("S256", "test-method"), config.supportedCodeChallengeMethods)
+        val configured = PkceService(config)
+        val result = assertIs<PkceAuthorizationResult.Success>(configured.validateAuthorizationRequest(
+            mapOf("code_challenge" to listOf(verifier), "code_challenge_method" to listOf(custom.name))))
+        assertIs<PkceVerificationResult.Success>(configured.verifyTokenRequest(mapOf("code_verifier" to listOf(verifier)), result.binding))
+        val permissive = object : PkceCodeChallengeMethod by custom {
+            override fun isValidChallenge(codeChallenge: String) = true
+        }
+        val commonValidation = PkceService(PkceServiceConfig(listOf(permissive)))
+        assertIs<PkceAuthorizationResult.Failure>(commonValidation.validateAuthorizationRequest(
+            mapOf("code_challenge" to listOf("short"), "code_challenge_method" to listOf(custom.name))))
+        assertIs<PkceVerificationResult.Failure>(commonValidation.verifyTokenRequest(
+            mapOf("code_verifier" to listOf(verifier)), PkceBinding.Challenge("short", custom.name)))
+        assertFailsWith<IllegalArgumentException> { PkceServiceConfig(emptyList()) }
+        assertFailsWith<IllegalArgumentException> { PkceServiceConfig(listOf(custom, custom)) }
+        assertFailsWith<IllegalArgumentException> { PkceServiceConfig(listOf(object : PkceCodeChallengeMethod by custom { override val name = " " })) }
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
