@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile
 
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -74,21 +76,21 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
     }
     val parentMetadata = buildJsonObject {
         put("vct", parentVct); put("extends", rootVct)
-        put("extends#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(rootMetadata.toString().encodeToByteArray()))
+        put("extends#integrity", MetadataIntegrity.sha256(rootMetadata.toString().encodeToByteArray()))
     }
     val leafMetadata = buildJsonObject {
         put("vct", vct); put("extends", parentVct)
-        put("extends#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(parentMetadata.toString().encodeToByteArray()))
+        put("extends#integrity", MetadataIntegrity.sha256(parentMetadata.toString().encodeToByteArray()))
         put("display", buildJsonArray { add(buildJsonObject { put("locale", "en"); put("name", "Inherited SCA attestation") }) })
     }
     val metadataDocuments = mapOf(vct to leafMetadata, parentVct to parentMetadata, rootVct to rootMetadata)
-    val metadataSnapshot = id.walt.sdjwt.metadata.type.TypeMetadataResolver(
+    val metadataSnapshot = TypeMetadataResolver(
         { uri -> metadataDocuments.getValue(uri).toString().encodeToByteArray() }
-    ).resolve(vct, id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()), true).snapshot()
+    ).resolve(vct, MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()), true).snapshot()
 
     val payload = SDPayload.createSDPayload(buildJsonObject {
         put("iss", "https://issuer.example"); put("vct", vct)
-        put("vct#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()))
+        put("vct#integrity", MetadataIntegrity.sha256(leafMetadata.toString().encodeToByteArray()))
         put("cnf", buildJsonObject {
             put("jwk", Json.parseToJsonElement(requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()))
         })

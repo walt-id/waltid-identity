@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.policies
 
+import io.ktor.client.HttpClient
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.sdjwt.metadata.type.ResolvedTypeMetadata
 import id.walt.sdjwt.metadata.type.TypeMetadataResolver
@@ -12,7 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** Per-verification snapshot shared by DCQL and credential policies. Never a global trust cache. */
-class CredentialTypeMetadataResolver(private val httpClient: io.ktor.client.HttpClient? = null) {
+class CredentialTypeMetadataResolver(private val httpClient: HttpClient? = null) {
     private val mutex = Mutex()
     private val results = mutableMapOf<Pair<String, String?>, Result<ResolvedTypeMetadata>>()
 

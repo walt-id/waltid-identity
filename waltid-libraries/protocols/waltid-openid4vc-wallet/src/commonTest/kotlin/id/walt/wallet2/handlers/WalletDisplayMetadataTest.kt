@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
 import id.walt.wallet2.consent.PaymentConsentFixture
 import id.walt.wallet2.data.StoredCredential
 import id.walt.sdjwt.metadata.type.TypeMetadataResolver
@@ -75,7 +76,7 @@ class WalletDisplayMetadataTest {
             assertTrue(restored.copy(metadata = oldVersion).resolvedSdJwtVcTypes().isEmpty())
             val changedPin = fixture.credential(buildJsonObject {
                 put("vct", "https://issuer.example/leaf")
-                put("vct#integrity", id.walt.sdjwt.metadata.type.MetadataIntegrity.sha256("replacement document".encodeToByteArray()))
+                put("vct#integrity", MetadataIntegrity.sha256("replacement document".encodeToByteArray()))
             })
             assertTrue(restored.copy(credential = changedPin).resolvedSdJwtVcTypes().isEmpty())
             assertEquals(before, requests)
