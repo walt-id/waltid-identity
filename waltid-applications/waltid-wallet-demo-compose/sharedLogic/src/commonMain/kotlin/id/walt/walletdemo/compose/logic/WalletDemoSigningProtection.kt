@@ -90,6 +90,12 @@ class InMemoryWalletDemoSigningProtectionStore(
     }
 }
 
+fun biometricTimedApprovalDescription(timeoutSeconds: Int): String {
+    val duration = if (timeoutSeconds == 1) "1 second" else "$timeoutSeconds seconds"
+    return "Biometric approval may be reused for ordinary signing for up to $duration. " +
+        "Each payment requires fresh biometric approval."
+}
+
 internal fun WalletDemoSigningProtection.approvalChoice(): WalletDemoKeyChoice = WalletDemoKeyChoice(name,
     when (this) {
         WalletDemoSigningProtection.None -> "No biometric signing"
@@ -97,7 +103,7 @@ internal fun WalletDemoSigningProtection.approvalChoice(): WalletDemoKeyChoice =
         WalletDemoSigningProtection.BiometricPerUse -> "Current biometrics only"
     }, when (this) {
         WalletDemoSigningProtection.None -> "Signing does not require system approval. Your wallet PIN does not authorize the signing key."
-        WalletDemoSigningProtection.Biometric -> "Approve signing with biometrics. Authorization is reused for up to 10 seconds."
+        WalletDemoSigningProtection.Biometric -> biometricTimedApprovalDescription(10)
         WalletDemoSigningProtection.BiometricPerUse -> "Approve each signature with biometrics. Changing enrolled biometrics invalidates this key."
     })
 

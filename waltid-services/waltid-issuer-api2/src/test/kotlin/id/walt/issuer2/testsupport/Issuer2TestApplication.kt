@@ -2,6 +2,7 @@ package id.walt.issuer2.testsupport
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -22,9 +23,13 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
     json: Json = issuer2TestJson,
     configureProfilesConfig: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
     configureMetadataConfig: (Issuer2MetadataConfig) -> Issuer2MetadataConfig = { it },
+    configureAuthenticationConfig: (AuthenticationServiceConfig) -> AuthenticationServiceConfig = { it },
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
     loadIssuer2ConfigFiles()
+    val authenticationConfig = ConfigManager.getConfig<AuthenticationServiceConfig>()
+    ConfigManager.loadedConfigurations["authentication-service" to AuthenticationServiceConfig::class] =
+        configureAuthenticationConfig(authenticationConfig)
     val serviceConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
     ConfigManager.loadedConfigurations["issuer-service" to Issuer2ServiceConfig::class] =
         configureServiceConfig(serviceConfig)
