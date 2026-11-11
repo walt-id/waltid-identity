@@ -119,5 +119,12 @@ class PkceServiceTest {
         assertFailsWith<IllegalArgumentException> { PkceServiceConfig(listOf(object : PkceCodeChallengeMethod by custom { override val name = " " })) }
     }
 
+    @Test
+    fun bindingsRoundTripWithAnExplicitNonPkceState() {
+        for (value in listOf(PkceBinding.NotUsed, binding)) {
+            assertEquals(value, Json.decodeFromString<PkceBinding>(Json.encodeToString<PkceBinding>(value)))
+        }
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
