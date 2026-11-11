@@ -109,6 +109,37 @@ class Issuer2AttestationChallengeTest {
     }
 
     @Test
+    fun `configured PKCE requirement rejects missing challenges and accepts S256 through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false, requirePkce = true)
+        val client = install(fixture)
+        val authorization = client.get("/openid4vci/authorize") {
+            parParameters().forEach { name, values -> values.forEach { parameter(name, it) } }
+        }
+        assertEquals(HttpStatusCode.BadRequest, authorization.status, authorization.bodyAsText())
+        assertEquals("invalid_request", authorization.body<JsonObject>().string("error"))
+        assertEquals("no-store", authorization.headers[HttpHeaders.CacheControl])
+        val par = client.par(fixture, null)
+        assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
+        assertEquals("invalid_request", par.body<JsonObject>().string("error"))
+
+        val verifier = id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs.PKCE_VERIFIER_EXAMPLE
+        val code = fixture.authorizationCode(verifier)
+        val token = client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code); append("code_verifier", verifier)
+        }, null).assertToken()
+        client.token(fixture, Parameters.build {
+            append("grant_type", "refresh_token"); append("client_id", "wallet")
+            append("refresh_token", token.string("refresh_token"))
+        }, null).assertToken()
+        val preAuthorizedCode = fixture.preAuthorizedCode("wallet")
+        client.token(fixture, Parameters.build {
+            append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
+            append("client_id", "wallet"); append("pre-authorized_code", preAuthorizedCode)
+        }, null).assertToken()
+    }
+
+    @Test
     fun `PKCE downgrade and invalid PAR challenge are rejected through HTTP`() = testApplication {
         val fixture = fixture(enabled = false)
         val client = install(fixture)
@@ -384,6 +415,7 @@ class Issuer2AttestationChallengeTest {
         lifetime: Long = 300,
         tokenKey: JWKKey? = null,
         storedKey: String? = null,
+        requirePkce: Boolean = false,
     ): Fixture {
         val resolvedTokenKey = tokenKey ?: JWKKey.generate(KeyType.secp256r1)
         val material = createIssuer2ClientAttestationTestMaterial()
@@ -392,6 +424,7 @@ class Issuer2AttestationChallengeTest {
             baseUrl = "http://localhost",
             ciTokenKey = KeySerialization.serializeKey(resolvedTokenKey),
             ciTokenStoredKey = storedKey,
+            requirePkce = requirePkce,
             clientAuthenticationConfig = auth.copy(supportedMethods = auth.supportedMethods +
                     if (anonymous) listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous) else emptyList()),
         ), resolvedTokenKey, material, generateIssuer2WalletInstanceKey())
