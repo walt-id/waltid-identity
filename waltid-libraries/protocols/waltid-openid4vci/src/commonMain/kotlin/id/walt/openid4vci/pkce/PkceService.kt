@@ -17,7 +17,7 @@ sealed interface PkceVerificationResult {
 class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
     private val methods = config.methods.associateBy { it.name }
 
-    fun validateAuthorizationRequest(parameters: Map<String, List<String>>): PkceAuthorizationResult {
+    suspend fun validateAuthorizationRequest(parameters: Map<String, List<String>>): PkceAuthorizationResult {
         for (name in listOf("code_challenge", "code_challenge_method")) {
             if (parameters.containsKey(name) && parameters.getValue(name).size != 1) {
                 return invalidAuthorization("Exactly one $name value is required when supplied")
@@ -27,7 +27,7 @@ class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
         val methodName = parameters["code_challenge_method"]?.single()
         if (challenge == null) {
             if (methodName != null) return invalidAuthorization("code_challenge is required with code_challenge_method")
-            if (config.requirePkce) return invalidAuthorization("PKCE code_challenge is required")
+            if (config.requirePkce()) return invalidAuthorization("PKCE code_challenge is required")
             return PkceAuthorizationResult.Success(PkceBinding.NotUsed)
         }
 
@@ -41,7 +41,7 @@ class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
         return PkceAuthorizationResult.Success(PkceBinding.Challenge(challenge, effectiveMethod))
     }
 
-    fun verifyTokenRequest(
+    suspend fun verifyTokenRequest(
         parameters: Map<String, List<String>>,
         binding: PkceBinding?,
     ): PkceVerificationResult {
@@ -56,7 +56,7 @@ class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
         return when (binding) {
             PkceBinding.NotUsed -> when {
                 verifier != null -> invalidGrant("code_verifier was supplied without an authorization code_challenge")
-                config.requirePkce -> invalidGrant("PKCE is required for this authorization code")
+                config.requirePkce() -> invalidGrant("PKCE is required for this authorization code")
                 else -> PkceVerificationResult.Success
             }
 
