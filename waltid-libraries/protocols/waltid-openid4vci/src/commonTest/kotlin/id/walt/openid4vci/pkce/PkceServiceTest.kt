@@ -28,5 +28,18 @@ class PkceServiceTest {
         }
     }
 
+    @Test
+    fun optionalAndRequiredPoliciesAreEnforcedAtBothStages() {
+        assertEquals(PkceAuthorizationResult.Success(PkceBinding.NotUsed), service.validateAuthorizationRequest(emptyMap()))
+        assertIs<PkceVerificationResult.Success>(service.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed))
+        val required = PkceService(PkceServiceConfig(requirePkce = true))
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+            assertIs<PkceAuthorizationResult.Failure>(required.validateAuthorizationRequest(emptyMap())).error.error)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<PkceVerificationResult.Failure>(required.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed)).error.error)
+        assertEquals(PkceAuthorizationResult.Success(binding), required.validateAuthorizationRequest(parameters()))
+        assertIs<PkceVerificationResult.Success>(required.verifyTokenRequest(mapOf("code_verifier" to listOf(verifier)), binding))
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
