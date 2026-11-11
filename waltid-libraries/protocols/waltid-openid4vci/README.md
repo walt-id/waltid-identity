@@ -40,7 +40,10 @@ The library includes:
 The OAuth provider handles PKCE internally through `PkceService`, configured by
 `OAuth2ProviderConfig.pkceServiceConfig`. Both direct authorization and PAR use the same
 validation. The default configuration supports S256 and permits requests without PKCE;
-set `PkceServiceConfig(requirePkce = true)` to require it. Supplied PKCE is always enforced.
+set `PkceServiceConfig(requirePkce = { true })` to require it. Supplied PKCE is always enforced.
+The suspend callback resolves the requirement when an authorization request or a code issued
+without PKCE is checked. Providers shared by multiple issuers can resolve the current issuer's
+policy from request context. A policy change never disables verification of a stored challenge.
 An omitted challenge method means `plain` under RFC 7636 and is rejected by the default
 S256-only configuration.
 
