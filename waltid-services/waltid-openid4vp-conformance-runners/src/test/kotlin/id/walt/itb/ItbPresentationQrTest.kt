@@ -36,13 +36,33 @@ class ItbPresentationQrTest {
     }
 
     @Test
-    fun rejectsUnsupportedImagesAndBoundsBytesAndDimensions() {
+    fun rejectsUnsupportedAndTruncatedImages() {
         for (content in listOf(
             byteArrayOf(1, 2, 3),
             ItbQrFixtures.qr("openid4vp://example").copyOf(20),
-            ByteArray(1_048_577),
-            ItbQrFixtures.png(BufferedImage(1, 2049, BufferedImage.TYPE_INT_RGB)),
-            ItbQrFixtures.png(BufferedImage(2049, 1, BufferedImage.TYPE_INT_RGB)),
         )) assertFailsWith<IllegalArgumentException> { ItbPresentationQr.decode(content) }
+    }
+
+    @Test
+    fun boundsEncodedBytesWithAnOtherwiseReadableQr() {
+        val invocation = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+        val qr = ItbQrFixtures.qr(invocation)
+        // Trailing padding keeps the same PNG/QR readable while varying only the encoded size.
+        assertEquals(invocation, ItbPresentationQr.decode(qr.copyOf(1_048_576)))
+        assertFailsWith<IllegalArgumentException> { ItbPresentationQr.decode(qr.copyOf(1_048_577)) }
+    }
+
+    @Test
+    fun boundsEachDimensionWithAnOtherwiseReadableQr() {
+        val invocation = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+        for ((atLimit, beyondLimit) in listOf(
+            (2048 to 350) to (2049 to 350),
+            (350 to 2048) to (350 to 2049),
+        )) {
+            assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.qr(invocation, atLimit.first, atLimit.second)))
+            assertFailsWith<IllegalArgumentException> {
+                ItbPresentationQr.decode(ItbQrFixtures.qr(invocation, beyondLimit.first, beyondLimit.second))
+            }
+        }
     }
 }
