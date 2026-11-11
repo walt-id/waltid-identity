@@ -314,7 +314,7 @@ class DeferredAttestationExpiryTest {
             val completed = assertNotNull(repository.get(offer.offerId))
             assertEquals(1, completed.issuanceResults.size)
             assertEquals(checkpoint.response, completed.deferredState!!.transactions.getValue(transactionId).response)
-            assertTrue(completed.deferredState!!.transactions.getValue(transactionId).consumed)
+            assertTrue(completed.deferredState.transactions.getValue(transactionId).consumed)
             return@testApplication
         }
         var savedResults = emptyMap<String, IssuanceResult>()
