@@ -195,7 +195,11 @@ class ProviderPkceFlowTest {
             records.remove(code)?.let { Json.decodeFromString<DefaultAuthorizationCodeRecord>(it) }
     }
 
-    private class Fixture(val codes: SerializedCodes = SerializedCodes(), required: Boolean = false) {
+    private class Fixture(
+        val codes: SerializedCodes = SerializedCodes(),
+        required: Boolean = false,
+        requirePkce: suspend () -> Boolean = { required },
+    ) {
         var resolverCalls = 0
         var tokenCalls = 0
         var refreshWrites = 0
@@ -206,7 +210,7 @@ class ProviderPkceFlowTest {
             refreshTokenRepository = object : RefreshTokenRepository by InMemoryRefreshTokenRepository() {
                 override suspend fun save(record: RefreshTokenRecord) { refreshWrites++ }
             },
-        ).copy(authorizationCodeRepository = codes, pkceServiceConfig = PkceServiceConfig(requirePkce = required),
+        ).copy(authorizationCodeRepository = codes, pkceServiceConfig = PkceServiceConfig(requirePkce = requirePkce),
             pushedAuthorizationConfig = PushedAuthorizationConfig(InMemoryPARRepository()))
         val provider = buildOAuth2Provider(config)
     }
