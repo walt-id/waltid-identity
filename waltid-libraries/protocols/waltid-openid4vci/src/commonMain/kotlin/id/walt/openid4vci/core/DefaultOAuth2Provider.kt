@@ -169,7 +169,9 @@ class DefaultOAuth2Provider(
         AuthorizationResponseHttp(
             status = 400,
             redirectUri = null,
-            body = error.description ?: error.error,
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA +
+                    ("Content-Type" to "application/json"),
+            body = JsonObject(oauthErrorPayload(error)).toString(),
         )
 
     override fun writeAuthorizationError(
@@ -195,11 +197,7 @@ class DefaultOAuth2Provider(
                 headers = headers,
             )
         } else {
-            AuthorizationResponseHttp(
-                status = 400,
-                redirectUri = null,
-                body = error.description ?: error.error,
-            )
+            writeAuthorizationError(error)
         }
     }
 
