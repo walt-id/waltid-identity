@@ -63,6 +63,32 @@ class ProviderPkceFlowTest {
         assertTrue(success.request.requestForm.containsKey("code_verifier"))
     }
 
+    @Test
+    fun invalidPkceHasNoIssuanceSideEffectsAndKeepsFailureSession() = runTest {
+        val invalid = listOf(
+            null to OAuthErrorCodes.INVALID_REQUEST,
+            emptyList<String>() to OAuthErrorCodes.INVALID_REQUEST,
+            listOf(verifier, "") to OAuthErrorCodes.INVALID_REQUEST,
+            listOf("", verifier) to OAuthErrorCodes.INVALID_REQUEST,
+            listOf("") to OAuthErrorCodes.INVALID_GRANT,
+            listOf("x".repeat(43)) to OAuthErrorCodes.INVALID_GRANT,
+            listOf("a".repeat(42)) to OAuthErrorCodes.INVALID_GRANT,
+            listOf("a".repeat(129)) to OAuthErrorCodes.INVALID_GRANT,
+            listOf("é".repeat(43)) to OAuthErrorCodes.INVALID_GRANT,
+        )
+        for ((values, errorCode) in invalid) {
+            val fixture = Fixture()
+            val code = authorize(fixture.provider, verifier)
+            val failure = assertIs<AccessTokenResponseResult.Failure>(redeem(fixture, code, values))
+            assertEquals(errorCode, failure.error.error)
+            assertEquals(session.subject, failure.request.session?.subject)
+            assertEquals(0, fixture.resolverCalls)
+            assertEquals(0, fixture.tokenCalls)
+            assertEquals(0, fixture.refreshWrites)
+            assertNull(fixture.codes.records[code])
+        }
+    }
+
     private fun authorizationForm(verifier: String?) = mapOf(
         "response_type" to listOf("code"), "client_id" to listOf("wallet"), "redirect_uri" to listOf(redirect),
     ) + (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)), "code_challenge_method" to listOf("S256")) } ?: emptyMap())
