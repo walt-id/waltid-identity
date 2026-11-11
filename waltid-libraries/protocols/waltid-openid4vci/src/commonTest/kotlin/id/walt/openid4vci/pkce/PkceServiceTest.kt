@@ -62,5 +62,23 @@ class PkceServiceTest {
         }
     }
 
+    @Test
+    fun tokenRejectsMissingDuplicateAndInvalidVerifiers() {
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+            assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(emptyMap(), binding)).error.error)
+        for (values in listOf(emptyList(), listOf(verifier, ""), listOf("", verifier))) {
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+                assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to values), binding)).error.error)
+        }
+        for (value in listOf("", "a".repeat(42), "a".repeat(129), "?".repeat(43), "é".repeat(43), " ".repeat(43))) {
+            // Even a matching hash cannot make invalid verifier syntax acceptable.
+            val matching = PkceBinding.Challenge(Pkce.generateS256CodeChallenge(value), "S256")
+            assertEquals(OAuthErrorCodes.INVALID_GRANT,
+                assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to listOf(value)), matching)).error.error)
+        }
+        assertEquals(OAuthErrorCodes.INVALID_GRANT,
+            assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to listOf("x".repeat(43))), binding)).error.error)
+    }
+
     private fun parameters() = mapOf("code_challenge" to listOf(challenge), "code_challenge_method" to listOf("S256"))
 }
