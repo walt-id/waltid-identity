@@ -140,7 +140,8 @@ object Issuer2RequestExamples {
         expiresInSeconds = 120L,
     )
 
-    val PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+    val PROFILE_AUTHORIZED_OFFER_WITHOUT_EXPIRY = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        authMethod = AuthenticationMethod.AUTHORIZED,
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         expiresInSeconds = -1L,
     )
@@ -548,7 +549,7 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][by-reference][provided tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE,
         "[pre-authorized][single][by-reference][generated tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_GENERATED_TX_CODE,
         "[pre-authorized][single][by-reference][expires in 2 minutes]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY,
-        "[pre-authorized][single][by-reference][no expiry]" to PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
+        "[authorized][single][by-reference][no expiry]" to PROFILE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
         "[pre-authorized][single][by-reference][credentialData override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
         "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
         "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,

@@ -1,5 +1,8 @@
 package id.walt.issuer2.service
 
+import id.walt.openid4vci.preauthorized.InvalidPreAuthorizedOfferLifetimeException
+import io.ktor.server.plugins.BadRequestException
+
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
@@ -93,7 +96,14 @@ class CredentialOfferService(
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
-        val expiresAt = expirationTimestamp(request.expiresInSeconds)
+        val expiresAt = when (request.authMethod) {
+            AuthenticationMethod.PRE_AUTHORIZED -> try {
+                config.preAuthorizedCodePolicy.offerExpiresAt(request.expiresInSeconds, Clock.System.now())
+            } catch (e: InvalidPreAuthorizedOfferLifetimeException) {
+                throw BadRequestException(e.message.orEmpty(), e)
+            }
+            AuthenticationMethod.AUTHORIZED -> expirationTimestamp(request.expiresInSeconds)
+        }
         val notifications = resolvedCredentials.map { it.third }.distinct().singleOrNull()
         require(resolvedCredentials.all { it.third == notifications }) {
             "All credentials in an issuance session must resolve to the same notification configuration"

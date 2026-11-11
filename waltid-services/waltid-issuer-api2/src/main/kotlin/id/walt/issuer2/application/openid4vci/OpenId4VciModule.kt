@@ -101,6 +101,7 @@ data class OpenId4VciModule(
             val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
                 repository = preAuthorizedCodeRepository,
                 anonymousAccessSupported = config.supportsPreAuthAnonymous(),
+                policy = config.preAuthorizedCodePolicy,
             )
             val credentialNonceService = crypto2TokenKey?.let { signingKey ->
                 JwtCredentialNonceService.crypto2(
@@ -187,6 +188,7 @@ data class OpenId4VciModule(
                     refreshTokenVerifier = refreshTokenVerifier,
 
                     preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                    preAuthorizedCodePolicy = config.preAuthorizedCodePolicy,
                 )
             )
 

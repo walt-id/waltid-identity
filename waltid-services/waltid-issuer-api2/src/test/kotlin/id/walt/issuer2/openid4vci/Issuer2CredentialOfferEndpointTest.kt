@@ -154,6 +154,26 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun rejectsUnboundedPreAuthorizedOffersForBothRequestFormats() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val selectors = listOf(
+            """"profileId":"$OPEN_BADGE_PROFILE_ID"""",
+            """"credentials":[{"profileId":"$OPEN_BADGE_PROFILE_ID"}]""",
+        )
+        for (selector in selectors) {
+            for (lifetime in listOf(-1, 301)) {
+                val response = client.post("/issuer2/credential-offers") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{$selector,"authMethod":"PRE_AUTHORIZED","expiresInSeconds":$lifetime}""")
+                }
+                assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+                assertTrue(response.bodyAsText().contains("expiresInSeconds"))
+            }
+        }
+    }
+
+    @Test
     fun authorizedOfferModesAndOverridesMatchAcrossRequestFormats() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -762,7 +782,7 @@ class Issuer2CredentialOfferEndpointTest {
         val response = client.createCredentialOffer(
             CredentialOfferCreateRequest(
                 profileId = PROFILE_ID,
-                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                authMethod = AuthenticationMethod.AUTHORIZED,
                 expiresInSeconds = -1L,
             )
         )
@@ -891,7 +911,8 @@ class Issuer2CredentialOfferEndpointTest {
         val response = client.createCredentialOffer(
             CredentialOfferCreateRequest(
                 profileId = profile.profileId,
-                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
                 expiresInSeconds = -1L,
                 runtimeOverrides = runtimeOverridesForConfiguredProfile(profile.profileId),
             )

@@ -371,7 +371,7 @@ Events raised while handling a single request are delivered in order, on both tr
 
 On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
 
-Only terminal credential endpoint failures conclude a session. Earlier stages and retryable credential proof or nonce failures leave it usable. An incorrect `tx_code`, for example, does not consume the pre-authorized code, so the wallet can retry and complete the same session.
+Only terminal credential endpoint failures conclude an issuance session. A wrong `tx_code` can be retried until the pre-authorized code reaches its failed attempt limit. At that point the code is locked and the holder needs a new offer.
 
 Published session payloads redact issuer signing key material (`issuerKey.type = "redacted"`). Credential data may still be present; use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
 
@@ -426,6 +426,10 @@ recovering the original offer session. Pre-authorized offers are unchanged.
 **Migration:** Send `"issuerStateMode": "INCLUDE"` to preserve the previous OSS behavior,
 including recovery of the original offer session and support for runtime overrides.
 Defaults for reference/value mode, expiry, and transaction codes are shared by both request forms.
+
+Pre-authorized offers default to 300 seconds and must specify a positive lifetime no greater than
+`preAuthorizedCodePolicy.maxLifetimeSeconds` (300 by default). Use `-1` only for authorized offers.
+`preAuthorizedCodePolicy.maxFailedTxCodeAttempts` defaults to five wrong values per code.
 
 ### Sessions, authorization and proof copies
 

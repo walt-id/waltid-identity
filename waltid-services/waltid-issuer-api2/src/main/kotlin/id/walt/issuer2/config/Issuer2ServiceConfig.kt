@@ -11,6 +11,7 @@ import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeC
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodePolicy
 import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
@@ -28,6 +29,7 @@ data class Issuer2ServiceConfig(
     /** Optional dedicated metadata signer, separate from token and credential signing. */
     val signedMetadata: SignedMetadataConfig? = null,
     val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
+    val preAuthorizedCodePolicy: PreAuthorizedCodePolicy = PreAuthorizedCodePolicy(),
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(
