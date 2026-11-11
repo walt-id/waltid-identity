@@ -47,8 +47,26 @@ class CredentialIssuerMetadataSerializationTest {
     }
 
     @Test
+    fun `claim path strings that look numeric stay object keys`() {
+        for (path in listOf("""["map","1E+19"]""", """["map","1e2"]""", """["by_code","0"]""", """["map","2.0"]""")) {
+            val claim = json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            assertEquals(json.parseToJsonElement(path), json.parseToJsonElement(json.encodeToString(claim)).jsonObject.getValue("path"), path)
+            assertTrue(claim.path.last().jsonPrimitive.isString, path)
+        }
+    }
+
+    @Test
+    fun `claim description constructor requires canonical integers`() {
+        assertFailsWith<IllegalArgumentException> {
+            ClaimDescription(listOf(JsonPrimitive("namespace"), JsonPrimitive("map"), JsonPrimitive(1.0E19)))
+        }
+        val claim = ClaimDescription(listOf(JsonPrimitive("namespace"), JsonPrimitive("map"), JsonPrimitive(7)))
+        assertEquals(JsonPrimitive(7), claim.path.last())
+    }
+
+    @Test
     fun `claim paths reject invalid components`() {
-        for (path in listOf("[]", "[true]", "[1.5]", "[1e2]", "[{}]", "[[]]")) {
+        for (path in listOf("[]", "[true]", "[1.5]", "[1e2]", "[1E+19]", "[2.0]", "[{}]", "[[]]")) {
             assertFailsWith<IllegalArgumentException>(path) {
                 json.decodeFromString<ClaimDescription>("""{"path":$path}""")
             }

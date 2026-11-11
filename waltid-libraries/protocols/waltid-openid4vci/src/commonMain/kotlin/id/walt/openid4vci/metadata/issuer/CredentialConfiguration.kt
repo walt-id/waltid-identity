@@ -17,7 +17,6 @@ import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
@@ -312,7 +311,7 @@ data class ClaimDescription(
 
     init {
         require(path.isNotEmpty()) { "claim description path must not be empty" }
-        require(path.all { it.isValidPathSegment() }) {
+        require(path.all { canonicalClaimPathSegment(it) == it }) {
             "claim description path must contain only strings, integers, or null wildcards"
         }
         display?.let { entries ->
@@ -325,10 +324,17 @@ data class ClaimDescription(
     }
 }
 
-private fun JsonElement.isValidPathSegment(): Boolean = when (this) {
-    JsonNull -> true
-    is JsonPrimitive -> isString || integerPathSegment.matches(content)
-    else -> false
+/**
+ * The claims path pointer segment as stored and serialized (Appendix C), or null if it is not a string, an integer
+ * written as plain digits, or a null wildcard. Integers become unquoted literals, so their digits are kept exactly.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal fun canonicalClaimPathSegment(segment: JsonElement): JsonElement? = when {
+    segment == JsonNull -> JsonNull
+    segment !is JsonPrimitive -> null
+    segment.isString -> segment
+    integerPathSegment.matches(segment.content) -> JsonUnquotedLiteral(segment.content)
+    else -> null
 }
 
 private val integerPathSegment = Regex("-?(0|[1-9][0-9]*)")
@@ -339,17 +345,12 @@ object ClaimDescriptionPathSerializer : KSerializer<List<JsonElement>> {
     private val delegate = ListSerializer(JsonElement.serializer())
     override val descriptor: SerialDescriptor = delegate.descriptor
 
-    override fun deserialize(decoder: Decoder): List<JsonElement> = delegate.deserialize(decoder)
+    override fun deserialize(decoder: Decoder): List<JsonElement> = delegate.deserialize(decoder).map(::canonical)
 
-    override fun serialize(encoder: Encoder, value: List<JsonElement>) {
-        val jsonEncoder = encoder as? JsonEncoder
-            ?: throw SerializationException("Claim description paths only support JSON encoding")
-        jsonEncoder.encodeJsonElement(JsonArray(value.map { segment ->
-            if (segment is JsonPrimitive && segment != JsonNull && !segment.isString) {
-                JsonUnquotedLiteral(segment.content)
-            } else segment
-        }))
-    }
+    override fun serialize(encoder: Encoder, value: List<JsonElement>) = delegate.serialize(encoder, value.map(::canonical))
+
+    private fun canonical(segment: JsonElement): JsonElement = canonicalClaimPathSegment(segment)
+        ?: throw SerializationException("claim description path segment must be a string, integer, or null wildcard: $segment")
 }
 
 @Serializable
