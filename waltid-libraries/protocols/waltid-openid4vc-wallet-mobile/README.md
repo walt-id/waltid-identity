@@ -606,17 +606,20 @@ Managed signing keys are device-local by default. They protect data at rest on t
 
 When an app enables `urn:eudi:sca:payment:1`, reviewed ordinary and Digital
 Credentials API submissions require a generated, non-exportable hardware signing
-key with the per-use `BiometricCurrentSet` policy. The SDK checks the restored
-native key's protection and policy provenance before signing. A successful native
-signature establishes possession and inherence; the proof reports both methods as
+key with `BiometricCurrentSet` or `BiometricTimedReuse`. The SDK checks the restored
+native key's protection and policy provenance before signing. Per-use keys authenticate
+during signing. Timed keys require fresh native biometrics for each payment, followed
+by a single-use signer that expires with the configured window and closes when the
+operation ends. A successful authorized signature establishes possession and inherence;
+the proof reports both methods as
 `other`, without claiming a specific biometric modality or certified WSCD category.
-Cancellation, missing native evidence, and unsupported key policies produce no
+Cancellation, expiry, missing native evidence, and unsupported key policies produce no
 payment proof. This does not upgrade an existing key's policy.
 
 The application remains responsible for transaction display, informed consent and
-action lifetime. This adapter does not supply transaction UI, authentication
-batching, timed reuse, or full SCA assurance. The native provenance contract depends
-on the provider changes in [PR #2222](https://github.com/walt-id/waltid-identity/pull/2222).
+action lifetime. The payment scope enforces fresh approval and one proof; the native
+key retains its timed policy for ordinary operations. This adapter does not supply
+transaction UI, authentication batching across payments, or full SCA assurance.
 
 The examples below build `MobileWalletConfig` values. Pass the selected config
 to `MobileWalletFactory(...).create(config)` from a coroutine to create the

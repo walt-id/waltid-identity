@@ -40,10 +40,16 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
     var explanation: String {
         switch self {
         case .none: "Private-key operations do not require biometric authorization."
-        case .biometric: "Strong biometric authorization can be reused for signing for 10 seconds."
+        case .biometric: biometricTimedApprovalDescription(10)
         case .biometricPerUse: "Approve every signature with current biometrics. Changing enrolled biometrics invalidates this key."
         }
     }
+}
+
+func biometricTimedApprovalDescription(_ timeoutSeconds: Int) -> String {
+    let duration = timeoutSeconds == 1 ? "1 second" : "\(timeoutSeconds) seconds"
+    return "Biometric approval may be reused for ordinary signing for up to \(duration). " +
+        "Each payment requires fresh biometric approval."
 }
 
 private enum WalletDemoSigningProtectionPolicyError: LocalizedError {

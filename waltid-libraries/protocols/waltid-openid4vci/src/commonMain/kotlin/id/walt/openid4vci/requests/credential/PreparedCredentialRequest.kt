@@ -1,5 +1,13 @@
 package id.walt.openid4vci.requests.credential
 
+import id.walt.openid4vci.deferred.DeferredCredentialResponseContext
+import id.walt.openid4vci.clientauth.attestation.VerifiedClientAttestation
+import id.walt.openid4vci.deferred.AcceptedCredentialProof
+import id.walt.openid4vci.deferred.AcceptedKeyAttestation
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.proofs.VerifiedAttestationProof
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedJwtProof
 import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.jose.Jwk
@@ -16,8 +24,12 @@ data class AcceptedCredentialRequest(
     val request: DefaultCredentialRequest,
     val credentialIdentifier: String,
     val credentialConfigurationId: String,
-    val configuration: id.walt.openid4vci.metadata.issuer.CredentialConfiguration,
+    val configuration: CredentialConfiguration,
     val bindings: List<AcceptedHolderBinding>,
+    val clientAttestation: VerifiedClientAttestation? = null,
+    /** Null identifies persisted transactions predating authentication-policy capture. */
+    val clientAttestationRequired: Boolean? = null,
+    val proofs: List<AcceptedCredentialProof>? = null,
 ) {
     internal suspend fun equivalentTo(other: AcceptedCredentialRequest): Boolean {
         fun DefaultCredentialRequest.issuanceParameters() = requestForm.filterKeys {
@@ -37,12 +49,15 @@ data class AcceptedCredentialRequest(
         }
     }
 
-    suspend fun restore(encryption: CredentialResponseEncryptionParameters? = request.credentialResponseEncryption): CredentialRequest =
-        PreparedCredentialRequest(
-            request.copy(credentialResponseEncryption = encryption),
-            configuration,
-            bindings.map { VerifiedCredentialBinding(restoreAttestedKey(it.publicJwk), it.holderKid, it.holderDid, it.proofIndexes) },
-        )
+    suspend fun restore(
+        encryption: CredentialResponseEncryptionParameters? = request.credentialResponseEncryption,
+        deferredContext: DeferredCredentialResponseContext? = null,
+    ): CredentialRequest = PreparedCredentialRequest(
+        request.copy(credentialResponseEncryption = encryption),
+        this,
+        bindings.map { VerifiedCredentialBinding(restoreAttestedKey(it.publicJwk), it.holderKid, it.holderDid, it.proofIndexes) },
+        deferredContext,
+    )
 }
 
 @Serializable
@@ -56,22 +71,26 @@ data class AcceptedHolderBinding(
 /** Only the provider or a trusted persisted acceptance can construct this proof-free request. */
 internal class PreparedCredentialRequest(
     private val original: CredentialRequest,
-    val acceptedConfiguration: id.walt.openid4vci.metadata.issuer.CredentialConfiguration,
+    val accepted: AcceptedCredentialRequest,
     val bindings: List<VerifiedCredentialBinding>,
+    val deferredContext: DeferredCredentialResponseContext? = null,
 ) : CredentialRequest by original {
     override fun withSession(session: Session?): CredentialRequest =
-        PreparedCredentialRequest(original.withSession(session), acceptedConfiguration, bindings)
+        PreparedCredentialRequest(original.withSession(session), accepted, bindings, deferredContext)
     override fun withIssuer(issClaim: String?): CredentialRequest =
-        PreparedCredentialRequest(original.withIssuer(issClaim), acceptedConfiguration, bindings)
+        PreparedCredentialRequest(original.withIssuer(issClaim), accepted, bindings, deferredContext)
     override fun withAccessTokenClient(clientId: String?, anonymousPreAuthorizedAccess: Boolean): CredentialRequest =
-        PreparedCredentialRequest(original.withAccessTokenClient(clientId, anonymousPreAuthorizedAccess), acceptedConfiguration, bindings)
+        PreparedCredentialRequest(original.withAccessTokenClient(clientId, anonymousPreAuthorizedAccess), accepted, bindings, deferredContext)
 }
 
 internal suspend fun CredentialRequest.accept(
     credentialIdentifier: String,
     credentialConfigurationId: String,
-    configuration: id.walt.openid4vci.metadata.issuer.CredentialConfiguration,
+    configuration: CredentialConfiguration,
     bindings: List<VerifiedCredentialBinding>,
+    proofs: List<VerifiedCredentialProof>,
+    clientAttestation: VerifiedClientAttestation?,
+    clientAttestationRequired: Boolean,
 ): AcceptedCredentialRequest = AcceptedCredentialRequest(
     request = DefaultCredentialRequest(
         id = id, requestedAt = requestedAt, client = client,
@@ -84,5 +103,23 @@ internal suspend fun CredentialRequest.accept(
     credentialIdentifier = credentialIdentifier,
     credentialConfigurationId = credentialConfigurationId,
     configuration = configuration,
+    clientAttestation = clientAttestation,
+    clientAttestationRequired = clientAttestationRequired,
+    proofs = proofs.map { proof ->
+        val attestation = when (proof) {
+            is VerifiedJwtProof -> proof.keyAttestation
+            is VerifiedAttestationProof -> proof.attestation
+            else -> null
+        }
+        AcceptedCredentialProof(
+            proof.proofType.value,
+            attestation?.let {
+                AcceptedKeyAttestation(
+                    requireNotNull(it.lifetime) { "Verified key attestation is missing lifetime evidence" },
+                    it.attestedKeys.map { key -> Jwk.sha256Thumbprint(key.exportPublicJwk()) }.toSet(),
+                )
+            },
+        )
+    },
     bindings = bindings.map { AcceptedHolderBinding(it.holderKey.exportPublicJwkObject(), it.holderKid, it.holderDid, it.proofIndexes) },
 )

@@ -21,6 +21,8 @@ data class CredentialResponse(
     @SerialName("transaction_id") val transactionId: String? = null,
     val interval: Long? = null,
     @SerialName("notification_id") val notificationId: String? = null,
+    /** Response-creation output; ciphertext is never persisted in a credential checkpoint. */
+    @kotlinx.serialization.Transient internal val preparedBody: CredentialResponseBody? = null,
 )
 
 @Serializable

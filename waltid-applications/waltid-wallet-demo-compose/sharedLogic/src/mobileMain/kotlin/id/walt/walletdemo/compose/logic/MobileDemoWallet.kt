@@ -527,7 +527,7 @@ private fun KeyUseAuthorizationPolicy.identityDescription(isIos: Boolean): Strin
     KeyUseAuthorizationPolicy.None -> "Signing does not require system approval."
     KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Approve each signature with biometrics. Changing enrolled biometrics makes this key unusable."
     KeyUseAuthorizationPolicy.BiometricAny -> "Approve each use with biometrics, including newly enrolled biometrics. Security changes can still make the key unavailable."
-    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Approve signing with biometrics. The system may reuse that approval for ${durationSeconds(timeoutSeconds)}."
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> biometricTimedApprovalDescription(timeoutSeconds)
     is KeyUseAuthorizationPolicy.DeviceCredential -> (if (isIos) "Approve signing with the device passcode. " else "Approve signing with the device PIN, pattern, or password. ") + approvalReuse(timeoutSeconds)
     is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> (if (isIos) "Approve signing with biometrics or the device passcode. " else "Approve signing with biometrics or the device PIN, pattern, or password. ") + approvalReuse(timeoutSeconds)
 }
