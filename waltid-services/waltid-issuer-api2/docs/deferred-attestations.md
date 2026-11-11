@@ -134,11 +134,15 @@ the persisted claim fence and lifetimes are checked again after resolution.
 |---|---|
 | Every applicable entry VALID (`0x00`) | Continue remaining lifetime and authorization checks |
 | Confirmed INVALID (`0x01`) | Persist whole-transaction denial; HTTP 400 `credential_request_denied` |
-| SUSPENDED (`0x02`) | HTTP 503 `temporarily_unavailable`, `Retry-After: 1`; retry the same transaction |
-| Lookup failure, bad signature, unauthorized signer, stale/malformed list, unknown status or out-of-range index | HTTP 503 `temporarily_unavailable`, `Retry-After: 1`; no permanent revocation decision |
+| SUSPENDED (`0x02`) | HTTP 202 with the same `transaction_id` and a positive `interval`; no credentials |
+| Lookup failure, bad signature, unauthorized signer, stale/malformed list, unknown status or out-of-range index | HTTP 202 with the same `transaction_id` and `interval`; no credentials or permanent revocation decision |
 | Required legacy evidence missing | Persist denial; HTTP 400 `credential_request_denied` |
 
 A confirmed INVALID entry takes precedence over another entry's unavailable lookup.
+For a retryable status outcome on an accepted transaction, the wallet waits at least the
+returned `interval` before polling again. The pending response uses the requested response
+encryption when configured. The provider exposes retryability to the embedding service
+separately from the HTTP status; it is not an extra field in the wire response.
 Suspension and technical failure do not consume or deny the transaction. Processing claims
 and uncommitted usage reservations are released; a retry reacquires reservations as needed,
 including for a previously signed checkpoint. Coroutine cancellation propagates, with claim
@@ -146,8 +150,10 @@ cleanup performed outside cancellation. Cancellation after a durable signing che
 preserves its reservation for F5 recovery. The offer's absolute deadline still limits retries.
 
 An INVALID WIA during OAuth client authentication is a client-authentication failure. Malformed or missing required
-KA status evidence is a proof-validation failure. Initial status lookup failures are technical
-failures; they create no accepted transaction or successful issuance.
+KA status evidence is a proof-validation failure. Before a transaction is accepted, an initial
+Credential Request whose status lookup is unavailable remains an HTTP 503 technical failure;
+it creates no transaction or successful issuance. Token-endpoint OAuth error mapping is
+separate from the deferred-poll response contract.
 
 At credential-request acceptance, a confirmed INVALID WIA or KA emits the existing
 format-specific credential-request failure notification with `credential_request_denied`,
