@@ -108,6 +108,36 @@ class ProviderPkceFlowTest {
         assertEquals(3, fixture.tokenCalls)
     }
 
+    @Test
+    fun invalidAuthorizationAndParFailBeforeHandlersOrStorage() = runTest {
+        val fixture = Fixture()
+        var handlerCalls = 0
+        val config = fixture.config
+        config.authorizationEndpointHandlers.append(object : AuthorizationEndpointHandler {
+            override suspend fun handleAuthorizationEndpointRequest(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult {
+                handlerCalls++
+                return AuthorizationResponseResult.Success(AuthorizationResponse(redirectUri = redirect, code = "must-not-issue"))
+            }
+        })
+        for (invalid in listOf(
+            authorizationForm(verifier) + ("code_challenge_method" to listOf("plain")),
+            authorizationForm(verifier) - "code_challenge_method",
+            authorizationForm(verifier) + ("code_challenge" to listOf("")),
+            authorizationForm(verifier) + ("code_challenge" to listOf(challenge, "")),
+        )) {
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+                assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createAuthorizationRequest(invalid)).error.error)
+            assertIs<AuthorizationRequestResult.Failure>(fixture.provider.createPushedAuthorizationRequest(invalid))
+            // A caller bypassing the provider's request parser cannot bypass the response guards.
+            val typed = assertIs<AuthorizationRequestResult.Success>(DefaultAuthorizationRequestValidator().validate(
+                authorizationForm(null))).request.toDefaultAuthorizationRequest().copy(requestForm = invalid)
+            assertIs<AuthorizationResponseResult.Failure>(fixture.provider.createAuthorizationResponse(typed, session))
+            assertIs<PushedAuthorizationResponseResult.Failure>(fixture.provider.createPushedAuthorizationResponse(typed))
+        }
+        assertEquals(0, handlerCalls)
+        assertTrue(fixture.codes.records.isEmpty())
+    }
+
     private fun authorizationForm(verifier: String?) = mapOf(
         "response_type" to listOf("code"), "client_id" to listOf("wallet"), "redirect_uri" to listOf(redirect),
     ) + (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)), "code_challenge_method" to listOf("S256")) } ?: emptyMap())
