@@ -198,7 +198,8 @@ object OpenId4VciRoutesDocs {
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
         description =
-            "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example. " +
+            "When requirePkce is true in issuer-service.conf, authorization-code requests require S256 PKCE. " +
+                "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example. " +
                 "For PKCE, include code_challenge and code_challenge_method=S256 as shown in the PAR example; retain the verifier for /token."
         response {
             HttpStatusCode.Found to {
