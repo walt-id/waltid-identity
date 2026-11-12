@@ -35,6 +35,14 @@ fun interface Crypto2JwtVerificationKeyResolver {
     suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey?
 }
 
+/**
+ * Resolves the key that signed a JWT, in this order: DID `iss`, `x5c` header, inline `jwk` (opt-in),
+ * HTTPS well-known issuer metadata.
+ *
+ * Resolution does not establish trust in the key. A key with source [JwtKeyResolutionSource.X5C] is
+ * chosen by the token itself and must be anchored, for example with
+ * [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors], before it is relied on.
+ */
 class Crypto2JwtKeyResolver(
     private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
         resolveDocument = { did -> DidService.resolve(did) },
