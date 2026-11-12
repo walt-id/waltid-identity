@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Inject enhanced GitHub environment variables
-        uses: rlespinasse/github-slug-action@v5
+        uses: rlespinasse/github-slug-action@0e3299190dac9a700da92a90de4556116ea965ed # v5.7.1
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
       - name: Delete namespace if not exists
-        uses: actions-hub/kubectl@master
         continue-on-error: true
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        with:
-          args: delete namespace ${{ env.GITHUB_REF_SLUG }}
+        run: |
+          set -euo pipefail
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          (umask 077; printf '%s' "$KUBE_CONFIG" | base64 -d > "$KUBECONFIG")
+          kubectl delete namespace "$GITHUB_REF_SLUG"

@@ -22,18 +22,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           repository: walt-id/waltid-identity
           ref: ${{ github.ref_name }}
 
-      - name: Create namespace if not exists
-        uses: actions-hub/kubectl@master
-        continue-on-error: true
+      - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: Create kubeconfig file
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
-        with:
-          args: create namespace ${{ inputs.namespace }}
+        run: |
+          set -euo pipefail
+          (umask 077; printf '%s' "$KUBE_CONFIG" | base64 -d > "$RUNNER_TEMP/kubeconfig")
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Create namespace if not exists
+        continue-on-error: true
+        env:
+          NAMESPACE: ${{ inputs.namespace }}
+        run: kubectl create namespace "$NAMESPACE"
 
       - name: Update domains and image name in helm-values.json
         env:
@@ -72,13 +80,8 @@ jobs:
 
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
-      - uses: azure/setup-kubectl@v4
-      - uses: azure/setup-helm@v5.0.1
-      - name: Create kubeconfig file
-        run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
       - name: Create portal2 PID secret
         env:
-          KUBECONFIG: ${{ github.workspace }}/kubeconfig
           PORTAL2_PID_ENV: ${{ secrets.PORTAL2_PID_ENV }}
         run: |
           if [ -z "$PORTAL2_PID_ENV" ]; then
@@ -113,7 +116,6 @@ jobs:
           rm -f "$ENV_FILE"
       - name: Create portal2 Enterprise secret
         env:
-          KUBECONFIG: ${{ github.workspace }}/kubeconfig
           PORTAL2_ENTERPRISE_ENV: ${{ secrets.PORTAL2_ENTERPRISE_ENV_TEST }}
         run: |
           if [ -z "$PORTAL2_ENTERPRISE_ENV" ]; then
@@ -126,8 +128,6 @@ jobs:
         run: |
           helm dependency build ./helm-charts/waltid
       - name: Helm Deploy
-        env:
-          KUBECONFIG: ${{ github.workspace }}/kubeconfig
         run: |
           helm upgrade --install waltid-helm-release ./helm-charts/waltid \
             --namespace ${{ inputs.namespace }} \
