@@ -39,12 +39,14 @@ object PolicyClaimChecker {
         }
     }
 
-    fun checkClaim(
+    fun <T : ClaimCheckResult> checkClaim(
         credential: DigitalCredential,
         claims: List<JsonPath>,
         requireField: Boolean = false,
         checkAllClaims: Boolean = false,
-        block: JsonElement.(path: JsonPath) -> Result<ClaimCheckResult>
+        fallbackClaims: List<JsonPath> = emptyList(),
+        selectResult: (List<T>) -> T = { it.first() },
+        block: JsonElement.(path: JsonPath) -> Result<T>
     ): Result<JsonObject> {
         val dataSources = buildList {
             add(credential.credentialData)
@@ -54,13 +56,15 @@ object PolicyClaimChecker {
                 credential.signed?.let { add(JwtUtils.parseJwt(it.substringBefore("~")).second) }
             }
         }
-        val foundClaims = dataSources.flatMap { data ->
-            claims.mapNotNull { claim -> data.resolveOrNull(claim)?.let { claim to it } }
-        }.let { if (checkAllClaims) it else it.take(1) }
+        fun findClaims(paths: List<JsonPath>) = dataSources.flatMap { data ->
+            paths.mapNotNull { claim -> data.resolveOrNull(claim)?.let { claim to it } }
+        }
+        val foundClaims = findClaims(claims).ifEmpty { findClaims(fallbackClaims) }
+            .let { if (checkAllClaims) it else it.take(1) }
 
         if (foundClaims.isEmpty()) {
             if (requireField) {
-                val claimNames = claims.joinToString(", ")
+                val claimNames = (claims + fallbackClaims).joinToString(", ")
                 return Result.failure(IllegalArgumentException("Mandatory claim ($claimNames) is absent"))
             }
             return Result.success(ClaimNotFoundClaimCheckResult.CLAIM_NOT_FOUND)
@@ -69,6 +73,6 @@ object PolicyClaimChecker {
         val results = foundClaims.map { (claim, data) ->
             block.invoke(data, claim).getOrElse { return Result.failure(it) }
         }
-        return Result.success(Json.encodeToJsonElement(results.first()).jsonObject)
+        return Result.success(Json.encodeToJsonElement<ClaimCheckResult>(selectResult(results)).jsonObject)
     }
 }
