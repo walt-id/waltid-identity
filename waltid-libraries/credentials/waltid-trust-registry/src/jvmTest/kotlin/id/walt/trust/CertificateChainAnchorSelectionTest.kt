@@ -68,6 +68,15 @@ class CertificateChainAnchorSelectionTest {
     }
 
     @Test
+    fun issuerNameInUtf8StringMatchesARootSubjectInPrintableString() = runTest {
+        val chain = TestCertificates.createChainWithReencodedIssuerName("Encoding")
+        check(!chain.root.subjectX500Principal.encoded.contentEquals(chain.leaf.issuerX500Principal.encoded))
+
+        assertEquals(CanonicalSubjectHash.of(chain.root.subjectX500Principal), CanonicalSubjectHash.of(chain.leaf.issuerX500Principal))
+        assertTrusted("root", resolve(chain.leaf, anchors = mapOf("root" to der(chain.root))))
+    }
+
+    @Test
     fun unparseableStoredCertificateDoesNotHideAValidAnchor() = runTest {
         val chain = TestCertificates.createChain("Selection")
 
