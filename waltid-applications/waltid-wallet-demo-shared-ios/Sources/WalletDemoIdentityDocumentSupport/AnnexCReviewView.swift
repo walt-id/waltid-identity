@@ -43,6 +43,7 @@ public struct AnnexCReviewView: View {
     }
 
     public var body: some View {
+        let reviewedStatuses = model.credentialStatuses.mapValues { $0.presentation.advisoryRevision }
         Group {
             if showDcApiPresentationPreview || model.failure != nil {
                 SharingReviewScreen(
@@ -54,12 +55,15 @@ public struct AnnexCReviewView: View {
                     isSubmitting: model.isSubmitting,
                     onToggleCredential: model.toggleCredential,
                     onToggleDisclosure: model.toggleDisclosure,
-                    onSubmit: { Task { await model.submit() } },
+                    onSubmit: {
+                        Task { await model.submit(reviewedStatus: reviewedStatuses) }
+                    },
                     // No Reject action: IdentityDocumentServices has no way to tell the reader it was
                     // refused, so cancelling is the only truthful decline. Offering both would promise the
                     // requester learns something it never learns.
                     onReject: nil,
-                    onCancel: model.cancel
+                    onCancel: model.cancel,
+                    statusNotice: model.statusReviewNotice
                 )
             } else {
                 ProgressView("Preparing presentation")
@@ -67,6 +71,7 @@ public struct AnnexCReviewView: View {
                     .accessibilityIdentifier(WalletAccessibilityID.presentationPreparing)
             }
         }
+        .environment(\.credentialStatusUI, CredentialStatusUIContext(values: model.credentialStatuses))
         .task {
             await model.prepare()
             if !showDcApiPresentationPreview, model.failure == nil {

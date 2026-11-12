@@ -173,3 +173,7 @@ fun handleWalletDemoDeepLink(url: String) {
 fun handleWalletDemoApplicationForegrounded() {
     iosController?.handleApplicationForegrounded()
 }
+
+fun handleWalletDemoApplicationBackgrounded() {
+    iosController?.handleApplicationBackgrounded()
+}

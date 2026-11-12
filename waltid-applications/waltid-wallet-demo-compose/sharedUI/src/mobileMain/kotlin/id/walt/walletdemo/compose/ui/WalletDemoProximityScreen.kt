@@ -28,6 +28,7 @@ import id.walt.wallet2.mobile.ProximityReview
 import id.walt.wallet2.mobile.ProximityReviewReason
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.wallet2.mobile.legalActions
+import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
@@ -54,7 +55,7 @@ internal fun WalletDemoProximityScreen(
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
-    onApprove: () -> Unit,
+    onApprove: (Map<String, String>) -> Unit,
     onDecline: () -> Unit,
     onRetry: () -> Unit,
     onRemediate: (ProximityRemediationAction, WalletDemoProximityHostActionExecutor) -> Unit,
@@ -69,6 +70,8 @@ internal fun WalletDemoProximityScreen(
     headerOwnsClose: Boolean = false,
     fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
+    val statuses = id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi.current.snapshot.credentials
+    val approve = { onApprove(statuses.mapValues { it.value.advisoryRevision }) }
     val sessionState = state.sessionState
     val terminal = state.isTerminal
     val canCancel = !state.closing && !terminal && (
@@ -102,7 +105,7 @@ internal fun WalletDemoProximityScreen(
                 onSelectCredential = onSelectCredential,
                 onToggleElement = onToggleElement,
                 onContinueAfterResponseChange = onContinueAfterResponseChange,
-                onApprove = onApprove,
+                onApprove = approve,
                 onDecline = onDecline,
                 onCancel = onCancel,
                 onRestart = onRestart,
@@ -237,6 +240,9 @@ private fun WalletDemoProximityReview(
                 onSubmit = onApprove,
                 onCancel = onCancel,
                 onReject = onDecline,
+                credentialStatuses = state.selections.mapNotNull { selected ->
+                    id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi.current.snapshot.credentials[selected.credentialId]?.let { (credentialDetailsById[selected.credentialId]?.toCardDisplayData()?.title ?: "Credential") to it }
+                },
                 presentation = ReviewActionPresentation.Proximity,
                 showCancelWithReject = !headerOwnsClose,
             )

@@ -9,6 +9,13 @@ internal object WalletVisualFixtures {
         Json.parseToJsonElement(SyntheticCredentialImageFiles.read("wallet-visual-data.json").decodeToString()).jsonObject
             .also { check(it.getValue("schemaVersion").jsonPrimitive.int == 1) }
     }
+    val statusData by lazy {
+        Json.parseToJsonElement(SyntheticCredentialImageFiles.read("credential-status.json").decodeToString())
+            .jsonObject.getValue("values").jsonObject
+    }
+    fun credentialStatus(name: String): WalletDemoCredentialStatus = Json { ignoreUnknownKeys = true }
+        .decodeFromJsonElement(statusData.getValue(name).jsonObject.getValue("presentation"))
+
     private val issuer get() = data.getValue("issuer").jsonObject
     private val credential get() = data.getValue("credential").jsonObject
     private val offered get() = data.getValue("offer").jsonObject

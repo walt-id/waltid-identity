@@ -14,6 +14,7 @@ public struct CredentialDetailsBody: View {
 
         VStack(alignment: .leading, spacing: 12) {
             CredentialOverviewView(details: details)
+            CredentialStatusSection(credentialID: details.id)
 
             if details.groups.isEmpty && technicalGroups.isEmpty {
                 Text("No credential details available")

@@ -15,6 +15,7 @@ struct SharingCredentialRow: View {
             .map { $0.item.label }.reduce(into: [String]()) { labels, label in
                 if !labels.contains(label) { labels.append(label) }
             }
+        VStack(alignment: .leading, spacing: 0) {
         ReviewCredentialChoice(selected: selection.credentials.contains(option.selection), multiple: option.multiple || !hasAlternatives,
             enabled: !isLoading, readOnly: isReadOnly,
             hint: extras.isEmpty ? nil : "Also shares " + extras.prefix(2).joined(separator: ", ")
@@ -24,5 +25,8 @@ struct SharingCredentialRow: View {
                     .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
             }
             .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
+        CredentialStatusSection(credentialID: option.credentialID, compact: true)
+            .padding(.leading, isReadOnly ? 4 : 36).padding(.trailing, 4)
+        }
     }
 }

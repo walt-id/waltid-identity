@@ -19,6 +19,14 @@ struct WalletVisualFixtures {
         XCTAssertEqual(root["schemaVersion"] as? Int, 1)
     }
 
+    func credentialStatus(_ name: String) throws -> CredentialStatus {
+        let data = try Data(contentsOf: resourceDirectory.appendingPathComponent("credential-status.json"))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let values = try XCTUnwrap(root["values"] as? [String: Any])
+        let encoded = try JSONSerialization.data(withJSONObject: XCTUnwrap(values[name]))
+        return try decodeCredentialStatus(CredentialStatus.self, json: XCTUnwrap(String(data: encoded, encoding: .utf8)))
+    }
+
     func readerTrustImport() throws -> ProximityReaderTrustImportPreview {
         let value = try object(root, "readerTrust")
         let authority = ProximityReaderTrustAnchorImportPreview(displayName: try text(value, "displayName"),

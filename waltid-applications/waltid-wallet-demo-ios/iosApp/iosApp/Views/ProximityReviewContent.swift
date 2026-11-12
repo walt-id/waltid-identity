@@ -71,6 +71,7 @@ struct ProximityReviewContent: View {
                                 }
                             }.accessibilityIdentifier(WalletAccessibilityID.proximityCredential(
                                 requestIndex: document.requestIndex, credentialID: credential.credentialID))
+                            CredentialStatusSection(credentialID: credential.credentialID, compact: true)
                         }
                     }
                 }

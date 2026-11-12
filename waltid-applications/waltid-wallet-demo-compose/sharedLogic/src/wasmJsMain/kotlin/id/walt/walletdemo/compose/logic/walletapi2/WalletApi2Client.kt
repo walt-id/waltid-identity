@@ -25,6 +25,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 internal class WalletApi2Exception(
     val status: HttpStatusCode,
@@ -117,6 +118,17 @@ internal class WalletApi2Client(
         require(kind.canGenerateIdentity) { "This API does not set a default DID" }
         request(HttpStatusCode.NoContent) { put(walletPath(walletId, "dids/$did/set-default")) }
     }
+
+    suspend fun credentialStatusSnapshot(walletId: String): CredentialStatusSnapshotDto? {
+        val response = http.get(walletPath(walletId, "credential-status"))
+        checkSession(response)
+        if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.MethodNotAllowed) return null
+        if (!response.status.isSuccess()) throw response.toApiException()
+        return response.body()
+    }
+
+    suspend fun refreshCredentialStatuses(walletId: String, request: RefreshCredentialStatusesDto): List<CredentialStatusRefreshResultDto> =
+        request { post(walletPath(walletId, "credential-status/refresh")) { jsonBody(request) } }.body()
 
     suspend fun listCredentialMetadata(walletId: String): List<StoredCredentialMetadataDto> =
         request { get(walletPath(walletId, "credentials")) }.body()
@@ -228,18 +240,33 @@ internal class WalletApi2Client(
             }
         }.body()
 
-    suspend fun buildVpToken(walletId: String, request: BuildVpTokenRequestDto): BuildVpTokenResultDto =
-        request {
+    private suspend fun statusReviewedResponse(response: HttpResponse): HttpResponse {
+        checkSession(response)
+        if (response.status == HttpStatusCode.Conflict) {
+            val error = walletApi2Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            if (error["code"]?.jsonPrimitive?.content == "credential_status_review_changed")
+                throw id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged()
+        }
+        if (!response.status.isSuccess()) throw response.toApiException()
+        return response
+    }
+
+    suspend fun buildVpToken(walletId: String, request: BuildVpTokenRequestDto, reviewedStatus: Map<String, String>? = null): BuildVpTokenResultDto =
+        if (reviewedStatus == null) request {
             post(walletPath(walletId, "credentials/present/build-vp-token")) { jsonBody(request) }
-        }.body()
+        }.body() else statusReviewedResponse(http.post(walletPath(walletId, "credentials/present/build-vp-token/status-reviewed")) {
+            jsonBody(StatusReviewedBuildRequestDto(request, reviewedStatus))
+        }).body()
 
     suspend fun sendPresentationResponse(
-        walletId: String,
-        request: SendAuthorizationResponseRequestDto,
+        walletId: String, request: SendAuthorizationResponseRequestDto,
+        reviewedStatus: Map<String, String>? = null, selectedIds: Set<String> = emptySet(),
     ): WalletPresentResultDto =
-        request {
+        if (reviewedStatus == null) request {
             post(walletPath(walletId, "credentials/present/send-response")) { jsonBody(request) }
-        }.body()
+        }.body() else statusReviewedResponse(http.post(walletPath(walletId, "credentials/present/send-response/status-reviewed")) {
+            jsonBody(StatusReviewedSendRequestDto(request, selectedIds, reviewedStatus))
+        }).body()
 
     suspend fun rejectPresentation(
         walletId: String,

@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { createHash } = require('node:crypto');
 const catalogue = require('./catalogue.json');
+const statusFixtures = require('../../../waltid-wallet-demo-test-fixtures/resources/files/credential-status.json').values;
 
 // Compose's ARIA mirror supplies bounds, while the canvas receives the actual pointer input.
 async function clickControl(page, locator) {
@@ -48,7 +49,7 @@ async function submitEditedForm(page, locator) {
   await clickControl(page, locator);
 }
 
-for (const scenario of catalogue.states.filter(state => state.state !== 'credential-dates')) {
+for (const scenario of catalogue.states.filter(state => state.id.startsWith('account.'))) {
   test(scenario.id, async ({ page }, testInfo) => {
     testInfo.annotations.push({ type: 'requirements', description: catalogue.requirements.join(', ') });
     await page.setViewportSize({ width: scenario.width, height: scenario.height });
@@ -124,7 +125,7 @@ for (const scenario of catalogue.states.filter(state => state.state !== 'credent
   });
 }
 
-for (const scenario of catalogue.states.filter(state => state.state === 'credential-dates')) {
+for (const scenario of catalogue.states.filter(state => state.id.startsWith('credential.'))) {
   test.describe(scenario.id, () => {
     test.use({ locale: scenario.locale, timezoneId: scenario.timezoneId });
     test(scenario.id, async ({ page }, testInfo) => {
@@ -136,10 +137,16 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
         localStorage.setItem('waltid.wallet2.walletId', 'synthetic-wallet');
         localStorage.setItem('waltid.wallet2.walletTargets', JSON.stringify(['synthetic-wallet']));
       });
+      const dates = scenario.state === 'credential-dates';
+      const oldServer = scenario.state === 'status-unsupported';
       const metadata = {
         id: 'synthetic-date-credential', format: 'jwt_vc_json', label: 'Date display credential',
         issuer: 'Synthetic Issuer', subject: 'did:example:holder', addedAt: '2026-10-25T00:35:00Z',
       };
+      if (!dates) metadata.label = 'Status review credential';
+      const reference = { storeIndex: 0, credentialId: metadata.id };
+      let status = dates ? statusFixtures.not_provided : statusFixtures.clear;
+      const refreshes = [];
       const responses = {
         '/wallet': ['synthetic-wallet'],
         '/wallet/synthetic-wallet': { walletId: 'synthetic-wallet', defaultKeyId: 'synthetic-key', defaultDidId: 'did:example:holder' },
@@ -164,7 +171,17 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
       page.on('pageerror', error => errors.push(error.message));
       await page.route(url => url.pathname === '/wallet' || url.pathname.startsWith('/wallet/'), async route => {
         const path = new URL(route.request().url()).pathname;
-        if (path.endsWith('/set-default') && route.request().method() === 'PUT') {
+        const method = route.request().method();
+        if (path === '/wallet/synthetic-wallet/credential-status' && method === 'GET') {
+          await route.fulfill(oldServer ? { status: 404, json: {} } : { json: {
+            evaluatedAt: status.evaluatedAt, credentials: [{ reference, ...status }], refreshing: [], nextRefreshAt: null,
+          } });
+        } else if (path === '/wallet/synthetic-wallet/credential-status/refresh' && method === 'POST' && !oldServer) {
+          const request = route.request().postDataJSON();
+          refreshes.push(request);
+          if (request.mode === 'FORCE') status = statusFixtures.revoked_partial;
+          await route.fulfill({ json: [{ reference, outcome: request.mode === 'FORCE' ? 'COMPLETED' : 'UNCHANGED', status: status.status }] });
+        } else if (path.endsWith('/set-default') && method === 'PUT') {
           await route.fulfill({ status: 204 });
         } else if (route.request().method() === 'GET' && Object.hasOwn(responses, path)) {
           await route.fulfill({ json: responses[path] });
@@ -174,7 +191,36 @@ for (const scenario of catalogue.states.filter(state => state.state === 'credent
         }
       });
       await page.goto('/');
-      await clickControl(page, page.getByText('Date display credential', { exact: true }));
+      await clickControl(page, page.getByText(metadata.label, { exact: true }));
+      if (!dates) {
+        const title = page.getByText(oldServer ? 'This server does not support credential status' : 'Not revoked', { exact: true });
+        await expect(title).toHaveCount(1);
+        for (let attempt = 0; !await title.isVisible() && attempt < 4; attempt++) {
+          await page.mouse.move(scenario.width / 2, scenario.height / 2);
+          await page.mouse.wheel(0, scenario.height / 2);
+        }
+        await expect(title).toBeVisible();
+        if (oldServer) {
+          await expect(page.getByRole('button', { name: 'Check now', exact: true })).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
+          expect(refreshes).toEqual([]);
+        } else {
+          await clickControl(page, page.getByRole('button', { name: 'Check now', exact: true }));
+          await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
+          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toBeVisible();
+          expect(refreshes.filter(request => request.mode === 'FORCE')).toEqual([{ credentials: [reference], mode: 'FORCE' }]);
+        }
+        await clickControl(page, page.getByRole('button', { name: 'Details', exact: true }));
+        await expect(page.getByText(oldServer
+          ? 'This server does not expose credential status checks. The credential can still be shared, and the recipient performs its own checks.'
+          : 'This check only reports the issuer’s status information. It does not confirm every aspect of the credential’s validity. The recipient performs its own checks.', { exact: true })).toBeVisible();
+        await waitForSettledImage(page);
+        expect(unexpected).toEqual([]);
+        expect(errors).toEqual([]);
+        await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
+        await testInfo.attach(scenario.id, { body: await page.screenshot(), contentType: 'image/png' });
+        return;
+      }
       const birthDate = page.getByText('1990-05-21', { exact: true });
       await expect(birthDate).toHaveCount(1);
       // Wide cards put the details below the fold. Scroll the actual canvas, not its ARIA mirror.

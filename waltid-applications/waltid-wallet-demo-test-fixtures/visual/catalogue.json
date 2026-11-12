@@ -1240,9 +1240,136 @@
       ],
       "kind": "deterministic",
       "note": "Production Compose confirmation dialog opened through Settings; cancellation is asserted. SwiftUI uses a system alert covered by the existing recovery/reset host journey rather than a replica of OS chrome."
+    },
+    {
+      "id": "status.home.issue",
+      "requirements": [
+        "Issue-only home-card icon with title clearance and no positive badge"
+      ],
+      "composeTest": "credentialStatusHome",
+      "swiftTest": "testCredentialStatusHome",
+      "title": "Issue-only home-card icon with title clearance and no positive badge"
+    },
+    {
+      "id": "status.details.clear",
+      "requirements": [
+        "Standalone clear-status section, checked time and manual action"
+      ],
+      "composeTest": "credentialStatusDetailsClear",
+      "swiftTest": "testCredentialStatusDetailsClear",
+      "title": "Standalone clear-status section, checked time and manual action"
+    },
+    {
+      "id": "status.details.adverse",
+      "requirements": [
+        "Adverse previous observation with stale and partial essentials visible"
+      ],
+      "composeTest": "credentialStatusDetailsAdverse",
+      "swiftTest": "testCredentialStatusDetailsAdverse",
+      "title": "Adverse previous observation with stale and partial essentials visible"
+    },
+    {
+      "id": "status.details.expanded",
+      "requirements": [
+        "Expanded explanation, previous attempt, failure and privacy wording"
+      ],
+      "composeTest": "credentialStatusDetailsExpanded",
+      "swiftTest": "testCredentialStatusDetailsExpanded",
+      "title": "Expanded explanation, previous attempt, failure and privacy wording",
+      "note": "Expanded production status section. Compose opens the actual Details control and asserts its contents; native uses the same internal initial-disclosure fixture convention as payment details. App-host navigation is separate evidence."
+    },
+    {
+      "id": "status.states",
+      "requirements": [
+        "Distinct no-status, unchecked, clear, stale, unsupported, unverified and suspended meanings"
+      ],
+      "composeTest": "credentialStatusKinds",
+      "swiftTest": "testCredentialStatusKinds",
+      "title": "Distinct no-status, unchecked, clear, stale, unsupported, unverified and suspended meanings"
+    },
+    {
+      "id": "status.sharing.review",
+      "requirements": [
+        "Cached row status and selected-only advisory with ordinary Share anyway action"
+      ],
+      "composeTest": "credentialStatusSharing",
+      "swiftTest": "testCredentialStatusSharing",
+      "title": "Cached row status and selected-only advisory with ordinary Share anyway action",
+      "note": "Wallet-owned provider review content. It does not reproduce OS-owned credential-picker chrome; the same shared row/advisory is used in ordinary review."
+    },
+    {
+      "id": "status.payment.review",
+      "requirements": [
+        "Cached status warnings preserve payment consent and payment action labels"
+      ],
+      "composeTest": "credentialStatusPayment",
+      "swiftTest": "testCredentialStatusPayment",
+      "title": "Cached status warnings preserve payment consent and payment action labels"
+    },
+    {
+      "id": "status.settings.partial",
+      "requirements": [
+        "Foreground preference, explicit batch check and partial/deferred result summary"
+      ],
+      "composeTest": "credentialStatusSettingsPartial",
+      "swiftTest": "testCredentialStatusSettingsPartial",
+      "title": "Foreground preference, explicit batch check and partial/deferred result summary"
+    },
+    {
+      "id": "status.settings.checking",
+      "requirements": [
+        "Visible check progress and duplicate-action prevention"
+      ],
+      "composeTest": "credentialStatusSettingsChecking",
+      "swiftTest": "testCredentialStatusSettingsChecking",
+      "title": "Visible check progress and duplicate-action prevention"
+    },
+    {
+      "id": "status.compact.dark_large_text_rtl",
+      "requirements": [
+        "Compact status rows with large text, dark contrast and right-to-left reading order"
+      ],
+      "composeTest": "credentialStatusCompactRtl",
+      "swiftTest": "testCredentialStatusCompactRtl",
+      "title": "Compact status rows with large text, dark contrast and right-to-left reading order",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "textSize": "accessibilityMedium"
+        }
+      }
     }
   ],
   "galleryPreview": [
+    "status.home.issue",
+    "status.details.adverse",
+    "status.details.expanded",
+    "status.sharing.review",
+    "status.payment.review",
+    "status.settings.partial",
     "payment.scheduled.main",
     "payment.scheduled.details",
     "payment.recurring.main",
@@ -1262,6 +1389,7 @@
     "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",
     "batch.offer.compact_dark_large_text",
-    "components.dates.compact_large_text_rtl"
+    "components.dates.compact_large_text_rtl",
+    "status.compact.dark_large_text_rtl"
   ]
 }

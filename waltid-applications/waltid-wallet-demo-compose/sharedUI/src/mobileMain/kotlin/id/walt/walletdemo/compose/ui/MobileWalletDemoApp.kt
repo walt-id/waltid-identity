@@ -64,6 +64,7 @@ fun MobileWalletDemoApp(
     val showingNearbySheet = proximity.active || retainedNearbyState != null
     val displayedProximity = if (proximity.active && !proximity.closing) proximity else retainedNearbyState ?: proximity
     val closingNearbySheet = proximity.closing || !proximity.active
+    LaunchedEffect(showingNearbySheet) { controller.setExternalCredentialStatusReviewActive(showingNearbySheet) }
     LaunchedEffect(proximity.active) {
         if (proximity.active) hadNearbyTask = true
         else if (hadNearbyTask) {
@@ -192,7 +193,7 @@ fun MobileWalletDemoApp(
                                             onSelectCredential = proximityController::selectCredential,
                                             onToggleElement = proximityController::toggleElement,
                                             onContinueAfterResponseChange = proximityController::setContinueAfterResponse,
-                                            onApprove = { proximityController.approve() },
+                                            onApprove = { proximityController.approve(it) },
                                             onDecline = proximityController::decline,
                                             onRetry = proximityController::retryPrerequisites,
                                             onRemediate = proximityController::remediate,

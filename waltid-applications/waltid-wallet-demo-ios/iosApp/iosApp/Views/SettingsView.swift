@@ -24,6 +24,9 @@ struct SettingsView: View {
                     SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
                 }
                 .accessibilityIdentifier("wallet.settingsSigningKey")
+                NavigationLink { CredentialStatusSettingsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Credential status", systemImage: "checkmark.shield", summary: String(localized: "Checks and last-known results"))
+                }.accessibilityIdentifier("settings-credential-status")
                 NavigationLink { TechnicalDetailsView(viewModel: viewModel) } label: {
                     SettingsDestinationLabel("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"))
                 }
@@ -168,5 +171,25 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+}
+
+struct CredentialStatusSettingsView: View {
+    @ObservedObject var viewModel: WalletViewModel
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Automatic status checks", isOn: $viewModel.automaticCredentialStatusChecks)
+                    .accessibilityIdentifier("settings-credential-status-automatic")
+            } footer: { Text("Check while the wallet is open and unlocked. No background checks.") }
+            Section {
+                Button(viewModel.checkingCredentialStatuses ? String(localized: "Checking…") : String(localized: "Check all statuses")) { viewModel.checkCredentialStatuses() }
+                    .disabled(viewModel.checkingCredentialStatuses).accessibilityIdentifier("settings-credential-status-check-all")
+                if let summary = viewModel.credentialStatusSummary {
+                    Text(summary + "\n" + String(localized: "Deferred checks can be retried shortly.")).font(.footnote)
+                }
+                if let error = viewModel.credentialStatusError { Text(error).font(.footnote).foregroundStyle(.red) }
+            } footer: { Text("Checks contact the issuer’s status service. Credential contents and status indexes are not sent in the request.") }
+        }.navigationTitle("Credential status").navigationBarTitleDisplayMode(.inline)
     }
 }

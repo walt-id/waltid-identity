@@ -4,6 +4,7 @@ import WalletSDK
 import WalletDemoIdentityDocumentSupport
 
 struct ProximityPresentationView: View {
+    @Environment(\.credentialStatusUI) private var statusUI
     @ObservedObject var viewModel: ProximityPresentationViewModel
     @Binding var approvalMode: WalletDemoProximityApprovalMode
     var headerOwnsClose = false
@@ -66,7 +67,7 @@ struct ProximityPresentationView: View {
                 WalletActions(
                     primary: WalletAction(expired ? String(localized: "Get a new request") : String(localized: "Approve and get ready"),
                         enabled: expired || viewModel.canApprove, identifier: WalletAccessibilityID.proximityApproveButton) {
-                            if expired { viewModel.restart() } else { viewModel.approve() }
+                            if expired { viewModel.restart() } else { viewModel.approve(reviewedStatus: statusUI.values.mapValues { $0.presentation.advisoryRevision }) }
                         },
                     secondary: headerOwnsClose ? nil : WalletAction(String(localized: "Cancel"), identifier: WalletAccessibilityID.proximityCancelButton,
                         perform: viewModel.requestClose)
@@ -75,10 +76,13 @@ struct ProximityPresentationView: View {
                 ReviewActions(
                     selectionComplete: viewModel.canApprove,
                     isLoading: viewModel.pendingReviewID != nil,
-                    onSubmit: { viewModel.approve() },
+                    onSubmit: { viewModel.approve(reviewedStatus: statusUI.values.mapValues { $0.presentation.advisoryRevision }) },
                     onReject: viewModel.decline,
                     onCancel: viewModel.requestClose,
-                    presentation: .proximity, showCancelWithReject: !headerOwnsClose
+                    presentation: .proximity, showCancelWithReject: !headerOwnsClose,
+                    credentialStatuses: viewModel.selections.compactMap { selection in
+                        statusUI.values[selection.credentialID].map { (credentialDetailsByID[selection.credentialID]?.cardSummary.title ?? String(selection.credentialID.suffix(8)), $0.presentation) }
+                    }
                 )
             } else if canCancel && !headerOwnsClose {
                 WalletActions(secondary: WalletAction("Cancel", identifier: WalletAccessibilityID.proximityCancelButton,

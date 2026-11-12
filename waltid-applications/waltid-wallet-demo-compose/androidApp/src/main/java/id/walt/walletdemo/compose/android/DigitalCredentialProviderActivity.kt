@@ -29,6 +29,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
             if (owner != null && model.failure == null) {
                 WalletDemoSharingReviewScreen(
                     review = owner.review, controller = owner, title = model.title,
+                    credentialStatuses = model.credentialStatuses, statusReviewNotice = model.statusReviewNotice,
                     enabled = !model.submitting,
                     onSubmit = model::submit, onCancel = model::cancel,
                     onBackAtRoot = model::back,

@@ -1,6 +1,10 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentReview
@@ -21,11 +25,12 @@ internal fun SharingActionsRow(
     paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
     isPayment: Boolean = false,
     showCancelWithReject: Boolean = true,
+    credentialStatuses: List<Pair<String, WalletDemoCredentialStatus>> = emptyList(),
 ) {
     val canSubmit = enabled && selectionComplete && paymentReview.canConfirm
     val submit = rememberPaymentSubmission(paymentReview, canSubmit, onSubmit)
     val submitLabel = paymentReview.consent?.affirmativeAction ?: if (isPayment) stringResource(Res.string.payment_confirm) else when (presentation) {
-        ReviewActionPresentation.Sharing -> "Share"
+        ReviewActionPresentation.Sharing -> if (credentialStatuses.any { it.second.adverse }) stringResource(Res.string.credential_status_share_anyway) else "Share"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
     }
     val rejectLabel = paymentReview.consent?.denialAction ?: if (isPayment) stringResource(Res.string.payment_decline) else when (presentation) {
@@ -38,12 +43,15 @@ internal fun SharingActionsRow(
     }
     val cancel = WalletAction(cancelLabel, onCancel,
         enabled = enabled || presentation == ReviewActionPresentation.Proximity, testTag = presentation.cancelTestTag)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    CredentialStatusAdvisory(credentialStatuses)
     WalletActions(
         primary = WalletAction(submitLabel, submit, canSubmit, presentation.submitTestTag),
         secondary = onReject?.let { WalletAction(rejectLabel, it, enabled, presentation.rejectTestTag) } ?: cancel,
         tertiary = cancel.takeIf { onReject != null && showCancelWithReject },
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
     )
+    }
 }
 
 internal enum class ReviewActionPresentation {

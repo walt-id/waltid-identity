@@ -14,8 +14,10 @@ import WalletSDK
 /// submit it: in a provider extension the transport, the retained request handle and the platform
 /// result all live outside the view.
 public struct SharingReviewScreen: View {
+    @Environment(\.credentialStatusUI) private var statusUI
     @State private var renderedOptions: [PresentationCredentialOption] = []
     private let title: String
+    private let statusNotice: String?
     private let review: SharingReviewModel?
     private let selection: SharingSelection
     private let selectionComplete: Bool
@@ -48,8 +50,10 @@ public struct SharingReviewScreen: View {
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)? = nil,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        statusNotice: String? = nil
     ) {
+        self.statusNotice = statusNotice
         self.title = title
         self.review = review
         self.selection = selection
@@ -62,6 +66,12 @@ public struct SharingReviewScreen: View {
         self.onSubmit = onSubmit
         self.onReject = onReject
         self.onCancel = onCancel
+    }
+
+    private var statusAdvisories: [(String, CredentialStatusPresentation)] {
+        (review?.credentialOptions ?? []).filter { selection.credentials.contains($0.selection) }.compactMap { option in
+            statusUI.values[option.credentialID].map { (CredentialDisplayNormalizer.details(for: option).cardSummary.title, $0.presentation) }
+        }
     }
 
     public var body: some View {
@@ -77,7 +87,8 @@ public struct SharingReviewScreen: View {
                         onReject: onReject,
                         onCancel: onCancel,
                         paymentReview: paymentReview, isPayment: review?.request.hasPaymentTransaction == true,
-                        showCancelWithReject: false
+                        showCancelWithReject: false,
+                        credentialStatuses: statusAdvisories
                     )
                 } else if let failure {
                     Text(failure).font(.subheadline).foregroundStyle(.red)
@@ -92,6 +103,7 @@ public struct SharingReviewScreen: View {
 
     @ViewBuilder
     private var content: some View {
+        if let statusNotice { Text(statusNotice).font(.footnote).foregroundStyle(.secondary) }
         if failure != nil {
             Label("Unable to share", systemImage: "exclamationmark.shield")
                 .font(.headline).accessibilityIdentifier(WalletAccessibilityID.presentationError)

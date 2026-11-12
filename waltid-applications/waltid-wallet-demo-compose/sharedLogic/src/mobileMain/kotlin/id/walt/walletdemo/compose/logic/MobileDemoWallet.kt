@@ -225,6 +225,15 @@ internal class MobileDemoWallet(
         }
     }
 
+    override fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> =
+        kotlinx.coroutines.flow.flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses()) } }
+
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = mobileWallet.credentialStatusSnapshot().toDemoStatuses()
+
+    override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary =
+        mobileWallet.refreshCredentialStatuses(ids?.toList(),
+            if (force) id.walt.wallet2.status.CredentialStatusRefreshMode.FORCE else id.walt.wallet2.status.CredentialStatusRefreshMode.IF_DUE).toDemoSummary()
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         mobileWallet.credentials().map { it.toDemoCredential() }
 
@@ -300,6 +309,20 @@ internal class MobileDemoWallet(
         selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
         selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did,
     )?.toDemoPaymentConsent()
+
+    override suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
+    ): WalletDemoOperationResult = try {
+        mobileWallet.submitStatusReviewedPresentation(
+            MobileWalletPresentationPreviewHandle(previewHandle.value),
+            selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+            selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) },
+            reviewedStatus, did = did, paymentConsentRevision = paymentConsentRevision,
+        ).toDemoOperationResult(WalletDisplayText.PresentationSent, WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
+    } catch (_: id.walt.wallet2.status.CredentialStatusReviewChangedException) { throw WalletDemoStatusReviewChanged() }
 
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,

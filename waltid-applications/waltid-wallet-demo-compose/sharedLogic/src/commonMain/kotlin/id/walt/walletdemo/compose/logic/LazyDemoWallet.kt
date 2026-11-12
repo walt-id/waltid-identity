@@ -30,6 +30,18 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     ): WalletDemoSigningProtectionAvailability =
         wallet().signingProtectionAvailability(signingProtection)
 
+    override fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> = kotlinx.coroutines.flow.flow {
+        wallet().credentialStatusSnapshots().collect { emit(it) }
+    }
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet().credentialStatusSnapshot()
+    override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = wallet().refreshCredentialStatuses(ids, force)
+    override suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
+    ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision)
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 

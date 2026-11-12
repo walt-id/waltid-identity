@@ -11,9 +11,11 @@ import XCTest
 @MainActor
 final class WalletVisualTests: XCTestCase {
     private var previousTimeZone: String?
+    private var savedAutomaticStatusChecks: Any?
     private var savedSharingPreferences: [(String, Any?)] = []
     override func setUp() {
         super.setUp()
+        savedAutomaticStatusChecks = UserDefaults.standard.object(forKey: "wallet.visual-settings.status.automatic")
         previousTimeZone = ProcessInfo.processInfo.environment["TZ"]
         setenv("TZ", "UTC", 1)
         tzset()
@@ -25,12 +27,96 @@ final class WalletVisualTests: XCTestCase {
         savedSharingPreferences.forEach { defaults.removeObject(forKey: $0.0) }
     }
     override func tearDown() {
+        UserDefaults.standard.set(savedAutomaticStatusChecks, forKey: "wallet.visual-settings.status.automatic")
         let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier)!
         savedSharingPreferences.forEach { defaults.set($0.1, forKey: $0.0) }
         if let previousTimeZone { setenv("TZ", previousTimeZone, 1) } else { unsetenv("TZ") }
         tzset()
         NSTimeZone.resetSystemTimeZone()
         super.tearDown()
+    }
+
+    func testCredentialStatusHome() async throws {
+        let fixtures = try WalletVisualFixtures()
+        let credential = try fixtures.credential()
+        let model = makeModel()
+        model.isReady = true; model.statusMessage = ""; model.credentials = [credential]
+        let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
+        let status = try fixtures.credentialStatus("revoked_partial")
+        try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
+            onOpenSettings: {}, onScan: {}, onShareNearby: {})
+            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status])), id: "status.home.issue")
+    }
+
+    func testCredentialStatusDetailsClear() throws { try credentialStatusDetails(adverse: false) }
+    func testCredentialStatusDetailsAdverse() throws { try credentialStatusDetails(adverse: true) }
+    private func credentialStatusDetails(adverse: Bool) throws {
+        let fixtures = try WalletVisualFixtures()
+        let details = try fixtures.credentialDetails()
+        let status = try fixtures.credentialStatus(adverse ? "revoked_partial" : "clear")
+        let context = CredentialStatusUIContext(values: [details.id: status], check: { _ in })
+        try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }
+            .environment(\.credentialStatusUI, context), id: adverse ? "status.details.adverse" : "status.details.clear")
+    }
+
+    func testCredentialStatusDetailsExpanded() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_partial")
+        let content = ScrollView { CredentialStatusSection(credentialID: "identity").padding(16) }
+            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: ["identity": status], check: { _ in }))
+            .environment(\.credentialStatusDetailsInitiallyExpanded, true)
+        try await captureWhenReady(content, id: "status.details.expanded", isReady: { true },
+            failure: "Expanded status details did not settle")
+    }
+
+    func testCredentialStatusKinds() throws { try credentialStatusKinds() }
+    func testCredentialStatusCompactRtl() throws { try credentialStatusKinds(compactRtl: true) }
+    private func credentialStatusKinds(compactRtl: Bool = false) throws {
+        let fixtures = try WalletVisualFixtures()
+        let names = compactRtl ? ["revoked_partial", "unverified", "unsupported"] :
+            ["not_provided", "not_checked", "clear", "stale", "unsupported", "unverified", "suspended"]
+        let context = CredentialStatusUIContext(values: try Dictionary(uniqueKeysWithValues: names.map { ($0, try fixtures.credentialStatus($0)) }))
+        let content = ScrollView { VStack(alignment: .leading, spacing: 0) {
+            ForEach(names, id: \.self) { CredentialStatusSection(credentialID: $0, compact: true) }
+        }.padding(16) }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .environment(\.credentialStatusUI, context)
+            .environment(\.layoutDirection, compactRtl ? .rightToLeft : .leftToRight)
+        try capture(content, id: compactRtl ? "status.compact.dark_large_text_rtl" : "status.states",
+            config: compactRtl ? .iPhoneSe : .iPhone13, colorScheme: compactRtl ? .dark : .light,
+            sizeCategory: compactRtl ? .accessibilityMedium : .large,
+            layoutDirection: compactRtl ? .rightToLeft : .leftToRight)
+    }
+
+    func testCredentialStatusSharing() async throws { try await credentialStatusSharing(payment: false) }
+    func testCredentialStatusPayment() async throws { try await credentialStatusSharing(payment: true) }
+    private func credentialStatusSharing(payment: Bool) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let review = try fixtures.sharingReview(payment: payment)
+        let status = try fixtures.credentialStatus("revoked_partial")
+        let context = CredentialStatusUIContext(values: Dictionary(uniqueKeysWithValues: review.credentialOptions.map { ($0.credentialID, status) }))
+        let screen = SharingReviewScreen(title: payment ? "Payment" : "Share documents", review: review,
+            selection: SharingSelection(credentials: review.defaultCredentialSelection()), selectionComplete: true,
+            paymentReview: payment ? .ready(try fixtures.payment(recurring: false)) : .notRequired,
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+            .environment(\.credentialStatusUI, context)
+        try await captureReview(screen, id: payment ? "status.payment.review" : "status.sharing.review",
+            expected: Set(review.credentialOptions.map { $0.selection.id }))
+    }
+
+    func testCredentialStatusSettingsPartial() async throws { try await credentialStatusSettings(checking: false) }
+    func testCredentialStatusSettingsChecking() async throws { try await credentialStatusSettings(checking: true) }
+    private func credentialStatusSettings(checking: Bool) async throws {
+        let model = makeModel(walletClient: MockWalletClient(operationDelayMilliseconds: 30_000))
+        model.automaticCredentialStatusChecks = false
+        if checking {
+            model.auth = .unlocked; model.isReady = true
+            model.checkCredentialStatuses()
+            XCTAssertTrue(model.checkingCredentialStatuses)
+        } else { model.credentialStatusSummary = "Checked: 2 · unchanged: 1 · deferred: 1 · with unavailable checks: 1" }
+        defer { model.handleApplicationEnteredBackground() }
+        try await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { CredentialStatusSettingsView(viewModel: model) }.navigationViewStyle(.stack),
+            id: checking ? "status.settings.checking" : "status.settings.partial")
     }
 
     func testWalletOpening() async throws { try await walletOpening(failure: false) }
@@ -708,11 +794,11 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil, pinStore: (any DemoPinStore)? = nil) -> WalletViewModel {
+    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil, pinStore: (any DemoPinStore)? = nil, walletClient: any WalletClient = MockWalletClient()) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
-            walletClient: MockWalletClient(),
+            walletClient: walletClient,
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
             pinStore: pinStore ?? InMemoryDemoPinStore(),

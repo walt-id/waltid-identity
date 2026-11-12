@@ -9,6 +9,8 @@
     { "id": "account.registered.wide", "state": "registered", "width": 1280, "height": 800 },
     { "id": "account.expired.compact", "state": "expired", "width": 393, "height": 852 },
     { "id": "credential.dates.compact", "state": "credential-dates", "width": 393, "height": 852, "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Localized credential timestamps, DST overlap, exact fractions and calendar dates"] },
-    { "id": "credential.dates.wide", "state": "credential-dates", "width": 1280, "height": 900, "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Localized credential timestamps, DST overlap, exact fractions and calendar dates"] }
+    { "id": "credential.dates.wide", "state": "credential-dates", "width": 1280, "height": 900, "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Localized credential timestamps, DST overlap, exact fractions and calendar dates"] },
+    { "id": "credential.status.adverse.wide", "state": "status-supported", "width": 1280, "height": 1000, "locale": "en-GB", "timezoneId": "UTC", "requirements": ["Server-local status snapshot, explicit stored-record refresh and partial adverse details"] },
+    { "id": "credential.status.unsupported.compact", "state": "status-unsupported", "width": 393, "height": 1000, "locale": "en-GB", "timezoneId": "UTC", "requirements": ["Older-server fallback without unsupported refresh requests"] }
   ]
 }

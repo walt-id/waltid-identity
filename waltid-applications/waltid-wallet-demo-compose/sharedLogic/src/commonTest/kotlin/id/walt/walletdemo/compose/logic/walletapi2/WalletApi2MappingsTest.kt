@@ -18,6 +18,22 @@ import kotlin.test.assertTrue
 
 class WalletApi2MappingsTest {
     @Test
+    fun overlappingStoreIdsCannotHideAnAdverseResultAndWireFailuresAreCounted() {
+        val clear = id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus("NOT_REVOKED", "NONE", "FRESH", "CHECK", "clear")
+        val revoked = clear.copy(kind = "REVOKED", issue = "REVOKED", advisoryRevision = "revoked")
+        val snapshot = CredentialStatusSnapshotDto(listOf(
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked),
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(1, "same-id"), clear),
+        )).toDemoStatuses()
+        assertEquals("NEEDS_REVIEW", snapshot.credentials.getValue("same-id").issue)
+        assertEquals("AMBIGUOUS_CREDENTIAL_ID", snapshot.credentials.getValue("same-id").failure)
+        val failed = CredentialStatusRefreshResultDto("COMPLETED", kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"entries":[{"type":"unavailable","reason":"TIMEOUT"}]}""").jsonObject)
+        assertTrue(failed.hasUnavailableChecks)
+        assertFalse(failed.copy(status = kotlinx.serialization.json.Json.parseToJsonElement("{}").jsonObject).hasUnavailableChecks)
+    }
+
+    @Test
     fun preAuthorizedGrantWhenCodePresent() {
         val response = ResolveOfferDetailedResponseDto(
             credentialIssuer = "https://issuer.example",

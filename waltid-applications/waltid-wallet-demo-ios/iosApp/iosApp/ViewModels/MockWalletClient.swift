@@ -12,6 +12,10 @@ actor MockWalletClient: WalletClient {
     }
 
     private var storedCredentials: [Credential]
+    private var statusSnapshot: CredentialStatusSnapshot?
+    private var statusCollectors: [UUID: AsyncThrowingStream<CredentialStatusSnapshot, Error>.Continuation] = [:]
+    var statusCollectorCount: Int { statusCollectors.count }
+    private(set) var statusRefreshCalls = 0
     private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
@@ -49,8 +53,10 @@ actor MockWalletClient: WalletClient {
         sampleCredentialDataJSON: String? = nil,
         samplePortraitDisclosureValueJSON: String? = nil,
         deleteLocalDataDelayMilliseconds: UInt64 = 0,
-        deleteLocalDataError: Error? = nil
+        deleteLocalDataError: Error? = nil,
+        credentialStatusSnapshot: CredentialStatusSnapshot? = nil
     ) {
+        self.statusSnapshot = credentialStatusSnapshot
         self.storedCredentials = storedCredentials
         self.initialCredentialRead = initialCredentialRead
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -255,6 +261,26 @@ actor MockWalletClient: WalletClient {
             throw deleteLocalDataError
         }
         storedCredentials = []
+    }
+
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { statusSnapshot }
+    func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+        let id = UUID()
+        return AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            statusCollectors[id] = continuation
+            if let statusSnapshot { continuation.yield(statusSnapshot) }
+            continuation.onTermination = { [weak self] _ in Task { await self?.removeStatusCollector(id) } }
+        }
+    }
+    private func removeStatusCollector(_ id: UUID) { statusCollectors.removeValue(forKey: id) }
+    func setCredentialStatusSnapshot(_ snapshot: CredentialStatusSnapshot) {
+        statusSnapshot = snapshot
+        for continuation in statusCollectors.values { continuation.yield(snapshot) }
+    }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
+        statusRefreshCalls += 1
+        try await delayOperation()
+        return []
     }
 
     private func delayOperation() async throws {
