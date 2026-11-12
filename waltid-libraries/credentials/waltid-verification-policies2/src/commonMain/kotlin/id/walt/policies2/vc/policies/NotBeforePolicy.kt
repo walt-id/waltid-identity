@@ -12,13 +12,14 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlin.jvm.JvmOverloads
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 
 @Serializable
 @SerialName("not-before")
-class NotBeforePolicy(
+class NotBeforePolicy @JvmOverloads constructor(
     /**
      * If true, the policy fails when the nbf claim is absent entirely.
      * Default false for general use; set true for strict profiles (e.g. ETSI TS 119 472-1 EAA-5.2.7.1-01).
