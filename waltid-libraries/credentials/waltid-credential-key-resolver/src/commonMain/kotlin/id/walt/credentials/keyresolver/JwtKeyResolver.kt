@@ -22,6 +22,10 @@ import kotlinx.serialization.json.jsonPrimitive
  * 1. DID - if `iss` / `issuer` is a DID URL
  * 2. x5c - if the JWT header contains an `x5c` certificate chain
  * 3. HTTPS well-known - if `iss` / `issuer` is an HTTPS URL (JWT VC Issuer Metadata)
+ *
+ * Resolution does not establish trust in the key. A key taken from `x5c` is chosen by the token
+ * itself and must be anchored with [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors]
+ * before it is relied on.
  */
 object JwtKeyResolver {
 
