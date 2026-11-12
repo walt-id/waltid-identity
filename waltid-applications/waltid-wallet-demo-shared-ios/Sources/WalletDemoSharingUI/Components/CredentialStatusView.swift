@@ -130,8 +130,13 @@ public struct CredentialStatusSection: View {
 
     private func detailContents(_ status: CredentialStatus) -> some View {
         let value = status.presentation
+        let purposes = Set(value.purposes.map(purposeTitle)).sorted().joined(separator: ", ")
         return VStack(alignment: .leading, spacing: 8) {
             Text(explanation(value)).font(.footnote)
+            if !purposes.isEmpty {
+                Text("Checked purposes: \(purposes)", bundle: .module).font(.footnote)
+            }
+            if compact, value.coverage == .partial { Text("Some status references could not be checked.", bundle: .module).font(.footnote) }
             if compact { checkTime(value) }
             if let attempt = value.lastAttemptAt {
                 Text("Last attempt: \(WalletInstant(attempt).formatted(timeZone: timeZone, locale: locale).fullText)", bundle: .module).font(.footnote)
@@ -139,6 +144,16 @@ public struct CredentialStatusSection: View {
             if let failure = value.failure { Text(failureExplanation(failure)).font(.footnote) }
             Text("Checks contact the issuer’s status service. Credential contents and status indexes are not sent in the request.", bundle: .module).font(.footnote)
             if compact { Text("Status information is shown for your review and is not an additional claim to share.", bundle: .module).font(.footnote) }
+        }
+    }
+
+    private func purposeTitle(_ purpose: String) -> String {
+        switch purpose {
+        case "revocation": String(localized: "Revocation", bundle: .module)
+        case "suspension": String(localized: "Suspension", bundle: .module)
+        case "refresh": String(localized: "Credential update", bundle: .module)
+        case "token": String(localized: "Token status", bundle: .module)
+        default: String(localized: "Other", bundle: .module)
         }
     }
 

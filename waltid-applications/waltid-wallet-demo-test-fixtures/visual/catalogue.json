@@ -1365,6 +1365,7 @@
   ],
   "galleryPreview": [
     "status.home.issue",
+    "status.details.clear",
     "status.details.adverse",
     "status.details.expanded",
     "status.sharing.review",

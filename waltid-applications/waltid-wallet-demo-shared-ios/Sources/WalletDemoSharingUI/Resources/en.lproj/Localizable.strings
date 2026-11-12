@@ -133,3 +133,9 @@
 "This wallet cannot check this status method. The recipient may support it." = "This wallet cannot check this status method. The recipient may support it.";
 "out of date" = "out of date";
 "partial check" = "partial check";
+"Checked purposes: %@" = "Checked purposes: %@";
+"Revocation" = "Revocation";
+"Suspension" = "Suspension";
+"Credential update" = "Credential update";
+"Token status" = "Token status";
+"Other" = "Other";
