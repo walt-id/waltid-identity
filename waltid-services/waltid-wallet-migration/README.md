@@ -20,7 +20,7 @@
 
 ## Overview
 
-This tool migrates wallet data from the legacy `waltid-wallet-api` (v1) database schema to the new Wallet SDK schema used by `waltid-openid4vc-wallet-persistence-server`. It handles the conversion of wallets, keys, credentials, DIDs, and account mappings.
+This tool migrates wallet data from the legacy `waltid-wallet-api` (v1) database schema to the new Wallet SDK schema used by `waltid-openid4vc-wallet-persistence`. It handles the conversion of wallets, keys, credentials, DIDs, and account mappings.
 
 ## Features
 
@@ -123,7 +123,7 @@ Feel free to test and contribute the missing functionality, or open an issue to 
 
 ## Related Libraries
 
-- **[waltid-openid4vc-wallet-persistence-server](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-server)** — Target schema and store implementations
+- **[waltid-openid4vc-wallet-persistence](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence)** — Target schema and store implementations
 - **[waltid-wallet-api](../waltid-wallet-api)** — Legacy wallet service (source schema)
 
 ## Join the community

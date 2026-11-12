@@ -475,7 +475,7 @@ waltid-wallet-api2 (this service)
         ├── waltid-openid4vc-wallet-server  - all HTTP route handlers (compatible with Enterprise for easy later upgrading)
         │   └── Wallet2RouteHandler         - /wallet, /keys, /dids, /credentials, ...
         ├── waltid-openid4vc-wallet         - core logic: WalletIssuanceHandler, WalletPresentationHandler
-        └── waltid-openid4vc-wallet-persistence-server  - Exposed-based SQLite/Postgres stores
+        └── waltid-openid4vc-wallet-persistence  - Exposed-based SQLite/Postgres stores
 ```
 
 The route handlers and core logic live in the **library** layer, not in this service - both the OSS service and the Enterprise stack point at the same libraries. Adding the `waltid.ktordocker` Gradle plugin is all that's needed to get Docker build/push support.

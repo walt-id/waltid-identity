@@ -279,7 +279,8 @@ This library builds on top of several walt.id protocol libraries:
 ### Implementations
 
 - **[waltid-openid4vc-wallet-server](../waltid-openid4vc-wallet-server)** — Ktor HTTP route handlers (Wallet API)
-- (Wallet SDK for mobile coming soon)
+- **[waltid-openid4vc-wallet-mobile](../waltid-openid4vc-wallet-mobile)** — Android/iOS wallet SDK facade
+- **[WalletSDK](../waltid-wallet-sdk-ios)** — Swift API for native iOS wallets
 
 ## Supported Platforms
 
@@ -287,6 +288,7 @@ This library builds on top of several walt.id protocol libraries:
 | Platform   | Support                              |
 | ---------- | ------------------------------------ |
 | JVM        | Full support                         |
+| Android    | Available when `enableAndroidBuild=true` |
 | JavaScript | Full support                         |
 | iOS        | Available when `enableIosBuild=true` |
 

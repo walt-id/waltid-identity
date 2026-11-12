@@ -48,8 +48,8 @@ these baselines; updates with iOS disabled are rejected to preserve the iOS decl
 
 - `waltid.mobile.library` - Android/iOS libraries
 - `waltid.full.library` - Libraries targeting JVM, Android, JavaScript and iOS
-- These conventions enable their Android targets through `enableAndroidBuild`.
-- Android apps configure `com.android.application` directly; see the [Compose demo host](../waltid-applications/waltid-wallet-demo-compose/androidApp/build.gradle.kts).
+
+These conventions enable their Android targets through `enableAndroidBuild`. Android apps configure `com.android.application` directly; see the [Compose demo host](../waltid-applications/waltid-wallet-demo-compose/androidApp/build.gradle.kts).
 
 #### Dependency analysis
 

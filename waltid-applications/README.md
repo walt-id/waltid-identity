@@ -83,7 +83,7 @@ Web3 login application. Nuxt.js application demonstrating Web3 wallet-based auth
 ### Mobile Applications
 
 ### [🟢 waltid-wallet-demo-compose](./waltid-wallet-demo-compose)
-Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates credential issuance, presentation, platform-backed keys, and persistence on Android and iOS. The Web/Wasm module is currently a mock UI preview only.
+Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates credential issuance, presentation, platform-backed keys, and persistence on Android and iOS. The Web/Wasm host is a separate custodial demo backed by Wallet API2.
 
 **Use when:** You need the current cross-platform mobile wallet demo, Android or iOS integration tests, or a reference for wallet SDK integration in a mobile app.
 

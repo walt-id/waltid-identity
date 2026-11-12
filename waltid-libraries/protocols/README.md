@@ -155,7 +155,7 @@ ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support. Provides HPKE 
 - **Draft Implementations**: Use [waltid-openid4vc](./waltid-openid4vc) for OID4VCI Draft 11/13 and OID4VP Draft 14/20
 - **OpenID4VP 1.0**: Use the `waltid-openid4vp-`* libraries for the final OpenID4VP 1.0 specification
 - **OpenID4VCI 1.0**: Use [waltid-openid4vci](./waltid-openid4vci) for issuer-side and [waltid-openid4vci-wallet](./waltid-openid4vci-wallet) for wallet-side
-- **Wallet SDKs**: Use [waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet) for a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0 on mobile, or [waltid-openid4vc-wallet-server](./waltid-openid4vc-wallet)  for building custodial REST API-based wallets.
+- **Wallet SDKs**: Use [waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet-mobile) for Android and Kotlin Multiplatform mobile wallets, [WalletSDK](./waltid-wallet-sdk-ios) for native Swift apps, or [waltid-openid4vc-wallet-server](./waltid-openid4vc-wallet-server) for custodial REST API wallets.
 
 ## Join the community
 
