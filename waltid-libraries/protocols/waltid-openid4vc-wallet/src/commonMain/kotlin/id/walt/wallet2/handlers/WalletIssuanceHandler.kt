@@ -1060,12 +1060,39 @@ data class ExchangeCodeRequest(
 // ---------------------------------------------------------------------------
 
 /**
+ * Thrown when an issuer's only token authentication method is a wallet instance attestation
+ * and this wallet has no provider that can obtain one.
+ *
+ * A pre-authorized grant the issuer allows anonymously does not throw. That grant can be
+ * redeemed without a wallet instance attestation.
+ */
+public class WalletInstanceAttestationRequiredException(
+    message: String = "This issuer requires a wallet instance attestation, and no wallet provider is configured",
+) : IllegalStateException(message)
+
+/**
  * OpenID4VCI 1.0 credential issuance logic.
  *
  * Orchestrates the wallet-side steps using waltid-openid4vci-wallet primitives.
  * Returns a [Flow] of [StoredCredential] for the full flow so callers can
  * react to each credential as it arrives (useful for streaming UIs).
  */
+internal fun attestationAssemblerForTokenMethods(
+    methods: Set<String>?,
+    attestationAssembler: ClientAttestationAssembler?,
+    anonymousPreAuthorizedAccessSupported: Boolean = false,
+): ClientAttestationAssembler? {
+    if (methods?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true) return null
+    if (attestationAssembler != null) return attestationAssembler
+    if (
+        !anonymousPreAuthorizedAccessSupported &&
+        methods.all { it == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }
+    ) {
+        throw WalletInstanceAttestationRequiredException()
+    }
+    return null
+}
+
 object WalletIssuanceHandler {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
@@ -1302,6 +1329,7 @@ object WalletIssuanceHandler {
             resolveInstanceKey = { keyMaterial.crypto2AttestationKey() },
             onAttestationObtained = { onEvent.emitSafely(WalletSessionEvent.issuance_attestation_obtained) },
             httpClient = httpClient,
+            anonymousPreAuthorizedAccessSupported = asMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
         )
 
         // private_key_jwt (RFC 7523). Engaged from authorization server metadata for the same reason
@@ -1355,7 +1383,8 @@ object WalletIssuanceHandler {
             grantedCredentialSelections(issuerMetadata, selections, tokenResponse.authorization_details, tokenResponse.scope),
             CredentialIssuanceAccess(tokenResponse.access_token, keyMaterial,
                 dpopAlgorithmsForToken(tokenResponse.token_type, dpopAlgorithms),
-                request.clientId.takeUnless { anonymousPreAuthorizedCode }),
+                request.clientId.takeUnless { anonymousPreAuthorizedCode },
+                walletClientId = request.clientId),
             sessions = wallet.issuanceSessions(httpClient), requestMetadata = requestMetadata, onEvent = onEvent,
             beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = { entry ->
@@ -1640,6 +1669,7 @@ object WalletIssuanceHandler {
                 },
                 onAttestationObtained = onAttestationObtained,
                 httpClient = httpClient,
+                anonymousPreAuthorizedAccessSupported = it.preAuthorizedGrantAnonymousAccessSupported == true,
             )
         }
         val anonymousPreAuthorizedCode =
@@ -1751,6 +1781,7 @@ object WalletIssuanceHandler {
         issuer: String,
         nonce: String?,
         clientId: String?,
+        providerClientId: String? = clientId,
     ): Proofs {
         val requirements = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired
         val provider = if (requirements != null) requireNotNull(wallet.keyAttestationProviderFor(issuer)) {
@@ -1764,6 +1795,7 @@ object WalletIssuanceHandler {
                 binding.did,
                 algorithms,
                 clientId = clientId,
+                providerClientId = providerClientId,
                 keyAttestationsRequired = requirements,
                 keyAttestationProvider = provider,
             ).jwt!!.single()
@@ -2231,9 +2263,13 @@ object WalletIssuanceHandler {
         discoveryHeaders: io.ktor.http.Headers = io.ktor.http.Headers.Empty,
         restoredDiscovery: Boolean = false,
         flowId: String? = null,
+        anonymousPreAuthorizedAccessSupported: Boolean = false,
     ): RequestClientAttestation? {
-        val assembler = attestationAssembler ?: return null
-        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+        val assembler = configuredAttestationAssembler(
+            asMetadata,
+            attestationAssembler,
+            anonymousPreAuthorizedAccessSupported,
+        ) ?: return null
 
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
@@ -2263,6 +2299,16 @@ object WalletIssuanceHandler {
 
     private fun AuthorizationServerMetadata.supportsAttestationBasedClientAuthentication(): Boolean =
         tokenEndpointAuthMethodsSupported?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
+
+    private fun configuredAttestationAssembler(
+        asMetadata: AuthorizationServerMetadata,
+        attestationAssembler: ClientAttestationAssembler?,
+        anonymousPreAuthorizedAccessSupported: Boolean = false,
+    ): ClientAttestationAssembler? = attestationAssemblerForTokenMethods(
+        asMetadata.tokenEndpointAuthMethodsSupported,
+        attestationAssembler,
+        anonymousPreAuthorizedAccessSupported,
+    )
 
     private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(
         credentialIssuerBaseUrl: String,
@@ -2938,6 +2984,7 @@ object WalletIssuanceHandler {
         did: String?,
         acceptedAlgorithms: Set<String>? = null,
         clientId: String? = null,
+        providerClientId: String? = clientId,
         keyAttestationsRequired: KeyAttestationsRequired? = null,
         keyAttestationProvider: KeyAttestationProvider? = null,
     ): Proofs {
@@ -2949,6 +2996,7 @@ object WalletIssuanceHandler {
         return effectiveCrypto2Key?.let {
             val keyAttestation = keyAttestationForProof(
                 keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms,
+                providerClientId ?: clientId,
             )
             proofBuilder.buildProof(
                 key = it,

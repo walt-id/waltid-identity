@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -48,6 +50,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -429,6 +432,46 @@ class KeyAttestationProofTest {
     }
 
     @Test
+    fun `anonymous receipt keeps the proof issuer empty and the provider unit on the wallet client id`() = runTest {
+        val proofKey = newKey("proof")
+        val seenClientIds = mutableListOf<String?>()
+        val wallet = walletWithProofKey(proofKey).attachKeyAttestationProvider(
+            recordingProvider(newKey("attester"), seenClientIds),
+        )
+        val proofs = mutableListOf<String>()
+        val credential = signedCredential(proofKey)
+        val result = WalletIssuanceHandler.receiveCredential(
+            wallet,
+            ReceiveCredentialRequest(offerJson = preAuthorizedOffer(), clientId = "wallet-client"),
+            httpClient = anonymousKeyAttestationClient(proofs, credential),
+        )
+        assertEquals(listOf<String?>("wallet-client"), seenClientIds, result.toString())
+        assertNull(proofPayload(proofs.single())["iss"])
+        assertEquals(1, result.credentialIds.size, result.toString())
+    }
+
+    @Test
+    fun `anonymous session stores the credential with the configured provider client id`() = runTest {
+        val proofKey = newKey("proof")
+        val seenClientIds = mutableListOf<String?>()
+        val wallet = walletWithProofKey(proofKey).attachKeyAttestationProvider(
+            recordingProvider(newKey("attester"), seenClientIds),
+        )
+        val proofs = mutableListOf<String>()
+        val service = WalletIssuanceSessionService(
+            wallet,
+            httpClient = anonymousKeyAttestationClient(proofs, signedCredential(proofKey)),
+        )
+        val session = service.start(WalletIssuanceSessionRequest(
+            offerJson = preAuthorizedOffer(), clientId = "wallet-client", redirectUri = Url("openid://"),
+        ))
+        val outcome = service.continuePreAuthorized(session.id)
+        assertEquals(listOf<String?>("wallet-client"), seenClientIds, outcome.toString())
+        assertNull(proofPayload(proofs.single())["iss"])
+        assertEquals(1, assertIs<WalletIssuanceOutcome.Stored>(outcome, outcome.toString()).credentialIds.size)
+    }
+
+    @Test
     fun `provider is not invoked when issuer has no attestation requirement`() = runTest {
         val unusedAttester = newKey("unused-attester")
         val wallet = walletWithProofKey().attachKeyAttestationProvider(object : KeyAttestationProvider {
@@ -454,6 +497,64 @@ class KeyAttestationProofTest {
         keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(key ?: newKey("proof")) }),
         credentialStores = listOf(InMemoryCredentialStore()),
     )
+
+    private fun recordingProvider(attester: Crypto2Key, clientIds: MutableList<String?>): KeyAttestationProvider {
+        val delegate = TestProvider(attester)
+        return object : KeyAttestationProvider {
+            override val verificationKey = attester
+            override suspend fun attest(request: KeyAttestationRequest): String {
+                clientIds += request.clientId
+                return delegate.attest(request)
+            }
+        }
+    }
+
+    private suspend fun signedCredential(holder: Crypto2Key): String {
+        val holderJwk = holder.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(holder.spec)
+            .data.toByteArray().decodeToString()
+        return JWKKey.generate(KeyType.secp256r1).signJws(
+            """{"iss":"$ISSUER","sub":"holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"holder"},"cnf":{"jwk":$holderJwk}}}"""
+                .encodeToByteArray(),
+        )
+    }
+
+    private fun proofPayload(proof: String): JsonObject =
+        Json.parseToJsonElement(CompactJws.decodeUnverified(proof).payload.decodeToString()).jsonObject
+
+    private fun anonymousKeyAttestationClient(proofs: MutableList<String>, credential: String): HttpClient =
+        HttpClient(MockEngine) {
+            engine { addHandler { request ->
+                val (status, body) = when (request.url.toString()) {
+                    "$ISSUER/.well-known/openid-credential-issuer" -> HttpStatusCode.OK to """
+                        {"credential_issuer":"$ISSUER","credential_endpoint":"$ISSUER/credential",
+                         "nonce_endpoint":"$ISSUER/nonce","credential_configurations_supported":{
+                           "$CONFIG_ID":{"format":"jwt_vc_json",
+                             "credential_definition":{"type":["VerifiableCredential","TestCredential"]},
+                             "cryptographic_binding_methods_supported":["jwk"],
+                             "proof_types_supported":{"jwt":{"proof_signing_alg_values_supported":["ES256"],
+                               "key_attestations_required":{}}}}}}
+                    """.trimIndent()
+                    "$ISSUER/.well-known/oauth-authorization-server" -> HttpStatusCode.OK to """
+                        {"issuer":"$ISSUER","token_endpoint":"$ISSUER/token","response_types_supported":["code"],
+                         "authorization_details_types_supported":["openid_credential"],
+                         "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"],
+                         "pre-authorized_grant_anonymous_access_supported":true}
+                    """.trimIndent()
+                    "$ISSUER/token" -> HttpStatusCode.OK to """{"access_token":"access","token_type":"Bearer"}"""
+                    "$ISSUER/nonce" -> HttpStatusCode.OK to """{"c_nonce":"anonymous-nonce"}"""
+                    "$ISSUER/credential" -> {
+                        val raw = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+                        val proof = Json.parseToJsonElement(raw).jsonObject.getValue("proofs")
+                            .jsonObject.getValue(ProofType.JWT.value).jsonArray.single().jsonPrimitive.content
+                        proofs += proof
+                        HttpStatusCode.OK to """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}"""
+                    }
+                    else -> error("Unexpected issuance request: ${request.url}")
+                }
+                respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
+            } }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
 
     private fun preAuthorizedOffer() = Json.parseToJsonElement("""
         {"credential_issuer":"$ISSUER","credential_configuration_ids":["$CONFIG_ID"],
