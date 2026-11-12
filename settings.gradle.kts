@@ -71,7 +71,8 @@ val modules = listOfNotNull(
         "waltid-mdoc-reader-trust",
         "waltid-mdoc-proximity-mobile" whenEnabled enableAndroidBuild,
         "waltid-mdoc-proximity-mobile" whenEnabled enableIosBuild,
-        "waltid-trust-registry"
+        "waltid-trust-registry",
+        "waltid-trust-decision"
     ),
 
     * "$libraries:protocols".group(

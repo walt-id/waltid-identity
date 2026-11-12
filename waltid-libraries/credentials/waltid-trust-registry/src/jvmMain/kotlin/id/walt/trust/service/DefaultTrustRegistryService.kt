@@ -105,15 +105,23 @@ class DefaultTrustRegistryService(
             )
         }
 
+        val certificateFactory = CertificateFactory.getInstance("X.509")
         val identitiesByAnchor = store.listCertificateIdentities().toList().mapNotNull { identity ->
             val encoded = identity.certificateDerBase64 ?: return@mapNotNull null
-            runCatching { identity to parseCertificate(encoded) }
+            runCatching { identity to parseCertificate(encoded, certificateFactory) }
                 .onFailure { log.warn(it) { "Ignoring invalid stored certificate for identity ${identity.identityId}" } }
                 .getOrNull()
         }
 
+        // A path ends at an anchor whose subject issued one of the presented certificates, and an exact
+        // pin has the subject of a presented certificate. PKIX chains names with the same X500Principal
+        // equality, so any other anchor cannot validate and is skipped before the costly path build.
+        val candidateSubjects = presentedCertificates.flatMapTo(HashSet()) {
+            listOf(it.issuerX500Principal, it.subjectX500Principal)
+        }
         val pathMatches = identitiesByAnchor.filter { (_, anchor) ->
-            validateCertificatePath(presentedCertificates, anchor, instant)
+            anchor.subjectX500Principal in candidateSubjects &&
+                validateCertificatePath(presentedCertificates, anchor, instant)
         }.map { it.first }
 
         if (pathMatches.isNotEmpty()) {
@@ -809,6 +817,8 @@ class DefaultTrustRegistryService(
     }
 
     companion object {
+        private val WHITESPACE = "\\s".toRegex()
+
         private val TRUSTED_STATUSES = setOf(
             TrustStatus.GRANTED,
             TrustStatus.RECOGNIZED,
@@ -830,18 +840,20 @@ class DefaultTrustRegistryService(
         }
     }
 
-    private fun parseCertificate(pemOrDer: String): X509Certificate {
+    private fun parseCertificate(
+        pemOrDer: String,
+        certificateFactory: CertificateFactory = CertificateFactory.getInstance("X.509"),
+    ): X509Certificate {
         val encoded = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
             pemOrDer
                 .replace("-----BEGIN CERTIFICATE-----", "")
                 .replace("-----END CERTIFICATE-----", "")
-                .replace("\\s".toRegex(), "")
+                .replace(WHITESPACE, "")
         } else {
-            pemOrDer.replace("\\s".toRegex(), "")
+            pemOrDer.replace(WHITESPACE, "")
         }
         val der = Base64.decode(encoded)
-        return CertificateFactory.getInstance("X.509")
-            .generateCertificate(ByteArrayInputStream(der)) as X509Certificate
+        return certificateFactory.generateCertificate(ByteArrayInputStream(der)) as X509Certificate
     }
 
     private fun validateCertificatePath(
