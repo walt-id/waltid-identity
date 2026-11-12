@@ -1,5 +1,6 @@
 package id.walt.trust.fetcher
 
+import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -29,6 +30,8 @@ private val log = KotlinLogging.logger {}
  * - The same blocking for IPv4 addresses embedded in NAT64, 6to4 and Teredo IPv6 addresses
  * - The same blocking on every socket connect via [SecureSocketFactory], which also covers
  *   IP-literal URLs and redirect targets that never pass through [SecureDns]
+ * - Deployment opt-outs for loopback and private networks from [PrivateNetworkGuardSettings]
+ *   (`network-fetch-guard.conf`), shared with every other guarded server-side fetch
  * - DNS pinning to prevent TOCTOU/rebinding attacks
  * - Request timeouts to prevent resource exhaustion
  */
@@ -46,7 +49,7 @@ actual object SourceFetcher {
             val addresses = Dns.SYSTEM.lookup(hostname)
 
             for (addr in addresses) {
-                blockedReason(addr, config)?.let { throw UnknownHostException("$it: $hostname") }
+                blockedReason(addr, hostname, config)?.let { throw UnknownHostException("$it: $hostname") }
             }
 
             return addresses
@@ -63,9 +66,11 @@ actual object SourceFetcher {
     internal class SecureSocketFactory(private val config: FetcherSecurityConfig) : SocketFactory() {
         override fun createSocket(): Socket = object : Socket() {
             override fun connect(endpoint: SocketAddress, timeout: Int) {
-                val address = (endpoint as? InetSocketAddress)?.address
+                val socketAddress = endpoint as? InetSocketAddress
+                val address = socketAddress?.address
                 if (address != null) {
-                    blockedReason(address, config)?.let {
+                    // hostString is the name OkHttp resolved, or the IP literal. It never does a reverse lookup.
+                    blockedReason(address, socketAddress.hostString, config)?.let {
                         close()
                         throw BlockedAddressException("$it: ${address.hostAddress}")
                     }
@@ -180,7 +185,7 @@ actual object SourceFetcher {
         }
 
         for (addr in addresses) {
-            blockedReason(addr, config)?.let { return false to it }
+            blockedReason(addr, host, config)?.let { return false to it }
         }
 
         return true to null
@@ -197,22 +202,31 @@ actual object SourceFetcher {
     private val teredoPrefix = byteArrayOf(0x20, 0x01, 0x00, 0x00) // 2001::/32
 
     /**
-     * Returns why [addr] is blocked under [config], or null if it is allowed. Shared by
-     * [validateUrl] and [SecureDns] so that both layers apply the same rules.
+     * Returns why [addr], resolved for [host], is blocked under [config], or null if it is allowed. Shared by
+     * [validateUrl], [SecureDns] and [SecureSocketFactory] so that all layers apply the same rules.
+     *
+     * The deployment's [PrivateNetworkGuardSettings] can still allow loopback and private addresses, through its
+     * allow flags or for a host matching a trusted suffix. Its `allowLoopback` getter ignores the test-only
+     * `walt.ssrf.allowLoopback` property. Link-local, cloud metadata and unspecified addresses have no deployment
+     * opt-out.
      */
-    private fun blockedReason(addr: InetAddress, config: FetcherSecurityConfig): String? {
-        if (config.blockLoopback && addr.isLoopbackAddress) return "Loopback addresses are blocked"
+    private fun blockedReason(addr: InetAddress, host: String, config: FetcherSecurityConfig): String? {
+        val trustedHost = PrivateNetworkGuardSettings.isTrustedHost(host)
+        val blockLoopback = config.blockLoopback && !trustedHost && !PrivateNetworkGuardSettings.allowLoopback
+        val blockPrivate = config.blockPrivateIPs && !trustedHost && !PrivateNetworkGuardSettings.allowPrivateNetworks
+
+        if (blockLoopback && addr.isLoopbackAddress) return "Loopback addresses are blocked"
         // Connecting to 0.0.0.0 or :: reaches the local host on Linux.
         if (config.blockLoopback && addr.isAnyLocalAddress) return "Unspecified addresses (0.0.0.0, ::) are blocked"
         if (config.blockLinkLocal && addr.isLinkLocalAddress) return "Link-local addresses are blocked"
-        if (config.blockPrivateIPs) {
+        if (blockPrivate) {
             if (addr.isSiteLocalAddress) return "Private/site-local addresses are blocked"
             if (addr is Inet6Address && isIPv6UniqueLocalAddress(addr)) return "IPv6 Unique Local Addresses (ULA) are blocked"
         }
         if (config.blockLinkLocal && addr in cloudMetadataAddresses) return "Cloud metadata endpoints are blocked"
 
         val embedded = (addr as? Inet6Address)?.let(::embeddedIPv4) ?: return null
-        return blockedReason(embedded, config)?.let { "$it (embedded in IPv6 transition address ${addr.hostAddress})" }
+        return blockedReason(embedded, host, config)?.let { "$it (embedded in IPv6 transition address ${addr.hostAddress})" }
     }
 
     /**
