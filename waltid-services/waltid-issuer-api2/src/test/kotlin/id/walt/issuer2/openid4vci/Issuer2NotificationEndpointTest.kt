@@ -10,7 +10,9 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
@@ -426,6 +428,64 @@ class Issuer2NotificationEndpointTest {
             "READY",
             client.get("/issuer2/sessions/${offer.offerId}").body<JsonObject>()["deferredStatus"]?.jsonPrimitive?.contentOrNull,
         )
+    }
+
+    @Test
+    fun deferredCollectionKeepsAnEarlierWalletReport() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val wallet = Issuer2WalletFlowDriver(client)
+        val scenarios = listOf(Issuer2CredentialScenarios.identitySdJwt, Issuer2CredentialScenarios.isoMdl)
+        val offer = client.createCredentialOffer(MultiCredentialOfferCreateRequest(
+            scenarios.map { CredentialOfferCredential(it.profileId) },
+            AuthenticationMethod.PRE_AUTHORIZED,
+            deferred = true,
+        ))
+        val resolved = wallet.resolve(offer)
+        val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null)
+        val transactions = scenarios.map { scenario ->
+            val proof = wallet.buildJwtProofs(resolved.issuerMetadata, scenario.credentialConfigurationId)
+            val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+                bearerAuth(token.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequest(scenario.credentialConfigurationId, proof))
+            }
+            assertEquals(HttpStatusCode.Accepted, response.status, response.bodyAsText())
+            response.body<JsonObject>().getValue("transaction_id").jsonPrimitive.content
+        }
+        assertEquals(
+            HttpStatusCode.NoContent,
+            client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status,
+        )
+        val endpoint = assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)
+        suspend fun collect(transactionId: String) = client.post(endpoint) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject { put("transaction_id", transactionId) })
+        }
+        val first = collect(transactions[0])
+        assertEquals(HttpStatusCode.OK, first.status, first.bodyAsText())
+        val notificationId = first.body<JsonObject>().getValue("notification_id").jsonPrimitive.content
+        val reported = client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(notificationBody(notificationId, "credential_accepted", "stored"))
+        }
+        assertEquals(HttpStatusCode.NoContent, reported.status, reported.bodyAsText())
+        val reportedSession = client.getSession(offer.offerId)
+        val reportedIdentifier = reportedSession.issuanceResults.entries.single {
+            it.value.walletNotification?.notificationId == notificationId
+        }.key
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, reportedSession.issuanceResults.getValue(reportedIdentifier).walletNotification?.event)
+        val second = collect(transactions[1])
+        assertEquals(HttpStatusCode.OK, second.status, second.bodyAsText())
+        val finished = client.getSession(offer.offerId)
+        assertEquals(
+            NotificationEvent.CREDENTIAL_ACCEPTED,
+            finished.issuanceResults.getValue(reportedIdentifier).walletNotification?.event,
+        )
+        assertEquals("stored", finished.issuanceResults.getValue(reportedIdentifier).walletNotification?.eventDescription)
+        assertNull(finished.issuanceResults.entries.single { it.key != reportedIdentifier }.value.walletNotification?.event)
     }
 
     private suspend fun HttpClient.issueCredential(webhookUrl: String? = null): IssuedNotificationContext {

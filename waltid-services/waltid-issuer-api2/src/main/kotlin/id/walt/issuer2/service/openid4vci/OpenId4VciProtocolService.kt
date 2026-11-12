@@ -1573,14 +1573,22 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 claimFinalized = true
                 return response
             }
-            val issuanceResults = session.issuanceResults + (
-                issuanceRequest.credentialIdentifier to IssuanceResult(
-                    issuedCredentialFormat = configuration.format.value,
-                    walletNotification = credentialResponse.notificationId?.let {
-                        IssuedCredentialNotification(issuanceRequest.credentialIdentifier, it)
-                    },
-                )
+            val issuedResult = IssuanceResult(
+                issuedCredentialFormat = configuration.format.value,
+                walletNotification = credentialResponse.notificationId?.let {
+                    IssuedCredentialNotification(issuanceRequest.credentialIdentifier, it)
+                },
             )
+            val issuanceResults = session.issuanceResults + (
+                issuanceRequest.credentialIdentifier to issuedResult
+            )
+            // A deferred collection may have started before another credential's wallet report was saved.
+            // Merge only this credential so that report is not replaced by the stale snapshot.
+            val persistedResults = if (deferredClaim != null) {
+                mapOf(issuanceRequest.credentialIdentifier to issuedResult)
+            } else {
+                issuanceResults
+            }
             val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
                 .map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
                     tokenClaims, null,
@@ -1596,7 +1604,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         if (deferredClaim != null) sessionService::saveDeferredProgress else sessionService::saveSession
                     save(
                         session.copy(
-                            issuanceResults = issuanceResults,
+                            issuanceResults = persistedResults,
                             authorizedCredentialIdentifiers = establishedSelection,
                             status = if (issuanceComplete) {
                                 IssuanceSessionStatus.SUCCESSFUL
