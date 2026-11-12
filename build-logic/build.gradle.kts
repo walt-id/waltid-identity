@@ -69,7 +69,6 @@ dependencies {
 
     // Android
     implementation(identityLibs.android.gradle.plugin)
-    implementation(identityLibs.jetbrains.compose)
 
     // Persistence
     implementation(identityLibs.sqldelight.gradle.plugin)
