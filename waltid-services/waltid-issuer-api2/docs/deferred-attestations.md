@@ -111,8 +111,10 @@ are unchanged by this library refactor.
 Each checkpoint fetches the signed lists afresh. No acceptance-time VALID decision or
 previous checkpoint's list authorizes later delivery, even if its signed TTL remains valid.
 Within one checkpoint, HTTP requests are deduplicated by URI, while every index and each
-accepted attester's signer authorization are checked. The signed `exp` and `nbf`, when
-present, must permit current use. `iat` must not be in the future. When the accepted
+accepted attester's signer authorization are checked. The status-list profile permits
+`iat` and `nbf` up to 60 seconds ahead of the issuer clock, matching the existing
+attestation verifiers' tolerance. This allowance does not extend signed `exp`, retrieval
+TTL or a configured maximum list age. When the accepted
 `maximumListAgeSeconds` is non-null, the list must also be no older than that bound;
 omission or `null` imposes no additional age cap. `exp` and `ttl` may be omitted under
 the supported profile. TTL is a cache limit rather than an independent token expiry.
