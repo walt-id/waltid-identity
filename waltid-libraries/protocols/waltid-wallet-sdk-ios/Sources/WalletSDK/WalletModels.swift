@@ -695,6 +695,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Optional sidecar metadata JSON persisted with the credential (e.g. `issuerDisplay`).
     public let metadataJSON: String?
 
+    /// Local, dated status observation, independent of credential validity and acceptance.
+    public let status: CredentialStatus?
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -710,6 +713,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///     app-side display.
     ///   - metadataJSON: Optional sidecar metadata JSON persisted with the
     ///     credential.
+    ///   - status: Optional local dated status observation, independent of credential validity.
     public init(
         id: String,
         format: String,
@@ -718,7 +722,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
         label: String?,
         addedAt: Date?,
         credentialDataJSON: String,
-        metadataJSON: String? = nil
+        metadataJSON: String? = nil,
+        status: CredentialStatus? = nil
     ) {
         self.id = id
         self.format = format
@@ -728,6 +733,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.addedAt = addedAt
         self.credentialDataJSON = credentialDataJSON
         self.metadataJSON = metadataJSON
+        self.status = status
     }
 }
 

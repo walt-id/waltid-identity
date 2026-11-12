@@ -2,6 +2,24 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testStatusFacadeForwardsSelectionAndCloseAndPreservesStreamFailures() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        _ = try await wallet.refreshCredentialStatuses(ids: ["identity"], force: true)
+        XCTAssertEqual(bridge.statusRefreshIDs, ["identity"])
+        XCTAssertEqual(bridge.statusRefreshForce, true)
+        bridge.statusUpdates = AsyncThrowingStream { $0.finish(throwing: WalletError.credentialStatusReviewChanged) }
+        var updates = await wallet.credentialStatuses.makeAsyncIterator()
+        do {
+            _ = try await updates.next()
+            XCTFail("A bridge failure must not become an empty clear snapshot")
+        } catch let error as WalletError {
+            XCTAssertEqual(error, .credentialStatusReviewChanged)
+        }
+        try await wallet.close()
+        XCTAssertEqual(bridge.statusCloseCalls, 1)
+    }
+
     func testTypedPaymentFailuresRemainActionableThroughFacade() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
@@ -1241,6 +1259,19 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let encryptionInfoBase64URL: String
         let selectedCredentialOptions: [PresentationCredentialSelection]
     }
+
+    var statusUpdates: AsyncThrowingStream<CredentialStatusSnapshot, Error> = AsyncThrowingStream { $0.finish() }
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { statusUpdates }
+    var statusRefreshIDs: [String]?
+    var statusRefreshForce = false
+    var statusCloseCalls = 0
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot {
+        CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+    }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
+        statusRefreshIDs = ids; statusRefreshForce = force; return []
+    }
+    func close() async throws { statusCloseCalls += 1 }
 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?

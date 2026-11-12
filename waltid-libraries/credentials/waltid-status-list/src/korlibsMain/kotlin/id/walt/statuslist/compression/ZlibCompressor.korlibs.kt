@@ -22,4 +22,7 @@ actual object ZlibCompressor {
         else ZLib.compress(data, outputSizeHint = data.size + COMPRESS_OUTPUT_HEADROOM)
 
     actual fun decompress(data: ByteArray): ByteArray = ZLib.uncompress(data)
+
+    actual fun decompress(data: ByteArray, maxOutputBytes: Int): ByteArray =
+        ZLib.uncompressBounded(data, maxOutputBytes)
 }

@@ -230,6 +230,9 @@ private class ProximitySessionImpl(
         sessionJob = scope.launch(start = CoroutineStart.ATOMIC) { runSession() }
     }
 
+    override suspend fun dispatchStatusReviewed(action: ProximityAction, reviewedStatus: Map<String, String>): ProximityActionResult =
+        if (action is ProximityAction.Approve) owner.dispatch(action, reviewedStatus.toMap()) else dispatch(action)
+
     override suspend fun dispatch(action: ProximityAction): ProximityActionResult {
         val result = owner.dispatch(action)
         if (action is ProximityAction.Cancel && result is ProximityActionResult.Accepted) {

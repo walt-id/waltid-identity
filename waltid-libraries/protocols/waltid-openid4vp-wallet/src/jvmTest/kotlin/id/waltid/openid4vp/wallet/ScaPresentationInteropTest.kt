@@ -57,6 +57,27 @@ class ScaPresentationInteropTest {
     )
 
     @Test
+    fun `changed host review after authorization prevents proof signing`() = runTest {
+        val fixture = fixture("sca-iban", OpenID4VPResponseMode.DIRECT_POST)
+        var current = true
+        var signatures = 0
+        val authorizer = object : ScaPresentationAuthorizer {
+            override suspend fun authorize(presentation: ScaPresentation) = factors
+            override suspend fun withAuthorizedSigner(
+                presentation: ScaPresentation, signer: Signer,
+                operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+            ): String {
+                current = false // Simulated native prompt completed after the warning changed.
+                return operation(factors, Signer { bytes, algorithm -> signatures++; signer.sign(bytes, algorithm) })
+            }
+        }
+        assertFailsWith<IllegalStateException> {
+            kotlinx.coroutines.withContext(PresentationReviewGuard { check(current) { "Review changed" } }) { present(fixture, authorizer) }
+        }
+        assertEquals(0, signatures)
+    }
+
+    @Test
     fun `three payment credentials bind all four response modes and decrypt independently`() = runTest {
         val artifacts = mutableListOf<JsonObject>()
         val identifiers = mutableSetOf<String>()

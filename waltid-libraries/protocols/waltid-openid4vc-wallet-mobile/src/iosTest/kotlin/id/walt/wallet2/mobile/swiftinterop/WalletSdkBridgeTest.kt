@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.credentials.status.presentation
+
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.certificate.x509.X509CertificateUtil
@@ -621,6 +623,37 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun statusStreamSerializesEmptyCollectionsAndReleasesTheNativeCollector() = runTest {
+        var released = false
+        val operations = FakeWalletSdkBridgeOperations()
+        operations.statusFlow = kotlinx.coroutines.flow.flow {
+            try {
+                emit(id.walt.wallet2.status.WalletCredentialStatusSnapshot(
+                    kotlin.time.Instant.parse("2026-11-12T10:00:00Z"), emptyList()))
+                kotlinx.coroutines.awaitCancellation()
+            } finally { released = true }
+        }
+        val bridge = WalletSdkBridge.forOperations(operations, kotlinx.coroutines.flow.emptyFlow())
+        val update = assertIs<WalletBridgeCredentialStatusUpdate.Snapshot>(bridge.credentialStatuses.first())
+        val json = Json.parseToJsonElement(update.snapshotJson).jsonObject
+        assertEquals("[]", json.getValue("credentials").toString())
+        assertEquals("[]", json.getValue("refreshing").toString())
+        assertEquals(true, released)
+    }
+
+    @Test
+    fun statusStreamSanitizesFailuresAndDoesNotConvertCancellationToAnUpdate() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations, kotlinx.coroutines.flow.emptyFlow())
+        operations.statusFlow = kotlinx.coroutines.flow.flow { throw IllegalStateException("secret-status-url") }
+        val failure = assertIs<WalletBridgeCredentialStatusUpdate.Failure>(bridge.credentialStatuses.first())
+        assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
+        assertEquals("Credential status observation failed", failure.error.message)
+        operations.statusFlow = kotlinx.coroutines.flow.flow { throw CancellationException("owner ended") }
+        kotlin.test.assertFailsWith<CancellationException> { bridge.credentialStatuses.first() }
+    }
+
+    @Test
     fun bridgeExposesCommonMobileWalletEvents() = runTest {
         val events = MutableSharedFlow<MobileWalletEvent>(replay = 1)
         val bridge = WalletSdkBridge.forOperations(
@@ -710,6 +743,19 @@ class WalletSdkBridgeTest {
 
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")
+
+        override suspend fun credentialReads(): List<id.walt.wallet2.mobile.MobileWalletCredentialRead> = credentials().map {
+            val status = id.walt.credentials.status.CredentialStatusMetadata()
+            id.walt.wallet2.mobile.MobileWalletCredentialRead(it, status,
+                status.presentation(kotlin.time.Clock.System.now()), kotlin.time.Clock.System.now().toString())
+        }
+        var statusFlow: kotlinx.coroutines.flow.Flow<id.walt.wallet2.status.WalletCredentialStatusSnapshot> = kotlinx.coroutines.flow.emptyFlow()
+        override val credentialStatuses: kotlinx.coroutines.flow.Flow<id.walt.wallet2.status.WalletCredentialStatusSnapshot>
+            get() = statusFlow
+        override suspend fun credentialStatusSnapshot(): id.walt.wallet2.status.WalletCredentialStatusSnapshot =
+            id.walt.wallet2.status.WalletCredentialStatusSnapshot(kotlin.time.Clock.System.now(), emptyList())
+        override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: id.walt.wallet2.status.CredentialStatusRefreshMode): List<id.walt.wallet2.status.CredentialStatusRefreshResult> = emptyList()
+        override suspend fun close() = Unit
 
         override suspend fun credentials(): List<MobileWalletCredential> =
             listOf(

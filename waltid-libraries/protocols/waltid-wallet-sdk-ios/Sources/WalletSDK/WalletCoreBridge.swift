@@ -3,6 +3,10 @@ import Foundation
 @available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { get }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
+    func close() async throws
     var signingIdentityCore: any SigningIdentityCore { get }
 
     func keyUseAuthorizationPreflight(
@@ -28,6 +32,15 @@ protocol WalletCoreBridge: Sendable {
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?
     ) async throws -> PaymentConsent?
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        reviewedStatus: [String: String],
+        did: String?,
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
+    ) async throws -> PresentationResult
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -54,6 +67,14 @@ protocol WalletCoreBridge: Sendable {
         verifiedOrigin: String,
         selectedRegistryEntryIDs: [String]
     ) async throws -> AnnexCPresentationPreview
+    func submitStatusReviewedAnnexCPresentation(
+        reviewedStatus: [String: String],
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse
     func submitAnnexCPresentation(
         requestID: String,
         verifiedOrigin: String,
@@ -124,6 +145,13 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         throw unavailableError()
     }
+
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+        AsyncThrowingStream { $0.finish(throwing: unavailableError()) }
+    }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot { throw unavailableError() }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { throw unavailableError() }
+    func close() async throws { }
 
     func credentials() async throws -> [Credential] {
         throw unavailableError()
@@ -218,4 +246,27 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
+}
+
+extension WalletCoreBridge {
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        reviewedStatus: [String: String], did: String?, runPolicies: Bool?, paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        let snapshot = try await credentialStatusSnapshot()
+        guard selectedCredentialOptions.allSatisfy({ selection in
+            snapshot.credentials.first { $0.credentialID == selection.credentialID }?.value.presentation.advisoryRevision == reviewedStatus[selection.credentialID]
+        }) else { throw WalletError.credentialStatusReviewChanged }
+        return try await submitPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did, runPolicies: runPolicies, paymentConsentRevision: paymentConsentRevision)
+    }
+}
+
+extension WalletCoreBridge {
+    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
+        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
+        throw WalletError.internalFailure("Status-reviewed Annex C presentation is unavailable")
+    }
 }

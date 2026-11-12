@@ -12,6 +12,20 @@ actual object GzipCompressor {
         return result.toByteArray()
     }
 
-    actual fun decompress(data: ByteArray): ByteArray =
-        GZIPInputStream(ByteArrayInputStream(data)).use { it.readBytes() }
+    actual fun decompress(data: ByteArray): ByteArray = decompress(data, Int.MAX_VALUE)
+
+    actual fun decompress(data: ByteArray, maxOutputBytes: Int): ByteArray {
+        require(maxOutputBytes > 0)
+        return GZIPInputStream(ByteArrayInputStream(data)).use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > maxOutputBytes - output.size()) throw StatusListSizeLimitException()
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
+        }
+    }
 }

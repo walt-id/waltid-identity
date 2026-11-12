@@ -1,5 +1,7 @@
 package id.walt.wallet2.server.handlers
 
+import id.walt.wallet2.status.*
+import id.walt.wallet2.server.WalletCredentialStatusRequests
 import id.walt.errors.StatusException
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
@@ -201,6 +203,8 @@ object Wallet2RouteHandler {
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
+        val credentialStatuses = WalletCredentialStatusRequests()
+
 
         post("", Wallet2OpenApiDocs.createWallet()) {
             val req = runCatching { call.receive<CreateWalletRequest>() }
@@ -340,6 +344,7 @@ object Wallet2RouteHandler {
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@delete
                 resolver.deleteWallet(wallet.id)
+                credentialStatuses.forget(WalletCredentialStatusRequests.Scope(resolver.walletStore, wallet.id))
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -532,18 +537,38 @@ object Wallet2RouteHandler {
             // Credential management + issuance + presentation
             // -----------------------------------------------------------------
 
+            route("/credential-status") {
+                get("", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Read local credential status observations without contacting issuers"
+                    request { pathParameter<String>("walletId") }
+                    response { HttpStatusCode.OK to { body<WalletCredentialStatusSnapshot>() } }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
+                    call.respond(credentialStatuses.snapshot(wallet))
+                }
+                post("/refresh", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Refresh status for stored credentials (bounded, advisory)"
+                    description = "Uses authenticated status references in this wallet. At most 100 records per request; a 30-second per-wallet cooldown returns DEFERRED outcomes. No caller-supplied URL is accepted."
+                    request { pathParameter<String>("walletId"); body<RefreshCredentialStatusesRequest>() }
+                    response { HttpStatusCode.OK to { body<List<CredentialStatusRefreshResult>>() } }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                    call.respond(credentialStatuses.refresh(wallet, WalletCredentialStatusRequests.Scope(resolver.walletStore, wallet.id), call.receive()))
+                }
+            }
+
             route("/credentials") {
 
                 get("", {
                     tags = listOf(CREDENTIALS_TAG)
                     summary = "List credentials (metadata only, no raw credential data)"
                     request { pathParameter<String>("walletId") }
-                    response { HttpStatusCode.OK to { body<List<StoredCredentialMetadata>>() } }
+                    response { HttpStatusCode.OK to { body<List<WalletCredentialMetadataResponse>>() } }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
-                    val credentials = wallet.streamAllCredentials()
-                        .toList()
-                        .map { it.toMetadata() }
+                    val credentials = credentialStatuses.reads(wallet).map { it.toMetadataResponse() }
                     call.respond(credentials)
                 }
 
@@ -568,15 +593,15 @@ object Wallet2RouteHandler {
                         summary = "Get a credential including raw credential data"
                         request { pathParameter<String>("walletId"); pathParameter<String>("credentialId") }
                         response {
-                            HttpStatusCode.OK to { body<StoredCredential>() }
+                            HttpStatusCode.OK to { body<WalletCredentialResponse>() }
                             HttpStatusCode.NotFound to {}
                         }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
                         val credentialId = call.parameters["credentialId"]!!
-                        val entry = wallet.findCredential(credentialId)
+                        val entry = credentialStatuses.read(wallet, credentialId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, "Credential '$credentialId' not found")
-                        call.respond(entry)
+                        call.respond(entry.toResponse())
                     }
 
                     delete("", {
@@ -676,6 +701,38 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<MatchCredentialsFromStoreRequest>()
                         call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
+                    }
+
+                    post("/build-vp-token/status-reviewed", {
+                        summary = "Build a presentation against the credential status warnings actually reviewed"
+                        request { pathParameter<String>("walletId"); body<StatusReviewedBuildVpTokenRequest>() }
+                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<StatusReviewedBuildVpTokenRequest>()
+                        val ids = req.request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }
+                        try {
+                            call.respond(credentialStatuses.withReviewedStatus(wallet, ids, req.reviewedStatus) {
+                                WalletPresentationHandler.buildVpToken(wallet, req.request, transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                    clientIdTrustConfiguration = clientIdTrustConfiguration).also {
+                                    kotlinx.coroutines.currentCoroutineContext()[id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard]?.check()
+                                }
+                            })
+                        } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
+                    }
+                    post("/send-response/status-reviewed", {
+                        summary = "Deliver a presentation only if the selected local status warnings are unchanged"
+                        request { pathParameter<String>("walletId"); body<StatusReviewedSendResponseRequest>() }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<StatusReviewedSendResponseRequest>()
+                        try {
+                            call.respond(credentialStatuses.withReviewedStatus(wallet, req.selectedCredentialIds, req.reviewedStatus) {
+                                WalletPresentationHandler.sendAuthorizationResponse(wallet, req.request, transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                    clientIdTrustConfiguration = clientIdTrustConfiguration)
+                            })
+                        } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
                     }
 
                     post("/build-vp-token", {

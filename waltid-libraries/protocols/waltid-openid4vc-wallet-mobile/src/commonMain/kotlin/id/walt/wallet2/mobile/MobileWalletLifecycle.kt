@@ -25,6 +25,17 @@ internal class MobileWalletLifecycle {
         }
     }
 
+    suspend fun close(cleanup: () -> Unit) = deletionMutex.withLock {
+        val shouldClose = mutex.withLock {
+            if (closed) false else {
+                check(activeOperations == 0) { "Cannot close the mobile wallet while an operation is in progress" }
+                closed = true
+                true
+            }
+        }
+        if (shouldClose) cleanup()
+    }
+
     /**
      * Busy rejection is nondestructive. Once admitted, deletion permanently closes operations,
      * survives caller cancellation, and can be retried after a cleanup failure.

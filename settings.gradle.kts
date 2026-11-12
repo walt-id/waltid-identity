@@ -61,6 +61,7 @@ val modules = listOfNotNull(
         "waltid-dif-definitions-parser",
         "waltid-dcql",
         "waltid-status-list",
+        "waltid-credential-status",
         "waltid-verification-policies",
         "waltid-verification-policies2",
         "waltid-verification-policies2-vp",

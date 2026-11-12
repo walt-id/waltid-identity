@@ -162,12 +162,17 @@ public class PreviewSessionStore<T>(
     suspend fun <R> useOnce(walletId: String, id: String, validate: (T) -> Unit = {}, block: suspend (T) -> R): R =
         use(walletId, id, consumeOnSuccess = true, consumeOnFailure = true, validate = validate, block = block)
 
+    internal suspend fun <R> useStatusReviewedOnce(walletId: String, id: String, block: suspend (T) -> R): R =
+        use(walletId, id, consumeOnSuccess = true, consumeOnFailure = true,
+            retainOnFailure = { it is id.walt.wallet2.status.CredentialStatusReviewChangedException }, block = block)
+
     private suspend fun <R> use(
         walletId: String,
         id: String,
         consumeOnSuccess: Boolean,
         consumeOnFailure: Boolean,
         preparing: Boolean = false,
+        retainOnFailure: (Throwable) -> Boolean = { false },
         validate: (T) -> Unit = {},
         block: suspend (T) -> R,
     ): R = coroutineScope {
@@ -183,6 +188,7 @@ public class PreviewSessionStore<T>(
                 it.preparing = preparing
             }
         }
+        var retainedFailure = false
         var completed = false
         try {
             val result = withTimeout(entry.expiresAt - now()) { block(entry.value) }
@@ -193,6 +199,9 @@ public class PreviewSessionStore<T>(
                 completed = true
             }
             result
+        } catch (failure: Throwable) {
+            retainedFailure = retainOnFailure(failure)
+            throw failure
         } finally {
             withContext(NonCancellable) {
                 mutex.withLock {
@@ -200,7 +209,7 @@ public class PreviewSessionStore<T>(
                     val reason = when {
                         entry.discardRequested -> PreviewSessionFailureReason.DISCARDED
                         currentTime >= entry.expiresAt -> PreviewSessionFailureReason.EXPIRED
-                        if (completed) consumeOnSuccess else consumeOnFailure -> PreviewSessionFailureReason.CONSUMED
+                        if (completed) consumeOnSuccess else consumeOnFailure && !retainedFailure -> PreviewSessionFailureReason.CONSUMED
                         else -> null
                     }
                     if (reason != null) {
