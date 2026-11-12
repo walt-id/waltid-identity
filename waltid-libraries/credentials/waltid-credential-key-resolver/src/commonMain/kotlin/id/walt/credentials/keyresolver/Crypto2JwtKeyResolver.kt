@@ -9,6 +9,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
@@ -34,12 +35,15 @@ fun interface Crypto2JwtVerificationKeyResolver {
 }
 
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
-        DidService.resolveToCrypto2Keys(did).getOrThrow()
-    },
+    didResolver: Crypto2DidKeyResolver? = null,
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
+    verificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
+    private val didResolver = didResolver ?: Crypto2DidKeyResolver { did ->
+        DidService.resolveToCrypto2Keys(did, verificationRelationship).getOrThrow()
+    }
+
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
         val signerIdentifier = extractSignerIdentifier(jwtPayload)
         val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
