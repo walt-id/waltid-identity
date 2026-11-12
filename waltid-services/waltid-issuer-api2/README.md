@@ -582,7 +582,7 @@ requirePkce = false
 ```
 
 The default permits authorization-code requests without PKCE. Set `requirePkce = true`
-or `ISSUER2_REQUIRE_PKCE=true` to require S256 PKCE at `/authorize` and `/par`.
+to require S256 PKCE at `/authorize` and `/par`.
 Restart the service after changing its configuration. The provider rejects a missing
 challenge with `invalid_request` and verifies the matching `code_verifier` before issuing tokens.
 Supplied PKCE is always verified, including when the requirement is disabled.
