@@ -5,7 +5,6 @@ import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ExpirationDatePolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
 import id.walt.verifier2.data.Verification2Session
-import id.walt.verifier2.freePort
 import kotlin.test.Test
 
 class CredentialValidityHttpTest {
@@ -21,6 +20,6 @@ class CredentialValidityHttpTest {
             W3cPolicyHttpCase("outer dates satisfy required fields", true, policies(required = true)),
             W3cPolicyHttpCase("optional dates absent", true, policies(), notBeforeOffset = null, expirationOffset = null),
             W3cPolicyHttpCase("required dates absent", false, policies(required = true), notBeforeOffset = null, expirationOffset = null),
-        ), port = freePort())
+        ))
     }
 }
