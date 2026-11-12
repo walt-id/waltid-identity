@@ -16,11 +16,9 @@ import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
-import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import id.walt.credentials.signatures.sdjwt.SdJwtDisclosureLocator
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
-import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
-import id.walt.credentials.utils.SdJwtUtils.appendClaimName
 import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
@@ -299,117 +297,9 @@ object CredentialParser {
         // extracted from `credential` itself per RFC 9901 §4 compact serialisation format.
         val disclosuresPart = credential.substringAfter("~", "")
         log.trace { "Parsing disclosures: $disclosuresPart" }
-        var availableDisclosures = parseDisclosureString(disclosuresPart)
-
-        if (availableDisclosures?.isNotEmpty() == true) {
-            log.trace { "=== MAPPING ===" }
-            // Use a Mutable Set to track what we have successfully mapped
-            val mappedDisclosures = HashSet<SdJwtSelectiveDisclosure>()
-
-            // A queue of hashes we expect to find, paired with the Claim Path of their containing
-            // object (per SD-JWT VC §4.6.1; relative to the credential root).
-            val hashesToVerify = ArrayDeque<Pair<List<JsonElement>, String>>()
-
-            fun findForHash(hash: String) =
-                /* asHashedFromEncoded() hashes the exact original base64url wire bytes (RFC 9901 §4.2)
-                 - the most reliable match as it is independent of any JSON re-serialization.
-                 asHashed() is SHA-256(base64url(json_array)) recomputed from salt/name/value.
-                 asHashed2() is an alternative base64 encoding fallback for some non-standard issuers.
-                 asHashed3() (double-base64url) is a non-standard malformed disclosure */
-                availableDisclosures!!.firstOrNull {
-                    it.asHashedFromEncoded() == hash || it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash
-                }
-
-            // Helper to recursively scan a JSON element for more SD-JWT hashes.
-            // currentPath is the Claim Path (§4.6.1) of [element] relative to the credential root.
-            fun scanForHashes(element: JsonElement, currentPath: List<JsonElement>) {
-                when (element) {
-                    is JsonObject -> {
-                        // Check for _sd array in this object
-                        element["_sd"]?.jsonArray?.forEach {
-                            if (it is JsonPrimitive && it.isString) {
-                                hashesToVerify.add(currentPath to it.content)
-                            }
-                        }
-                        // Recurse into properties
-                        element.forEach { (key, value) ->
-                            if (key != "_sd") scanForHashes(value, currentPath.appendClaimName(key))
-                        }
-                    }
-
-                    is JsonArray -> {
-                        element.forEachIndexed { index, item ->
-                            // Check for Array Disclosure format: { "...": "hash" }
-                            if (item is JsonObject && item.size == 1 && item.containsKey("...")) {
-                                val hash = item["..."]?.jsonPrimitive?.content
-                                if (hash != null) {
-                                    hashesToVerify.add(currentPath.appendArrayIndex(index) to hash)
-                                }
-                            } else {
-                                // Recurse
-                                scanForHashes(item, currentPath.appendArrayIndex(index))
-                            }
-                        }
-                    }
-
-                    else -> {} // Primitives contain no hashes
-                }
-            }
-
-            // 1. Initial population from the credential-root payload, using the
-            // identification logic in scanForHashes (RFC 9901 §7.1 step 3.b). For W3C JWT-VCs that
-            // embed the credential under a `vc` claim, scan that wrapper's content so Claim Paths
-            // stay relative to the credential root (mirrors parseSdLocationToClaimPath's vc handling).
-            val credentialRoot = (payload["vc"] as? JsonObject) ?: payload
-            scanForHashes(credentialRoot, emptyList())
-
-            // 2. Process the queue until all nested hashes are resolved
-            while (hashesToVerify.isNotEmpty()) {
-                val (basePath, hash) = hashesToVerify.removeFirst()
-                log.trace { "Processing hash: $hash at $basePath" }
-
-                val matchingDisclosure = findForHash(hash)
-                if (matchingDisclosure != null) {
-                    // Construct the Claim Path for the *content* of this disclosure.
-                    // Object-property disclosures append their claim name; array-element
-                    // disclosures ([salt, value], name == null) keep the containing path.
-                    val newPath = if (matchingDisclosure.name != null)
-                        basePath.appendClaimName(matchingDisclosure.name)
-                    else basePath
-
-                    // Create a copy of the disclosure with the populated location
-                    val updatedDisclosure = matchingDisclosure.copy(location = newPath)
-
-                    // Only process if we haven't mapped this specific disclosure instance yet
-                    // (SD-JWT spec says digest MUST NOT appear more than once, but safety check)
-                    // Add the UPDATED disclosure to the set, not the raw one
-                    if (mappedDisclosures.add(updatedDisclosure)) {
-                        log.trace { "Found hash for ${updatedDisclosure.name ?: "array_element"}" }
-
-                        // 3. Recursive Step: Scan the *value* of the disclosure for new hashes
-                        scanForHashes(updatedDisclosure.value, newPath)
-                    }
-                } else {
-                    log.trace { "Hash $hash not found in available disclosures (might be a decoy)" }
-                }
-            }
-
-            log.trace {
-                mappedDisclosures.mapIndexed { idx, it -> "$idx: ${it.name} -> $it" }.joinToString("\n")
-            }
-
-            // Per RFC 9901 §7.1 step 5: "If any Disclosure was not referenced by digest value
-            // in the Issuer-signed JWT (directly or recursively via other Disclosures), the
-            // SD-JWT MUST be rejected." Throw a distinct exception so callers can return INVALID.
-            if (availableDisclosures.size != mappedDisclosures.size) {
-                throw UnreachableDisclosuresException(
-                    "Invalid disclosures: ${availableDisclosures.size} disclosures provided but " +
-                            "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
-                            "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
-                )
-            }
-            availableDisclosures = mappedDisclosures.toList()
-        }
+        val parsedDisclosures = parseDisclosureString(disclosuresPart)
+        val locatedDisclosures = SdJwtDisclosureLocator.locate(payload, parsedDisclosures.orEmpty())
+        val availableDisclosures = parsedDisclosures?.let { locatedDisclosures }
 
         val fullCredentialData =
             if (availableDisclosures?.isNotEmpty() == true ||
