@@ -48,6 +48,12 @@ class WalletIssuanceStorageRecoveryTest {
         val issuer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val issuerUrl = "http://127.0.0.1:${issuer.address.port}"
         val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val proofs = holders.map { key ->
+            key.signJws("{}".encodeToByteArray(), mapOf(
+                "typ" to JsonPrimitive("openid4vci-proof+jwt"),
+                "jwk" to key.getPublicKey().exportJWKObject(),
+            ))
+        }
         val credentialGroups = List(if (datasets) 2 else 1) { dataset ->
             holders.map { key ->
                 val publicJwk = key.getPublicKey().exportJWKObject()
@@ -136,7 +142,7 @@ class WalletIssuanceStorageRecoveryTest {
                 setBody(when (kind) {
                     RequestKind.FETCH -> """{"credentialEndpoint":"$issuerUrl/credential","accessToken":"test-token",
                       "credentialConfigurationId":"identity","credentialIdentifier":"dataset-a","storeInWallet":true,
-                      "credentialIssuerBaseUrl":"$issuerUrl","proofs":{"jwt":["proof-one","proof-two"]},
+                      "credentialIssuerBaseUrl":"$issuerUrl","proofs":{"jwt":${Json.encodeToString(proofs)}},
                       "holderBindings":[{"keyId":"${keyIds[0]}"},{"keyId":"${keyIds[1]}"}]}"""
                     RequestKind.POLL -> """{"deferredCredentialEndpoint":"$issuerUrl/deferred","accessToken":"test-token",
                       "transactionId":"transaction","proofRequired":true,

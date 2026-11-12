@@ -2,7 +2,7 @@ package id.walt.verifier2.w3c
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
@@ -242,9 +242,8 @@ class Verifier2RemoteSchemaTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = freePort()
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -254,7 +253,7 @@ class Verifier2RemoteSchemaTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -267,6 +266,7 @@ class Verifier2RemoteSchemaTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             // Create the verification session

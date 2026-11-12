@@ -15,6 +15,7 @@ import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.authFlows
 import id.walt.ktorauthnz.methods.EmailPass
+import id.walt.ktorauthnz.methods.TOTP
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
@@ -40,12 +41,31 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AuthFlowRoutesTest {
+
+    private val totpClock = Clock.fixed(Instant.parse("2026-11-02T14:47:29Z"), ZoneOffset.UTC)
+    private lateinit var previousTotpClock: Clock
+
+    @BeforeTest
+    fun useFixedTotpClock() {
+        previousTotpClock = TOTP.clock
+        TOTP.clock = totpClock
+    }
+
+    @AfterTest
+    fun restoreTotpClock() {
+        TOTP.clock = previousTotpClock
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
     private val alice = "11111111-1111-1111-1111-000000000000"
@@ -105,7 +125,7 @@ class AuthFlowRoutesTest {
     private fun HttpResponse.info() = runBlocking { json.decodeFromString<AuthSessionInformation>(bodyAsText()) }
 
     private val password = """{"username":"alice1","password":"123456"}"""
-    private fun totp() = """{"code":"${TOTPGenerator().generateCurrent(TOTPSecret.fromBase32EncodedString("JBSWY3DPEHPK3PXP")).value}"}"""
+    private fun totp() = """{"code":"${TOTPGenerator(totpClock).generateCurrent(TOTPSecret.fromBase32EncodedString("JBSWY3DPEHPK3PXP")).value}"}"""
 
     @Test
     fun `a multi-step flow is served from its definition, next_method naming the next URL`() = flowTest {

@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
+import id.walt.walletdemo.compose.logic.incomingWalletPageLink
+import io.ktor.http.encodeURLParameter
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
@@ -233,6 +235,39 @@ class WalletApi2MappingsTest {
 }
 
 class WalletDeepLinkSchemeWebTest {
+    @Test
+    fun pageLinkReadsCredentialOffer() {
+        val offer =
+            "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer%2Fa+b"
+        assertEquals(
+            offer,
+            incomingWalletPageLink("http://localhost:7106/?link=${offer.encodeURLParameter()}"),
+        )
+    }
+
+    @Test
+    fun pageLinkReadsPresentationRequest() {
+        val request = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+        assertEquals(
+            request,
+            incomingWalletPageLink("http://localhost:7106/?link=${request.encodeURLParameter()}"),
+        )
+    }
+
+    @Test
+    fun pageLinkIgnoresWalletRoutesAndOtherSchemes() {
+        assertEquals(
+            null,
+            incomingWalletPageLink("http://localhost:7106/api/siop/initiateIssuance?credential_offer=abc"),
+        )
+        assertEquals(null, incomingWalletPageLink("http://localhost:7106/?code=abc&state=1"))
+        assertEquals(
+            null,
+            incomingWalletPageLink("http://localhost:7106/?link=${"https://issuer.example/offer".encodeURLParameter()}"),
+        )
+        assertEquals(null, incomingWalletPageLink("not a url"))
+    }
+
     @Test
     fun httpsAuthorizationCallbackWithCode() {
         assertEquals(

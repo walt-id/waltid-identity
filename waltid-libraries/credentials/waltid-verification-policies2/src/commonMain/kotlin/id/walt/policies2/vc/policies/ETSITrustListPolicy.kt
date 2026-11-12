@@ -3,12 +3,21 @@ package id.walt.policies2.vc.policies
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.credentials.keyresolver.JwtKeyResolutionSource
+import id.walt.credentials.keyresolver.resolvers.X5CKeyResolver
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.w3c.schemes.JwsSignatureScheme
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -27,8 +36,9 @@ private val log = KotlinLogging.logger { }
  * A verification policy that validates credential issuer certificates against an
  * ETSI Trust List (TSL/LoTE).
  *
- * This policy extracts the signing certificate from the credential's x5c chain,
- * computes its SHA-256 fingerprint, and resolves trust status.
+ * This policy resolves trust for the key that signed the credential: its x5c
+ * certificate chain, or, for a JWT issuer identified by a DID or HTTPS issuer
+ * metadata without a matching x5c chain, the issuer's public key.
  *
  * ## Trust Resolution Modes
  *
@@ -137,8 +147,8 @@ data class ETSITrustListPolicy(
         log.debug { "Verifying credential with ETSI Trust List policy" }
 
         try {
-            // Extract the issuer's certificate chain (x5c) or, when absent, resolve the
-            // issuer's public key (DID, HTTPS well-known metadata) for JWT-based credentials.
+            // Extract the trust material for the key that signed the credential: its certificate
+            // chain (x5c) or, for JWT issuers without a matching x5c, the resolved public key.
             val trustMaterial = extractTrustMaterial(credential)
             log.debug { "Extracted issuer trust material: $trustMaterial" }
 
@@ -253,12 +263,13 @@ data class ETSITrustListPolicy(
                 IssuerTrustMaterial.CertificateChain(extractChainFromCoseSignature(signature))
             }
             signature is JwtBasedSignature -> {
-                extractJwtTrustMaterial(signature, credential.credentialData)
+                extractJwtTrustMaterial(signature, credential)
             }
             else -> {
                 throw ETSITrustListPolicyException(
                     "Unsupported credential type for ETSI Trust List verification. " +
-                    "Supported: mDoc with COSE x5c, SD-JWT with x5c header, JWT VC with x5c header. " +
+                    "Supported: mDoc with COSE x5chain, SD-JWT VC / JWT VC with an x5c header or a resolvable " +
+                    "DID / HTTPS issuer key. " +
                     "Got: ${credential::class.simpleName} with ${signature?.let { it::class.simpleName } ?: "no signature"}"
                 )
             }
@@ -280,71 +291,80 @@ data class ETSITrustListPolicy(
     }
 
     /**
-     * Extracts trust material for a JWT-based credential (SD-JWT VC, JWT VC).
+     * Extracts trust material for a JWT-based credential (SD-JWT VC, JWT VC): the key the
+     * credential was signed with, resolved via [Crypto2JwtKeyResolver] (DID resolution for a DID
+     * `iss`, then the `x5c` leaf certificate, then HTTPS well-known JWT VC issuer metadata).
      *
-     * When the JWT header carries an `x5c` certificate chain, that chain is used as before.
-     * Otherwise — e.g. an issuer that signs with a `did:web` DID and identifies its signing
-     * key only via `kid` + `iss` — the issuer's public key is resolved via [Crypto2JwtKeyResolver]
-     * (DID resolution, or HTTPS well-known JWT VC issuer metadata) and matched against the trust
-     * list by JWK thumbprint instead. An inline `jwk` header is intentionally not trusted here
-     * (`allowInlineJwk = false`): it is self-asserted and establishes no issuer identity on its own.
+     * That key is represented by its `x5c` certificate chain when it was taken from `x5c`, or when
+     * the `x5c` leaf certificate holds it (e.g. a DID `iss` signing with its certified key).
+     * Otherwise — e.g. an issuer that signs with a `did:web` DID and identifies its signing key only
+     * via `kid` + `iss` — the public key itself is matched against the trust list by JWK thumbprint.
+     * An inline `jwk` header is intentionally not trusted here (`allowInlineJwk = false`): it is
+     * self-asserted and establishes no issuer identity on its own.
      *
-     * Signer binding: this trust check is only sound if it resolves the *same* key that the base
-     * `signature` policy verified the credential against — otherwise an attacker could sign with a
-     * self-asserted key while trust is matched against a different, trust-listed key. That binding
-     * holds structurally rather than by convention: for both W3C JWT VCs and SD-JWT VCs, the base
-     * signature policy resolves its verification key via
-     * `JwsSignatureScheme.getIssuerCrypto2KeyInfo(compact)`, whose default `resolver` parameter is
-     * `Crypto2JwtKeyResolver()` — the same class, with the same `allowInlineJwk = false` default, run
-     * over the same JWT header/payload as [keyResolver] here. Given identical (deterministic) inputs
-     * and an identical resolver configuration, both policies always resolve to the same key.
+     * Signer binding: this trust check is only sound if it covers the key the credential was signed
+     * with — otherwise an attacker could sign with a self-asserted key while trust is established for
+     * a different, trust-listed key or certificate. The key is resolved as the base `signature` policy
+     * resolves it: `JwsSignatureScheme.getIssuerCrypto2KeyInfo` on the signed JWT, with
+     * `Crypto2JwtKeyResolver`'s `allowInlineJwk = false` default, not on the parsed credential data,
+     * whose SD-JWT disclosures can add claims (such as `iss`) that the signed payload lacks. Resolving
+     * twice does not guarantee the same key, as a `did:web` document or HTTPS issuer metadata is
+     * fetched again, so the signed JWT is verified with the resolved key before its trust is checked.
+     * An `x5c` chain stands in for the key only when its leaf certificate holds it.
      */
     private suspend fun extractJwtTrustMaterial(
         signature: JwtBasedSignature,
-        credentialData: JsonObject
+        credential: DigitalCredential
     ): IssuerTrustMaterial {
-        val jwtHeader = signature.jwtHeader
-            ?: throw ETSITrustListPolicyException("JWT credential has no header")
+        val signed = credential.signed
+            ?: throw ETSITrustListPolicyException("JWT credential is not signed")
 
-        val x5cElement = jwtHeader["x5c"]
-        if (x5cElement != null) {
-            val x5cArray = x5cElement.jsonArray
-            if (x5cArray.isEmpty()) {
-                throw ETSITrustListPolicyException("JWT x5c header is empty")
-            }
-            log.debug { "Extracted ${x5cArray.size} certificate(s) from JWT x5c header" }
-            return IssuerTrustMaterial.CertificateChain(
-                x5cArray.map { certElement ->
-                    val derBytes = certElement.jsonPrimitive.content.decodeFromBase64()
-                    buildPemCertificate(derBytes)
-                }
+        val resolved = runCatching {
+            JwsSignatureScheme().getIssuerCrypto2KeyInfo(signed, keyResolver).resolved
+        }.getOrElse { cause ->
+            throw ETSITrustListPolicyException(
+                "The JWT issuer's public key could not be resolved: ${cause.message}. ETSI Trust List " +
+                "verification requires an x5c header or a resolvable issuer key (DID or HTTPS well-known " +
+                "JWT VC issuer metadata).",
+                cause
+            )
+        }
+        runCatching {
+            CompactJws.verify(signed.substringBefore('~'), resolved.key, JwsAlgorithm.entries.toSet())
+        }.getOrElse { cause ->
+            throw ETSITrustListPolicyException(
+                "The resolved JWT issuer key does not verify the credential signature: ${cause.message}",
+                cause
             )
         }
 
-        val resolved = runCatching {
-            signature.getCrypto2JwtBasedIssuer(credentialData, keyResolver)
-        }.getOrElse { cause ->
-            throw ETSITrustListPolicyException(
-                "JWT has no x5c certificate chain in header, and the issuer's public key could not be " +
-                "resolved: ${cause.message}. ETSI Trust List verification requires either an x5c header " +
-                "or a resolvable issuer key (DID or HTTPS well-known JWT VC issuer metadata).",
-                cause
+        val x5c = signature.jwtHeader?.get("x5c") as? JsonArray
+        val certificateChain = when {
+            resolved.source == JwtKeyResolutionSource.X5C -> resolved.certificateChain
+            x5c != null && x5cLeafHoldsKey(x5c, resolved.key) -> x5c.map { it.jsonPrimitive.content }
+            else -> null
+        }
+        if (certificateChain != null) {
+            log.debug { "Using the ${certificateChain.size}-certificate x5c chain of the ${resolved.source} issuer key" }
+            return IssuerTrustMaterial.CertificateChain(
+                certificateChain.map { buildPemCertificate(it.decodeFromBase64()) }
             )
-        } ?: throw ETSITrustListPolicyException(
-            "JWT has no x5c certificate chain in header, and the issuer's public key could not be resolved " +
-            "(no DID or HTTPS issuer identifier found). ETSI Trust List verification requires either an " +
-            "x5c header or a resolvable issuer key."
-        )
+        }
 
         log.debug { "Resolved issuer public key via ${resolved.source} for trust list matching" }
-        return IssuerTrustMaterial.PublicKey(exportIssuerJwk(resolved.key))
+        return IssuerTrustMaterial.PublicKey(exportIssuerJwk(resolved.key).data.toByteArray().decodeToString())
     }
 
-    private suspend fun exportIssuerJwk(key: Key): String {
+    /** Whether the leaf certificate of [x5c] holds [key], compared by RFC 7638 JWK thumbprint. */
+    private suspend fun x5cLeafHoldsKey(x5c: JsonArray, key: Key): Boolean = runCatching {
+        val leafKey = X5CKeyResolver.restoreKeyFromX5c(x5c, runtime)
+        Jwk.sha256Thumbprint(exportIssuerJwk(leafKey)) == Jwk.sha256Thumbprint(exportIssuerJwk(key))
+    }.getOrDefault(false)
+
+    private suspend fun exportIssuerJwk(key: Key): EncodedKey.Jwk {
         val exporter = key.capabilities.publicKeyExporter
             ?: throw ETSITrustListPolicyException("Resolved issuer key does not support public key export")
-        val jwk = exporter.exportPublicKey().toPublicJwk(key.spec)
-        return jwk.data.toByteArray().decodeToString()
+        return exporter.exportPublicKey().toPublicJwk(key.spec)
     }
 
     // ---------------------------------------------------------------------------
@@ -626,11 +646,14 @@ data class ETSITrustListPolicy(
         }
 
         /**
-         * Resolves the issuer's public key from a JWT header/payload that has no x5c chain
-         * (DID, or HTTPS well-known JWT VC issuer metadata). Inline `jwk` headers are not
+         * Resolves the key a JWT credential was signed with, as the base signature policy does
+         * (DID, x5c, HTTPS well-known JWT VC issuer metadata). Inline `jwk` headers are not
          * trusted for trust-list matching, as they are self-asserted.
          */
         private val keyResolver: Crypto2JwtKeyResolver by lazy { Crypto2JwtKeyResolver(allowInlineJwk = false) }
+
+        /** Restores the x5c leaf certificate's key, to compare it with the resolved issuer key. */
+        private val runtime: CryptoRuntime by lazy { CryptoRuntime(defaultSoftwareKeyProviders()) }
     }
 }
 

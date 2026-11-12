@@ -175,7 +175,7 @@ when (decision.decision) {
 }
 ```
 
-Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor.
+Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor. A presented certificate that matches the registry only by fingerprint counts when it is the leaf, or when the leaf validates to it through the presented chain.
 
 ## Source lifecycle
 

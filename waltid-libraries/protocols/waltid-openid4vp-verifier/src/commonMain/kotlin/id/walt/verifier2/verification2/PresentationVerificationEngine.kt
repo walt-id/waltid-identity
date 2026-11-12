@@ -545,9 +545,12 @@ object PresentationVerificationEngine {
                 when (val presentation = it.value) {
                     is JwtVcJsonPresentation -> {
                         if (presentation.vp == null) {
-                            throw PresentationRejectionException(
-                                "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
-                            )
+                            val reason = "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
+                            session.updateSession(SessionEvent.presentation_validation_available) {
+                                failure = SessionFailure.PresentationValidation(reason, emptyMap())
+                            }
+                            session.failSession(SessionEvent.presentation_validation_failed)
+                            throw PresentationRejectionException(reason)
                         }
                         presentation.credentials ?: emptyList()
                     }

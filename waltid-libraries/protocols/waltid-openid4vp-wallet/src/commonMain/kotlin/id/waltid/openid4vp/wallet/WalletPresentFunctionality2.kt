@@ -2,6 +2,8 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.crypto2.keys.Signer
+import id.walt.verifier.openid.transactiondata.parseTs12PaymentEntries
 import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
@@ -69,11 +71,15 @@ fun interface CredentialPresentationKeyResolver {
     suspend fun resolve(credentialId: String, credential: DigitalCredential): CredentialPresentationKey?
 }
 
+internal fun paymentDeadlineCheck(request: AuthorizationRequest, clock: Clock = Clock.System): () -> Unit {
+    val payments = parseTs12PaymentEntries(decodeList(request.transactionData.orEmpty()), clock.now())
+    return { val now = clock.now(); payments.forEach { it.requireCurrent(now) } }
+}
+
 object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
 
-    private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
     private val webPostToken = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_POST_TOKEN)
 
     private fun mdocPresentationKeyResolver(
@@ -101,7 +107,9 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         scaAuthorizer: ScaPresentationAuthorizer? = null,
         credentialHolderKeyResolver: CredentialPresentationKeyResolver? = null,
+        clock: Clock = Clock.System,
     ): String {
+        val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
         // OID4VP 1.0 Appendix A: DC API holder binding is to the platform-asserted origin.
         val holderBindingAudience = dcApiOrigin?.let { "origin:$it" }
@@ -192,6 +200,7 @@ object WalletPresentFunctionality2 {
         }
 
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
+        requireCurrentPayment()
         return Json.encodeToString(JsonObject(vpTokenMapContents))
     }
 
@@ -815,7 +824,18 @@ object WalletPresentFunctionality2 {
         vpToken: String,
         idToken: String? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+    ): Result<WalletPresentResult> = sendAuthorizationResponse(
+        authorizationRequest, vpToken, idToken, clientMetadata, Clock.System,
+    )
+
+    internal suspend fun sendAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        vpToken: String,
+        idToken: String?,
+        clientMetadata: ClientMetadata?,
+        clock: Clock,
     ): Result<WalletPresentResult> = runCatching {
+        val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         // Infer response_mode from response_type if not explicitly set
         if (authorizationRequest.responseMode == null) {
             require(authorizationRequest.responseType != null) { "Missing response_type" }
@@ -885,6 +905,7 @@ object WalletPresentFunctionality2 {
                     idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
+                requireCurrentPayment()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -908,6 +929,7 @@ object WalletPresentFunctionality2 {
                     contentEncryption = encryption.contentEncryption,
                 )
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
+                requireCurrentPayment()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -930,14 +952,17 @@ object WalletPresentFunctionality2 {
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = webResolveAuthReq,
-                    requestUri = requestUri,
-                    requestUriMethod = requestUriMethod,
-                    requestUriPostWalletMetadata = requestUriPostWalletMetadata,
-                    sendWalletMetadata = true,
-                    expectedRequestObjectAudience = expectedRequestObjectAudience,
-                )
+                // Create and close each fetch client using the current startup configuration.
+                WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST).use { fetcher ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = fetcher,
+                        requestUri = requestUri,
+                        requestUriMethod = requestUriMethod,
+                        requestUriPostWalletMetadata = requestUriPostWalletMetadata,
+                        sendWalletMetadata = true,
+                        expectedRequestObjectAudience = expectedRequestObjectAudience,
+                    )
+                }
             },
         )
 
@@ -1531,6 +1556,8 @@ object WalletPresentFunctionality2 {
         }
         val sdHash = calculateSha256Base64Url(stringToHash)
         val decodedTransactionData = decodeList(transactionData.orEmpty())
+        val paymentClock = scaContext?.clock ?: Clock.System
+        val payments = parseTs12PaymentEntries(decodedTransactionData, paymentClock.now())
         val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
             calculateTransactionDataHashes(
@@ -1553,7 +1580,7 @@ object WalletPresentFunctionality2 {
         }
 
         val proofId = scaContext?.let { UuidUtils.randomUUIDString() }
-        val authentication = scaContext?.let { context ->
+        val presentation = scaContext?.let { context ->
             currentCoroutineContext().ensureActive()
             val confirmationKey = (issuerClaims["cnf"] as? JsonObject)?.get("jwk") as? JsonObject
             requireNotNull(confirmationKey) { "TS12 requires the credential's cnf.jwk holder key" }
@@ -1565,7 +1592,7 @@ object WalletPresentFunctionality2 {
             require(jwkThumbprint(confirmationKey) == actual) {
                 "TS12 signing key does not match the credential's holder key"
             }
-            val presentation = ScaPresentation(
+            ScaPresentation(
                 proofId = requireNotNull(proofId),
                 credentialId = context.credentialId,
                 holderKeyId = crypto2Key?.id?.value ?: requireNotNull(holderKey).getKeyId(),
@@ -1576,45 +1603,58 @@ object WalletPresentFunctionality2 {
                 sdHash = sdHash,
                 transactionData = transactionData.orEmpty().toList(),
             )
-            context.authorizer.authorize(presentation).also { currentCoroutineContext().ensureActive() }
         }
-        val kbJwtPayload = buildJsonObject {
-            if (scaContext != null) {
-                put("jti", requireNotNull(proofId))
-                put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
-                put("amr", requireNotNull(authentication).toJson())
-            }
-            put("aud", JsonPrimitive(audience))
-            put("nonce", JsonPrimitive(nonce))
-            put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
-            put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
-            transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
-                put(
-                    "transaction_data_hashes",
-                    buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
-                )
-                if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
+        suspend fun signProof(authentication: ScaAuthenticationMethods?, signer: Signer?): String {
+            currentCoroutineContext().ensureActive()
+            payments.forEach { it.requireCurrent(paymentClock.now()) }
+            val kbJwtPayload = buildJsonObject {
+                if (scaContext != null) {
+                    put("jti", requireNotNull(proofId))
+                    put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
+                    put("amr", requireNotNull(authentication).toJson())
+                }
+                put("aud", JsonPrimitive(audience))
+                put("nonce", JsonPrimitive(nonce))
+                put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
+                put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+                transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
                     put(
-                        "transaction_data_hashes_alg",
-                        JsonPrimitive(transactionDataHashAlgorithm),
+                        "transaction_data_hashes",
+                        buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
                     )
+                    if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
+                        put(
+                            "transaction_data_hashes_alg",
+                            JsonPrimitive(transactionDataHashAlgorithm),
+                        )
+                    }
                 }
             }
-        }
-        val proof = if (crypto2Key != null) {
-            CompactJws.sign(
-                payload = Json.encodeToString(kbJwtPayload).encodeToByteArray(),
-                key = crypto2Key,
-                algorithm = requireNotNull(crypto2Algorithm),
-                protectedHeader = jwsHeaders,
+            val proof = if (crypto2Key != null) {
+                CompactJws.sign(
+                    payload = Json.encodeToString(kbJwtPayload).encodeToByteArray(),
+                    key = if (signer == null) crypto2Key else object : Crypto2Key by crypto2Key {
+                        override val capabilities = crypto2Key.capabilities.copy(signer = signer)
+                    },
+                    algorithm = requireNotNull(crypto2Algorithm),
+                    protectedHeader = jwsHeaders,
+                )
+            } else requireNotNull(holderKey).signJws(
+                plaintext = kbJwtPayload.toString().encodeToByteArray(),
+                headers = jwsHeaders,
             )
-        } else requireNotNull(holderKey).signJws(
-            plaintext = kbJwtPayload.toString().encodeToByteArray(),
-            headers = jwsHeaders,
-        )
-        // A native signer may finish after cancellation without observing the coroutine's Job.
-        if (scaContext != null) currentCoroutineContext().ensureActive()
-        return proof
+            // A native signer may finish after cancellation without observing the coroutine's Job.
+            if (scaContext != null) currentCoroutineContext().ensureActive()
+            payments.forEach { it.requireCurrent(paymentClock.now()) }
+            return proof
+        }
+        return if (presentation != null && crypto2Key != null) {
+            requireNotNull(scaContext).authorizer.withAuthorizedSigner(
+                presentation, requireNotNull(crypto2Key.capabilities.signer), ::signProof,
+            )
+        } else {
+            signProof(presentation?.let { requireNotNull(scaContext).authorizer.authorize(it) }, null)
+        }
     }
 
     internal suspend fun encryptDirectPostResponse(

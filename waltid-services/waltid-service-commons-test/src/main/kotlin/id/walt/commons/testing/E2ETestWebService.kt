@@ -10,16 +10,20 @@ data class E2ETestWebService(
 ) {
     private val webServiceModule = WebService(module).webServiceModule
 
-    fun runService(block: suspend () -> Unit, host: String, port: Int): suspend () -> Unit = {
+    fun runService(block: suspend () -> Unit, host: String, port: Int): suspend () -> Unit =
+        runService({ _: Int -> block() }, host, port)
+
+    internal fun runService(block: suspend (Int) -> Unit, host: String, port: Int): suspend () -> Unit = {
         val server = embeddedServer(
             CIO,
             host = host,
             port = port,
             module = webServiceModule
-        ).start(wait = false)
+        )
 
         try {
-            block.invoke()
+            server.start(wait = false)
+            block(server.engine.resolvedConnectors().single().port)
         } finally {
             server.stop(gracePeriodMillis = 1000, timeoutMillis = 5000)
         }

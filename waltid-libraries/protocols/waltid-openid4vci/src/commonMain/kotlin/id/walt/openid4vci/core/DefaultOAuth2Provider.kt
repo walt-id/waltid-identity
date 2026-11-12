@@ -1,5 +1,9 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.clientauth.attestation.verifiedClientAttestation
+import id.walt.openid4vci.clientauth.attestation.verifiedClientAuthentication
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
@@ -7,6 +11,7 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
@@ -97,6 +102,8 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
+    private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
+
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
             is AuthorizationParameterResolution.Direct ->
@@ -282,7 +289,7 @@ class DefaultOAuth2Provider(
         PushedAuthorizationResponseHttp(
             status = oauthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = error.responseHeaders + noStoreHeaders(),
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
         )
 
     override fun writePushedAuthorizationError(
@@ -301,7 +308,6 @@ class DefaultOAuth2Provider(
                 put("request_uri", JsonPrimitive(response.requestUri))
                 put("expires_in", JsonPrimitive(response.expiresIn))
             },
-            headers = noStoreHeaders(),
         )
 
     override suspend fun createAccessTokenRequest(
@@ -432,13 +438,7 @@ class DefaultOAuth2Provider(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
     ): ClientAuthenticationResult {
-        val resolution = config.clientAuthenticationServiceResolver?.resolve(endpoint, parameters, headers)
-            ?: ClientAuthenticationServiceResolution(
-                serviceConfig = config.clientAuthenticationServiceConfig,
-                context = ClientAuthenticationContext(
-                    authorizationServerIssuer = config.authorizationServerIssuer,
-                ),
-            )
+        val resolution = resolveClientAuthentication(endpoint, parameters, headers)
 
         if (resolution.skipAuthentication) {
             return ClientAuthenticationResult.Unauthenticated
@@ -450,6 +450,27 @@ class DefaultOAuth2Provider(
             headers = headers,
             context = resolution.context,
         )
+    }
+
+    private suspend fun resolveClientAuthentication(
+        endpoint: ClientAuthenticationEndpoint,
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): ClientAuthenticationServiceResolution =
+        config.clientAuthenticationServiceResolver?.resolve(endpoint, parameters, headers)
+            ?: ClientAuthenticationServiceResolution(
+                serviceConfig = config.clientAuthenticationServiceConfig,
+                context = ClientAuthenticationContext(authorizationServerIssuer = config.authorizationServerIssuer),
+            )
+
+    private suspend fun requiresClientAttestation(clientId: String?, anonymousPreAuthorizedAccess: Boolean): Boolean {
+        if (anonymousPreAuthorizedAccess) return false
+        val resolution = resolveClientAuthentication(
+            ClientAuthenticationEndpoint.TOKEN,
+            clientId?.let { mapOf("client_id" to listOf(it)) }.orEmpty(), emptyMap(),
+        )
+        return !resolution.skipAuthentication && resolution.serviceConfig.methodsForEndpoint(ClientAuthenticationEndpoint.TOKEN) ==
+            setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
     }
 
     override suspend fun createAccessTokenResponse(
@@ -491,7 +512,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = oauthJsonErrorStatus(error),
-            headers = error.responseHeaders + TOKEN_RESPONSE_HEADERS,
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
@@ -507,7 +528,6 @@ class DefaultOAuth2Provider(
     ): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 200,
-            headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("token_type", JsonPrimitive(response.tokenType))
                 put("access_token", JsonPrimitive(response.accessToken))
@@ -539,10 +559,6 @@ class DefaultOAuth2Provider(
     private companion object {
         const val HTTP_POST = "POST"
         const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
-        val TOKEN_RESPONSE_HEADERS = mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
     }
 
     override suspend fun acceptCredentialRequest(
@@ -561,16 +577,29 @@ class DefaultOAuth2Provider(
                 throw CredentialProofValidationException(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, "Invalid response encryption parameters")
             }
         }
-        val bindings = when (val result = verifyCredentialProofs(request, configuration, proofValidationContext)) {
-            is CredentialProofVerification.Success -> result.bindings
+        val verification = when (val result = verifyCredentialProofs(request, configuration, proofValidationContext)) {
+            is CredentialProofVerification.Success -> result
             is CredentialProofVerification.Failure -> throw CredentialProofValidationException(result.error.error, result.error.description.orEmpty())
         }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: throw CredentialProofValidationException(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, "Unsupported credential format")
+        val bindings = verification.bindings
         validateCredentialBindings(handler, configuration, bindings)?.let {
             throw CredentialProofValidationException(it.error, it.description.orEmpty())
         }
-        return request.accept(credentialIdentifier, credentialConfigurationId, configuration, bindings)
+        val authentication = (request as? AuthenticatedCredentialRequest)?.authentication
+        val required = authentication?.clientAttestationRequired == true ||
+            requiresClientAttestation(request.accessTokenClientId, request.anonymousPreAuthorizedAccess)
+        val accepted = request.accept(
+            credentialIdentifier, credentialConfigurationId, configuration, bindings, verification.proofs,
+            authentication?.clientAttestation, required,
+        )
+        if (!deferredAttestationLifetimeValidator.isValid(accepted, Clock.System.now(), required)) {
+            throw CredentialProofValidationException(
+                CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid",
+            )
+        }
+        return accepted
     }
 
     override suspend fun createDeferredCredentialRequest(
@@ -625,6 +654,33 @@ class DefaultOAuth2Provider(
         return DeferredCredentialRequestResult.Success(DeferredCredentialRequest(transactionId, encryption))
     }
 
+    override suspend fun createDeferredCredentialResponse(
+        request: DeferredCredentialRequest,
+        response: CredentialResponse,
+        context: DeferredCredentialResponseContext?,
+    ): CredentialResponseResult {
+        val pending = response.transactionId != null && response.credentials == null
+        if (pending && response.transactionId != request.transactionId ||
+            !pending && (context == null || request.transactionId != context.transaction.id)) {
+            return CredentialResponseResult.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID, "Deferred transaction does not match the response context"),
+            )
+        }
+        if (!pending) deferredClaimError(requireNotNull(context))?.let { return CredentialResponseResult.Failure(it) }
+        val body = try {
+            prepareCredentialResponseBody(response, request.credentialResponseEncryption)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return CredentialResponseResult.Failure(
+                CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, e.message ?: "Credential response encryption failed"),
+            )
+        }
+        // Encryption may await a remote key provider; validity is checked before returning success.
+        if (!pending) deferredClaimError(requireNotNull(context))?.let { return CredentialResponseResult.Failure(it) }
+        return CredentialResponseResult.Success(response.copy(preparedBody = body))
+    }
+
     override suspend fun writeDeferredCredentialResponse(request: DeferredCredentialRequest, response: CredentialResponse): CredentialResponseHttp =
         writeCredentialResponse(
             DefaultCredentialRequest(
@@ -639,8 +695,8 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
-        val tokenClaims = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
-            is CredentialAccessTokenVerification.Success -> tokenResult.claims
+        val authentication = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
+            is CredentialAccessTokenVerification.Success -> tokenResult.authentication
             is CredentialAccessTokenVerification.Failure -> return tokenResult.result
         }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
@@ -653,7 +709,7 @@ class DefaultOAuth2Provider(
                         )
                     )
                 } else {
-                    CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
+                    CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(authentication))
                 }
 
             is CredentialRequestResult.Failure -> result
@@ -666,8 +722,8 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: CredentialAccessTokenContext?
     ): CredentialRequestResult {
-        val tokenClaims = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
-            is CredentialAccessTokenVerification.Success -> tokenResult.claims
+        val authentication = when (val tokenResult = verifyCredentialAccessToken(accessTokenContext)) {
+            is CredentialAccessTokenVerification.Success -> tokenResult.authentication
             is CredentialAccessTokenVerification.Failure -> return tokenResult.result
         }
         val decryptor = config.credentialRequestDecryptor
@@ -693,7 +749,7 @@ class DefaultOAuth2Provider(
         }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
             is CredentialRequestResult.Success ->
-                CredentialRequestResult.Success(result.request.withAccessTokenClient(tokenClaims))
+                CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(authentication))
 
             is CredentialRequestResult.Failure -> result
             is CredentialRequestResult.OAuthFailure -> result
@@ -731,8 +787,9 @@ class DefaultOAuth2Provider(
             bindings
         )?.let { return CredentialResponseResult.Failure(it) }
         val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
+        deferredCredentialError(request)?.let { return CredentialResponseResult.Failure(it) }
 
-        return handler.sign(
+        val result = handler.sign(
             request = request,
             configuration = configuration,
             issuerKey = issuerKey,
@@ -749,6 +806,8 @@ class DefaultOAuth2Provider(
             validUntil = validUntil,
             expectedUpdate = expectedUpdate,
         )
+        deferredCredentialError(request)?.let { return CredentialResponseResult.Failure(it) }
+        return result
     }
 
     override suspend fun createCredentialResponse(
@@ -789,8 +848,9 @@ class DefaultOAuth2Provider(
             bindings
         )?.let { return CredentialResponseResult.Failure(it) }
         val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
+        deferredCredentialError(request)?.let { return CredentialResponseResult.Failure(it) }
 
-        return handler.sign(
+        val result = handler.sign(
             request = request,
             configuration = configuration,
             issuerKey = issuerKey,
@@ -807,6 +867,8 @@ class DefaultOAuth2Provider(
             validUntil = validUntil,
             expectedUpdate = expectedUpdate,
         )
+        deferredCredentialError(request)?.let { return CredentialResponseResult.Failure(it) }
+        return result
     }
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
@@ -816,7 +878,6 @@ class DefaultOAuth2Provider(
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
-            headers = noStoreHeaders(),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
@@ -826,7 +887,7 @@ class DefaultOAuth2Provider(
         CredentialResponseHttp(
             status = credentialOAuthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = noStoreHeaders() + credentialOAuthErrorHeaders(error),
+            headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA + credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -834,37 +895,35 @@ class DefaultOAuth2Provider(
 
     override suspend fun writeCredentialResponse(
         request: CredentialRequest,
-        response: CredentialResponse
+        response: CredentialResponse,
     ): CredentialResponseHttp {
-        val payload = response.toJsonObject()
-        val status = if (response.transactionId != null && response.credentials == null) 202 else 200
-        val encryption = request.credentialResponseEncryption
-            ?: return CredentialResponseHttp(status = status, payload = payload, headers = noStoreHeaders())
-
-        val encrypted = try {
-            config.credentialResponseEncryptor.encrypt(payload, encryption)
+        val body = response.preparedBody ?: try {
+            prepareCredentialResponseBody(response, request.credentialResponseEncryption)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             return writeCredentialError(
                 request,
-                CredentialError(
-                    CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
-                    e.message ?: "Credential response encryption failed",
-                ),
+                CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, e.message ?: "Credential response encryption failed"),
             )
         }
-        return CredentialResponseHttp(
-            status = status,
-            body = CredentialResponseBody.EncryptedJwt(encrypted),
-            headers = noStoreHeaders(),
-        )
+        val status = if (response.transactionId != null && response.credentials == null) 202 else 200
+        return CredentialResponseHttp(status = status, body = body)
+    }
+
+    private suspend fun prepareCredentialResponseBody(
+        response: CredentialResponse,
+        encryption: CredentialResponseEncryptionParameters?,
+    ): CredentialResponseBody {
+        val payload = response.toJsonObject()
+        return if (encryption == null) CredentialResponseBody.Json(payload)
+        else CredentialResponseBody.EncryptedJwt(config.credentialResponseEncryptor.encrypt(payload, encryption))
     }
 
     private suspend fun verifyCredentialAccessToken(
         accessTokenContext: CredentialAccessTokenContext?,
     ): CredentialAccessTokenVerification {
-        if (accessTokenContext == null) return CredentialAccessTokenVerification.Success(null)
+        if (accessTokenContext == null) return CredentialAccessTokenVerification.Success()
         val verifier = config.accessTokenVerifier
             ?: return CredentialAccessTokenVerification.Failure(
                 CredentialRequestResult.OAuthFailure(
@@ -879,7 +938,7 @@ class DefaultOAuth2Provider(
             )
             verifyCredentialAccessTokenBinding(accessTokenContext, claims)
                 ?.let { CredentialAccessTokenVerification.Failure(it) }
-                ?: CredentialAccessTokenVerification.Success(claims)
+                ?: CredentialAccessTokenVerification.Success(verifiedCredentialAuthentication(claims))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -889,14 +948,44 @@ class DefaultOAuth2Provider(
         }
     }
 
-    private fun CredentialRequest.withAccessTokenClient(tokenClaims: JsonObject?): CredentialRequest {
-        val clientId = tokenClaims?.get(JwtPayloadClaims.CLIENT_ID)
-            ?.jsonPrimitive
-            ?.contentOrNull
-            ?.takeIf { it.isNotBlank() }
-        val anonymousPreAuthorizedAccess = clientId == null &&
-                tokenClaims?.get(JwtPayloadClaims.PRE_AUTHORIZED_CODE)?.jsonPrimitive?.contentOrNull != null
-        return withAccessTokenClient(clientId, anonymousPreAuthorizedAccess)
+    private fun verifiedCredentialAuthentication(claims: JsonObject): CredentialRequestAuthentication {
+        val clientId = claims[JwtPayloadClaims.CLIENT_ID]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank)
+        val original = claims.verifiedClientAuthentication()
+        val attestation = claims.verifiedClientAttestation()
+        val anonymous = clientId == null && (original?.anonymousPreAuthorizedAccess == true ||
+            claims[JwtPayloadClaims.PRE_AUTHORIZED_CODE]?.jsonPrimitive?.contentOrNull != null)
+        return CredentialRequestAuthentication(
+            clientId, anonymous, attestation,
+            clientAttestationRequired = attestation != null || original?.method == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH,
+        )
+    }
+
+    private fun CredentialRequest.withAccessTokenAuthentication(
+        authentication: CredentialRequestAuthentication?,
+    ): CredentialRequest {
+        val verified = authentication ?: return this
+        return AuthenticatedCredentialRequest(
+            withAccessTokenClient(verified.clientId, verified.anonymousPreAuthorizedAccess), verified,
+        )
+    }
+
+    private suspend fun deferredCredentialError(request: CredentialRequest): CredentialError? {
+        if (request !is PreparedCredentialRequest) return null
+        request.deferredContext?.let { return deferredClaimError(it) }
+        val required = request.accepted.clientAttestationRequired ?:
+            requiresClientAttestation(request.accessTokenClientId, request.anonymousPreAuthorizedAccess)
+        return if (deferredAttestationLifetimeValidator.isValid(request.accepted, Clock.System.now(), required)) null
+        else CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence is no longer valid")
+    }
+
+    private suspend fun deferredClaimError(context: DeferredCredentialResponseContext): CredentialError? = try {
+        val accepted = context.transaction.accepted
+        val required = accepted.clientAttestationRequired ?:
+            requiresClientAttestation(accepted.request.accessTokenClientId, accepted.request.anonymousPreAuthorizedAccess)
+        context.deferredIssuance.validateClaim(context.sessionId, context.transaction, required)
+        null
+    } catch (e: DeferredProtocolException) {
+        e.error
     }
 
     private suspend fun verifyCredentialProofs(
@@ -905,7 +994,8 @@ class DefaultOAuth2Provider(
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialProofVerification {
         if (request is PreparedCredentialRequest) {
-            if (request.acceptedConfiguration != configuration) return CredentialProofVerification.Failure(
+            deferredCredentialError(request)?.let { return CredentialProofVerification.Failure(it) }
+            if (request.accepted.configuration != configuration) return CredentialProofVerification.Failure(
                 CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Accepted credential configuration has changed")
             )
             return CredentialProofVerification.Success(request.bindings)
@@ -924,7 +1014,7 @@ class DefaultOAuth2Provider(
                 context = context,
             )
             validateCredentialProofResult(collection, verification)
-            CredentialProofVerification.Success(verification.bindings)
+            CredentialProofVerification.Success(verification.bindings, verification.proofs)
         } catch (e: CancellationException) {
             throw e
         } catch (e: CredentialProofValidationException) {
@@ -1028,12 +1118,12 @@ class DefaultOAuth2Provider(
         )
 
     private sealed class CredentialAccessTokenVerification {
-        data class Success(val claims: JsonObject?) : CredentialAccessTokenVerification()
+        data class Success(val authentication: CredentialRequestAuthentication? = null) : CredentialAccessTokenVerification()
         data class Failure(val result: CredentialRequestResult) : CredentialAccessTokenVerification()
     }
 
     private sealed class CredentialProofVerification {
-        data class Success(val bindings: List<VerifiedCredentialBinding>) : CredentialProofVerification()
+        data class Success(val bindings: List<VerifiedCredentialBinding>, val proofs: List<VerifiedCredentialProof> = emptyList()) : CredentialProofVerification()
         data class Failure(val error: CredentialError) : CredentialProofVerification()
     }
 
@@ -1196,12 +1286,6 @@ class DefaultOAuth2Provider(
 
             else -> 400
         }
-
-    private fun noStoreHeaders(): Map<String, String> =
-        mapOf(
-            "Cache-Control" to "no-store",
-            "Pragma" to "no-cache",
-        )
 
     private fun Map<String, List<String>>.withAuthenticatedClientId(
         authenticatedClient: AuthenticatedClient?,

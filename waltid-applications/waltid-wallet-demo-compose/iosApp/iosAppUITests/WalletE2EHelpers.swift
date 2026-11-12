@@ -223,9 +223,10 @@ final class WalletE2EUI {
         let tagged = app.buttons.matching(identifier: identifier)
         if tagged.firstMatch.waitForExistence(timeout: 20) {
             // Navigation 3 retains both pages during motion; wait for the active page.
-            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagged.count == 1 }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [unique], timeout: 5), .completed,
-                "Button remained ambiguous after navigation: \(identifier)")
+            guard waitForUniqueButton(identifier: identifier) else {
+                XCTFail("Button remained ambiguous after navigation: \(identifier)")
+                return
+            }
         }
         XCTAssertTrue(button(identifier: identifier, fallbackLabel: fallbackLabel).waitForExistence(timeout: 20),
                       "Button not found: \(identifier)")
@@ -392,5 +393,28 @@ final class WalletE2EUI {
             return element
         }
         return elements[0]
+    }
+    private func waitForUniqueButton(identifier: String) -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
+        let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard ProcessInfo.processInfo.systemUptime < deadline,
+                  let root = try? self.app.snapshot(),
+                  ProcessInfo.processInfo.systemUptime < deadline else { return false }
+            var pending = root.children
+            var matches = 0
+            while let element = pending.popLast() {
+                // Match the identifying properties used by XCUIElementQuery.matching(identifier:).
+                let properties: [String?] = [element.identifier, element.title, element.label,
+                                             element.value as? String, element.placeholderValue]
+                if element.elementType == .button && properties.contains(where: { $0 == identifier }) {
+                    matches += 1
+                    if matches > 1 { return false }
+                }
+                pending.append(contentsOf: element.children)
+            }
+            return matches == 1
+        }, object: nil)
+        return XCTWaiter.wait(for: [unique], timeout: 5) == .completed
+            && ProcessInfo.processInfo.systemUptime < deadline
     }
 }

@@ -21,7 +21,7 @@ import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.*
 import id.walt.verifier2.events.Verifier2WebhookRecorder
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -191,9 +191,9 @@ class MsoMdocsVerifier2IntegrationTest {
 
     private fun runVerifierWalletFlow(clientId: String?) {
         val host = "127.0.0.1"
-        val port = freePort()
+
         Verifier2WebhookRecorder().start().use { webhook ->
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -203,7 +203,7 @@ class MsoMdocsVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -216,6 +216,7 @@ class MsoMdocsVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             // Create the verification session
@@ -249,7 +250,7 @@ class MsoMdocsVerifier2IntegrationTest {
             }
 
             if (clientId == null) {
-                val responseUri = "http://$host:$port/verification-session/$sessionId/response"
+                val responseUri = "${getBaseURL()}/verification-session/$sessionId/response"
                 test("Omitted clientId is generated as redirect_uri bound to response_uri") {
                     assertEquals(responseUri, info1.authorizationRequest.responseUri)
                     assertEquals("redirect_uri:$responseUri", info1.authorizationRequest.clientId)

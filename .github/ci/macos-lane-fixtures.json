@@ -153,6 +153,13 @@
       "lanes": ["sdk-docs"]
     },
     {
+      "name": "WalletCore producer workflow selects its consumers and SDK docs",
+      "files": [
+        ".github/workflows/wallet-core-framework.yml"
+      ],
+      "lanes": ["compose", "enterprise", "native", "sdk-docs", "visual-native"]
+    },
+    {
       "name": "backend API source selects no macOS lane",
       "files": [
         "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer2/api/status/StatusApi.kt"
@@ -382,6 +389,20 @@
       "name": "browser source selects browser visuals and Enterprise coverage",
       "files": [
         "waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/kotlin/WebWallet.kt"
+      ],
+      "lanes": ["enterprise", "visual-browser"]
+    },
+    {
+      "name": "shared wallet logic test changes select browser execution",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonTest/kotlin/id/walt/walletdemo/compose/logic/WalletDemoControllerTest.kt"
+      ],
+      "lanes": ["compose", "enterprise", "ios-simulator", "visual-browser"]
+    },
+    {
+      "name": "browser wallet logic test changes select browser execution",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/kotlin/id/walt/walletdemo/compose/logic/walletapi2/WalletApi2ClientTest.kt"
       ],
       "lanes": ["enterprise", "visual-browser"]
     }

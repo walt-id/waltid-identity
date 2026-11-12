@@ -1,3 +1,4 @@
+import { stringifyPaymentJson } from "~/utils/ts12Payment";
 import { createError } from "h3";
 
 export async function readJsonObject(value: unknown): Promise<Record<string, unknown>> {
@@ -35,7 +36,7 @@ export async function forwardJson(
   const response = await fetch(url, {
     method: "POST",
     headers,
-    body: JSON.stringify(body),
+    body: stringifyPaymentJson(body),
   });
   const text = await response.text();
   let parsed: unknown = text;

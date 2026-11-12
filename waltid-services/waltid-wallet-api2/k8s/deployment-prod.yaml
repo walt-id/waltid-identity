@@ -262,7 +262,7 @@ metadata:
   name: legacy-wallet-redirect
 spec:
   redirectRegex:
-    regex: ^https?://(wallet\.demo\.walt\.id|wallet-dev\.demo\.walt\.id)(:\d+)?(/.*)?$
+    regex: ^https?://(wallet\.walt\.id|wallet\.demo\.walt\.id|wallet-dev\.demo\.walt\.id)(:\d+)?(/.*)?$
     replacement: https://wallet2.demo.walt.id/
     permanent: true
 ---
@@ -283,6 +283,16 @@ spec:
         - wallet.demo.walt.id
       secretName: wallet-demo-tls-secret
   rules:
+    - host: wallet.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-demo-compose-web
+                port:
+                  name: http
     - host: wallet-dev.demo.walt.id
       http:
         paths:

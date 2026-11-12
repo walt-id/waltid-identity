@@ -64,8 +64,8 @@ class VicalFetchModeRouteTest {
         block: suspend E2ETest.(HttpClient) -> Unit,
     ) {
         val host = "127.0.0.1"
-        val port = freePort()
-        E2ETest(host, port, true).testBlock(
+
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -73,7 +73,7 @@ class VicalFetchModeRouteTest {
                     OSSVerifier2ServiceConfig(
                         clientId = null,
                         clientMetadata = ClientMetadata(clientName = "Verifier2"),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize",
                         vicalFetchEnabled = enabled,
                         allowPrivateNetworkVical = allowPrivate,
@@ -83,6 +83,7 @@ class VicalFetchModeRouteTest {
             init = {},
             module = Application::verifierModule,
         ) {
+            useBoundVerifierAddress()
             block(testHttpClient())
         }
     }

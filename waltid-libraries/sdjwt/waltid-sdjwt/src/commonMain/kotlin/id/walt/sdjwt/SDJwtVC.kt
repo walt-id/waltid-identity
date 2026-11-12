@@ -302,7 +302,7 @@ class SDJwtVC(sdJwt: SDJwt) :
             status: JsonObject? = null,
             subject: String? = null
         ) = buildJsonObject {
-            put("_sd_alg", "sha-256")
+            put(SDPayload.HASH_ALGORITHM_KEY, SDPayload.HASH_ALGORITHM_SHA_256)
             put("iss", JsonPrimitive(issuerId))
             put("cnf", cnf)
             put("vct", JsonPrimitive(vct))
@@ -315,5 +315,24 @@ class SDJwtVC(sdJwt: SDJwt) :
         }
 
         fun isSdJwtVCPresentation(token: String): Boolean = parse(token).isPresentation
+
+        /** Registered claims that MUST NOT be selectively disclosed, with all their subclaims (draft-ietf-oauth-sd-jwt-vc-24 §2.2.2.3) */
+        val NON_SELECTIVELY_DISCLOSABLE_CLAIMS = setOf("iss", "nbf", "exp", "cnf", "vct", "vct#integrity", "aka_vcts", "status")
+
+        /**
+         * The issuer's [requested] selective disclosure map without the claims an SD-JWT VC keeps in clear text:
+         * [NON_SELECTIVELY_DISCLOSABLE_CLAIMS] and the [alwaysDisclosedClaims] the issuer adds itself.
+         * Removing a top-level claim also removes the rules for its subclaims.
+         */
+        fun effectiveDisclosureMap(
+            requested: SDMap?,
+            alwaysDisclosedClaims: Set<String> = emptySet(),
+        ): SDMap = requested?.let {
+            SDMap(
+                fields = it.fields - NON_SELECTIVELY_DISCLOSABLE_CLAIMS - alwaysDisclosedClaims,
+                decoyMode = it.decoyMode,
+                decoys = it.decoys,
+            )
+        } ?: SDMap(emptyMap())
     }
 }

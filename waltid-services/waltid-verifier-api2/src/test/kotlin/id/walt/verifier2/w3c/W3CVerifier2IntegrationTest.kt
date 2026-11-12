@@ -21,7 +21,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -258,9 +258,9 @@ class W3CVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         Verifier2WebhookRecorder().start().use { webhook ->
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -270,7 +270,7 @@ class W3CVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -283,6 +283,7 @@ class W3CVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
 
             // Create the verification session

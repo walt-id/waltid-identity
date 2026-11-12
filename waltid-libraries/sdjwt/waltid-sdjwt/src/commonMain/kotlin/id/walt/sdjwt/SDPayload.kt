@@ -63,7 +63,7 @@ data class SDPayload internal constructor(
      */
     private fun walk(select: Map<String, SDField>?): WalkResult {
         val state = WalkState(unconsumed = digestedDisclosures.toMutableMap())
-        val resolved = walkObject(undisclosedPayload, select, state)
+        val resolved = walkObject(undisclosedPayload, select, state, topLevel = true)
         if (state.unconsumed.isNotEmpty()) {
             // Include the unreferenced disclosure key(s) to aid diagnosis.
             val keys = state.unconsumed.values.joinToString(", ") {
@@ -80,20 +80,21 @@ data class SDPayload internal constructor(
         payload: JsonObject,
         select: Map<String, SDField>?,
         state: WalkState,
+        topLevel: Boolean = false,
     ): JsonObject = buildJsonObject {
         payload.forEach { entry ->
             when (entry.key) {
                 SDJwt.DIGESTS_KEY -> {
                     val digestArray = entry.value as? JsonArray
                         ?: throw SDJwtVerificationException("${SDJwt.DIGESTS_KEY} must be a JSON array")
-                    digestArray.forEach { unveilObjectDisclosure(digestString(it), select, state, this) }
+                    digestArray.forEach { unveilObjectDisclosure(digestString(it), select, state, this, topLevel) }
                 }
                 ARRAY_ELEMENT_WRAPPER_KEY ->
                     throw SDJwtVerificationException("Reserved name '${entry.key}' used as a plain claim")
-                else -> putUnique(
-                    entry.key,
-                    recurse(entry.value, select?.get(entry.key), select == null, state),
-                )
+                else -> {
+                    if (entry.key == HASH_ALGORITHM_KEY && !topLevel) throw nestedHashAlgorithm()
+                    putUnique(entry.key, recurse(entry.value, select?.get(entry.key), select == null, state))
+                }
             }
         }
     }
@@ -103,6 +104,7 @@ data class SDPayload internal constructor(
         select: Map<String, SDField>?,
         state: WalkState,
         builder: JsonObjectBuilder,
+        topLevel: Boolean,
     ) {
         if (!state.seenDigests.add(digest)) {
             throw SDJwtVerificationException("Duplicate digest reference: $digest")
@@ -117,6 +119,7 @@ data class SDPayload internal constructor(
                 if (disc.key == SDJwt.DIGESTS_KEY || disc.key == ARRAY_ELEMENT_WRAPPER_KEY) {
                     throw SDJwtVerificationException("Reserved name '${disc.key}' used as a disclosed claim")
                 }
+                if (disc.key == HASH_ALGORITHM_KEY && !topLevel) throw nestedHashAlgorithm()
                 val release = select == null || select[disc.key]?.sd == true
                 if (!release) return
                 state.released += disc.disclosure
@@ -216,10 +219,26 @@ data class SDPayload internal constructor(
         /** Marker key inside an array element that names a digest. */
         internal const val ARRAY_ELEMENT_WRAPPER_KEY = "..."
 
+        internal const val HASH_ALGORITHM_KEY = "_sd_alg"
+        internal const val HASH_ALGORITHM_SHA_256 = "sha-256"
+
         private fun digest(value: String): String {
             val messageDigest = SHA256().digest(value.encodeToByteArray())
             return messageDigest.encodeToBase64Url()
         }
+
+        /** Disclosures are always digested with [HASH_ALGORITHM_SHA_256], so a payload may not declare another algorithm. */
+        private fun requireSupportedHashAlgorithm(fullPayload: JsonObject) {
+            fullPayload[HASH_ALGORITHM_KEY]?.let { algorithm ->
+                if ((algorithm as? JsonPrimitive)?.takeIf { it.isString }?.content != HASH_ALGORITHM_SHA_256) {
+                    throw SDJwtVerificationException("$HASH_ALGORITHM_KEY $algorithm is not supported, disclosures are digested with $HASH_ALGORITHM_SHA_256")
+                }
+            }
+        }
+
+        /** RFC 9901 §4.1.1: `_sd_alg` MUST NOT be used in any object nested within the payload. */
+        private fun nestedHashAlgorithm() =
+            SDJwtVerificationException("$HASH_ALGORITHM_KEY is only allowed at the top level of the payload")
 
         class CryptoRandAsKotlinRandom(private val cryptoRand: CryptoRand) : Random() {
             override fun nextBits(bitCount: Int): Int {
@@ -421,9 +440,12 @@ data class SDPayload internal constructor(
          * **Not supported on JavaScript**, use _SDPayloadBuilder_ instead.
          * @param fullPayload Full payload with all fields contained
          * @param disclosureMap SDMap indicating selective disclosure for each payload field recursively, and decoy properties for issuance
+         * @throws SDJwtVerificationException if the payload breaks SD-JWT processing (RFC 9901 §7.1), e.g. a reserved name such as `_sd` or `...` used as a claim,
+         * or uses `_sd_alg` other than as a top-level `sha-256` (RFC 9901 §4.1.1)
          */
         @JsExport.Ignore
         fun createSDPayload(fullPayload: JsonObject, disclosureMap: SDMap): SDPayload {
+            requireSupportedHashAlgorithm(fullPayload)
             val digestedDisclosures = mutableMapOf<String, SDisclosure>()
             return SDPayload(
                 undisclosedPayload = generateSDPayload(
@@ -432,7 +454,7 @@ data class SDPayload internal constructor(
                     digests2disclosures = digestedDisclosures
                 ),
                 digestedDisclosures = digestedDisclosures
-            )
+            ).also { it.fullPayload }
         }
 
         /**
@@ -440,6 +462,7 @@ data class SDPayload internal constructor(
          * **Not supported on JavaScript**, use _SDPayloadBuilder_ instead.
          * @param jwtClaimsSet Full payload with all fields contained
          * @param disclosureMap SDMap indicating selective disclosure for each payload field recursively, and decoy properties for issuance
+         * @throws SDJwtVerificationException as [createSDPayload] with a disclosure map
          */
         @JsExport.Ignore
         fun createSDPayload(jwtClaimsSet: JWTClaimsSet, disclosureMap: SDMap) =
@@ -455,6 +478,7 @@ data class SDPayload internal constructor(
          * @param undisclosedPayload  Payload with selectively disclosable fields removed
          * @param decoyMode **For SD-JWT issuance:** Generate decoy digests for this hierarchical level randomly or fixed, set to NONE for parsed SD-JWTs, **for presentation:** _unused_
          * @param decoys  **For SD-JWT issuance:** Num (fixed mode) or max num (random mode) of decoy digests to add for this hierarchical level. 0 if NONE, **for presentation:** _unused_.
+         * @throws SDJwtVerificationException as [createSDPayload] with a disclosure map
          */
         @JsExport.Ignore
         fun createSDPayload(
@@ -479,6 +503,7 @@ data class SDPayload internal constructor(
          * @param undisclosedJWTClaimsSet  Payload with selectively disclosable fields removed
          * @param decoyMode **For SD-JWT issuance:** Generate decoy digests for this hierarchical level randomly or fixed, set to NONE for parsed SD-JWTs, **for presentation:** _unused_
          * @param decoys  **For SD-JWT issuance:** Num (fixed mode) or max num (random mode) of decoy digests to add for this hierarchical level. 0 if NONE, **for presentation:** _unused_.
+         * @throws SDJwtVerificationException as [createSDPayload] with a disclosure map
          */
         @JsExport.Ignore
         fun createSDPayload(

@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
+import id.walt.openid4vci.clientauth.attestation.withClientAuthentication
+import id.walt.openid4vci.clientauth.attestation.clientAuthenticationClaims
 import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.GrantType
@@ -83,7 +85,7 @@ class AuthorizationCodeTokenEndpoint(
         val resolvedRequest = unresolvedRequest.withSession(record.session.copy())
 
         return try {
-            val session = requireNotNull(resolvedRequest.session)
+            val session = requireNotNull(resolvedRequest.session).withClientAuthentication(request.authenticatedClient)
             val client = request.client
             if (client.id != record.clientId) {
                 return AccessTokenResponseResult.Failure(
@@ -103,7 +105,7 @@ class AuthorizationCodeTokenEndpoint(
                 }
             }
 
-            val updatedRequest = resolvedRequest
+            val updatedRequest = resolvedRequest.withSession(session)
                 .grantScopes(record.grantedScopes)
                 .grantAudience(record.grantedAudience)
 
@@ -141,6 +143,7 @@ class AuthorizationCodeTokenEndpoint(
                     session.customAttributes["issuance_session_id"]?.let {
                         put("issuance_session_id", it)
                     }
+                    putAll(session.clientAuthenticationClaims())
                     putAll(scopedRequest.dpopAccessTokenClaims())
                 },
             )

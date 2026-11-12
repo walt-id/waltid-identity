@@ -100,17 +100,14 @@ object SdJwtVcCredentialSigner {
         val holderKeyJson = exportHolderJwk(binding.holderKey)
         val holderDid = binding.holderDid
 
-        val sdPayload = SDPayload.createSDPayload(
-            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
-                mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = issuanceTemplateContext(
-                    issuerId = issuerId,
-                    subjectDid = holderDid,
-                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
-                ),
-                data = issuanceDataFunctions()
+        val mappedCredentialData = credentialData.mergeSDJwtVCPayloadWithMapping(
+            mapping = dataMapping ?: JsonObject(emptyMap()),
+            context = issuanceTemplateContext(
+                issuerId = issuerId,
+                subjectDid = holderDid,
+                display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
             ),
-            disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
+            data = issuanceDataFunctions()
         )
 
         val defaultPayloadProperties = defaultPayloadProperties(
@@ -128,11 +125,11 @@ object SdJwtVcCredentialSigner {
         }
 
 
-        val extraClaims = sdJwtCredentialClaims ?: emptyMap()
-        val undisclosedPayload =
-            sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
-
-        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
+        val alwaysDisclosedOverrides = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val sdPayload = SDPayload.createSDPayload(
+            fullPayload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides),
+            disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
+        )
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
@@ -151,12 +148,7 @@ object SdJwtVcCredentialSigner {
             }))
         } ?: mapOf())
 
-        val finalSdPayload = SDPayload.createSDPayload(
-            fullPayload = fullPayload,
-            undisclosedPayload = undisclosedPayload
-        )
-
-        val signable = finalSdPayload.undisclosedPayload.toString().encodeToByteArray()
+        val signable = sdPayload.undisclosedPayload.toString().encodeToByteArray()
         val jwt = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> issuerSigningKey.key.signJws(signable, headers)
             is IssuerSigningKey.Crypto2 -> CompactJws.sign(
@@ -170,7 +162,7 @@ object SdJwtVcCredentialSigner {
         val sdJwtVC = SDJwtVC(
             sdJwt = SDJwt.createFromSignedJwt(
                 signedJwt = jwt,
-                sdPayload = finalSdPayload
+                sdPayload = sdPayload
             )
         )
 

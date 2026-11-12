@@ -2112,6 +2112,16 @@ public struct PaymentConsentField: Equatable, Sendable {
     public let value: String
     /// Placement resolved in shared code.
     public let placement: PaymentConsentFieldPlacement
+    /// Payload-relative semantic path. Interpret known field types by path, never by localized labels.
+    public let path: [String]
+
+    init(label: String, description: String?, value: String, placement: PaymentConsentFieldPlacement, path: [String] = []) {
+        self.label = label
+        self.description = description
+        self.value = value
+        self.placement = placement
+        self.path = path
+    }
 }
 
 /// Display placement, already resolved from attestation metadata by shared code.

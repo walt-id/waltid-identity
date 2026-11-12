@@ -1,5 +1,6 @@
 package id.walt.issuer2.controller
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.notifications.IssuanceNotificationService
@@ -84,8 +85,8 @@ enum class Issuer2RouteSurface {
 private val credentialResponseCacheControl = createRouteScopedPlugin("CredentialResponseCacheControl") {
     // Set this before parsing/authentication, including responses from StatusPages or rate limiting.
     onCall { call ->
-        if (call.response.headers[HttpHeaders.CacheControl] != "no-store") {
-            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        OpenId4VciResponseHeaders.NO_STORE.forEach { (name, value) ->
+            if (call.response.headers[name] != value) call.response.headers.append(name, value)
         }
     }
 }

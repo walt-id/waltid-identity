@@ -1,5 +1,6 @@
 package id.walt.openid4vci.proofs.attestation
 
+import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
@@ -19,6 +20,7 @@ data class VerifiedKeyAttestation(
     val payload: JsonObject,
     val attesterKey: Key,
     val attestedKeys: List<Key>,
+    val lifetime: VerifiedAttestationLifetime? = null,
 )
 
 enum class KeyAttestationUsage { JWT_HEADER, STANDALONE_PROOF }
@@ -98,21 +100,16 @@ class KeyAttestationVerifier(
         val issuedAt = payload.integer("iat")
         val expiresAt =
             if (usage == KeyAttestationUsage.JWT_HEADER || "exp" in payload) payload.integer("exp") else null
-        val currentInstant = now()
-        val currentTime = currentInstant.epochSeconds
-        if (issuedAt > currentTime + clockSkewSeconds ||
-            expiresAt != null && (expiresAt <= currentTime - clockSkewSeconds || expiresAt <= issuedAt)
-        ) {
-            throw invalidCredentialProof("Key attestation is outside its valid lifetime")
-        }
-        payload["nbf"]?.let { value ->
-            val notBefore = (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull
+        val notBefore = payload["nbf"]?.let { value ->
+            (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull
                 ?.takeIf { it.isFinite() }
                 ?: throw invalidCredentialProof("Key attestation nbf must be a NumericDate")
-            val currentNumericDate = currentTime.toDouble() + currentInstant.nanosecondsOfSecond / 1_000_000_000.0
-            if (notBefore > currentNumericDate + clockSkewSeconds) {
-                throw invalidCredentialProof("Key attestation is not yet valid")
-            }
+        }
+        val lifetime = VerifiedAttestationLifetime(
+            issuedAt, expiresAt, notBefore, clockSkewSeconds,
+        )
+        if (!lifetime.keyAttestationValidAt(now())) {
+            throw invalidCredentialProof("Key attestation is outside its valid lifetime")
         }
         validateCredentialNonce(payload, context)
         payload.string("nonce")
@@ -137,7 +134,7 @@ class KeyAttestationVerifier(
         }
         val verified = VerifiedKeyAttestation(jwt, header, payload, signer, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))
-        })
+        }, lifetime)
         val accepted = try {
             options.policy?.accepts(verified, context, configuration) ?: true
         } catch (e: CancellationException) {

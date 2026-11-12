@@ -19,8 +19,8 @@ internal suspend fun exerciseNativeSca(provider: PlatformManagedKeyProvider, can
         "Physical device must support a hardware key with strong, enrolled biometrics"
     }
     val request = WalletKeyCreationRequest(
-        KeyId("wal1423-sca-test-${Uuid.random()}"), requirements,
-        KeyUseAuthorizationPrompt("Authorize the WAL-1423 synthetic payment test"),
+        KeyId("sca-test-${Uuid.random()}"), requirements,
+        KeyUseAuthorizationPrompt("Authorize the synthetic payment test"),
     )
     val generated = provider.generateManagedKey(request)
     try {

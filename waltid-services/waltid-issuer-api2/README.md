@@ -59,6 +59,13 @@ Configuration files live in `config/`:
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
 | `authentication-service.conf` | Optional external OAuth authentication configuration |
 
+Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
+external OAuth authentication. The service and Docker Compose configuration files
+read `clientSecret` from this environment variable. Without it, the secret is
+empty and Keycloak authentication cannot complete. The issuer2 Kubernetes
+deployments read this variable from the `client-secret` key of the
+`issuer2-keycloak` Secret in their namespace.
+
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
@@ -683,6 +690,42 @@ expired, consumed, or unauthorized transactions return `invalid_transaction_id`.
 Each transaction can be collected once. One offer can contain multiple transactions,
 including a batch of holder proofs for a selected credential. Completing an offer
 before its first Credential Request allows immediate issuance from that request.
+
+
+Deferred collection uses the WIA and KAs accepted for that transaction. Their verified
+validity bounds, original clock skew, client identity, and holder-key associations are
+retained privately. The shared library checks those lifetimes before signing and before
+delivering a saved response, including after a restart. Original PoP, proof age, and
+nonce checks are not replayed.
+
+The provider captures WIA evidence from verified access-token authentication and
+snapshots it automatically in `acceptCredentialRequest()`, together with the verified
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
+The provider uses its existing client-authentication configuration resolver when a
+legacy transaction has no recorded requirement; optional authentication methods do
+not make WIA mandatory. Originally anonymous pre-authorized grants retain that
+profile through refresh.
+
+If a required attestation has expired, or required evidence is missing, collection
+returns `credential_request_denied`. Denial is permanent for that transaction: one
+expired KA denies the entire holder-key batch. Other transactions and completed
+datasets retain their progress. This transaction denial does not change the offer's
+operator approval decision.
+
+An acceptance-time `credential_request_denied` emits one credential-request failure
+notification for that request.
+A transaction's first lifetime denial emits one credential-request failure notification;
+later polls return the persisted denial without another notification. Response-encryption
+errors retain the signed checkpoint so a later poll can retry delivery.
+
+Refreshing an access token preserves its original WIA evidence and never replaces a
+transaction's accepted evidence. Resubmitting a Credential Request also keeps the
+original acceptance. Transactions stored before evidence capture fail closed when
+their required profile cannot be enforced. Standalone KAs without `exp` retain the
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
+replacement and attestation status-list enforcement are separate work (status: F6).
 
 Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
 in the issuer service configuration):

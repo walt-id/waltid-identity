@@ -203,15 +203,8 @@ class PublicDemoBackendE2ETest {
             device = device,
             path = "transactionData[0].details.amount",
             label = "Amount",
-            expectedValues = listOf("42.00"),
-            message = "Payment amount missing",
-        )
-        assertClaimValueVisibleAfterScrolling(
-            device = device,
-            path = "transactionData[0].details.currency",
-            label = "Currency",
-            expectedValues = listOf("EUR"),
-            message = "Payment currency missing",
+            expectedValues = listOf("42.00", "EUR"),
+            message = "Payment amount or currency missing",
         )
         assertClaimValueVisibleAfterScrolling(
             device = device,

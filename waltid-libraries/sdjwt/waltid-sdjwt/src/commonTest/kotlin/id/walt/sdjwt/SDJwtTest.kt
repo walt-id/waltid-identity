@@ -147,6 +147,55 @@ class SDJwtTest {
     }
 
     @Test
+    fun testSDPayloadCreationRejectsPayloadsBreakingSdJwtProcessing() {
+        val nonArrayDigests = buildJsonObject { putJsonObject("value") { put("_sd", "not-an-array") } }
+        val reservedName = buildJsonObject { put("...", "value") }
+
+        for (disclosureMap in listOf(SDMap(mapOf("value" to SDField(true))), SDMap(mapOf()))) {
+            val error = assertFailsWith<SDJwtVerificationException> { SDPayload.createSDPayload(nonArrayDigests, disclosureMap) }
+            assertEquals("_sd must be a JSON array", error.message)
+        }
+        assertFailsWith<SDJwtVerificationException> { SDPayload.createSDPayload(reservedName, SDMap(mapOf())) }
+    }
+
+    @Test
+    fun testSDPayloadCreationAcceptsOnlyTopLevelSha256HashAlgorithm() {
+        val hideValue = SDMap(mapOf("value" to SDField(true)))
+        val nested = buildJsonObject { putJsonObject("value") { putJsonArray("items") { addJsonObject { put("_sd_alg", "sha-256") } } } }
+        for (disclosureMap in listOf(hideValue, SDMap(mapOf()))) {
+            val error = assertFailsWith<SDJwtVerificationException> { SDPayload.createSDPayload(nested, disclosureMap) }
+            assertEquals("_sd_alg is only allowed at the top level of the payload", error.message)
+        }
+
+        for (algorithm in listOf(JsonPrimitive("sha-512"), JsonPrimitive(256), JsonNull)) {
+            val payload = buildJsonObject { put("_sd_alg", algorithm); put("value", "a") }
+            assertFailsWith<SDJwtVerificationException> { SDPayload.createSDPayload(payload, hideValue) }
+        }
+
+        val supported = buildJsonObject { put("_sd_alg", "sha-256"); put("value", "a") }
+        assertEquals("sha-256", SDPayload.createSDPayload(supported, hideValue).undisclosedPayload.getValue("_sd_alg").jsonPrimitive.content)
+    }
+
+    @Test
+    fun testParsedSDPayloadRejectsNestedHashAlgorithm() {
+        fun encode(json: JsonElement) = json.toString().encodeToByteArray().encodeToBase64Url()
+        fun digestOf(disclosure: String) = SHA256().digest(disclosure.encodeToByteArray()).encodeToBase64Url()
+
+        val inDisclosedValue = encode(buildJsonArray { add("salt-1"); add("value"); addJsonObject { put("_sd_alg", "sha-512") } })
+        val asNestedDisclosure = encode(buildJsonArray { add("salt-2"); add("_sd_alg"); add("sha-512") })
+        val cases = listOf(
+            buildJsonObject { putJsonArray("_sd") { add(digestOf(inDisclosedValue)) } } to setOf(inDisclosedValue),
+            buildJsonObject { putJsonObject("value") { putJsonArray("_sd") { add(digestOf(asNestedDisclosure)) } } } to setOf(asNestedDisclosure),
+            buildJsonObject { putJsonObject("value") { put("_sd_alg", "sha-256") } } to emptySet(),
+        )
+        for ((body, disclosures) in cases) {
+            val payload = SDPayload.parse(encode(body), disclosures)
+            val error = assertFailsWith<SDJwtVerificationException> { payload.fullPayload }
+            assertEquals("_sd_alg is only allowed at the top level of the payload", error.message)
+        }
+    }
+
+    @Test
     fun testParseKeyBindingJwt() {
         val issuerJwt =
             "eyJhbGciOiAiRVMyNTYiLCAidHlwIjogImV4YW1wbGUrc2Qtand0In0.eyJfc2QiOiBbIkNyUWU3UzVrcUJBSHQtbk1ZWGdjNmJkdDJTSDVhVFkxc1VfTS1QZ2tqUEkiLCAiSnpZakg0c3ZsaUgwUjNQeUVNZmVadTZKdDY5dTVxZWhabzdGN0VQWWxTRSIsICJQb3JGYnBLdVZ1Nnh5bUphZ3ZrRnNGWEFiUm9jMkpHbEFVQTJCQTRvN2NJIiwgIlRHZjRvTGJnd2Q1SlFhSHlLVlFaVTlVZEdFMHc1cnREc3JaemZVYW9tTG8iLCAiWFFfM2tQS3QxWHlYN0tBTmtxVlI2eVoyVmE1TnJQSXZQWWJ5TXZSS0JNTSIsICJYekZyendzY002R242Q0pEYzZ2Vks4QmtNbmZHOHZPU0tmcFBJWmRBZmRFIiwgImdiT3NJNEVkcTJ4Mkt3LXc1d1BFemFrb2I5aFYxY1JEMEFUTjNvUUw5Sk0iLCAianN1OXlWdWx3UVFsaEZsTV8zSmx6TWFTRnpnbGhRRzBEcGZheVF3TFVLNCJdLCAiaXNzIjogImh0dHBzOi8vaXNzdWVyLmV4YW1wbGUuY29tIiwgImlhdCI6IDE2ODMwMDAwMDAsICJleHAiOiAxODgzMDAwMDAwLCAic3ViIjogInVzZXJfNDIiLCAibmF0aW9uYWxpdGllcyI6IFt7Ii4uLiI6ICJwRm5kamtaX1ZDem15VGE2VWpsWm8zZGgta284YUlLUWM5RGxHemhhVllvIn0sIHsiLi4uIjogIjdDZjZKa1B1ZHJ5M2xjYndIZ2VaOGtoQXYxVTFPU2xlclAwVmtCSnJXWjAifV0sICJfc2RfYWxnIjogInNoYS0yNTYiLCAiY25mIjogeyJqd2siOiB7Imt0eSI6ICJFQyIsICJjcnYiOiAiUC0yNTYiLCAieCI6ICJUQ0FFUjE5WnZ1M09IRjRqNFc0dmZTVm9ISVAxSUxpbERsczd2Q2VHZW1jIiwgInkiOiAiWnhqaVdXYlpNUUdIVldLVlE0aGJTSWlyc1ZmdWVjQ0U2dDRqVDlGMkhaUSJ9fX0.Ds6Agd3LwQJuQW0V7EZLaX-ed2CpEvA7gFrVjuVJaPCzIAvLXhDzcmEzDzXJxx27iPs91uodf0wGVrpe529ZmQ~WyJlbHVWNU9nM2dTTklJOEVZbnN4QV9BIiwgImZhbWlseV9uYW1lIiwgIkRvZSJd~WyJBSngtMDk1VlBycFR0TjRRTU9xUk9BIiwgImFkZHJlc3MiLCB7InN0cmVldF9hZGRyZXNzIjogIjEyMyBNYWluIFN0IiwgImxvY2FsaXR5IjogIkFueXRvd24iLCAicmVnaW9uIjogIkFueXN0YXRlIiwgImNvdW50cnkiOiAiVVMifV0~WyIyR0xDNDJzS1F2ZUNmR2ZyeU5STjl3IiwgImdpdmVuX25hbWUiLCAiSm9obiJd~WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIlVTIl0~"

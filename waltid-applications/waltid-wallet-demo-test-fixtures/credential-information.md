@@ -28,6 +28,19 @@ The SDK preview identifies unrequested clear-text data that will also be transmi
 
 ## Values and media
 
+Details, receipt information and consent normalize the source JSON value through the same renderer.
+The SDK's optional display string is only a fallback when the JSON cannot be parsed; it must not
+replace a formatted date or change a valid claim's meaning. JSON strings such as `"true"` remain
+text, distinct from boolean `true`.
+
+Recognized temporal claims (`iat`, `nbf`, `exp` and the issuance/validity/expiry aliases) become
+instants only from numeric JSON seconds or a complete supported ISO timestamp with an offset.
+The [date/time display policy](date-time-display.md) applies across details, receipt information,
+consent, credential Added, reader-trust validity/updates and nearby-sharing validity/receipts.
+Unknown numbers, identifiers, country codes and status-list indices are not reinterpreted using
+size or issuer-provided labels. These display rules never change stored claims, disclosure
+selection, presentation payloads or credential validation.
+
 Keep null, empty text, false, zero, empty objects and empty lists distinct. Collections initially show 25 items, their total and an explicit next-page action. Preserve indices when revealing more items. Retain deferred, bounded image decoding; loading and failed images have visible placeholders. Full-screen image inspection is available after successful decoding. Credential artwork identifies the credential and stays separate from claim images and issuer/verifier logos.
 
 ## Evidence

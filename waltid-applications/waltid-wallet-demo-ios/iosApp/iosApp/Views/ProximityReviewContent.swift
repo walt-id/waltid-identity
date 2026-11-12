@@ -64,7 +64,10 @@ struct ProximityReviewContent: View {
                                 } else {
                                     Text(credential.label ?? String(localized: "Wallet credential"))
                                     if let issuer = credential.issuer { Text(issuer).font(.footnote).foregroundStyle(.secondary) }
-                                    Text("Valid until \(credential.validUntil.formatted(date: .abbreviated, time: .omitted))").font(.footnote)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Valid until")
+                                        WalletInstantText(credential.validUntil)
+                                    }.font(.footnote)
                                 }
                             }.accessibilityIdentifier(WalletAccessibilityID.proximityCredential(
                                 requestIndex: document.requestIndex, credentialID: credential.credentialID))

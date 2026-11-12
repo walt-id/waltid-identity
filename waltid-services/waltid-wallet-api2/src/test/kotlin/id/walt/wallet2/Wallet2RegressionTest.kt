@@ -4,6 +4,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TypedKeyGenerationRequest
+import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -12,9 +14,12 @@ import id.walt.did.dids.DidService
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.handlers.BuildVpTokenRequest
+import id.walt.wallet2.handlers.BuildVpTokenResult
 import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.MatchCredentialsResult
+import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.handlers.CreateDidRequest
@@ -25,9 +30,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -471,6 +474,106 @@ class Wallet2RegressionTest {
                     assertTrue("Unsupported DCQL credential format \"vc+sd-jwt\"" in message, message)
                     assertTrue("must use \"dc+sd-jwt\"" in message, message)
                 }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // A requested SD-JWT array element is presented, not another one
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `presentation of an SD-JWT array element sends exactly that element`() {
+        OSSWallet2Service.walletStore = InMemoryWalletStore()
+
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
+            features = listOf(OSSWallet2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "wallet-service",
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
+                )
+            },
+            init = { DidService.minimalInit() },
+            module = { wallet2Module(withPlugins = false) }
+        ) {
+            val http = testHttpClient()
+
+            val walletId = testAndReturn("Create wallet") {
+                http.post("/wallet") {
+                    contentType(ContentType.Application.Json)
+                    setBody(CreateWalletRequest())
+                }.body<WalletCreatedResponse>().walletId
+            }
+            val keyId = testAndReturn("Generate holder key") {
+                http.post("/wallet/$walletId/keys/generate") {
+                    contentType(ContentType.Application.Json)
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
+                }.body<WalletKeyInfo>().keyId
+            }
+
+            // Array-element disclosures carry no claim name; the wallet used to pick one by name.
+            val india = SdJwtSelectiveDisclosure("salt-in", null, JsonPrimitive("IN"))
+            val france = SdJwtSelectiveDisclosure("salt-fr", null, JsonPrimitive("FR"))
+            fun b64(json: JsonElement) = json.toString().encodeToByteArray().encodeToBase64Url()
+            val header = buildJsonObject { put("alg", "ES256"); put("typ", "dc+sd-jwt") }
+            val payload = buildJsonObject {
+                put("iss", "https://issuer.example")
+                put("vct", "https://example.com/pid")
+                put("_sd_alg", "sha-256")
+                putJsonArray("nationalities") {
+                    addJsonObject { put("...", india.asHashedFromEncoded()) }
+                    addJsonObject { put("...", france.asHashedFromEncoded()) }
+                }
+            }
+            val rawSdJwt = "${b64(header)}.${b64(payload)}.c2ln~${india.encoded}~${france.encoded}~"
+
+            val credentialId = testAndReturn("Import SD-JWT credential") {
+                http.post("/wallet/$walletId/credentials/import") {
+                    contentType(ContentType.Application.Json)
+                    setBody(ImportCredentialRequest(rawCredential = rawSdJwt, label = "SD-JWT array elements"))
+                }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }
+                    .body<JsonObject>().getValue("id").jsonPrimitive.content
+            }
+
+            val responseUri = "https://verifier.example/response"
+            val dcqlQuery = """{"credentials":[{"id":"pid","format":"dc+sd-jwt","meta":{"vct_values":["https://example.com/pid"]},""" +
+                    """"claims":[{"path":["nationalities",1]}]}]}"""
+            val requestUrl = Url(
+                "openid4vp://?client_id=${"redirect_uri:$responseUri".encodeURLParameter()}" +
+                        "&response_type=vp_token&response_mode=direct_post" +
+                        "&response_uri=${responseUri.encodeURLParameter()}" +
+                        "&nonce=n-array-element&dcql_query=${dcqlQuery.encodeURLParameter()}"
+            )
+
+            testAndReturn("Preview shows the requested element") {
+                val preview = http.post("/wallet/$walletId/credentials/present/preview") {
+                    contentType(ContentType.Application.Json)
+                    setBody(PreviewPresentationRequest(requestUrl = requestUrl, keyId = keyId))
+                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                    .body<JsonObject>()
+                val disclosures = preview.getValue("credentialOptions").jsonArray.single()
+                    .jsonObject.getValue("disclosures").jsonArray.map { it.jsonObject }
+                val requested = disclosures.single { it["selectivelyDisclosable"]?.jsonPrimitive?.boolean == true }
+                assertEquals(JsonPrimitive("FR"), requested["value"])
+            }
+
+            testAndReturn("vp_token carries only the requested element's disclosure") {
+                val vpToken = http.post("/wallet/$walletId/credentials/present/build-vp-token") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        BuildVpTokenRequest(
+                            requestUrl = requestUrl,
+                            selectedCredentialOptions = listOf(PresentationCredentialSelection("pid", credentialId)),
+                            keyId = keyId,
+                        )
+                    )
+                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                    .body<BuildVpTokenResult>().vpToken
+                val presentation = Json.parseToJsonElement(vpToken).jsonObject.getValue("pid").jsonArray.single().jsonPrimitive.content
+                val sent = presentation.split("~").drop(1).filter { it.isNotEmpty() && it.count { c -> c == '.' } != 2 }
+                assertEquals(listOf(france.encoded), sent)
             }
         }
     }

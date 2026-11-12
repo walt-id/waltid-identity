@@ -187,7 +187,12 @@ class WalletIssuanceHandlerInvalidNonceTest {
         val result = WalletIssuanceHandler.fetchCredential(
             wallet = wallet,
             request = fetchRequest(storeInWallet = true).copy(
-                proofs = id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-1", "proof-2")),
+                proofs = id.walt.openid4vci.proofs.Proofs(jwt = holders.map { holder ->
+                    holder.signJws("{}".encodeToByteArray(), mapOf(
+                        "typ" to kotlinx.serialization.json.JsonPrimitive("openid4vci-proof+jwt"),
+                        "jwk" to holder.getPublicKey().exportJWKObject(),
+                    ))
+                }),
                 credentialIssuerBaseUrl = "https://issuer.example",
                 credentialConfigurationId = "identity",
                 holderBindings = bindings,

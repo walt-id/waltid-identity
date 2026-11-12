@@ -10,6 +10,9 @@ import org.robolectric.annotation.Config
 class WalletFooterAndroidTest {
     private val scenarios = WalletFooterTestScenarios()
 
+    @Test fun paymentActionsShareOneRowAndKeepTheirSeparateActions() =
+        scenarios.paymentActionsShareOneRowAndKeepTheirSeparateActions()
+
     @Test fun feedbackKeepsTopContentAndActionsStableWithLargeText() =
         scenarios.feedbackKeepsTopContentAndActionsStableWithLargeText()
 

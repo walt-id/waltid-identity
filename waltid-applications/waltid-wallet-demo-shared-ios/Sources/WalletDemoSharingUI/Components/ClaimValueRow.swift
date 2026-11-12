@@ -23,6 +23,8 @@ struct ClaimValueView: View {
 
     var body: some View {
         switch value {
+        case .instant(let value):
+            WalletInstantText(value)
         case .bool(let value):
             Text(value ? "Yes" : "No")
                 .font(textFont)

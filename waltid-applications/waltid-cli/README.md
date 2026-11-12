@@ -65,6 +65,12 @@ waltid vc verify credential.signed.json
 waltid vc verify -p signature -p schema -a schema=schema.json credential.signed.json
 ```
 
+`signature` does not check a credential's `x5c` certificate chain against any root. Add `x509-trust` to check it against one or more trust root files (PEM or base64 DER):
+
+```bash
+waltid vc verify -p x509-trust -a trust-root=root-ca.pem credential.signed.json
+```
+
 Other retained policy names are `expiration`/`expired`, `not-before`, `revoked-status-list`, `allowed-issuer`, and `webhook`.
 
 ## Presentations

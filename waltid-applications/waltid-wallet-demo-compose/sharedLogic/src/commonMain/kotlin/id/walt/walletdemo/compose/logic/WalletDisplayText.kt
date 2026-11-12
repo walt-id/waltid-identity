@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import io.ktor.http.Url
+
 internal enum class WalletDeepLinkScheme(val scheme: String) {
     CredentialOffer("openid-credential-offer"),
     PresentationRequest("openid4vp"),
@@ -21,6 +23,16 @@ internal enum class WalletDeepLinkScheme(val scheme: String) {
                 parameter.startsWith("code=") || parameter.startsWith("error=")
             }
         }
+    }
+}
+
+/** Portal "Open in Wallet" hands the raw OpenID URL to the web wallet in `link`. */
+fun incomingWalletPageLink(pageUrl: String): String? {
+    val link = runCatching { Url(pageUrl).parameters["link"] }.getOrNull()?.trim().orEmpty()
+    if (link.isEmpty()) return null
+    return when (WalletDeepLinkScheme.parse(link)) {
+        WalletDeepLinkScheme.CredentialOffer, WalletDeepLinkScheme.PresentationRequest -> link
+        else -> null
     }
 }
 

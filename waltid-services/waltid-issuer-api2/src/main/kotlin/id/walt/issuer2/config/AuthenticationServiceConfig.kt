@@ -7,7 +7,12 @@ data class AuthenticationServiceConfig(
     val authorizeUrl: String = "https://keycloak.demo.walt.id/realms/mynewrealm/protocol/openid-connect/auth",
     val accessTokenUrl: String = "https://keycloak.demo.walt.id/realms/mynewrealm/protocol/openid-connect/token",
     val clientId: String = "issuer_api",
-    val clientSecret: String = "Y0DyNhF4NgpOS6VMRUtl0JtvxrRYQD4s",
+    val clientSecret: String = "",
     val defaultScopes: List<String> = listOf("openid", "profile"),
     val forwardIssuerStateToAuthorizationServer: Boolean = false,
-) : WaltConfig()
+) : WaltConfig() {
+    override fun toString(): String =
+        "AuthenticationServiceConfig(name=$name, authorizeUrl=$authorizeUrl, accessTokenUrl=$accessTokenUrl, " +
+            "clientId=$clientId, clientSecret=[REDACTED], defaultScopes=$defaultScopes, " +
+            "forwardIssuerStateToAuthorizationServer=$forwardIssuerStateToAuthorizationServer)"
+}

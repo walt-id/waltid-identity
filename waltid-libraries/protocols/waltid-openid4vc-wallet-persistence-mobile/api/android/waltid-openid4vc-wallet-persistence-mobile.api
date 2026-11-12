@@ -206,6 +206,7 @@ public final class id/walt/wallet2/persistence/keys/AndroidPlatformKeyProvider :
 	public fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun restoreManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+	public fun withFreshBiometricAuthorization (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt {
@@ -264,6 +265,7 @@ public abstract interface class id/walt/wallet2/persistence/keys/PlatformManaged
 	public abstract fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun restoreManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+	public fun withFreshBiometricAuthorization (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider$DefaultImpls {
@@ -271,6 +273,7 @@ public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider$D
 	public static fun importManagedKey (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lid/walt/crypto2/keys/EncodedKey$Jwk;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun keyFacts (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+	public static fun withFreshBiometricAuthorization (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration {

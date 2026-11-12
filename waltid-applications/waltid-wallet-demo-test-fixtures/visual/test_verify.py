@@ -102,7 +102,7 @@ class ComparisonRunnerTests(unittest.TestCase):
 class AppleEnvironmentTests(unittest.TestCase):
     def output(self, *command, device_type=verify.NATIVE_DEVICE):
         if command[0] == "xcodebuild":
-            return "Xcode 27.0\nBuild version 27A266a"
+            return "Xcode 27.2\nBuild version 27B52"
         if command[0] == "xcodebuildmcp":
             return "2.7.0"
         return json.dumps({"devices": {verify.RUNTIME: [{

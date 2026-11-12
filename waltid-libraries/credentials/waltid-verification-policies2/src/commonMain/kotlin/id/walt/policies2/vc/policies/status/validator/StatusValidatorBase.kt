@@ -53,7 +53,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
                 signerAuthorizer,
             )
             if (entry is IETFEntry) {
-                validateIetfClaims(verified, entry.uri)
+                validateIetfToken(statusListContent, verified, entry.uri)
             }
         }
         
@@ -95,7 +95,15 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         return verified
     }
 
-    private fun validateIetfClaims(verified: VerifiedStatusList<*>, statusListUri: String) {
+    private fun validateIetfToken(
+        content: StatusListContent,
+        verified: VerifiedStatusList<*>,
+        statusListUri: String,
+    ) {
+        when (content) {
+            is StatusListContent.Text -> IetfStatusListTokenClaims.requireJwtType(content.content)
+            is StatusListContent.Binary -> IetfStatusListTokenClaims.requireCwtType(content.content)
+        }
         val now = Clock.System.now().epochSeconds
         when (val payload = verified.payload) {
             is JsonObject -> IetfStatusListTokenClaims.validate(payload, statusListUri, now)

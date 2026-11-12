@@ -2,6 +2,8 @@
 
 package id.walt.walletdemo.compose.android
 
+import id.walt.mobile.test.DigitalCredentialProviderTest
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
@@ -74,6 +76,7 @@ import org.junit.runner.RunWith
 
 /** Unattended Credential Manager coverage using the ordinary demo fixture. */
 @RunWith(AndroidJUnit4::class)
+@DigitalCredentialProviderTest
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
     override val wallet: MobileWallet get() = provisionedWallet
@@ -276,7 +279,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
                         assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
                     }
-                    listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                    listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
                         "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
                         WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
                             "Payment review is missing issuer instruction '$label'")
@@ -399,15 +402,8 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         device = device,
                         path = "transactionData[0].details.payload.amount",
                         label = "Amount",
-                        expectedValues = listOf(SCA_AMOUNT_TEXT),
-                        message = "SCA payment amount missing from the wallet review",
-                    )
-                    assertClaimValueVisibleAfterScrolling(
-                        device = device,
-                        path = "transactionData[0].details.payload.currency",
-                        label = "Currency",
-                        expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_CURRENCY),
-                        message = "SCA payment currency missing from the wallet review",
+                        expectedValues = listOf(SCA_AMOUNT_TEXT, DemoTestBackend.SCA_PAYMENT_CURRENCY),
+                        message = "SCA payment amount or currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
                     // Check the exact age candidate and its disclosure directly in the consent review.
@@ -924,7 +920,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             runCatching { context.packageManager.getPackageInfo("com.google.android.gms", 0) }.isSuccess
 
         private const val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
-        private const val EUDI_PID_SD_JWT_VCT = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
+        private const val EUDI_PID_SD_JWT_VCT = "urn:eudi:pid:1"
         private const val SCA_DOC_TYPE = "eu.europa.ec.eudi.sca.payment_card.1"
         private const val SCA_CREDENTIAL_QUERY_ID = "sca_payment_card"
         private const val AGE_DOC_TYPE = "eu.europa.ec.av.1"

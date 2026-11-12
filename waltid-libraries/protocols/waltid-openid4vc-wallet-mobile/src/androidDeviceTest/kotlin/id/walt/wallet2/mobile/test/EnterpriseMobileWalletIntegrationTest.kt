@@ -16,6 +16,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
+import id.walt.mobile.test.EnterpriseMobileTest
 import id.walt.mobile.test.PhysicalDeviceTest
 import kotlinx.coroutines.delay
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig

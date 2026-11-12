@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlin.time.Instant
+
 data class CredentialDetails(
     val summary: CredentialSummary,
     val groups: List<ClaimGroup>,
@@ -102,6 +104,8 @@ data class ClaimItem(
 )
 
 sealed interface DisplayValue {
+    /** Keep the instant independent of the viewer's locale and time zone until rendering. */
+    data class InstantValue(val value: Instant) : DisplayValue
     data class Text(val value: String) : DisplayValue
     data class NumberValue(val value: String) : DisplayValue
     data class BooleanValue(val value: Boolean) : DisplayValue

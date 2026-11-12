@@ -56,6 +56,26 @@ final class WalletVisualTests: XCTestCase {
         try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl", layoutDirection: .rightToLeft)
     }
 
+    func testDateValues() throws { try dateValues() }
+    func testDateValuesCompactRtl() throws { try dateValues(rtl: true) }
+
+    private func dateValues(rtl: Bool = false) throws {
+        let first = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T00:30:00Z"))
+        let second = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T01:30:00Z"))
+        let content = VStack(alignment: .leading, spacing: 20) {
+            ClaimValueRow(item: ClaimItem(path: .topLevel("iat"), label: "Issued at", value: .instant(first), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("exp"), label: "Expires", value: .instant(second), rawValue: nil))
+            ClaimValueRow(item: ClaimItem(path: .topLevel("birth_date"), label: "Birth date", value: .text("1990-05-21"), rawValue: nil))
+        }
+        .padding(16).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .environment(\.locale, Locale(identifier: rtl ? "ar@hours=h23" : "en_GB@hours=h23"))
+        .environment(\.timeZone, try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")))
+        .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+        try capture(content, id: rtl ? "components.dates.compact_large_text_rtl" : "components.dates",
+                    config: rtl ? .iPhoneSe : .iPhone13, sizeCategory: rtl ? .accessibilityMedium : .large,
+                    layoutDirection: rtl ? .rightToLeft : .leftToRight)
+    }
+
     func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
     func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
 
@@ -278,8 +298,10 @@ final class WalletVisualTests: XCTestCase {
             id: required ? "settings.reader_required.default" : "settings.reader.default")
     }
     func testReaderTrustImport() throws {
-        try capture(ReaderTrustImportReviewView(preview: WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {}),
-            id: "settings.reader.import_review")
+        let content = ReaderTrustImportReviewView(preview: try WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {})
+            .environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+        try capture(WalletVisualHostingController(rootView: content), id: "settings.reader.import_review")
     }
 
     func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }
@@ -371,12 +393,14 @@ final class WalletVisualTests: XCTestCase {
     }
 
     func testProviderSharingReview() async throws { try await providerSharingReview() }
+    func testSharingInformationDates() async throws { try await sharingInformation(dates: true) }
     func testSharingInformationSelected() async throws { try await sharingInformation() }
     func testSharingInformationAlternative() async throws { try await sharingInformation(alternative: true) }
     func testSharingInformationMultiple() async throws { try await sharingInformation(multiple: true) }
 
-    private func sharingInformation(alternative: Bool = false, multiple: Bool = false) async throws {
-        let review = try WalletVisualFixtures().informationReview(multiple: multiple)
+    private func sharingInformation(alternative: Bool = false, multiple: Bool = false, dates: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let review = try dates ? fixtures.dateReview() : fixtures.informationReview(multiple: multiple)
         var credentials = review.defaultCredentialSelection()
         if alternative { credentials = [review.credentialOptions[1].selection] }
         let selection = SharingSelection(credentials: credentials)
@@ -385,9 +409,13 @@ final class WalletVisualTests: XCTestCase {
         let groups = review.informationToShare(selection: selection, details: details)
         XCTAssertEqual(groups.count, multiple ? 2 : 1)
         if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }
+        if dates {
+            XCTAssertEqual(groups[0].fields.map { $0.item.value }, [.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)), .instant(WalletInstant(epochSeconds: 1801094400, nanoseconds: 0))])
+            XCTAssertTrue(groups[0].fields.allSatisfy { $0.alwaysIncluded })
+        }
         let screen = SharingReviewScreen(title: "Share credentials", review: review, selection: selection,
             selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
-        try await captureReview(screen, id: "sharing.information." + (multiple ? "multiple" : alternative ? "alternative" : "selected"),
+        try await captureReview(screen, id: "sharing.information." + (dates ? "dates" : multiple ? "multiple" : alternative ? "alternative" : "selected"),
             expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: multiple)
     }
 
@@ -446,20 +474,102 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertFalse(state.canConfirm)
     }
 
-    func testPaymentLocalizedCompact() throws {
+    func testPaymentLocalizedCompact() async throws {
         let state = PaymentReviewState.ready(try WalletVisualFixtures().payment(localized: true))
-        try capture(WalletReviewScaffold {
+        try await captureWhenReady(WalletReviewScaffold {
             PaymentConsentView(state: state)
         } actions: {
             ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
                 onCancel: {}, paymentReview: state)
-        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
+        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium,
+            isReady: { state.canConfirm }, failure: "Payment review did not become available", scrollToBottom: true)
+    }
+
+    func testPaymentLogoPolicyHidesUnavailableImages() async {
+        XCTAssertNotNil(paymentWebsite("https://shop.example/payments?q=1"))
+        for source in ["http://shop.example", "https://user:password@shop.example", "javascript:alert(1)", "https://shop.example/with space"] {
+            XCTAssertNil(paymentWebsite(source))
+        }
+        for source in ["https://shop.example/logo.png", "data:image/png;base64,AA==", "data:image/svg+xml;base64,PHN2Zz4=",
+                       "data:image/png;base64," + String(repeating: "A", count: 700_000)] {
+            let image = await loadPaymentLogo(source)
+            XCTAssertNil(image)
+        }
+        let embedded = await loadPaymentLogo("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFUlEQVR4nGNgKPhAGhrVMKph+GoAADKWYBBGgv6DAAAAAElFTkSuQmCC")
+        XCTAssertEqual(embedded?.size.width, 16)
+        XCTAssertEqual(embedded?.size.height, 16)
+    }
+
+    func testScheduledAndRecurringTermsSurviveTheNativeDisplayBoundary() throws {
+        let fixtures = try WalletVisualFixtures()
+        for recurring in [false, true] {
+            let state = PaymentReviewState.ready(try fixtures.payment(recurring: recurring))
+            let display = try XCTUnwrap(state.displays(transactions: []).first)
+            XCTAssertTrue(state.canConfirm)
+            XCTAssertEqual(display.fields.count, recurring ? 25 : 15)
+            XCTAssertEqual(display.fields.first { $0.item.label == "Payee" }?.item.rawValue, "Super Store")
+            if recurring {
+                XCTAssertEqual(display.fields.first { $0.item.label == "Payment frequency" }?.item.rawValue, "Monthly")
+                XCTAssertEqual(display.fields.first { $0.item.label == "Maximum payment amount" }?.item.rawValue, "9007199254740993.01")
+                XCTAssertEqual(display.fields.first { $0.item.label == "Annual percentage rate" }?.item.rawValue, "0.1234567890123456789")
+            } else {
+                XCTAssertEqual(display.fields.first { $0.item.label == "Execution date and time" }?.item.rawValue, "2099-01-01T12:00:00Z")
+            }
+        }
+    }
+
+    func testScheduledPaymentMain() async throws { try await paymentTerms(recurring: false) }
+    func testScheduledPaymentDetails() async throws { try await paymentTerms(recurring: false, details: true) }
+    func testRecurringPaymentMain() async throws { try await paymentTerms(recurring: true) }
+    func testRecurringPaymentDetails() async throws { try await paymentTerms(recurring: true, details: true) }
+    func testRecurringPaymentCompactLargeText() async throws { try await paymentTerms(recurring: true, compact: true) }
+
+    private func paymentTerms(recurring: Bool, details: Bool = false, compact: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let consent = try fixtures.payment(recurring: recurring)
+        let state = PaymentReviewState.ready(consent)
+        let review = try fixtures.sharingReview(payment: true)
+        let expected = Set(review.credentialOptions.map { $0.selection.id })
+        let id = "payment.\(recurring ? "recurring" : "scheduled")."
+            + (compact ? "compact_large_text" : details ? "details" : "main")
+        let sizeCategory: ContentSizeCategory = compact ? .accessibilityMedium : .large
+        var logoReady = false
+        var rendered: Set<String> = []
+        var positioned = !details && !compact
+        let content = ScrollViewReader { proxy in
+            SharingReviewScreen(title: "Payment", review: review,
+                selection: SharingSelection(credentials: review.defaultCredentialSelection()),
+                selectionComplete: true, paymentReview: state,
+                onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+                .environment(\.paymentDetailsInitiallyExpanded, details)
+                .onPreferenceChange(SharingReviewReadinessKey.self) {
+                    rendered = Set($0.map { $0.selection.id })
+                    if logoReady && expected.isSubset(of: rendered) && !positioned {
+                        proxy.scrollTo(details ? "payment-details" : "payment-terms", anchor: .top)
+                        positioned = true
+                    }
+                }
+                .onPreferenceChange(CredentialImageReadinessKey.self) {
+                    logoReady = $0.contains("payment-payee-logo")
+                    if logoReady && expected.isSubset(of: rendered) && !positioned {
+                        proxy.scrollTo(details ? "payment-details" : "payment-terms", anchor: .top)
+                        positioned = true
+                    }
+                }
+        }.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
+            .environment(\.colorScheme, .light).environment(\.sizeCategory, sizeCategory)
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+        try await captureWhenReady(content, id: id, config: compact ? .iPhoneSe : .iPhone13,
+            sizeCategory: sizeCategory,
+            isReady: { state.canConfirm && logoReady && expected.isSubset(of: rendered) && positioned },
+            failure: "Full payment review did not become available")
     }
 
     func testPaymentConsent() throws {
         let consent = try WalletVisualFixtures().payment()
-        XCTAssertEqual(consent.fields.count, 4)
-        XCTAssertEqual(consent.fields.first?.value, "11.56 EUR")
+        XCTAssertEqual(consent.fields.count, 6)
+        XCTAssertEqual(consent.fields.first(where: { $0.path == ["amount"] })?.value, "11.56")
         try capture(ScrollView { PaymentConsentView(state: .ready(consent)).padding(20) }, id: "payment.consent.main")
     }
 
@@ -615,6 +725,7 @@ final class WalletVisualTests: XCTestCase {
                                               expected: Set<String>, scrollToBottom: Bool = false) async throws {
         var ready: Set<String> = []
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = Set($0.map(\.selection.id)) }
@@ -634,7 +745,7 @@ final class WalletVisualTests: XCTestCase {
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
-        let host = WalletVisualHostingController(rootView: content)
+        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory))
         host.scrollToBottom = scrollToBottom
         host.scrollFraction = scrollFraction
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -715,6 +826,7 @@ final class WalletVisualTests: XCTestCase {
                                       layoutDirection: LayoutDirection = .leftToRight,
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)

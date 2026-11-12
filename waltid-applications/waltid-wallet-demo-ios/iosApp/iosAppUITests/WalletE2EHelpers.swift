@@ -201,8 +201,9 @@ final class WalletE2EUI {
         XCTAssertTrue(element.exists, "Element not found with identifier: \(identifier)")
     }
 
-    func tapElement(identifierPrefix: String, timeout: TimeInterval = 20) {
-        guard let element = waitForHittableElement(identifierPrefix: identifierPrefix, timeout: timeout) else {
+    func tapElement(identifierPrefix: String, in container: XCUIElement? = nil, timeout: TimeInterval = 20) {
+        guard let element = waitForHittableElement(identifierPrefix: identifierPrefix,
+            in: container ?? app, timeout: timeout) else {
             XCTFail("Element not found or not hittable with identifier prefix: \(identifierPrefix)\n\(app.debugDescription)")
             return
         }
@@ -330,11 +331,13 @@ final class WalletE2EUI {
             let coveredInput = input && footer.exists && footer.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
             return element.isHittable && !coveredInput
         }
-        for _ in 0..<6 where !uncoveredAndHittable() {
+        for _ in 0..<6 {
+            if uncoveredAndHittable() { return }
             app.swipeUp()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
-        for _ in 0..<6 where !uncoveredAndHittable() {
+        for _ in 0..<6 {
+            if uncoveredAndHittable() { return }
             app.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
@@ -366,28 +369,31 @@ final class WalletE2EUI {
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     }
 
-    private func firstElement(identifierPrefix: String) -> XCUIElement {
+    private func firstElement(identifierPrefix: String, in container: XCUIElement? = nil) -> XCUIElement {
         let predicate = NSPredicate(format: "identifier BEGINSWITH %@", identifierPrefix)
-        return app.descendants(matching: .any).matching(predicate).firstMatch
+        return (container ?? app).descendants(matching: .any).matching(predicate).firstMatch
     }
 
-    private func waitForHittableElement(identifierPrefix: String, timeout: TimeInterval) -> XCUIElement? {
+    private func waitForHittableElement(identifierPrefix: String, in container: XCUIElement,
+        timeout: TimeInterval) -> XCUIElement? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if let hittable = firstHittableElement(identifierPrefix: identifierPrefix) {
-                return hittable
-            }
-            if firstElement(identifierPrefix: identifierPrefix).exists {
-                app.swipeUp()
+            if container.exists {
+                if let hittable = firstHittableElement(identifierPrefix: identifierPrefix, in: container) {
+                    return hittable
+                }
+                if firstElement(identifierPrefix: identifierPrefix, in: container).exists {
+                    app.swipeUp()
+                }
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
-        return firstHittableElement(identifierPrefix: identifierPrefix)
+        return container.exists ? firstHittableElement(identifierPrefix: identifierPrefix, in: container) : nil
     }
 
-    private func firstHittableElement(identifierPrefix: String) -> XCUIElement? {
+    private func firstHittableElement(identifierPrefix: String, in container: XCUIElement) -> XCUIElement? {
         let predicate = NSPredicate(format: "identifier BEGINSWITH %@", identifierPrefix)
-        return app.descendants(matching: .any)
+        return container.descendants(matching: .any)
             .matching(predicate)
             .allElementsBoundByIndex
             .first { element in

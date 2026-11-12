@@ -41,10 +41,14 @@ class WalletVisualAndroidTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
+    fun dateValuesCompactRtl() = scenario(fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
-    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun readerTrustImport() = scenario(sheetHost = true) { readerTrustImport() }
     @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
     @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
     @Test fun settingsNearby() = scenario { settingsRoot("nearby") }
@@ -63,12 +67,20 @@ class WalletVisualAndroidTest {
     @Test fun externalUnavailableCallback() = scenario(sheetHost = true) { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario(sheetHost = true) { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario(sheetHost = true) { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario(sheetHost = true) { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario(sheetHost = true) { sharingInformation(multiple = true) }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
+    @Test fun scheduledPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = false) }
+    @Test fun scheduledPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = false, details = true) }
+    @Test fun recurringPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = true) }
+    @Test fun recurringPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = true, details = true) }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi", fontScale = 1.5f)
+    fun recurringPaymentTermsLargeText() = scenario(fontScale = 1.5f, sheetHost = true) { paymentTerms(recurring = true, compact = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
     @Test
@@ -192,6 +204,6 @@ class WalletVisualAndroidTest {
             // These are settled-state screenshots; interaction feedback remains enabled in the app.
             CompositionLocalProvider(LocalRippleConfiguration provides null,
                 LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content)
-        }).block()
+        }).execute(block)
     }
 }

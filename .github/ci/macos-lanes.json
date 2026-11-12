@@ -53,6 +53,7 @@
     "native": {
       "description": "WalletCore XCFramework, Swift package, and native Xcode demo",
       "patterns": [
+        ".github/workflows/wallet-core-framework.yml",
         "*/Package.swift",
         ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh",
         "scripts/check-mobile-swift-parity-decision.sh",
@@ -71,6 +72,7 @@
     "compose": {
       "description": "Compose iOS demo and its WalletCore/Swift integration",
       "patterns": [
+        ".github/workflows/wallet-core-framework.yml",
         "waltid-applications/waltid-wallet-demo-compose/shared*/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/shared*/src/common*/*",
         "waltid-applications/waltid-wallet-demo-compose/shared*/src/mobile*/*",
@@ -89,6 +91,7 @@
     "enterprise": {
       "description": "Enterprise iOS SDK and native/Compose batch integration",
       "patterns": [
+        ".github/workflows/wallet-core-framework.yml",
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-compose/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
@@ -103,6 +106,7 @@
       "description": "Mobile SDK ABI, Dokka, snippets, and Swift DocC",
       "patterns": [
         ".github/workflows/mobile-sdk-docs.yml",
+        ".github/workflows/wallet-core-framework.yml",
         ".github/actions/gradle-mobile-sdk-docs/*",
         "scripts/check-mobile-swift-parity-decision.sh",
         "docs/mobile-sdk-api/*",
@@ -161,6 +165,7 @@
     "visual-native": {
       "description": "Complete SwiftUI visual catalogue using the shared WalletCore build",
       "patterns": [
+        ".github/workflows/wallet-core-framework.yml",
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
@@ -172,7 +177,7 @@
       ]
     },
     "visual-browser": {
-      "description": "Complete browser account visual catalogue",
+      "description": "Shared Wasm logic tests and complete browser visual catalogue",
       "patterns": [
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/src/wasmJsMain/*",
@@ -182,6 +187,8 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonTest/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/webApp/*",
         "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*"

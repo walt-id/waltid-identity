@@ -1,8 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
 import kotlin.time.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -92,11 +90,8 @@ object CredentialDisplayNormalizer {
     ): DisplayValue {
         val parsed = runCatching { json.parseToJsonElement(valueJson) }.getOrNull()
         if (parsed != null) {
-            val parsedValue = parsed.toDisplayValue(path, format)
-            if (parsedValue is DisplayValue.Text && !displayValue.isNullOrBlank()) {
-                return DisplayValue.Text(displayValue)
-            }
-            return parsedValue
+            // The SDK display string is a fallback, not a replacement for typed claim semantics.
+            return parsed.toDisplayValue(path, format)
         }
 
         return displayValue
@@ -353,14 +348,17 @@ object CredentialDisplayNormalizer {
         }
 
     private fun JsonPrimitive.toPrimitiveDisplayValue(path: ClaimPath, format: String?): DisplayValue {
-        booleanOrNull?.let { return DisplayValue.BooleanValue(it) }
         if (!isString) {
-            content.formatEpochDateIfTemporal(path)?.let { return DisplayValue.Text(it) }
+            booleanOrNull?.let { return DisplayValue.BooleanValue(it) }
+            content.instantIfTemporal(path)?.let { return DisplayValue.InstantValue(it) }
             doubleOrNull?.let { return DisplayValue.NumberValue(content) }
         }
 
         val text = contentOrNull.orEmpty()
-        text.formatEpochDateIfTemporal(path)?.let { return DisplayValue.Text(it) }
+        if (CredentialDisplayVocabulary.hasRole(path, ClaimRole.Temporal)) {
+            val instant = WalletDateTime.parseTimestamp(text) ?: w3cTimestampWithoutOffset(text, path, format)
+            return instant?.let(DisplayValue::InstantValue) ?: DisplayValue.Text(text)
+        }
 
         val decoded = valueDecoder.decodedString(
             value = text,
@@ -375,6 +373,15 @@ object CredentialDisplayNormalizer {
         return DisplayValue.Text(text)
     }
 
+    private fun w3cTimestampWithoutOffset(text: String, path: ClaimPath, format: String?): Instant? {
+        // VCDM 2.0 §5.8 and Data Integrity §2.1 assign UTC to missing offsets.
+        // Recover only defined credential/proof timestamps, not arbitrary subject dates.
+        if (format !in setOf("jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc")) return null
+        val components = if (path.topLevel == "vc") path.components.drop(1) else path.components
+        if (components !in listOf(listOf("validFrom"), listOf("validUntil"), listOf("proof", "created"), listOf("proof", "expires"))) return null
+        return WalletDateTime.parseTimestamp(text.trim() + "Z")
+    }
+
     private fun imageDecodingPolicy(path: ClaimPath, format: String?): ImageDecodingPolicy =
         when {
             CredentialDisplayVocabulary.hasRole(path, ClaimRole.Image) -> ImageDecodingPolicy.SchemaImage
@@ -383,21 +390,10 @@ object CredentialDisplayNormalizer {
             else -> ImageDecodingPolicy.Disabled
         }
 
-    private fun String.formatEpochDateIfTemporal(path: ClaimPath): String? {
+    private fun String.instantIfTemporal(path: ClaimPath): Instant? {
         if (!CredentialDisplayVocabulary.hasRole(path = path, role = ClaimRole.Temporal)) return null
-        val rawEpoch = trim().toLongOrNull() ?: return null
-        val epochSeconds = when {
-            rawEpoch < minimumCredibleEpochSeconds -> return null
-            rawEpoch >= epochMillisecondsThreshold -> rawEpoch / 1_000
-            else -> rawEpoch
-        }
-
-        return runCatching {
-            Instant.fromEpochSeconds(epochSeconds).toLocalDateTime(TimeZone.UTC).date.toString()
-        }.getOrNull()
+        return NumericDateParser.parse(this)
     }
-    private const val minimumCredibleEpochSeconds = 100_000_000L
-    private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
     private const val MdocFormat = "mso_mdoc"
     private val dataUrlFallbackFormats = setOf(

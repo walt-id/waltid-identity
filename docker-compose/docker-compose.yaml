@@ -10,6 +10,8 @@ services:
       - caddy
     env_file:
       - .env
+    environment:
+      - KEYCLOAK_CLIENT_SECRET
     extra_hosts:
       - "$SERVICE_HOST:host-gateway"
     volumes:
@@ -73,6 +75,10 @@ services:
     environment:
       NUXT_PUBLIC_ISSUER_BASE: "http://$PUBLIC_SERVICE_HOST:$ISSUER_API2_PORT"
       NUXT_PUBLIC_VERIFIER_BASE: "http://$PUBLIC_SERVICE_HOST:$VERIFIER_API2_PORT"
+      # Server routes must not use the public host. Inside this container that
+      # address is Portal2 itself, so issuer metadata and offer calls fail.
+      NUXT_ISSUER_PROXY_TARGET: "http://caddy:$ISSUER_API2_PORT"
+      NUXT_VERIFIER_PROXY_TARGET: "http://caddy:$VERIFIER_API2_PORT"
       NUXT_PUBLIC_WALLET_URL: "http://$PUBLIC_SERVICE_HOST:$WALLET_DEMO_COMPOSE_WEB_PORT"
       NUXT_PUBLIC_VERIFIER_KEY_JWK: "$WEB_PORTAL2_VERIFIER_KEY_JWK"
       NUXT_PUBLIC_VERIFIER_X5C: "$WEB_PORTAL2_VERIFIER_X5C"

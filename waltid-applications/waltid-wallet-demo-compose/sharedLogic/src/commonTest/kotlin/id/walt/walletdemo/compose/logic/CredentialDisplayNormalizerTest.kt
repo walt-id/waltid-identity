@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import kotlin.io.encoding.Base64
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,6 +10,77 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CredentialDisplayNormalizerTest {
+
+    @Test
+    fun consentPreservesNormalizedClaimsAcrossCredentialFormats() {
+        for (format in listOf("dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "mso_mdoc")) {
+            val option = WalletDemoPresentationCredentialOption(
+                queryId = "identity", credentialId = "one", format = format,
+                issuer = null, subject = null, label = "Identity",
+                credentialDataJson = """{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}""",
+                disclosures = listOf("iat" to "1793318400", "exp" to "1801094400", "nbf" to "1793318400.25").map { (name, value) ->
+                    WalletDemoPresentationDisclosure(path = name, label = name, valueJson = value,
+                        displayValue = value, selectivelyDisclosable = false)
+                },
+            )
+            val details = option.toCredentialDetails()
+            val expected = listOf("2026-10-30T00:00:00Z", "2027-01-28T00:00:00Z", "2026-10-30T00:00:00.25Z")
+            assertEquals(expected.map { DisplayValue.InstantValue(Instant.parse(it)) }, details.groups.first().items.map { it.value }, format)
+            val stored = details.groups.drop(1).flatMap { it.items }.associateBy { it.path.id }
+            option.disclosures.forEachIndexed { index, disclosure ->
+                assertEquals(DisplayValue.InstantValue(Instant.parse(expected[index])), stored.getValue(disclosure.path).value, format)
+                assertEquals(disclosure.valueJson, details.groups.first().items[index].rawValue)
+            }
+        }
+    }
+
+    @Test
+    fun temporalFormattingPreservesSecondsAndRejectsUnitGuessing() {
+        val cases = listOf(
+            "-62135596800" to "0001-01-01T00:00:00Z",
+            "0" to "1970-01-01T00:00:00Z",
+            "-1" to "1969-12-31T23:59:59Z",
+            "-0.25" to "1969-12-31T23:59:59.75Z",
+            "1.793318400125e9" to "2026-10-30T00:00:00.125Z",
+            "1793318400.123456789" to "2026-10-30T00:00:00.123456789Z",
+            "10000000000" to "2286-11-20T17:46:40Z",
+            "253402300799" to "9999-12-31T23:59:59Z",
+        )
+        for ((raw, expected) in cases) {
+            assertEquals(DisplayValue.InstantValue(Instant.parse(expected)), disclosureValue("iat", raw), raw)
+            assertEquals(DisplayValue.Text(raw), disclosureValue("validFrom", "\"$raw\""), raw)
+        }
+        for (raw in listOf("1793318400000", "253402300800", "1e100", "1793318400.1234567891")) {
+            assertEquals(DisplayValue.NumberValue(raw), disclosureValue("exp", raw), raw)
+        }
+    }
+
+    @Test
+    fun typedClaimFallbackDoesNotChangeSourceMeaning() {
+        assertEquals(DisplayValue.BooleanValue(true), disclosureValue("age_over_18", "true"))
+        assertEquals(DisplayValue.Text("true"), disclosureValue("custom", "\"true\""))
+        assertEquals(DisplayValue.Text("false"), disclosureValue("custom", "\"false\""))
+        assertEquals(DisplayValue.NumberValue("1793318400"), disclosureValue("idx", "1793318400"))
+        assertEquals(DisplayValue.Text("00123"), disclosureValue("document_number", "\"00123\""))
+        assertEquals(DisplayValue.NullValue, disclosureValue("custom", "null"))
+        for (date in listOf("1990-01-01", "2026-10-30T23:30:00", "2026-02-30T12:00:00Z", "2026-10-30T23:30:60Z", "2026-10-30T23:30:00.1234567891Z", "not a date", "SGVsbG8gd29ybGQ=")) {
+            assertEquals(DisplayValue.Text(date), disclosureValue("expiry_date", "\"$date\""))
+        }
+        assertEquals(DisplayValue.Text("Fallback"), disclosureValue("custom", "{"))
+    }
+
+    @Test
+    fun nestedAndArrayTemporalValuesUseTheSameFormatting() {
+        val value = disclosureValue("history", """[{"issued_at":1793318400,"flags":[true,"true"]}]""")
+        val item = assertIs<DisplayValue.ObjectValue>(assertIs<DisplayValue.ListValue>(value).values.single())
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z")), item.entries.first().value)
+        assertEquals(DisplayValue.ListValue(listOf(DisplayValue.BooleanValue(true), DisplayValue.Text("true"))), item.entries.last().value)
+        assertEquals(DisplayValue.ListValue(listOf(DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z")))),
+            disclosureValue("exp", "[1793318400]"))
+    }
+
+    private fun disclosureValue(name: String, json: String): DisplayValue =
+        CredentialDisplayNormalizer.toDisclosureValue(json, "Fallback", ClaimPath.topLevel(name), "dc+sd-jwt")
 
     @Test
     fun claimIdentityPreservesNamespacesPunctuationAndArrayIndices() {
@@ -75,7 +147,7 @@ class CredentialDisplayNormalizerTest {
         val systemInfo = assertNotNull(details.toSystemInfoGroup())
         assertEquals("About this credential", systemInfo.title)
         assertFalse(systemInfo.initiallyExpanded)
-        assertEquals(DisplayValue.Text("2026-07-09T12:00:00Z"), systemInfo.items.first { it.path.id == "system.added" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2026-07-09T12:00:00Z")), systemInfo.items.first { it.path.id == "system.added" }.value)
         assertEquals(DisplayValue.Text("cred-1"), systemInfo.items.first { it.path.id == "system.id" }.value)
         assertEquals(DisplayValue.Text("vc+sd-jwt"), systemInfo.items.first { it.path.id == "system.format" }.value)
         assertEquals(DisplayValue.Text("did:web:issuer.example"), systemInfo.items.first { it.path.id == "system.issuer" }.value)
@@ -354,8 +426,8 @@ class CredentialDisplayNormalizerTest {
         val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
         assertEquals(DisplayValue.Text("2 undisclosed claim values"), technical.items.first { it.path.id == "_sd" }.value)
         assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), technical.items.first { it.path.id == "cnf" }.value)
-        assertEquals(DisplayValue.Text("2025-01-15"), technical.items.first { it.path.id == "iat" }.value)
-        assertEquals(DisplayValue.Text("2030-01-15"), technical.items.first { it.path.id == "exp" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2025-01-15T00:00:00Z")), technical.items.first { it.path.id == "iat" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2030-01-15T09:30:00Z")), technical.items.first { it.path.id == "exp" }.value)
         assertTrue(technical.items.none { item ->
             item.value == DisplayValue.Text("very-long-x-coordinate") ||
                 item.value == DisplayValue.Text("very-long-y-coordinate")

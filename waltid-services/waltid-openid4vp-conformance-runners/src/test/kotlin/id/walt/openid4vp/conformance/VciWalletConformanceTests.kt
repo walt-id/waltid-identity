@@ -116,7 +116,7 @@ class VciWalletConformanceTests {
         @AfterAll
         fun writeSkippedSummaryIfSuiteUnavailable() {
             if (isConformanceAvailable) return
-            ConformanceReportWriter.writeSkippedIfEmpty(
+            ConformanceReportWriter.writeUnavailableIfEmpty(
                 role = ConformanceReportWriter.Role.VCI_WALLET,
                 reason = "Conformance suite not available at $conformanceHost:$conformancePort",
             )

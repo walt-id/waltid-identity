@@ -2,7 +2,7 @@ package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
@@ -50,8 +50,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Instant
 
 /**
  * A presentation without disclosures passes VP checks but fails issuer signature verification.
@@ -224,9 +222,9 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = freePort()
+
         Verifier2WebhookRecorder().start().use { webhook ->
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -236,7 +234,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -249,15 +247,18 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val walletCredentials = walletCredentials()
 
             // Create the verification session
+            val creationStarted = Clock.System.now()
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
                     setBody(verificationSessionSetup(webhook.notifications()))
                 }.body<VerificationSessionCreationResponse>()
             }
+            val creationCompleted = Clock.System.now()
             println("Verification Session Response: $verificationSessionResponse")
 
             // Check verification session
@@ -278,7 +279,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             // Check created session
             test("Check Verification Session") {
                 assertTrue {
-                    info1.creationDate.wasWithinLastSeconds()
+                    info1.creationDate in creationStarted..creationCompleted
                 }
             }
 
@@ -354,9 +355,4 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
         }
     }
 
-    // Utils:
-    private fun Instant.wasWithinLastSeconds(): Boolean {
-        val now = Clock.System.now()
-        return this <= now && (now - this) <= 1500.milliseconds
-    }
 }

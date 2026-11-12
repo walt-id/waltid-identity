@@ -362,8 +362,9 @@ public enum CredentialDisplayNormalizer {
         case .null:
             return .null
         case .string(let string):
-            if let dateText = epochDateStringIfTemporal(value: string, path: path) {
-                return .text(dateText)
+            if CredentialDisplayVocabulary.roles(for: path.components).contains(.temporal) {
+                let instant = WalletInstant.parseTimestamp(string) ?? w3cTimestampWithoutOffset(string, path: path, format: format)
+                return instant.map(DisplayValue.instant) ?? .text(string)
             }
             return CredentialDisplayValueDecoder.decodedValue(
                 for: string,
@@ -372,8 +373,8 @@ public enum CredentialDisplayNormalizer {
                 renderJSON: { json, jsonPath in displayValue(for: json, path: jsonPath, format: format) }
             ) ?? .text(string)
         case .number(let number):
-            if let dateText = epochDateStringIfTemporal(value: number, path: path) {
-                return .text(dateText)
+            if let instant = instantIfTemporal(value: number, path: path) {
+                return .instant(instant)
             }
             return .number(number)
         case .bool(let bool):
@@ -404,6 +405,14 @@ public enum CredentialDisplayNormalizer {
 
     private static func rawString(_ value: CredentialDisplayJSONValue) -> String? {
         value.rawJSON
+    }
+
+    private static func w3cTimestampWithoutOffset(_ text: String, path: DisplayClaimPath, format: String?) -> WalletInstant? {
+        // VCDM 2.0 §5.8 and Data Integrity §2.1 assign UTC to missing offsets.
+        guard let format, ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format) else { return nil }
+        let components = path.components.first == "vc" ? Array(path.components.dropFirst()) : path.components
+        guard [["validFrom"], ["validUntil"], ["proof", "created"], ["proof", "expires"]].contains(components) else { return nil }
+        return WalletInstant.parseTimestamp(text.trimmingCharacters(in: .whitespacesAndNewlines) + "Z")
     }
 
     private static func sanitizedMdocMember(_ member: CredentialDisplayJSONMember) -> CredentialDisplayJSONMember? {
@@ -439,13 +448,8 @@ public enum CredentialDisplayNormalizer {
         format: String
     ) -> DisplayValue {
         if let parsed = CredentialDisplayJSONParser.parse(disclosure.valueJSON) {
-            let parsedValue = displayValue(for: parsed, path: path, format: format)
-            if case .text = parsedValue,
-               let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
-               !displayValue.isEmpty {
-                return .text(displayValue)
-            }
-            return parsedValue
+            // The SDK display string is a fallback, not a replacement for typed claim semantics.
+            return displayValue(for: parsed, path: path, format: format)
         }
 
         if let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -473,27 +477,10 @@ public enum CredentialDisplayNormalizer {
         return .disabled
     }
 
-    private static func epochDateStringIfTemporal(value: String, path: DisplayClaimPath) -> String? {
-        guard CredentialDisplayVocabulary.roles(for: path.components).contains(.temporal),
-              let rawEpoch = Int64(value.trimmingCharacters(in: .whitespacesAndNewlines)),
-              rawEpoch >= minimumCredibleEpochSeconds else {
-            return nil
-        }
-        let epochSeconds = rawEpoch >= epochMillisecondsThreshold ? rawEpoch / 1_000 : rawEpoch
-        return utcDateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(epochSeconds)))
+    private static func instantIfTemporal(value: String, path: DisplayClaimPath) -> WalletInstant? {
+        guard CredentialDisplayVocabulary.roles(for: path.components).contains(.temporal) else { return nil }
+        return NumericDateParser.parse(value)
     }
-
-    private static let utcDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }()
-
-    private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
-    private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
     private static let mdocFormat = "mso_mdoc"
     private static let dataURLFallbackFormats: Set<String> = [

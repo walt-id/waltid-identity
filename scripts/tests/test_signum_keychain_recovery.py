@@ -62,42 +62,33 @@ class KeychainReportTest(unittest.TestCase):
         self.assertEqual("1", xml.get("failures"))
         self.assertEqual("0", xml.get("errors"))
 
-    def test_failed_launch_keeps_status_and_publishes_failure_junit(self):
-        def launch(*args, **kwargs):
-            (self.output / "tests.log").write_text(ONE)
-            return subprocess.CompletedProcess(args[0], 137)
-
-        with patch.object(runner.subprocess, "run", side_effect=launch), \
-                patch.object(runner, "crash_diagnostics", return_value=[]), patch.object(runner.time, "sleep"), \
-                patch("builtins.print"):
-            with self.assertRaises(SystemExit):
-                runner.run("specific-device", self.output)
-        receipt = json.loads((self.output / "launch.json").read_text())
-        self.assertEqual(137, receipt["simctl_returncode"])
-        self.assertEqual(["ownership.reopen"], receipt["unfinished"])
-        self.assertEqual("1", ET.parse(self.output / "results.xml").getroot().get("errors"))
-
-    def test_direct_app_output_requires_an_observed_process_exit(self):
-        for pid_reported in (True, False):
-            with self.subTest(pid_reported=pid_reported):
+    def test_launch_results_require_observed_completion(self):
+        cases = ((ONE, 137, False, ["ownership.reopen"], "simctl exited with 137"),
+                 (PASSED, 0, False, [], "did not report"),
+                 (PASSED, 0, True, [], None))
+        for text, code, pid_reported, unfinished, reason in cases:
+            with self.subTest(code=code, pid_reported=pid_reported):
                 def launch(arguments, **kwargs):
-                    (self.output / "tests.log").write_text(PASSED)
+                    (self.output / "tests.log").write_text(text)
                     if pid_reported:
                         kwargs["stdout"].write(f"{runner.BUNDLE}: 123\n")
-                    return subprocess.CompletedProcess(arguments, 0)
+                    return subprocess.CompletedProcess(arguments, code)
 
                 with patch.object(runner.subprocess, "run", side_effect=launch), \
                         patch.object(runner.os, "kill", side_effect=[None, ProcessLookupError()]), \
                         patch.object(runner, "crash_diagnostics", return_value=[]), \
                         patch.object(runner.time, "sleep"), patch("builtins.print"):
-                    if pid_reported:
+                    if reason is None:
                         runner.run("specific-device", self.output)
                     else:
-                        with self.assertRaisesRegex(SystemExit, "did not report"):
+                        with self.assertRaisesRegex(SystemExit, reason):
                             runner.run("specific-device", self.output)
                 receipt = json.loads((self.output / "launch.json").read_text())
-                self.assertEqual(pid_reported, receipt["success"])
-                self.assertEqual(["ownership.reopen"], receipt["passed"])
+                self.assertEqual(reason is None, receipt["success"])
+                self.assertEqual(code, receipt["simctl_returncode"])
+                self.assertEqual(unfinished, receipt["unfinished"])
+                self.assertEqual("0" if reason is None else "1",
+                                 ET.parse(self.output / "results.xml").getroot().get("errors"))
 
     def test_timeout_keeps_partial_results_and_bounds_cleanup(self):
         for launch_timeout in (True, False):

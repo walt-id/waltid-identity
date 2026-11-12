@@ -2,7 +2,7 @@
 
 package id.walt.wallet2.mobile
 
-import kotlinx.io.bytestring.ByteString
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.selectCoseSignatureAlgorithm
@@ -37,20 +37,19 @@ import id.walt.mdoc.proximity.MdocResponseResolution
 import id.walt.mdoc.proximity.MdocSessionContinuation
 import id.walt.mdoc.proximity.PreviewDocument
 import id.walt.mdoc.proximity.PreviewElement
-import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayEntry
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayValidity
-import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.mdoc.proximity.ReaderAuthenticationResult
-import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.ReaderAuthenticationVerifier
-import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.mdoc.readertrust.ReaderTrustEvaluator
-import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.proximity.SelectedDocument
 import id.walt.mdoc.proximity.supportsMdocDeviceMac
 import id.walt.mdoc.proximity.toDisplaySafe
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.verification.verifyIssuerAuthentication
 import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
@@ -59,21 +58,20 @@ import id.walt.wallet2.data.ResolvedHolderKey
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.resolveHolderKey
-import id.walt.x509.authorityKeyIdentifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborElement
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.JsonObject
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
-import kotlinx.serialization.json.JsonObject
+import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 
 internal class ProximityRequestProcessor(
     private val wallet: Wallet,
@@ -487,7 +485,7 @@ internal class ProximityRequestProcessor(
             holderKey = authentication.holderKey,
             deviceAuthentication = authentication.method,
             issuerAuthorityKeyIdentifiers = issuerAuthentication.certificateChain.mapNotNull {
-                it.authorityKeyIdentifier?.let({ ByteString(it) })
+                it.data.extensionAuthorityKeyIdentifier?.keyIdentifier
             }.distinct(),
         )
     }

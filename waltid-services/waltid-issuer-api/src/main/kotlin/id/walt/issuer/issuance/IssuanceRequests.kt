@@ -104,7 +104,8 @@ data class IssuanceRequest(
     val credentialStatus: JsonElement? = null,
 
     /**
-     * Optional extra top-level claims merged into the SD-JWT VC payload before signing (after [credentialData], before mapping).
+     * Optional extra top-level claims merged into the SD-JWT VC payload after mapping [credentialData] and before signing.
+     * They overwrite matching top-level claims in the mapped credential data. Mapping templates within these claims are not expanded.
      * Use for externally managed revocation metadata such as an IETF Token Status List [`status`](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/) claim.
      */
     val sdJwtCredentialClaims: JsonObject? = null,

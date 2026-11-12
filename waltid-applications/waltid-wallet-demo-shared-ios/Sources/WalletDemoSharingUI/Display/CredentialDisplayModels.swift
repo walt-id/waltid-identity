@@ -109,6 +109,7 @@ public struct ClaimItem: Equatable, Identifiable {
 }
 
 public enum DisplayValue: Equatable {
+    case instant(WalletInstant)
     case text(String)
     case number(String)
     case bool(Bool)

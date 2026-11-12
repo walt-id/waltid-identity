@@ -34,6 +34,7 @@ data class DeferredTransaction(
     /** Service-owned issuance progress, e.g. allocated credential status entries. */
     val progress: JsonObject? = null,
     val consumed: Boolean = false,
+    val denied: Boolean = false,
 )
 
 data class DeferredSessionSnapshot(val id: String, val expiresAt: Instant, val state: DeferredIssuanceState?)
@@ -53,6 +54,8 @@ class DeferredIssuance(
     val config: DeferredIssuanceConfig = DeferredIssuanceConfig(),
     private val now: () -> Instant = { Clock.System.now() },
 ) {
+    private val attestationLifetimeValidator = DeferredAttestationLifetimeValidator()
+
     suspend fun decide(sessionId: String, decision: DeferredStatus) {
         require(decision != DeferredStatus.PENDING)
         update(sessionId, management = true) { snapshot, state ->
@@ -79,6 +82,7 @@ class DeferredIssuance(
             val existing = state.transactions.values.find { it.accepted.credentialIdentifier == accepted.credentialIdentifier }
             if (existing != null) {
                 if (existing.consumed) invalidTransaction()
+                if (existing.denied) denied()
                 if (!existing.accepted.equivalentTo(accepted)) {
                     throw DeferredProtocolException(CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, "Credential request conflicts with the accepted transaction"))
                 }
@@ -102,13 +106,14 @@ class DeferredIssuance(
     ): Collection {
         var result: Collection? = null
         update(sessionId) { _, state ->
+            result = null
             val transaction = state.transactions[transactionId] ?: invalidTransaction()
             if (transaction.consumed) invalidTransaction()
             if (transaction.accepted.credentialIdentifier !in authorizedCredentialIdentifiers ||
                 transaction.accepted.request.accessTokenClientId != clientId) {
                 invalidTransaction()
             }
-            if (state.status == DeferredStatus.DENIED) denied()
+            if (state.status == DeferredStatus.DENIED || transaction.denied) denied()
             if (state.status == DeferredStatus.PENDING || transaction.claimExpiresAt?.let { it > now() } == true) {
                 result = Collection.Pending(pending(transactionId))
                 state
@@ -119,6 +124,22 @@ class DeferredIssuance(
             }
         }
         return requireNotNull(result)
+    }
+
+    /** Recheck the persisted acceptance under the claim fence before issuance or delivery. */
+    internal suspend fun validateClaim(
+        sessionId: String,
+        claim: DeferredTransaction,
+        clientAttestationRequired: Boolean = false,
+    ) {
+        val state = update(sessionId) { _, state ->
+            val current = state.transactions[claim.id] ?: invalidTransaction()
+            if (current.denied || state.status == DeferredStatus.DENIED) denied()
+            check(!current.consumed && current.claimId == claim.claimId && claim.claimId != null) { "Deferred transaction claim was lost" }
+            if (attestationLifetimeValidator.isValid(current.accepted, now(), clientAttestationRequired)) state
+            else state.copy(transactions = state.transactions + (claim.id to current.copy(denied = true)))
+        }
+        if (state.transactions.getValue(claim.id).denied) denied()
     }
 
     /** Renew only the processing lease, never the offer's absolute deadline. */
@@ -134,7 +155,10 @@ class DeferredIssuance(
 
     /** A fenced checkpoint lets a new process resume finalization without signing again. */
     suspend fun checkpoint(sessionId: String, claim: DeferredTransaction, response: CredentialResponse, progress: JsonObject? = null) {
-        mutateClaim(sessionId, claim) { it.copy(response = response, progress = progress) }
+        mutateClaim(sessionId, claim) {
+            if (it.denied) denied()
+            it.copy(response = response, progress = progress)
+        }
     }
 
     suspend fun checkpointProgress(sessionId: String, claim: DeferredTransaction, progress: JsonObject) {
@@ -142,7 +166,10 @@ class DeferredIssuance(
     }
 
     suspend fun consume(sessionId: String, claim: DeferredTransaction) {
-        mutateClaim(sessionId, claim) { it.copy(consumed = true, claimId = null, claimExpiresAt = null) }
+        mutateClaim(sessionId, claim) {
+            if (it.denied) denied()
+            it.copy(consumed = true, claimId = null, claimExpiresAt = null)
+        }
     }
 
     suspend fun release(sessionId: String, claim: DeferredTransaction) {

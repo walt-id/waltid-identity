@@ -184,15 +184,14 @@ class DcqlQueryBindingVerifier2IntegrationTest {
         present: suspend (bootstrapUrl: Url) -> Result<WalletPresentFunctionality2.WalletPresentResult>,
     ) {
         val host = "127.0.0.1"
-        val port = freePort()
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = null,
                         clientMetadata = ClientMetadata(clientName = "Verifier2"),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -205,6 +204,7 @@ class DcqlQueryBindingVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val setup: VerificationSessionSetup = CrossDeviceFlowSetup(core = GeneralFlowConfig(dcqlQuery = dcqlQuery, policies = policies))
             val created = testAndReturn("Create verification session") {

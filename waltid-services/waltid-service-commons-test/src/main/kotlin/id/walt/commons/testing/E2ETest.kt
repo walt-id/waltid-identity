@@ -37,7 +37,7 @@ class E2ETest(
     )
 
     private val e2eHost = this.host
-    private val e2ePort = this.port
+    private var e2ePort = this.port
 
     fun testHttpClient(
         bearerToken: String? = null,
@@ -70,7 +70,7 @@ class E2ETest(
         val term = Terminal(ansiLevel = AnsiLevel.TRUECOLOR)
     }
 
-    fun getBaseURL() = "http://$host:$port"
+    fun getBaseURL() = "http://$host:$e2ePort"
 
     fun getTestStats(): TestStats {
         val succeeded = testResults.count { it.isSuccess }
@@ -102,7 +102,10 @@ class E2ETest(
                     preload.invoke()
                 },
                 init = init,
-                run = E2ETestWebService(module).runService(suspend { block.invoke(this) }, host, port)
+                run = E2ETestWebService(module).runService({ boundPort: Int ->
+                    e2ePort = boundPort
+                    block.invoke(this)
+                }, host, port)
             )
         ),
         timeout = timeout,

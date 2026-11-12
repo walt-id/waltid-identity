@@ -4,6 +4,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import kotlin.time.Duration.Companion.minutes
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import com.atlassian.onetime.core.TOTP
+import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.exceptions.OTPAuthException
@@ -19,8 +20,11 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
+import java.time.Clock
 
 object TOTP : AuthenticationMethod("totp") {
+
+    internal var clock: Clock = Clock.systemUTC()
 
     override val relatedAuthMethodStoredData = TOTPStoredData::class
 
@@ -32,7 +36,7 @@ object TOTP : AuthenticationMethod("totp") {
         val userProvidedOtpCode = TOTP(code)
         val secret = TOTPSecret.fromBase32EncodedString(storedData.secret)
 
-        val service = DefaultTOTPService()
+        val service = DefaultTOTPService(TOTPGenerator(clock))
         authCheck(
             service.verify(userProvidedOtpCode, secret).isSuccess(), OTPAuthException()
         )

@@ -576,6 +576,12 @@ selection change, and discard abandoned previews. A failed URL submission requir
 a new preview and confirmation. The direct `present` shortcut cannot authorize
 these payments. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
 
+Each field also exposes its payload-relative `path`. Use known semantic paths to select display
+types; localized labels and timestamp-looking identifiers must not determine parsing. The demos
+render `date_time`, `execution_date`, `recurrence.start_date` and `recurrence.end_date` using
+the same device-local timestamp components as credential instants. Keep `value` unchanged for
+technical inspection; localized output never replaces the transaction bytes used for signing.
+
 
 ### Client attestation challenges
 

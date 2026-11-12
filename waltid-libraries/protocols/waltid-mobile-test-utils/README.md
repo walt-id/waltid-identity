@@ -30,6 +30,11 @@ operations: list scenarios, create an offer, create a verifier session, and poll
 verification status. Enterprise tenant/service provisioning stays inside the
 Enterprise integration-test module.
 
+Mark classes or methods needing that fixture with `@EnterpriseMobileTest`,
+and Digital Credentials provider journeys with `@DigitalCredentialProviderTest`.
+CI selects these groups by annotation, so new tests do not need class-name entries
+in its scripts. `@PhysicalDeviceTest` remains excluded from emulator runs.
+
 ## iOS Parity
 
 iOS XCTest targets use the Swift helpers in

@@ -16,6 +16,8 @@ class GalleryTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.command("init", "-b", "main")
+        # Background maintenance must not outlive this disposable repository.
+        self.command("config", "maintenance.auto", "false")
         self.command("config", "commit.gpgsign", "false")
         self.command("config", "user.name", "Visual contract test")
         self.command("config", "user.email", "visual-test@example.invalid")
@@ -142,21 +144,29 @@ class GalleryTests(unittest.TestCase):
         self.assertNotIn("?raw=true", body)
 
     def test_browser_catalogue_is_included_without_mobile_duplication(self):
+        self.data["renderers"]["android"]["configuration"]["locale"] = "en-US"
+        self.add("wallet.empty")
         catalogue = self.root / gallery.BROWSER_CATALOGUE_PATH
         catalogue.parent.mkdir(parents=True)
         catalogue.write_text(json.dumps({"requirements": ["Readable account feedback"], "environment": "Chromium fixture host",
-            "states": [{"id": "account.empty.wide", "width": 1280, "height": 800}]}))
+            "states": [{"id": "account.empty.wide", "width": 1280, "height": 800,
+                        "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Readable dates"]}]}))
         snapshots = catalogue.parent / "snapshots"
         snapshots.mkdir()
         Image.new("RGB", (1280, 800), "red").save(snapshots / "account-empty-wide.png")
         self.checkpoint()
         result = self.build()
-        self.assertEqual(result["counts"], {"added": 1})
-        cell = result["changes"][0]
+        self.assertEqual(result["counts"], {"added": 2})
+        cell = next(cell for cell in result["changes"] if cell["renderer"] == "browser")
         self.assertEqual(cell["renderer"], "browser")
         self.assertEqual(cell["after"]["configuration"]["viewport"], [1280, 800])
+        self.assertEqual(cell["after"]["configuration"]["locale"], "en-GB")
+        self.assertEqual(cell["after"]["configuration"]["timezoneId"], "Europe/Budapest")
+        self.assertEqual(cell["after"]["requirements"], ["Readable dates"])
+        self.assertIn("en-GB, Europe/Budapest", gallery.markdown(result))
         self.assertIn(gallery.BROWSER_CATALOGUE_PATH, result["changedCatalogues"])
-        self.assertIn("Browser", gallery.markdown(result))
+        self.assertIn("Browser states", gallery.markdown(result))
+        self.assertNotIn("Accessibility and layout variants", gallery.markdown(result))
 
     def test_gallery_contains_every_changed_platform_cell(self):
         for i in range(9):

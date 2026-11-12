@@ -358,3 +358,64 @@ same immutable `credentialAuthorization` in `AccessTokenResponseResult.Success`.
 Refresh stores persist the initial `grantedAuthorizationDetails` and retain them
 through rotation; a narrower access token does not narrow the original refresh grant.
 The session's established selection and each token's authorization are distinct.
+
+### HTTP response cache headers
+
+HTTP response models supply endpoint-appropriate cache headers by default:
+
+```kotlin
+val response = NonceResponseHttp(status = 200, payload = noncePayload)
+// Forward response.status, response.payload, and response.headers to your HTTP framework.
+```
+
+Token, PAR, and credential responses default to `Cache-Control: no-store` and
+`Pragma: no-cache`; nonce and attestation challenge responses default to
+`Cache-Control: no-store` only. Explicit `headers` arguments replace these defaults.
+Provider error writers also preserve authentication and attestation challenge headers.
+
+For failures handled before the provider runs, route integrations can apply
+`OpenId4VciResponseHeaders.NO_STORE` from `id.walt.openid4vci.responses`.
+The library does not depend on a server framework.
+
+
+## Deferred attestation lifetime
+
+Deferred collection uses the WIA and KAs accepted for that transaction. Their verified
+validity bounds, original clock skew, client identity, and holder-key associations are
+retained privately. The shared library checks those lifetimes before signing and before
+delivering a saved response, including after a restart. Original PoP, proof age, and
+nonce checks are not replayed.
+
+The provider captures WIA evidence from verified access-token authentication and
+snapshots it automatically in `acceptCredentialRequest()`, together with the verified
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
+The provider uses its existing client-authentication configuration resolver when a
+legacy transaction has no recorded requirement; optional authentication methods do
+not make WIA mandatory. Originally anonymous pre-authorized grants retain that
+profile through refresh.
+
+If a required attestation has expired, or required evidence is missing, collection
+returns `credential_request_denied`. Denial is permanent for that transaction: one
+expired KA denies the entire holder-key batch. Other transactions and completed
+datasets retain their progress. This transaction denial does not change the offer's
+operator approval decision.
+
+Refreshing an access token preserves its original WIA evidence and never replaces a
+transaction's accepted evidence. Resubmitting a Credential Request also keeps the
+original acceptance. Transactions stored before evidence capture fail closed when
+their required profile cannot be enforced. Standalone KAs without `exp` retain the
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
+replacement and attestation status-list enforcement are separate work (status: F6).
+
+`createCredentialResponse` validates accepted evidence before allocation and signing.
+`createDeferredCredentialResponse` validates the persisted claim for both fresh and
+checkpointed credentials, prepares response encryption, and rechecks lifetime before
+returning `CredentialResponseResult.Success` or `Failure`. The response writer only
+formats that prepared output; it does not resolve transactions or decide denial.
+
+The shared `DeferredIssuanceStore` persists transaction denial. Embedding services
+provide a `DeferredCredentialResponseContext` with the accepted claim and store-backed
+coordinator, and perform usage accounting and successful-result writes only after
+response creation succeeds. Runtime response bodies are excluded from checkpoints.

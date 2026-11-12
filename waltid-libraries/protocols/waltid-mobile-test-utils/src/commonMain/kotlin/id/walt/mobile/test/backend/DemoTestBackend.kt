@@ -68,7 +68,7 @@ object DemoTestBackend {
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y = "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
 
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet2.demo.walt.id/transaction-data-profiles"
-    private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
+    private const val EUDI_PID_SD_JWT_VCT = "urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
 
     /** EUDI TS-12 SCA payment, the type whose payload the Credential Manager matcher reads as a nested object. */

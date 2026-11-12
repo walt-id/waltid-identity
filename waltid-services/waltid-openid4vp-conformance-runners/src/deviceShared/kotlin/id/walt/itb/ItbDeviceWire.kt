@@ -133,6 +133,7 @@ internal object ItbDeviceWire {
                             }
                         })
                         if (error is ItbWalletRejection) put("code", error.code)
+                        if (error is ItbVerifierRejection) put("code", error.code)
                         if (error is TokenRequestException) put("tokenFailure", ItbTokenFailure.encode(error))
                     }
                 }

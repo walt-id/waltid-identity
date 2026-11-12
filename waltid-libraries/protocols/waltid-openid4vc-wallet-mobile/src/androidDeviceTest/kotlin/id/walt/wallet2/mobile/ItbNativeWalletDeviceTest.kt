@@ -8,6 +8,7 @@ import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.keys.*
 import id.walt.itb.*
+import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.data.Wallet
@@ -32,6 +33,7 @@ import java.net.SocketTimeoutException
 import java.util.UUID
 
 /** Manual live ITB fixture; never opted in by ordinary device CI. All disposable keys are deleted. */
+@PhysicalDeviceTest
 class ItbNativeWalletDeviceTest {
     @Test
     fun runOwnedItbSessions() = runBlocking {
@@ -52,10 +54,12 @@ class ItbNativeWalletDeviceTest {
         ) as ScaAuthorizationTestActivity
         instrumentation.runOnMainSync {
             activity.setContentView(android.widget.TextView(activity).apply {
-                text = "WAL-1423 live ITB test. Approve only the synthetic test operations requested by the operator."
+                text = "Live ITB wallet test. Approve only the synthetic test operations requested by the operator."
             })
         }
         val provider = AndroidPlatformKeyProvider(activity) { activity }
+        val timed = args.getString("wallet.itb.biometricPolicy") == "timed"
+        require(args.getString("wallet.itb.biometricPolicy") in setOf(null, "per-use", "timed"))
         var generated: ManagedKey? = null
         try {
             withTimeout(30 * 60_000L) {
@@ -78,12 +82,13 @@ class ItbNativeWalletDeviceTest {
                         require(certificates.isNotEmpty())
                         val requirements = WalletKeyRequirements(
                             KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                            KeyUseAuthorizationPolicy.BiometricCurrentSet, WalletKeyProtection.HardwareRequired,
+                            if (timed) KeyUseAuthorizationPolicy.BiometricTimedReuse(10) else KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                            WalletKeyProtection.HardwareRequired,
                         )
                         check(provider.preflight(requirements) is KeyUseAuthorizationSupport.Supported)
                         val key = provider.generateManagedKey(WalletKeyCreationRequest(
-                            KeyId("wal1423-itb-${UUID.randomUUID()}"), requirements,
-                            KeyUseAuthorizationPrompt("Authorize this WAL-1423 ITB test operation"),
+                            KeyId("itb-test-${UUID.randomUUID()}"), requirements,
+                            KeyUseAuthorizationPrompt("Authorize this ITB wallet test operation"),
                         )).also { generated = it }
                         val restored = provider.restoreManagedKey(key.storedKey) as PlatformManagedKeyRestoration.Restored
                         val wallet = Wallet(

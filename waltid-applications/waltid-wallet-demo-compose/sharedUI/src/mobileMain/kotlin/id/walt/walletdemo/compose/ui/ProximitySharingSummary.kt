@@ -26,8 +26,6 @@ import id.walt.walletdemo.compose.ui.components.toCardArt
 import id.walt.walletdemo.compose.ui.resources.*
 import kotlin.time.Instant
 import kotlinx.coroutines.delay
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -61,9 +59,7 @@ internal fun ProximitySharingReceiptContent(
     credentialDetailsById: Map<String, CredentialDetails>,
 ) {
     ReviewMetadataSection(stringResource(Res.string.proximity_shared_data)) {
-        Text(completedAt.toLocalDateTime(TimeZone.currentSystemDefault()).let {
-            "${it.date} ${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}"
-        }, style = MaterialTheme.typography.bodySmall)
+        WalletInstantText(completedAt)
         if (approvalTiming == ProximityApprovalTiming.BeforeConnection) {
             Text(stringResource(Res.string.proximity_used_prepared_approval))
         }

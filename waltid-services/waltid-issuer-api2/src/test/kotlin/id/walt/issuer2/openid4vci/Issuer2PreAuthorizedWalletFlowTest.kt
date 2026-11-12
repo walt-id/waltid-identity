@@ -1,9 +1,11 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.config.ConfigManager
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
@@ -69,6 +71,22 @@ class Issuer2PreAuthorizedWalletFlowTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun walletCanIssuePreAuthorizedCredentialWithoutKeycloakSecret() = testApplication {
+        installIssuer2WithConfigFiles(configureAuthenticationConfig = { it.copy(clientSecret = "") })
+        assertEquals("", ConfigManager.getConfig<AuthenticationServiceConfig>().clientSecret)
+
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val offer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE)
+        val resolvedOffer = walletFlow.resolve(offer)
+        val token = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+
+        assertBearerAccessToken(token)
+        assertJwtVcJsonCredentialPayload(walletFlow.requestCredential(resolvedOffer, token.access_token))
+        assertSessionStatus(client, offer.offerId, "SUCCESSFUL")
     }
 
     @Test

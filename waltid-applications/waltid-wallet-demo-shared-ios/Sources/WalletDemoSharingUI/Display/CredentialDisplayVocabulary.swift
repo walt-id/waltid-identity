@@ -145,6 +145,8 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("sub", label: "Subject", group: .technical, displayOrder: 202),
         ClaimDescriptor("iat", label: "Issued at", group: .technical, roles: [.temporal], displayOrder: 203),
         ClaimDescriptor("issued_at", roles: [.temporal], displayOrder: 204),
+        ClaimDescriptor("issue_date", roles: [.temporal], displayOrder: 205),
+        ClaimDescriptor("portrait_capture_date", roles: [.temporal], displayOrder: 217),
         ClaimDescriptor("issuance_date", roles: [.temporal], displayOrder: 205),
         ClaimDescriptor("valid_from", aliases: ["Valid from"], roles: [.temporal], displayOrder: 206),
         ClaimDescriptor("nbf", label: "Valid from", group: .technical, roles: [.temporal], displayOrder: 207),
@@ -295,6 +297,9 @@ public enum CredentialDisplayVocabulary {
     private static func roles(for claimPath: ClaimPath) -> Set<ClaimRole> {
         let leaf = claimPath.leaf
         var roles = descriptor(for: leaf)?.roles ?? []
+        if claimPath.components == ["proof", "created"] || claimPath.components == ["vc", "proof", "created"] {
+            roles.insert(.temporal)
+        }
         if isCredentialTypeClaimPath(claimPath) {
             roles.insert(.credentialType)
         }

@@ -102,6 +102,7 @@ class VPVerifyCmd : CliktCommand(name = "verify") {
             "schema",
             "allowed-issuer",
             "webhook",
+            "x509-trust",
         )
         .multiple()
 

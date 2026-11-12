@@ -45,6 +45,8 @@ runs:
           --console=plain \
           --warning-mode=summary
 
+    # Fallback when the caller did not restore a framework artifact. One worker:
+    # concurrent device/simulator links swap heavily on the hosted runner.
     - name: Assemble Swift wallet SDK core XCFramework
       if: ${{ inputs.skip-wallet-core-assemble != 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
@@ -53,6 +55,7 @@ runs:
         ./gradlew \
           :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework \
           -PenableIosBuild=true \
+          --max-workers=1 \
           --no-daemon \
           --console=plain \
           --warning-mode=summary

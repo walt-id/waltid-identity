@@ -311,7 +311,7 @@ final class WalletIdentityScreenModel: ObservableObject {
         case .none: "Signing does not require system approval."
         case .biometricCurrentSet: "Approve each signature with biometrics. Changing enrolled biometrics makes this key unusable."
         case .biometricAny: "Approve each use with biometrics, including newly enrolled biometrics. Security changes can still make the key unavailable."
-        case .biometricTimedReuse(let seconds): "Approve signing with biometrics. The system may reuse that approval for \(duration(seconds))."
+        case .biometricTimedReuse(let seconds): biometricTimedApprovalDescription(seconds)
         case .deviceCredential(let seconds): "Approve signing with the device passcode. " + reuse(seconds)
         case .biometricOrDeviceCredential(let seconds): "Approve signing with biometrics or the device passcode. " + reuse(seconds)
         }

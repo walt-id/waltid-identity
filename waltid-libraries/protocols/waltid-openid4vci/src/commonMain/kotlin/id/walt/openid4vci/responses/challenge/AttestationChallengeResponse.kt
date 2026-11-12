@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.challenge
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -18,5 +19,5 @@ data class AttestationChallengeResponse(
 data class AttestationChallengeResponseHttp(
     val payload: JsonObject,
     val status: Int = 200,
-    val headers: Map<String, String> = mapOf("Cache-Control" to "no-store"),
+    val headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE,
 )

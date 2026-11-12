@@ -16,6 +16,44 @@ import kotlin.test.assertFalse
 
 class EudiTestBackendTest {
     @Test
+    fun redirectPreservesOptionalSignedPayload() {
+        val payload = """<input name="payload" value='{}'>"""
+        assertEquals(mapOf("payload" to "{}"), EudiTestBackend.redirectFields(payload))
+        assertEquals(
+            mapOf("payload" to "{}", "payload_jwt" to "opaque.signed.value"),
+            EudiTestBackend.redirectFields(payload + """<input name="payload_jwt" value="opaque.signed.value" />"""),
+        )
+    }
+
+    @Test
+    fun payloadFieldSupportsEitherHtmlQuoteStyle() {
+        val pages = listOf(
+            """<input type="hidden" name="payload" value='{"message":"A &amp; B"}'>""",
+            """<input type="hidden" name="payload" value="{&quot;message&quot;:&quot;A &amp; B&quot;}" />""",
+            """<input type="hidden" name="payload" value="{&#34;message&#34;:&#34;A &amp; B&#34;}" />""",
+        )
+        pages.forEach { page ->
+            assertEquals("""{"message":"A & B"}""", EudiTestBackend.extractPayload(page))
+        }
+    }
+
+    @Test
+    fun payloadEntitiesAreDecodedOnlyOnce() {
+        val page = """<input name="payload" value="{&#34;message&#34;:&#34;&amp;quot; &amp;lt;&#34;}" />"""
+        assertEquals("""{"message":"&quot; &lt;"}""", EudiTestBackend.extractPayload(page))
+    }
+
+    @Test
+    fun payloadFieldRejectsMissingOrMismatchedQuotes() {
+        listOf(
+            """<input name="payload_jwt" value="ignored">""",
+            """<input name="payload" value='unterminated">""",
+        ).forEach { page ->
+            assertFailsWith<IllegalStateException> { EudiTestBackend.extractPayload(page) }
+        }
+    }
+
+    @Test
     fun selectsFirstNonBlankConfiguredIntendedUse() {
         val response = buildJsonObject {
             putJsonArray("intended_uses") {

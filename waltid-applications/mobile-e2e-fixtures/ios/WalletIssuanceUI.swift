@@ -34,12 +34,9 @@ func allowIdentityDocumentRegistrationIfRequested(file: StaticString = #filePath
 @MainActor
 func waitForIdleResultDismissal(_ app: XCUIApplication, timeout: TimeInterval = 20,
                                 file: StaticString = #filePath, line: UInt = #line) {
-    let home = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-        !app.buttons["issuance-done"].exists && !app.buttons["wallet.presentationDone"].exists
-            && app.buttons["wallet.scanButton"].exists && app.buttons["wallet.scanButton"].isHittable
-    }, object: nil)
-    XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: timeout), .completed, app.debugDescription,
-                   file: file, line: line)
+    // Poll one accessibility property; assert receipt dismissal once Home is usable.
+    XCTAssertTrue(app.buttons["wallet.scanButton"].wait(for: \.isHittable, toEqual: true, timeout: timeout),
+                  app.debugDescription, file: file, line: line)
     XCTAssertFalse(app.buttons["issuance-done"].exists, file: file, line: line)
     XCTAssertFalse(app.buttons["wallet.presentationDone"].exists, file: file, line: line)
 }
