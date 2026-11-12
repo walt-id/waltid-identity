@@ -112,10 +112,10 @@ class IssuanceNotificationRouteTest {
     }
 
     @Test
-    fun shortSigningSecretsAreRejectedAsBadRequests() = testApplication {
+    fun blankAndShortSigningSecretsAreRejectedAsBadRequests() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
-        for (secret in listOf("", "x".repeat(31))) {
+        for (secret in listOf("", " ".repeat(32), "x".repeat(31))) {
             val response = client.post("/issuer2/credential-offers") {
                 contentType(ContentType.Application.Json)
                 setBody(

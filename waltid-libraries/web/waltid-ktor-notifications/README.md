@@ -159,7 +159,7 @@ Every attempt sends the following headers:
 | `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
 | `X-Webhook-Signature` | `v1=` followed by Base64 HMAC-SHA256 when `signing_secret` is configured |
 
-A receiver should atomically record `Idempotency-Key` with its business update. If the key is already present, it
+A receiver should atomically record `Webhook-Id` with its business update. For signed callbacks, verify the ID before recording it. If the key is already present, it
 must return success without applying the update again. The receiver should also recompute `Content-Digest` before
 processing. The digest detects body changes but does not authenticate the sender. Enable signed callbacks for
 authentication and use HTTPS.
@@ -194,8 +194,9 @@ The callback URL is the normalized Ktor URL string stored in the delivery, inclu
 `https://example.com:443/hook?source=issuer2` is signed as `https://example.com/hook?source=issuer2`.
 A receiver behind a proxy should use that external URL, not an internal rewritten URL. To verify, calculate SHA-256 over the raw request body and
 compare its RFC 9530-style value with `Content-Digest`; then compute the HMAC and compare decoded bytes in constant
-time. Reject missing or invalid signatures, timestamps outside a short window (for example five minutes), and
-previously processed `Webhook-Id` values. Retries keep the same ID and body but get a new timestamp and signature.
+time. Reject missing or invalid signatures and timestamps outside a short window (for example, five minutes).
+Return success for a valid duplicate without applying the update again. Retries keep the same ID and body. Each
+attempt gets a fresh signature that covers its timestamp and attempt number.
 The `WebhookSignature.verify` JVM helper performs only the constant-time signature comparison; callers must also
 check body digest, timestamp freshness, and delivery ID replay protection.
 
