@@ -22,7 +22,8 @@ private val EMPTY_ZLIB = byteArrayOf(
 actual object ZlibCompressor {
     actual fun decompress(data: ByteArray, maximumOutputBytes: Int): ByteArray {
         require(maximumOutputBytes >= 0) { "Maximum decompressed size must be non-negative" }
-        require(data.size >= 2 && (data[1].toInt() and 0x20) == 0) { "Zlib dictionary streams are not supported" }
+        require(data.size >= 2) { "Truncated zlib stream" }
+        require((data[1].toInt() and 0x20) == 0) { "Zlib dictionary streams are not supported" }
         return MemorySyncStreamToByteArray(minOf(data.size, maximumOutputBytes)) {
             val output = this
             var written = 0
