@@ -23,26 +23,30 @@ class HttpAttestationStatusResolver(private val fetcher: WebDataFetcher) : Attes
         }
     }
 
-    override suspend fun resolve(uri: String): String = withTimeoutOrNull(10_000) {
-        val url = parseAttestationStatusListUrl(uri)
-        val loopbackHost = url.host in setOf("localhost", "127.0.0.1", "::1") || url.host.endsWith(".localhost")
-        require(url.user == null && url.password == null) { "Status-list URLs must not contain credentials" }
-        require(url.protocol.name == "https" || url.protocol.name == "http" && loopbackHost) {
-            "Status-list transport requires HTTPS; HTTP is permitted only on loopback for development"
-        }
-        val response = fetcher.rawFetch(url) {
-            method = HttpMethod.Get
-            // Attester URLs must never receive credentials inherited from generic request defaults.
-            headers.clear()
-            header("Accept", "application/statuslist+jwt")
-            header("Cache-Control", "no-cache")
-        }
-        require(response.status.value in 200..299) { "Status-list lookup failed" }
-        require(response.headers[HttpHeaders.ContentType]?.substringBefore(';')?.trim().equals("application/statuslist+jwt", ignoreCase = true)) {
-            "Unsupported status-list media type"
-        }
-        response.bodyAsText().trim()
-    } ?: error("Status-list lookup timed out")
+    override suspend fun resolve(uri: String): String = attestationStatusCheck(AttestationStatusFailureReason.LOOKUP) {
+        withTimeoutOrNull(10_000) {
+            val url = parseAttestationStatusListUrl(uri)
+            val loopbackHost = url.host in setOf("localhost", "127.0.0.1", "::1") || url.host.endsWith(".localhost")
+            require(url.user == null && url.password == null) { "Status-list URLs must not contain credentials" }
+            require(url.protocol.name == "https" || url.protocol.name == "http" && loopbackHost) {
+                "Status-list transport requires HTTPS; HTTP is permitted only on loopback for development"
+            }
+            val response = fetcher.rawFetch(url) {
+                method = HttpMethod.Get
+                // Attester URLs must never receive credentials inherited from generic request defaults.
+                headers.clear()
+                header("Accept", "application/statuslist+jwt")
+                header("Cache-Control", "no-cache")
+            }
+            require(response.status.value in 200..299) { "Status-list lookup failed" }
+            attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+                require(response.headers[HttpHeaders.ContentType]?.substringBefore(';')?.trim().equals("application/statuslist+jwt", ignoreCase = true)) {
+                    "Unsupported status-list media type"
+                }
+            }
+            response.bodyAsText().trim()
+        } ?: error("Status-list lookup timed out")
+    }
 
     companion object {
         const val MAXIMUM_RESPONSE_BYTES: Long = 2L * 1024 * 1024

@@ -83,7 +83,8 @@ class HttpAttestationStatusResolverTest {
         })
         try {
             val resolver = HttpAttestationStatusResolver(fetcher)
-            assertFailsWith<IllegalArgumentException> { resolver.resolve(uri) }
+            val failure = assertFailsWith<AttestationStatusValidationException> { resolver.resolve(uri) }
+            assertEquals(AttestationStatusFailureReason.LOOKUP, failure.reason)
             assertEquals("jwt", resolver.resolve(uri))
         } finally { fetcher.close() }
     }
@@ -95,14 +96,19 @@ class HttpAttestationStatusResolverTest {
             respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://other.example/status"))
         })
         try {
-            assertFailsWith<IllegalArgumentException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
+            val failure = assertFailsWith<AttestationStatusValidationException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
+            assertEquals(AttestationStatusFailureReason.LOOKUP, failure.reason)
             assertEquals(1, requests)
         } finally { fetcher.close() }
     }
 
     @Test fun responseMustHaveTheStatusListMediaType() = runTest {
         val fetcher = fetcher(engine { respond("jwt", headers = headersOf(HttpHeaders.ContentType, "application/jwt")) })
-        try { assertFailsWith<IllegalArgumentException> { HttpAttestationStatusResolver(fetcher).resolve(uri) } }
+        try {
+            val failure = assertFailsWith<AttestationStatusValidationException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
+            assertEquals(AttestationStatusFailureReason.FORMAT, failure.reason)
+            assertIs<IllegalArgumentException>(failure.cause)
+        }
         finally { fetcher.close() }
     }
 
@@ -120,7 +126,10 @@ class HttpAttestationStatusResolverTest {
                     if (declared) append(HttpHeaders.ContentLength, "129")
                 })
             }, defaults.copy(maxResponseBytes = 128))
-            try { assertFails { HttpAttestationStatusResolver(fetcher).resolve(uri) } }
+            try {
+                val failure = assertFailsWith<AttestationStatusValidationException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
+                assertEquals(AttestationStatusFailureReason.LOOKUP, failure.reason)
+            }
             finally { fetcher.close() }
         }
     }
@@ -132,7 +141,8 @@ class HttpAttestationStatusResolverTest {
         try {
             val resolver = HttpAttestationStatusResolver(fetcher)
             for (url in listOf("http://attester.example/status", "https://user:password@attester.example/status", "https://other.example/status")) {
-                assertFailsWith<IllegalArgumentException>(url) { resolver.resolve(url) }
+                val failure = assertFailsWith<AttestationStatusValidationException>(url) { resolver.resolve(url) }
+                assertEquals(AttestationStatusFailureReason.LOOKUP, failure.reason)
             }
             assertEquals(0, requests)
         } finally { fetcher.close() }
@@ -156,8 +166,9 @@ class HttpAttestationStatusResolverTest {
         }
         val fetcher = fetcher(engine)
         try {
-            val failure = assertFailsWith<IllegalStateException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
-            assertEquals("Status-list lookup timed out", failure.message)
+            val failure = assertFailsWith<AttestationStatusValidationException> { HttpAttestationStatusResolver(fetcher).resolve(uri) }
+            assertEquals(AttestationStatusFailureReason.LOOKUP, failure.reason)
+            assertEquals("Status-list lookup timed out", failure.cause?.message)
             requestCancelled.await()
         } finally { fetcher.close() }
     }

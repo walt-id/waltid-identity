@@ -124,27 +124,37 @@ class AttestationStatusValidator(
     ): AttestationStatusResult {
         val lists = mutableMapOf<String, Result<ResolvedList>>()
         val validityChecks = mutableListOf<ListValidity>()
+        val logged = mutableSetOf<Pair<String, AttestationStatusFailureReason>>()
+        fun logFailure(uri: String, reason: AttestationStatusFailureReason) {
+            if (logged.add(uri to reason)) {
+                // Exception messages, JWTs and complete URLs may contain sensitive evidence.
+                logger.warn { "Attestation status validation failed reason=$reason host=${statusListHost(uri)}" }
+            }
+        }
         var outcome = AttestationStatusOutcome.VALID
         for (accepted in evidence) {
             val next = if (accepted.reference == null) {
                 if (accepted.policy.requireStatusReference) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
-            } else if (accepted.attesterPublicJwk == null) {
-                AttestationStatusOutcome.UNVERIFIABLE
             } else {
                 val uri = accepted.reference.uri
-                val jwt = lists.getOrPut(uri) {
-                    try {
-                        parseAttestationStatusListUrl(uri)
-                        val jwt = requireNotNull(resolver) { "Attestation status resolver is not configured" }.resolve(uri)
-                        Result.success(ResolvedList(jwt, now()))
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (cause: Exception) { Result.failure(cause) }
-                }
                 try {
+                    if (accepted.attesterPublicJwk == null) {
+                        throw AttestationStatusValidationException(AttestationStatusFailureReason.SIGNER)
+                    }
+                    val jwt = lists.getOrPut(uri) {
+                        try {
+                            Result.success(attestationStatusCheck(AttestationStatusFailureReason.LOOKUP) {
+                                parseAttestationStatusListUrl(uri)
+                                val jwt = requireNotNull(resolver) { "Attestation status resolver is not configured" }.resolve(uri)
+                                ResolvedList(jwt, now())
+                            })
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (cause: AttestationStatusValidationException) { Result.failure(cause) }
+                    }
                     validateList(jwt.getOrThrow(), accepted).also { validityChecks += it.validity }.outcome
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (cause: Exception) {
-                    logger.debug(cause) { "Attestation status validation failed" }
+                catch (cause: AttestationStatusValidationException) {
+                    logFailure(uri, cause.reason)
                     AttestationStatusOutcome.UNVERIFIABLE
                 }
             }
@@ -153,7 +163,9 @@ class AttestationStatusValidator(
         }
         // Earlier lists may have expired while later lookups or signature checks were suspended.
         val checkedAt = now()
-        if (validityChecks.any { !it.isValidAt(checkedAt) } && priority(AttestationStatusOutcome.UNVERIFIABLE) > priority(outcome)) {
+        val expired = validityChecks.filter { !it.isValidAt(checkedAt) }
+        expired.forEach { logFailure(it.uri, AttestationStatusFailureReason.FRESHNESS) }
+        if (expired.isNotEmpty() && priority(AttestationStatusOutcome.UNVERIFIABLE) > priority(outcome)) {
             outcome = AttestationStatusOutcome.UNVERIFIABLE
         }
         return AttestationStatusResult(outcome)
@@ -162,6 +174,7 @@ class AttestationStatusValidator(
     private data class ResolvedList(val jwt: String, val resolvedAt: Instant)
     private data class ValidatedList(val outcome: AttestationStatusOutcome, val validity: ListValidity)
     private data class ListValidity(
+        val uri: String,
         val claims: IetfStatusListToken.Validity,
         val resolvedAt: Instant,
         val maximumAgeSeconds: Long?,
@@ -173,23 +186,42 @@ class AttestationStatusValidator(
 
     private suspend fun validateList(resolved: ResolvedList, evidence: VerifiedAttestationStatus): ValidatedList {
         val jwt = resolved.jwt
-        require(jwt.length <= 2 * 1024 * 1024) { "Status-list JWT is too large" }
-        val decoded = CompactJws.decodeUnverified(jwt)
-        val signer = restoreAttestedKey(requireNotNull(evidence.attesterPublicJwk) { "Verified attester signer context is unavailable" })
+        val decoded = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            require(jwt.length <= 2 * 1024 * 1024) { "Status-list JWT is too large" }
+            CompactJws.decodeUnverified(jwt)
+        }
+        val signer = attestationStatusCheck(AttestationStatusFailureReason.SIGNER) {
+            restoreAttestedKey(requireNotNull(evidence.attesterPublicJwk) { "Verified attester signer context is unavailable" })
+        }
+        val algorithm = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            JwsAlgorithm.parse(requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.content))
+        }
         // Status-response jwk/kid/x5c never authorize a different key. Delegation is not enabled.
-        CompactJws.verify(jwt, signer, JwsAlgorithm.parse(requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.content)))
-        val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+        attestationStatusCheck(AttestationStatusFailureReason.SIGNATURE) { CompactJws.verify(jwt, signer, algorithm) }
         val reference = requireNotNull(evidence.reference)
-        val list = IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
-        val validity = ListValidity(list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
-        require(validity.isValidAt(now())) { "Status list is stale, expired or not yet valid" }
-        val outcome = when (list.readStatus(reference.index)) {
-            0u -> AttestationStatusOutcome.VALID
-            1u -> AttestationStatusOutcome.INVALID
-            2u -> AttestationStatusOutcome.SUSPENDED
-            else -> AttestationStatusOutcome.UNVERIFIABLE
+        val list = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+            IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
+        }
+        val validity = ListValidity(reference.uri, list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
+        if (!validity.isValidAt(now())) throw AttestationStatusValidationException(AttestationStatusFailureReason.FRESHNESS)
+        val outcome = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            when (list.readStatus(reference.index)) {
+                0u -> AttestationStatusOutcome.VALID
+                1u -> AttestationStatusOutcome.INVALID
+                2u -> AttestationStatusOutcome.SUSPENDED
+                else -> throw AttestationStatusValidationException(AttestationStatusFailureReason.FORMAT)
+            }
         }
         return ValidatedList(outcome, validity)
+    }
+
+    private fun statusListHost(uri: String): String = try {
+        parseAttestationStatusListUrl(uri).host.takeIf { host ->
+            host.length <= 255 && host.all { it.isLetterOrDigit() || it in ".:-[]" }
+        } ?: "unavailable"
+    } catch (_: IllegalArgumentException) {
+        "unavailable"
     }
 
     private fun priority(outcome: AttestationStatusOutcome): Int = when (outcome) {
