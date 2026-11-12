@@ -90,7 +90,7 @@ class SourceFetcherDeploymentGuardTest {
     }
 
     @Test
-    fun `opt-outs apply to IPv4 embedded in IPv6 transition addresses`() {
+    fun `opt-outs apply to IPv4 embedded in IPv6 transition addresses and never open multicast`() {
         // NAT64 (64:ff9b::/96) for 10.0.0.1, 127.0.0.1 and 169.254.169.254.
         PrivateNetworkGuardSettings.allowLoopback = true
         PrivateNetworkGuardSettings.allowPrivateNetworks = false
@@ -100,6 +100,8 @@ class SourceFetcherDeploymentGuardTest {
         PrivateNetworkGuardSettings.allowPrivateNetworks = true
         assertEquals(true to null, SourceFetcher.validateUrl("http://[64:ff9b::a00:1]/", config))
         assertBlocked("Link-local addresses are blocked", "http://[64:ff9b::a9fe:a9fe]/")
+        assertBlocked("Multicast addresses are blocked", "http://224.0.0.1/")
+        assertBlocked("Multicast addresses are blocked", "http://[ff02::1]/")
     }
 
     @Test

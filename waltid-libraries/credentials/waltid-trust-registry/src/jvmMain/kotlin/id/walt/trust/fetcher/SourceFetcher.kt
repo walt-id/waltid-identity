@@ -27,6 +27,7 @@ private val log = KotlinLogging.logger {}
  * - URL scheme validation (https/http only)
  * - Hostname allow-listing (optional)
  * - Private IP blocking at DNS resolution time via [SecureDns]
+ * - Multicast addresses are always blocked
  * - The same blocking for IPv4 addresses embedded in NAT64, 6to4 and Teredo IPv6 addresses
  * - The same blocking on every socket connect via [SecureSocketFactory], which also covers
  *   IP-literal URLs and redirect targets that never pass through [SecureDns]
@@ -207,8 +208,8 @@ actual object SourceFetcher {
      *
      * The deployment's [PrivateNetworkGuardSettings] can still allow loopback and private addresses, through its
      * allow flags or for a host matching a trusted suffix. Its `allowLoopback` getter ignores the test-only
-     * `walt.ssrf.allowLoopback` property. Link-local, cloud metadata and unspecified addresses have no deployment
-     * opt-out.
+     * `walt.ssrf.allowLoopback` property. Link-local, cloud metadata, multicast and unspecified addresses have no
+     * deployment opt-out.
      */
     private fun blockedReason(addr: InetAddress, host: String, config: FetcherSecurityConfig): String? {
         val trustedHost = PrivateNetworkGuardSettings.isTrustedHost(host)
@@ -219,6 +220,8 @@ actual object SourceFetcher {
         // Connecting to 0.0.0.0 or :: reaches the local host on Linux.
         if (config.blockLoopback && addr.isAnyLocalAddress) return "Unspecified addresses (0.0.0.0, ::) are blocked"
         if (config.blockLinkLocal && addr.isLinkLocalAddress) return "Link-local addresses are blocked"
+        // Never a valid fetch target. Blocked unconditionally, as in the shared guard.
+        if (addr.isMulticastAddress) return "Multicast addresses are blocked"
         if (blockPrivate) {
             if (addr.isSiteLocalAddress) return "Private/site-local addresses are blocked"
             if (addr is Inet6Address && isIPv6UniqueLocalAddress(addr)) return "IPv6 Unique Local Addresses (ULA) are blocked"
