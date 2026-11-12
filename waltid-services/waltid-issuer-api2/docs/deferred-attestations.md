@@ -130,6 +130,34 @@ restart. Validity is determined at those checkpoints; a remote provider may publ
 change after a check completes. Network I/O runs outside the storage CAS retry loop, and
 the persisted claim fence and lifetimes are checked again after resolution.
 
+## Operator diagnostics
+
+Operator diagnostics use WARN-level messages from the shared OpenID4VCI attestation
+status validator:
+
+```text
+Attestation status validation failed reason=FRESHNESS host=provider.example
+```
+
+| Reason | Meaning |
+| --- | --- |
+| `LOOKUP` | Transport, timeout, HTTP response or resource-resolution failure |
+| `SIGNER` | The original trusted signer context is missing or unusable |
+| `SIGNATURE` | Verification against the accepted attester key failed |
+| `FRESHNESS` | Signed validity, retrieval TTL or the configured maximum age no longer permits use |
+| `FORMAT` | Invalid JWT, media type, claims, encoding, index or unsupported status value |
+
+A signature failure alone cannot distinguish a different signing key from damaged data.
+Only the fixed category and sanitized host are logged. JWTs, indices, keys, attester
+identities, complete URLs, exception messages and stack traces are excluded from these
+messages. Unusable host values are reported as `unavailable`.
+
+Warnings are deduplicated by list and reason within a validation checkpoint. The next
+checkpoint can log the failure again. This includes freshness failures discovered after
+later lookups finish. Cancellation propagates without a failure warning. Verified VALID,
+INVALID and SUSPENDED statuses retain their existing outcomes and do not produce these
+technical-failure warnings.
+
 ## Failure and retry behavior
 
 | Outcome | Deferred behavior |
