@@ -122,6 +122,11 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
                     else -> Res.string.credential_status_explanation
                 }
                 Text(stringResource(explanation), style = MaterialTheme.typography.bodySmall)
+                if (status.purposes.isNotEmpty()) {
+                    val purposes = status.purposes.map { statusPurposeTitle(it) }.distinct().joinToString(", ")
+                    Text(stringResource(Res.string.credential_status_purposes, purposes), style = MaterialTheme.typography.bodySmall)
+                }
+                if (compact && status.coverage == "PARTIAL") Text(stringResource(Res.string.credential_status_partial_detail), style = MaterialTheme.typography.bodySmall)
                 if (compact) Text(status.lastCheckedAt?.let { stringResource(Res.string.credential_status_checked_at, statusDate(it)) }
                     ?: stringResource(Res.string.credential_status_no_check), style = MaterialTheme.typography.bodySmall)
                 status.lastAttemptAt?.let { Text(stringResource(Res.string.credential_status_attempt_at, statusDate(it)), style = MaterialTheme.typography.bodySmall) }
@@ -133,6 +138,15 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
     }
     if (compact) content() else WalletSection(stringResource(Res.string.credential_status_title), modifier = Modifier.testTag("credential-status-$credentialId")) { content() }
 }
+
+@Composable
+private fun statusPurposeTitle(purpose: String): String = stringResource(when (purpose) {
+    "revocation" -> Res.string.credential_status_purpose_revocation
+    "suspension" -> Res.string.credential_status_purpose_suspension
+    "refresh" -> Res.string.credential_status_purpose_refresh
+    "token" -> Res.string.credential_status_purpose_token
+    else -> Res.string.credential_status_purpose_other
+})
 
 @Composable
 private fun statusFailureExplanation(reason: String): String = stringResource(when (reason) {

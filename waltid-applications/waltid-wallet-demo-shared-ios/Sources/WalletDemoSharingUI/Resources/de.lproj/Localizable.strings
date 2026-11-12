@@ -50,3 +50,9 @@
 "This wallet cannot check this status method. The recipient may support it." = "Diese Wallet kann diese Statusmethode nicht prüfen. Der Empfänger unterstützt sie möglicherweise.";
 "out of date" = "veraltet";
 "partial check" = "teilweise geprüft";
+"Checked purposes: %@" = "Geprüfte Zwecke: %@";
+"Revocation" = "Widerruf";
+"Suspension" = "Aussetzung";
+"Credential update" = "Aktualisierung des Nachweises";
+"Token status" = "Tokenstatus";
+"Other" = "Sonstige";

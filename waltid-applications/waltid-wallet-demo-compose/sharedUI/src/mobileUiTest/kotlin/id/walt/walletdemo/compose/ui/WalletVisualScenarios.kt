@@ -125,6 +125,7 @@ internal class WalletVisualScenarios(
         onNodeWithTag("credential-status-check-${details.summary.id}").assertIsEnabled()
         if (expanded) {
             onNodeWithTag("credential-status-details-${details.summary.id}").performScrollTo().performClick()
+            onNodeWithText("Checked purposes: Revocation").assertExists()
             onNodeWithText("The latest check could not complete. Previous results keep their original check time.")
                 .performScrollTo().assertIsDisplayed()
         }
@@ -168,6 +169,7 @@ internal class WalletVisualScenarios(
         capture("status.sharing.review")
         val id = review.credentialOptions.first().credentialId
         onNodeWithTag("credential-status-details-$id").performScrollToContent(this).performClick()
+        onNodeWithText("Checked purposes: Revocation").assertExists()
         onNodeWithText("Status information is shown for your review and is not an additional claim to share.").assertExists()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
         kotlin.test.assertEquals(review.defaultCredentialSelection(), submitted?.credentials,

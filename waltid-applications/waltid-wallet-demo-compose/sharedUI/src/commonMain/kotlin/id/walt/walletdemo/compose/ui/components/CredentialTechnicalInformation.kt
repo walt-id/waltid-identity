@@ -7,7 +7,7 @@ import id.walt.walletdemo.compose.logic.toSystemInfoGroup
 
 @Composable
 internal fun CredentialTechnicalInformation(details: CredentialDetails) {
-    LocalCredentialStatusUi.current.snapshot.credentials[details.summary.id]?.let { status ->
+    LocalCredentialStatusUi.current.snapshot.credentials[details.summary.id]?.takeIf { it.references.isNotEmpty() }?.let { status ->
         WalletSection("Credential status") {
             status.references.forEach { reference ->
                 SettingsDetailRow(reference.method, listOfNotNull(reference.purpose, reference.failure).joinToString(" · "))

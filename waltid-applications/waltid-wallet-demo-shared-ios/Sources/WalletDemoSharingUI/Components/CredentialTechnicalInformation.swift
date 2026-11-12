@@ -8,7 +8,7 @@ public struct CredentialTechnicalInformation: View {
     public init(details: CredentialDetails) { self.details = details }
 
     public var body: some View {
-        if let status = statusUI.values[details.id] {
+        if let status = statusUI.values[details.id], !status.status.entries.isEmpty {
             WalletSection(String(localized: "Credential status", bundle: .module)) {
                 ForEach(Array(status.status.entries.enumerated()), id: \.offset) { _, entry in
                     Text(String(describing: entry)).font(.caption).textSelection(.enabled).padding(12)

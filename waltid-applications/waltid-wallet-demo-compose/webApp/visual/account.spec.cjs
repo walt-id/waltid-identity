@@ -195,9 +195,14 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
       if (!dates) {
         const title = page.getByText(oldServer ? 'This server does not support credential status' : 'Not revoked', { exact: true });
         await expect(title).toHaveCount(1);
+        // Wide credential artwork puts the standalone status section below the fold.
+        await page.mouse.move(scenario.width / 2, scenario.height / 2);
+        await page.mouse.wheel(0, scenario.height);
+        await waitForSettledImage(page);
         for (let attempt = 0; !await title.isVisible() && attempt < 4; attempt++) {
           await page.mouse.move(scenario.width / 2, scenario.height / 2);
           await page.mouse.wheel(0, scenario.height / 2);
+          await waitForSettledImage(page);
         }
         await expect(title).toBeVisible();
         if (oldServer) {
@@ -209,11 +214,18 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
           await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
           await expect(page.getByText('Some status references could not be checked.', { exact: true })).toBeVisible();
           expect(refreshes.filter(request => request.mode === 'FORCE')).toEqual([{ credentials: [reference], mode: 'FORCE' }]);
+          const notice = page.getByText('Status changed: Status review credential. Open the marked cards for details.', { exact: true });
+          await expect(notice).toBeVisible();
+          await expect(notice).toHaveCount(0);
         }
         await clickControl(page, page.getByRole('button', { name: 'Details', exact: true }));
+        await page.mouse.move(scenario.width / 2, scenario.height / 2);
+        await page.mouse.wheel(0, scenario.height);
+        await waitForSettledImage(page);
         await expect(page.getByText(oldServer
           ? 'This server does not expose credential status checks. The credential can still be shared, and the recipient performs its own checks.'
           : 'This check only reports the issuer’s status information. It does not confirm every aspect of the credential’s validity. The recipient performs its own checks.', { exact: true })).toBeVisible();
+        if (!oldServer) await expect(page.getByText('Checked purposes: Revocation', { exact: true })).toBeVisible();
         await waitForSettledImage(page);
         expect(unexpected).toEqual([]);
         expect(errors).toEqual([]);
@@ -224,10 +236,9 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
       const birthDate = page.getByText('1990-05-21', { exact: true });
       await expect(birthDate).toHaveCount(1);
       // Wide cards put the details below the fold. Scroll the actual canvas, not its ARIA mirror.
-      if (!await birthDate.isVisible()) {
-        await page.mouse.move(scenario.width / 2, scenario.height / 2);
-        await page.mouse.wheel(0, scenario.height);
-      }
+      await page.mouse.move(scenario.width / 2, scenario.height / 2);
+      await page.mouse.wheel(0, scenario.height);
+      await waitForSettledImage(page);
       await expect(birthDate).toBeVisible();
       await clickControl(page, page.getByRole('button', { name: 'Technical details', exact: true }));
       // Assertions exercise the real API2 mapping, normalizer, Intl adapter and claim component.
