@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.deferred.DeferredCredentialResponseContext
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.CredentialError
@@ -138,6 +139,13 @@ interface OAuth2Provider {
         encryptedRequest: String,
         accessTokenContext: CredentialAccessTokenContext,
     ): id.walt.openid4vci.deferred.DeferredCredentialRequestResult
+
+    /** Validate persisted acceptance and prepare fresh or checkpointed credentials for delivery. */
+    suspend fun createDeferredCredentialResponse(
+        request: id.walt.openid4vci.deferred.DeferredCredentialRequest,
+        response: CredentialResponse,
+        context: DeferredCredentialResponseContext? = null,
+    ): CredentialResponseResult
 
     suspend fun writeDeferredCredentialResponse(
         request: id.walt.openid4vci.deferred.DeferredCredentialRequest,

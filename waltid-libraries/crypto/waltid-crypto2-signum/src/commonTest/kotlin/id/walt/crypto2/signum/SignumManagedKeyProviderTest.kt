@@ -22,6 +22,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
@@ -42,6 +43,43 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SignumManagedKeyProviderTest {
+    @Test
+    fun `fresh signing requires signing usage before native authorization`() = runTest {
+        val backend = FakeBackend()
+        val key = SignumManagedKeyProvider(backend).generateSignumKey(
+            GenerateManagedKeyRequest(
+                id = KeyId("verify-only"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.VERIFY),
+                providerOptions = SignumKeyOptions().encode(),
+            ),
+        )
+        assertFailsWith<SignumAuthorizationException> {
+            key.withFreshBiometricAuthorization { signer ->
+                signer.sign(byteArrayOf(1), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
+            }
+        }
+        assertEquals(0, backend.freshAuthorizations)
+    }
+
+    @Test
+    fun `fresh signing retains the managed ECDSA encoding adapter`() = runTest {
+        val backend = FakeBackend()
+        val key = SignumManagedKeyProvider(backend).generateSignumKey(
+            GenerateManagedKeyRequest(
+                id = KeyId("fresh-encoding"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN),
+                providerOptions = SignumKeyOptions().encode(),
+            ),
+        )
+        val signature = key.withFreshBiometricAuthorization { signer ->
+            signer.sign(byteArrayOf(1), SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER))
+        }
+        assertContentEquals(backend.signature, EcdsaSignatureCodec.derToP1363(signature, 32))
+        assertEquals(1, backend.freshAuthorizations)
+    }
+
     @Test
     fun `direct generation has inferred ManagedKey serialization and an explicit typed API`() = runTest {
         val provider = SignumManagedKeyProvider(FakeBackend())
@@ -399,6 +437,7 @@ class SignumManagedKeyProviderTest {
         override val id = ProviderId("fake-signum")
         val signature = ByteArray(64) { it.toByte() }
         val deletedAliases = mutableListOf<String>()
+        var freshAuthorizations = 0
         private val keys = mutableMapOf<String, SignumPlatformKey>()
 
         override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
@@ -435,6 +474,11 @@ class SignumManagedKeyProviderTest {
             override val attestation = this@FakeBackend.attestation
             override val signatureAlgorithms = setOf(SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))
             override val keyAgreementAlgorithms = setOf(KeyAgreementAlgorithm.Ecdh)
+
+            override suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T {
+                freshAuthorizations++
+                return operation(Signer(::sign))
+            }
 
             override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray {
                 signFailure?.let { throw it }

@@ -295,6 +295,7 @@ class StatusCredentialTestServer {
             return CoseSign1.createAndSign(
                 protectedHeaders = CoseHeaders(
                     algorithm = -8,
+                    type = IetfStatusListTokens.statusListCwtType,
                     kid = keyId.encodeToByteArray(),
                 ),
                 payload = payload,
