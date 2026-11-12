@@ -8,7 +8,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.*
 import id.walt.openid4vci.clientauth.attestation.VerifiedClientAttestation
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.deferred.DeferredProtocolException
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
@@ -65,7 +65,7 @@ class InitialAttestationStatusTest {
     @Test fun temporaryStatusCannotHideAnInvalidLaterProofSignature() = runTest {
         val fixture = fixture()
         fixture.unavailable = true
-        val failure = assertFailsWith<DeferredProtocolException> {
+        val failure = assertFailsWith<CredentialProtocolException> {
             fixture.accept(fixture.request(invalidSignatureIndex = 2))
         }
         assertEquals("invalid_proof", failure.error.error)
@@ -76,7 +76,7 @@ class InitialAttestationStatusTest {
         for (missingReference in listOf(false, true)) {
             val fixture = fixture()
             fixture.unavailable = true
-            val failure = assertFailsWith<DeferredProtocolException> {
+            val failure = assertFailsWith<CredentialProtocolException> {
                 fixture.accept(fixture.request(
                     invalidNonceIndex = if (missingReference) null else 2,
                     missingReferenceIndex = if (missingReference) 2 else null,
@@ -91,7 +91,7 @@ class InitialAttestationStatusTest {
         val fixture = fixture()
         fixture.states[1] = 2
         fixture.states[3] = 1
-        val failure = assertFailsWith<DeferredProtocolException> { fixture.accept() }
+        val failure = assertFailsWith<CredentialProtocolException> { fixture.accept() }
         assertEquals("credential_request_denied", failure.error.error)
         assertNull(failure.error.retryAfterSeconds)
         assertEquals(1, fixture.fetches)
@@ -106,7 +106,7 @@ class InitialAttestationStatusTest {
     @Test fun directProofVerificationStillRequiresValidStatus() = runTest {
         val fixture = fixture()
         fixture.states[1] = 2
-        assertFailsWith<DeferredProtocolException> {
+        assertFailsWith<CredentialProtocolException> {
             DefaultCredentialProofVerifier(now = { time }).verify(fixture.request(), fixture.configuration, fixture.context)
         }
         assertEquals(1, fixture.fetches)

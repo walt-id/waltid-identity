@@ -24,6 +24,7 @@ import id.walt.openid4vci.requests.credential.*
 import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -583,7 +584,7 @@ class DefaultOAuth2Provider(
             request, configuration, proofValidationContext, deferKeyAttestationStatusValidation = true,
         )) {
             is CredentialProofVerification.Success -> result
-            is CredentialProofVerification.Failure -> throw DeferredProtocolException(result.error)
+            is CredentialProofVerification.Failure -> throw CredentialProtocolException(result.error)
         }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: throw CredentialProofValidationException(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, "Unsupported credential format")
@@ -606,7 +607,7 @@ class DefaultOAuth2Provider(
         // Acceptance captures verified proofs, not permission to deliver. Temporary status
         // failures may remain pending; every delivery still checks the original evidence.
         val status = acceptedStatus(accepted)
-        if (status.permanentlyDenied) throw DeferredProtocolException(requireNotNull(status.error()))
+        if (status.permanentlyDenied) throw CredentialProtocolException(requireNotNull(status.error()))
         if (!deferredAttestationLifetimeValidator.isValid(accepted, Clock.System.now(), required)) {
             throw CredentialProofValidationException(
                 CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation evidence expired during status resolution",
@@ -1025,7 +1026,7 @@ class DefaultOAuth2Provider(
             context.sessionId, context.transaction, required, attestationStatusValidator.takeIf { checkStatus },
         )
         null
-    } catch (e: DeferredProtocolException) {
+    } catch (e: CredentialProtocolException) {
         e.error
     }
 
@@ -1064,7 +1065,7 @@ class DefaultOAuth2Provider(
             CredentialProofVerification.Success(verification.bindings, verification.proofs)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: DeferredProtocolException) {
+        } catch (e: CredentialProtocolException) {
             CredentialProofVerification.Failure(e.error)
         } catch (e: CredentialProofValidationException) {
             CredentialProofVerification.Failure(CredentialError(e.errorCode, e.message))

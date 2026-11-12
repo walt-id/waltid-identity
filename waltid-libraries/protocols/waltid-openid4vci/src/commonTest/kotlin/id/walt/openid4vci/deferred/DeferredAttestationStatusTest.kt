@@ -12,6 +12,7 @@ import id.walt.openid4vci.clientauth.*
 import id.walt.openid4vci.clientauth.attestation.*
 import id.walt.openid4vci.clientauth.attestation.verifier.Crypto2KeyBasedClientAttestationVerifier
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.metadata.issuer.*
 import id.walt.openid4vci.proofs.*
 import id.walt.openid4vci.proofs.attestation.*
@@ -131,7 +132,7 @@ class DeferredAttestationStatusTest {
             put("attested_keys", JsonArray(listOf(holder.exportPublicJwkObject())))
             put("status", buildJsonObject { put("status_list", buildJsonObject { put("uri", uri); put("idx", 0) }) })
         }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", "key-attestation+jwt") })
-        val failure = assertFailsWith<DeferredProtocolException> {
+        val failure = assertFailsWith<CredentialProtocolException> {
             KeyAttestationVerifier(now = { time }).verify(jwt, null,
                 CredentialProofValidationContext("https://issuer.example"), CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "identity"),
                 KeyAttestationVerificationOptions(KeyAttestationTrustResolver { _, _, _ -> listOf(signer) },

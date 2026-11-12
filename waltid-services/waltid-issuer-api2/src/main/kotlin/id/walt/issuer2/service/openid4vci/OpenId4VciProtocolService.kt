@@ -30,6 +30,7 @@ import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
@@ -889,7 +890,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
         return try {
             collectDeferredCredential(authorization.token, session, request, claims, requestId)
-        } catch (e: DeferredProtocolException) {
+        } catch (e: CredentialProtocolException) {
             oauth2Provider.writeDeferredCredentialError(e.error)
         }
     }
@@ -1146,7 +1147,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
                         ),
                     )
-                } catch (e: DeferredProtocolException) {
+                } catch (e: CredentialProtocolException) {
                     // Collection notifications apply only after a transaction has been accepted.
                     if (e.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
                         return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, e.error)
@@ -1172,7 +1173,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, error)
                 }
                 return oauth2Provider.writeCredentialError(error)
-            } catch (e: DeferredProtocolException) {
+            } catch (e: CredentialProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
             }
         }
@@ -1606,7 +1607,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 )
             }
             throw e
-        } catch (e: DeferredProtocolException) {
+        } catch (e: CredentialProtocolException) {
             throw e
         } catch (e: Exception) {
             if (claimFinalized) {

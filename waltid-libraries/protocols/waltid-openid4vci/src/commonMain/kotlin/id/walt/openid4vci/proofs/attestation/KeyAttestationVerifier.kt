@@ -1,7 +1,7 @@
 package id.walt.openid4vci.proofs.attestation
 
 import id.walt.openid4vci.attestation.*
-import id.walt.openid4vci.deferred.DeferredProtocolException
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
@@ -154,7 +154,7 @@ class KeyAttestationVerifier(
         if (!accepted) throw invalidCredentialProof("Key attestation rejected by issuer policy")
         if (!context.deferKeyAttestationStatusValidation) {
             AttestationStatusValidator(options.statusResolver, now).validate(listOf(status))
-                .error()?.let { throw DeferredProtocolException(it) }
+                .error()?.let { throw CredentialProtocolException(it) }
         }
         if (!lifetime.keyAttestationValidAt(now())) throw invalidCredentialProof("Key attestation expired during status resolution")
         return verified

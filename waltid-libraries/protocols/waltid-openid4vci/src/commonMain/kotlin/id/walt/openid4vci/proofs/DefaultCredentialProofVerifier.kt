@@ -1,7 +1,7 @@
 package id.walt.openid4vci.proofs
 
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.deferred.DeferredProtocolException
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
@@ -34,7 +34,7 @@ class DefaultCredentialProofVerifier(
                 throw e
             } catch (e: CredentialProofValidationException) {
                 throw e
-            } catch (e: DeferredProtocolException) {
+            } catch (e: CredentialProtocolException) {
                 throw e
             } catch (e: CredentialProofServiceException) {
                 throw e

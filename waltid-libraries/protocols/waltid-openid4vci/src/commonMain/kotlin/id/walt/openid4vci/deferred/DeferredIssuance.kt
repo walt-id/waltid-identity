@@ -4,6 +4,7 @@ import id.walt.openid4vci.attestation.*
 
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
 import id.walt.openid4vci.requests.generateRequestId
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -48,7 +49,7 @@ interface DeferredIssuanceStore {
 }
 
 class DeferredDecisionException(val httpStatus: Int, message: String) : IllegalStateException(message)
-class DeferredProtocolException(val error: CredentialError) : IllegalStateException(error.description)
+class DeferredProtocolException(error: CredentialError) : CredentialProtocolException(error)
 
 /** Operates only on an already resolved and authorized issuance session. Knows nothing about grants. */
 class DeferredIssuance(
@@ -140,8 +141,7 @@ class DeferredIssuance(
         val accepted = initial.transactions.getValue(claim.id).accepted
         val status = statusValidator?.validate(accepted.statusEvidence())
         // Re-read the fence and lifetime after every asynchronous status lookup.
-        val state = validateClaimState(sessionId, claim, clientAttestationRequired, status?.permanentlyDenied == true)
-        if (state.transactions.getValue(claim.id).denied) denied()
+        validateClaimState(sessionId, claim, clientAttestationRequired, status?.permanentlyDenied == true)
         status?.error()?.let { throw DeferredProtocolException(it) }
     }
 
