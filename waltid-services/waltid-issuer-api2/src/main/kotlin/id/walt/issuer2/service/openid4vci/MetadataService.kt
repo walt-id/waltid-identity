@@ -82,6 +82,11 @@ class MetadataService @JvmOverloads constructor(
                 DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
                 configuration.vct?.let { validateVct(configurationId, it) }
+                val claimConflicts = configuration.claimDescriptionConflicts()
+                require(claimConflicts.isEmpty()) {
+                    "Credential configuration '$configurationId' has repeated or contradictory claim descriptions " +
+                        "(OpenID4VCI Appendix B.3): ${claimConflicts.joinToString("; ") { it.message }}"
+                }
             }
         }
 
