@@ -2,6 +2,7 @@
 
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.credsdata.CredentialManager
 import id.walt.mdoc.objects.MdocsCborSerializer
@@ -12,6 +13,8 @@ import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborBoolean
@@ -32,6 +35,21 @@ import kotlin.test.assertFalse
 
 class NamespaceJsonConversionTest {
     private val namespace = "org.iso.18013.5.1"
+
+    @Test
+    fun `wire decoded issuer and device booleans retain JSON types`() {
+        CredentialManager.init()
+        val values = mapOf("age_over_18" to CborBoolean(true), "age_over_21" to CborBoolean(false))
+        val decodedIssuer = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(
+            coseCompliantCbor.encodeToByteArray(issuer(values)),
+        )
+        val decodedDevice = coseCompliantCbor.decodeFromByteArray<DeviceNameSpaces>(
+            coseCompliantCbor.encodeToByteArray(device(values)),
+        )
+        val expected = values.mapValues { it.value.toSerializedJsonElement() }
+        assertEquals(expected, decodedIssuer.namespacesToJson().getValue(namespace).jsonObject)
+        assertEquals(expected, decodedDevice.namespacesToJson().getValue(namespace).jsonObject)
+    }
 
     @Test
     fun `issuer and device CBOR values convert without serializer exceptions on stdout`() {
