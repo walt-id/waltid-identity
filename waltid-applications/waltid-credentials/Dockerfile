@@ -1,5 +1,5 @@
 # Debian/glibc, not Alpine: Node + npm + better-sqlite3 deadlock under QEMU on musl.
-FROM node:22-slim AS buildstage
+FROM node:24-slim AS buildstage
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm config set fetch-retries 5 \
@@ -10,7 +10,7 @@ COPY ./ /build
 
 RUN npm run build
 
-FROM node:22-slim
+FROM node:24-slim
 
 RUN groupadd --gid 10001 appgroup && \
     useradd --uid 10001 --gid appgroup --no-create-home --home-dir /app --shell /usr/sbin/nologin appuser

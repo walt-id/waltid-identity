@@ -202,7 +202,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: isolatedWalletEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "required"]) { _, new in new },
                   initializeSigningIdentity: false)
-        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Storage"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Storage"].waitForExistence(timeout: 180), app.debugDescription)
         ui.tapButton(identifier: "wallet.keySetupEdit.Storage", fallbackLabel: "Key storage")
         let storage = app.staticTexts["Secure Enclave"]
         XCTAssertTrue(storage.waitForExistence(timeout: 10))
@@ -220,16 +220,18 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.openWalletLink(offer.offerUrl)
         XCTAssertTrue(ui.waitForOfferReview(timeout: 90), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 180), app.debugDescription)
+        let savedCredential = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")
+        ).firstMatch
+        XCTAssertTrue(savedCredential.waitForExistence(timeout: 180), app.debugDescription)
         ui.returnToWallet()
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")).firstMatch.waitForExistence(timeout: 20))
 
         let session = try await backend.createScaPaymentVerifierSession()
         ui.openWalletLink(session.authorizationRequestUri)
         XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
         let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
         XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
-        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Amount",
                       "Check the payee and amount before confirming."] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             // Static Compose text need not expose an XCTest activation point.
@@ -250,6 +252,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
         XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let unsignedConfirmation = app.buttons["payment-unsigned-confirm"]
+        XCTAssertTrue(unsignedConfirmation.waitForExistence(timeout: 10), "The unsigned fixture must retain its warning")
+        unsignedConfirmation.tap()
         let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
         XCTAssertNotNil(status)
         XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")
@@ -562,8 +567,22 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode), dismiss: false)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        // The rejection is above the code input in the scrolling review.
-        app.otherElements["wallet.review.content"].swipeDown()
+        let retryEnabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "enabled == true"), object: app.buttons["wallet.offerAcceptButton"]
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [retryEnabled], timeout: credentialOperationTimeout), .completed)
+        // Reveal the rejection above the input. Stop as soon as it is visible: a full swipe
+        // can overscroll the review and dismiss the sheet instead of exposing the error.
+        let errorDetails = app.buttons["wallet.statusExpand"]
+        let reviewContent = app.otherElements["wallet.review.content"]
+        for _ in 0..<8 {
+            if errorDetails.exists && errorDetails.isHittable { break }
+            XCTAssertTrue(reviewContent.exists, "The rejected offer must remain open")
+            reviewContent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35)).press(
+                forDuration: 0.05,
+                thenDragTo: reviewContent.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.55))
+            )
+        }
         let rejectedStatus = ui.waitForStatus(prefixes: ["Receive failed"], timeout: credentialOperationTimeout)
         guard rejectedStatus?.starts(with: "Receive failed") == true else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")

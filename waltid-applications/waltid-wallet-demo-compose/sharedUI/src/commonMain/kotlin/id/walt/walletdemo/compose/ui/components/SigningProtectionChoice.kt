@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.biometricTimedApprovalDescription
 
 @Composable
 internal fun SigningProtectionChoice(
@@ -54,7 +55,7 @@ internal fun WalletDemoSigningProtection.title(): String = when (this) {
 internal fun WalletDemoSigningProtection.description(): String = when (this) {
     WalletDemoSigningProtection.None -> "Private-key operations do not require biometric authorization."
     WalletDemoSigningProtection.Biometric ->
-        "Strong biometric authorization can be reused for signing for 10 seconds."
+        biometricTimedApprovalDescription(10)
     WalletDemoSigningProtection.BiometricPerUse ->
         "Approve every signature with current biometrics. Changing enrolled biometrics invalidates this key."
 }

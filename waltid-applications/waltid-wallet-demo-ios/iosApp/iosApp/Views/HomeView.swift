@@ -38,16 +38,20 @@ struct HomeView: View {
         .sheet(isPresented: Binding(get: { showingTaskSheet }, set: { if !$0 { returnHome() } })) {
             Group {
                 if showingOnlineFlow {
-                    switch viewModel.selectedTab {
-                    case .receive: ReceiveView(viewModel: viewModel, onBack: returnHome)
-                    case .present: PresentView(viewModel: viewModel, onBack: returnHome)
-                    case .credentials: EmptyView()
+                    Group {
+                        switch viewModel.selectedTab {
+                        case .receive: ReceiveView(viewModel: viewModel, onBack: returnHome)
+                        case .present: PresentView(viewModel: viewModel, onBack: returnHome)
+                        case .credentials: EmptyView()
+                        }
                     }
+                    .walletSheetSizing()
                 } else {
+                    // Keep the system's large sheet while switching between camera and
+                    // keyboard input; keyboard avoidance must not race content resizing.
                     WalletScanView(onBack: returnHome, onOpen: openLink)
                 }
             }
-            .walletSheetSizing()
             .interactiveDismissDisabled(showingOnlineFlow && !viewModel.canDismissExternalFlow)
         }
         .sheet(isPresented: Binding(get: { nearbySheet.isPresented }, set: { if !$0 { dismissNearbySheet() } }),

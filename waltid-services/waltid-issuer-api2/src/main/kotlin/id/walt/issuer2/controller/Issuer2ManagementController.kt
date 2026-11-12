@@ -69,6 +69,25 @@ class Issuer2ManagementController(
                 }
             }
 
+            for ((operation, decision) in mapOf("complete" to id.walt.openid4vci.deferred.DeferredStatus.READY, "deny" to id.walt.openid4vci.deferred.DeferredStatus.DENIED)) {
+                post("credential-offers/{offerId}/deferred/$operation", {
+                    summary = "${operation.replaceFirstChar(Char::uppercase)} deferred issuance"
+                    request { pathParameter<String>("offerId") { description = "Existing credential offer ID" } }
+                    response {
+                        HttpStatusCode.NoContent to { description = "Decision recorded (idempotent)" }
+                        HttpStatusCode.NotFound to { description = "Unknown or expired offer" }
+                        HttpStatusCode.Conflict to { description = "Ordinary offer or conflicting decision" }
+                    }
+                }) {
+                    try {
+                        id.walt.openid4vci.deferred.DeferredIssuance(sessionService.deferredStore).decide(requireNotNull(call.parameters["offerId"]), decision)
+                        call.respond(HttpStatusCode.NoContent)
+                    } catch (e: id.walt.openid4vci.deferred.DeferredDecisionException) {
+                        call.respond(HttpStatusCode.fromValue(e.httpStatus), mapOf("error" to e.message))
+                    }
+                }
+            }
+
             get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
                 call.respond(sessionService.listSessions().map(::PublicIssuanceSession))
             }

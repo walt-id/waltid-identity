@@ -77,7 +77,7 @@
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
       "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
-      "title": "Wallet — saved credential"
+      "title": "Wallet \u2014 saved credential"
     },
     {
       "id": "wallet.scan.empty",
@@ -91,7 +91,7 @@
     },
     {
       "id": "wallet.scan.fido",
-      "title": "Scanner — FIDO request",
+      "title": "Scanner \u2014 FIDO request",
       "requirements": [
         "Android system handoff action and iOS system scanner guidance"
       ],
@@ -142,7 +142,7 @@
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
-      "title": "Receiving — selected credentials"
+      "title": "Receiving \u2014 selected credentials"
     },
     {
       "id": "batch.offer.none_selected",
@@ -159,7 +159,7 @@
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
-      "title": "Receiving — saved and deferred"
+      "title": "Receiving \u2014 saved and deferred"
     },
     {
       "id": "payment.mixed_credentials.main",
@@ -209,7 +209,7 @@
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
-      "title": "Nearby sharing — hold near reader",
+      "title": "Nearby sharing \u2014 hold near reader",
       "note": "Synthetic engagement with the decorative animation paused (Compose reduced motion; native inactive scene); no radio session or system NFC prompt."
     },
     {
@@ -220,7 +220,7 @@
         "PIN setup guidance and input"
       ],
       "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
-      "title": "Onboarding — choose a PIN"
+      "title": "Onboarding \u2014 choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -283,7 +283,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "PIN — compact, dark, large text"
+      "title": "PIN \u2014 compact, dark, large text"
     },
     {
       "id": "onboarding.pin.unlock",
@@ -366,7 +366,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "Receiving — compact, dark, large text"
+      "title": "Receiving \u2014 compact, dark, large text"
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -438,7 +438,7 @@
       "composeTest": "missingSavedDetails",
       "swiftTest": "testMissingSavedDetails",
       "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
-      "title": "Receiving — saved details unavailable"
+      "title": "Receiving \u2014 saved details unavailable"
     },
     {
       "id": "onboarding.key.summary",
@@ -493,7 +493,19 @@
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
       "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
-      "title": "Sharing — selected information"
+      "title": "Sharing \u2014 selected information"
+    },
+    {
+      "id": "sharing.information.dates",
+      "composeTest": "sharingInformationDates",
+      "swiftTest": "testSharingInformationDates",
+      "requirements": [
+        "Issued at and Expires show a continuous date, time and parenthesized timezone value",
+        "Unavoidable claim explanation remains visible",
+        "Share and dismissal actions remain reachable"
+      ],
+      "kind": "deterministic",
+      "note": "Numeric SD-JWT claims with the SDK raw display-string fallback, rendered through production consent normalization."
     },
     {
       "id": "sharing.information.alternative",
@@ -650,6 +662,79 @@
         "Localized payment layout with compact large text"
       ],
       "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "payment.scheduled.main",
+      "composeTest": "scheduledPaymentTerms",
+      "swiftTest": "testScheduledPaymentMain",
+      "title": "Scheduled payment",
+      "requirements": [
+        "Issuer-labelled execution timestamp and pinned confirmation action"
+      ],
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
+    },
+    {
+      "id": "payment.scheduled.details",
+      "composeTest": "scheduledPaymentTermsDetails",
+      "swiftTest": "testScheduledPaymentDetails",
+      "title": "Scheduled payment details",
+      "requirements": [
+        "Expanded transaction and PISP details; the payee website remains reachable by scrolling"
+      ],
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
+    },
+    {
+      "id": "payment.recurring.main",
+      "composeTest": "recurringPaymentTerms",
+      "swiftTest": "testRecurringPaymentMain",
+      "title": "Recurring payment",
+      "requirements": [
+        "Recurring timing and merchant-initiated terms remain scrollable with pinned actions"
+      ],
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
+    },
+    {
+      "id": "payment.recurring.details",
+      "composeTest": "recurringPaymentTermsDetails",
+      "swiftTest": "testRecurringPaymentDetails",
+      "title": "Recurring payment details",
+      "requirements": [
+        "Expanded transaction and PISP details remain reachable below all recurring terms"
+      ],
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately."
+    },
+    {
+      "id": "payment.recurring.compact_large_text",
+      "composeTest": "recurringPaymentTermsLargeText",
+      "swiftTest": "testRecurringPaymentCompactLargeText",
+      "title": "Recurring payment at compact width and large text",
+      "requirements": [
+        "Long recurring terms wrap and scroll without obscuring confirmation or cancellation"
+      ],
+      "note": "Synthetic complete TS12 payment in the full sharing review on every platform. Main states start at the top; details and large-text states show a scrolled continuation. Compose exercises expansion and cancellation; native app-host tests cover those interactions separately.",
       "configuration": {
         "android": {
           "viewport": [
@@ -904,7 +989,8 @@
     {
       "id": "settings.reader.import_review",
       "requirements": [
-        "Reader trust import review"
+        "Reader trust import review",
+        "Scrolled validity fields show complete localized timestamps above the import action"
       ],
       "composeTest": "readerTrustImport",
       "swiftTest": "testReaderTrustImport",
@@ -935,6 +1021,57 @@
           "layoutDirection": "rtl"
         },
         "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
+    },
+    {
+      "id": "components.dates",
+      "requirements": [
+        "Date, time and parenthesized geographic timezone form one continuous text value",
+        "DST overlap instants show Budapest CEST and CET despite equal local clock times",
+        "Calendar-only birth date has no time or timezone"
+      ],
+      "composeTest": "dateValues",
+      "swiftTest": "testDateValues",
+      "kind": "deterministic",
+      "note": "Production claim rows; timestamp formatter explicitly uses en-GB and Europe/Budapest while host metadata remains en-US/UTC. Two instants share a local clock time during DST rollback."
+    },
+    {
+      "id": "components.dates.compact_large_text_rtl",
+      "requirements": [
+        "Date, time and parenthesized geographic timezone form one continuous text value",
+        "DST overlap instants retain distinct seasonal zone labels",
+        "Named-zone text wraps at large text size in RTL without clipping",
+        "Calendar-only birth date has no time or timezone"
+      ],
+      "composeTest": "dateValuesCompactRtl",
+      "swiftTest": "testDateValuesCompactRtl",
+      "kind": "deterministic",
+      "note": "Production claim rows at 320x568 with large text and RTL. Timestamp formatter explicitly uses Arabic and Europe/Budapest; host metadata remains en-US/UTC. Two instants share a local clock time during DST rollback. Calendar text remains unchanged.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5,
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5,
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium",
           "layoutDirection": "rtl"
         }
       }
@@ -1106,6 +1243,11 @@
     }
   ],
   "galleryPreview": [
+    "payment.scheduled.main",
+    "payment.scheduled.details",
+    "payment.recurring.main",
+    "payment.recurring.details",
+    "components.dates",
     "wallet.home.credential",
     "onboarding.pin.setup",
     "wallet.scan.empty",
@@ -1116,7 +1258,10 @@
     "settings.root.default"
   ],
   "galleryVariants": [
+    "payment.recurring.compact_large_text",
+    "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",
-    "batch.offer.compact_dark_large_text"
+    "batch.offer.compact_dark_large_text",
+    "components.dates.compact_large_text_rtl"
   ]
 }

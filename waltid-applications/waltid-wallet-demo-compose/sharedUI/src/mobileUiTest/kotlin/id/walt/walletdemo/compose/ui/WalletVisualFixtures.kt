@@ -107,6 +107,7 @@ internal object WalletVisualFixtures {
 
     val payment: WalletDemoPaymentConsent get() = payment("payment")
     val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    fun paymentTerms(recurring: Boolean): WalletDemoPaymentConsent = payment(if (recurring) "paymentRecurring" else "paymentScheduled")
     private fun payment(key: String): WalletDemoPaymentConsent {
         val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(
@@ -117,7 +118,8 @@ internal object WalletVisualFixtures {
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),
-                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")))
+                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")),
+                    path = field["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList())
             },
         )
     }
@@ -126,6 +128,8 @@ internal object WalletVisualFixtures {
         sharingCredentials("sharing")
 
     val informationCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingInformation")
+
+    val dateCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingDates")
 
     private fun sharingCredentials(key: String): List<WalletDemoPresentationCredentialOption> =
         data.getValue(key).jsonObject.getValue("credentials").jsonArray.map { item ->
@@ -142,7 +146,7 @@ internal object WalletVisualFixtures {
                 disclosures = credential.getValue("disclosures").jsonArray.map {
                     val claim = it.jsonObject
                     WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
-                        valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
+                        valueJson = claim.getValue("value").toString(), displayValue = claim.getValue("value").jsonPrimitive.content,
                         selectivelyDisclosable = claim.getValue("selective").jsonPrimitive.boolean,
                         required = claim.getValue("required").jsonPrimitive.boolean,
                         selectable = claim.getValue("selectable").jsonPrimitive.boolean,

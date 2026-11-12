@@ -11,6 +11,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import java.time.Instant
 
@@ -33,6 +34,14 @@ sealed interface ItbWalletInteraction {
 }
 
 class ItbWalletRejection(val code: String) : IllegalStateException("The wallet rejected the presentation request ($code)")
+
+/** Only allowlisted error identifiers and a bounded HTTP status can leave the verifier response. */
+internal class ItbVerifierRejection(response: JsonElement?, status: HttpStatusCode? = null) :
+    IllegalStateException("The verifier rejected the wallet response") {
+    val code: String = ItbWalletDriver.verifierErrorCategory(response)
+        ?: status?.value?.takeIf { it in 100..599 }?.let { "verifier_http_$it" }
+        ?: "verifier_rejected"
+}
 
 /**
  * Exercises the shared wallet with an explicitly supplied holder and credential store.
@@ -119,11 +128,7 @@ class ItbWalletDriver internal constructor(
                 transactionDataTypeRegistry = paymentTypes,
                 scaAuthorizer = scaAuthorizer,
             )
-            check(result.transmissionSuccess == true) {
-                val category = verifierErrorCategory(result.verifierResponse)
-                "The wallet did not transmit the presentation successfully" +
-                    (category?.let { " (verifier error: $it)" } ?: "")
-            }
+            if (result.transmissionSuccess != true) throw ItbVerifierRejection(result.verifierResponse)
         }
     }
 
@@ -180,7 +185,14 @@ class ItbWalletDriver internal constructor(
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject { put("protocol", credential.protocol); put("data", credential.data) }.toString())
         }
-        check(submitted.status.isSuccess()) { "The ITB DC API response endpoint rejected the wallet response" }
+        if (!submitted.status.isSuccess()) {
+            val error = try {
+                Json.parseToJsonElement(submitted.bodyAsText())
+            } catch (_: SerializationException) {
+                null
+            }
+            throw ItbVerifierRejection(error, submitted.status)
+        }
     }
 
     private fun requireSameOrigin(url: Url) {

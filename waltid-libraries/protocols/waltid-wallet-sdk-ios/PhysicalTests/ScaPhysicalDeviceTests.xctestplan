@@ -1,0 +1,39 @@
+{
+  "configurations": [
+    {
+      "id": "E1577000-0000-4000-8000-000000000001",
+      "name": "sca-physical-local",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "environmentVariableEntries": [
+      {
+        "key": "WALLET_SCA_TIMED",
+        "value": "$(WALLET_SCA_TIMED)"
+      }
+    ],
+    "targetForVariableExpansion": {
+      "containerPath": "container:PhysicalTests.xcodeproj",
+      "identifier": "4740AE6347B0172C01254FF5",
+      "name": "PhysicalHost"
+    },
+    "testTimeoutsEnabled": true,
+    "defaultTestExecutionTimeAllowance": 600,
+    "maximumTestExecutionTimeAllowance": 600
+  },
+  "testTargets": [
+    {
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:PhysicalTests.xcodeproj",
+        "identifier": "3A0C9CEF9D8F3BC090274361",
+        "name": "ProximityPhysicalDeviceTests"
+      },
+      "selectedTests": [
+        "ScaPhysicalDeviceTests"
+      ]
+    }
+  ],
+  "version": 1
+}

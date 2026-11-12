@@ -6,10 +6,44 @@ plugins {
 
 group = "id.walt.credentials"
 
+val generateJsonSchemaTestFixtures = tasks.register("generateJsonSchemaTestFixtures") {
+    inputs.files(
+        "src/commonTest/resources/json-schema-remote-policy.json",
+        "src/commonTest/resources/ob_v3p0_achievementcredential_schema.json",
+    )
+    outputs.dir(layout.buildDirectory.dir("generated/json-schema-test-fixtures/kotlin"))
+    doLast {
+        val source = buildString {
+            appendLine("// Generated from commonTest/resources. Do not edit.")
+            appendLine("package id.walt.policies2.vc")
+            appendLine("internal object JsonSchemaTestFixtures {")
+            for (file in inputs.files.files.sortedBy { it.name }) {
+                val name = when (file.name) {
+                    "json-schema-remote-policy.json" -> "issuer"
+                    "ob_v3p0_achievementcredential_schema.json" -> "openBadge"
+                    else -> error("Unexpected schema fixture: ${file.name}")
+                }
+                appendLine("    val $name: String = listOf(")
+                for (chunk in file.readText().chunked(16_000)) {
+                    val literal = groovy.json.JsonOutput.toJson(chunk).replace("$", "\\$")
+                    appendLine("        $literal,")
+                }
+                appendLine("    ).joinToString(\"\")")
+            }
+            appendLine("}")
+        }
+        val destination = outputs.files.singleFile.resolve("id/walt/policies2/vc/JsonSchemaTestFixtures.kt")
+        destination.parentFile.mkdirs()
+        destination.writeText(source)
+    }
+}
 
 kotlin {
 
     sourceSets {
+        commonTest {
+            kotlin.srcDir(generateJsonSchemaTestFixtures.map { it.outputs.files })
+        }
         commonMain.dependencies {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -67,11 +101,6 @@ kotlin {
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.server.netty)
             implementation(identityLibs.mockk)
-        }
-        if (enableIosBuild) {
-            iosTest.dependencies {
-                implementation(identityLibs.ktor.client.darwin)
-            }
         }
     }
 }

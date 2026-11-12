@@ -1,0 +1,7 @@
+<resources>
+    <string name="payment_payee_details">Empfängerdetails</string>
+    <string name="payment_timing_title">Zahlungszeitpunkt</string>
+    <string name="payment_provider_title">Zahlungsauslösedienstleister</string>
+    <string name="payment_load_logo">Empfängerlogo laden</string>
+    <string name="payment_terms_title">Zahlungsbedingungen</string>
+</resources>

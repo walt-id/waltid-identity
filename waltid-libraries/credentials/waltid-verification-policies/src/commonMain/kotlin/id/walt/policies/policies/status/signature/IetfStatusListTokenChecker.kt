@@ -54,6 +54,7 @@ class IetfStatusListTokenChecker(
             throw StatusVerificationError("Status list JWT signature verification failed: ${it.message}")
         }
         authorize(verified.signer, verified.embeddedKeyReference, statusListUri, referencedCredential, signerAuthorizer)
+        IetfStatusListTokenClaims.requireJwtType(token)
         IetfStatusListTokenClaims.validate(verified.payload, statusListUri, nowEpochSeconds())
     }
 
@@ -67,6 +68,7 @@ class IetfStatusListTokenChecker(
             throw StatusVerificationError("Status list CWT signature verification failed: ${it.message}")
         }
         authorize(verified.signer, verified.embeddedKeyReference, statusListUri, referencedCredential, signerAuthorizer)
+        IetfStatusListTokenClaims.requireCwtType(token.hexToByteArray())
         IetfStatusListTokenClaims.validate(verified.payload, statusListUri, nowEpochSeconds())
     }
 

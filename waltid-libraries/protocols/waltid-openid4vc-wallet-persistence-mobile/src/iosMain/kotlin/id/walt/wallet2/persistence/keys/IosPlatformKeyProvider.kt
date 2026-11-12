@@ -1,5 +1,6 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
@@ -91,6 +92,15 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
 
     override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = try {
         signumProvider.restoreSignumKey(stored).let { it.toWalletKeyFacts(id.walt.crypto2.keys.KeyAuthorizationEvidence.CREATION_RECORD) }
+    } catch (cause: Throwable) {
+        throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
+    }
+
+    override suspend fun <T> withFreshBiometricAuthorization(
+        stored: StoredKey.Managed,
+        operation: suspend (Signer) -> T,
+    ): T = try {
+        signumProvider.restoreSignumKey(stored).withFreshBiometricAuthorization(operation)
     } catch (cause: Throwable) {
         throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
     }

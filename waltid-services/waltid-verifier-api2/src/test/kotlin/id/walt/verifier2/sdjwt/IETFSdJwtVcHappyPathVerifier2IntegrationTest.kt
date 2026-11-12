@@ -2,7 +2,7 @@ package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
@@ -156,9 +156,9 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
 
     private fun verifyLifecycle(reattemptable: Boolean?) {
         val host = "127.0.0.1"
-        val port = freePort()
+
         Verifier2WebhookRecorder().start().use { webhook ->
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -168,7 +168,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -181,6 +181,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
             },
             module = Application::verifierModule
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val walletCredential = issueSdJwtVcForHolder(holderDid)
 
@@ -318,7 +319,11 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
             } else {
                 assertNotEquals(originalId, latest.presentationId)
                 assertEquals(HttpStatusCode.OK, http.get("/verification-session/$sessionId/request").status)
-                assertEquals(HttpStatusCode.OK, http.submitForm("/verification-session/$sessionId/request").status)
+                assertEquals(
+                    HttpStatusCode.BadRequest,
+                    http.submitForm("/verification-session/$sessionId/request").status,
+                    "Unsigned sessions stay on GET; request_uri POST requires a signed Request Object",
+                )
                 val afterRequest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
                 assertEquals(latest.presentationId, afterRequest.presentationId)
                 assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, afterRequest.status)

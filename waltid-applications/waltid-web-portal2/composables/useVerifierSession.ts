@@ -1,3 +1,4 @@
+import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
 import {
   formatDcApiPresentationUnsupportedMessage,
   getDcApiPresentationSupport,
@@ -80,7 +81,7 @@ export function useVerifierSession(verifierBase: string) {
           "content-type": "application/json",
           accept: "application/json",
         },
-        body: JSON.stringify(payload),
+        body: stringifyPaymentJson(payload),
       });
       if (!res.ok) {
         const body = await res.text();
@@ -125,7 +126,7 @@ export function useVerifierSession(verifierBase: string) {
             "content-type": "application/json",
             accept: "application/json",
           },
-          body: JSON.stringify(withWallet(withPortalExpectedOrigins(payload))),
+          body: stringifyPaymentJson(withWallet(withPortalExpectedOrigins(payload))),
         },
       );
 
@@ -159,7 +160,7 @@ export function useVerifierSession(verifierBase: string) {
             "content-type": "application/json",
             accept: "application/json",
           },
-          body: JSON.stringify(dcApiResponse),
+          body: stringifyPaymentJson(dcApiResponse),
         },
       );
       sse.addEvent({ event: "DC_API_WALLET_RESPONSE_POSTED" });
@@ -270,7 +271,7 @@ async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
   if (!text) return {} as T;
 
   try {
-    return JSON.parse(text) as T;
+    return parsePaymentJson(text) as T;
   } catch {
     return { raw: text } as T;
   }

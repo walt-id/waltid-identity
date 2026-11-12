@@ -529,6 +529,23 @@ object Verifier2OpenApiExamples {
         openid = OpenId4VPConfig(transactionData = listOf(scaPaymentTransactionData("sca_payment"))),
     )
 
+    /** Future-dated example; portal form examples instead generate dates when selected. */
+    val openid4vpDcApiSdJwtScheduledScaPayment = paymentWithTerms(Json.parseToJsonElement(
+        """{"execution_date":"2099-01-01T12:00:00Z","pisp":{"legal_name":"Example Payments Ltd","brand_name":"Example Payments","domain_name":"payments.example"},"sct_inst":true}"""
+    ).jsonObject)
+
+    val openid4vpDcApiSdJwtRecurringScaPayment = paymentWithTerms(Json.parseToJsonElement(
+        """{"recurrence":{"frequency":"MNTH","number":12,"mit_options":{"amount_variable":true,"min_amount":10,"max_amount":20,"total_amount":200,"initial_amount":5,"initial_amount_number":2,"apr":0.12345}}}"""
+    ).jsonObject)
+
+    private fun paymentWithTerms(terms: JsonObject): DcApiAnnexDFlowSetup {
+        val base = openid4vpDcApiSdJwtScaPayment
+        val openid = requireNotNull(base.openid)
+        return base.copy(openid = openid.copy(transactionData = requireNotNull(openid.transactionData).map { item ->
+            JsonObject(item + ("payload" to JsonObject(item.getValue("payload").jsonObject + terms)))
+        }))
+    }
+
     private fun scaPaymentTransactionData(credentialQueryId: String): JsonObject =
         buildJsonObject {
             put("type", "urn:eudi:sca:payment:1")

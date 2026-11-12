@@ -117,6 +117,7 @@ class MetadataService @JvmOverloads constructor(
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
             CredentialIssuerMetadata.fromBaseUrl(
                 baseUrl = baseUrl,
+                deferredCredentialEndpointPath = "/deferred_credential",
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,

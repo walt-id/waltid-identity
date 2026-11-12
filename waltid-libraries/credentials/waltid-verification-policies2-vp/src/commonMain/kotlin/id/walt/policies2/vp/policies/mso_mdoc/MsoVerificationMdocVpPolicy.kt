@@ -8,6 +8,7 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.time.Clock
 
 
 private const val policyId = "mso_mdoc/mso"
@@ -43,7 +44,7 @@ class MsoVerificationMdocVpPolicy(
         addResult("valid_from", timestamps.validFrom.toString())
         addResult("valid_until", timestamps.validUntil.toString())
         timestamps.precheck()
-        timestamps.validate()
+        timestamps.validate(verificationContext?.verificationTime ?: Clock.System.now())
 
         // EAA-6.2.7.1-04/05 (ETSI TS 119 472-1 v1.2.1): validFrom and validUntil SHALL
         // have seconds precision and SHALL NOT contain fractions of seconds.
