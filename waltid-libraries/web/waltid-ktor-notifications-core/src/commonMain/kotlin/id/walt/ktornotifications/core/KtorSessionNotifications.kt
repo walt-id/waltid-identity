@@ -8,6 +8,15 @@ import kotlinx.serialization.Serializable
 data class KtorSessionNotifications(
     val webhook: VerificationSessionWebhookNotification? = null
 ) {
+    /** Remove authentication material before exposing notifications in sessions or callbacks. */
+    fun withoutCredentials(): KtorSessionNotifications = copy(
+        webhook = webhook?.copy(
+            basicAuthUser = null,
+            basicAuthPass = null,
+            bearerToken = null,
+        ),
+    )
+
     @Serializable
     data class WebhookRetryPolicy(
         @SerialName("max_attempts")
