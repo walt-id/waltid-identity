@@ -7,12 +7,10 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.engagement.DeviceEngagement
 import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.VerificationResult
-import id.walt.mdoc.verification.validateDocumentSignerCertificateChain
-import id.walt.x509.CertificateDer
+import id.walt.mdoc.verification.verifyIssuerAuthentication
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
-import kotlin.io.encoding.Base64
 
 /** Checks a decrypted response without owning the reader's session keys or retrieval channel. */
 @OptIn(ExperimentalSerializationApi::class)
@@ -50,7 +48,7 @@ object MdocProximityVerifier {
             require(document.docType == document.issuerSigned.decodeMobileSecurityObject().docType) {
                 "Document docType differs from the signed MSO docType"
             }
-            validateDocumentSignerCertificateChain(requireNotNull(result.x5c).map { CertificateDer(Base64.decode(it)) })
+            verifyIssuerAuthentication(document)
             result
         }
     }
