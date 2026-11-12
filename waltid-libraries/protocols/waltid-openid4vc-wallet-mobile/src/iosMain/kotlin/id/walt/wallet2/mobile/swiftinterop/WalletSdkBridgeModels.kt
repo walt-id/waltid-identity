@@ -567,8 +567,6 @@ private fun WalletDidEntry.toBridgeStoredDid() = WalletBridgeStoredDid(
  */
 @Serializable
 public enum class WalletBridgeErrorCategory {
-    /** The local semantic status warning changed after host review. */
-    credentialStatusReviewChanged,
     /** Input supplied by the caller is invalid. */
     invalidInput,
 
@@ -604,6 +602,9 @@ public enum class WalletBridgeErrorCategory {
 
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
+
+    /** The local semantic status warning changed after host review. */
+    credentialStatusReviewChanged,
 }
 
 /**
