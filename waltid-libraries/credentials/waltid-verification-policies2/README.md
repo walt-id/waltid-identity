@@ -161,7 +161,7 @@ When working with DCQL presentations, you can re-check that revealed claims sati
 ## Available policies
 
 ### `signature`
-Verifies the cryptographic signature of a credential.
+Verifies the cryptographic signature of a credential. For DID issuers, JWT and SD-JWT credential signing keys must be authorized by `assertionMethod`, either by reference or as embedded verification methods. Authentication-only keys and DID documents without assertion methods are rejected.
 
 **Use case:** Ensure credential authenticity and integrity.
 
@@ -203,7 +203,7 @@ Validates that a credential is not being used before its `notBefore` or `issuedA
 ---
 
 ### `allowed-issuer`
-Validates that the credential issuer is in an allowed list.
+Validates that the parsed credential issuer is in an allowed list, including an issuer present only in the outer JWT `iss`. A missing issuer fails the policy.
 
 **Use case:** Restrict credentials to trusted issuers only.
 
