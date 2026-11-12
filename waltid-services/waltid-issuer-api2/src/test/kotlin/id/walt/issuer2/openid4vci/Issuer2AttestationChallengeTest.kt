@@ -408,11 +408,18 @@ class Issuer2AttestationChallengeTest {
         )
 
         suspend fun session(method: AuthenticationMethod): DefaultSession {
+            val now = Clock.System.now()
+            val expiresAt = if (method == AuthenticationMethod.PRE_AUTHORIZED) {
+                val policy = config.preAuthorizedCodePolicy
+                policy.offerExpiresAt(policy.maxLifetimeSeconds, now)
+            } else {
+                now + 10.minutes
+            }
             val session = IssuanceSession(
                 sessionId = UUID.randomUUID().toString(), authenticationMethod = method,
                 issuanceRequests = listOf(IssuanceRequest("credential", "profile", "identity", JsonObject(emptyMap()),
                     credentialData = JsonObject(emptyMap()))),
-                expiresAt = Clock.System.now() + 10.minutes,
+                expiresAt = expiresAt,
             )
             sessions.saveSession(session)
             return DefaultSession(subject = session.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt))
