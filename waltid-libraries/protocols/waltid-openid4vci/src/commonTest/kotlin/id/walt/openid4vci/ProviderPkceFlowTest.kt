@@ -70,7 +70,10 @@ class ProviderPkceFlowTest {
             emptyList<String>() to OAuthErrorCodes.INVALID_REQUEST,
             listOf(verifier, "") to OAuthErrorCodes.INVALID_REQUEST,
             listOf("", verifier) to OAuthErrorCodes.INVALID_REQUEST,
-            listOf("") to OAuthErrorCodes.INVALID_GRANT,
+            listOf("") to OAuthErrorCodes.INVALID_REQUEST,
+            listOf("", "") to OAuthErrorCodes.INVALID_REQUEST,
+            listOf(" $verifier") to OAuthErrorCodes.INVALID_GRANT,
+            listOf("$verifier ") to OAuthErrorCodes.INVALID_GRANT,
             listOf("x".repeat(43)) to OAuthErrorCodes.INVALID_GRANT,
             listOf("a".repeat(42)) to OAuthErrorCodes.INVALID_GRANT,
             listOf("a".repeat(129)) to OAuthErrorCodes.INVALID_GRANT,
@@ -86,6 +89,30 @@ class ProviderPkceFlowTest {
             assertEquals(0, fixture.tokenCalls)
             assertEquals(0, fixture.refreshWrites)
             assertNull(fixture.codes.records[code])
+        }
+    }
+
+    @Test
+    fun emptyPkceParametersCompleteOptionalDirectAndParFlows() = runTest {
+        for (usePar in listOf(false, true)) {
+            val fixture = Fixture()
+            val form = authorizationForm(null) + mapOf(
+                "code_challenge" to listOf(""), "code_challenge_method" to listOf(""),
+            )
+            val request = if (usePar) {
+                val pushed = assertIs<AuthorizationRequestResult.Success>(fixture.provider.createPushedAuthorizationRequest(form)).request
+                val response = assertIs<PushedAuthorizationResponseResult.Success>(fixture.provider.createPushedAuthorizationResponse(pushed)).response
+                assertIs<AuthorizationRequestResult.Success>(fixture.provider.createAuthorizationRequest(mapOf(
+                    "client_id" to listOf("wallet"), "request_uri" to listOf(response.requestUri),
+                ))).request
+            } else assertIs<AuthorizationRequestResult.Success>(fixture.provider.createAuthorizationRequest(form)).request
+            val code = assertIs<AuthorizationResponseResult.Success>(fixture.provider.createAuthorizationResponse(request, session)).response.code
+            val stored = Json.decodeFromString<DefaultAuthorizationCodeRecord>(fixture.codes.records.getValue(code))
+            assertEquals(PkceBinding.NotUsed, stored.pkceBinding)
+            assertIs<AccessTokenResponseResult.Success>(redeem(fixture, code, listOf("")))
+            assertEquals(1, fixture.resolverCalls)
+            assertEquals(1, fixture.tokenCalls)
+            assertEquals(1, fixture.refreshWrites)
         }
     }
 
