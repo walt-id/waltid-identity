@@ -56,6 +56,8 @@ Settled-state captures advance the Compose virtual clock before capture. Android
 
 The wallet module defaults ordinary Gradle tests to verification from both Identity and coordinated build roots, with mode and baselines tracked as test inputs. The `roborazzi.test.verify` project property remains an explicit override; CI rejects disabled verification and recording or compare-only modes. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 
+The test-owned iOS simulator must use English (US) and a 12-hour clock to match the catalogue metadata. For a newly created simulator, set `AppleLocale` to `en_US`, `AppleLanguages` to `[en-US]` and `AppleICUForce24HourTime` to `false` in its global defaults before running comparisons or recording. Run Gradle with `TZ=UTC`; explicit localized/RTL date scenarios retain their own formatter overrides.
+
 ## Deliberate baseline updates
 
 Use the same destinations and fixture configuration. For Compose, invoke `sharedUI:testAndroidHostTest --tests '*WalletVisualAndroidTest'` or `sharedUI:iosSimulatorArm64Test --device "$WALLET_VISUAL_SIMULATOR_ID" --tests '*WalletVisualIosTest'` with `-Proborazzi.test.record=true -Proborazzi.test.verify=false`. The task paths use the full `:waltid-applications:waltid-wallet-demo-compose:` prefix. The outer `recordRoborazziIosSimulatorArm64` task does not accept the native test's `--device` argument. The comparison runner intentionally has no recording option. For native tests, add `"WALLET_VISUAL_RECORD":"1"` to `testRunnerEnv`. Point-Free deliberately reports record-mode assertions as failures; this is not a successful verification run.
