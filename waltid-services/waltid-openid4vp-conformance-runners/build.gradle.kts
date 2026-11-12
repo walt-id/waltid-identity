@@ -55,6 +55,8 @@ dependencies {
 
     /* -- Misc --*/
 
+    implementation(identityLibs.zxing.core)
+
     // Config
     implementation(identityLibs.hoplite.core)
     implementation(identityLibs.hoplite.hocon)

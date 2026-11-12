@@ -11,7 +11,7 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
 | Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
-| Mobile key storage | [waltid-crypto](../waltid-libraries/crypto/waltid-crypto/README.md) |
+| Mobile cryptography | [Crypto2](../waltid-libraries/crypto/waltid-crypto2/README.md) and [Signum](../waltid-libraries/crypto/waltid-crypto2-signum/README.md) |
 
 ## IDE guidance
 
@@ -19,7 +19,7 @@ Use Android Studio for Android application and Android Gradle Plugin work. Intel
 
 Use Xcode for the iOS app and simulator work. Use the command line for CI-like checks.
 
-The Compose demo app's Android and iOS targets are the supported mobile demo targets. Its Web/Wasm module is a mock UI preview only; it does not run the mobile wallet SDK, platform-backed keys, persistence, EUDI flows, or Enterprise flows.
+The Compose demo app's Android and iOS targets use the mobile wallet SDK with platform-backed keys and local persistence. Its Web/Wasm host is a separate custodial demo backed by Wallet API2.
 
 ## Whitelabel branding
 
@@ -92,7 +92,7 @@ sdk.dir=/path/to/android-sdk
 
 enableAndroidBuild=true
 enableIosBuild=true
-# Optional: enables the mock Web/Wasm preview module.
+# Optional: enables the custodial Web/Wasm demo.
 # enableWalletDemoComposeWeb=true
 ```
 
@@ -104,7 +104,57 @@ biometric prompt. iOS callers must run on a physical Secure Enclave device and
 declare `NSFaceIDUsageDescription` in the host app's `Info.plist`; simulator
 preflight is expected to report `BiometricUnavailable`.
 
-Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
+Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag enables the custodial web demo.
+
+## Wallet provider
+
+The sample apps leave the Enterprise Wallet Provider unset. They do not call `https://org4.enterprise.demo.walt.id` or `org4.demo.wallet-provider`. That hosted service is not provisioned. Ordinary Portal2 issuance and presentation are unchanged.
+
+With no provider configured:
+
+- An issuer that does not require attestation never calls a wallet provider.
+- An issuer that allows anonymous pre-authorized access can still redeem the token. If it also requires a key attestation, issuance stops before the credential request and stores nothing.
+- An issuer whose only token method is `attest_jwt_client_auth`, and which does not allow anonymous access, still receives a token request without a wallet instance attestation. The issuer rejects it, and nothing is stored.
+
+Point a wallet at a test environment with `baseUrl` (Enterprise API origin), `servicePath` (`organization.tenant.service`), and `bearerToken` (an Enterprise session token). An empty bearer sends no `Authorization` header, and the provider rejects the call. `composition` must match that provider: `wia_ka` (default), `wia`, or `ka`. A `ka` provider is used only for key attestations. The unit id lasts for the wallet process; restarting the app activates another unit.
+
+Kotlin:
+
+```kotlin
+MobileWalletConfig(
+    walletId = "consumer-wallet",
+    walletProvider = WalletProviderConfig(
+        baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
+        servicePath = "{org}.{tenant}.wallet-provider",
+        bearerToken = enterpriseSessionToken,
+        composition = "wia_ka",
+    ),
+)
+```
+
+Swift:
+
+```swift
+WalletConfiguration(
+    walletID: "consumer-wallet",
+    walletProvider: WalletProviderConfiguration(
+        baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
+        servicePath: "{org}.{tenant}.wallet-provider",
+        bearerToken: enterpriseSessionToken,
+        composition: "wia_ka"
+    )
+)
+```
+
+The Compose demo turns this on through `DemoWalletConfig`. `walletProviderEnabled` stays `false`. Set it to `true` and supply the test URL, service path, and bearer. The enabled config always uses composition `wia_ka`.
+
+| App | Where to set it |
+|-----|-----------------|
+| Compose Android | `demoWalletConfig()` in `waltid-applications/waltid-wallet-demo-compose/androidApp/src/main/java/id/walt/walletdemo/compose/android/DemoWalletConfiguration.kt` |
+| Compose iOS | `DemoWalletConfig(...)` in `waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/kotlin/id/walt/walletdemo/compose/ui/WalletDemoIos.kt` |
+| Native iOS | `walletProvider:` on `WalletConfiguration` in `waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ViewModels/WalletViewModel.swift` |
+
+Do not enable the hosted demo constants. They name a provider that is not deployed.
 
 ## iOS physical-device and Digital Credentials setup
 
@@ -409,7 +459,7 @@ or non-PR comparisons, pass an explicit base with `--base-ref origin/<base-branc
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
 - **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, or pass `-PenableIosBuild=true`, then reload Gradle.
-- **Web/Wasm preview module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
+- **Web/Wasm demo module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
 - **Enterprise mobile fixture cannot be reached from Android:** make sure an emulator or device is booted and `adb reverse` is available.

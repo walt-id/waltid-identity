@@ -173,10 +173,22 @@ data class Verification2Session(
             VerificationSessionStatus.PROCESSING_FLOW,
         )
 
+    /** Explicit lifecycle policy takes precedence over the persisted legacy reattemptable flag. */
+    val sessionUsage: VerificationSessionUsage
+        get() = setup.core.sessionUsage ?: if (reattemptable) VerificationSessionUsage.REUSABLE else VerificationSessionUsage.SINGLE_SUCCESS
+
+    val isConsumed: Boolean
+        get() = when (sessionUsage) {
+            VerificationSessionUsage.SINGLE_ATTEMPT -> attempted || status.successful != null
+            VerificationSessionUsage.SINGLE_SUCCESS -> status == VerificationSessionStatus.SUCCESSFUL
+            VerificationSessionUsage.REUSABLE -> false
+        }
+
     fun requireAvailable(now: Instant = Clock.System.now()) {
         require(expirationDate?.let { now < it } != false) { "This verification session is expired." }
-        require(reattemptable || status != VerificationSessionStatus.SUCCESSFUL) {
-            "This verification session has already completed successfully."
+        require(!isConsumed) {
+            if (sessionUsage == VerificationSessionUsage.SINGLE_ATTEMPT) "This verification session has already received a presentation."
+            else "This verification session has already completed successfully."
         }
     }
 

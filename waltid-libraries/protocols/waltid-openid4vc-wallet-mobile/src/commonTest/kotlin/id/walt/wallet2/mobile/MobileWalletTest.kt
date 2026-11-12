@@ -344,6 +344,7 @@ class MobileWalletTest {
         val (
             walletId,
             attestationConfig,
+            walletProvider,
             persistence,
             onEvent,
             preferredLocales,
@@ -354,6 +355,7 @@ class MobileWalletTest {
 
         assertEquals("default", walletId)
         assertEquals(null, attestationConfig)
+        assertEquals(null, walletProvider)
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)
         assertEquals(emptyList(), transactionDataProfiles)
