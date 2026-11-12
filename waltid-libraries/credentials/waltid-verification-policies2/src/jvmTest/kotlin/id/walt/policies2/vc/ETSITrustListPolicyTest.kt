@@ -4,6 +4,8 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
+import id.walt.crypto.keys.Key as LegacyKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -391,7 +393,7 @@ class ETSITrustListPolicyTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
 
-    private suspend fun generateP256Key(keyId: KeyId): id.walt.crypto2.keys.Key =
+    private suspend fun generateP256Key(keyId: KeyId): Crypto2Key =
         runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = keyId,
@@ -400,13 +402,13 @@ class ETSITrustListPolicyTest {
             )
         )
 
-    private suspend fun publicJwk(key: id.walt.crypto2.keys.Key): JsonObject =
+    private suspend fun publicJwk(key: Crypto2Key): JsonObject =
         Json.parseToJsonElement(
             key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()
         ).jsonObject
 
     /** Generates a P-256 key and derives its self-contained `did:jwk:` identifier. */
-    private suspend fun generateIssuerKeyAndDid(keyId: KeyId): Pair<id.walt.crypto2.keys.Key, String> {
+    private suspend fun generateIssuerKeyAndDid(keyId: KeyId): Pair<Crypto2Key, String> {
         DidService.minimalInit()
         val key = generateP256Key(keyId)
         val did = "did:jwk:" + base64Url.encode(publicJwk(key).toString().encodeToByteArray())
@@ -416,7 +418,7 @@ class ETSITrustListPolicyTest {
     /** Base64 DER certificates of a fresh IACA root and a Document Signer certificate for [signerKey]. */
     private class DocumentSignerChain(val rootCertificate: String, val signerCertificate: String)
 
-    private suspend fun documentSignerChain(signerKey: id.walt.crypto2.keys.Key): DocumentSignerChain {
+    private suspend fun documentSignerChain(signerKey: Crypto2Key): DocumentSignerChain {
         val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
         val now = Clock.System.now()
         val rootKey = generateP256Key(KeyId("iaca-root-key"))
@@ -443,7 +445,7 @@ class ETSITrustListPolicyTest {
 
     /** An SD-JWT VC without disclosures, signed by [key], with an optional single-certificate `x5c`. */
     private suspend fun signedSdJwtVc(
-        key: id.walt.crypto2.keys.Key,
+        key: Crypto2Key,
         iss: String,
         kid: String,
         x5cCertificate: String?,
@@ -475,6 +477,7 @@ class ETSITrustListPolicyTest {
         override suspend fun resolve(did: String): Result<JsonObject> = Result.success(
             buildJsonObject {
                 put("id", did)
+                putJsonArray("assertionMethod") { add("$did#key-1") }
                 putJsonArray("verificationMethod") {
                     add(buildJsonObject {
                         put("id", "$did#key-1")
@@ -486,10 +489,10 @@ class ETSITrustListPolicyTest {
             }
         )
 
-        override suspend fun resolveToKey(did: String): Result<id.walt.crypto.keys.Key> =
+        override suspend fun resolveToKey(did: String): Result<LegacyKey> =
             Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
 
-        override suspend fun resolveToKeys(did: String): Result<Set<id.walt.crypto.keys.Key>> =
+        override suspend fun resolveToKeys(did: String): Result<Set<LegacyKey>> =
             Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
     }
 
