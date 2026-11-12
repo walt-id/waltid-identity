@@ -13,7 +13,9 @@ sealed interface TrustRequirement {
 
     /**
      * The decision must be [TrustDecisionCode.TRUSTED], from a source that did not fail authentication
-     * and has not expired. Static anchors satisfy this level.
+     * and has not expired. If the request names expected entity types, the decision must also name a
+     * matched entity of one of them. Static anchors and the development allow-all adapter hold no roles
+     * and are exempt from that, so static anchors satisfy this level.
      */
     data object Trusted : TrustRequirement
 
@@ -56,12 +58,27 @@ suspend fun TrustDecisionEvaluator?.check(request: TrustDecisionRequest, require
     return if (reason == null) TrustCheck.Accepted(decision) else TrustCheck.Rejected(reason, decision)
 }
 
+/**
+ * Evidence of adapters that hold no registry roles: their decisions name no entity by design, and the
+ * anchors (or the development setup) chosen per purpose stand in for the role check.
+ */
+private val ROLE_LESS_EVIDENCE_TYPES = setOf(
+    StaticTrustDecisionEvaluator.EVIDENCE_TYPE,
+    InsecureAllowAllTrustDecisionEvaluator.EVIDENCE_TYPE,
+)
+
 private fun rejectionReason(decision: TrustDecision, request: TrustDecisionRequest, requirement: TrustRequirement): String? {
     if (decision.decision != TrustDecisionCode.TRUSTED) return "Trust decision is ${decision.decision}"
 
+    val expectedTypes = request.expectedEntityTypes
     val matchedType = decision.matchedEntity?.entityType
-    if (matchedType != null && request.expectedEntityTypes.isNotEmpty() && matchedType !in request.expectedEntityTypes) {
-        return "Matched entity type $matchedType is not one of ${request.expectedEntityTypes}"
+    if (expectedTypes.isNotEmpty()) {
+        if (matchedType == null && decision.evidence.none { it.type in ROLE_LESS_EVIDENCE_TYPES }) {
+            return "Trust decision names no matched entity, so it does not show one of $expectedTypes"
+        }
+        if (matchedType != null && matchedType !in expectedTypes) {
+            return "Matched entity type $matchedType is not one of $expectedTypes"
+        }
     }
 
     val assurance = decision.sourceAssurance

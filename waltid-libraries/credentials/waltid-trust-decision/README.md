@@ -29,14 +29,14 @@ Take the expected entity types and the requirement from your own configuration o
 | Requirement | Accepts | Satisfied by |
 |---|---|---|
 | `NotRequired` | everything; the evaluator is not called | n/a |
-| `Trusted` | `TRUSTED`, source authentication not `FAILED`, freshness not `EXPIRED` | static anchors, registries |
+| `Trusted` | `TRUSTED`, source authentication not `FAILED`, freshness not `EXPIRED`; with expected entity types, a matched entity of one of them (static anchors and allow-all hold no roles and are exempt) | static anchors, registries |
 | `RegistryFresh(requireAuthenticated)` | `TRUSTED` with a matched entity of an expected type, from an accepted `FRESH` source (and `AUTHENTICATED` if required) | registries only |
 
 ## Adapters
 
 | Adapter | Use |
 |---|---|
-| `StaticTrustDecisionEvaluator(anchors per purpose)` | PKIX validation against configured anchors. Freshness `UNKNOWN`. A purpose without anchors is `UNSUPPORTED_SOURCE`. |
+| `StaticTrustDecisionEvaluator(anchors per purpose)` | PKIX validation against configured anchors, up to the first presented certificate that is itself an anchor, so a pinned leaf may come with its issuers. Freshness `UNKNOWN`. A purpose without anchors is `UNSUPPORTED_SOURCE`. |
 | `HttpTrustDecisionEvaluator(resolveUrl, headers)` | Remote registry over the `resolve/certificate-chain` contract: the Enterprise route with a bearer token, or a compatible resolver such as the one `ETSITrustListPolicy` calls (no OSS service serves it). Unavailable is `UNKNOWN`. |
 | `InsecureAllowAllTrustDecisionEvaluator` | Development only. Trusts everything with `UNKNOWN` freshness, so `RegistryFresh` still rejects. |
 | `TrustDecisionEvaluator { ... }` | Lambda for tests and fixtures. |

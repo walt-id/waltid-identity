@@ -15,10 +15,16 @@ import kotlin.io.encoding.Base64
  * Validates certificate chains against configured anchors per purpose (PKIX path validation through
  * [X509CertificateUtil]).
  *
+ * The chain is validated up to the first certificate that is itself one of the anchors (same DER), so a
+ * pinned leaf or intermediate may still be presented with its own issuers. This is the rule of
+ * `X5cTrustAnchors` in `waltid-credential-key-resolver`, so a pin gets the same answer from both.
+ * A certificate that is only in the chain, such as a root with an anchor's name, is never an anchor.
+ *
  * Static anchors carry no registry roles and no freshness: decisions report [FreshnessState.UNKNOWN]
  * and an unaccepted source, so they satisfy [TrustRequirement.Trusted] but never
- * [TrustRequirement.RegistryFresh]. Certificate validity is checked at the current time, not at
- * [TrustDecisionRequest.at].
+ * [TrustRequirement.RegistryFresh]. The anchors configured per purpose stand in for the role check, so
+ * decisions name no entity and carry [EVIDENCE_TYPE] evidence instead. Certificate validity is checked
+ * at the current time, not at [TrustDecisionRequest.at].
  *
  * A purpose without anchors yields [TrustDecisionCode.UNSUPPORTED_SOURCE].
  */
@@ -40,8 +46,13 @@ class StaticTrustDecisionEvaluator(
             }
         }
 
+        val anchorIndex = chain.indexOfFirst { certificate ->
+            store.findCertificateBySubjectDn(certificate.data.subjectDn).any { it.encodedDer == certificate.encodedDer }
+        }
+        val path = if (anchorIndex < 0) chain else chain.take(anchorIndex + 1)
+
         val result = try {
-            X509CertificateUtil.validateCertificateChain(chain, store)
+            X509CertificateUtil.validateCertificateChain(path, store)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

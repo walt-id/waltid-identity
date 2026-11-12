@@ -6,6 +6,8 @@ import id.walt.trust.model.FreshnessState
 import id.walt.trust.model.TrustDecisionCode
 import id.walt.trust.model.TrustedEntityType
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,6 +15,9 @@ import kotlin.test.assertIs
 class StaticTrustDecisionEvaluatorTest {
 
     private fun anchors(pem: String) = InMemoryTrustStore(listOf(X509CertificateUtil.parseCertificatePem(pem)))
+
+    private fun leafCertificate() =
+        X509CertificateUtil.parseCertificateDerEncoded(ByteString(Base64.decode(TestCertificates.LEAF_DER_BASE64)))
 
     private val evaluator = StaticTrustDecisionEvaluator(
         mapOf(TrustPurpose.ISSUER_WUA_SIGNER to anchors(TestCertificates.TRUSTED_ROOT_PEM))
@@ -37,6 +42,28 @@ class StaticTrustDecisionEvaluatorTest {
         )
 
         val decision = other.evaluate(request(listOf(TestCertificates.LEAF_DER_BASE64)))
+
+        assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
+    }
+
+    @Test
+    fun pinnedLeafIsTrustedAloneAndWithItsIssuer() = runTest {
+        val pinned = StaticTrustDecisionEvaluator(
+            mapOf(TrustPurpose.ISSUER_WUA_SIGNER to InMemoryTrustStore(listOf(leafCertificate())))
+        )
+
+        assertEquals(TrustDecisionCode.TRUSTED, pinned.evaluate(request(listOf(TestCertificates.LEAF_DER_BASE64))).decision)
+        assertEquals(
+            TrustDecisionCode.TRUSTED,
+            pinned.evaluate(request(listOf(TestCertificates.LEAF_DER_BASE64, TestCertificates.TRUSTED_ROOT_PEM))).decision,
+        )
+    }
+
+    @Test
+    fun rootWithTheAnchorsNameButAnotherKeyIsNotTrusted() = runTest {
+        val decision = evaluator.evaluate(
+            request(listOf(TestCertificates.ATTACKER_LEAF_DER_BASE64, TestCertificates.ATTACKER_ROOT_PEM))
+        )
 
         assertEquals(TrustDecisionCode.NOT_TRUSTED, decision.decision)
     }

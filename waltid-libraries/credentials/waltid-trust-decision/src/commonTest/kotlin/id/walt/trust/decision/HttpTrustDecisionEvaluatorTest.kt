@@ -107,12 +107,13 @@ class HttpTrustDecisionEvaluatorTest {
     }
 
     @Test
-    fun minimalLegacyAnswerIsTrustedButNotRegistryFresh() = runTest {
+    fun minimalLegacyAnswerMeetsTrustedOnlyWithoutExpectedTypes() = runTest {
         val evaluator = evaluator { json("""{"decision":"TRUSTED"}""") }
-        val request = request(TrustedEntityType.WALLET_PROVIDER)
+        val typed = request(TrustedEntityType.WALLET_PROVIDER)
 
-        assertIs<TrustCheck.Accepted>(evaluator.check(request, TrustRequirement.Trusted))
-        assertIs<TrustCheck.Rejected>(evaluator.check(request, TrustRequirement.RegistryFresh()))
+        assertIs<TrustCheck.Accepted>(evaluator.check(request(), TrustRequirement.Trusted))
+        assertIs<TrustCheck.Rejected>(evaluator.check(typed, TrustRequirement.Trusted))
+        assertIs<TrustCheck.Rejected>(evaluator.check(typed, TrustRequirement.RegistryFresh()))
     }
 
     @Test

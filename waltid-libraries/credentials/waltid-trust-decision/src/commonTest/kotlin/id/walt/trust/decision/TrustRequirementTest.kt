@@ -71,6 +71,22 @@ class TrustRequirementTest {
     }
 
     @Test
+    fun trustedWithExpectedTypesNeedsAMatchedEntityOfOneOfThem() = runTest {
+        val noEntity = registryDecision().copy(matchedEntity = null)
+
+        assertIs<TrustCheck.Rejected>(checkWith(noEntity, TrustRequirement.Trusted))
+        assertIs<TrustCheck.Rejected>(checkWith(registryDecision(entityType = TrustedEntityType.PID_PROVIDER), TrustRequirement.Trusted))
+        assertIs<TrustCheck.Accepted>(
+            TrustDecisionEvaluator { noEntity }.check(request.copy(expectedEntityTypes = emptySet()), TrustRequirement.Trusted)
+        )
+    }
+
+    @Test
+    fun insecureAllowAllMeetsTrustedWithExpectedTypes() = runTest {
+        assertIs<TrustCheck.Accepted>(InsecureAllowAllTrustDecisionEvaluator.check(request, TrustRequirement.Trusted))
+    }
+
+    @Test
     fun registryFreshAcceptsOnlyFreshAcceptedRegistryMatches() = runTest {
         val fresh = TrustRequirement.RegistryFresh()
 
