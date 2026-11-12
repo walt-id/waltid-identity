@@ -33,7 +33,7 @@ final class ProximityPhysicalDeviceTests: XCTestCase {
 
     private func exchange(holder: WalletCore.PhysicalProximityHolder, nfc: IOSNfcHostPlatformAdapter,
                           run: PhysicalPreflight, round: Int) async throws {
-        let configuration = configuration(run.configuration)
+        let configuration = try configuration(run.configuration)
         let core = try await holder.start(configuration: configuration.toKMPConfiguration())
         let session = WalletSDK.ProximitySession(bridge: KMPProximityPresentationSessionBridge(session: core, nfcHost: nfc))
         var approvedReview: WalletSDK.ProximityReview?
@@ -54,8 +54,8 @@ final class ProximityPhysicalDeviceTests: XCTestCase {
                 case .reviewRequired(let review, _):
                     let option = try XCTUnwrap(review.documents.first?.credentialOptions.first)
                     XCTAssertEqual(Set(option.requestedElements.map(\.elementIdentifier)), ["given_name", "family_name"])
-                    let fields: Set<WalletSDK.ProximityElementReference> = Set(["given_name", "family_name"].map {
-                        .init(namespace: "org.iso.18013.5.1", elementIdentifier: $0)
+                    let fields: Set<WalletSDK.ProximityElementReference> = try Set(["given_name", "family_name"].map {
+                        try .init(namespace: "org.iso.18013.5.1", elementIdentifier: $0)
                     })
                     let submission = try WalletSDK.ProximitySubmission(documents: [
                         .init(requestIndex: 0, credentialID: "peer-mdl", disclosedElements: fields)
@@ -103,10 +103,10 @@ final class ProximityPhysicalDeviceTests: XCTestCase {
         }
     }
 
-    private func configuration(_ name: String) -> WalletSDK.ProximityConfiguration {
+    private func configuration(_ name: String) throws -> WalletSDK.ProximityConfiguration {
         let ble = WalletSDK.ProximityBLEConfiguration(roles: name.hasSuffix("peripheral") ? .peripheralServer : .centralClient,
             bearerPolicy: name.hasPrefix("ble-l2cap") ? .preferL2CAP : .gattOnly)
-        return .init(session: name == "nfc-ble-continuation"
+        return try .init(session: name == "nfc-ble-continuation"
             ? .nfc(.init(handover: .staticHandover, retrieval: .init(bluetoothLowEnergy: ble)))
             : .qr(.init(bluetoothLowEnergy: ble)))
     }

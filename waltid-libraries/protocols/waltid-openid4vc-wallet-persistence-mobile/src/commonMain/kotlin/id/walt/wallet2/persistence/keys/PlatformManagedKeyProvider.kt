@@ -1,5 +1,8 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationException
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
@@ -27,11 +30,24 @@ public interface PlatformManagedKeyProvider {
 
     /** Imports private material into native storage. Implementations must verify the public key. */
     public suspend fun importManagedKey(request: WalletKeyCreationRequest,
-        material: id.walt.crypto2.keys.EncodedKey.Jwk): ManagedKey =
+        material: EncodedKey.Jwk): ManagedKey =
         throw UnsupportedOperationException("Native private-key import is unavailable")
 
     /** Inspects actual key origin and protection without claiming certification. */
     public suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = PlatformKeyFacts()
+
+    /**
+     * Applies fresh native biometrics to a timed key and lends a single-use signer to [operation].
+     * The signer cannot prompt again, outlive the callback or extend the immutable reuse period.
+     * This authorizes key use; the caller must bind its operation to reviewed payment consent.
+     */
+    public suspend fun <T> withFreshBiometricAuthorization(
+        stored: StoredKey.Managed,
+        operation: suspend (Signer) -> T,
+    ): T = throw KeyUseAuthorizationException(
+        KeyUseAuthorizationFailure.UnsupportedCombination,
+        "Fresh biometric signing is unavailable",
+    )
 
     /** Reads the immutable wallet authorization policy encoded in a managed-key descriptor. */
     public fun keyUseAuthorizationPolicy(stored: StoredKey.Managed): KeyUseAuthorizationPolicy

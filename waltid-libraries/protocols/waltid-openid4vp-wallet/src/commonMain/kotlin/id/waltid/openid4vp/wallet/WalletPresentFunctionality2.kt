@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.walt.crypto2.keys.Signer
 import id.walt.verifier.openid.transactiondata.parseTs12PaymentEntries
 import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
@@ -1579,7 +1580,7 @@ object WalletPresentFunctionality2 {
         }
 
         val proofId = scaContext?.let { UuidUtils.randomUUIDString() }
-        val authentication = scaContext?.let { context ->
+        val presentation = scaContext?.let { context ->
             currentCoroutineContext().ensureActive()
             val confirmationKey = (issuerClaims["cnf"] as? JsonObject)?.get("jwk") as? JsonObject
             requireNotNull(confirmationKey) { "TS12 requires the credential's cnf.jwk holder key" }
@@ -1591,7 +1592,7 @@ object WalletPresentFunctionality2 {
             require(jwkThumbprint(confirmationKey) == actual) {
                 "TS12 signing key does not match the credential's holder key"
             }
-            val presentation = ScaPresentation(
+            ScaPresentation(
                 proofId = requireNotNull(proofId),
                 credentialId = context.credentialId,
                 holderKeyId = crypto2Key?.id?.value ?: requireNotNull(holderKey).getKeyId(),
@@ -1602,47 +1603,58 @@ object WalletPresentFunctionality2 {
                 sdHash = sdHash,
                 transactionData = transactionData.orEmpty().toList(),
             )
-            context.authorizer.authorize(presentation).also { currentCoroutineContext().ensureActive() }
         }
-        payments.forEach { it.requireCurrent(paymentClock.now()) }
-        val kbJwtPayload = buildJsonObject {
-            if (scaContext != null) {
-                put("jti", requireNotNull(proofId))
-                put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
-                put("amr", requireNotNull(authentication).toJson())
-            }
-            put("aud", JsonPrimitive(audience))
-            put("nonce", JsonPrimitive(nonce))
-            put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
-            put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
-            transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
-                put(
-                    "transaction_data_hashes",
-                    buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
-                )
-                if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
+        suspend fun signProof(authentication: ScaAuthenticationMethods?, signer: Signer?): String {
+            currentCoroutineContext().ensureActive()
+            payments.forEach { it.requireCurrent(paymentClock.now()) }
+            val kbJwtPayload = buildJsonObject {
+                if (scaContext != null) {
+                    put("jti", requireNotNull(proofId))
+                    put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
+                    put("amr", requireNotNull(authentication).toJson())
+                }
+                put("aud", JsonPrimitive(audience))
+                put("nonce", JsonPrimitive(nonce))
+                put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
+                put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+                transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
                     put(
-                        "transaction_data_hashes_alg",
-                        JsonPrimitive(transactionDataHashAlgorithm),
+                        "transaction_data_hashes",
+                        buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
                     )
+                    if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
+                        put(
+                            "transaction_data_hashes_alg",
+                            JsonPrimitive(transactionDataHashAlgorithm),
+                        )
+                    }
                 }
             }
-        }
-        val proof = if (crypto2Key != null) {
-            CompactJws.sign(
-                payload = Json.encodeToString(kbJwtPayload).encodeToByteArray(),
-                key = crypto2Key,
-                algorithm = requireNotNull(crypto2Algorithm),
-                protectedHeader = jwsHeaders,
+            val proof = if (crypto2Key != null) {
+                CompactJws.sign(
+                    payload = Json.encodeToString(kbJwtPayload).encodeToByteArray(),
+                    key = if (signer == null) crypto2Key else object : Crypto2Key by crypto2Key {
+                        override val capabilities = crypto2Key.capabilities.copy(signer = signer)
+                    },
+                    algorithm = requireNotNull(crypto2Algorithm),
+                    protectedHeader = jwsHeaders,
+                )
+            } else requireNotNull(holderKey).signJws(
+                plaintext = kbJwtPayload.toString().encodeToByteArray(),
+                headers = jwsHeaders,
             )
-        } else requireNotNull(holderKey).signJws(
-            plaintext = kbJwtPayload.toString().encodeToByteArray(),
-            headers = jwsHeaders,
-        )
-        // A native signer may finish after cancellation without observing the coroutine's Job.
-        if (scaContext != null) currentCoroutineContext().ensureActive()
-        payments.forEach { it.requireCurrent(paymentClock.now()) }
-        return proof
+            // A native signer may finish after cancellation without observing the coroutine's Job.
+            if (scaContext != null) currentCoroutineContext().ensureActive()
+            payments.forEach { it.requireCurrent(paymentClock.now()) }
+            return proof
+        }
+        return if (presentation != null && crypto2Key != null) {
+            requireNotNull(scaContext).authorizer.withAuthorizedSigner(
+                presentation, requireNotNull(crypto2Key.capabilities.signer), ::signProof,
+            )
+        } else {
+            signProof(presentation?.let { requireNotNull(scaContext).authorizer.authorize(it) }, null)
+        }
     }
 
     internal suspend fun encryptDirectPostResponse(

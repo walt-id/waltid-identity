@@ -20,6 +20,7 @@ import kotlinx.cinterop.*
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -27,8 +28,10 @@ import kotlinx.serialization.json.jsonPrimitive
 import platform.CoreFoundation.*
 import platform.Foundation.*
 import platform.LocalAuthentication.LAContext
+import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
 import platform.Security.*
 import kotlin.io.encoding.Base64
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 internal interface AppleKeychainKey : SignumPlatformKey {
@@ -190,20 +193,53 @@ internal object AppleKeychainKeys {
 
 
         override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray = withContext(Dispatchers.Default) {
-            require(algorithm == SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)) { "Unsupported signature algorithm" }
-            val coroutineContext = currentCoroutineContext()
-            authorization.use { context ->
-                val signature = withKey(alias, policy, nativeIdentity, context) { key ->
-                    retained(data.toNSData()) { input -> memScoped {
-                        val error = alloc<CFErrorRefVar>(); error.value = null
-                        val result = SecKeyCreateSignature(key, kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
-                            input as CFDataRef, error.ptr) ?: throw takeKeychainFailure(alias, error.value)
-                        try { result.toBytes() } finally { CFRelease(result) }
-                    } }
-                }
-                coroutineContext.ensureActive()
-                EcdsaSignatureCodec.derToP1363(signature, 32)
+            val caller = currentCoroutineContext()
+            authorization.use { context -> signWithContext(data, algorithm, context).also { caller.ensureActive() } }
+        }
+
+        override suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T {
+            val auth = policy.authentication.requireTimedBiometrics()
+            val context = LAContext().apply {
+                localizedReason = auth.prompt
+                localizedCancelTitle = auth.cancelText
+                localizedFallbackTitle = ""
+                touchIDAuthenticationAllowableReuseDuration = 0.0
             }
+            try {
+                val authenticatedAt = suspendCancellableCoroutine<TimeMark> { continuation ->
+                    continuation.invokeOnCancellation { context.invalidate() }
+                    if (continuation.isActive) {
+                        context.evaluatePolicy(LAPolicyDeviceOwnerAuthenticationWithBiometrics, auth.prompt) { success, error ->
+                            val outcome = if (success) {
+                                Result.success(TimeSource.Monotonic.markNow())
+                            } else {
+                                Result.failure(error?.let { iosKeychainFailure(alias, it.toKeychainException()) }
+                                    ?: SignumAuthorizationException())
+                            }
+                            continuation.resumeWith(outcome)
+                        }
+                    }
+                }
+                context.interactionNotAllowed = true
+                return withFreshBiometricSigner(auth.timeoutSeconds, Signer { data, algorithm ->
+                    withContext(Dispatchers.Default) { signWithContext(data, algorithm, context) }
+                }, authenticatedAt, operation)
+            } finally {
+                context.invalidate()
+            }
+        }
+
+        private fun signWithContext(data: ByteArray, algorithm: SignatureAlgorithm, context: LAContext): ByteArray {
+            require(algorithm == SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)) { "Unsupported signature algorithm" }
+            val signature = withKey(alias, policy, nativeIdentity, context) { key ->
+                retained(data.toNSData()) { input -> memScoped {
+                    val error = alloc<CFErrorRefVar>(); error.value = null
+                    val result = SecKeyCreateSignature(key, kSecKeyAlgorithmECDSASignatureMessageX962SHA256,
+                        input as CFDataRef, error.ptr) ?: throw takeKeychainFailure(alias, error.value)
+                    try { result.toBytes() } finally { CFRelease(result) }
+                } }
+            }
+            return EcdsaSignatureCodec.derToP1363(signature, 32)
         }
 
         override suspend fun verify(data: ByteArray, signature: ByteArray, algorithm: SignatureAlgorithm): Boolean {
