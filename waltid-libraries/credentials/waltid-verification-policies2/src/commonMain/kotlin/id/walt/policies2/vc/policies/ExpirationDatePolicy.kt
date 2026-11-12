@@ -8,6 +8,7 @@ import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -20,7 +21,8 @@ class ExpirationDatePolicy(
      * If true, the policy fails when the exp claim is absent entirely.
      * Default false for general use; set true for strict profiles (e.g. ETSI TS 119 472-1 EAA-5.2.7.1-03).
      */
-    val requireField: Boolean = false
+    val requireField: Boolean = false,
+    @Transient private val clock: Clock = Clock.System,
 ) : CredentialVerificationPolicy2() {
     override val id = "expiration"
 
@@ -51,18 +53,21 @@ class ExpirationDatePolicy(
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
-        return PolicyClaimChecker.checkClaim(credential, claims, requireField, checkAllClaims = true) { claim ->
+        return PolicyClaimChecker.checkClaim(
+            credential, claims, requireField, checkAllClaims = true,
+            selectResult = { results: List<ExpirationDateClaimCheckResult> -> results.minBy { it.date } },
+        ) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
             val rawLong = this.longOrNull
             // RFC 7519 §4.1.4: NumericDate is seconds since epoch.
-            // Values >= 1e12 (year ~33658) indicate milliseconds were used instead — non-conformant.
+            // Values >= 1e12 (year ~33658) indicate milliseconds were used instead - non-conformant.
             require(rawLong == null || rawLong < 1_000_000_000_000L) {
                 "Claim $claim value $rawLong appears to be in milliseconds, not seconds as required by RFC 7519 §4.1.4 (NumericDate)"
             }
 
             val storedDate = rawLong?.let { Instant.fromEpochSeconds(it) } ?: Instant.parse(this.content)
-            val now = Clock.System.now()
+            val now = clock.now()
 
             val isExpired = now >= storedDate
 
