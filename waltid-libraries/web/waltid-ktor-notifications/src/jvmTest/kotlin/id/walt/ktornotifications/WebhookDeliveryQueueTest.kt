@@ -46,6 +46,7 @@ class WebhookDeliveryQueueTest {
     fun `signing secret requires at least 32 UTF-8 bytes`() {
         val config = webhook()
         assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "") }
+        assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = " ".repeat(32)) }
         assertFailsWith<IllegalArgumentException> { config.copy(signingSecret = "x".repeat(31)) }
         assertEquals("x".repeat(32), config.copy(signingSecret = "x".repeat(32)).signingSecret)
         assertEquals("é".repeat(16), config.copy(signingSecret = "é".repeat(16)).signingSecret)
