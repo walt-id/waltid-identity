@@ -273,7 +273,8 @@ This library builds on top of several walt.id protocol libraries:
 
 ### Companion Libraries
 
-- **[waltid-openid4vc-wallet-persistence](../waltid-openid4vc-wallet-persistence)** — SQL-backed store implementations
+- **[waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile)** — SQLDelight and SQLCipher-backed mobile stores
+- **[waltid-openid4vc-wallet-persistence-server](../waltid-openid4vc-wallet-persistence-server)** — Exposed-based server stores
 
 ### Implementations
 

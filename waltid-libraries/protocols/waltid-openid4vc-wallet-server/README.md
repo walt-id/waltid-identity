@@ -303,7 +303,7 @@ interface WalletResolver {
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet](../waltid-openid4vc-wallet)** — Core wallet library
-- **[waltid-openid4vc-wallet-persistence](../waltid-openid4vc-wallet-persistence)** — SQL-backed stores
+- **[waltid-openid4vc-wallet-persistence-server](../waltid-openid4vc-wallet-persistence-server)** — SQL-backed server stores
 - **[waltid-service-commons](../../../waltid-services/waltid-service-commons)** — Service utilities
 
 ## Join the community

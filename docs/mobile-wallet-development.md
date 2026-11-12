@@ -11,7 +11,7 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
 | Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
-| Mobile key storage | [waltid-crypto](../waltid-libraries/crypto/waltid-crypto/README.md) |
+| Mobile key storage | [Mobile persistence](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md), backed by [Crypto2](../waltid-libraries/crypto/waltid-crypto2/README.md) and [Signum](../waltid-libraries/crypto/waltid-crypto2-signum/README.md) |
 
 ## IDE guidance
 

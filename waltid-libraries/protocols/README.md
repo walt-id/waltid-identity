@@ -98,7 +98,7 @@ OpenID4VCI 1.0 wallet (holder) implementation. Provides offer parsing, metadata 
 
 #### Wallet Server Libraries
 
-### [🟢 waltid-openid4vc-wallet-persistence-server](./waltid-openid4vc-wallet-persistence)
+### [🟢 waltid-openid4vc-wallet-persistence-server](./waltid-openid4vc-wallet-persistence-server)
 
 SQL-backed persistence for the Wallet Server. Provides Exposed ORM-based implementations of wallet stores supporting SQLite and PostgreSQL.
 
@@ -106,21 +106,21 @@ SQL-backed persistence for the Wallet Server. Provides Exposed ORM-based impleme
 
 #### Mobile Wallet Libraries
 
-### [🟢 waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet-persistence)
+### [🟢 waltid-openid4vc-wallet-mobile](./waltid-openid4vc-wallet-mobile)
 
-Kotlin Multiplatform SDK for the walt.id mobile wallet. Example application showing integration can be found in the [waltid-compose-wallet-demo](https://github.com/walt-id/waltid-compose-wallet-demo) repository.
+Kotlin Multiplatform SDK for the walt.id mobile wallet. See the [Compose wallet demo](../../waltid-applications/waltid-wallet-demo-compose) for Android and iOS integration.
 
 **Use when:** Building Kotlin Multiplatform Compose wallets and native Android Wallets.
 
-### [🟢 waltid-openid4vc-wallet-sdk-ios](./waltid-openid4vc-wallet-persistence)
+### [🟢 waltid-wallet-sdk-ios](./waltid-wallet-sdk-ios)
 
-Swift facade for the walt.id mobile wallet. Example application showing integration can be found in the [waltid-ios-wallet-demo](https://github.com/walt-id/waltid-ios-wallet-demo) repository.
+Swift facade for the walt.id mobile wallet. See the [native iOS wallet demo](../../waltid-applications/waltid-wallet-demo-ios) for SwiftUI integration.
 
 **Use when:** Building native iOS Wallets.
 
-### [🟢 waltid-openid4vc-wallet-persistence-mobile](./waltid-openid4vc-wallet-persistence)
+### [🟢 waltid-openid4vc-wallet-persistence-mobile](./waltid-openid4vc-wallet-persistence-mobile)
 
-SQL-backed persistence for the Wallet SDK. Provides Exposed ORM-based implementations of wallet stores supporting SQLite.
+SQLDelight-based persistence for the Wallet SDK, with SQLCipher-encrypted SQLite storage on Android and iOS.
 
 **Use when:** You need persistent storage for wallet data (keys, credentials, DIDs) that survives application restarts on mobile.
 
