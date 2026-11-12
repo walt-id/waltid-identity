@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
+import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -13,6 +14,10 @@ class ItbPreviewCleanupTest {
         assertEquals("missing_sca_credential", ItbWalletDriver.verifierErrorCategory(
             Json.parseToJsonElement("""{"error":"missing_sca_credential","details":"private response"}"""),
         ))
+        assertEquals("missing_sca_credential", ItbVerifierRejection(
+            Json.parseToJsonElement("""{"error":"missing_sca_credential","details":"private response"}"""),
+            HttpStatusCode.BadRequest,
+        ).code)
         for (body in listOf(
             """{"error":"token.value.with.dots"}""",
             """{"error":"secret with spaces"}""",
@@ -20,7 +25,11 @@ class ItbPreviewCleanupTest {
             """{"error":{"code":"missing_sca_credential"}}""",
             """{"details":"private response"}""",
         )) {
-            assertNull(ItbWalletDriver.verifierErrorCategory(Json.parseToJsonElement(body)))
+            val response = Json.parseToJsonElement(body)
+            assertNull(ItbWalletDriver.verifierErrorCategory(response))
+            assertEquals("verifier_http_400", ItbVerifierRejection(response, HttpStatusCode.BadRequest).code)
+            assertEquals("verifier_rejected", ItbVerifierRejection(response).code)
+            assertFalse(ItbVerifierRejection(response).toString().contains("secret"))
         }
     }
 

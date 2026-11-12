@@ -45,6 +45,15 @@ jobs:
       - name: Install the pinned browser test tools
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         run: npm ci
+      - name: Run shared browser logic tests
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        run: |
+          export CHROME_BIN="$(node -p "require('playwright').chromium.executablePath()")"
+          python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py \
+            --output-dir ../build/reports/browser-visual/timings browser-logic-tests \
+            ../../../../gradlew --project-dir ../../../.. :waltid-applications:waltid-wallet-demo-compose:sharedLogic:wasmJsBrowserTest \
+            -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true \
+            --max-workers=2 --console=plain
       - name: Compare every browser catalogue state
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         env:
@@ -59,7 +68,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: wallet-visual-browser-${{ github.run_attempt }}
-          path: waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual
+          path: |
+            waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual
+            waltid-applications/waltid-wallet-demo-compose/sharedLogic/build/reports/tests/wasmJsBrowserTest
+            waltid-applications/waltid-wallet-demo-compose/sharedLogic/build/test-results/wasmJsBrowserTest
           if-no-files-found: error
           retention-days: 14
 
@@ -72,7 +84,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout the coordinated source revisions
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -275,6 +287,7 @@ jobs:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       cacheless: ${{ needs.cacheless-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
+      job-name-prefix: gradle-build
       conformance-report-check-name: 'gradle-build / wallet/verifier-conformance'
       run-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
       run-issuer-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}

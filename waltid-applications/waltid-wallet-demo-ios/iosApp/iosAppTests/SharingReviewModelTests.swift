@@ -10,6 +10,23 @@ import XCTest
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
 
+    func testPaymentScheduleAndMonetaryTermsKeepTheirGroupsAndIssuerPlacement() throws {
+        let fixtures = try WalletVisualFixtures()
+        let schedule: Set<[String]> = [["recurrence", "start_date"], ["recurrence", "end_date"],
+            ["recurrence", "number"], ["recurrence", "frequency"]]
+        let terms = Set(["amount_variable", "min_amount", "max_amount", "total_amount", "initial_amount", "initial_amount_number", "apr"]
+            .map { ["recurrence", "mit_options", $0] })
+        let consent = try fixtures.payment(recurring: true)
+        let fields = try XCTUnwrap(PaymentReviewState.ready(consent).displays(transactions: []).first).fields
+        XCTAssertEqual(Set(fields.filter { $0.group == .timing }.map(\.paymentPath)), schedule)
+        XCTAssertEqual(Set(fields.filter { $0.group == .terms }.map(\.paymentPath)), terms)
+        XCTAssertEqual(fields.map(\.placement), consent.fields.map(\.placement))
+        XCTAssertEqual(fields.map(\.item.label), consent.fields.map(\.label))
+        XCTAssertEqual(fields.map(\.item.rawValue), consent.fields.map { Optional($0.value) })
+        let scheduled = try XCTUnwrap(PaymentReviewState.ready(fixtures.payment(recurring: false)).displays(transactions: []).first)
+        XCTAssertEqual(scheduled.fields.filter { $0.group == .timing }.map(\.paymentPath), [["execution_date"]])
+    }
+
     func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
         let identity = option(queryID: "pid", credentialID: "one")
         let address = option(queryID: "address", credentialID: "two")
@@ -308,6 +325,43 @@ final class SharingReviewModelTests: XCTestCase {
                 XCTAssertEqual(PaymentReviewState.ready(consent).displays(transactions: transactions).map(\.id), ["validated"])
             }
         }
+    }
+
+    func testPaymentTimestampPathsPreserveTypedInstantsAndOriginalStrings() throws {
+        let raw = "2026-10-25T02:30:00.123456789+02:00"
+        let paths = [["date_time"], ["execution_date"], ["recurrence", "start_date"], ["recurrence", "end_date"]]
+        let fields = paths.map { PaymentConsentField(label: "Issuer label", description: "Description", value: raw,
+            placement: .main, path: $0) }
+        let display = try paymentDisplay(fields)
+        let expected = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-25T00:30:00.123456789Z"))
+        for (index, field) in display.fields.enumerated() {
+            XCTAssertEqual(field.item.value, .instant(expected))
+            XCTAssertEqual(field.item.pathComponents, paths[index])
+            XCTAssertEqual(field.item.rawValue, raw)
+            XCTAssertEqual(field.item.label, "Issuer label")
+            XCTAssertEqual(field.description, "Description")
+            XCTAssertEqual(field.placement, .main)
+        }
+        XCTAssertTrue(fields.allSatisfy { $0.value == raw })
+    }
+
+    func testPaymentLabelsUnknownPathsAndUnsupportedTimestampTextStayVerbatim() throws {
+        let date = "2026-10-25T00:30:00Z"
+        let fields = [
+            PaymentConsentField(label: "Execution date", description: nil, value: date, placement: .main),
+            PaymentConsentField(label: "Issued at", description: nil, value: date, placement: .main, path: ["transaction_id"]),
+        ] + ["2026-10-25", "2026-10-25T00:30:00", "2026-10-25T00:30:00.1234567891Z", "invalid"].map {
+            PaymentConsentField(label: "Issuer label", description: nil, value: $0, placement: .details, path: ["execution_date"])
+        }
+        let display = try paymentDisplay(fields)
+        XCTAssertEqual(display.fields.map(\.item.value), fields.map { .text($0.value) })
+        XCTAssertEqual(display.fields.map(\.item.rawValue), fields.map(\.value))
+    }
+
+    private func paymentDisplay(_ fields: [PaymentConsentField]) throws -> PaymentDisplay {
+        let consent = PaymentConsent(revision: "revision", locale: "en", title: nil, securityHint: nil,
+            affirmativeAction: "Pay", denialAction: nil, requiresUnsignedRequestWarning: false, fields: fields)
+        return try XCTUnwrap(PaymentReviewState.ready(consent).displays(transactions: []).first)
     }
 
     func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {

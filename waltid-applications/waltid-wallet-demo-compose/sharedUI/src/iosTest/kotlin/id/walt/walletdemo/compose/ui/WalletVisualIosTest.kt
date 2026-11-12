@@ -44,6 +44,8 @@ class WalletVisualIosTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test fun dateValuesCompactRtl() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
@@ -64,11 +66,17 @@ class WalletVisualIosTest {
     @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario { sharingInformation(multiple = true) }
     @Test
     fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario { providerOfferReview() }
+    @Test fun scheduledPaymentTerms() = scenario { paymentTerms(recurring = false) }
+    @Test fun scheduledPaymentTermsDetails() = scenario { paymentTerms(recurring = false, details = true) }
+    @Test fun recurringPaymentTerms() = scenario { paymentTerms(recurring = true) }
+    @Test fun recurringPaymentTermsDetails() = scenario { paymentTerms(recurring = true, details = true) }
+    @Test fun recurringPaymentTermsLargeText() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { paymentTerms(recurring = true, compact = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
     @Test fun paymentLocalizedCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { localizedPayment() }
@@ -181,6 +189,6 @@ class WalletVisualIosTest {
             platformTheme = { content -> CompositionLocalProvider(
                 LocalSystemTheme provides if (dark) SystemTheme.Dark else SystemTheme.Light,
                 LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content) },
-        ).block()
+        ).execute(block)
     }
 }

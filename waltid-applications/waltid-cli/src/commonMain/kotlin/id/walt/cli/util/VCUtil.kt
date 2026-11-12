@@ -13,6 +13,7 @@ import id.walt.policies2.vc.policies.JsonSchemaPolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
 import id.walt.policies2.vc.policies.RevocationPolicy
 import id.walt.policies2.vc.policies.WebhookPolicy
+import id.walt.policies2.vc.policies.X509TrustPolicy
 import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.runBlocking
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.io.File
 
 data class CredentialPolicyRun(
     val policy: CredentialVerificationPolicy2,
@@ -76,6 +78,11 @@ object VCUtil {
                     JsonArray(requiredArguments(arguments, "issuer", name).map(::JsonPrimitive)),
                 )
                 "webhook" -> WebhookPolicy(requiredArgument(arguments, "url", name))
+                "x509-trust" -> X509TrustPolicy(
+                    requiredArguments(arguments, "trust-root", name).map { path ->
+                        File(path).also { require(it.isFile) { "Trust root file does not exist: $path" } }.readText()
+                    },
+                )
                 else -> throw IllegalArgumentException("Unknown credential policy: $name")
             }
         }

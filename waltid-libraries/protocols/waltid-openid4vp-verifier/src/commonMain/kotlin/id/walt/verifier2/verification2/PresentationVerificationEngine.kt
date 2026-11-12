@@ -6,14 +6,20 @@ import kotlin.time.TimeSource
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
 import id.walt.cose.acceptsCoseAlgorithm
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.presentations.formats.*
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeySpec
 import id.walt.dcql.DcqlCredential
+import id.walt.dcql.DcqlDisclosure
+import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
@@ -22,6 +28,7 @@ import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
+import id.walt.verifier2.data.DcqlFulfillmentFailure
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
@@ -271,64 +278,125 @@ object PresentationVerificationEngine {
     ): Map<String, List<VerifiablePresentation>> =
         parsedPresentations.entries.groupBy({ it.key.second.id }, { it.value })
 
+    /**
+     * Parses every presentation with the format of the Credential Query it was returned for.
+     *
+     * @throws IllegalArgumentException if the vp_token does not have the shape [vpTokenStructureViolation] checks.
+     */
     suspend fun parseAllPresentations(
         vpTokenContents: ParsedVpToken,
         session: Verification2Session
     ): Map<Pair<String, CredentialQuery>, VerifiablePresentation> {
-        val authorizationRequest = session.authorizationRequest
+        val dcqlQuery = session.authorizationRequest.dcqlQuery
+        vpTokenStructureViolation(vpTokenContents, dcqlQuery)?.let { throw IllegalArgumentException(it) }
 
-
-        val presentationsToUse = ArrayList<Pair<String, CredentialQuery>>()
-
-        for ((queryId, presentedItemsJsonElements) in vpTokenContents) {
-            val originalCredentialQuery = authorizationRequest.dcqlQuery?.credentials
-                ?.find { credentialQuery -> credentialQuery.id == queryId }
-
-            if (originalCredentialQuery == null) {
-                log.warn { "Received presentation for unknown queryId '$queryId' in vp_token." }
-                // This is a protocol error or a mismatch. Decide how to handle.
-                // For strictness, maybe consider the whole vp_token invalid.
-                // allPresentationsValid = false; break;
-                continue // Or ignore this entry
-            }
-
-            if (presentedItemsJsonElements.isEmpty()) {
-                // This shouldn't happen if the Wallet adheres to the spec (no key for empty results).
-                // If it does, it might mean an optional query had no matches, but the Wallet still included the key.
-                log.warn { "Empty presentation list received for queryId '$queryId'." }
-                continue
-            }
-
-            // If multiple=false in originalCredentialQuery, presentedItemsJsonElements should have size 1.
-            if (!originalCredentialQuery.multiple && presentedItemsJsonElements.size > 1) {
-                log.warn { "Multiple presentations received for queryId '$queryId' where multiple=false was expected." }
-                // Handle as an error or process only the first one.
-                // allPresentationsValid = false; break;
-                // For now, let's process only the first if multiple=false
-            }
-            val itemsToProcess =
-                if (!originalCredentialQuery.multiple) presentedItemsJsonElements.take(1) else presentedItemsJsonElements
-
-            for (presentationJsonElement in itemsToProcess) {
-                presentationsToUse.add(presentationJsonElement to originalCredentialQuery)
-            }
+        val presentationsToUse = vpTokenContents.flatMap { (queryId, presentations) ->
+            val credentialQuery = dcqlQuery!!.credentials.single { it.id == queryId }
+            presentations.map { it to credentialQuery }
         }
 
-        val parsedPresentations = presentationsToUse.associateWith { (presentationString, originalCredentialQuery) ->
-            val presentation = parsePresentation(presentationString, originalCredentialQuery.format)
-            presentation
+        return presentationsToUse.associateWith { (presentationString, credentialQuery) ->
+            parsePresentation(presentationString, credentialQuery.format)
         }
+    }
 
-        return parsedPresentations
+    /**
+     * Why the vp_token does not have the shape OpenID4VP 1.0 §8.1 defines, or null if it does: every key is the
+     * `id` of a Credential Query in the request, and its array holds one or more Presentations, only one unless
+     * the query sets `multiple`. Rejecting it is §8.6 step 1; ignoring an entry or dropping extra items would
+     * leave the response accepted on parts the Verifier never checked.
+     */
+    internal fun vpTokenStructureViolation(vpTokenContents: ParsedVpToken, dcqlQuery: DcqlQuery?): String? {
+        val credentialQueries = dcqlQuery?.credentials.orEmpty().associateBy { it.id }
+        for ((queryId, presentations) in vpTokenContents) {
+            val credentialQuery = credentialQueries[queryId]
+                ?: return "vp_token contains '$queryId', which is not a Credential Query id of the request"
+            if (presentations.isEmpty()) return "vp_token has an empty array for '$queryId'"
+            if (!credentialQuery.multiple && presentations.size > 1) {
+                return "vp_token has ${presentations.size} presentations for '$queryId', whose query does not allow multiple"
+            }
+        }
+        return null
+    }
 
+    /**
+     * Matches every presented credential against the Credential Query whose `id` it was returned under, and
+     * returns the ids of the queries all of whose credentials match (OpenID4VP 1.0 §8.6 step 2, §14.9). The
+     * vp_token key is chosen by the Wallet, so it proves nothing about the credential on its own.
+     *
+     * A query has to have at least one credential, and only one unless it sets `multiple` (§6.1): one
+     * jwt_vc_json presentation can carry several. `trusted_authorities` is left to the caller's own check.
+     * With [matchClaims] false only format and `meta` are matched, for ISO/IEC 18013-7 Annex C, whose query is
+     * built from the requested elements and where a holder may withhold some of them.
+     */
+    internal fun matchCredentialsToQueries(
+        dcqlQuery: DcqlQuery,
+        credentialsByQuery: Map<String, List<DigitalCredential>>,
+        matchClaims: Boolean,
+    ): Result<Set<String>> {
+        val mismatches = credentialsByQuery.mapNotNull { (queryId, credentials) ->
+            val credentialQuery = dcqlQuery.credentials.single { it.id == queryId }
+            credentialMismatch(credentialQuery, credentials, matchClaims)?.let { queryId to it }
+        }.toMap()
+        val matched = credentialsByQuery.keys - mismatches.keys
+        if (mismatches.isEmpty()) return Result.success(matched)
+        // A query whose credentials do not match is reported as missing, together with whatever the matched
+        // queries leave unfulfilled, so the structured failure names it and not only the reason text.
+        val unfulfilled = (DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matched).exceptionOrNull()
+            as? DcqlFulfillmentChecker.DcqlFulfillmentException)?.details
+        return Result.failure(
+            DcqlFulfillmentChecker.DcqlFulfillmentException(
+                message = "Presented credentials do not satisfy their Credential Query: " +
+                    mismatches.entries.joinToString("; ") { (queryId, reason) -> "'$queryId': $reason" },
+                details = DcqlFulfillmentFailure(
+                    missingQueryIds = mismatches.keys + unfulfilled?.missingQueryIds.orEmpty(),
+                    unsatisfiedSets = unfulfilled?.unsatisfiedSets.orEmpty(),
+                    successfullyValidatedQueryIds = matched,
+                ),
+            )
+        )
+    }
 
+    private fun credentialMismatch(
+        credentialQuery: CredentialQuery,
+        credentials: List<DigitalCredential>,
+        matchClaims: Boolean,
+    ): String? {
+        if (credentials.isEmpty()) return "no credential was presented"
+        if (!credentialQuery.multiple && credentials.size > 1) {
+            return "${credentials.size} credentials were presented, but the query does not allow multiple"
+        }
+        val query = credentialQuery.copy(trustedAuthorities = null).let {
+            if (matchClaims) it else it.copy(claims = null, claimSets = null)
+        }
+        credentials.forEachIndexed { index, credential ->
+            if (credential is MdocsCredential) {
+                // The Document's docType is not issuer-signed, the MSO's is (ISO/IEC 18013-5 §9.3.1).
+                val signedDocType = credential.documentMso.docType
+                if (credential.document.docType != signedDocType) {
+                    return "credential $index has docType '${credential.document.docType}', but its MSO is for '$signedDocType'"
+                }
+            }
+            val dcqlCredential = RawDcqlCredential(
+                id = credentialQuery.id,
+                format = credential.format,
+                data = credential.credentialData,
+                disclosures = (credential as? SelectivelyDisclosableVerifiableCredential)?.disclosures
+                    ?.map { DcqlDisclosure(it.name, it.value, it.location) },
+                originalCredential = credential,
+            )
+            DcqlMatcher.matchCredential(query, dcqlCredential).onFailure { return "credential $index: ${it.message}" }
+        }
+        return null
     }
 
 
     /**
-    1. VP
-    2. DCQL
-    3. Credentials
+     * Verifies a vp_token against the session, in the order of OpenID4VP 1.0 §8.6:
+     * 1. VP: the vp_token's shape ([vpTokenStructureViolation]), then the VP policies of every presentation
+     * 2. DCQL: every credential against its own Credential Query ([matchCredentialsToQueries]), then the
+     *    request as a whole, including credential_sets
+     * 3. Credentials: the VC policies
      */
     suspend fun executeAllVerification(
         vpTokenContents: ParsedVpToken, session: Verification2Session,
@@ -395,6 +463,15 @@ object PresentationVerificationEngine {
             // too, so the failure could not even be recorded. Checked here, the wallet gets a 400 naming the
             // sizes, the session records why, and none of the verification work is done first.
             checkPresentationIsStorable(vpTokenContents)
+
+            vpTokenStructureViolation(vpTokenContents, session.authorizationRequest.dcqlQuery)?.let { reason ->
+                log.warn { "Rejecting vp_token for session ${session.id}: $reason" }
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason = reason, failedPolicies = emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason)
+            }
 
             // Phase timings for the verifier's real work. The enclosing call is ~13ms of a 40ms
             // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
@@ -468,9 +545,12 @@ object PresentationVerificationEngine {
                 when (val presentation = it.value) {
                     is JwtVcJsonPresentation -> {
                         if (presentation.vp == null) {
-                            throw PresentationRejectionException(
-                                "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
-                            )
+                            val reason = "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
+                            session.updateSession(SessionEvent.presentation_validation_available) {
+                                failure = SessionFailure.PresentationValidation(reason, emptyMap())
+                            }
+                            session.failSession(SessionEvent.presentation_validation_failed)
+                            throw PresentationRejectionException(reason)
                         }
                         presentation.credentials ?: emptyList()
                     }
@@ -523,13 +603,16 @@ object PresentationVerificationEngine {
 
             // --- DCQL validation ---
 
-            // Check if the set of validated presentations satisfies the overall DCQL Query
-            // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
+            // Each credential must satisfy the query it was returned for (OpenID4VP 1.0 §8.6 step 2), and only
+            // the queries so satisfied count towards the request and its credential_sets (§8.6 step 3, §6.4.2).
             val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
-                DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
+                matchCredentialsToQueries(
                     dcqlQuery = dcqlQuery,
-                    successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
-                )
+                    credentialsByQuery = allSuccessfullyValidatedAndProcessedData,
+                    matchClaims = session.setup !is DcApiAnnexCFlowSetup,
+                ).mapCatching { matchedQueryIds ->
+                    DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matchedQueryIds).getOrThrow()
+                }
             }
             val dcqlFailure = dcqlFulfilled?.exceptionOrNull() as? DcqlFulfillmentChecker.DcqlFulfillmentException
             if (dcqlFailure != null) {

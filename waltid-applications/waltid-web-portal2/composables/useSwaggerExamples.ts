@@ -1,3 +1,5 @@
+import { ref } from "vue";
+
 export interface SwaggerExample {
   title: string;
   payload: unknown;
@@ -18,14 +20,14 @@ function getCandidateUrls(base: string): string[] {
   return urls;
 }
 
-function normalizePayload(raw: unknown): unknown {
+function normalizePayload(raw: unknown, parseJson: (text: string) => unknown): unknown {
   let current = raw;
 
   for (let i = 0; i < 3; i += 1) {
     if (typeof current !== "string") return current;
 
     try {
-      current = JSON.parse(current);
+      current = parseJson(current);
     } catch {
       return current;
     }
@@ -34,7 +36,7 @@ function normalizePayload(raw: unknown): unknown {
   return current;
 }
 
-function extractExamples(spec: unknown, apiPath: string): SwaggerExample[] {
+function extractExamples(spec: unknown, apiPath: string, parseJson: (text: string) => unknown): SwaggerExample[] {
   const root = spec as Record<string, unknown>;
   const paths = root?.paths as Record<string, unknown> | undefined;
   if (!paths) return [];
@@ -58,11 +60,13 @@ function extractExamples(spec: unknown, apiPath: string): SwaggerExample[] {
 
   return Object.entries(examplesObj).map(([title, entry]) => {
     const value = (entry as Record<string, unknown>)?.value;
-    return { title, payload: normalizePayload(value) };
+    return { title, payload: normalizePayload(value, parseJson) };
   });
 }
 
 export interface SwaggerExamplesOptions {
+  // Verifier examples use lossless parsing at both the HTTP and nested JSON boundaries.
+  parseJson?: (text: string) => unknown;
   // Examples whose title matches this predicate are dropped after extraction.
   excludeTitle?: (title: string) => boolean;
 }
@@ -72,6 +76,7 @@ export function useSwaggerExamples(
   apiPath: string,
   options: SwaggerExamplesOptions = {},
 ) {
+  const parseJson = options.parseJson ?? JSON.parse;
   const examples = ref<SwaggerExample[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -88,8 +93,8 @@ export function useSwaggerExamples(
           headers: { accept: "application/json" },
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const spec = await res.json();
-        const extracted = extractExamples(spec, apiPath);
+        const spec = parseJson(await res.text());
+        const extracted = extractExamples(spec, apiPath, parseJson);
         examples.value = options.excludeTitle
           ? extracted.filter((ex) => !options.excludeTitle!(ex.title))
           : extracted;

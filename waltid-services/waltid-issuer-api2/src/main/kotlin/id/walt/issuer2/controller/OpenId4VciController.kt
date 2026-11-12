@@ -1,5 +1,6 @@
 package id.walt.issuer2.controller
 
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.notifications.IssuanceNotificationService
@@ -84,8 +85,8 @@ enum class Issuer2RouteSurface {
 private val credentialResponseCacheControl = createRouteScopedPlugin("CredentialResponseCacheControl") {
     // Set this before parsing/authentication, including responses from StatusPages or rate limiting.
     onCall { call ->
-        if (call.response.headers[HttpHeaders.CacheControl] != "no-store") {
-            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        OpenId4VciResponseHeaders.NO_STORE.forEach { (name, value) ->
+            if (call.response.headers[name] != value) call.response.headers.append(name, value)
         }
     }
 }
@@ -279,6 +280,39 @@ class OpenId4VciController(
                     response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                     call.respond(HttpStatusCode.fromValue(response.status), response.payload)
                 }
+
+                post("deferred_credential", {
+                    summary = "Collect a deferred credential"
+                    description = "Authenticate each poll with a current access token and a fresh DPoP proof when required. Pending transactions return 202; successful collection consumes the transaction."
+                    request {
+                        headerParameter<String>("Authorization") { required = true }
+                        headerParameter<String>("DPoP") { required = false }
+                        body<id.walt.openid4vci.deferred.DeferredCredentialRequest>()
+                        body<String> { mediaTypes(ContentType.parse("application/jwt")) }
+                    }
+                    response {
+                        for (status in listOf(HttpStatusCode.OK, HttpStatusCode.Accepted)) {
+                            status to {
+                                body<id.walt.openid4vci.responses.credential.CredentialResponse>()
+                                body<String> { mediaTypes(ContentType.parse("application/jwt")) }
+                            }
+                        }
+                        HttpStatusCode.BadRequest to {
+                            description = "credential_request_denied or invalid_transaction_id, including expired and consumed transactions"
+                            body<id.walt.openid4vci.errors.CredentialError>()
+                        }
+                        HttpStatusCode.Unauthorized to { body<id.walt.openid4vci.errors.OAuthError>() }
+                    }
+                }) {
+                    val response = protocolService.processDeferredCredentialRequest(
+                        authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty(),
+                        dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty(),
+                        parameters = if (!call.isEncryptedCredentialRequest()) call.receive<JsonObject>() else null,
+                        encryptedRequest = if (call.isEncryptedCredentialRequest()) call.receiveText() else null,
+                        requestId = requireNotNull(call.callId),
+                    )
+                    call.respondCredentialResponse(response)
+                }.apply { install(credentialResponseCacheControl) }
 
                 post(Issuer2EndpointPaths.CREDENTIAL, OpenId4VciRoutesDocs.credential()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }

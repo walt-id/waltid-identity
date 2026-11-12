@@ -18,6 +18,7 @@ import IdentityDocumentServices
 /// deadlocks - the status can never leave `.notDetermined`. Settings is the recovery path afterwards.
 @available(iOS 26.0, *)
 public struct IdentityDocumentRegistrationCoordinator: Sendable {
+    private static let updates = RegistrationReconciliationQueue()
     private let namespace: IdentityDocumentNamespace
     private let log: Logger
 
@@ -34,6 +35,13 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
     /// silent `try?` there is indistinguishable from a wallet that has nothing to register.
     @discardableResult
     public func reconcile() async throws -> RegistrationPlan {
+        let update = await Self.updates.enqueue(namespace: namespace.appGroupIdentifier) {
+            try await reconcileStore()
+        }
+        return try await update.value
+    }
+
+    private func reconcileStore() async throws -> RegistrationPlan {
         let store = IdentityDocumentProviderRegistrationStore()
         let status = await store.status
         DigitalCredentialRegistrationStorage.persist(
@@ -170,5 +178,35 @@ public struct IdentityDocumentRegistrationCoordinator: Sendable {
         } catch {
             log.error("Registration reconciliation failed for App Group \(namespace.appGroupIdentifier, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
+    }
+}
+
+/// Serializes each provider's updates within this process, including across coordinator instances.
+/// A queued update reads the current projection and authorization after its predecessor finishes.
+/// Merely isolating `reconcile` in an actor would still permit overlap at each store suspension.
+actor RegistrationReconciliationQueue {
+    private struct Pending {
+        let id: UUID
+        let task: Task<RegistrationPlan, Error>
+    }
+
+    private var pending: [String: Pending] = [:]
+
+    func enqueue(
+        namespace: String,
+        operation: @escaping @Sendable () async throws -> RegistrationPlan
+    ) -> Task<RegistrationPlan, Error> {
+        let id = UUID()
+        let previous = pending[namespace]?.task
+        let task = Task {
+            // A failed update must not prevent later changes from being reconciled.
+            _ = await previous?.result
+            defer {
+                if self.pending[namespace]?.id == id { self.pending[namespace] = nil }
+            }
+            return try await operation()
+        }
+        pending[namespace] = Pending(id: id, task: task)
+        return task
     }
 }

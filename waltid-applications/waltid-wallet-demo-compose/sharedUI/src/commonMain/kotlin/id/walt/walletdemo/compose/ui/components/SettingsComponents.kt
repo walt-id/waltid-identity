@@ -121,9 +121,14 @@ internal fun SettingsChoiceRow(
 
 @Composable
 internal fun SettingsDetailRow(label: String, value: String, modifier: Modifier = Modifier) {
+    SettingsDetailRow(label, modifier) { Text(value, style = MaterialTheme.typography.bodyLarge) }
+}
+
+@Composable
+internal fun SettingsDetailRow(label: String, modifier: Modifier = Modifier, value: @Composable () -> Unit) {
     Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+        value()
     }
 }
 

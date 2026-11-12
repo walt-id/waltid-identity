@@ -12,6 +12,9 @@ class WalletFooterIosTest {
         CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content)
     }
 
+    @Test fun paymentActionsShareOneRowAndKeepTheirSeparateActions() =
+        scenarios.paymentActionsShareOneRowAndKeepTheirSeparateActions()
+
     @Test fun feedbackKeepsTopContentAndActionsStableWithLargeText() =
         scenarios.feedbackKeepsTopContentAndActionsStableWithLargeText()
 

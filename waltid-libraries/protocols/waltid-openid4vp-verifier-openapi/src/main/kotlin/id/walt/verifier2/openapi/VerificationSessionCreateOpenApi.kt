@@ -126,6 +126,12 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][sd-jwt demo payment] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
                 }
+                example("[openid4vp-dc_api][sd-jwt scheduled payment] urn:eudi:sca:payment:1") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScheduledScaPayment
+                }
+                example("[openid4vp-dc_api][sd-jwt recurring payment] urn:eudi:sca:payment:1") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtRecurringScaPayment
+                }
                 example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment
                 }

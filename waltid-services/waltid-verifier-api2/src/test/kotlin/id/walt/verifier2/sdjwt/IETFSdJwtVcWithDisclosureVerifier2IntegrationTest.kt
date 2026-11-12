@@ -2,7 +2,7 @@ package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
@@ -267,9 +267,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = freePort()
 
-        E2ETest(host, port, true).testBlock(
+        E2ETest(host, 0, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
@@ -279,7 +278,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
                         ),
-                        urlPrefix = "http://$host:$port/verification-session",
+                        urlPrefix = "http://$host/verification-session",
                         urlHost = "openid4vp://authorize"
                     )
                 )
@@ -301,6 +300,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 }
             }
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val walletCredentials = walletCredentials()
 
@@ -310,7 +310,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     setBody(
                         verificationSessionSetup(
                             issuer = requireNotNull(walletCredentials.first().issuer),
-                            webhookUrl = "http://$host:$port/policy-webhook",
+                            webhookUrl = "${getBaseURL()}/policy-webhook",
                         )
                     )
                 }.body<VerificationSessionCreationResponse>()

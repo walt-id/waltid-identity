@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.data
 
+import id.walt.verifier.openid.transactiondata.TransactionDataObjectsSerializer
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -37,6 +38,8 @@ data class GeneralFlowConfig(
     val requestedElements: AnnexCDocTypeToRequestedElements? = null,
 
     @SerialName("signed_request") val signedRequest: Boolean = false,
+    /** Sign then encrypt the Request Object to the wallet's POST-supplied key. Requires a URL-based flow. */
+    @SerialName("encrypted_request") val encryptedRequest: Boolean = false,
     @SerialName("encrypted_response") val encryptedResponse: Boolean = false,
 
     val notifications: KtorSessionNotifications? = null,
@@ -161,6 +164,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
+    @Serializable(with = TransactionDataObjectsSerializer::class)
     val transactionData: List<JsonObject>? = null,
     val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
     val scope: String? = null,

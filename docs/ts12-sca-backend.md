@@ -30,3 +30,17 @@ use the matching local service revision instead.
 This is a synthetic demo profile, not a registered banking attestation or a
 complete regulated SCA implementation. SD-JWT transaction hashes are bound in the
 KB-JWT; the existing mdoc demo retains its MSO/device-signature semantics.
+
+## Complete payment payloads
+
+The default SD-JWT payment type metadata labels all 26 supported scalar paths in English
+and German. Scheduling/recurrence and merchant-initiated payment terms use visualisation
+level 2; ordinary optional details use level 3. Conditional fields are not marked globally
+mandatory. Existing credential integrity pins remain authoritative: version the metadata
+and reissue pinned credentials when changing the referenced document.
+
+Deploy matching issuer metadata, verifier validation and wallet support before enabling
+scheduled or recurring authoring in the portals. See the [payment contract and schema
+maintenance procedure](ts12-sca-payment-demo.md#payment-payload-contract). Discovery's
+`payloadSchema` is read-only authoring information; the attestation's authenticated metadata
+supplies consent labels and placement.
