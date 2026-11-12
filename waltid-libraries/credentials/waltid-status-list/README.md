@@ -16,12 +16,15 @@ according to JOSE media-type rules. Required `iat` and optional `exp`, `nbf` and
 must be finite JSON numbers, preserving fractional seconds. Numeric strings and explicit
 nulls are rejected; TTL must be positive and expiry must follow issuance.
 
-Call `token.validity.isValidAt(current, resolvedAt, maximumAgeSeconds)` whenever a list
-is used. This checks issuance, signed expiry, validity start, retrieval time plus TTL,
-and an optional stricter local age bound. Expiry and TTL boundaries are exclusive; the
-maximum-age boundary is inclusive. Retrieving a list again does not extend its signed
-expiry or reset its age from `iat`. Callers retain responsibility for fresh retrieval,
-caching policy and rechecking validity after asynchronous work.
+Call `token.validity.isValidAt(current, resolvedAt, maximumAgeSeconds, clockSkewSeconds)`
+whenever a list is used. This checks issuance, signed expiry, validity start, retrieval
+time plus TTL, and an optional stricter local age bound. `clockSkewSeconds` defaults to
+zero and must be non-negative. Callers may explicitly permit future `iat` and `nbf`
+values up to that allowance; the boundary is inclusive and retains fractional seconds.
+Clock skew does not extend signed expiry, TTL or the maximum age. Expiry and TTL
+boundaries are exclusive; the maximum-age boundary is inclusive. Retrieving a list again
+does not extend its signed expiry or reset its age from `iat`. Callers retain responsibility
+for fresh retrieval, caching policy and rechecking validity after asynchronous work.
 
 The API is in common Kotlin and uses the library's bounded JVM and portable zlib codecs.
 It has no dependency on HTTP, crypto providers, OpenID4VCI or verifier policies.

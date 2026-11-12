@@ -82,8 +82,10 @@ class IetfStatusListTokenTest {
 
     @Test fun expiryIsExclusiveAndRetainsFractions() {
         val list = token(payload { put("exp", issued.epochSeconds + 0.5) })
-        assertTrue(list.validity.isValidAt(issued + 499.milliseconds, issued))
-        assertFalse(list.validity.isValidAt(issued + 500.milliseconds, issued))
+        for (skew in listOf(0L, 60L)) {
+            assertTrue(list.validity.isValidAt(issued + 499.milliseconds, issued, clockSkewSeconds = skew))
+            assertFalse(list.validity.isValidAt(issued + 500.milliseconds, issued, clockSkewSeconds = skew))
+        }
     }
 
     @Test fun issuanceAndNotBeforeRejectFutureUseWithoutTruncation() {
@@ -93,18 +95,40 @@ class IetfStatusListTokenTest {
         assertTrue(list.validity.isValidAt(issued + 750.milliseconds, issued))
     }
 
+    @Test fun explicitClockSkewAcceptsASlightlyAheadProvider() {
+        val list = token(payload { put("iat", issued.epochSeconds + 1); put("nbf", issued.epochSeconds + 1) })
+        assertFalse(list.validity.isValidAt(issued, issued))
+        assertTrue(list.validity.isValidAt(issued, issued, clockSkewSeconds = 60))
+    }
+
+    @Test fun clockSkewBoundaryIsInclusiveAndPreservesFractionalDates() {
+        for (claim in listOf("iat", "nbf")) {
+            val list = token(payload { put(claim, issued.epochSeconds + 60.5) })
+            assertFalse(list.validity.isValidAt(issued + 499.milliseconds, issued, clockSkewSeconds = 60), claim)
+            assertTrue(list.validity.isValidAt(issued + 500.milliseconds, issued, clockSkewSeconds = 60), claim)
+        }
+    }
+
+    @Test fun clockSkewCannotBeNegative() {
+        assertFailsWith<IllegalArgumentException> { token().validity.isValidAt(issued, issued, clockSkewSeconds = -1) }
+    }
+
     @Test fun ttlStartsAtResolutionAndDoesNotReplaceSignedExpiry() {
         val list = token(payload { put("ttl", 0.5) })
         val resolved = issued + 100.seconds
-        assertTrue(list.validity.isValidAt(resolved + 499.milliseconds, resolved))
-        assertFalse(list.validity.isValidAt(resolved + 500.milliseconds, resolved))
-        assertFalse(list.validity.isValidAt(issued + 600.seconds, issued + 600.seconds))
+        for (skew in listOf(0L, 60L)) {
+            assertTrue(list.validity.isValidAt(resolved + 499.milliseconds, resolved, clockSkewSeconds = skew))
+            assertFalse(list.validity.isValidAt(resolved + 500.milliseconds, resolved, clockSkewSeconds = skew))
+            assertFalse(list.validity.isValidAt(issued + 600.seconds, issued + 600.seconds, clockSkewSeconds = skew))
+        }
     }
 
     @Test fun maximumAgeIsIndependentAndItsBoundaryIsInclusive() {
         val list = token(payload { put("ttl", 1000) })
-        assertTrue(list.validity.isValidAt(issued + 300.seconds, issued, 300))
-        assertFalse(list.validity.isValidAt(issued + 300.seconds + 1.milliseconds, issued, 300))
+        for (skew in listOf(0L, 60L)) {
+            assertTrue(list.validity.isValidAt(issued + 300.seconds, issued, 300, clockSkewSeconds = skew))
+            assertFalse(list.validity.isValidAt(issued + 300.seconds + 1.milliseconds, issued, 300, clockSkewSeconds = skew))
+        }
         assertFailsWith<IllegalArgumentException> { list.validity.isValidAt(issued, issued, 0) }
     }
 

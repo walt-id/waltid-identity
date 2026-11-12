@@ -31,15 +31,24 @@ class IetfStatusListToken private constructor(
         /**
          * [resolvedAt] is the time the signed list was retrieved, not its issuance time. A caller
          * can impose [maximumAgeSeconds] in addition to signed expiry and TTL. Fractional NumericDate
-         * values are retained; expiry and TTL boundaries are exclusive.
+         * values are retained; expiry and TTL boundaries are exclusive. [clockSkewSeconds]
+         * permits future `iat` and `nbf` values within that allowance. It does not extend signed
+         * expiry, TTL or the caller's maximum age.
          */
-        fun isValidAt(current: Instant, resolvedAt: Instant, maximumAgeSeconds: Long? = null): Boolean {
+        fun isValidAt(
+            current: Instant,
+            resolvedAt: Instant,
+            maximumAgeSeconds: Long? = null,
+            clockSkewSeconds: Long = 0,
+        ): Boolean {
             require(maximumAgeSeconds == null || maximumAgeSeconds > 0) { "Maximum list age must be positive" }
+            require(clockSkewSeconds >= 0) { "Clock skew must not be negative" }
             val now = current.fractionalEpochSeconds()
-            return issuedAt <= now &&
+            val latestStart = now + clockSkewSeconds
+            return issuedAt <= latestStart &&
                 (maximumAgeSeconds == null || now - issuedAt <= maximumAgeSeconds) &&
                 (expiresAt == null || now < expiresAt) &&
-                (notBefore == null || now >= notBefore) &&
+                (notBefore == null || notBefore <= latestStart) &&
                 (ttl == null || now - resolvedAt.fractionalEpochSeconds() < ttl)
         }
     }
