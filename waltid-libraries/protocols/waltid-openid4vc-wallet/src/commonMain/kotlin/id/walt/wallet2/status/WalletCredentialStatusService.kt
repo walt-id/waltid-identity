@@ -41,7 +41,7 @@ class WalletCredentialStatusService(
     private data class Record(val reference: WalletCredentialReference, val store: WalletCredentialStore, val credential: StoredCredential) {
         val fingerprint = credential.statusFingerprint()
     }
-    private data class State(val fingerprint: String, val generation: Long, val metadata: CredentialStatusMetadata)
+    private data class State(val store: WalletCredentialStore, val fingerprint: String, val generation: Long, val metadata: CredentialStatusMetadata)
     private class Flight(val fingerprint: String, val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
     private val job = SupervisorJob(parentScope?.coroutineContext?.get(Job))
@@ -164,7 +164,7 @@ class WalletCredentialStatusService(
 
     private suspend fun local(record: Record): CredentialStatusMetadata {
         check(job.isActive) { "Credential status service is closed" }
-        mutex.withLock { states[record.reference]?.takeIf { it.fingerprint == record.fingerprint }?.let { return it.metadata } }
+        mutex.withLock { states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint }?.let { return it.metadata } }
         val discovered = resolver.discover(record.credential.credential)
         val stored = (record.store as? CredentialStatusSnapshotStore)?.readCredentialStatus(record.credential.id)
         val restored = stored?.takeIf { it.schemaVersion == 1 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
@@ -176,9 +176,9 @@ class WalletCredentialStatusService(
             })
         } ?: discovered
         return mutex.withLock {
-            states[record.reference]?.takeIf { it.fingerprint == record.fingerprint }?.metadata ?: run {
+            states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint }?.metadata ?: run {
                 flights.remove(record.reference)?.result?.cancel()
-                states[record.reference] = State(record.fingerprint, ++generation, restored)
+                states[record.reference] = State(record.store, record.fingerprint, ++generation, restored)
                 restored
             }
         }
@@ -224,11 +224,11 @@ class WalletCredentialStatusService(
         val resolved = resolver.resolve(record.credential.credential, mode == CredentialStatusRefreshMode.FORCE, refreshSession)
         currentCoroutineContext().ensureActive()
         val current = record.store.getCredential(record.credential.id)
-        if (current?.statusFingerprint() != record.fingerprint) {
+        if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store || current?.statusFingerprint() != record.fingerprint) {
             return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
         }
         val merged = mutex.withLock {
-            val previous = states[record.reference]?.takeIf { it.fingerprint == record.fingerprint && it.generation == version }
+            val previous = states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint && it.generation == version }
                 ?: return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
             val known = previous.metadata.entries.associateBy(CredentialStatusEntry::referenceId)
             CredentialStatusMetadata(resolved.metadata.entries.map { entry ->
@@ -260,7 +260,8 @@ class WalletCredentialStatusService(
         mutex.withLock {
             check(job.isActive) { "Credential status service is closed" }
             val state = states[record.reference]
-            if (state?.fingerprint != record.fingerprint || state.generation != version) {
+            if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store ||
+                state == null || state.store !== record.store || state.fingerprint != record.fingerprint || state.generation != version) {
                 return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
             }
             states[record.reference] = state.copy(metadata = merged)

@@ -186,27 +186,30 @@ class WalletCredentialStatusServiceTest {
     }
 
     @Test
-    fun deletingDuringRefreshCannotRecreateStateOrPersistAResult() = runTest {
+    fun deletingCredentialOrDetachingStoreDuringRefreshCannotPersistAResult() = runTest {
         val issuer = StatusTestIssuer.create()
-        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
         val body = issuer.list()
-        val entered = CompletableDeferred<Unit>()
-        val release = CompletableDeferred<Unit>()
-        val client = HttpClient(MockEngine(MockEngineConfig().apply {
-            dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { entered.complete(Unit); release.await(); respond(body,
-                headers = Headers.build { append(HttpHeaders.ContentType, "application/statuslist+jwt") }) }
-        }))
-        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client, parentScope = backgroundScope)
-        try {
-            val work = async { service.refresh(mode = CredentialStatusRefreshMode.FORCE) }
-            entered.await()
-            store.removeCredential("resident")
-            release.complete(Unit)
-            assertEquals(CredentialStatusRefreshOutcome.REMOVED, work.await().single().outcome)
-            assertTrue(store.snapshots.isEmpty())
-            assertTrue(service.snapshot().credentials.isEmpty())
-        } finally { service.close(); client.close() }
+        for (detachStore in listOf(false, true)) {
+            val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+            val stores = mutableListOf<WalletCredentialStore>(store)
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val client = HttpClient(MockEngine(MockEngineConfig().apply {
+                dispatcher = StandardTestDispatcher(testScheduler)
+                addHandler { entered.complete(Unit); release.await(); respond(body,
+                    headers = Headers.build { append(HttpHeaders.ContentType, "application/statuslist+jwt") }) }
+            }))
+            val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = stores), client, parentScope = backgroundScope)
+            try {
+                val work = async { service.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+                entered.await()
+                if (detachStore) stores.clear() else store.removeCredential("resident")
+                release.complete(Unit)
+                assertEquals(CredentialStatusRefreshOutcome.REMOVED, work.await().single().outcome)
+                assertTrue(store.snapshots.isEmpty())
+                assertTrue(service.snapshot().credentials.isEmpty())
+            } finally { service.close(); client.close() }
+        }
     }
 
     @Test
