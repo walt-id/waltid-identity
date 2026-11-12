@@ -18,6 +18,35 @@ struct PaymentDisplayField: Identifiable {
     var id: String { item.id }
 }
 
+// Keep these rendering groups aligned with the Compose demo; validated values, labels,
+// locale and placement continue to come from the same wallet core.
+enum PaymentDisplayGroup { case payee, amount, timing, terms, provider, other }
+
+extension PaymentDisplayField {
+    var paymentPath: [String] {
+        guard item.pathComponents.dropFirst().first == "details" else { return item.pathComponents }
+        let fields = Array(item.pathComponents.dropFirst(2))
+        return fields.first == "payload" ? Array(fields.dropFirst()) : fields
+    }
+    var group: PaymentDisplayGroup {
+        switch paymentPath.first {
+        case "payee": .payee
+        case "amount", "currency": .amount
+        case "execution_date": .timing
+        case "recurrence":
+            switch paymentPath.dropFirst().first {
+            case "start_date", "end_date", "number", "frequency": .timing
+            case "mit_options": .terms
+            default: .other
+            }
+        case "pisp": .provider
+        default: .other
+        }
+    }
+    var isLogo: Bool { paymentPath == ["payee", "logo"] }
+    var isWebsite: Bool { paymentPath == ["payee", "website"] }
+}
+
 extension PaymentReviewState {
     func displays(transactions: [ClaimGroup]) -> [PaymentDisplay] {
         var displays: [PaymentDisplay] = []
@@ -26,7 +55,7 @@ extension PaymentReviewState {
                 requiresUnsignedRequestWarning: consent.requiresUnsignedRequestWarning,
                 fields: consent.fields.enumerated().map { index, field in
                     PaymentDisplayField(item: ClaimItem(path: ClaimItemPath(id: "payment").indexedChild(index),
-                        label: field.label, value: .text(field.value), rawValue: field.value),
+                        pathComponents: field.path, label: field.label, value: field.displayValue, rawValue: field.value),
                         placement: field.placement, description: field.description)
                 }))
         }
@@ -38,6 +67,19 @@ extension PaymentReviewState {
                 }, technical: transaction.items.filter { $0.pathComponents.dropFirst().first != "details" }))
         }
         return displays
+    }
+}
+
+private let paymentTimestampPaths: Set<[String]> = [
+    ["date_time"], ["execution_date"], ["recurrence", "start_date"], ["recurrence", "end_date"],
+]
+
+private extension PaymentConsentField {
+    var displayValue: DisplayValue {
+        guard paymentTimestampPaths.contains(path), let instant = WalletInstant.parseTimestamp(value) else {
+            return .text(value)
+        }
+        return .instant(instant)
     }
 }
 

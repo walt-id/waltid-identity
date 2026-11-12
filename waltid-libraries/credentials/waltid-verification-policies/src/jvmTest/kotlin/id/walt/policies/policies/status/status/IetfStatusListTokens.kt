@@ -2,6 +2,7 @@ package id.walt.policies.policies.status.status
 
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseContentType
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.CoseSigner
@@ -64,8 +65,11 @@ object IetfStatusListTokens {
         ).toTagged()
     }
 
+    val statusListCwtType = CoseContentType.AsString("application/statuslist+cwt")
+
     fun certificateHeaders(algorithm: Int, certificateDer: ByteArray): CoseHeaders = CoseHeaders(
         algorithm = algorithm,
+        type = statusListCwtType,
         x5chain = listOf(CoseCertificate(certificateDer)),
     )
 

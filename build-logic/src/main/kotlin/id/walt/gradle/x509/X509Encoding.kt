@@ -18,7 +18,7 @@ internal fun pem(certificates: List<X509CertificateHolder>) = certificates.joinT
 }
 
 /**
- * RFC 7517 JWK of the certificate's key; `kid` is the RFC 7638 thumbprint and `x5c` carries the chain.
+ * RFC 7517 JWK of the certificate's key; `kid` is the RFC 7638 thumbprint.
  */
 internal fun jwk(generated: GeneratedCertificate, includePrivate: Boolean): Map<String, Any> {
     val publicKey = generated.keyPair.public
@@ -61,7 +61,6 @@ internal fun jwk(generated: GeneratedCertificate, includePrivate: Boolean): Map<
     return publicMembers + privateMembers + mapOf(
         "kid" to thumbprint(publicMembers),
         "alg" to generated.keyAlgorithm.jwsAlgorithm,
-        "x5c" to generated.chain.map { Base64.getEncoder().encodeToString(it.encoded) },
     )
 }
 

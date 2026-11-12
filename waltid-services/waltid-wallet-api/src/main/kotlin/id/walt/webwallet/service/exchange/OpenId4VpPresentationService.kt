@@ -65,12 +65,14 @@ class OpenId4VpPresentationService(
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             enforceFinalRequestObject = false,
             fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = webResolveAuthReq,
-                    requestUri = requestUri,
-                    requestUriMethod = requestUriMethod,
-                    requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
-                )
+                WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST).use { fetcher ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = fetcher,
+                        requestUri = requestUri,
+                        requestUriMethod = requestUriMethod,
+                        requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
+                    )
+                }
             },
             trustConfiguration = clientIdTrustConfiguration,
         ).also { resolvedRequest ->
@@ -210,8 +212,6 @@ class OpenId4VpPresentationService(
     }
 
     companion object {
-        private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
             parameters.contains("dcql_query") ||

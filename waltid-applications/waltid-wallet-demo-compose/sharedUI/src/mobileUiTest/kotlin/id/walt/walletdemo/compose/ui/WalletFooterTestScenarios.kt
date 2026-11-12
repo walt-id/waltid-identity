@@ -33,6 +33,33 @@ class WalletFooterTestScenarios(
 ) {
     @Composable private fun theme(content: @Composable () -> Unit) = platformTheme { WalletDemoTheme(content = content) }
 
+    fun paymentActionsShareOneRowAndKeepTheirSeparateActions() = runComposeUiTest {
+        var cancelled = false
+        var confirmed = false
+        setContent {
+            theme {
+                Box(Modifier.size(390.dp, 500.dp)) {
+                    ReviewScaffold(actions = {
+                        WalletActions(
+                            WalletAction("Confirm payment", { confirmed = true }, testTag = "footer-primary"),
+                            WalletAction("Cancel payment", { cancelled = true }, testTag = "footer-secondary"),
+                        )
+                    }) { Text("Review payment") }
+                }
+            }
+        }
+        val primary = onNodeWithTag("footer-primary").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val secondary = onNodeWithTag("footer-secondary").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertEquals(primary.top, secondary.top)
+        assertEquals(primary.bottom, secondary.bottom)
+        assertTrue(secondary.right <= primary.left)
+        assertTrue(primary.bottom - primary.top >= 48.dp && secondary.bottom - secondary.top >= 48.dp)
+        onNodeWithTag("footer-secondary").performClick()
+        runOnIdle { assertTrue(cancelled && !confirmed) }
+        onNodeWithTag("footer-primary").performClick()
+        runOnIdle { assertTrue(confirmed) }
+    }
+
     fun feedbackKeepsTopContentAndActionsStableWithLargeText() = runComposeUiTest {
         val message = mutableStateOf(false)
         setContent {

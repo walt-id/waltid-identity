@@ -2872,7 +2872,8 @@ private extension Waltid_openid4vc_walletPreparedPaymentConsent {
                 case .details: placement = .details
                 case .omitted: placement = .omitted
                 }
-                return PaymentConsentField(label: field.label, description: field.descriptionText, value: field.value, placement: placement)
+                return PaymentConsentField(label: field.label, description: field.descriptionText, value: field.value,
+                    placement: placement, path: swiftArray(field.path, of: String.self))
             })
     }
 }

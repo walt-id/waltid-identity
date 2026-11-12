@@ -1,4 +1,5 @@
-import { createError, defineEventHandler, readBody } from "h3";
+import { parsePaymentJson } from "~/utils/ts12Payment";
+import { createError, defineEventHandler, readRawBody } from "h3";
 import { applyVerificationPolicy, walletForVerification } from "../../../utils/verificationRouting";
 import { forwardJson, httpError, readJsonObject } from "../../utils/forwardJson";
 import {
@@ -9,7 +10,10 @@ import {
 } from "../../utils/pidMaterials";
 
 export default defineEventHandler(async (event) => {
-  const payload = await readJsonObject(await readBody(event));
+  let input: unknown;
+  try { input = parsePaymentJson((await readRawBody(event)) ?? "{}"); }
+  catch { throw createError({ statusCode: 400, statusMessage: "Request body must be valid JSON" }); }
+  const payload = await readJsonObject(input);
   let wallet;
   let prepared;
   try {

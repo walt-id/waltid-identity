@@ -28,6 +28,12 @@ internal object TestCertificates {
         val leaf: X509Certificate
     )
 
+    data class IntermediateChain(
+        val root: X509Certificate,
+        val intermediate: X509Certificate,
+        val leaf: X509Certificate
+    )
+
     data class RsaPssSigner(
         val keyPair: KeyPair,
         val certificate: X509Certificate
@@ -69,7 +75,10 @@ internal object TestCertificates {
         return RsaPssSigner(keyPair, certificate)
     }
 
-    fun createChain(commonName: String = "WAL-1186"): Chain {
+    fun createChain(
+        commonName: String = "WAL-1186",
+        leafNotAfter: Instant = Instant.now().plusSeconds(86_400)
+    ): Chain {
         val rootKeyPair = keyPair()
         val rootName = X500Name("CN=$commonName Root,O=walt.id,C=AT")
         val root = certificate(
@@ -88,9 +97,34 @@ internal object TestCertificates {
             issuer = rootName,
             issuerPrivateKey = rootKeyPair.private,
             issuerCertificate = root,
-            isCa = false
+            isCa = false,
+            notAfter = leafNotAfter
         )
         return Chain(rootKeyPair, root, leafKeyPair, leaf)
+    }
+
+    /** A root → intermediate → leaf chain; the leaf is issued by the intermediate. */
+    fun createChainWithIntermediate(commonName: String = "WAL-1186"): IntermediateChain {
+        val chain = createChain(commonName)
+        val intermediateKeyPair = keyPair()
+        val intermediateName = X500Name("CN=$commonName Intermediate,O=walt.id,C=AT")
+        val intermediate = certificate(
+            subject = intermediateName,
+            subjectKeyPair = intermediateKeyPair,
+            issuer = X500Name.getInstance(chain.root.subjectX500Principal.encoded),
+            issuerPrivateKey = chain.rootKeyPair.private,
+            issuerCertificate = chain.root,
+            isCa = true
+        )
+        val leaf = certificate(
+            subject = X500Name("CN=$commonName Leaf,O=walt.id,C=AT"),
+            subjectKeyPair = keyPair(),
+            issuer = intermediateName,
+            issuerPrivateKey = intermediateKeyPair.private,
+            issuerCertificate = intermediate,
+            isCa = false
+        )
+        return IntermediateChain(chain.root, intermediate, leaf)
     }
 
     fun derBase64(certificate: X509Certificate): String =
@@ -112,14 +146,15 @@ internal object TestCertificates {
         issuer: X500Name,
         issuerPrivateKey: PrivateKey,
         issuerCertificate: X509Certificate?,
-        isCa: Boolean
+        isCa: Boolean,
+        notAfter: Instant = Instant.now().plusSeconds(86_400)
     ): X509Certificate {
         val extensions = JcaX509ExtensionUtils()
         val builder = JcaX509v3CertificateBuilder(
             issuer,
             BigInteger(128, SecureRandom()),
             Date.from(Instant.now().minusSeconds(60)),
-            Date.from(Instant.now().plusSeconds(86_400)),
+            Date.from(notAfter),
             subject,
             subjectKeyPair.public
         )

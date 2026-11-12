@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,10 +13,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.ClaimItemPath
+import id.walt.walletdemo.compose.logic.DisplayValue
+import id.walt.walletdemo.compose.logic.WalletDateTime
+import id.walt.walletdemo.compose.ui.components.ClaimValueRow
+import kotlin.time.Instant
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
@@ -40,6 +51,7 @@ import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletOperationState
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentFieldPlacement
 
 /** Content and readiness are shared; the platform adapter owns the renderer and baseline path. */
 @OptIn(ExperimentalTestApi::class)
@@ -49,13 +61,24 @@ internal class WalletVisualScenarios(
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
     private var layoutDirection = "ltr"
+    private val captureFailures = mutableListOf<AssertionError>()
+
+    fun execute(block: WalletVisualScenarios.() -> Unit) {
+        block()
+        captureFailures.firstOrNull()?.let { failure ->
+            captureFailures.drop(1).forEach(failure::addSuppressed)
+            throw failure
+        }
+    }
 
     private fun capture(id: String) {
         // Capture the settled Compose state after interactions and navigation.
         // Advancing virtual time keeps this independent of host rendering speed.
         test.mainClock.advanceTimeBy(1_000)
         test.waitForIdle()
-        captureImage(id, layoutDirection)
+        // Keep later states and interaction assertions in a journey reachable after a pixel diff.
+        // The platform test still fails after the scenario; references are never accepted here.
+        try { captureImage(id, layoutDirection) } catch (failure: AssertionError) { captureFailures += failure }
     }
 
     private fun content(body: @Composable () -> Unit) {
@@ -85,6 +108,34 @@ internal class WalletVisualScenarios(
         capture(if (rtl) "components.controls.rtl" else "components.controls.default")
         onNodeWithTag("preview.copies.more").performClick()
         onNodeWithText("Copies: 2").assertIsDisplayed()
+    }
+
+    fun dateValues(rtl: Boolean = false) = with(test) {
+        layoutDirection = if (rtl) "rtl" else "ltr"
+        val values = listOf(
+            ClaimItem(ClaimItemPath.topLevel("iat"), label = "Issued at",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T00:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("exp"), label = "Expires",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T01:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("birth_date"), label = "Birth date",
+                value = DisplayValue.Text("1990-05-21"), rawValue = null),
+        )
+        content {
+            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalWalletTimeFormatter provides { WalletDateTime.format(it, "Europe/Budapest", if (rtl) "ar" else "en-GB", true) }) {
+                Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    values.forEach { ClaimValueRow(it) }
+                }
+            }
+        }
+        values.forEach { onNodeWithTag(WalletUiTestTags.claim(it.path.id)).assertIsDisplayed() }
+        onNodeWithText("1990-05-21").assertIsDisplayed()
+        if (!rtl) {
+            onNodeWithText("02:30 \u2068(Budapest, CEST)\u2069", substring = true).assertIsDisplayed()
+            onNodeWithText("02:30 \u2068(Budapest, CET)\u2069", substring = true).assertIsDisplayed()
+        }
+        capture(if (rtl) "components.dates.compact_large_text_rtl" else "components.dates")
     }
 
     fun walletOpening(failure: Boolean = false) = with(test) {
@@ -286,6 +337,8 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).assertIsDisplayed()
         onNodeWithText("Example Reader CA", substring = false).assertIsDisplayed()
+        onNodeWithText("Jan 1, 2031", substring = true).performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Valid until", substring = false).assertIsDisplayed()
         capture("settings.reader.import_review")
     }
 
@@ -637,8 +690,8 @@ internal class WalletVisualScenarios(
         capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
     }
 
-    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false) = with(test) {
-        val options = WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
+    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false, dates: Boolean = false) = with(test) {
+        val options = if (dates) WalletVisualFixtures.dateCredentials else WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
         val review = id.walt.walletdemo.compose.logic.WalletDemoSharingReview(
             id.walt.walletdemo.compose.logic.WalletDemoSharingRequest(
                 id.walt.walletdemo.compose.logic.WalletDemoSharingRequester(
@@ -655,13 +708,14 @@ internal class WalletVisualScenarios(
         options.mapNotNull { it.issuer }.distinct().forEach { issuer ->
             onAllNodesWithText(issuer).assertCountEquals(1)
         }
-        val heading = if (alternative) "City ID" else "National ID"
+        val heading = if (dates) "PID (SD-JWT VC)" else if (alternative) "City ID" else "National ID"
         onAllNodes(hasText(heading) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(1)
-        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada")
+        if (dates) onNodeWithText("Oct 30, 2026", substring = true).assertIsDisplayed()
+        onNodeWithText(if (dates) "Jan 28, 2027" else if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada", substring = dates)
             .performScrollToContent(this).assertIsDisplayed()
         if (alternative) onNodeWithText("Always included by this credential").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
-        capture("sharing.information." + if (multiple) "multiple" else if (alternative) "alternative" else "selected")
+        capture("sharing.information." + if (dates) "dates" else if (multiple) "multiple" else if (alternative) "alternative" else "selected")
     }
 
     fun providerOfferReview() = with(test) {
@@ -733,10 +787,76 @@ internal class WalletVisualScenarios(
                 onSubmit = {}, onCancel = {}, compact = false,
                 preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
         }
-        onNodeWithText("11.56 EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("11.56").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
         capture("payment.localized.compact_large_text")
+    }
+
+    fun paymentTerms(recurring: Boolean, compact: Boolean = false, details: Boolean = false) = with(test) {
+        val consent = WalletVisualFixtures.paymentTerms(recurring)
+        var cancelled = false
+        var submitted = false
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.paymentReview, title = "Payment",
+                onSubmit = { submitted = true }, onCancel = { cancelled = true }, compact = false,
+                preparePaymentConsent = { consent })
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag("payment-payee-logo").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Payee logo").assertDoesNotExist()
+        onNodeWithText("Currency").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").assertExists()
+        if (!recurring) {
+            onNodeWithText("2099-01-01T12:00:00Z").assertDoesNotExist()
+            onNodeWithText("(UTC)", substring = true).assertExists()
+        }
+        onNodeWithText("Requested credentials").assertExists()
+        onNodeWithText("https://verifier.example").assertExists()
+        consent.fields.filter { it.path != listOf("payee", "logo") && it.path != listOf("currency") }.forEach { field ->
+            when (field.placement) {
+                WalletDemoPaymentFieldPlacement.Prominent, WalletDemoPaymentFieldPlacement.Main ->
+                    onNodeWithText(field.label).assertExists("Main payment field must not require expansion: ${field.label}")
+                WalletDemoPaymentFieldPlacement.Details, WalletDemoPaymentFieldPlacement.Omitted ->
+                    onNodeWithText(field.label).assertDoesNotExist()
+            }
+        }
+        if (recurring) onNodeWithText("Payment terms").assertExists()
+        if (compact) {
+            onNodeWithText("Payment terms").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+        }
+        if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
+            val results = mutableListOf<TextLayoutResult>()
+            kotlin.test.assertTrue(layout(results))
+            kotlin.test.assertEquals(1.5f, results.single().layoutInput.density.fontScale)
+        }
+        val id = if (recurring) "payment.recurring" else "payment.scheduled"
+        if (!details) capture(if (compact) "$id.compact_large_text" else "$id.main")
+        if (details || compact) {
+            onNodeWithTag("payment-payee-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("https://shop.example ↗").performScrollToContent(this).assertIsDisplayed()
+            if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
+            if (details) {
+                onNodeWithTag("payment-details-toggle").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+                capture("$id.details")
+            }
+            consent.fields.forEach { field ->
+                when (field.path) {
+                    listOf("payee", "logo") -> onNodeWithTag("payment-payee-logo").performScrollToContent(this).assertIsDisplayed()
+                    listOf("currency") -> onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+                    else -> onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
+                        .performScrollToContent(this).assertIsDisplayed()
+                }
+            }
+        }
+        onNodeWithText("Cancel payment").assertIsDisplayed().performClick()
+        kotlin.test.assertTrue(cancelled)
+        kotlin.test.assertFalse(submitted)
     }
 
     fun paymentReview() = with(test) {
@@ -749,9 +869,9 @@ internal class WalletVisualScenarios(
             )
         }
         onNodeWithText("Confirm payment").performScrollTo().assertIsDisplayed()
-        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
-        onNodeWithText("bound-but-hidden").assertDoesNotExist()
+        onNodeWithText("Technical reference").assertDoesNotExist()
         capture("payment.mixed_credentials.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
 const config = useRuntimeConfig();
 const issuerBase = config.public.issuerBase as string;
 const verifierBase = config.public.verifierBase as string;
@@ -27,6 +28,7 @@ const issuerSelectedIndex = ref(0);
 const verifierSwagger = useSwaggerExamples(
   verifierBase,
   "/verification-session/create",
+  { parseJson: parsePaymentJson },
 );
 const verifierSession = useVerifierSession(verifierBase);
 const verifierJson = ref("");
@@ -39,7 +41,7 @@ watch(issuerSwagger.examples, (list) => {
 });
 watch(verifierSwagger.examples, (list) => {
   if (list.length > 0 && !verifierJson.value) {
-    verifierJson.value = JSON.stringify(list[0].payload, null, 2);
+    verifierJson.value = stringifyPaymentJson(list[0].payload, 2);
   }
 });
 

@@ -2,6 +2,7 @@ export interface TransactionDataProfile {
   type: string;
   displayName: string;
   fields: string[];
+  payloadSchema?: Record<string, unknown> | null;
 }
 
 export function useTransactionDataProfiles(verifierBase: string) {
