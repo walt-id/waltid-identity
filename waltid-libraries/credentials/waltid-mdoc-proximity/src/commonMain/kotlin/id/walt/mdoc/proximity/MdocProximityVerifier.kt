@@ -1,5 +1,7 @@
 package id.walt.mdoc.proximity
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.objects.SessionTranscript
@@ -48,7 +50,10 @@ object MdocProximityVerifier {
             require(document.docType == document.issuerSigned.decodeMobileSecurityObject().docType) {
                 "Document docType differs from the signed MSO docType"
             }
-            verifyIssuerAuthentication(document)
+            val certificates = verifyIssuerAuthentication(document).certificateChain
+            // Check the supplied chain's signatures; IACA/VICAL policies establish external trust.
+            val chain = X509CertificateUtil.validateCertificateChain(certificates, InMemoryTrustStore(certificates.takeLast(1)))
+            require(chain.valid) { "Document signer certificate chain is invalid: ${chain.errorLog}" }
             result
         }
     }
