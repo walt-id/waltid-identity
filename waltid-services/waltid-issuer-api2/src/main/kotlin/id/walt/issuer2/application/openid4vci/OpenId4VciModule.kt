@@ -168,7 +168,6 @@ data class OpenId4VciModule(
                 OAuth2ProviderConfig(
 
                     attestationStatusResolver = statusResolver,
-                    keyAttestationStatusPolicy = { config.keyAttestationConfig?.statusPolicy ?: AttestationStatusPolicy() },
                     authorizationServerIssuer = config.openId4VciBaseUrl(),
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
