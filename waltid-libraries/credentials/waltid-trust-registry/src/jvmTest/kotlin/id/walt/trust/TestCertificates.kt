@@ -1,6 +1,11 @@
 package id.walt.trust
 
+import org.bouncycastle.asn1.ASN1Encodable
+import org.bouncycastle.asn1.DERPrintableString
+import org.bouncycastle.asn1.DERUTF8String
+import org.bouncycastle.asn1.x500.RDN
 import org.bouncycastle.asn1.x500.X500Name
+import org.bouncycastle.asn1.x500.style.BCStyle
 import org.bouncycastle.asn1.x509.BasicConstraints
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.KeyUsage
@@ -99,6 +104,42 @@ internal object TestCertificates {
             issuerCertificate = root,
             isCa = false,
             notAfter = leafNotAfter
+        )
+        return Chain(rootKeyPair, root, leafKeyPair, leaf)
+    }
+
+    /**
+     * A root whose subject is encoded as `PrintableString` and a leaf that names it as issuer in `UTF8String`, as
+     * happens between CA products. PKIX treats both as the same name; their DER encodings differ.
+     */
+    fun createChainWithReencodedIssuerName(commonName: String): Chain {
+        fun name(encode: (String) -> ASN1Encodable) = X500Name(
+            arrayOf(
+                RDN(BCStyle.CN, encode("$commonName Root")),
+                RDN(BCStyle.O, encode("walt.id")),
+                RDN(BCStyle.C, DERPrintableString("AT")),
+            )
+        )
+
+        val rootKeyPair = keyPair()
+        val printableName = name(::DERPrintableString)
+        val root = certificate(
+            subject = printableName,
+            subjectKeyPair = rootKeyPair,
+            issuer = printableName,
+            issuerPrivateKey = rootKeyPair.private,
+            issuerCertificate = null,
+            isCa = true
+        )
+
+        val leafKeyPair = keyPair()
+        val leaf = certificate(
+            subject = X500Name("CN=$commonName Leaf,O=walt.id,C=AT"),
+            subjectKeyPair = leafKeyPair,
+            issuer = name(::DERUTF8String),
+            issuerPrivateKey = rootKeyPair.private,
+            issuerCertificate = root,
+            isCa = false
         )
         return Chain(rootKeyPair, root, leafKeyPair, leaf)
     }

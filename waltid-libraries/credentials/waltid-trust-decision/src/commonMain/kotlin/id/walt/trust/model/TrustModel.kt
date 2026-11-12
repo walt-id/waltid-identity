@@ -169,7 +169,16 @@ data class ServiceIdentity(
     val serialNumber: String? = null,
     val subjectKeyIdentifierHex: String? = null,
     val publicKeyJwkThumbprint: String? = null,
-    val metadata: Map<String, String> = emptyMap()
+    val metadata: Map<String, String> = emptyMap(),
+    /**
+     * Lowercase hex SHA-256 of the UTF-8 RFC 2253 canonical form of the subject of [certificateDerBase64],
+     * so two identities share it exactly when their certificate subjects are equal names under PKIX.
+     *
+     * Derived from the certificate, never from [subjectDn] or trust-list metadata, and set when a source is
+     * loaded. Stores use it only to narrow the anchors a chain resolution reads; the resolution itself still
+     * compares the parsed subject, so a stale or missing value can lose a match but never add one.
+     */
+    val canonicalSubjectSha256Hex: String? = null,
 )
 
 // ---------------------------------------------------------------------------
