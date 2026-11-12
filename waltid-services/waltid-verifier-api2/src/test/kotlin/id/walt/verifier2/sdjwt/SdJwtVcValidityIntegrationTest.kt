@@ -18,7 +18,7 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.freePort
+import id.walt.verifier2.useBoundVerifierAddress
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
 import io.ktor.client.call.body
@@ -48,18 +48,18 @@ class SdJwtVcValidityIntegrationTest {
 
     @Test
     fun `default startup policies enforce validity and reject reserved disclosures`() {
-        val port = freePort()
-        E2ETest("127.0.0.1", port, failEarly = true).testBlock(
+        E2ETest("127.0.0.1", 0, failEarly = true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(
-                    urlPrefix = "http://127.0.0.1:$port/verification-session",
+                    urlPrefix = "http://127.0.0.1/verification-session",
                     urlHost = "openid4vp://authorize",
                 ))
             },
             init = { DidService.minimalInit() },
             module = Application::verifierModule,
         ) {
+            useBoundVerifierAddress()
             val http = testHttpClient()
             val issuer = JWKKey.generate(KeyType.secp256r1)
             val holder = JWKKey.generate(KeyType.secp256r1)
