@@ -44,6 +44,48 @@ class PkceServiceTest {
     }
 
     @Test
+    fun emptyAuthorizationValuesAreOmittedUnderBothPolicies() = runTest {
+        val required = PkceService(PkceServiceConfig(requirePkce = { true }))
+        val emptyForms = listOf(
+            mapOf("code_challenge" to listOf("")),
+            mapOf("code_challenge_method" to listOf("")),
+            mapOf("code_challenge" to listOf(""), "code_challenge_method" to listOf("")),
+        )
+        for (form in emptyForms) {
+            assertEquals(PkceAuthorizationResult.Success(PkceBinding.NotUsed), service.validateAuthorizationRequest(form))
+            assertEquals(required.validateAuthorizationRequest(emptyMap()), required.validateAuthorizationRequest(form))
+        }
+    }
+
+    @Test
+    fun emptyMethodDefaultsToPlainOnlyWhenExplicitlyConfigured() = runTest {
+        val plain = object : PkceCodeChallengeMethod {
+            override val name = "plain"
+            override fun isValidChallenge(codeChallenge: String) = Pkce.isValidVerifier(codeChallenge)
+            override fun calculateChallenge(codeVerifier: String) = codeVerifier
+        }
+        val configured = PkceService(PkceServiceConfig(listOf(S256PkceCodeChallengeMethod, plain)))
+        val form = mapOf("code_challenge" to listOf(verifier), "code_challenge_method" to listOf(""))
+        assertEquals(PkceAuthorizationResult.Success(PkceBinding.Challenge(verifier, "plain")),
+            configured.validateAuthorizationRequest(form))
+        assertEquals(service.validateAuthorizationRequest(form - "code_challenge_method"),
+            service.validateAuthorizationRequest(form))
+    }
+
+    @Test
+    fun emptyAuthorizationValuesDoNotHideDuplicatesOrWhitespace() = runTest {
+        for (form in listOf(
+            mapOf("code_challenge" to listOf("", "")),
+            mapOf("code_challenge_method" to listOf("", "")),
+            mapOf("code_challenge" to listOf(" ")),
+            mapOf("code_challenge_method" to listOf(" ")),
+        )) {
+            assertEquals(OAuthErrorCodes.INVALID_REQUEST,
+                assertIs<PkceAuthorizationResult.Failure>(service.validateAuthorizationRequest(form)).error.error)
+        }
+    }
+
+    @Test
     fun authorizationRejectsMalformedRepeatedAndUnsupportedParameters() = runTest {
         val invalid = listOf(
             parameters() + ("code_challenge" to emptyList()),
@@ -65,14 +107,24 @@ class PkceServiceTest {
     }
 
     @Test
+    fun emptyVerifierIsOmittedForBoundAndUnboundCodes() = runTest {
+        val form = mapOf("code_verifier" to listOf(""))
+        assertEquals(service.verifyTokenRequest(emptyMap(), binding), service.verifyTokenRequest(form, binding))
+        assertIs<PkceVerificationResult.Success>(service.verifyTokenRequest(form, PkceBinding.NotUsed))
+        val required = PkceService(PkceServiceConfig(requirePkce = { true }))
+        assertEquals(required.verifyTokenRequest(emptyMap(), PkceBinding.NotUsed),
+            required.verifyTokenRequest(form, PkceBinding.NotUsed))
+    }
+
+    @Test
     fun tokenRejectsMissingDuplicateAndInvalidVerifiers() = runTest {
         assertEquals(OAuthErrorCodes.INVALID_REQUEST,
             assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(emptyMap(), binding)).error.error)
-        for (values in listOf(emptyList(), listOf(verifier, ""), listOf("", verifier))) {
+        for (values in listOf(emptyList(), listOf(verifier, ""), listOf("", verifier), listOf("", ""))) {
             assertEquals(OAuthErrorCodes.INVALID_REQUEST,
                 assertIs<PkceVerificationResult.Failure>(service.verifyTokenRequest(mapOf("code_verifier" to values), binding)).error.error)
         }
-        for (value in listOf("", "a".repeat(42), "a".repeat(129), "?".repeat(43), "é".repeat(43), " ".repeat(43))) {
+        for (value in listOf("a".repeat(42), "a".repeat(129), "?".repeat(43), "é".repeat(43), " ".repeat(43))) {
             // Even a matching hash cannot make invalid verifier syntax acceptable.
             val matching = PkceBinding.Challenge(Pkce.generateS256CodeChallenge(value), "S256")
             assertEquals(OAuthErrorCodes.INVALID_GRANT,

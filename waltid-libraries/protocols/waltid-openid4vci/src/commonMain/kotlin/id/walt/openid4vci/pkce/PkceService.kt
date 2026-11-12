@@ -23,8 +23,9 @@ class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
                 return invalidAuthorization("Exactly one $name value is required when supplied")
             }
         }
-        val challenge = parameters["code_challenge"]?.single()
-        val methodName = parameters["code_challenge_method"]?.single()
+        // RFC 6749 section 3.1: empty values are omitted, after rejecting repeated parameters.
+        val challenge = parameters["code_challenge"]?.single()?.takeIf(String::isNotEmpty)
+        val methodName = parameters["code_challenge_method"]?.single()?.takeIf(String::isNotEmpty)
         if (challenge == null) {
             if (methodName != null) return invalidAuthorization("code_challenge is required with code_challenge_method")
             if (config.requirePkce()) return invalidAuthorization("PKCE code_challenge is required")
@@ -52,7 +53,8 @@ class PkceService(private val config: PkceServiceConfig = PkceServiceConfig()) {
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Exactly one code_verifier value is required when supplied"),
             )
         }
-        val verifier = values?.single()
+        // RFC 6749 section 3.2 applies the same empty-value rule at the token endpoint.
+        val verifier = values?.single()?.takeIf(String::isNotEmpty)
         return when (binding) {
             PkceBinding.NotUsed -> when {
                 verifier != null -> invalidGrant("code_verifier was supplied without an authorization code_challenge")
