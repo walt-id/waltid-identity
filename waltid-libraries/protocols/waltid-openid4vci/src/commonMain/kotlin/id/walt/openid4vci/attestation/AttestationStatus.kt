@@ -16,6 +16,9 @@ import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+// Match the attestation verifiers' allowance for provider clocks ahead of the issuer.
+private const val STATUS_LIST_CLOCK_SKEW_SECONDS = 60L
+
 /** Status requirements are independent of the requirement to present an attestation. */
 @Serializable
 data class AttestationStatusPolicy(
@@ -163,7 +166,9 @@ class AttestationStatusValidator(
         val resolvedAt: Instant,
         val maximumAgeSeconds: Long?,
     ) {
-        fun isValidAt(current: Instant): Boolean = claims.isValidAt(current, resolvedAt, maximumAgeSeconds)
+        fun isValidAt(current: Instant): Boolean = claims.isValidAt(
+            current, resolvedAt, maximumAgeSeconds, clockSkewSeconds = STATUS_LIST_CLOCK_SKEW_SECONDS,
+        )
     }
 
     private suspend fun validateList(resolved: ResolvedList, evidence: VerifiedAttestationStatus): ValidatedList {

@@ -89,10 +89,10 @@ class DeferredAttestationStatusTest {
             token(key("attacker")), token(signer, typ = "oauth-client-attestation+jwt"),
             token(signer, changes = mapOf("sub" to JsonPrimitive("https://other.example/list"))),
             token(signer, changes = mapOf("iat" to JsonPrimitive(time.epochSeconds - 301))),
-            token(signer, changes = mapOf("iat" to JsonPrimitive(time.epochSeconds + 1))),
+            token(signer, changes = mapOf("iat" to JsonPrimitive(time.epochSeconds + 61))),
             token(signer, changes = mapOf("iat" to JsonNull)), token(signer, omit = setOf("iat")),
             token(signer, changes = mapOf("exp" to JsonPrimitive(time.epochSeconds))),
-            token(signer, changes = mapOf("nbf" to JsonPrimitive(time.epochSeconds + 1))),
+            token(signer, changes = mapOf("nbf" to JsonPrimitive(time.epochSeconds + 61))),
             token(signer, changes = mapOf("ttl" to JsonPrimitive(0))),
             token(signer, changes = mapOf("status_list" to buildJsonObject { put("bits", 3); put("lst", "bad") })),
         )
