@@ -68,6 +68,7 @@ kotlin {
             implementation(identityLibs.ktor.server.test.host)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
     }
 }

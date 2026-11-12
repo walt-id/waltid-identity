@@ -260,10 +260,21 @@ class SignumManagedKeyProvider(
             supportsKeyAgreementAlgorithm = { it in advertisedKeyAgreementAlgorithms },
         )
 
-        private suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray {
+        override suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T {
+            if (capabilities.signer == null) throw SignumAuthorizationException("This key does not permit signing")
+            return handle.withFreshBiometricAuthorization { authorized ->
+                operation(Signer { data, algorithm -> sign(data, algorithm, authorized) })
+            }
+        }
+
+        private suspend fun sign(
+            data: ByteArray,
+            algorithm: SignatureAlgorithm,
+            signer: Signer = Signer(handle::sign),
+        ): ByteArray {
             require(algorithm in signatureAlgorithms) { "Unsupported Signum signature algorithm" }
             val nativeAlgorithm = algorithm.nativeEncoding()
-            val signature = handle.sign(data, nativeAlgorithm)
+            val signature = signer.sign(data, nativeAlgorithm)
             return if (algorithm is SignatureAlgorithm.Ecdsa && algorithm.encoding == EcdsaSignatureEncoding.DER) {
                 EcdsaSignatureCodec.p1363ToDer(signature, storedKey.spec.ecComponentSize())
             } else signature
@@ -335,6 +346,10 @@ class SignumManagedKeyProvider(
 }
 
 interface SignumManagedKey : ManagedKey {
+    /** The signer is valid for one operation in this callback only, using this key's native policy. */
+    suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T =
+        throw SignumAuthorizationException("Fresh biometric signing is unavailable for this key")
+
     val origin: KeyOrigin get() = KeyOrigin.UNKNOWN
     val securityLevel: KeySecurityLevel get() = KeySecurityLevel.UNKNOWN
     val protectionLevel: KeyProtectionLevel

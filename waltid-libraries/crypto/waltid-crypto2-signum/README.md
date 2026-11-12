@@ -10,7 +10,7 @@ needed directly.
 `attestationChallenge` additionally requires attestation evidence; hardware and
 attestation are independent requirements.
 
-On Android, Signum performs signing and key-use authorization, including for keys created or imported
+On Android, Signum performs ordinary signing and key-use authorization, including for keys created or imported
 by the native settings adapter. `AndroidSignumKeyBackend` takes an Android `Context` to check
 StrongBox availability without retaining an activity. Explicit native configurations skip unavailable
 StrongBox when preferred and reject it when required; native readback still verifies the actual
@@ -55,6 +55,27 @@ possible. Native access control still authorizes each operation; the availabilit
 A native token failure can indicate temporary unavailability rather than permanent invalidation.
 `SignumKeyUnavailableException` preserves that distinction and the native cause; callers should retain
 the key for retry. Cancellation and failed authorization remain separate failures.
+
+## Fresh biometric signing for timed keys
+
+`withFreshBiometricAuthorization` lends a single-use signer for an existing timed,
+biometric-only P-256 key. Each call requests fresh native authentication. The signer
+expires at the key's configured timeout, cannot escape the callback, and cannot
+silently prompt again. Cancellation and failures release no successful result.
+The immutable key policy and ordinary signing behavior are unchanged. Freshness and
+single use are enforced by this scope; the timed key is not converted into a
+hardware-enforced per-operation key.
+
+Android uses a strong-biometric prompt followed by a noninteractive AndroidKeyStore
+signature. This narrow native extension is necessary because Signum 0.16.0 retries
+expired authorization with another prompt, including through its current-activity
+fallback. iOS uses a new biometric-only `LAContext`, disables further interaction,
+and passes that same context to the existing Keychain signing operation. That
+context is invalidated on exit and is separate from the ordinary per-key reuse cache.
+
+This capability establishes native authentication and key use. The payment layer
+must bind it to the reviewed transaction; it is not a reusable wallet-wide approval
+or a claim of certified SCA assurance.
 
 ## Native regression tests
 
