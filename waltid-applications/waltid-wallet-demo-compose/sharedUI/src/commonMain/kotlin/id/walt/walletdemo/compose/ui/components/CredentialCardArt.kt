@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -100,6 +102,8 @@ internal fun CredentialCardArt(
     compact: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
+    val status = LocalCredentialStatusUi.current.snapshot.credentials[art.id]?.takeIf { it.hasIssue && !compact }
+    val statusTitle = status?.title()
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
@@ -123,6 +127,7 @@ internal fun CredentialCardArt(
             .clip(shape)
             .then(if (onClick == null) Modifier else Modifier.clickable(
                 role = Role.Button, onClickLabel = "View credential details", onClick = onClick))
+            .then(if (statusTitle != null) Modifier.semantics { contentDescription = "${art.name}, $statusTitle" } else Modifier)
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
         val logoSize = if (compact) minOf(28.dp, maxHeight - 8.dp) else 36.dp
@@ -199,6 +204,8 @@ internal fun CredentialCardArt(
                     .fillMaxWidth(0.72f),
             )
         }
+        if (status != null) CredentialStatusIcon(status,
+            Modifier.align(Alignment.TopEnd).padding(12.dp).testTag("credential-status-icon-${art.id}"))
     }
 }
 

@@ -6,6 +6,9 @@ busy submission, invalid credentials, registration conflict and expired sessions
 cases also exercise browser-local timestamp formatting at compact/wide widths, including the two
 02:30 instants in Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
 Other shared wallet content stays in the [mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md).
+Browser status cases use the same semantic fixtures as mobile. They cover the server-local snapshot,
+an explicit refresh of a stored record that changes to a partial adverse result, and an older server's
+404 fallback without an unsupported refresh request. No browser request fetches an issuer status list.
 The [browser catalogue](catalogue.json) records exact states, requirements and environment.
 
 The tests intercept only synthetic local account/wallet HTTP requests. They exercise the actual

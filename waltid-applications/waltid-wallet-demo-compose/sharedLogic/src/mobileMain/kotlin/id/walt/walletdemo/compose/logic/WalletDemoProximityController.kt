@@ -288,7 +288,7 @@ class WalletDemoProximityController(
         mutableState.update { it.copy(continueAfterResponse = enabled, actionError = null) }
     }
 
-    fun approve() {
+    fun approve(reviewedStatus: Map<String, String>? = null) {
         val current = mutableState.value
         val review = current.review ?: return
         if (!current.canApprove) return
@@ -305,14 +305,14 @@ class WalletDemoProximityController(
         )
         val preparation = current.sessionState as? ProximityState.PreparationRequired
         if (preparation != null) {
-            when (val result = preparation.plan.approve(submission)) {
+            when (val result = if (reviewedStatus == null) preparation.plan.approve(submission) else preparation.plan.approveStatusReviewed(submission, reviewedStatus)) {
                 is ProximityPreparationResult.Rejected -> mutableState.update { it.copy(actionError = result.error) }
                 is ProximityPreparationResult.Prepared -> {
                     val configuration = effectiveConfiguration ?: return
                     replaceSession(configuration.copy(approval = ProximityApproval.Prepared(result.sharing)))
                 }
             }
-        } else dispatch(ProximityAction.Approve(review.reviewId, submission))
+        } else dispatch(ProximityAction.Approve(review.reviewId, submission), reviewedStatus)
     }
 
     fun decline() {
@@ -616,7 +616,7 @@ class WalletDemoProximityController(
         }
     }
 
-    private fun dispatch(action: ProximityAction) {
+    private fun dispatch(action: ProximityAction, reviewedStatus: Map<String, String>? = null) {
         val currentSession = session ?: return
         val reviewId = when (action) {
             is ProximityAction.Approve -> action.reviewId
@@ -627,7 +627,7 @@ class WalletDemoProximityController(
         val actionGeneration = generation
         mutableState.update { it.copy(actionError = null, pendingReviewId = reviewId ?: it.pendingReviewId) }
         scope.launch(dispatcher) {
-            val result = try { currentSession.dispatch(action) }
+            val result = try { if (reviewedStatus == null) currentSession.dispatch(action) else currentSession.dispatchStatusReviewed(action, reviewedStatus) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { ProximityActionResult.Rejected(demoSessionFailure) }
             if (generation != actionGeneration || !mutableState.value.active) return@launch

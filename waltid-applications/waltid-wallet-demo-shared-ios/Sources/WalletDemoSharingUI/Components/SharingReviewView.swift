@@ -7,6 +7,7 @@ import WalletSDK
 /// The host owns the transport, the preview handle and the operating-system result; this view owns
 /// only the rendering of what the user is being asked and the reporting of what they chose.
 public struct SharingReviewView: View {
+    @Environment(\.credentialStatusUI) private var statusUI
     private let review: SharingReviewModel
     private let selection: SharingSelection
     private let selectionComplete: Bool
@@ -81,6 +82,12 @@ public struct SharingReviewView: View {
         self.onRetryClaimReview = onRetryClaimReview
     }
 
+    private var statusAdvisories: [(String, CredentialStatusPresentation)] {
+        (review.credentialOptions).filter { selection.credentials.contains($0.selection) }.compactMap { option in
+            statusUI.values[option.credentialID].map { (CredentialDisplayNormalizer.details(for: option).cardSummary.title, $0.presentation) }
+        }
+    }
+
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             SharingRequestSections(request: review.request, paymentReview: paymentReview)
@@ -148,7 +155,8 @@ public struct SharingReviewView: View {
                     onReject: onReject,
                     onCancel: onCancel,
                     paymentReview: paymentReview,
-                    isPayment: review.request.hasPaymentTransaction
+                    isPayment: review.request.hasPaymentTransaction,
+                    credentialStatuses: statusAdvisories
                 )
             }
         }

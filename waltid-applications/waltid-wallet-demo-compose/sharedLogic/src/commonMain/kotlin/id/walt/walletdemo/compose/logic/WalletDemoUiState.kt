@@ -1,6 +1,12 @@
 package id.walt.walletdemo.compose.logic
 
 data class WalletDemoUiState(
+    val credentialStatuses: WalletDemoCredentialStatuses = WalletDemoCredentialStatuses(),
+    val automaticCredentialStatusChecks: Boolean = true,
+    val checkingCredentialStatuses: Boolean = false,
+    val credentialStatusSummary: WalletDemoStatusRefreshSummary? = null,
+    val credentialStatusError: String? = null,
+    val credentialStatusNotice: String? = null,
     val access: WalletAccessState = WalletAccessState(),
     val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
     val identityProgress: String? = null,

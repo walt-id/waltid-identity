@@ -8,6 +8,12 @@ import WalletSDK
 /// A protocol rather than a concrete `Wallet` so the orchestration below - which is where the
 /// selection and staging rules live - can be exercised without a database, a Keychain, or a device.
 public protocol AnnexCPresentationWallet: Sendable {
+    func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot?
+    func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
+    func closeStatusWallet() async throws
+    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
+        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse
+
     /// Stage 1: retain the pre-consent request and report what could satisfy it.
     func previewAnnexCPresentation(
         parsedRequest: AnnexCParsedRequest,
@@ -25,7 +31,21 @@ public protocol AnnexCPresentationWallet: Sendable {
     ) async throws -> DigitalCredentialResponse
 }
 
-extension Wallet: AnnexCPresentationWallet {}
+public extension AnnexCPresentationWallet {
+    func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { nil }
+    func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
+    func closeStatusWallet() async throws {}
+    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
+        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
+        try await submitAnnexCPresentation(requestID: requestID, verifiedOrigin: verifiedOrigin, deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL, selectedCredentialOptions: selectedCredentialOptions)
+    }
+}
+extension Wallet: AnnexCPresentationWallet {
+    public func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { try await credentialStatusSnapshot() }
+    public func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { credentialStatuses }
+    public func closeStatusWallet() async throws { try await close() }
+}
 
 /// Drives one Annex C presentation from Apple's request to the sealed response.
 ///
@@ -44,6 +64,9 @@ public final class AnnexCPresentationModel: ObservableObject {
     /// Derived from ``preview`` so the review UI never sees the Annex C preview handle, the retained
     /// request ID or the platform request context - those stay here, with the orchestration that has
     /// to submit them.
+    @Published public private(set) var credentialStatuses: [String: CredentialStatus] = [:]
+    @Published public private(set) var statusReviewNotice: String?
+    private var statusObservation: Task<Void, Never>?
     @Published public private(set) var review: SharingReviewModel?
     /// Credentials and disclosures the user has chosen.
     @Published public private(set) var selection = SharingSelection()
@@ -99,6 +122,12 @@ public final class AnnexCPresentationModel: ObservableObject {
             try Task.checkCancellation()
             guard phase == .preparing else { return }
             self.wallet = wallet
+            if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+            statusObservation = Task { [weak self] in
+                do { for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
+                    try Task.checkCancellation(); self?.installStatuses(snapshot)
+                } } catch is CancellationError {} catch { self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.") }
+            }
             let prepared = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
                 // The platform-asserted origin is passed through verbatim: it is what the wallet must
@@ -128,7 +157,7 @@ public final class AnnexCPresentationModel: ObservableObject {
     }
 
     /// Runs stage 2: requests the raw request and returns the sealed response to the platform.
-    public func submit() async {
+    public func submit(reviewedStatus: [String: String]? = nil) async {
         guard phase == .reviewing, let wallet, let preview else { return }
         guard hasCompleteSelection else {
             failure = IdentityDocumentSupportFailure.missingCredentialSelection.localizedDescription
@@ -142,16 +171,29 @@ public final class AnnexCPresentationModel: ObservableObject {
         phase = .submitting
         do {
             try await context.sendResponse { rawRequest in
-                let response = try await wallet.submitAnnexCPresentation(
+                let response: DigitalCredentialResponse
+                if let reviewedStatus {
+                    response = try await wallet.submitStatusReviewedAnnexCPresentation(
+                        reviewedStatus: reviewedStatus, requestID: preview.requestID, verifiedOrigin: preview.verifiedOrigin,
+                        deviceRequestBase64URL: rawRequest.deviceRequest, encryptionInfoBase64URL: rawRequest.encryptionInfo,
+                        selectedCredentialOptions: selections)
+                } else { response = try await wallet.submitAnnexCPresentation(
                     requestID: preview.requestID,
                     verifiedOrigin: preview.verifiedOrigin,
                     deviceRequestBase64URL: rawRequest.deviceRequest,
                     encryptionInfoBase64URL: rawRequest.encryptionInfo,
                     selectedCredentialOptions: selections
                 )
+                }
                 return try encryptedResponseData(fromResponseJSON: response.dataJSON)
             }
             phase = .finished
+            statusObservation?.cancel()
+            try? await wallet.closeStatusWallet()
+        } catch WalletError.credentialStatusReviewChanged {
+            if let snapshot = try? await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+            statusReviewNotice = WalletError.credentialStatusReviewChanged.localizedDescription
+            phase = .reviewing
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
@@ -159,10 +201,16 @@ public final class AnnexCPresentationModel: ObservableObject {
         }
     }
 
+    private func installStatuses(_ snapshot: CredentialStatusSnapshot) {
+        credentialStatuses = Dictionary(snapshot.credentials.map { ($0.credentialID, $0.value) }, uniquingKeysWith: { _, latest in latest })
+    }
+
     /// Dismisses the request without releasing anything.
     public func cancel() {
         guard phase != .submitting, phase != .finished else { return }
         phase = .finished
+        statusObservation?.cancel()
+        if let wallet { Task { try? await wallet.closeStatusWallet() } }
         context.cancelRequest()
     }
 }

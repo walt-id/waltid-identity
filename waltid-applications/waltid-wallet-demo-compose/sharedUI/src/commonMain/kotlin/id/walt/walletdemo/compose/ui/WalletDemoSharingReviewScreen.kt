@@ -20,6 +20,7 @@ import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
@@ -44,6 +45,8 @@ fun WalletDemoSharingReviewScreen(
     compact: Boolean = true,
     preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
     controller: WalletDemoSharingReviewController? = null,
+    credentialStatuses: id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses? = null,
+    statusReviewNotice: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val owner = controller ?: remember(review) { WalletDemoSharingReviewController(review, scope, prepare = preparePaymentConsent) }
@@ -52,10 +55,12 @@ fun WalletDemoSharingReviewScreen(
     val state by owner.state.collectAsState()
     val selection = state.selection
     val paymentReview = state.payment
-    val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
+    val statuses = credentialStatuses ?: LocalCredentialStatusUi.current.snapshot
+    val submit = { owner.selectionForSubmission(state)?.let { onSubmit(it.copy(credentialStatusRevisions = statuses.credentials.mapValues { it.value.advisoryRevision })) }; Unit }
     val information by rememberSharingInformation(review.credentialOptions, state.information is WalletDemoClaimReview.Legacy)
     val selectionComplete = information != null && state.information.canConfirm && review.hasCompleteCredentialSelection(selection.credentials)
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalCredentialStatusUi provides id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext(statuses)) {
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
         ReviewScaffold(
             fillViewport = false,
@@ -69,6 +74,8 @@ fun WalletDemoSharingReviewScreen(
             },
             actions = {
                 SharingActionsRow(
+                    credentialStatuses = review.credentialOptions.filter { it.selection in selection.credentials }
+                        .mapNotNull { option -> LocalCredentialStatusUi.current.snapshot.credentials[option.credentialId]?.let { (information?.firstOrNull { info -> info.option.selection == option.selection }?.summary?.title ?: option.label ?: "Credential") to it } },
                     paymentReview = paymentReview,
                     isPayment = review.request.transactionData.any { it.isPaymentTransaction },
                     enabled = enabled,
@@ -80,6 +87,7 @@ fun WalletDemoSharingReviewScreen(
                 )
             },
         ) {
+            statusReviewNotice?.let { androidx.compose.material3.Text(it) }
             SharingReviewSection(
                 paymentReview = paymentReview,
                 claimReview = state.information,
@@ -94,6 +102,7 @@ fun WalletDemoSharingReviewScreen(
                 onToggleDisclosure = owner::toggleDisclosure,
             )
         }
+    }
     }
 }
 

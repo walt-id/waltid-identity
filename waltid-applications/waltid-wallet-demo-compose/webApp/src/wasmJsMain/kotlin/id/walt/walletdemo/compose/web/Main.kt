@@ -8,6 +8,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -163,6 +164,20 @@ private fun WebWalletSession(
         )
     }
 
+    DisposableEffect(controller) {
+        val visibility: (org.w3c.dom.events.Event) -> Unit = {
+            if (isWalletDocumentVisible()) controller.handleApplicationForegrounded()
+            else controller.handleApplicationBackgrounded()
+        }
+        if (isWalletDocumentVisible()) controller.handleApplicationForegrounded()
+        else controller.handleApplicationBackgrounded()
+        document.addEventListener("visibilitychange", visibility)
+        onDispose {
+            document.removeEventListener("visibilitychange", visibility)
+            controller.handleApplicationBackgrounded()
+        }
+    }
+
     LaunchedEffect(session.token, session.kind, session.baseUrl) {
         val refreshed = runCatching { refreshWalletTargets(session) }.getOrNull() ?: return@LaunchedEffect
         targets = refreshed
@@ -247,3 +262,7 @@ private fun isAuthorizationCallbackHref(href: String): Boolean {
 private fun clearPageQueryFromAddressBar() {
     window.history.replaceState(null, "", window.location.pathname)
 }
+
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => document.visibilityState === 'visible'")
+private external fun isWalletDocumentVisible(): Boolean

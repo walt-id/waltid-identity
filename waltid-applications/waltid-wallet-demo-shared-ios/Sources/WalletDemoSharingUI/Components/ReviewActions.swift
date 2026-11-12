@@ -1,7 +1,9 @@
 import SwiftUI
+import WalletSDK
 
 /// Presentation actions, with transport-specific labels and accessibility identifiers when needed.
 public struct ReviewActions: View {
+    let credentialStatuses: [(String, CredentialStatusPresentation)]
     let selectionComplete: Bool
     let isLoading: Bool
     let onSubmit: () -> Void
@@ -22,8 +24,10 @@ public struct ReviewActions: View {
         presentation: ReviewActionPresentation = .sharing,
         paymentReview: PaymentReviewState = .notRequired,
         isPayment: Bool = false,
-        showCancelWithReject: Bool = true
+        showCancelWithReject: Bool = true,
+        credentialStatuses: [(String, CredentialStatusPresentation)] = []
     ) {
+        self.credentialStatuses = credentialStatuses
         self.selectionComplete = selectionComplete
         self.isLoading = isLoading
         self.onSubmit = onSubmit
@@ -38,13 +42,15 @@ public struct ReviewActions: View {
     public var body: some View {
         let canSubmit = !isLoading && selectionComplete && paymentReview.canConfirm
         let submitTitle = paymentReview.consent?.affirmativeAction
-            ?? (isPayment ? String(localized: "Confirm payment", bundle: .module) : presentation.submitTitle)
+            ?? (isPayment ? String(localized: "Confirm payment", bundle: .module) : (presentation == .sharing && credentialStatuses.contains { $0.1.hasAdverseStatus } ? String(localized: "Share anyway", bundle: .module) : presentation.submitTitle))
         let cancel = WalletAction(
             (onReject == nil ? paymentReview.consent?.denialAction : nil) ?? presentation.cancelTitle
                 ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)),
             enabled: !isLoading || presentation == .proximity, identifier: presentation.cancelAccessibilityIdentifier,
             perform: onCancel
         )
+        VStack(spacing: 8) {
+        CredentialStatusAdvisory(credentialStatuses)
         WalletActions(
             primary: WalletAction(submitTitle,
                 enabled: canSubmit,
@@ -60,6 +66,7 @@ public struct ReviewActions: View {
             } ?? cancel,
             tertiary: onReject == nil || !showCancelWithReject ? nil : cancel
         )
+        }
         .alert(String(localized: "Unsigned payment request", bundle: .module), isPresented: Binding(
             get: { pendingUnsignedRevision != nil },
             set: { if !$0 { pendingUnsignedRevision = nil } }

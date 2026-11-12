@@ -102,7 +102,10 @@ struct WalletDemoApp: App {
                 // active is the first moment the app can act on it, so it reconciles here rather
                 // than polling. The same foreground signal also drives the one-shot biometric
                 // unlock prompt, because PinView's scenePhase can stay inactive on a cold launch.
-                guard phase == .active else { return }
+                guard phase == .active else {
+                    if phase == .background { viewModel.handleApplicationEnteredBackground() }
+                    return
+                }
                 viewModel.handleApplicationBecameActive()
                 if #available(iOS 26.0, *) {
                     Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }

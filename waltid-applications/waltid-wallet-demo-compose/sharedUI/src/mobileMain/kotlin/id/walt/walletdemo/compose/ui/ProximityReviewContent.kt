@@ -136,6 +136,7 @@ private fun CredentialOption(
             WalletInstantText(credential.validUntil)
         }
     }
+    id.walt.walletdemo.compose.ui.components.CredentialStatusSection(credential.credentialId, compact = true)
 }
 
 internal fun CredentialDetails.mdocClaims(namespace: String, elementIdentifier: String): List<ClaimItem> =

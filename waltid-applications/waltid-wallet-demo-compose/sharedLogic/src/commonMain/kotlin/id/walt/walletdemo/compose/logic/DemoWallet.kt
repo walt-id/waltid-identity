@@ -1,6 +1,23 @@
 package id.walt.walletdemo.compose.logic
 
 interface DemoWallet {
+    fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> = kotlinx.coroutines.flow.emptyFlow()
+    suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses()
+    suspend fun refreshCredentialStatuses(ids: Set<String>? = null, force: Boolean = false): WalletDemoStatusRefreshSummary =
+        WalletDemoStatusRefreshSummary(0, 0, 0, 0)
+    suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>,
+        did: String? = null,
+        paymentConsentRevision: String? = null,
+    ): WalletDemoOperationResult {
+        val latest = credentialStatusSnapshot().credentials
+        if (selectedCredentialOptions.any { latest[it.credentialId]?.advisoryRevision != reviewedStatus[it.credentialId] }) throw WalletDemoStatusReviewChanged()
+        return submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
+    }
+
     /** Returns null only when this wallet does not support identity management. */
     suspend fun identityDetails(): WalletDemoIdentityDetails? = null
     suspend fun identitySetup(): WalletDemoIdentitySetup? = null

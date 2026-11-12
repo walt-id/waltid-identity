@@ -158,15 +158,17 @@ struct PresentView: View {
         let reviewedSelection = viewModel.presentationSharingSelection
         let reviewedPayment = viewModel.paymentReview
         let reviewedClaims = viewModel.claimReview
+        let reviewedStatuses = viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision }
         let submit = {
             guard informationReady, review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
                   reviewedPayment == viewModel.paymentReview,
                   reviewedClaims == viewModel.claimReview else { return }
-            viewModel.submitPresentation()
+            viewModel.submitPresentation(reviewedStatus: reviewedStatuses)
         }
         return WalletReviewScaffold(showsActions: true) {
             WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+            if let statusError = viewModel.credentialStatusError { Text(statusError).font(.footnote).foregroundStyle(.red) }
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }

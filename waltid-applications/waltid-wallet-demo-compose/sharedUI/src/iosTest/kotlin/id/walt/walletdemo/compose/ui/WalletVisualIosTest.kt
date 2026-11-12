@@ -37,6 +37,17 @@ class WalletVisualIosTest {
         platform.posix.tzset()
     }
 
+    @Test fun credentialStatusHome() = scenario { credentialStatusHome() }
+    @Test fun credentialStatusDetailsClear() = scenario { credentialStatusDetails() }
+    @Test fun credentialStatusDetailsAdverse() = scenario { credentialStatusDetails(adverse = true) }
+    @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
+    @Test fun credentialStatusKinds() = scenario { credentialStatusKinds() }
+    @Test fun credentialStatusSharing() = scenario { credentialStatusSharing() }
+    @Test fun credentialStatusPayment() = scenario { credentialStatusPayment() }
+    @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
+    @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
+    @Test fun credentialStatusCompactRtl() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }
+
     @Test fun walletOpening() = scenario { walletOpening() }
     @Test fun walletOpeningFailure() = scenario { walletOpening(failure = true) }
     @Test fun pinStorageUnavailable() = scenario { pinStorageUnavailable() }
@@ -172,7 +183,7 @@ class WalletVisualIosTest {
                 onNode(isRoot() and hasAnyDescendant(hasTestTag(WalletUiTestTags.SettingsResetConfirm)))
             else if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
-            else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
+            else if (id.startsWith("status.sharing.") || id.startsWith("status.payment.") || id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
                     onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
                 fun environment(key: String) = platform.posix.getenv(key)?.toKString() ?: ""
                 val metadata: Map<String, Any> = mapOf(

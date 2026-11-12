@@ -30,7 +30,7 @@ internal fun PresentTab(
     onPreview: () -> Unit,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (Map<String, String>) -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
     onDone: () -> Unit,
@@ -74,11 +74,13 @@ internal fun PresentTab(
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
+                    credentialStatuses = preview.credentialOptions.filter { it.selection in state.selectedPresentationCredentialOptions }
+                        .mapNotNull { option -> state.credentialStatuses.credentials[option.credentialId]?.let { option.label.ifBlank { option.credentialId } to it } },
                     paymentReview = state.paymentReview,
                     isPayment = preview.transactionData.any { it.isPaymentTransaction },
                     enabled = state.presentationReviewEnabled,
                     selectionComplete = information != null && state.claimReview.canConfirm && state.presentationCredentialSelectionComplete(),
-                    onSubmit = onSubmit,
+                    onSubmit = { onSubmit(state.credentialStatuses.credentials.mapValues { it.value.advisoryRevision }) },
                     onCancel = onCancel,
                     onReject = onReject,
                     showCancelWithReject = false,
@@ -86,6 +88,7 @@ internal fun PresentTab(
             },
         ) {
             feedback?.invoke()
+            state.credentialStatusError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 claimReview = state.claimReview,
