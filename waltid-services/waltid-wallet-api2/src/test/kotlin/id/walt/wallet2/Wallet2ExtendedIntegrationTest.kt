@@ -37,7 +37,7 @@ import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.*
@@ -659,7 +659,7 @@ class Wallet2ExtendedIntegrationTest {
 
                 // -- Verify credential is NOT yet in wallet (isolated steps don't store) --
                 testAndReturn("Wallet has no credentials yet (isolated steps don't store)") {
-                    val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                    val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(0, creds.size, "Isolated steps should not auto-store, got ${creds.size} creds")
                 }
 
@@ -679,7 +679,7 @@ class Wallet2ExtendedIntegrationTest {
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
 
                     val credentials = http.get("/wallet/$walletId/credentials")
-                        .body<List<StoredCredentialMetadata>>()
+                        .body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(1, credentials.size)
                 }
 
@@ -723,7 +723,7 @@ class Wallet2ExtendedIntegrationTest {
 
                 // -- Verify credential is now in wallet --
                 testAndReturn("Credential now in wallet after full receive") {
-                    val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                    val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(2, creds.size, "Expected 2 stored credentials, got ${creds.size}")
                 }
             }
@@ -773,7 +773,7 @@ class Wallet2ExtendedIntegrationTest {
             val initialCreds = testAndReturn("List credentials before deletion") {
                 http.get("/wallet/$walletId/credentials")
                     .also { assertEquals(HttpStatusCode.OK, it.status) }
-                    .body<List<StoredCredentialMetadata>>()
+                    .body<List<WalletCredentialMetadataResponse>>()
             }
             assertTrue(initialCreds.isNotEmpty(), "Should have at least 1 stored credential")
 
@@ -786,7 +786,7 @@ class Wallet2ExtendedIntegrationTest {
 
             // Verify it's gone
             testAndReturn("Credential count decremented after deletion") {
-                val remaining = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                val remaining = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                 assertEquals(
                     initialCreds.size - 1, remaining.size,
                     "Expected ${initialCreds.size - 1} credentials, got ${remaining.size}"

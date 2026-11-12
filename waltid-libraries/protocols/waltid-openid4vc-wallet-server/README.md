@@ -238,6 +238,11 @@ List/detail responses retain their existing fields and add `reference`, `status`
 snapshots; `POST /wallet/{walletId}/credential-status/refresh` explicitly checks wallet-owned
 references. Both use the containing wallet's authentication and ownership checks.
 
+Typed Kotlin HTTP clients decode list entries as `WalletCredentialMetadataResponse` and details as
+`WalletCredentialResponse` from `id.walt.wallet2.status`. Import responses and inline isolated
+presentation inputs continue to use `StoredCredential`; copy its fields from the detail response
+when constructing an inline request. Strict JSON decoders must use the response types for reads.
+
 Refresh accepts `{ "credentials": [{ "storeIndex": 0, "credentialId": "stored-id" }], "mode": "IF_DUE" }`.
 Omit `credentials` to select the wallet; an explicit selection contains 1–100 references. `FORCE`
 requires revalidation. A wallet-scoped 30-second admission limit can return `DEFERRED` per credential;

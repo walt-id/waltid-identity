@@ -5,7 +5,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.ImportCredentialRequest
@@ -131,7 +131,7 @@ class Wallet2IntegrationTest {
 
             // 8. List credentials (endpoint returns metadata only, no raw credential data)
             testAndReturn("List credentials") {
-                val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                 creds
             }
 
