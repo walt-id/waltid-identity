@@ -89,7 +89,8 @@ class Issuer2AttestationChallengeTest {
             listOf(verifier) to null,
             null to "invalid_request",
             listOf(verifier, "") to "invalid_request",
-            listOf("") to "invalid_grant",
+            listOf("") to "invalid_request",
+            listOf("", "") to "invalid_request",
             listOf("x".repeat(43)) to "invalid_grant",
             listOf("é".repeat(43)) to "invalid_grant",
         )
@@ -109,18 +110,44 @@ class Issuer2AttestationChallengeTest {
     }
 
     @Test
+    fun `empty PKCE values are omitted by token and PAR endpoints`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val code = fixture.authorizationCode()
+        client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code); append("code_verifier", "")
+        }, null).assertToken()
+        val par = client.par(fixture, null, Parameters.build {
+            appendAll(parParameters()); append("code_challenge", ""); append("code_challenge_method", "")
+        })
+        assertEquals(HttpStatusCode.Created, par.status, par.bodyAsText())
+        assertNotNull(par.body<JsonObject>()["request_uri"])
+    }
+
+    @Test
     fun `configured PKCE requirement rejects missing challenges and accepts S256 through HTTP`() = testApplication {
         val fixture = fixture(enabled = false, requirePkce = true)
         val client = install(fixture)
-        val authorization = client.get("/openid4vci/authorize") {
-            parParameters().forEach { name, values -> values.forEach { parameter(name, it) } }
+        for (emptyPkce in listOf(false, true)) {
+            val parameters = Parameters.build {
+                appendAll(parParameters())
+                if (emptyPkce) {
+                    append("code_challenge", ""); append("code_challenge_method", "")
+                }
+            }
+            val authorization = client.get("/openid4vci/authorize") {
+                parameters.forEach { name, values -> values.forEach { parameter(name, it) } }
+            }
+            assertEquals(HttpStatusCode.BadRequest, authorization.status, authorization.bodyAsText())
+            assertEquals("invalid_request", authorization.body<JsonObject>().string("error"))
+            assertEquals("PKCE code_challenge is required", authorization.body<JsonObject>().string("error_description"))
+            assertEquals("no-store", authorization.headers[HttpHeaders.CacheControl])
+            val par = client.par(fixture, null, parameters)
+            assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
+            assertEquals("invalid_request", par.body<JsonObject>().string("error"))
+            assertEquals("PKCE code_challenge is required", par.body<JsonObject>().string("error_description"))
         }
-        assertEquals(HttpStatusCode.BadRequest, authorization.status, authorization.bodyAsText())
-        assertEquals("invalid_request", authorization.body<JsonObject>().string("error"))
-        assertEquals("no-store", authorization.headers[HttpHeaders.CacheControl])
-        val par = client.par(fixture, null)
-        assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
-        assertEquals("invalid_request", par.body<JsonObject>().string("error"))
 
         val verifier = id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs.PKCE_VERIFIER_EXAMPLE
         val code = fixture.authorizationCode(verifier)
@@ -526,9 +553,13 @@ class Issuer2AttestationChallengeTest {
         ).issue(issuer)
     }
 
-    private suspend fun HttpClient.par(fixture: Fixture, challenge: String?): HttpResponse {
+    private suspend fun HttpClient.par(
+        fixture: Fixture,
+        challenge: String?,
+        parameters: Parameters = parParameters(),
+    ): HttpResponse {
         val headers = fixture.headers(challenge)
-        return submitForm("/openid4vci/par", parParameters()) {
+        return submitForm("/openid4vci/par", parameters) {
             header(ClientAttestationHeaders.CLIENT_ATTESTATION, headers.attestationJwt)
             header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, headers.popJwt)
             header(HttpHeaders.Origin, "https://wallet.example")
