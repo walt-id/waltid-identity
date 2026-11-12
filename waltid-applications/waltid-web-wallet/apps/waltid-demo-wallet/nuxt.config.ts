@@ -23,6 +23,13 @@ export default defineNuxtConfig({
     },
 
     auth: {
+        // PTRID-753: this is a Nuxt module option, so it becomes a genuine runtimeConfig.public.auth.baseURL
+        // key (see @sidebase/nuxt-auth's module.ts: `nuxt.options.runtimeConfig.public.auth = options`) --
+        // resolving process.env HERE, in nuxt.config.ts, would bake whatever's set at `npm run build` time
+        // (nothing, in our Docker build) as a permanent default; it would NOT pick up a value set later via
+        // `docker run -e` / compose `environment:`. Leave this relative and let Nuxt's automatic runtime
+        // override for nested public keys (NUXT_PUBLIC_AUTH_BASE_URL) set the absolute cross-origin value at
+        // container start, same mechanism as runtimeConfig.public.walletApiBaseUrl below.
         baseURL: "/wallet-api/auth",
 
         provider: {
@@ -30,7 +37,11 @@ export default defineNuxtConfig({
             token: {
                 maxAgeInSeconds: 60 * 60 * 24 * 30, // 30 days
                 cookieName: 'auth.token',
-                sameSiteAttribute: 'strict'
+                // PTRID-753: SameSite=None is required for a cross-origin fetch to carry this
+                // cookie at all; browsers reject SameSite=None without Secure, so both change
+                // together (@sidebase/nuxt-auth does not imply one from the other).
+                sameSiteAttribute: 'none',
+                secureCookieAttribute: true
             },
 
             endpoints: {
@@ -194,6 +205,10 @@ export default defineNuxtConfig({
             issuerCallbackUrl: "http://localhost:7100",
             credentialsRepositoryUrl: "http://localhost:3000",
             devWalletUrl: "https://wallet-dev.walt.id",
+            // PTRID-753: absolute origin of wallet-api (e.g. "https://wallet-api.example.com"),
+            // no trailing slash. Empty string preserves the old same-origin-proxy behavior
+            // (relative /wallet-api/... paths) for any deployment that still needs it.
+            walletApiBaseUrl: process.env.NUXT_PUBLIC_WALLET_API_BASE_URL || '',
         }
     },
 
