@@ -63,8 +63,8 @@ data class KtorSessionNotifications(
         val retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy(),
     ) {
         init {
-            require(signingSecret == null || signingSecret.encodeToByteArray().size >= 32) {
-                "signing_secret must contain at least 32 UTF-8 bytes"
+            require(signingSecret == null || (signingSecret.isNotBlank() && signingSecret.encodeToByteArray().size >= 32)) {
+                "signing_secret must be non-blank and contain at least 32 UTF-8 bytes"
             }
         }
     }
