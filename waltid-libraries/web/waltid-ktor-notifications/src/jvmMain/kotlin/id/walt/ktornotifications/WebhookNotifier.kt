@@ -56,8 +56,8 @@ internal interface WebhookTransport {
 
 internal class KtorWebhookTransport(
     private val client: HttpClient = HttpClient(OkHttp) {
-        // Redirects stay off. The guard checks the address OkHttp connects to and follows a redirect
-        // only when this client has followRedirects enabled.
+        // Redirects stay off. The guard checks the address OkHttp connects to, and a redirect would
+        // send credentials to an unconfigured URL and invalidate URL-bound signatures.
         followRedirects = false
         install(HttpTimeout) {
             connectTimeoutMillis = 10_000
@@ -82,6 +82,19 @@ internal class KtorWebhookTransport(
                 header(WEBHOOK_TIMESTAMP_HEADER, timestampEpochSeconds)
                 header(WEBHOOK_ATTEMPT_HEADER, attempt)
                 header(CONTENT_DIGEST_HEADER, delivery.contentDigest)
+                delivery.signingSecret?.let { secret ->
+                    header(
+                        WEBHOOK_SIGNATURE_HEADER,
+                        WebhookSignature.sign(
+                            secret = secret,
+                            url = delivery.url,
+                            deliveryId = delivery.deliveryId,
+                            timestampEpochSeconds = timestampEpochSeconds,
+                            attempt = attempt,
+                            contentDigest = delivery.contentDigest,
+                        ),
+                    )
+                }
                 setBody(delivery.payload)
 
                 if (delivery.basicAuthUser != null && delivery.basicAuthPass != null) {
@@ -187,6 +200,7 @@ internal class WebhookDeliveryQueue(
             basicAuthUser = config.basicAuthUser,
             basicAuthPass = config.basicAuthPass,
             bearerToken = config.bearerToken,
+            signingSecret = config.signingSecret,
             retryPolicy = config.retryPolicy,
             enqueueOrder = enqueueSequence.updateAndGet { previous ->
                 maxOf(previous + 1, now * 1_000)
@@ -392,6 +406,7 @@ const val WEBHOOK_SEQUENCE_HEADER = "Webhook-Sequence"
 const val WEBHOOK_TIMESTAMP_HEADER = "Webhook-Timestamp"
 const val WEBHOOK_ATTEMPT_HEADER = "Webhook-Attempt"
 const val CONTENT_DIGEST_HEADER = "Content-Digest"
+const val WEBHOOK_SIGNATURE_HEADER = "X-Webhook-Signature"
 
 const val STORAGE_DIRECTORY_PROPERTY = "waltid.webhook.delivery.directory"
 const val STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE = "WALTID_WEBHOOK_DELIVERY_DIRECTORY"

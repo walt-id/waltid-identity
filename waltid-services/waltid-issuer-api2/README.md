@@ -393,6 +393,26 @@ The original request remains supported on `POST /issuer2/credential-offers`:
 }
 ```
 
+To authenticate issuance webhooks, add `signing_secret` to the offer's notification override:
+
+```json
+{
+  "profileId": "openBadgeCredential",
+  "authMethod": "PRE_AUTHORIZED",
+  "runtimeOverrides": {
+    "notifications": {
+      "webhook": {
+        "url": "https://receiver.example/issuer2",
+        "signing_secret": "replace-with-a-random-32-byte-secret"
+      }
+    }
+  }
+}
+```
+
+Issuer2 signs each outbound attempt using the [webhook receiver contract](../../waltid-libraries/web/waltid-ktor-notifications/README.md#signed-callbacks).
+The secret is retained internally for retries and omitted from public session and callback payloads.
+
 Its flat receipt includes `profileId`, `offerId`, `credentialOffer`, `authMethod`,
 `issuerStateMode`, `valueMode`, `expiresAt`, and `txCodeValue`, subject to the existing
 optional-field serialization settings.
