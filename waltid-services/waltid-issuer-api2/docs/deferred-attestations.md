@@ -1,8 +1,8 @@
 # Attestation status during deferred issuance
 
 Issuer2 rechecks the WIA accepted during OAuth client authentication and each KA accepted
-with the credential proofs. Verified status references, attester public keys, capture time,
-version and policy are retained with the original accepted evidence. Refresh, resubmission,
+with the credential proofs. Verified status references, attester public keys, capture time
+and policy are retained with the original accepted evidence. Refresh, resubmission,
 checkpoint recovery and restart preserve that evidence. Original nonce, PoP and proof-age
 checks are not replayed. F5 lifetime checks and their original clock tolerance remain in force.
 
@@ -136,7 +136,7 @@ the persisted claim fence and lifetimes are checked again after resolution.
 | Confirmed INVALID (`0x01`) | Persist whole-transaction denial; HTTP 400 `credential_request_denied` |
 | SUSPENDED (`0x02`) | HTTP 202 with the same `transaction_id` and a positive `interval`; no credentials |
 | Lookup failure, bad signature, unauthorized signer, stale/malformed list, unknown status or out-of-range index | HTTP 202 with the same `transaction_id` and `interval`; no credentials or permanent revocation decision |
-| Required legacy evidence missing | Persist denial; HTTP 400 `credential_request_denied` |
+| Required status reference missing | Persist denial; HTTP 400 `credential_request_denied` |
 
 A confirmed INVALID entry takes precedence over another entry's unavailable lookup.
 For a retryable status outcome on an accepted transaction, the wallet waits at least the
@@ -183,26 +183,20 @@ still prevents delivery of their cached credentials; previously committed accoun
 rolled back. Signing checkpoints and status-entry allocations are private recovery progress,
 not successful issuance or wallet storage.
 
-## Legacy transactions
+## Captured evidence
 
-A captured optional absence is represented by a versioned evidence object with no reference.
-A null status-evidence object means the verifier predates status capture. This also applies
-to an older access token used to create a new transaction after upgrading.
+Every verified attestation records its status policy, including when the profile permits
+omitting the status reference. A captured evidence object with no reference represents that
+known optional omission. A missing evidence object is an internal construction error and
+blocks delivery; it is never treated as optional omission or recorded as confirmed revocation.
 
-Legacy evidence fails closed when the current applicable profile requires a status
-reference. Legacy optional-status profiles are explicitly grandfathered under F5's existing
-lifetime enforcement; their original status cannot be reconstructed. They retain the null
-legacy marker, rather than being rewritten as a known optional omission. Newly captured
-transactions retain their accepted policy through configuration changes, refresh and
-resubmission. Only uncaptured legacy evidence consults current client-authentication trust and legacy
-KA policy callbacks. New snapshots, including known optional omission, use their captured
-policy without resolving current attester keys for status checks.
+Deferred transactions use their original captured policy through configuration changes,
+refresh, resubmission and restart. Status checks do not reconstruct that policy from current
+issuer configuration. An omitted `maximumListAgeSeconds` adds no age cap; an explicit cap
+remains attached to the transaction. Signed validity and freshness checks still apply.
 
-Newly captured status evidence uses version 2 and retains its optional age limit, including
-no additional age cap, through refresh, resubmission and restart. Existing version 1
-snapshots keep their explicit age limit or the original implicit 300-second limit when
-that field was omitted. Changing the service default does not weaken those transactions.
-Unknown evidence versions fail closed.
+This unreleased feature provides no migration for snapshots or tokens from earlier
+development versions. Restart affected in-flight flows when changing development versions.
 
 Auto-revoke scheduling, Wallet Provider minting, fresh-attestation replacement and
 TrustDecision changes remain separate work.
