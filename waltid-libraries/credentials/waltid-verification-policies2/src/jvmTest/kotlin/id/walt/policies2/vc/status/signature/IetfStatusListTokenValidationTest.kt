@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.status.signature
 
+import id.walt.cose.CoseContentType
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
@@ -91,6 +92,14 @@ class IetfStatusListTokenValidationTest {
     }
 
     @Test
+    fun `signed jwt and cwt of another token type are rejected`() = runTest {
+        val jwt = validate(StatusListContent.Text(signedJwt(sub = uri, exp = FAR_FUTURE, typ = "dc+sd-jwt")))
+        val cwt = validate(StatusListContent.Binary(signedCwt(sub = uri, exp = FAR_FUTURE, type = null)))
+        assertEquals("IETF status-list JWT typ must be statuslist+jwt", jwt.exceptionOrNull()?.message)
+        assertEquals("IETF status-list CWT type must be application/statuslist+cwt", cwt.exceptionOrNull()?.message)
+    }
+
+    @Test
     fun `unsigned status list text is rejected`() = runTest {
         val result = validate(StatusListContent.Text("not-a-status-list"))
         assertTrue(result.isFailure)
@@ -115,7 +124,7 @@ class IetfStatusListTokenValidationTest {
         )
     }
 
-    private suspend fun signedJwt(sub: String, exp: Long): String {
+    private suspend fun signedJwt(sub: String, exp: Long, typ: String = "statuslist+jwt"): String {
         val payload = buildJsonObject {
             put("iss", did)
             put("sub", sub)
@@ -128,7 +137,7 @@ class IetfStatusListTokenValidationTest {
         }
         val header = buildJsonObject {
             put("alg", "EdDSA")
-            put("typ", "statuslist+jwt")
+            put("typ", typ)
             put("kid", keyId)
         }
         val signable = "${json.encodeToString(header).encodeToByteArray().encodeToBase64Url()}." +
@@ -138,7 +147,11 @@ class IetfStatusListTokenValidationTest {
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun signedCwt(sub: String, exp: Long): ByteArray {
+    private suspend fun signedCwt(
+        sub: String,
+        exp: Long,
+        type: CoseContentType? = CoseContentType.AsString("application/statuslist+cwt"),
+    ): ByteArray {
         val payload = coseCompliantCbor.encodeToByteArray(
             CwtToken(
                 sub = sub,
@@ -148,7 +161,7 @@ class IetfStatusListTokenValidationTest {
             )
         )
         return CoseSign1.createAndSign(
-            protectedHeaders = CoseHeaders(algorithm = -8, kid = keyId.encodeToByteArray()),
+            protectedHeaders = CoseHeaders(algorithm = -8, type = type, kid = keyId.encodeToByteArray()),
             payload = payload,
             signer = key.toCoseSigner(),
         ).toTagged()
