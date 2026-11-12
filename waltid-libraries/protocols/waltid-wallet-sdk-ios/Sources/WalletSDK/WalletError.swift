@@ -2,6 +2,8 @@ import Foundation
 
 /// Errors thrown by the public Swift wallet SDK facade.
 public enum WalletError: Error, Equatable, Sendable {
+    /// The selected credential status warning changed after it was rendered.
+    case credentialStatusReviewChanged
     /// The SDK input could not be parsed or validated.
     case invalidInput(String)
 
@@ -62,6 +64,8 @@ extension WalletError: LocalizedError {
             return message
         case .keyUseAuthorization(let failure):
             return "Wallet key authorization failed: \(failure)"
+        case .credentialStatusReviewChanged:
+            return "Credential status changed. Review the updated information before sharing."
         case .cancelled:
             return "The wallet operation was cancelled."
         }

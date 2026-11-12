@@ -571,6 +571,8 @@ private fun WalletDidEntry.toBridgeStoredDid() = WalletBridgeStoredDid(
  */
 @Serializable
 public enum class WalletBridgeErrorCategory {
+    /** The local semantic status warning changed after host review. */
+    credentialStatusReviewChanged,
     /** Input supplied by the caller is invalid. */
     invalidInput,
 
@@ -658,6 +660,7 @@ public class WalletBridgeError internal constructor(
             val presentationFailure = throwable as? UnsafePresentationErrorResponseException
             val category = when {
                 presentationFailure != null -> WalletBridgeErrorCategory.presentationValidation
+                throwable is id.walt.wallet2.status.CredentialStatusReviewChangedException -> WalletBridgeErrorCategory.credentialStatusReviewChanged
                 paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
                 authorizationFailure != null -> WalletBridgeErrorCategory.authorization
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled

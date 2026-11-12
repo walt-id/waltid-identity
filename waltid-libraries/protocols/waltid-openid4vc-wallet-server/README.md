@@ -231,6 +231,28 @@ examples. Issuance does not implicitly generate keys or increase batch size.
 | `GET` | `/wallet/{walletId}/credentials/{credentialId}` | Get credential with data |
 | `DELETE` | `/wallet/{walletId}/credentials/{credentialId}` | Delete a credential |
 
+### Credential status
+
+List/detail responses retain their existing fields and add `reference`, `status`,
+`statusPresentation` and `statusEvaluatedAt`. `GET /wallet/{walletId}/credential-status` reads local
+snapshots; `POST /wallet/{walletId}/credential-status/refresh` explicitly checks wallet-owned
+references. Both use the containing wallet's authentication and ownership checks.
+
+Refresh accepts `{ "credentials": [{ "storeIndex": 0, "credentialId": "stored-id" }], "mode": "IF_DUE" }`.
+Omit `credentials` to select the wallet; an explicit selection contains 1–100 references. `FORCE`
+requires revalidation. A wallet-scoped 30-second admission limit can return `DEFERRED` per credential;
+other outcomes are `COMPLETED`, `UNCHANGED` and `REMOVED`. Inspect each returned metadata result and
+read the local snapshot for current presentation. No endpoint accepts a caller's status URL.
+
+The browser uses `/credentials/present/build-vp-token/status-reviewed` and
+`/credentials/present/send-response/status-reviewed` with the displayed `reviewedStatus` map.
+These preserve the ordinary request inside `request`; send also requires `selectedCredentialIds`.
+A changed selected warning yields HTTP 409 with `code: credential_status_review_changed` before
+response delivery. Re-render the local review and obtain consent again. Existing presentation
+endpoints remain available. Request-scoped services never retain a permission-bearing wallet;
+managed observations survive requests, while only bounded cooldown keys are retained in memory.
+See [shared status behavior](../../credentials/waltid-credential-status/README.md).
+
 ### Issuance (OpenID4VCI 1.0)
 
 | Method | Path | Description |

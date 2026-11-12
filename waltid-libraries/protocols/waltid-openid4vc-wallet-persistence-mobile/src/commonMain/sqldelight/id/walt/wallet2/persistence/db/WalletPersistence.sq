@@ -46,6 +46,26 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 deleteCredentialById:
 DELETE FROM credentials WHERE id = ?;
 
+-- Small authenticated observations, protected by the same encrypted database as credentials.
+CREATE TABLE credential_status_snapshots (
+    credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
+    snapshot TEXT NOT NULL
+);
+
+selectCredentialStatus:
+SELECT snapshot FROM credential_status_snapshots WHERE credential_id = ?;
+
+saveCredentialStatusIfCurrent:
+INSERT OR REPLACE INTO credential_status_snapshots (credential_id, snapshot)
+SELECT id, :snapshot FROM credentials
+WHERE id = :credential_id AND serialized_credential = :expected_credential;
+
+credentialStatusChanges:
+SELECT changes();
+
+deleteCredentialStatus:
+DELETE FROM credential_status_snapshots WHERE credential_id = ?;
+
 -- DIDs
 
 CREATE TABLE dids (

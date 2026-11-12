@@ -29,7 +29,7 @@ actual object ZlibCompressor {
             var written = 0
             ZLib.uncompress(data.openSync(), object : SyncOutputStream {
                 override fun write(buffer: ByteArray, offset: Int, len: Int) {
-                    require(len <= maximumOutputBytes - written) { "Decompressed status list exceeds the size limit" }
+                    if (len > maximumOutputBytes - written) throw StatusListSizeLimitException()
                     output.write(buffer, offset, len)
                     written += len
                 }

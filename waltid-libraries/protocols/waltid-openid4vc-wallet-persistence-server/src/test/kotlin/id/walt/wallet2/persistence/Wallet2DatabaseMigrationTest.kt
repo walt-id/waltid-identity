@@ -1,5 +1,7 @@
 package id.walt.wallet2.persistence
 
+import id.walt.wallet2.status.*
+import id.walt.credentials.status.*
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -26,7 +28,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Instant
-import kotlin.test.Test
+import kotlin.test.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -34,6 +36,32 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class Wallet2DatabaseMigrationTest {
+    @Test
+    fun `status snapshots survive reopening and cannot cross stores or recreate deleted credentials`() = runTest {
+        val url = sharedMemoryUrl("status-snapshot")
+        DriverManager.getConnection(url).use { anchor ->
+            val db = initWallet2Database(config(url))
+            anchor.createStatement().use { statement ->
+                statement.execute("INSERT INTO wallet2_credential_stores(id) VALUES ('first'), ('second')")
+            }
+            val credential = StoredCredential("same-id", MdocsCredential(buildJsonObject {}, signed = null, docType = "org.iso.18013.5.1.mDL"))
+            val first = ExposedCredentialStore("first", db)
+            val second = ExposedCredentialStore("second", db)
+            first.addCredential(credential); second.addCredential(credential)
+            val at = Instant.fromEpochSeconds(1_800_000_000)
+            val saved = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
+                metadata = CredentialStatusMetadata(listOf(CredentialStatusEntry.Observed(StatusObservation("ref", StatusProtocol.ISO_MSO_STATUS_LIST,
+                    "revocation", 1u, at, at, meaning = StatusMeaning.REVOKED)))))
+            assertTrue(first.saveCredentialStatusIfCurrent(credential, saved))
+            assertEquals(saved, ExposedCredentialStore("first", initWallet2Database(config(url))).readCredentialStatus(credential.id))
+            assertNull(second.readCredentialStatus(credential.id))
+            first.removeCredential(credential.id)
+            assertFalse(first.saveCredentialStatusIfCurrent(credential, saved))
+            assertNull(first.readCredentialStatus(credential.id))
+            assertNotNull(second.getCredential(credential.id))
+        }
+    }
+
     @Test
     fun `legacy credential table gains nullable holder key binding column`() = runTest {
         val jdbcUrl = sharedMemoryUrl("credential-binding-upgrade")
@@ -68,6 +96,7 @@ class Wallet2DatabaseMigrationTest {
                         while (columns.next()) add(columns.getString("name"))
                     }
                     assertTrue("holder_key_binding" in names)
+                    assertTrue("credential_status" in names)
                 }
                 statement.executeQuery(
                     "SELECT holder_key_binding FROM wallet2_credentials WHERE id = 'mdoc-1'"

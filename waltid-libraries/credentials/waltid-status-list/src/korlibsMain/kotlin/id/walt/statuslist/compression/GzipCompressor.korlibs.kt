@@ -23,4 +23,7 @@ actual object GzipCompressor {
         else GZIP.compress(data, outputSizeHint = data.size + COMPRESS_OUTPUT_HEADROOM)
 
     actual fun decompress(data: ByteArray): ByteArray = GZIP.uncompress(data)
+
+    actual fun decompress(data: ByteArray, maxOutputBytes: Int): ByteArray =
+        GZIP.uncompressBounded(data, maxOutputBytes)
 }
