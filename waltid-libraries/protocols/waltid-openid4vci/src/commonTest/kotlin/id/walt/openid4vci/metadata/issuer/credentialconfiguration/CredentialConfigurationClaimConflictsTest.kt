@@ -31,7 +31,7 @@ class CredentialConfigurationClaimConflictsTest {
     // JSON-based credentials
 
     @Test
-    fun `distinct claims, wildcard children, and a container with its child are consistent`() = assertConsistent(
+    fun `distinct claims and wildcard children and a container with its child are consistent`() = assertConsistent(
         CredentialFormat.SD_JWT_VC,
         """["given_name"]""",
         """["address"]""",
@@ -69,11 +69,11 @@ class CredentialConfigurationClaimConflictsTest {
     }
 
     @Test
-    fun `a numeric string key is an object key, not an array index`() =
+    fun `a numeric string key is an object key and not an array index`() =
         assertEquals(1, conflictingPaths(CredentialFormat.SD_JWT_VC, """["by_code", "0"]""", """["by_code", 0]""").size)
 
     @Test
-    fun `one conflict is reported per claim, naming one path of each kind`() = assertEquals(
+    fun `one conflict is reported per claim naming one path of each kind`() = assertEquals(
         listOf(listOf(path("""["nationalities", 0]"""), path("""["nationalities", null]"""))),
         conflictingPaths(
             CredentialFormat.SD_JWT_VC,
@@ -97,7 +97,7 @@ class CredentialConfigurationClaimConflictsTest {
     // ISO mdoc
 
     @Test
-    fun `mdoc map keys may mix strings, non-negative and negative integers`() = assertConsistent(
+    fun `mdoc map keys may mix strings with non-negative and negative integers`() = assertConsistent(
         CredentialFormat.MSO_MDOC,
         """["org.example.ns", "map", "a"]""",
         """["org.example.ns", "map", 7]""",
@@ -145,7 +145,7 @@ class CredentialConfigurationClaimConflictsTest {
     }
 
     @Test
-    fun `no claim description is processed when any conflict, and the conflicts are reported`() {
+    fun `no claim description is processed when any conflict and the conflicts are reported`() {
         val configuration = configuration(
             CredentialFormat.SD_JWT_VC, """["given_name"]""", """["nationalities", null]""", """["nationalities", 1]""",
         )
