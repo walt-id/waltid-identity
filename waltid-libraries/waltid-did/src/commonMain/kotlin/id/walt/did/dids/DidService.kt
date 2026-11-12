@@ -16,6 +16,7 @@ import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.dids.DidWebCreateOptions
 import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.did.dids.registrar.local.key.Crypto2DidKeyRegistrar
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import id.walt.did.dids.resolver.DidResolver
 import id.walt.did.dids.resolver.DidResolverRegistrations
@@ -191,8 +192,13 @@ object DidService {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    suspend fun resolveToCrypto2Keys(did: String): Result<Set<Crypto2Key>> = try {
-        Result.success(DidDocumentCrypto2KeyResolver(getResolverForDid(did)).resolveToKeys(did))
+    suspend fun resolveToCrypto2Keys(
+        did: String,
+        verificationRelationship: VerificationRelationshipType? = null,
+    ): Result<Set<Crypto2Key>> = try {
+        Result.success(DidDocumentCrypto2KeyResolver(
+            getResolverForDid(did), verificationRelationship = verificationRelationship,
+        ).resolveToKeys(did))
     } catch (cause: CancellationException) {
         throw cause
     } catch (cause: Throwable) {
