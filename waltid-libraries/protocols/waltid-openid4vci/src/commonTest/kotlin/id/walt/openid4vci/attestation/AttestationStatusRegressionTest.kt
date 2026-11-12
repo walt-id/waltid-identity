@@ -45,10 +45,10 @@ class AttestationStatusRegressionTest {
             val validator = AttestationStatusValidator(AttestationStatusResolver { uri ->
                 if (uri == kaUri) { now += 2.seconds; second } else first
             }, now = { now })
-            fun evidence(uri: String) = VerifiedAttestationStatus(version = 2, capturedAt = start.epochSeconds,
+            fun evidence(uri: String) = VerifiedAttestationStatus(capturedAt = start.epochSeconds,
                 policy = AttestationStatusPolicy(true, if (uri == wiaUri && boundary == "maximum-age") 1 else null),
                 reference = AttestationStatusReference(uri, 0), attesterPublicJwk = publicJwk)
-            val result = validator.validate(listOf(evidence(wiaUri) to false, evidence(kaUri) to false))
+            val result = validator.validate(listOf(evidence(wiaUri), evidence(kaUri)))
             assertEquals(if (boundary == "still-valid") AttestationStatusOutcome.VALID else AttestationStatusOutcome.UNVERIFIABLE,
                 result.outcome, boundary)
             assertFalse(result.permanentlyDenied, boundary)
@@ -65,7 +65,7 @@ class AttestationStatusRegressionTest {
             if (uri == kaUri) { now += 2.seconds; revoked } else first
         }, now = { now })
         val evidence = listOf(wiaUri, kaUri).map { uri -> VerifiedAttestationStatus(capturedAt = start.epochSeconds,
-            policy = AttestationStatusPolicy(true), reference = AttestationStatusReference(uri, 0), attesterPublicJwk = publicJwk) to false }
+            policy = AttestationStatusPolicy(true), reference = AttestationStatusReference(uri, 0), attesterPublicJwk = publicJwk) }
         assertEquals(AttestationStatusOutcome.INVALID, validator.validate(evidence).outcome)
     }
 

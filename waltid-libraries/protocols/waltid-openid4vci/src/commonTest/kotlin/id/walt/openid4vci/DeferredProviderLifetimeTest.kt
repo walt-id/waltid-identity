@@ -8,6 +8,8 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
+import id.walt.openid4vci.attestation.VerifiedAttestationStatus
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
 import id.walt.openid4vci.clientauth.attestation.VerifiedClientAttestation
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -176,6 +178,7 @@ class DeferredProviderLifetimeTest {
         ))
         val now = Clock.System.now()
         val lifetime = VerifiedAttestationLifetime(now.epochSeconds - 300, now.epochSeconds + 120, clockSkewSeconds = 60)
+        val status = VerifiedAttestationStatus(capturedAt = now.epochSeconds, policy = AttestationStatusPolicy())
         val accepted = AcceptedCredentialRequest(
             DefaultCredentialRequest(
                 client = DefaultClient("wallet", emptyList(), emptySet(), emptySet()), credentialIdentifier = "credential",
@@ -184,8 +187,8 @@ class DeferredProviderLifetimeTest {
                 CredentialFormat.SD_JWT_VC, vct = "identity", cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
                 proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(setOf("ES256"), KeyAttestationsRequired())),
             ), listOf(AcceptedHolderBinding(key.exportPublicJwkObject(), proofIndexes = setOf(0))),
-            VerifiedClientAttestation("wallet", key.exportPublicJwkObject(), lifetime), true,
-            listOf(AcceptedCredentialProof("jwt", AcceptedKeyAttestation(lifetime, setOf(Jwk.sha256Thumbprint(key.exportPublicJwk()))))),
+            VerifiedClientAttestation("wallet", key.exportPublicJwkObject(), lifetime, status), true,
+            listOf(AcceptedCredentialProof("jwt", AcceptedKeyAttestation(lifetime, setOf(Jwk.sha256Thumbprint(key.exportPublicJwk())), status))),
         )
         return Fixture(key, accepted)
     }

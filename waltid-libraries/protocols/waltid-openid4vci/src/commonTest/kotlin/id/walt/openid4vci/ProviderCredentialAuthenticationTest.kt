@@ -6,6 +6,8 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
+import id.walt.openid4vci.attestation.VerifiedAttestationStatus
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
 import id.walt.openid4vci.clientauth.*
 import id.walt.openid4vci.clientauth.attestation.*
 import id.walt.openid4vci.core.OAuth2Provider
@@ -199,7 +201,8 @@ class ProviderCredentialAuthenticationTest {
             KeyId("wallet-instance"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
         ))
         val now = Clock.System.now().epochSeconds
-        return VerifiedClientAttestation(CLIENT, key.exportPublicJwkObject(), VerifiedAttestationLifetime(now - 10, now + 300, clockSkewSeconds = 60))
+        return VerifiedClientAttestation(CLIENT, key.exportPublicJwkObject(), VerifiedAttestationLifetime(now - 10, now + 300, clockSkewSeconds = 60),
+            VerifiedAttestationStatus(capturedAt = now, policy = AttestationStatusPolicy()))
     }
 
     private fun claimsFor(client: AuthenticatedClient) = JsonObject(

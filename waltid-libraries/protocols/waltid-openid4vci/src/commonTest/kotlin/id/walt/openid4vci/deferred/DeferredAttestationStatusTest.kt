@@ -48,7 +48,7 @@ class DeferredAttestationStatusTest {
     }.let { JsonObject(it.filterKeys { name -> name !in omit }) }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", typ) })
 
     private suspend fun evidence(signer: Key, index: Int = 0) = VerifiedAttestationStatus(
-        version = 2, capturedAt = time.epochSeconds,
+        capturedAt = time.epochSeconds,
         policy = AttestationStatusPolicy(requireStatusReference = true, maximumListAgeSeconds = 300),
         reference = AttestationStatusReference(uri, index), attesterIssuer = "https://attester.example",
         attesterPublicJwk = signer.exportPublicJwkObject(),
@@ -59,13 +59,13 @@ class DeferredAttestationStatusTest {
         var jwt = token(signer)
         var fetches = 0
         val validator = AttestationStatusValidator(AttestationStatusResolver { fetches++; jwt }, now = { time })
-        val entries = (0..3).map { evidence(signer, it) to false }
+        val entries = (0..3).map { evidence(signer, it) }
         assertEquals(AttestationStatusOutcome.VALID, validator.validate(entries).outcome)
         assertEquals(1, fetches)
         jwt = token(signer, listOf(0, 0, 0, 1))
         assertEquals(AttestationStatusOutcome.INVALID, validator.validate(entries).outcome)
         assertEquals(2, fetches, "A checkpoint must refresh even while the earlier token's TTL remains valid")
-        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validator.validate(listOf(evidence(key("other")) to false)).outcome)
+        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validator.validate(listOf(evidence(key("other")))).outcome)
     }
 
     @Test fun normalizedStatusTokenTypesStillRequireTheAcceptedAttesterSigner() = runTest {
@@ -76,7 +76,7 @@ class DeferredAttestationStatusTest {
             for (key in listOf(signer, attacker)) {
                 val jwt = token(key, typ = type)
                 val result = AttestationStatusValidator(AttestationStatusResolver { jwt }, now = { time })
-                    .validate(listOf(accepted to false))
+                    .validate(listOf(accepted))
                 assertEquals(if (key == signer) AttestationStatusOutcome.VALID else AttestationStatusOutcome.UNVERIFIABLE, result.outcome)
             }
         }
@@ -97,26 +97,26 @@ class DeferredAttestationStatusTest {
             token(signer, changes = mapOf("status_list" to buildJsonObject { put("bits", 3); put("lst", "bad") })),
         )
         for (jwt in invalid) {
-            val result = AttestationStatusValidator(AttestationStatusResolver { jwt }, now = { time }).validate(listOf(entry to false))
+            val result = AttestationStatusValidator(AttestationStatusResolver { jwt }, now = { time }).validate(listOf(entry))
             assertEquals(AttestationStatusOutcome.UNVERIFIABLE, result.outcome)
             assertFalse(result.permanentlyDenied)
         }
         val validator = AttestationStatusValidator(AttestationStatusResolver { token(signer) }, now = { time })
-        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validator.validate(listOf(entry.copy(reference = AttestationStatusReference(uri, 4)) to false)).outcome)
+        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validator.validate(listOf(entry.copy(reference = AttestationStatusReference(uri, 4)))).outcome)
         val optionalClaimsOmitted = token(signer, omit = setOf("exp", "ttl"))
-        assertEquals(AttestationStatusOutcome.VALID, AttestationStatusValidator(AttestationStatusResolver { optionalClaimsOmitted }, now = { time }).validate(listOf(entry to false)).outcome)
+        assertEquals(AttestationStatusOutcome.VALID, AttestationStatusValidator(AttestationStatusResolver { optionalClaimsOmitted }, now = { time }).validate(listOf(entry)).outcome)
         val noOptionalClaims = token(signer, changes = mapOf("exp" to JsonNull))
-        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, AttestationStatusValidator(AttestationStatusResolver { noOptionalClaims }, now = { time }).validate(listOf(entry to false)).outcome)
+        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, AttestationStatusValidator(AttestationStatusResolver { noOptionalClaims }, now = { time }).validate(listOf(entry)).outcome)
     }
 
-    @Test fun optionalAbsenceRequiredAbsenceAndLegacyEvidenceHaveDistinctHandling() = runTest {
+    @Test fun optionalAbsenceIsValidAndRequiredAbsenceFailsClosed() = runTest {
         val empty = JsonObject(emptyMap())
         val optional = captureAttestationStatus(empty, null, AttestationStatusPolicy(), time)
         assertNull(optional.reference)
         val validator = AttestationStatusValidator(AttestationStatusResolver { error("No network request expected") })
-        assertEquals(AttestationStatusOutcome.VALID, validator.validate(listOf(optional to false, null to false)).outcome)
-        assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE, validator.validate(listOf(null to true)).outcome)
-        assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE, validator.validate(listOf(optional.copy(version = 3) to false)).outcome)
+        assertEquals(AttestationStatusOutcome.VALID, validator.validate(listOf(optional)).outcome)
+        assertEquals(AttestationStatusOutcome.MISSING_EVIDENCE,
+            validator.validate(listOf(optional.copy(policy = AttestationStatusPolicy(true)))).outcome)
         assertFailsWith<IllegalArgumentException> { captureAttestationStatus(empty, null, AttestationStatusPolicy(true), time) }
         for (status in listOf(JsonNull, JsonObject(emptyMap()), buildJsonObject {
             put("status_list", buildJsonObject { put("idx", -1); put("uri", uri) })
@@ -318,37 +318,22 @@ class DeferredAttestationStatusTest {
         assertEquals("successor", other.transaction().claimId)
     }
 
-    @Test fun requiredLegacyStatusFailsClosedWhileCapturedOptionalAbsenceKeepsItsAcceptedPolicy() = runTest {
-        for (mode in listOf("legacy-evidence", "uncaptured-proofs", "optional-absence")) {
-            val legacy = mode != "optional-absence"
+    @Test fun missingCapturedClientOrKeyStatusIsAConstructionError() = runTest {
+        for (client in listOf(false, true)) {
             val fixture = fixture()
-            val optional = VerifiedAttestationStatus(capturedAt = time.epochSeconds, policy = AttestationStatusPolicy())
             val snapshot = fixture.accepted.copy(
-                clientAttestation = fixture.accepted.clientAttestation!!.copy(status = if (legacy) null else optional),
-                proofs = if (mode == "uncaptured-proofs") null else fixture.accepted.proofs!!.map { it.copy(keyAttestation = it.keyAttestation!!.copy(status = if (legacy) null else optional)) },
-                configuration = if (mode == "uncaptured-proofs") fixture.accepted.configuration.copy(proofTypesSupported = null, cryptographicBindingMethodsSupported = null) else fixture.accepted.configuration,
+                clientAttestation = if (client) fixture.accepted.clientAttestation!!.copy(status = null) else fixture.accepted.clientAttestation,
+                proofs = if (client) fixture.accepted.proofs else fixture.accepted.proofs!!.map {
+                    it.copy(keyAttestation = it.keyAttestation!!.copy(status = null))
+                },
             )
             fixture.state = fixture.state.copy(transactions = mapOf("transaction" to fixture.transaction().copy(accepted = snapshot)))
-            val provider = buildOAuth2Provider(createTestConfig().copy(keyAttestationStatusPolicy = { AttestationStatusPolicy(true) }))
-            val claim = fixture.claim()
-            val result = provider.createDeferredCredentialResponse(DeferredCredentialRequest("transaction"), fixture.response,
-                DeferredCredentialResponseContext("offer", claim, fixture.deferred))
-            if (legacy) {
-                assertEquals("credential_request_denied", assertIs<CredentialResponseResult.Failure>(result).error.error)
-                assertTrue(fixture.transaction().denied)
-            } else assertIs<CredentialResponseResult.Success>(result)
+            assertFailsWith<IllegalArgumentException> { fixture.deliver() }
+            assertFalse(fixture.transaction().denied, "Incomplete internal evidence must not be recorded as revocation")
         }
     }
 
-    @Test fun capturedClientStatusDoesNotRebuildCurrentClientAuthentication() = runTest {
-        assertCapturedStatusSkipsLegacyPolicies(clientPolicy = true)
-    }
-
-    @Test fun capturedKeyStatusDoesNotResolveTheLegacyKeyPolicy() = runTest {
-        assertCapturedStatusSkipsLegacyPolicies(clientPolicy = false)
-    }
-
-    private suspend fun assertCapturedStatusSkipsLegacyPolicies(clientPolicy: Boolean) {
+    @Test fun capturedStatusIncludingOptionalOmissionDoesNotRebuildCurrentClientAuthentication() = runTest {
         for (optionalOmission in listOf(false, true)) {
             val fixture = fixture()
             if (optionalOmission) {
@@ -360,10 +345,8 @@ class DeferredAttestationStatusTest {
                 fixture.state = fixture.state.copy(transactions = mapOf("transaction" to fixture.transaction().copy(accepted = accepted)))
             }
             val base = createTestConfig().copy(attestationStatusResolver = AttestationStatusResolver { token(fixture.signer) })
-            val config = if (clientPolicy) base.copy(clientAuthenticationServiceResolver = ClientAuthenticationServiceResolver { _, _, _ ->
+            val config = base.copy(clientAuthenticationServiceResolver = ClientAuthenticationServiceResolver { _, _, _ ->
                 error("Captured evidence must not rebuild current client-authentication trust")
-            }) else base.copy(keyAttestationStatusPolicy = {
-                error("Captured evidence must not resolve a legacy policy")
             })
             val claim = fixture.claim()
             val response = buildOAuth2Provider(config).createDeferredCredentialResponse(

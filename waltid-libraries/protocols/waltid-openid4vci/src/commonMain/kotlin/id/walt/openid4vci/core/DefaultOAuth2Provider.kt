@@ -1,7 +1,6 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.attestation.*
-import id.walt.openid4vci.clientauth.attestation.AttestationBasedClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAttestation
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAuthentication
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -1024,38 +1023,14 @@ class DefaultOAuth2Provider(
             requiresClientAttestation(accepted.request.accessTokenClientId, accepted.request.anonymousPreAuthorizedAccess)
         context.deferredIssuance.validateClaim(
             context.sessionId, context.transaction, required, attestationStatusValidator.takeIf { checkStatus },
-            if (checkStatus) legacyClientStatusRequired(accepted) else false,
-            if (checkStatus) legacyKeyStatusRequired(accepted) else false,
         )
         null
     } catch (e: DeferredProtocolException) {
         e.error
     }
 
-    private suspend fun legacyClientStatusRequired(accepted: AcceptedCredentialRequest): Boolean {
-        if (accepted.request.anonymousPreAuthorizedAccess) return false
-        // A captured policy (including optional omission) is sufficient on its own. Do not
-        // resolve today's client-authentication keys or configuration for an accepted snapshot.
-        if (accepted.clientAttestation?.status != null ||
-            accepted.clientAttestation == null && accepted.clientAttestationRequired != null
-        ) return false
-        return resolveClientAuthentication(
-            ClientAuthenticationEndpoint.TOKEN,
-            accepted.request.accessTokenClientId?.let { mapOf("client_id" to listOf(it)) }.orEmpty(), emptyMap(),
-        ).serviceConfig.methods.filterIsInstance<AttestationBasedClientAuthenticationMethod>()
-            .any { it.statusPolicy.requireStatusReference }
-    }
-
-    private suspend fun legacyKeyStatusRequired(accepted: AcceptedCredentialRequest): Boolean {
-        val proofs = accepted.proofs
-        if (proofs != null && proofs.none { it.keyAttestation != null && it.keyAttestation.status == null }) return false
-        return config.keyAttestationStatusPolicy().requireStatusReference
-    }
-
     private suspend fun acceptedStatus(accepted: AcceptedCredentialRequest): AttestationStatusResult =
-        attestationStatusValidator.validate(accepted.statusEvidence(
-            legacyClientStatusRequired(accepted), legacyKeyStatusRequired(accepted),
-        ))
+        attestationStatusValidator.validate(accepted.statusEvidence())
 
     private suspend fun acceptedStatusError(accepted: AcceptedCredentialRequest): CredentialError? = acceptedStatus(accepted).error()
 

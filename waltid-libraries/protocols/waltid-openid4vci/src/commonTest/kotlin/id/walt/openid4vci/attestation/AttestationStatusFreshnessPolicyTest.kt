@@ -43,7 +43,7 @@ class AttestationStatusFreshnessPolicyTest {
 
     private suspend fun validate(jwt: String, evidence: VerifiedAttestationStatus) =
         AttestationStatusValidator(AttestationStatusResolver { jwt }, now = { now })
-            .validate(listOf(evidence to false))
+            .validate(listOf(evidence))
 
     @Test fun omittedAndNullConfigurationLeaveTheAgeLimitOptional() {
         assertNull(AttestationStatusPolicy().maximumListAgeSeconds)
@@ -61,7 +61,6 @@ class AttestationStatusFreshnessPolicyTest {
         val signer = key()
         val evidence = capture(signer)
         assertEquals(AttestationStatusOutcome.VALID, validate(token(signer), evidence).outcome)
-        assertEquals(2, evidence.version)
     }
 
     @Test fun anExplicitLimitKeepsItsInclusiveBoundary() = runTest {
@@ -77,13 +76,12 @@ class AttestationStatusFreshnessPolicyTest {
         val signer = key()
         val json = Json { encodeDefaults = false; explicitNulls = false }
         val encoded = json.encodeToJsonElement(capture(signer)).jsonObject
-        assertEquals(2, encoded.getValue("version").jsonPrimitive.int)
         val recovered = json.decodeFromJsonElement<VerifiedAttestationStatus>(encoded)
         assertNull(recovered.policy.maximumListAgeSeconds)
         assertEquals(AttestationStatusOutcome.VALID, validate(token(signer), recovered).outcome)
     }
 
-    @Test fun explicitAgeSurvivesRestartIndependentlyOfTheNewDefault() = runTest {
+    @Test fun explicitAgeSurvivesRestart() = runTest {
         val signer = key()
         for (limit in listOf(300L, 900L)) {
             val accepted = capture(signer, AttestationStatusPolicy(maximumListAgeSeconds = limit))
@@ -92,27 +90,6 @@ class AttestationStatusFreshnessPolicyTest {
             assertEquals(if (limit == 300L) AttestationStatusOutcome.UNVERIFIABLE else AttestationStatusOutcome.VALID,
                 validate(token(signer, ageSeconds = 600), recovered).outcome)
         }
-    }
-
-    @Test fun oldSnapshotsWithOmittedVersionAndAgeKeepTheOriginalFiveMinuteLimit() = runTest {
-        val signer = key()
-        val original = Json.encodeToJsonElement(capture(signer)).jsonObject
-        val oldWire = JsonObject(original - "version" + ("policy" to buildJsonObject { put("requireStatusReference", true) }))
-        var recovered = Json.decodeFromJsonElement<VerifiedAttestationStatus>(oldWire)
-        repeat(2) {
-            assertEquals(1, recovered.version)
-            assertEquals(AttestationStatusOutcome.VALID, validate(token(signer, ageSeconds = 300), recovered).outcome)
-            assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validate(token(signer, ageSeconds = 301), recovered).outcome)
-            recovered = Json.decodeFromString(Json.encodeToString(recovered))
-        }
-    }
-
-    @Test fun oldSnapshotsKeepAnExplicitAgeLimit() = runTest {
-        val signer = key()
-        val legacy = capture(signer, AttestationStatusPolicy(maximumListAgeSeconds = 900)).copy(version = 1)
-        val recovered = Json.decodeFromString<VerifiedAttestationStatus>(Json.encodeToString(legacy))
-        assertEquals(AttestationStatusOutcome.VALID, validate(token(signer, ageSeconds = 600), recovered).outcome)
-        assertEquals(AttestationStatusOutcome.UNVERIFIABLE, validate(token(signer, ageSeconds = 901), recovered).outcome)
     }
 
     @Test fun signedExpiryAndFutureIssuanceStillApplyWithoutAnAgeLimit() = runTest {
@@ -136,9 +113,9 @@ class AttestationStatusFreshnessPolicyTest {
         val validator = AttestationStatusValidator(AttestationStatusResolver { requested ->
             if (requested == secondUri) { current += 2.seconds; second } else first
         }, now = { current })
-        assertEquals(AttestationStatusOutcome.VALID, validator.validate(listOf(firstEvidence to false)).outcome)
+        assertEquals(AttestationStatusOutcome.VALID, validator.validate(listOf(firstEvidence)).outcome)
         assertEquals(AttestationStatusOutcome.UNVERIFIABLE,
-            validator.validate(listOf(firstEvidence to false, secondEvidence to false)).outcome)
+            validator.validate(listOf(firstEvidence, secondEvidence)).outcome)
     }
 
     @Test fun revocationAndSuspensionStillApplyWithoutAnAgeLimit() = runTest {

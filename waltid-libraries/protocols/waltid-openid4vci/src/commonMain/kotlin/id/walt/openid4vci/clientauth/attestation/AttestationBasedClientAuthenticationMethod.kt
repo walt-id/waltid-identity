@@ -238,7 +238,7 @@ class AttestationBasedClientAuthenticationMethod(
             )
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (cause: Exception) { return failure(cause.message ?: "Invalid client attestation status reference") }
-        val statusResult = AttestationStatusValidator(statusResolver, clock).validate(listOf(status to statusPolicy.requireStatusReference))
+        val statusResult = AttestationStatusValidator(statusResolver, clock).validate(listOf(status))
         statusResult.error()?.let { error ->
             return if (statusResult.permanentlyDenied) failure(error.description.orEmpty())
             else ClientAuthenticationResult.Failure(OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, error.description))

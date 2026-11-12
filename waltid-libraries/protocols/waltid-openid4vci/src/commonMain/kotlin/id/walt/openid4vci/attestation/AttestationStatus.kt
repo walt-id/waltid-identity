@@ -34,13 +34,11 @@ data class AttestationStatusPolicy(
 data class AttestationStatusReference(val uri: String, val index: Int)
 
 /**
- * Private, verified evidence. Null evidence means an older verifier did not capture status.
- * Version defaults to 1 for old snapshots that omitted it; new verification captures version 2.
- * Version 1 retains its implicit 300-second age limit, while version 2 permits an absent age cap.
+ * Private, verified evidence with the policy captured at verification.
+ * A null reference records a known optional omission, not missing evidence.
  */
 @Serializable
 data class VerifiedAttestationStatus(
-    val version: Int = 1,
     val capturedAt: Long,
     val policy: AttestationStatusPolicy,
     val reference: AttestationStatusReference? = null,
@@ -88,7 +86,7 @@ internal fun captureAttestationStatus(
     require(!policy.requireStatusReference || reference != null) { "Attestation status reference is required" }
     require(signer == null || !Jwk.containsPrivateMaterial(signer)) { "Attester context must contain only public material" }
     return VerifiedAttestationStatus(
-        version = 2, capturedAt = now.epochSeconds, policy = policy, reference = reference,
+        capturedAt = now.epochSeconds, policy = policy, reference = reference,
         attesterIssuer = (payload["iss"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
         attesterPublicJwk = signer,
     )
@@ -119,19 +117,14 @@ class AttestationStatusValidator(
     private val logger = KotlinLogging.logger {}
 
     suspend fun validate(
-        evidence: List<Pair<VerifiedAttestationStatus?, Boolean>>,
+        evidence: List<VerifiedAttestationStatus>,
     ): AttestationStatusResult {
         val lists = mutableMapOf<String, Result<ResolvedList>>()
         val validityChecks = mutableListOf<ListValidity>()
         var outcome = AttestationStatusOutcome.VALID
-        for ((accepted, required) in evidence) {
-            val next = if (accepted == null) {
-                // Explicit compatibility: legacy optional-status profiles retain F5 lifetime checks.
-                if (required) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
-            } else if (accepted.version !in 1..2) {
-                AttestationStatusOutcome.MISSING_EVIDENCE
-            } else if (accepted.reference == null) {
-                if (accepted.policy.requireStatusReference || required) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
+        for (accepted in evidence) {
+            val next = if (accepted.reference == null) {
+                if (accepted.policy.requireStatusReference) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
             } else if (accepted.attesterPublicJwk == null) {
                 AttestationStatusOutcome.UNVERIFIABLE
             } else {
@@ -183,11 +176,7 @@ class AttestationStatusValidator(
         val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
         val reference = requireNotNull(evidence.reference)
         val list = IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
-        // Version 1 could omit its former default of 300. A new configuration default must
-        // not weaken that transaction's accepted policy when its snapshot is restored.
-        val maximumAgeSeconds = if (evidence.version == 1) evidence.policy.maximumListAgeSeconds ?: 300L
-            else evidence.policy.maximumListAgeSeconds
-        val validity = ListValidity(list.validity, resolved.resolvedAt, maximumAgeSeconds)
+        val validity = ListValidity(list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
         require(validity.isValidAt(now())) { "Status list is stale, expired or not yet valid" }
         val outcome = when (list.readStatus(reference.index)) {
             0u -> AttestationStatusOutcome.VALID
@@ -207,16 +196,9 @@ class AttestationStatusValidator(
     }
 }
 
-internal fun AcceptedCredentialRequest.statusEvidence(
-    legacyClientStatusRequired: Boolean = false,
-    legacyKeyStatusRequired: Boolean = false,
-): List<Pair<VerifiedAttestationStatus?, Boolean>> = buildList {
-    clientAttestation?.let { add(it.status to (it.status == null && legacyClientStatusRequired)) }
-    if (clientAttestation == null && clientAttestationRequired == null && legacyClientStatusRequired && !request.anonymousPreAuthorizedAccess) {
-        add(null to true)
-    }
-    if (proofs == null && legacyKeyStatusRequired) add(null to true)
+internal fun AcceptedCredentialRequest.statusEvidence(): List<VerifiedAttestationStatus> = buildList {
+    clientAttestation?.let { add(requireNotNull(it.status) { "Verified client attestation is missing captured status evidence" }) }
     proofs.orEmpty().forEach { proof ->
-        proof.keyAttestation?.let { add(it.status to (it.status == null && legacyKeyStatusRequired)) }
+        proof.keyAttestation?.let { add(requireNotNull(it.status) { "Verified key attestation is missing captured status evidence" }) }
     }
 }

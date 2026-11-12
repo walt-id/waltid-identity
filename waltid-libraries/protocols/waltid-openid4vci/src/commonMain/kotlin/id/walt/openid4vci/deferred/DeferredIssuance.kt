@@ -134,13 +134,11 @@ class DeferredIssuance(
         claim: DeferredTransaction,
         clientAttestationRequired: Boolean = false,
         statusValidator: AttestationStatusValidator? = null,
-        legacyClientStatusRequired: Boolean = false,
-        legacyKeyStatusRequired: Boolean = false,
     ) {
         // Validate lifetime first, then do HTTP outside the CAS retry transformation.
         val initial = validateClaimState(sessionId, claim, clientAttestationRequired)
         val accepted = initial.transactions.getValue(claim.id).accepted
-        val status = statusValidator?.validate(accepted.statusEvidence(legacyClientStatusRequired, legacyKeyStatusRequired))
+        val status = statusValidator?.validate(accepted.statusEvidence())
         // Re-read the fence and lifetime after every asynchronous status lookup.
         val state = validateClaimState(sessionId, claim, clientAttestationRequired, status?.permanentlyDenied == true)
         if (state.transactions.getValue(claim.id).denied) denied()
