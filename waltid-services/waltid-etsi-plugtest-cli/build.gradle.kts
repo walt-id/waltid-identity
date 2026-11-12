@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
+    implementation(project(":waltid-libraries:ades:waltid-cbades"))
+    implementation(identityLibs.ktor.client.java)
 
     // Kotlinx
     implementation(identityLibs.kotlinx.serialization.json)

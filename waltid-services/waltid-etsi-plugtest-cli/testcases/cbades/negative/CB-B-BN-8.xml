@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-8.cbor"/>
+  <Documentation>This is a negative test case for checking the COSE crit protected header parameter in a CB-AdES signature. The crit array contains the label of a critical protected header parameter named "UNDEFINED" that the validation application cannot understand or process; therefore, validation shall not continue as if the parameter were understood.</Documentation>
+</SignatureRequest>

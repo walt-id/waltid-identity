@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-7.cbor"/>
+  <Documentation>This is a negative test case for checking the CB-AdES sigPId protected header parameter. The digVal member of sigPId does not match the digest, calculated with digAlg, of the signature policy document identified by the id member.</Documentation>
+</SignatureRequest>

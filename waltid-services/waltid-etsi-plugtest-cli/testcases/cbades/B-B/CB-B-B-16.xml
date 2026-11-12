@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <sigPl>
+                <addressCountry>FR</addressCountry>
+                <addressLocality>Sophia Antipolis</addressLocality>
+                <postalCode>06921</postalCode>
+            </sigPl>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected sigPl header parameter (label 263) containing the members addressCountry (key 1) with value "FR", addressLocality (key 2) with value "Sophia Antipolis" and postalCode (key 5) with value "06921" (clause 5.2.4). No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

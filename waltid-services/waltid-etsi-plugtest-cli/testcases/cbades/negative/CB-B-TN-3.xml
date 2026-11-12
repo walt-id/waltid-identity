@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-TN-3.cbor"/>
+  <Documentation>This is a negative test case for the CB-AdES sigTst signature time-stamp. The messageImprint value in the time-stamp token encapsulated by sigTst does not match the digest computed over the corresponding COSE signature value according to the CB-AdES sigTst processing rules.</Documentation>
+</SignatureRequest>
