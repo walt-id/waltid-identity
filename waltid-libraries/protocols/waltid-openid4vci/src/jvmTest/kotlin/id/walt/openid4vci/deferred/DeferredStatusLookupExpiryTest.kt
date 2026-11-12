@@ -41,7 +41,7 @@ class DeferredStatusLookupExpiryTest {
         val config = createTestConfig().copy(attestationStatusResolver = AttestationStatusResolver {
             fetches++
             withContext(Dispatchers.Default) {
-                // F5 accepts the entire WIA expiration second, including its clock tolerance.
+                // Lifetime checks accept the entire WIA expiration second, including clock tolerance.
                 while (Clock.System.now().epochSeconds <= requireNotNull(attestation.lifetime.expiresAt)) delay(25)
             }
             CompactJws.sign(buildJsonObject {

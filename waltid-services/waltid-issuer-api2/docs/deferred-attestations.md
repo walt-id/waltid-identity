@@ -4,7 +4,7 @@ Issuer2 rechecks the WIA accepted during OAuth client authentication and each KA
 with the credential proofs. Verified status references, attester public keys, capture time
 and policy are retained with the original accepted evidence. Refresh, resubmission,
 checkpoint recovery and restart preserve that evidence. Original nonce, PoP and proof-age
-checks are not replayed. F5 lifetime checks and their original clock tolerance remain in force.
+checks are not replayed. Attestation lifetime checks and their original clock tolerance remain in force.
 
 ## Configuration
 
@@ -177,7 +177,7 @@ Suspension and technical failure do not consume or deny the transaction. Process
 and uncommitted usage reservations are released; a retry reacquires reservations as needed,
 including for a previously signed checkpoint. Coroutine cancellation propagates, with claim
 cleanup performed outside cancellation. Cancellation after a durable signing checkpoint
-preserves its reservation for F5 recovery. The offer's absolute deadline still limits retries.
+preserves its reservation for deferred recovery. The offer's absolute deadline still limits retries.
 
 An INVALID WIA during OAuth client authentication is a client-authentication failure. Malformed
 or missing required KA status evidence is a proof-validation failure. For a deferred flow,

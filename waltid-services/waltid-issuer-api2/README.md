@@ -724,8 +724,9 @@ Refreshing an access token preserves its original WIA evidence and never replace
 transaction's accepted evidence. Resubmitting a Credential Request also keeps the
 original acceptance. Transactions stored before evidence capture fail closed when
 their required profile cannot be enforced. Standalone KAs without `exp` retain the
-existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
-replacement and attestation status-list enforcement are separate work (status: F6).
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh attestation
+replacement remains separate work. See [attestation status enforcement](docs/deferred-attestations.md)
+for status-policy configuration and retry behavior.
 
 Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
 in the issuer service configuration):
