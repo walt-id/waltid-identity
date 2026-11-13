@@ -151,6 +151,16 @@ extension XCTestCase {
             captureGallery(app, name: capturePrefix + suffix)
         }
 
+        // Wallet IDs isolate credentials; the user's automatic-check preference is app-wide.
+        // Establish this journey's precondition through the real control, including after a
+        // previous manual-mode run, rather than replacing persisted preferences behind the UI.
+        let initialSettings = app.buttons["wallet.settingsButton"].firstMatch
+        XCTAssertTrue(initialSettings.waitForExistence(timeout: 15)); initialSettings.tap()
+        let statusSettings = app.buttons["settings-credential-status"].firstMatch
+        XCTAssertTrue(statusSettings.waitForExistence(timeout: 15)); statusSettings.tap()
+        await setAutomaticStatusChecks(app.switches["settings-credential-status-automatic"].firstMatch, enabled: true)
+        returnToWallet()
+
         let pidScenario = try XCTUnwrap(DemoBackend.scenarios.first { $0.id == "eudi-pid-sdjwt" })
         let pidOffer = try await DemoBackend.shared.createOffer(scenario: pidScenario)
         let pidCard = try await issue(pidOffer.offerUrl)
@@ -375,42 +385,48 @@ extension XCTestCase {
         XCTAssertTrue(destination.waitForExistence(timeout: 10)); destination.tap()
         let automatic = app.switches["settings-credential-status-automatic"].firstMatch
         XCTAssertTrue(automatic.waitForExistence(timeout: 10))
-        func automaticState() -> Bool? {
-            guard automatic.exists else { return nil }
-            switch automatic.value as? String {
-            case "1": return true
-            case "0": return false
-            // Compose exposes its toggleable state through the selected trait;
-            // SwiftUI exposes the native switch's numeric accessibility value.
-            case "": return automatic.isSelected
-            default: return nil
-            }
-        }
-        func toggleAutomatic(expect enabled: Bool) async {
-            // SwiftUI may expose an outer labelled switch and a nested native thumb.
-            var target = automatic
-            for _ in 0..<3 {
-                let child = target.switches.firstMatch
-                if !child.exists { break }
-                target = child
-            }
-            target.tap()
-            let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                automaticState() == enabled
-            }, object: nil)
-            let result = await XCTWaiter.fulfillment(of: [changed], timeout: 5)
-            XCTAssertEqual(result, .completed, app.debugDescription)
-        }
-        XCTAssertEqual(automaticState(), true)
-        await toggleAutomatic(expect: false)
+        XCTAssertEqual(automaticStatusChecksState(automatic), true)
+        await setAutomaticStatusChecks(automatic, enabled: false)
         captureGallery(app, name: capturePrefix + "-status-settings-manual")
-        await toggleAutomatic(expect: true)
+        await setAutomaticStatusChecks(automatic, enabled: true)
         let batch = app.buttons["settings-credential-status-check-all"].firstMatch
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30)); batch.tap()
         XCTAssertTrue(app.staticTexts["Processed"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         captureGallery(app, name: capturePrefix + "-status-settings-completed")
-        if finishInManualMode { await toggleAutomatic(expect: false) }
+        if finishInManualMode { await setAutomaticStatusChecks(automatic, enabled: false) }
+    }
+
+    private func automaticStatusChecksState(_ automatic: XCUIElement) -> Bool? {
+        guard automatic.exists else { return nil }
+        switch automatic.value as? String {
+        case "1": return true
+        case "0": return false
+        // Compose exposes its toggleable state through the selected trait;
+        // SwiftUI exposes the native switch's numeric accessibility value.
+        case "": return automatic.isSelected
+        default: return nil
+        }
+    }
+
+    private func setAutomaticStatusChecks(_ automatic: XCUIElement, enabled: Bool) async {
+        XCTAssertTrue(automatic.waitForExistence(timeout: 10))
+        let initial = automaticStatusChecksState(automatic)
+        XCTAssertNotNil(initial, automatic.debugDescription)
+        if initial == enabled { return }
+        // SwiftUI may expose an outer labelled switch and a nested native thumb.
+        var target = automatic
+        for _ in 0..<3 {
+            let child = target.switches.firstMatch
+            if !child.exists { break }
+            target = child
+        }
+        target.tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.automaticStatusChecksState(automatic) == enabled
+        }, object: nil)
+        let result = await XCTWaiter.fulfillment(of: [changed], timeout: 5)
+        XCTAssertEqual(result, .completed, automatic.debugDescription)
     }
 
     private func assertCredentialStatusControls(_ app: XCUIApplication) {

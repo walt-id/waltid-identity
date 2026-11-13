@@ -270,7 +270,7 @@ final class WalletE2EUI {
                 return
             }
             let identifiers = ["wallet-detail-close",
-                "wallet.external.close", "wallet.detailsBack", "wallet.flowBack"]
+                "wallet.external.close", "wallet.detailsBack", "wallet.flowBack", "wallet.settingsBack"]
             if let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) {
                 button.tap()
             } else if home.exists && home.isHittable {

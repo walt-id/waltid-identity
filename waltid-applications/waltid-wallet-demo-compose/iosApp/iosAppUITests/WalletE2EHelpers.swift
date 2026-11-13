@@ -201,7 +201,7 @@ final class WalletE2EUI {
             }
             if home.exists && home.isHittable { return }
             let identifiers = ["wallet-detail-close",
-                "wallet.detailsBack", "wallet.flowBack", "wallet.external.close"]
+                "wallet.detailsBack", "wallet.flowBack", "wallet.external.close", "wallet.settingsBack"]
             guard let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) else {
                 XCTFail("No action returns to wallet home: \(app.debugDescription)")
                 return
