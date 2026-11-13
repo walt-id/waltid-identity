@@ -320,13 +320,31 @@ public enum class MobileWalletPresentationErrorCode(
     walletUnavailable("wallet_unavailable"),
 }
 
-/** Effective claims for a selection, prepared without signing or consuming the retained request. */
+/**
+ * Effective claims for a selection, prepared without signing or consuming the retained request.
+ *
+ * @property revision Opaque acknowledgment of this review. Submit it only after displaying the
+ * current review; changing the selection requires preparing and acknowledging a new review.
+ * @property credentials Effective claim contributions, kept separate for each query and credential.
+ */
 public data class MobileWalletPreparedPresentationReview(
     val revision: String,
     val credentials: List<MobileWalletPresentationCredentialClaims>,
 )
 
-/** Keep query contributions distinct: their received array indexes are not stored control paths. */
+/**
+ * One query's credential contribution; received array indexes are not stored control paths.
+ *
+ * @property queryId Identifier of the DCQL credential query fulfilled by this contribution.
+ * @property credentialId Identifier of the stored credential supplying this contribution.
+ * @property format Credential format identifier used by the presenter.
+ * @property claimsJson JSON object containing the effective credential claims carried by this
+ * contribution, before holder signing and response transport, including unavoidable extra values.
+ * @property wholeCredential Whether the presenter sends the credential in full rather than
+ * selectively disclosing its claims.
+ * @property locations Mappings from stored claim identities to positions in [claimsJson], with
+ * the selection information needed to explain why each value is shared.
+ */
 public data class MobileWalletPresentationCredentialClaims(
     val queryId: String,
     val credentialId: String,
@@ -336,7 +354,18 @@ public data class MobileWalletPresentationCredentialClaims(
     val locations: List<MobileWalletPresentationClaimLocation>,
 )
 
-/** Typed JSON claim paths preserve object keys, numeric indexes and compacted received positions. */
+/**
+ * Claim provenance preserving object keys, numeric indexes and compacted received positions.
+ *
+ * @property sourcePathJson JSON array identifying the claim in the stored credential. String
+ * elements are object keys and integer elements are array indexes; use this path for metadata.
+ * @property receivedPathJson JSON array locating the value in the contribution's effective claims.
+ * Its indexes can differ from the source when undisclosed array elements are omitted.
+ * @property sharedBy Original SDK claim-selection keys whose disclosures or selected elements
+ * carry this value. These are selection identifiers, not received claim paths.
+ * @property alwaysCarried Whether the value is clear text outside any selectively disclosed
+ * ancestor, or belongs to a credential that is shared in full.
+ */
 public data class MobileWalletPresentationClaimLocation(
     val sourcePathJson: String,
     val receivedPathJson: String,
