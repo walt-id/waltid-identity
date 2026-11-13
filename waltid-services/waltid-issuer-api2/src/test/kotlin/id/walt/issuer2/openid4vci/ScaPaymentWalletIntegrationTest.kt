@@ -105,7 +105,7 @@ class ScaPaymentWalletIntegrationTest {
             val middleVct = "https://localhost/openid4vci/sca_user"
             ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] = config.copy(
                 credentialConfigurations = config.credentialConfigurations + mapOf(
-                    "sca_payment_card_sd_jwt" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive("https://localhost/openid4vci/bank_payment_type"))),
+                    "sca_payment_card_sd_jwt" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive("HTTPS://localhost:443/openid4vci/bank_payment_type"))),
                     "sca_base" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(rootVct))),
                     "sca_user" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(middleVct))),
                 ),
@@ -226,9 +226,10 @@ class ScaPaymentWalletIntegrationTest {
                 wallet, ReceiveCredentialRequest(offerUrl = Url(offer.credentialOffer)), httpClient = http,
             ).toList().single()
             val vct = credential.credential.credentialData.getValue("vct").jsonPrimitive.content
-            assertEquals("$issuerBase/openid4vci/${if (inherited) "bank_payment_type" else "sca_payment_card_sd_jwt"}", vct)
+            assertEquals(if (inherited) "HTTPS://localhost:443/openid4vci/bank_payment_type" else "$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
 
             if (inherited) {
+                assertEquals(HttpStatusCode.OK, http.get(vct).status)
                 val aliases = listOf("$issuerBase/openid4vci/bank_payment_type", "$issuerBase/.well-known/vct/bank_payment_type")
                     .map { url -> http.get(url).also { assertEquals(HttpStatusCode.OK, it.status) }.readRawBytes() }
                 assertContentEquals(aliases.first(), aliases.last())
