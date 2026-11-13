@@ -23,6 +23,7 @@ final class SharingReviewModelTests: XCTestCase {
         let salary = try XCTUnwrap(requestedEmployment.children.first { $0.label == "Salary" })
         XCTAssertEqual(salary.kind, .object)
         XCTAssertEqual(salary.choice?.status, "Not shared")
+        XCTAssertEqual(salary.choice?.item.label, "Salary", "SDK field-name fallbacks must be humanized")
         XCTAssertTrue(salary.contextOnly)
         XCTAssertEqual(salary.children.map(\.value), [.number("0"), .bool(false), .null])
         let cert = try XCTUnwrap(requested.first { $0.path == [.key("certifications")] }?.children.first)
@@ -137,7 +138,7 @@ final class SharingReviewModelTests: XCTestCase {
         let disclosures: [PresentationDisclosure] = [
             .init(path: #""employment"."job_title""#, name: "Job title", valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: true, required: true),
             .init(path: #""certifications".1"#, name: "Cloud security", valueJSON: #"{"name":"Cloud security"}"#, displayValue: nil, selectivelyDisclosable: true, required: true),
-            .init(path: #""employment"."salary""#, name: "Salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
+            .init(path: #""employment"."salary""#, name: "salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
             .init(path: #""home_address"."city""#, name: "City", valueJSON: #""Bengaluru""#, displayValue: nil, selectivelyDisclosable: true),
         ]
         return .init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Employee",

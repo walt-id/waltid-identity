@@ -84,6 +84,8 @@ public struct EffectivePresentationReview: Equatable {
             let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, format: option.format)
             return bestClaimMetadata(metadata, expression: expression, format: option.format)?.element.name
                 ?? option.disclosures.first { $0.path == raw }?.name
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .flatMap { $0.isEmpty ? nil : CredentialDisplayVocabulary.humanizedLabel($0) }
                 ?? expression.leafKey.map(CredentialDisplayVocabulary.humanizedLabel) ?? "Selected information"
         }
         var rendered: [EffectiveClaimContribution] = []
