@@ -59,6 +59,12 @@ object PrivateNetworkGuardSettings {
 
     @Volatile
     var trustedHostSuffixes: Set<String> = emptySet()
+
+    /** True if [host] equals, or is a subdomain of, one of [trustedHostSuffixes]. */
+    fun isTrustedHost(host: String): Boolean =
+        trustedHostSuffixes.any { suffix ->
+            host.equals(suffix, ignoreCase = true) || host.endsWith(".$suffix", ignoreCase = true)
+        }
 }
 
 /**

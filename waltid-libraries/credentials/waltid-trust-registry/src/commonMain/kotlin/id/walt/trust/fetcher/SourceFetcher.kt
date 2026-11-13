@@ -13,8 +13,9 @@ data class FetcherSecurityConfig(
     val allowedHosts: Set<String> = emptySet(),
 
     /**
-     * Block requests to private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, etc.)
-     * Enabled by default to prevent SSRF attacks.
+     * Block requests to private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, IPv6 ULA).
+     * Enabled by default to prevent SSRF attacks. On the JVM, the deployment's
+     * `PrivateNetworkGuardSettings` (`network-fetch-guard.conf`) can still allow them.
      */
     val blockPrivateIPs: Boolean = true,
 
@@ -27,7 +28,8 @@ data class FetcherSecurityConfig(
     /**
      * Block requests to loopback addresses (127.x.x.x, ::1) and the unspecified addresses
      * (0.0.0.0, ::), which reach the local host on Linux.
-     * Enabled by default to prevent SSRF attacks against localhost services.
+     * Enabled by default to prevent SSRF attacks against localhost services. On the JVM, the
+     * deployment's `PrivateNetworkGuardSettings` can still allow loopback, never the unspecified addresses.
      */
     val blockLoopback: Boolean = true,
 

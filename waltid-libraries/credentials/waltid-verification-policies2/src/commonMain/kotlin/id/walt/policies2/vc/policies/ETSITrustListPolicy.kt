@@ -59,7 +59,9 @@ private val log = KotlinLogging.logger { }
  *
  * @property trustLists Optional list of trust list sources to load inline.
  *   Each entry can be either:
- *   - A URL (starting with `http://` or `https://`) to fetch the trust list
+ *   - A URL (starting with `http://` or `https://`) to fetch the trust list. On the JVM, a URL that resolves
+ *     to a loopback or private-network address is refused unless the deployment's `network-fetch-guard.conf`
+ *     allows it; link-local and cloud metadata addresses are always refused.
  *   - Raw content (XML or JSON) of a trust list
  *   Auto-detects format: TSL XML, LoTE JSON, LoTE XML.
  *

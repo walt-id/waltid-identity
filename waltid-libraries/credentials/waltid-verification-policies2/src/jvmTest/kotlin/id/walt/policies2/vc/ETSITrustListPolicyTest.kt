@@ -1,5 +1,6 @@
 package id.walt.policies2.vc
 
+import com.sun.net.httpserver.HttpServer
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
@@ -22,6 +23,7 @@ import id.walt.did.dids.resolver.DidResolver
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ETSITrustListPolicy
 import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.builder.Crypto2IACASignerSpecification
@@ -43,6 +45,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -212,6 +216,42 @@ class ETSITrustListPolicyTest {
         val result = policy.verify(credential, PolicyExecutionContext.Empty)
 
         assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `verify fetches a URL trust list from loopback only when the deployment allows loopback`() = runTest {
+        val (credential, did) = didJwkSignedCredential(KeyId("url-listed-issuer-key"))
+        val lote = loteRegisteringDidJwkIssuer(did).encodeToByteArray()
+        val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
+            createContext("/lote.json") { exchange ->
+                exchange.responseHeaders.add("Content-Type", "application/json")
+                exchange.sendResponseHeaders(200, lote.size.toLong())
+                exchange.responseBody.use { it.write(lote) }
+            }
+            start()
+        }
+        val previousLoopback = PrivateNetworkGuardSettings.allowLoopback
+            .takeIf { PrivateNetworkGuardSettings.allowLoopbackExplicit }
+        try {
+            // The URL is caller-supplied, so it follows network-fetch-guard.conf like every other guarded fetch.
+            val policy = ETSITrustListPolicy(trustLists = listOf("http://127.0.0.1:${server.address.port}/lote.json"))
+
+            PrivateNetworkGuardSettings.allowLoopback = false
+            val refused = policy.verify(credential, PolicyExecutionContext.Empty)
+            val refusal = refused.exceptionOrNull()?.message.orEmpty()
+            assertTrue(refusal.startsWith("No trust list sources could be loaded"), refusal)
+
+            PrivateNetworkGuardSettings.allowLoopback = true
+            val allowed = policy.verify(credential, PolicyExecutionContext.Empty)
+            assertTrue(allowed.isSuccess, allowed.exceptionOrNull()?.message)
+        } finally {
+            if (previousLoopback == null) {
+                PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+            } else {
+                PrivateNetworkGuardSettings.allowLoopback = previousLoopback
+            }
+            server.stop(0)
+        }
     }
 
     @Test
