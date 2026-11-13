@@ -100,12 +100,16 @@ async function run() {
     const box = { x: Math.floor(bounds.x), y: Math.floor(bounds.y), width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) };
     controls.set(name, { box, pixels: await page.screenshot({ clip: box }) });
   }
-  async function clickRemembered(name) {
+  async function expectRemembered(name) {
     // The pinned renderer can retain a dismissed popup's ARIA mirror. Check the actual
     // undimmed control at its previously measured location before using that location.
     const { box, pixels } = controls.get(name);
     await page.mouse.move(5, 350);
     await expect.poll(async () => (await page.screenshot({ clip: box })).equals(pixels)).toBe(true);
+    return box;
+  }
+  async function clickRemembered(name) {
+    const box = await expectRemembered(name);
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   }
   async function capture(id, visible) {
@@ -237,12 +241,12 @@ async function run() {
     await click(button('Share anyway'));
     await expect.poll(() => requests.filter(item => item.path.endsWith('/present/send-response/status-reviewed') && item.status === 200).length,
       { timeout: 30000 }).toBe(1);
-    await capture('sharing-result', page.getByText(/^Presentation (sent|finished)/).first());
     await expect.poll(async () => {
       verdict = await json(`${verifier}/verification-session/${sessionId}/info`); return verdict.status;
     }, { timeout: 30000 }).toBe('SUCCESSFUL');
+    await expectRemembered('scan'); // The actual host returns home after delivery; it has no persistent receipt screen.
     expect(errors).toEqual([]);
-    expect(frames).toHaveLength(12);
+    expect(frames).toHaveLength(11);
     clean();
   } catch (error) {
     await page.screenshot({ path: path.join(output, 'error.png') });

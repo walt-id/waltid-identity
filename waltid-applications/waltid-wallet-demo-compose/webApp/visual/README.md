@@ -112,10 +112,12 @@ node live-status.cjs
 ```
 
 The producer receipt identifies the service source revision and immutable JAR digest. The runner
-retains its own source revision, browser/platform, twelve full-frame captures, producer projections,
+retains its own source revision, browser/platform, eleven full-frame captures, producer projections,
 hash-only request bodies and the verifier's terminal verdict in `evidence.json`. The output must not
 already exist; diagnostics and request-derived data remain private. A page reload verifies server
 retention after issuance; the browser's runtime-owned manual preference is explicitly restored.
+Delivery is proved by the real verifier's terminal verdict and the actual return home, without
+manufacturing a persistent receipt screen or publishing a duplicate Home capture as a receipt.
 Refreshes respect the API's existing 30-second admission cooldown without automatic retries.
 
 Set `WALLET_BROWSER_EXECUTABLE` explicitly when using an installed Chromium instead of Playwright's
