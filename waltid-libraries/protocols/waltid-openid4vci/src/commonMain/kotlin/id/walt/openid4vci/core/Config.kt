@@ -1,5 +1,7 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
@@ -78,6 +80,7 @@ data class OAuth2ProviderConfig(
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
     val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
+    val attestationStatusResolver: AttestationStatusResolver? = null,
 )
 
 data class PushedAuthorizationConfig(

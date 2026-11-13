@@ -18,7 +18,10 @@ import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncry
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-/** Trusted storage representation, never a wallet request DTO. Contains no original proof JWTs. */
+/**
+ * Trusted authentication and proof evidence, never a wallet request DTO. Contains no original
+ * proof JWTs. Current attestation status must still authorize every credential delivery.
+ */
 @Serializable
 data class AcceptedCredentialRequest(
     val request: DefaultCredentialRequest,
@@ -117,6 +120,7 @@ internal suspend fun CredentialRequest.accept(
                 AcceptedKeyAttestation(
                     requireNotNull(it.lifetime) { "Verified key attestation is missing lifetime evidence" },
                     it.attestedKeys.map { key -> Jwk.sha256Thumbprint(key.exportPublicJwk()) }.toSet(),
+                    it.status,
                 )
             },
         )

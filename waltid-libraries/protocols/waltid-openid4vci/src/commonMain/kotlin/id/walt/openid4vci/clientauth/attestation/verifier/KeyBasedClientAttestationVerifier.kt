@@ -1,6 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
 import id.walt.crypto.keys.Key
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 
 class KeyBasedClientAttestationVerifier(
@@ -22,7 +23,16 @@ class KeyBasedClientAttestationVerifier(
 
         for (key in trustedKeys) {
             if (key.verifyJws(jwt).isSuccess) {
-                return ClientAttestationVerificationResult.Verified
+                if ("status" !in payload) return ClientAttestationVerificationResult.Verified
+                return try {
+                    ClientAttestationVerificationResult.VerifiedWithSigner(key.getPublicKey().exportJWKObject())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Preserve signature trust; the status validator treats unavailable trusted
+                    // signer context as a retryable technical failure when a reference is supplied.
+                    ClientAttestationVerificationResult.Verified
+                }
             }
         }
 

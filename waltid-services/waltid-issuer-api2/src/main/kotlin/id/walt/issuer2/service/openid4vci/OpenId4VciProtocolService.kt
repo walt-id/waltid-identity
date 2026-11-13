@@ -30,6 +30,7 @@ import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
@@ -889,7 +890,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
         return try {
             collectDeferredCredential(authorization.token, session, request, claims, requestId)
-        } catch (e: DeferredProtocolException) {
+        } catch (e: CredentialProtocolException) {
             oauth2Provider.writeDeferredCredentialError(e.error)
         }
     }
@@ -1133,18 +1134,26 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         if (observedSession.deferredState != null && deferredClaim == null) {
             try {
-                val accepted = oauth2Provider.acceptCredentialRequest(
-                    requestWithSession, configuration, authorization.credentialIdentifier,
-                    authorization.credentialConfigurationId,
-                    CredentialProofValidationContext(
-                        keyAttestation = keyAttestation,
-                        credentialIssuer = nonceBinding.credentialIssuer,
-                        clientId = requestWithSession.accessTokenClientId,
-                        anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
-                        nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
-                        batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-                    ),
-                )
+                val accepted = try {
+                    oauth2Provider.acceptCredentialRequest(
+                        requestWithSession, configuration, authorization.credentialIdentifier,
+                        authorization.credentialConfigurationId,
+                        CredentialProofValidationContext(
+                            keyAttestation = keyAttestation,
+                            credentialIssuer = nonceBinding.credentialIssuer,
+                            clientId = requestWithSession.accessTokenClientId,
+                            anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+                            nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
+                            batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
+                        ),
+                    )
+                } catch (e: CredentialProtocolException) {
+                    // Collection notifications apply only after a transaction has been accepted.
+                    if (e.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                        return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, e.error)
+                    }
+                    throw e
+                }
                 validateExpectedCredentialProofKeys(accepted.bindings.map { it.publicJwk }, observedIssuanceRequest)?.let {
                     return oauth2Provider.writeCredentialError(it)
                 }
@@ -1164,7 +1173,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     return rejectCredentialRequest(requestWithSession, observedSession, configuration.format, requestId, error)
                 }
                 return oauth2Provider.writeCredentialError(error)
-            } catch (e: DeferredProtocolException) {
+            } catch (e: CredentialProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
             }
         }
@@ -1414,7 +1423,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val credentialResponse = when (credentialResponseResult) {
                 is CredentialResponseResult.Success -> credentialResponseResult.response
                 is CredentialResponseResult.Failure -> {
-                    if (deferredClaim != null && credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                    if (deferredClaim != null && (credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED || credentialResponseResult.error.retryAfterSeconds != null)) {
                         return oauth2Provider.writeDeferredCredentialError(credentialResponseResult.error)
                     }
                     val response = if (credentialResponseResult.error.isRetryableProofFailure()) {
@@ -1439,6 +1448,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
+            if (credentialResponse.isDeferred) {
+                return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
+            }
             if (deferredClaim != null && deferredClaim.response == null) {
                 deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
             }
@@ -1453,6 +1465,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
+            if (responseToWrite.isDeferred) {
+                return oauth2Provider.writeCredentialResponse(requestWithSession, responseToWrite)
+            }
             credentialProofKeyCommitment?.let { commitment ->
                 val committed = try {
                     commitment.commit(session, requireNotNull(proofPublicKeyJwks))
@@ -1592,7 +1607,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 )
             }
             throw e
-        } catch (e: DeferredProtocolException) {
+        } catch (e: CredentialProtocolException) {
             throw e
         } catch (e: Exception) {
             if (claimFinalized) {

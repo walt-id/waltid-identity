@@ -1,0 +1,241 @@
+package id.walt.openid4vci.attestation
+
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.Jwk
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.proofs.attestation.restoreAttestedKey
+import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
+import id.walt.statuslist.token.IetfStatusListToken
+import io.ktor.http.Url
+import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import kotlin.time.Clock
+import kotlin.time.Instant
+
+// Match the attestation verifiers' allowance for provider clocks ahead of the issuer.
+private const val STATUS_LIST_CLOCK_SKEW_SECONDS = 60L
+
+/** Status requirements are independent of the requirement to present an attestation. */
+@Serializable
+data class AttestationStatusPolicy(
+    val requireStatusReference: Boolean = false,
+    /** Optional extra age bound from signed iat; signed validity checks apply with either setting. */
+    val maximumListAgeSeconds: Long? = null,
+) {
+    init {
+        require(maximumListAgeSeconds == null || maximumListAgeSeconds > 0) {
+            "maximumListAgeSeconds must be positive when configured"
+        }
+    }
+}
+
+@Serializable
+data class AttestationStatusReference(val uri: String, val index: Int)
+
+/**
+ * Private, verified evidence with the policy captured at verification.
+ * A null reference records a known optional omission, not missing evidence.
+ */
+@Serializable
+data class VerifiedAttestationStatus(
+    val capturedAt: Long,
+    val policy: AttestationStatusPolicy,
+    val reference: AttestationStatusReference? = null,
+    val attesterIssuer: String? = null,
+    val attesterPublicJwk: JsonObject? = null,
+)
+
+/** Returns the signed JWT, never a previously computed VALID decision. */
+fun interface AttestationStatusResolver {
+    suspend fun resolve(uri: String): String
+}
+
+enum class AttestationStatusOutcome { VALID, INVALID, SUSPENDED, UNVERIFIABLE, MISSING_EVIDENCE }
+
+data class AttestationStatusResult(val outcome: AttestationStatusOutcome) {
+    val permanentlyDenied: Boolean
+        get() = outcome == AttestationStatusOutcome.INVALID || outcome == AttestationStatusOutcome.MISSING_EVIDENCE
+
+    fun error(): CredentialError? = when (outcome) {
+        AttestationStatusOutcome.VALID -> null
+        AttestationStatusOutcome.INVALID -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Accepted attestation has been revoked")
+        AttestationStatusOutcome.MISSING_EVIDENCE -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Required attestation status evidence is missing")
+        AttestationStatusOutcome.SUSPENDED -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Attestation is suspended", retryAfterSeconds = 1)
+        AttestationStatusOutcome.UNVERIFIABLE -> CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Attestation status could not be verified", retryAfterSeconds = 1)
+    }
+}
+
+/** Only call with payload and signer returned by successful attestation verification. */
+internal fun captureAttestationStatus(
+    payload: JsonObject,
+    signer: JsonObject?,
+    policy: AttestationStatusPolicy,
+    now: Instant,
+): VerifiedAttestationStatus {
+    val reference = payload["status"]?.let { status ->
+        val objectValue = status as? JsonObject ?: error("Attestation status must be an object")
+        val list = objectValue["status_list"] as? JsonObject ?: error("Unsupported attestation status mechanism")
+        val index = (list["idx"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
+            ?.takeIf { it >= 0 } ?: error("Attestation status idx must be a non-negative integer")
+        val uri = (list["uri"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?.takeIf { it.isNotBlank() } ?: error("Attestation status uri must be a string")
+        parseAttestationStatusListUrl(uri)
+        AttestationStatusReference(uri, index)
+    }
+    require(!policy.requireStatusReference || reference != null) { "Attestation status reference is required" }
+    require(signer == null || !Jwk.containsPrivateMaterial(signer)) { "Attester context must contain only public material" }
+    return VerifiedAttestationStatus(
+        capturedAt = now.epochSeconds, policy = policy, reference = reference,
+        attesterIssuer = (payload["iss"] as? JsonPrimitive)?.takeIf { it.isString }?.content,
+        attesterPublicJwk = signer,
+    )
+}
+
+internal fun parseAttestationStatusListUrl(uri: String): Url {
+    // Ktor supplies a localhost origin for relative references. Check the signed raw value first.
+    val schemeEnd = uri.indexOf("://")
+    require(schemeEnd > 0 && uri.substring(0, schemeEnd).lowercase() in setOf("http", "https")) {
+        "Attestation status requires an absolute HTTP(S) URI"
+    }
+    val authority = uri.substring(schemeEnd + 3).takeWhile { it != '/' && it != '?' && it != '#' }
+    require(authority.isNotBlank() && uri.none { it.isWhitespace() || it == '\\' || it == '#' }) {
+        "Attestation status requires an authority and no whitespace, backslashes or fragment"
+    }
+    return Url(uri).also { url ->
+        require(url.protocol.name in setOf("http", "https") && url.host.isNotBlank()) {
+            "Attestation status requires an absolute HTTP(S) URI"
+        }
+    }
+}
+
+/** One invocation is one checkpoint. Lists are fetched afresh and deduplicated only within it. */
+class AttestationStatusValidator(
+    private val resolver: AttestationStatusResolver?,
+    private val now: () -> Instant = { Clock.System.now() },
+) {
+    private val logger = KotlinLogging.logger {}
+
+    suspend fun validate(
+        evidence: List<VerifiedAttestationStatus>,
+    ): AttestationStatusResult {
+        val lists = mutableMapOf<String, Result<ResolvedList>>()
+        val validityChecks = mutableListOf<ListValidity>()
+        val logged = mutableSetOf<Pair<String, AttestationStatusFailureReason>>()
+        fun logFailure(uri: String, reason: AttestationStatusFailureReason) {
+            if (logged.add(uri to reason)) {
+                // Exception messages, JWTs and complete URLs may contain sensitive evidence.
+                logger.warn { "Attestation status validation failed reason=$reason host=${statusListHost(uri)}" }
+            }
+        }
+        var outcome = AttestationStatusOutcome.VALID
+        for (accepted in evidence) {
+            val next = if (accepted.reference == null) {
+                if (accepted.policy.requireStatusReference) AttestationStatusOutcome.MISSING_EVIDENCE else AttestationStatusOutcome.VALID
+            } else {
+                val uri = accepted.reference.uri
+                try {
+                    if (accepted.attesterPublicJwk == null) {
+                        throw AttestationStatusValidationException(AttestationStatusFailureReason.SIGNER)
+                    }
+                    val jwt = lists.getOrPut(uri) {
+                        try {
+                            Result.success(attestationStatusCheck(AttestationStatusFailureReason.LOOKUP) {
+                                parseAttestationStatusListUrl(uri)
+                                val jwt = requireNotNull(resolver) { "Attestation status resolver is not configured" }.resolve(uri)
+                                ResolvedList(jwt, now())
+                            })
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (cause: AttestationStatusValidationException) { Result.failure(cause) }
+                    }
+                    validateList(jwt.getOrThrow(), accepted).also { validityChecks += it.validity }.outcome
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (cause: AttestationStatusValidationException) {
+                    logFailure(uri, cause.reason)
+                    AttestationStatusOutcome.UNVERIFIABLE
+                }
+            }
+            // A confirmed revocation wins even when another list is temporarily unavailable.
+            if (priority(next) > priority(outcome)) outcome = next
+        }
+        // Earlier lists may have expired while later lookups or signature checks were suspended.
+        val checkedAt = now()
+        val expired = validityChecks.filter { !it.isValidAt(checkedAt) }
+        expired.forEach { logFailure(it.uri, AttestationStatusFailureReason.FRESHNESS) }
+        if (expired.isNotEmpty() && priority(AttestationStatusOutcome.UNVERIFIABLE) > priority(outcome)) {
+            outcome = AttestationStatusOutcome.UNVERIFIABLE
+        }
+        return AttestationStatusResult(outcome)
+    }
+
+    private data class ResolvedList(val jwt: String, val resolvedAt: Instant)
+    private data class ValidatedList(val outcome: AttestationStatusOutcome, val validity: ListValidity)
+    private data class ListValidity(
+        val uri: String,
+        val claims: IetfStatusListToken.Validity,
+        val resolvedAt: Instant,
+        val maximumAgeSeconds: Long?,
+    ) {
+        fun isValidAt(current: Instant): Boolean = claims.isValidAt(
+            current, resolvedAt, maximumAgeSeconds, clockSkewSeconds = STATUS_LIST_CLOCK_SKEW_SECONDS,
+        )
+    }
+
+    private suspend fun validateList(resolved: ResolvedList, evidence: VerifiedAttestationStatus): ValidatedList {
+        val jwt = resolved.jwt
+        val decoded = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            require(jwt.length <= 2 * 1024 * 1024) { "Status-list JWT is too large" }
+            CompactJws.decodeUnverified(jwt)
+        }
+        val signer = attestationStatusCheck(AttestationStatusFailureReason.SIGNER) {
+            restoreAttestedKey(requireNotNull(evidence.attesterPublicJwk) { "Verified attester signer context is unavailable" })
+        }
+        val algorithm = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            JwsAlgorithm.parse(requireNotNull(decoded.protectedHeader["alg"]?.jsonPrimitive?.content))
+        }
+        // Status-response jwk/kid/x5c never authorize a different key. Delegation is not enabled.
+        attestationStatusCheck(AttestationStatusFailureReason.SIGNATURE) { CompactJws.verify(jwt, signer, algorithm) }
+        val reference = requireNotNull(evidence.reference)
+        val list = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+            IetfStatusListToken.fromJwt(decoded.protectedHeader, payload, reference.uri)
+        }
+        val validity = ListValidity(reference.uri, list.validity, resolved.resolvedAt, evidence.policy.maximumListAgeSeconds)
+        if (!validity.isValidAt(now())) throw AttestationStatusValidationException(AttestationStatusFailureReason.FRESHNESS)
+        val outcome = attestationStatusCheck(AttestationStatusFailureReason.FORMAT) {
+            when (list.readStatus(reference.index)) {
+                0u -> AttestationStatusOutcome.VALID
+                1u -> AttestationStatusOutcome.INVALID
+                2u -> AttestationStatusOutcome.SUSPENDED
+                else -> throw AttestationStatusValidationException(AttestationStatusFailureReason.FORMAT)
+            }
+        }
+        return ValidatedList(outcome, validity)
+    }
+
+    private fun statusListHost(uri: String): String = try {
+        parseAttestationStatusListUrl(uri).host.takeIf { host ->
+            host.length <= 255 && host.all { it.isLetterOrDigit() || it in ".:-[]" }
+        } ?: "unavailable"
+    } catch (_: IllegalArgumentException) {
+        "unavailable"
+    }
+
+    private fun priority(outcome: AttestationStatusOutcome): Int = when (outcome) {
+        AttestationStatusOutcome.VALID -> 0
+        AttestationStatusOutcome.SUSPENDED -> 1
+        AttestationStatusOutcome.UNVERIFIABLE -> 2
+        AttestationStatusOutcome.MISSING_EVIDENCE -> 3
+        AttestationStatusOutcome.INVALID -> 4
+    }
+}
+
+internal fun AcceptedCredentialRequest.statusEvidence(): List<VerifiedAttestationStatus> = buildList {
+    clientAttestation?.let { add(requireNotNull(it.status) { "Verified client attestation is missing captured status evidence" }) }
+    proofs.orEmpty().forEach { proof ->
+        proof.keyAttestation?.let { add(requireNotNull(it.status) { "Verified key attestation is missing captured status evidence" }) }
+    }
+}

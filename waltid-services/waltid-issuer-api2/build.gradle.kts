@@ -8,6 +8,7 @@ plugins {
 group = "id.walt"
 
 dependencies {
+    implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
     api(project(":waltid-services:waltid-service-commons"))
 
     implementation(identityLibs.ktor.server.core)
@@ -61,6 +62,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     testImplementation(kotlin("test"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-status-list"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(identityLibs.bundles.smiley4.schema.kenerator)

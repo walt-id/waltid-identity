@@ -121,7 +121,11 @@ interface OAuth2Provider {
 
     fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp
 
-    /** Validates the initial holder proofs without signing or allocating issuance inputs. */
+    /**
+     * Capture verified authentication, proofs and bindings for a deferred transaction.
+     * Temporary status failures may remain pending. Delivery must use the deferred
+     * response pipeline to revalidate status and lifetimes against the saved evidence.
+     */
     suspend fun acceptCredentialRequest(
         request: CredentialRequest,
         configuration: CredentialConfiguration,

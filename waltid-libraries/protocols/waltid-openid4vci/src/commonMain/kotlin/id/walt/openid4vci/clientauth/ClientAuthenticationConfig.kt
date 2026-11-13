@@ -2,6 +2,8 @@
 
 package id.walt.openid4vci.clientauth
 
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeConfig
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.GrantType
@@ -42,6 +44,7 @@ data class ClientAuthenticationConfig(
         keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
         crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
         challengeService: AttestationChallengeService? = null,
+        statusResolver: AttestationStatusResolver? = null,
     ): ClientAuthenticationServiceConfig {
         val methodConfig = clientAttestationMethod()
         require((methodConfig?.challenge != null) == (challengeService != null)) {
@@ -49,7 +52,7 @@ data class ClientAuthenticationConfig(
         }
         if (methodConfig == null) return ClientAuthenticationServiceConfig()
         val attestationMethod = methodConfig.config
-            .toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver)
+            .toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver, statusResolver)
             .toAuthenticationMethod(
                 challengeService = challengeService,
             )

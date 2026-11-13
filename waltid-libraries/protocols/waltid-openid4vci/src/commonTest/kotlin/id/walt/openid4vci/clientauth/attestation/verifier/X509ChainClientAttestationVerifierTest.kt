@@ -194,7 +194,7 @@ class X509ChainClientAttestationVerifierTest {
             println("Rejected: ${result.reason}")
         }
 
-        assertIs<ClientAttestationVerificationResult.Verified>(
+        assertIs<ClientAttestationVerificationResult.VerifiedWithSigner>(
             X509ChainClientAttestationVerifier(
                 InMemoryTrustStore(listOf(rootCertificate))
             )
