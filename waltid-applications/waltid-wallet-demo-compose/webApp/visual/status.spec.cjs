@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const catalogue = require('./catalogue.json');
 const { createWalletFixture, statusCases } = require('./wallet-fixture.cjs');
-const { clickControl, waitForSettledImage } = require('./browser-controls.cjs');
+const { clickControl, waitForSettledImage, revealReviewControl: reveal } = require('./browser-controls.cjs');
 
 async function openCard(page, title) {
   const card = page.getByRole('button', { name: new RegExp(`^${title}(,|$)`) });
@@ -27,24 +27,6 @@ async function openSharing(page, fixture) {
   await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
 }
 
-async function reveal(page, locator) {
-  await expect(locator).toBeVisible();
-  const viewport = page.viewportSize();
-  const share = page.getByRole('button', { name: 'Share', exact: true });
-  const footer = await share.count() ? await share.boundingBox() : null;
-  const bottom = footer ? footer.y - 8 : viewport.height - 12;
-  for (let n = 0; n < 8; n++) {
-    await waitForSettledImage(page);
-    const box = await locator.boundingBox();
-    if (box && box.y >= 72 && box.y + box.height <= bottom) return;
-    // ARIA visibility does not account for the canvas scroll clip or pinned footer.
-    // Wheel inside this sheet's actual column, rather than a fixed page coordinate.
-    await page.mouse.move(box ? box.x + box.width / 2 : viewport.width / 2, Math.min(bottom - 32, viewport.height / 2));
-    await page.mouse.wheel(0, box && box.y < 72 ? -250 : 250);
-    await waitForSettledImage(page);
-  }
-  throw new Error('The complete control must be inside the review content above the pinned actions');
-}
 
 function expectTransport(fixture) {
   expect(fixture.unexpected).toEqual([]);
