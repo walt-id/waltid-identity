@@ -8,6 +8,7 @@ import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.wallet2.consent.*
 
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlin.time.TimeSource
@@ -2351,7 +2352,7 @@ object WalletPresentationHandler {
         }
     }
 
-    /** Null for a stored credential whose disclosures cannot be located, so it cannot fail matching for the others. */
+    /** An unusable stored credential cannot fail matching for the other candidates. */
     private suspend fun StoredCredential.toRawDcqlCredential(id: String, query: DcqlQuery? = null): RawDcqlCredential? {
         val credential = this.credential
         val sdvc = credential as? SelectivelyDisclosableVerifiableCredential
@@ -2361,10 +2362,17 @@ object WalletPresentationHandler {
             log.warn { "Skipping credential $id: its disclosures cannot be located in the issuer-signed payload (${e.message})" }
             return null
         }
-        val resolved = resolveTypeMetadata(fetchIfMissing = query?.credentials?.any { item ->
-            val meta = item.meta as? SdJwtVcMeta
-            meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
-        } == true)
+        val resolved = try {
+            resolveTypeMetadata(fetchIfMissing = query?.credentials?.any { item ->
+                val meta = item.meta as? SdJwtVcMeta
+                meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
+            } == true)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: IllegalArgumentException) {
+            log.warn { "Skipping credential $id: its type metadata is invalid" }
+            return null
+        }
         return RawDcqlCredential(
             id = id,
             format = credential.format,

@@ -7,6 +7,8 @@ import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.wallet2.consent.PaymentConsentFixture
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -56,6 +58,29 @@ class WalletPresentationHandlerEligibleSelectionTest {
             "pid-2",
             (rematched.getValue("pid").single().credential as RawDcqlCredential).id,
         )
+    }
+
+    @Test
+    fun malformedMetadataNeighbourDoesNotBlockAHealthyExactTypeMatch() = runTest {
+        val fixture = PaymentConsentFixture.create()
+        try {
+            val healthy = StoredCredential("healthy", fixture.credential())
+            val malformed = StoredCredential("legacy", fixture.credential(buildJsonObject {
+                put("vct", "https://issuer.example/legacy"); put("vct#integrity", "")
+            }))
+            val store = InMemoryCredentialStore().also {
+                it.addCredential(malformed); it.addCredential(healthy)
+            }
+            val query = DcqlQuery(credentials = listOf(CredentialQuery(
+                id = "payment", format = CredentialFormat.DC_SD_JWT,
+                meta = SdJwtVcMeta(vctValues = listOf("https://issuer.example/vct")),
+            )))
+            val matches = WalletPresentationHandler.selectFromStores(
+                wallet = Wallet(id = "mixed-metadata", credentialStores = listOf(store)),
+                query = query, useWalletCredentialIds = true,
+            )
+            assertEquals(listOf("healthy"), matches.getValue("payment").map { (it.credential as RawDcqlCredential).id })
+        } finally { fixture.close() }
     }
 
     private fun storedCredential(id: String): StoredCredential = StoredCredential(

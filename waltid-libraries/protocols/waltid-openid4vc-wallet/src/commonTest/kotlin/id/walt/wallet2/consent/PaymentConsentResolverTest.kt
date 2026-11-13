@@ -3,6 +3,10 @@ package id.walt.wallet2.consent
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.utils.ShaUtils
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
+import id.walt.webdatafetching.config.AllowList
+import id.walt.webdatafetching.config.url.UrlConfiguration
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -52,6 +56,87 @@ class PaymentConsentResolverTest {
                 else -> "Basic " + kotlin.io.encoding.Base64.Default.encode("metadata-user:metadata-password".encodeToByteArray())
             }
             assertEquals(expectedAuth, headers[HttpHeaders.Authorization])
+        }
+    }
+
+    @Test fun cachedChainsKeepRequestCredentialsOnTheAuthenticatedLeafOrigin() = test {
+        val public = issuerKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(issuerKey.spec)
+        val trust = listOf(PaymentCredentialIssuer(ISSUER, public.data.toByteArray().decodeToString()))
+        val original = metadata
+        for (external in listOf(false, true)) {
+            val sourceOrigin = if (external) "https://catalogue.example" else ISSUER
+            val type = original.getValue("transaction_data_types").jsonObject.getValue(TS12_PAYMENT_TYPE).jsonObject
+            documents["/claims"] = type.getValue("claims").toString()
+            documents["/catalogue"] = type.getValue("ui_labels").toString()
+            val parentUri = "https://types.example/parent"
+            val parent = JsonObject(original + mapOf(
+                "vct" to JsonPrimitive(parentUri),
+                "transaction_data_types" to buildJsonObject {
+                    put(TS12_PAYMENT_TYPE, buildJsonObject {
+                        put("schema", TS12_PAYMENT_TYPE)
+                        put("claims_uri", "$sourceOrigin/claims")
+                        put("ui_labels_uri", "$sourceOrigin/catalogue")
+                    })
+                },
+            )).toString().encodeToByteArray()
+            documents["/parent"] = parent.decodeToString()
+            metadata = buildJsonObject {
+                put("vct", "$ISSUER/vct"); put("extends", parentUri)
+                put("extends#integrity", MetadataIntegrity.sha256(parent))
+            }
+            val leaf = metadata.toString().encodeToByteArray()
+            val pin = MetadataIntegrity.sha256(leaf)
+            val signed = credential(buildJsonObject { put("vct#integrity", pin) })
+            val complete = TypeMetadataResolver({ if (it == parentUri) parent else leaf }).resolve("$ISSUER/vct", pin).snapshot()
+            val partial = JsonObject(complete + ("documents" to JsonObject(complete.getValue("documents").jsonObject - parentUri)))
+            for (auth in listOf(
+                RequestConfiguration.HttpAuthConfiguration.BearerAuth("private-token"),
+                RequestConfiguration.HttpAuthConfiguration.BasicAuth("private-user", "private-password"),
+            )) for (snapshot in listOf(null, partial, complete)) {
+                requestUrls.clear(); requestHeaders.clear()
+                val fetcher = WebDataFetcher.wrapping(client, "cached-payment-origin", WebDataFetchingConfiguration(
+                    request = RequestConfiguration(headers = mapOf("X-Private" to "tenant"),
+                        cookies = mapOf("session" to "private"), auth = auth),
+                ))
+                assertEquals("Pay", PaymentConsentResolver(trust, fetcher).resolve(signed, payload, listOf("en"), snapshot).affirmativeAction)
+                assertTrue(requestUrls.any { it == "$sourceOrigin/claims" })
+                requestUrls.zip(requestHeaders).forEach { (url, headers) ->
+                    if (url.startsWith("$ISSUER/")) {
+                        assertNotNull(headers[HttpHeaders.Authorization])
+                        assertEquals("tenant", headers["X-Private"])
+                        assertEquals("session=private", headers[HttpHeaders.Cookie])
+                    } else for (name in listOf(HttpHeaders.Authorization, HttpHeaders.Cookie, "X-Private")) {
+                        assertNull(headers[name], "$url must not receive $name")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test fun cachedSourcesStillRequireHttpsAndConfiguredUrlPermission() = test {
+        val public = issuerKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(issuerKey.spec)
+        val trust = listOf(PaymentCredentialIssuer(ISSUER, public.data.toByteArray().decodeToString()))
+        val original = metadata
+        for ((leafUri, parentUri) in listOf(
+            "http://issuer.example/vct" to "https://types.example/parent",
+            "$ISSUER/vct" to "http://types.example/parent",
+            "$ISSUER/vct" to "https://blocked.example/parent",
+        )) {
+            val parent = JsonObject(original + ("vct" to JsonPrimitive(parentUri))).toString().encodeToByteArray()
+            val leaf = buildJsonObject {
+                put("vct", leafUri); put("extends", parentUri)
+                put("extends#integrity", MetadataIntegrity.sha256(parent))
+            }.toString().encodeToByteArray()
+            val pin = MetadataIntegrity.sha256(leaf)
+            val snapshot = TypeMetadataResolver({ if (it == leafUri) leaf else parent }).resolve(leafUri, pin).snapshot()
+            val fetcher = WebDataFetcher.wrapping(client, "cached-payment-policy", WebDataFetchingConfiguration(
+                url = UrlConfiguration(hosts = AllowList(whitelist = listOf("issuer.example", "types.example"))),
+            ))
+            val signed = credential(buildJsonObject { put("vct", leafUri); put("vct#integrity", pin) })
+            assertFailure(PaymentConsentFailure.METADATA_UNAVAILABLE) {
+                PaymentConsentResolver(trust, fetcher).resolve(signed, payload, listOf("en"), snapshot)
+            }
+            assertTrue(requestUrls.isEmpty())
         }
     }
 
@@ -220,11 +305,13 @@ internal class PaymentConsentFixture private constructor(val runtime: CryptoRunt
     }
     var onMetadataRequest: suspend () -> Unit = {}
     val requests = mutableListOf<String>()
+    val requestUrls = mutableListOf<String>()
     val requestHeaders = mutableListOf<Headers>()
     val documents = mutableMapOf<String, String>()
     val client = HttpClient(MockEngine { request ->
         onMetadataRequest()
         requests += request.url.encodedPath
+        requestUrls += request.url.toString()
         requestHeaders += request.headers
         val body = if (request.url.encodedPath == "/vct") metadata.toString() else documents.getValue(request.url.encodedPath)
         respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
