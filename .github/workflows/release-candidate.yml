@@ -141,8 +141,17 @@ jobs:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
     needs: tag
+    timeout-minutes: 300
+    env:
+      WORKFLOW: integration-test-aws.yml
     steps:
+      # benc-uk/workflow-dispatch v1.3.3 only warns when its wait times out, and with sync-status it fails only on a
+      # failure or cancelled conclusion, so the next step requires a completed, successful run. Release candidate
+      # 1.2.1 staged after 15 minutes while its AWS run (41889685734) went on to fail.
+      # The run takes 100 minutes at most plus 40 for its cleanup job, and its concurrency group can queue it behind
+      # one other run of the same length: wait 290 minutes, inside this job's 300.
       - name: Dispatch integration-test-aws.yml and wait
+        id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-aws.yml
@@ -150,13 +159,41 @@ jobs:
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
+          wait-timeout-seconds: 17400
+          wait-interval-seconds: 30
           sync-status: true
+      - name: Require a successful run
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.dispatch.outputs.runId }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::${WORKFLOW} was not dispatched (the dispatch action skips a disabled workflow with only a warning)."
+            exit 1
+          fi
+          run="$(gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/${RUN_ID}" --jq '{status, conclusion, html_url}')"
+          echo "$run"
+          if [ "$(jq -r '.status' <<< "$run")" != "completed" ]; then
+            echo "::error::${WORKFLOW} was still running when the wait ended: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
+          if [ "$(jq -r '.conclusion' <<< "$run")" != "success" ]; then
+            echo "::error::${WORKFLOW} did not succeed: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
   integration-test-azure:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
     needs: tag
+    timeout-minutes: 260
+    env:
+      WORKFLOW: integration-test-azure.yml
     steps:
+      # As for AWS. The run takes 90 minutes at most plus 30 for its cleanup job, and its concurrency group can queue
+      # it behind one other run of the same length: wait 250 minutes, inside this job's 260.
       - name: Dispatch integration-test-azure.yml and wait
+        id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-azure.yml
@@ -164,7 +201,71 @@ jobs:
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
+          wait-timeout-seconds: 15000
+          wait-interval-seconds: 30
           sync-status: true
+      - name: Require a successful run
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.dispatch.outputs.runId }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::${WORKFLOW} was not dispatched (the dispatch action skips a disabled workflow with only a warning)."
+            exit 1
+          fi
+          run="$(gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/${RUN_ID}" --jq '{status, conclusion, html_url}')"
+          echo "$run"
+          if [ "$(jq -r '.status' <<< "$run")" != "completed" ]; then
+            echo "::error::${WORKFLOW} was still running when the wait ended: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
+          if [ "$(jq -r '.conclusion' <<< "$run")" != "success" ]; then
+            echo "::error::${WORKFLOW} did not succeed: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
+  integration-test-postgresql:
+    name: Integration Tests - PostgreSQL
+    runs-on: ubuntu-latest
+    needs: tag
+    timeout-minutes: 205
+    env:
+      WORKFLOW: integration-test-postgresql.yml
+    steps:
+      # As for AWS. The run takes about 30 minutes and its job times out after 180; it has no shared concurrency
+      # group, so nothing queues it: wait 195 minutes, inside this job's 205.
+      - name: Dispatch integration-test-postgresql.yml and wait
+        id: dispatch
+        uses: benc-uk/workflow-dispatch@v1.3.3
+        with:
+          workflow: integration-test-postgresql.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.tag.outputs.tag }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          wait-timeout-seconds: 11700
+          wait-interval-seconds: 30
+          sync-status: true
+      - name: Require a successful run
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.dispatch.outputs.runId }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::${WORKFLOW} was not dispatched (the dispatch action skips a disabled workflow with only a warning)."
+            exit 1
+          fi
+          run="$(gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/${RUN_ID}" --jq '{status, conclusion, html_url}')"
+          echo "$run"
+          if [ "$(jq -r '.status' <<< "$run")" != "completed" ]; then
+            echo "::error::${WORKFLOW} was still running when the wait ended: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
+          if [ "$(jq -r '.conclusion' <<< "$run")" != "success" ]; then
+            echo "::error::${WORKFLOW} did not succeed: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
   sonar-snapshot:
     name: SonarCloud snapshot
     runs-on: ubuntu-latest
@@ -223,7 +324,7 @@ jobs:
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure, integration-test-postgresql ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
