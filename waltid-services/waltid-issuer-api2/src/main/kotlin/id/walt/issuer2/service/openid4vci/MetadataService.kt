@@ -25,6 +25,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.*
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
@@ -44,6 +45,7 @@ class MetadataService @JvmOverloads constructor(
     private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
     metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
+    private val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -82,6 +84,11 @@ class MetadataService @JvmOverloads constructor(
                 DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
             ).withResolvedVct(configurationId).also { configuration ->
                 configuration.vct?.let { validateVct(configurationId, it) }
+                val claimConflicts = configuration.claimDescriptionConflicts()
+                require(claimConflicts.isEmpty()) {
+                    "Credential configuration '$configurationId' has repeated or contradictory claim descriptions " +
+                        "(OpenID4VCI Appendix B.3): ${claimConflicts.joinToString("; ") { it.message }}"
+                }
             }
         }
 
@@ -142,7 +149,7 @@ class MetadataService @JvmOverloads constructor(
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
             baseUrl = baseUrl,
-            codeChallengeMethodsSupported = listOf("S256"),
+            codeChallengeMethodsSupported = pkceServiceConfig.supportedCodeChallengeMethods,
             pushedAuthorizationRequestEndpointPath = "/par",
             challengeEndpointPath = if (supportsAttestationChallenges) "/${Issuer2EndpointPaths.CHALLENGE}" else null,
             requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,

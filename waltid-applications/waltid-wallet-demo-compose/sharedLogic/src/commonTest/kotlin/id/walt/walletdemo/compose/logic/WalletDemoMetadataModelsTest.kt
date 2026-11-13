@@ -70,4 +70,24 @@ class WalletDemoMetadataModelsTest {
             ))), credential.claimDisplayGroups(),
         )
     }
+
+    @Test
+    fun readableFallbackOmitsPathSyntaxWhileKeepingTypedPaths() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":["nationalities",null]},
+          {"path":["other_nationalities",0]},
+          {"path":["namespace","element",-7]},
+          {"path":["namespace","element",18446744073709551615]}
+        ]}""")
+        assertEquals(listOf("Nationalities", "Other nationalities", "Element", "Element"), metadata.map { it.displayLabel("dc+sd-jwt") })
+        assertEquals(listOf("null", "0", "-7", "18446744073709551615"), metadata.map { it.path.last().toString() })
+    }
+
+    @Test
+    fun blankClaimKeysHaveReadableFallbackLabels() {
+        for (path in listOf("""[""]""", """[" "]""")) {
+            val claim = StoredCredentialMetadataParser.claims("""{"credentialClaims":[{"path":$path}]}""").single()
+            assertEquals("Claim", claim.displayLabel("dc+sd-jwt"))
+        }
+    }
 }

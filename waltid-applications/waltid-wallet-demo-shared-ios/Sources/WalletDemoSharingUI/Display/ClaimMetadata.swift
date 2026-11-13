@@ -1,16 +1,64 @@
 import Foundation
 
 public struct CredentialClaimMetadata: Equatable {
-    public let path: [String]
+    public let path: [CredentialClaimPathSegment]
     public let mandatory: Bool?
     public let name: String?
+}
+
+/// Keep metadata integers as literals: mdoc map keys can exceed the platform Int range.
+public enum CredentialClaimPathSegment: Hashable {
+    case key(String)
+    case integer(String)
+    case wildcard
+
+    init?(_ value: CredentialDisplayJSONValue) {
+        switch value {
+        case .string(let key): self = .key(key)
+        case .number(let literal) where literal.range(of: #"^-?(0|[1-9][0-9]*)$"#, options: .regularExpression) != nil:
+            self = .integer(literal)
+        case .null: self = .wildcard
+        default: return nil
+        }
+    }
+
+    fileprivate func matches(_ actual: ClaimPathExpression.Segment) -> Bool {
+        switch (self, actual) {
+        case (.key(let expected), .key(let value)): return expected == value
+        case (.integer(let expected), .index(let value)): return Int(expected) == value
+        case (.wildcard, .wildcard): return true
+        case (.wildcard, .index(let value)): return value >= 0
+        default: return false
+        }
+    }
+}
+
+extension CredentialClaimMetadata {
+    func displayLabel(format: String) -> String {
+        if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
+        let keys = path.compactMap { segment -> String? in
+            if case .key(let key) = segment { return key }; return nil
+        }
+        if keys.count == path.count,
+           let semantics = MdocClaimDisplaySemantics.describe(format: format, path: keys) {
+            return semantics.label
+        }
+        let key = keys.last ?? ""
+        return key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Claim" : CredentialDisplayVocabulary.humanizedLabel(key)
+
+    }
 }
 
 extension ClaimItem {
     /// Metadata changes label/order only; disclosure policy and values remain SDK-owned.
     func applyingClaimMetadata(_ metadata: [CredentialClaimMetadata], format: String, expression: ClaimPathExpression? = nil) -> ClaimItem {
         let paths = metadataPaths(expression ?? ClaimPathExpression.parse(path.id), format: format)
-        let match = metadata.enumerated().first { paths.contains($0.element.path) }
+        let match = metadata.enumerated().first { entry in
+            paths.contains { candidate in
+                entry.element.path.count == candidate.count && zip(entry.element.path, candidate).allSatisfy { $0.matches($1) }
+            }
+        }
         return ClaimItem(path: path, pathComponents: pathComponents, label: match?.element.name ?? label,
             value: value.applyingClaimMetadata(metadata, format: format), rawValue: rawValue, roles: roles,
             labelSource: match?.element.name == nil ? labelSource : .issuerMetadata, displayOrder: match?.offset)
@@ -28,13 +76,11 @@ private extension DisplayValue {
     }
 }
 
-private func metadataPaths(_ expression: ClaimPathExpression, format: String) -> [[String]] {
-    // String-only SDK metadata must not accidentally label a different claim after dropping an index.
-    let path: [String] = expression.segments.compactMap { if case .key(let value) = $0 { return value }; return nil }
-    guard path.count == expression.segments.count else { return [] }
+private func metadataPaths(_ expression: ClaimPathExpression, format: String) -> [[ClaimPathExpression.Segment]] {
+    let path = expression.segments
     var paths = [path]
-    if format == "mso_mdoc", path.last == "elementValue" { paths.append(Array(path.dropLast())) }
-    if format == "jwt_vc_json", path.first == "vc" { paths.append(Array(path.dropFirst())) }
+    if format == "mso_mdoc", path.last == .key("elementValue") { paths.append(Array(path.dropLast())) }
+    if format == "jwt_vc_json", path.first == .key("vc") { paths.append(Array(path.dropFirst())) }
     return paths
 }
 

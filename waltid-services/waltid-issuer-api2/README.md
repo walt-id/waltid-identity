@@ -573,6 +573,22 @@ separately. These examples do not assert full EUDI compliance for every credenti
 Restart OSS issuer2 after editing the metadata/profile configuration files. Existing offers
 should be replaced with offers selecting the intended profile after a policy change.
 
+## Issuer2 PKCE requirement
+
+In `issuer-service.conf`:
+
+```hocon
+requirePkce = false
+```
+
+The default permits authorization-code requests without PKCE. Set `requirePkce = true`
+to require S256 PKCE at `/authorize` and `/par`.
+Restart the service after changing its configuration. The provider rejects a missing
+challenge with `invalid_request` and verifies the matching `code_verifier` before issuing tokens.
+Supplied PKCE is always verified, including when the requirement is disabled.
+Codes issued without PKCE cannot be redeemed after the requirement is enabled.
+Pre-authorized-code and refresh-token requests are unaffected.
+
 ## Issuer2 pushed authorization requests
 
 In `issuer-service.conf`:
@@ -597,8 +613,12 @@ must also restart. Unaffected pre-authorized sessions remain usable.
 
 ## Client attestation challenges
 
+The shipped `issuer-service.conf` comments out `client-attestation`, so the public demo
+accepts authorization-code wallets without a client attestation. Uncomment that block to
+require `attest_jwt_client_auth`. Anonymous pre-authorized access stays enabled.
+
 Challenges are disabled in the shipped configurations. To enable them, add the following
-inside the `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
+inside the uncommented `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
 in `issuer-service.conf`, alongside `config`, and restart the issuer:
 
 ```hocon

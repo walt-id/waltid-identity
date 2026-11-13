@@ -12,6 +12,7 @@ export type IssuerKind = "community" | "enterprise";
 export interface WalletDefinition {
   id: WalletId;
   label: string;
+  learnMoreUrl: string;
   issuer: IssuerKind;
   /** Server env var holding the Enterprise issuer service target. */
   issuerTargetEnv?: string;
@@ -29,7 +30,9 @@ export interface WalletDefinition {
 export const WALLETS: readonly WalletDefinition[] = [
   {
     id: "walt-id",
-    label: "walt.id",
+    label: "walt.id Wallet",
+    learnMoreUrl:
+      "https://github.com/walt-id/waltid-identity#test-out-the-waltid-products",
     issuer: "community",
     dcApi: true,
     issuance: true,
@@ -38,6 +41,7 @@ export const WALLETS: readonly WalletDefinition[] = [
   {
     id: "eudi-reference-wallet",
     label: "🇪🇺 EUDI Reference Wallet",
+    learnMoreUrl: "https://docs.eudi.dev/latest/test/wallet-application/",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_EUDI_REF_ISSUER_TARGET",
     materialId: "eudi-reference-wallet",
@@ -48,6 +52,7 @@ export const WALLETS: readonly WalletDefinition[] = [
   {
     id: "france-identite",
     label: "🇫🇷 France Identité",
+    learnMoreUrl: "https://france-identite.gouv.fr/",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_FRANCE_IDENTITE_ISSUER_TARGET",
     materialId: "france-identite",
@@ -58,6 +63,8 @@ export const WALLETS: readonly WalletDefinition[] = [
   {
     id: "d-you",
     label: "🇩🇪 d-you",
+    learnMoreUrl:
+      "https://bmi.usercontent.opencode.de/eudi-wallet/developer-guide/sandbox/onboarding/#sandbox-wallet-app-access",
     issuer: "enterprise",
     issuerTargetEnv: "NUXT_ES_DYOU_ISSUER_TARGET",
     materialId: "german-eudi-wallet",

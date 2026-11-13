@@ -14,11 +14,50 @@ import id.walt.openid4vci.metadata.issuer.IssuerLogo
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class WalletDisplayMetadataTest {
+
+    @Test
+    fun storedClaimMetadataRetainsArrayPaths() {
+        val path = listOf(JsonPrimitive("namespace"), JsonPrimitive("items"), JsonNull, JsonPrimitive(0))
+        val original = issuerMetadata()
+        val configuration = original.credentialConfigurationsSupported.getValue("pid")
+        val issuer = original.copy(credentialConfigurationsSupported = mapOf(
+            "pid" to configuration.copy(credentialMetadata = CredentialMetadata(
+                claims = listOf(ClaimDescription(path = path)),
+            )),
+        ))
+        val stored = storedCredentialDisplayMetadata(issuer, "pid")!!
+        assertEquals(
+            JsonArray(path),
+            stored.getValue("credentialClaims").jsonArray.single().jsonObject.getValue("path"),
+        )
+    }
+
+    @Test
+    fun contradictoryClaimDescriptionsAreLeftOutButDisplayIsKept() {
+        val original = issuerMetadata()
+        val configuration = original.credentialConfigurationsSupported.getValue("pid")
+        val issuer = original.copy(credentialConfigurationsSupported = mapOf(
+            "pid" to configuration.copy(credentialMetadata = configuration.credentialMetadata?.copy(claims = listOf(
+                ClaimDescription(path = listOf(JsonPrimitive("nationalities"), JsonNull)),
+                ClaimDescription(path = listOf(JsonPrimitive("nationalities"), JsonPrimitive(1))),
+            ))),
+        ))
+
+        val stored = assertNotNull(storedCredentialDisplayMetadata(issuer, "pid"))
+
+        assertNull(stored["credentialClaims"])
+        assertNotNull(stored["credentialDisplay"])
+        assertNotNull(stored["issuerDisplay"])
+    }
 
     @Test
     fun retainsClaimsWithoutArtworkAndPreservesOtherRequestMetadata() {

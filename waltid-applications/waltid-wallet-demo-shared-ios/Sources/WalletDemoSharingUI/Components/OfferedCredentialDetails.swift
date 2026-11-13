@@ -34,8 +34,7 @@ public struct OfferedCredentialDetails: View {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(fields.enumerated()), id: \.element.path) { index, claim in
                                 if index > 0 { Divider() }
-                                Text(claim.name ?? MdocClaimDisplaySemantics.describe(format: credential.format, path: claim.path)?.label
-                                     ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? ""))
+                                Text(claim.displayLabel(format: credential.format))
                                     .font(.body)
                             }
                         }.padding(16)

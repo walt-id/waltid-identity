@@ -1,5 +1,4 @@
 import Foundation
-import CoreFoundation
 import WalletSDK
 
 /// Parses sidecar credential metadata JSON written by the wallet on receive.
@@ -23,19 +22,24 @@ public enum StoredCredentialMetadataParser {
 
     /// These are definitions advertised by the issuer, never values not yet received.
     public static func claims(from metadataJSON: String?, preferredLocales: [String] = []) -> [CredentialClaimMetadata] {
-        guard let data = metadataJSON?.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let entries = root["credentialClaims"] as? [[String: Any]] else { return [] }
-        var seen = Set<[String]>()
+        guard case .object(let root) = CredentialDisplayJSONParser.parse(metadataJSON ?? ""),
+              case .array(let entries)? = root.first(where: { $0.key == "credentialClaims" })?.value else { return [] }
+        var seen = Set<[CredentialClaimPathSegment]>()
         var result: [CredentialClaimMetadata] = []
         for entry in entries {
-            guard let path = entry["path"] as? [String], !path.isEmpty,
-                  path.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
-                  seen.insert(path).inserted else { return [] }
-            let displays = entry["display"] as? [[String: Any]] ?? []
+            guard case .object(let fields) = entry,
+                  case .array(let values)? = fields.first(where: { $0.key == "path" })?.value,
+                  !values.isEmpty else { return [] }
+            let path = values.compactMap(CredentialClaimPathSegment.init)
+            guard path.count == values.count, seen.insert(path).inserted else { return [] }
+            let displaysJSON = fields.first(where: { $0.key == "display" })?.value.rawJSON ?? "[]"
+            let displays = (try? JSONSerialization.jsonObject(with: Data(displaysJSON.utf8)) as? [[String: Any]]) ?? []
             let display = DisplayLocales.select(displays, preferredLocales: preferredLocales) { stringValue($0["locale"]) }
-            let mandatory = (entry["mandatory"] as? NSNumber).flatMap { value -> Bool? in
-                CFGetTypeID(value) == CFBooleanGetTypeID() ? value.boolValue : nil
+            let mandatory: Bool?
+            if case .bool(let value)? = fields.first(where: { $0.key == "mandatory" })?.value {
+                mandatory = value
+            } else {
+                mandatory = nil
             }
             result.append(CredentialClaimMetadata(path: path, mandatory: mandatory, name: stringValue(display?["name"])))
         }

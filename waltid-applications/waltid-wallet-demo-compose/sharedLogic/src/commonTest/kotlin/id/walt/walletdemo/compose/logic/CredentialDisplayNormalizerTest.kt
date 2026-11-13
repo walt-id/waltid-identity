@@ -1250,4 +1250,71 @@ class CredentialDisplayNormalizerTest {
         val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
         val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
+
+    @Test
+    fun wildcardAndIndexLabelsMatchWithoutAliasingStringKeysOrParents() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":["people",null,"name"],"display":[{"name":"Person name"}]},
+          {"path":["address",0,"city"],"display":[{"name":"Primary city"}]},
+          {"path":["object_address","0","city"],"display":[{"name":"Object city"}]}
+        ]}""")
+        for ((path, label) in listOf(
+            "people[0].name" to "Person name",
+            "people[2].name" to "Person name",
+            "people.name" to "Fallback",
+            "people[0]" to "Fallback",
+            """people["0"].name""" to "Fallback",
+            "address[0].city" to "Primary city",
+            "address[1].city" to "Fallback",
+            """object_address["0"].city""" to "Object city",
+            "object_address[0].city" to "Fallback",
+            """address["0"].city""" to "Fallback",
+        )) {
+            val item = metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path))
+            assertEquals(label, item.label, path)
+            assertEquals(DisplayValue.Text("Value"), item.value)
+        }
+    }
+
+    @Test
+    fun invalidPathsNeverLoseSegmentsAndAccidentallyMatch() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[{"path":["people","name"],"display":[{"name":"Wrong match"}]}]}""")
+        for (path in listOf("""["people",true,"name"]""", """["people",1.5,"name"]""", """["people",1e2,"name"]""", """["people",18446744073709551615,"name"]""")) {
+            assertEquals("Fallback", metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path)).label, path)
+        }
+    }
+
+    @Test
+    fun labelsReachNestedArrayValuesWithoutChangingCredentialData() {
+        val details = CredentialDisplayNormalizer.toDetails(CredentialSummary(
+            id = "typed-metadata", format = "dc+sd-jwt", issuer = "Issuer", label = "Credential",
+            credentialDataJson = """{"people":[{"name":"Alice"},{"name":"Bob"}]}""",
+            metadataJson = """{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person name"}]}]}""",
+        ))
+        val people = details.groups.flatMap { it.items }.single { it.path.id == "people" }
+        val values = assertIs<DisplayValue.ListValue>(people.value).values
+        val rows = values.map { assertIs<DisplayValue.ObjectValue>(it).entries.single() }
+        assertEquals(listOf("Person name", "Person name"), rows.map { it.label })
+        assertEquals(listOf(DisplayValue.Text("Alice"), DisplayValue.Text("Bob")), rows.map { it.value })
+        assertEquals(listOf("people[0].name", "people[1].name"), rows.map { it.path.id })
+    }
+
+    @Test
+    fun literalKeysRemainDistinctFromPathsAndWildcards() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":[""],"display":[{"name":"Empty key"}]},
+          {"path":[" "],"display":[{"name":"Space key"}]},
+          {"path":["a.b"],"display":[{"name":"Dotted key"}]},
+          {"path":["0"],"display":[{"name":"Zero key"}]},
+          {"path":["*"],"display":[{"name":"Star key"}]}
+        ]}""")
+        assertEquals(5, metadata.size)
+        for ((path, label) in listOf(
+            """[""]""" to "Empty key", """[" "]""" to "Space key",
+            """["a.b"]""" to "Dotted key", """["0"]""" to "Zero key",
+            """["*"]""" to "Star key", "a.b" to "Fallback", "[0]" to "Fallback", "[*]" to "Fallback",
+        )) assertEquals(label, metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path)).label, path)
+    }
+
+    private fun metadataClaimItem() = ClaimItem(path = ClaimItemPath.topLevel("claim"), label = "Fallback", value = DisplayValue.Text("Value"))
 }
