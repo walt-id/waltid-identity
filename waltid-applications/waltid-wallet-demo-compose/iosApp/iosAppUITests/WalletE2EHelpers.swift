@@ -192,6 +192,9 @@ final class WalletE2EUI {
     func returnToWallet() {
         dismissKeyboard()
         let home = app.buttons["wallet.scanButton"]
+        let identifiers = ["wallet-detail-close",
+            "wallet.detailsBack", "wallet.flowBack", "wallet.external.close", "wallet.settingsBack"]
+        let targets = identifiers.map { app.buttons.matching(identifier: $0) }
         for _ in 0..<6 {
             // Untouched successes can disappear between an AX lookup and a tap.
             // Tests that retain a result complete it explicitly before returning here.
@@ -200,13 +203,23 @@ final class WalletE2EUI {
                 return
             }
             if home.exists && home.isHittable { return }
-            let identifiers = ["wallet-detail-close",
-                "wallet.detailsBack", "wallet.flowBack", "wallet.external.close", "wallet.settingsBack"]
-            guard let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) else {
+            // Navigation 3 retains incoming and outgoing Back buttons during motion.
+            // Wait for a unique actionable target instead of resolving an offscreen first match.
+            let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                (home.exists && home.isHittable) || targets.contains {
+                    $0.count == 1 && $0.firstMatch.isHittable
+                }
+            }, object: nil)
+            guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed else {
                 XCTFail("No action returns to wallet home: \(app.debugDescription)")
                 return
             }
-            button.tap()
+            if home.exists && home.isHittable { return }
+            guard let target = targets.first(where: { $0.count == 1 && $0.firstMatch.isHittable }) else {
+                XCTFail("Wallet navigation changed before the Back action: \(app.debugDescription)")
+                return
+            }
+            target.firstMatch.tap()
         }
         XCTAssertTrue(home.exists && home.isHittable, "Wallet home did not appear: \(app.debugDescription)")
     }
