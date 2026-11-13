@@ -70,6 +70,7 @@ korlibs-krypto = "4.0.10"
 exposed = "1.6.1"
 sqlite-jdbc = "3.54.1.0"
 postgresql = "42.7.11"
+mariadb = "3.5.11"
 hikaricp = "7.1.0"
 
 # JVM-only: DID library
@@ -412,6 +413,7 @@ exposed-java-time = { module = "org.jetbrains.exposed:exposed-java-time", versio
 exposed-json = { module = "org.jetbrains.exposed:exposed-json", version.ref = "exposed" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+mariadb = { module = "org.mariadb.jdbc:mariadb-java-client", version.ref = "mariadb" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
 
 ## JVM-only: DID library
