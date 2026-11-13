@@ -61,10 +61,11 @@ async function run() {
   }, { walletId: wallet.walletId, server });
   const page = await context.newPage();
   const requests = [], errors = [], frames = [], controls = new Map(), artworks = new Map();
+  const observations = new Set();
   let requiredArtwork = [];
   let phase = 'bootstrap', admittedAt = Date.now(), verdict;
   page.on('pageerror', error => errors.push(error.message));
-  page.on('response', async response => {
+  async function observeResponse(response) {
     const url = new URL(response.url());
     if (response.headers()['content-type']?.startsWith('image/png')) {
       try { artworks.set(response.url(), digest(await response.body())); }
@@ -86,6 +87,11 @@ async function run() {
     } catch (error) {
       errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
     } finally { requests.push(item); }
+  }
+  page.on('response', response => {
+    const observation = observeResponse(response);
+    observations.add(observation);
+    observation.finally(() => observations.delete(observation));
   });
   const button = name => page.getByRole('button', { name, exact: true });
   const headline = name => page.getByText(name, { exact: true }).first();
@@ -102,12 +108,12 @@ async function run() {
     const box = { x: Math.floor(bounds.x), y: Math.floor(bounds.y), width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) };
     controls.set(name, { box, pixels: await page.screenshot({ clip: box }) });
   }
-  async function expectRemembered(name) {
+  async function expectRemembered(name, timeout = 5000) {
     // The pinned renderer can retain a dismissed popup's ARIA mirror. Check the actual
     // undimmed control at its previously measured location before using that location.
     const { box, pixels } = controls.get(name);
     await page.mouse.move(5, 350);
-    await expect.poll(async () => (await page.screenshot({ clip: box })).equals(pixels)).toBe(true);
+    await expect.poll(async () => (await page.screenshot({ clip: box })).equals(pixels), { timeout }).toBe(true);
     return box;
   }
   async function clickRemembered(name) {
@@ -196,6 +202,8 @@ async function run() {
     }
     // A reload also verifies that the actual server retains all three received credentials.
     // Browser demo preferences are runtime-owned, so explicitly restore manual mode afterwards.
+    // Finish inspecting response bodies before navigation invalidates Chromium's body handles.
+    await Promise.all([...observations]);
     await page.reload(); await ready();
     await expect.poll(() => requiredArtwork.every(uri => artworks.has(uri))).toBe(true);
     phase = 'settings'; await settings(); await click(button('Automatic checks'));
@@ -248,7 +256,10 @@ async function run() {
     await expect.poll(async () => {
       verdict = await json(`${verifier}/verification-session/${sessionId}/info`); return verdict.status;
     }, { timeout: 30000 }).toBe('SUCCESSFUL');
-    await expectRemembered('scan'); // The actual host returns home after delivery; it has no persistent receipt screen.
+    // Successful receipts auto-dismiss after five seconds plus the sheet animation. The
+    // renderer can retain their ARIA mirror, so verify the actual undimmed Home control.
+    await expectRemembered('scan', 15000);
+    await Promise.all([...observations]);
     expect(errors).toEqual([]);
     expect(frames).toHaveLength(11);
     clean();
