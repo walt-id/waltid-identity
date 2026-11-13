@@ -303,6 +303,12 @@ extension XCTestCase {
         waitForIdleResultDismissal(app)
         returnToWallet()
 
+        // Exercise the real preference before payment. Manual mode lets us deliberately
+        // review expired evidence without an automatic refresh invalidating its warning
+        // while XCTest captures it. The earlier outage assertions still prove real expiry.
+        await runCredentialStatusSettingsReview(app, capturePrefix: capturePrefix, finishInManualMode: true)
+        returnToWallet()
+
         let paymentOffer = try await DemoBackend.shared.createOffer(scenario: DemoBackend.credentialStatusPaymentScenario)
         _ = try await issue(paymentOffer.offerUrl)
         let payment = try await DemoBackend.shared.createCredentialStatusPaymentVerifierSession()
@@ -317,6 +323,8 @@ extension XCTestCase {
         captureGallery(app, name: capturePrefix + "-status-payment-main-terms")
         XCTAssertTrue(share.wait(for: \.isEnabled, toEqual: true, timeout: 15))
         reveal(selectedAdverse)
+        XCTAssertTrue(app.staticTexts["Last known: revoked"].firstMatch.waitForExistence(timeout: 45),
+                      "Payment evidence must deliberately review the expired result in manual mode")
         captureGallery(app, name: capturePrefix + "-status-payment-selected-credentials")
         let paymentWarning = app.staticTexts["Credential status warning"].firstMatch
         func showPaymentWarning() async {
@@ -356,11 +364,10 @@ extension XCTestCase {
         captureGallery(app, name: capturePrefix + "-status-payment-result")
         waitForIdleResultDismissal(app)
         returnToWallet()
-
-        await runCredentialStatusSettingsReview(app, capturePrefix: capturePrefix)
     }
 
-    func runCredentialStatusSettingsReview(_ app: XCUIApplication, capturePrefix: String) async {
+    func runCredentialStatusSettingsReview(_ app: XCUIApplication, capturePrefix: String,
+                                          finishInManualMode: Bool = false) async {
         let settings = app.buttons["wallet.settingsButton"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10)); settings.tap()
         captureGallery(app, name: capturePrefix + "-status-root-settings")
@@ -388,7 +395,9 @@ extension XCTestCase {
         let batch = app.buttons["settings-credential-status-check-all"].firstMatch
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30)); batch.tap()
         XCTAssertTrue(app.staticTexts["Processed"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         captureGallery(app, name: capturePrefix + "-status-settings-completed")
+        if finishInManualMode { await toggleAutomatic(expect: "0") }
     }
 
     private func assertCredentialStatusControls(_ app: XCUIApplication) {
