@@ -100,6 +100,27 @@ class Issuer2OpenApiCompatibilityTest {
             .getValue("anyOf").jsonArray.map(::resolve)
         assertTrue(sessionShapes.any { "profileId" in it.getValue("properties").jsonObject })
         assertTrue(sessionShapes.any { "issuanceRequests" in it.getValue("properties").jsonObject })
+        fun enumValues(schema: JsonElement): Set<String> {
+            val resolved = resolve(schema)
+            val direct = resolved["enum"]?.jsonArray.orEmpty().mapNotNull { it.jsonPrimitive.contentOrNull }
+            val composed = listOf("allOf", "anyOf", "oneOf").flatMap { resolved[it]?.jsonArray.orEmpty() }
+            return direct.toSet() + composed.flatMap { enumValues(it) }
+        }
+        val notificationFields = setOf("walletNotificationId", "walletNotificationEvent", "walletNotificationEventDescription")
+        for (shape in sessionShapes) {
+            val properties = shape.getValue("properties").jsonObject
+            val report = if ("issuanceResults" in properties) {
+                val results = resolve(properties.getValue("issuanceResults"))
+                resolve(results.getValue("additionalProperties")).getValue("properties").jsonObject
+            } else properties
+            assertTrue(report.keys.containsAll(notificationFields), report.toString())
+            assertFalse("walletNotification" in report, "Storage-only notification model must not appear in Swagger")
+            assertEquals(
+                setOf("credential_accepted", "credential_failure", "credential_deleted"),
+                enumValues(report.getValue("walletNotificationEvent")),
+                report.getValue("walletNotificationEvent").toString(),
+            )
+        }
         assertFalse(specification.toString().contains("CredentialOfferCredentialResponse"))
     }
 

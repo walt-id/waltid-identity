@@ -11,8 +11,8 @@ import kotlinx.serialization.json.JsonPrimitive
  * so access-token verification still precedes notification parameter validation.
  */
 fun notificationRequestParameters(body: String): Map<String, List<String>> {
-    if (jsonHasDuplicateMembers(body)) return emptyMap()
     val element = try {
+        if (jsonHasDuplicateMembers(body)) return emptyMap()
         Json.parseToJsonElement(body) as? JsonObject ?: return emptyMap()
     } catch (_: Exception) {
         return emptyMap()

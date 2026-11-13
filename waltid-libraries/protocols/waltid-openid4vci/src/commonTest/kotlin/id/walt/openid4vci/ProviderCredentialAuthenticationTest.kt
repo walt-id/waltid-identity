@@ -218,6 +218,6 @@ class ProviderCredentialAuthenticationTest {
         private const val CALLBACK = "https://openid4vci.walt.id/callback"
         private val PARAMETERS = mapOf("credential_configuration_id" to listOf("identity"))
         private val CONFIGURATION = CredentialConfiguration(format = CredentialFormat.SD_JWT_VC, vct = "identity")
-        private val TOKEN_CONTEXT = CredentialAccessTokenContext(AccessTokenAuthorization(AccessTokenAuthorizationScheme.BEARER, "verified-token"), ISSUER)
+        private val TOKEN_CONTEXT = ProtectedResourceAccessTokenContext(AccessTokenAuthorization(AccessTokenAuthorizationScheme.BEARER, "verified-token"), ISSUER)
     }
 }

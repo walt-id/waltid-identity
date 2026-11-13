@@ -1,5 +1,7 @@
 package id.waltid.openid4vci.wallet.notification
 
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
+
 import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
@@ -62,7 +64,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.BEARER,
+            accessTokenType = AccessTokenAuthorizationScheme.BEARER,
             request = notification,
         )
 
@@ -86,7 +88,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.BEARER,
+            accessTokenType = AccessTokenAuthorizationScheme.BEARER,
             request = notification,
         )
         assertSame(notification, assertIs<NotificationDeliveryResult.Success>(result).request)
@@ -99,7 +101,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.BEARER,
+            accessTokenType = AccessTokenAuthorizationScheme.BEARER,
             request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
@@ -118,7 +120,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.DPOP,
+            accessTokenType = AccessTokenAuthorizationScheme.DPOP,
             request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
@@ -142,7 +144,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = notificationEndpoint,
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.DPOP,
+            accessTokenType = AccessTokenAuthorizationScheme.DPOP,
             request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_ACCEPTED,
@@ -184,7 +186,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = notificationEndpoint,
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.DPOP,
+            accessTokenType = AccessTokenAuthorizationScheme.DPOP,
             request = DefaultNotificationRequest(
                 notificationId = "notification-id",
                 event = NotificationEvent.CREDENTIAL_FAILURE,
@@ -216,7 +218,7 @@ class NotificationRequestBuilderTest {
         val result = NotificationRequestBuilder(client).send(
             notificationEndpoint = "https://issuer.example/notification",
             accessToken = "access-token",
-            accessTokenType = NotificationAccessTokenType.BEARER,
+            accessTokenType = AccessTokenAuthorizationScheme.BEARER,
             request = DefaultNotificationRequest(
                 notificationId = "unknown",
                 event = NotificationEvent.CREDENTIAL_FAILURE,

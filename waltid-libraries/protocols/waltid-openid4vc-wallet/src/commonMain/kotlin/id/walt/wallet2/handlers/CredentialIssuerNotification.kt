@@ -3,7 +3,7 @@ package id.walt.wallet2.handlers
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.wallet2.data.WalletKeyStoreEntry
-import id.waltid.openid4vci.wallet.notification.NotificationAccessTokenType
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.waltid.openid4vci.wallet.notification.NotificationDeliveryResult
 import id.waltid.openid4vci.wallet.notification.NotificationRequestBuilder
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
@@ -88,11 +88,11 @@ internal suspend fun deliverCredentialNotification(
 ) {
     val endpoint = notificationEndpoint ?: return
     val id = notificationId ?: return
-    val accessTokenType = NotificationAccessTokenType.fromTokenType(tokenType) ?: run {
+    val accessTokenType = AccessTokenAuthorizationScheme.fromValue(tokenType) ?: run {
         notificationLog.warn { "Skipping issuer notification for unsupported token type, event=$event" }
         return
     }
-    if (accessTokenType == NotificationAccessTokenType.DPOP && dpopProofFactory == null) {
+    if (accessTokenType == AccessTokenAuthorizationScheme.DPOP && dpopProofFactory == null) {
         notificationLog.warn { "Skipping issuer notification because the DPoP access token has no proof, event=$event" }
         return
     }

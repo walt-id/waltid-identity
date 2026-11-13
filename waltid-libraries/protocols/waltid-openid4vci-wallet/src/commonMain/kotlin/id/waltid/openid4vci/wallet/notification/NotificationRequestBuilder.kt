@@ -22,28 +22,6 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
-/** How the notification request presents its access token. */
-enum class NotificationAccessTokenType {
-    BEARER,
-    DPOP,
-    ;
-
-    val authorizationScheme: String
-        get() = when (this) {
-            BEARER -> "Bearer"
-            DPOP -> "DPoP"
-        }
-
-    companion object {
-        fun fromTokenType(tokenType: String): NotificationAccessTokenType? =
-            when (AccessTokenAuthorizationScheme.fromValue(tokenType)) {
-                AccessTokenAuthorizationScheme.BEARER -> BEARER
-                AccessTokenAuthorizationScheme.DPOP -> DPOP
-                null -> null
-            }
-    }
-}
-
 /** Stable failure categories for an OpenID4VCI Notification Endpoint request. */
 enum class NotificationRequestError {
     INVALID_ENDPOINT,
@@ -80,7 +58,7 @@ class NotificationRequestBuilder(
     suspend fun send(
         notificationEndpoint: String,
         accessToken: String,
-        accessTokenType: NotificationAccessTokenType,
+        accessTokenType: AccessTokenAuthorizationScheme,
         request: NotificationRequest,
         dpopProofFactory: DPoPProofFactory? = null,
     ): NotificationDeliveryResult {
@@ -89,11 +67,11 @@ class NotificationRequestBuilder(
             return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
         }
         when (accessTokenType) {
-            NotificationAccessTokenType.BEARER ->
+            AccessTokenAuthorizationScheme.BEARER ->
                 if (dpopProofFactory != null) {
                     return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
                 }
-            NotificationAccessTokenType.DPOP ->
+            AccessTokenAuthorizationScheme.DPOP ->
                 if (dpopProofFactory == null) {
                     return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
                 }
@@ -117,7 +95,7 @@ class NotificationRequestBuilder(
     private suspend fun executeNotificationRequest(
         notificationEndpoint: String,
         accessToken: String,
-        accessTokenType: NotificationAccessTokenType,
+        accessTokenType: AccessTokenAuthorizationScheme,
         request: NotificationRequest,
         dpopProofFactory: DPoPProofFactory?,
     ): NotificationDeliveryResult {
@@ -125,7 +103,10 @@ class NotificationRequestBuilder(
             httpClient.postWithDpopNonceRetry(
                 endpoint = notificationEndpoint,
                 accessToken = accessToken,
-                authorizationScheme = accessTokenType.authorizationScheme,
+                authorizationScheme = when (accessTokenType) {
+                    AccessTokenAuthorizationScheme.BEARER -> "Bearer"
+                    AccessTokenAuthorizationScheme.DPOP -> "DPoP"
+                },
                 dpopProofFactory = dpopProofFactory,
             ) {
                 accept(ContentType.Application.Json)
