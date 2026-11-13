@@ -73,7 +73,10 @@ Libraries implementing identity and credential protocols:
 - **[🟢 waltid-openid4vp-verifier-openapi](./protocols/waltid-openid4vp-verifier-openapi)**: OpenAPI schema generation for OpenID4VP verifier endpoints
 - **[🟢 waltid-18013-7-verifier](./protocols/waltid-18013-7-verifier)**: ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support
 - **[🟢 waltid-openid4vc-wallet](./protocols/waltid-openid4vc-wallet)**: Wallet SDK for OpenID4VCI 1.0 issuance and OpenID4VP 1.0 presentation
-- **[🟢 waltid-openid4vc-wallet-persistence](./protocols/waltid-openid4vc-wallet-persistence)**: SQL-backed persistence for the Wallet SDK (SQLite, PostgreSQL)
+- **[🟢 waltid-openid4vc-wallet-mobile](./protocols/waltid-openid4vc-wallet-mobile)**: Android/iOS wallet SDK facade
+- **[🟢 waltid-wallet-sdk-ios](./protocols/waltid-wallet-sdk-ios)**: Swift API for native iOS wallets
+- **[🟢 waltid-openid4vc-wallet-persistence-mobile](./protocols/waltid-openid4vc-wallet-persistence-mobile)**: SQLDelight and SQLCipher-backed storage for mobile wallets
+- **[🟢 waltid-openid4vc-wallet-persistence-server](./protocols/waltid-openid4vc-wallet-persistence-server)**: Exposed-based server persistence (SQLite, PostgreSQL)
 - **[🟢 waltid-openid4vc-wallet-server](./protocols/waltid-openid4vc-wallet-server)**: Ktor HTTP route handlers for the Wallet SDK
 
 ### [SD-JWT](./sdjwt/)

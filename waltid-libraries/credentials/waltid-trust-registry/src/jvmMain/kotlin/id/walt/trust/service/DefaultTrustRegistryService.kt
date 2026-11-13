@@ -10,6 +10,7 @@ import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.signature.CompactJwsValidator
 import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.store.TrustStore
+import id.walt.trust.utils.CanonicalSubjectHash
 import id.walt.trust.utils.HashUtils
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -105,15 +106,26 @@ class DefaultTrustRegistryService(
             )
         }
 
-        val identitiesByAnchor = store.listCertificateIdentities().toList().mapNotNull { identity ->
+        // A path ends at an anchor whose subject issued one of the presented certificates, and an exact
+        // pin has the subject of a presented certificate. PKIX chains names with the same X500Principal
+        // equality, so any other anchor cannot validate: the store reads only anchors with these subjects,
+        // and the parsed subject is compared again because the stored key only narrows.
+        val candidateSubjects = presentedCertificates.flatMapTo(HashSet()) {
+            listOf(it.issuerX500Principal, it.subjectX500Principal)
+        }
+        val certificateFactory = CertificateFactory.getInstance("X.509")
+        val identitiesByAnchor = store.findCertificateIdentitiesByCanonicalSubject(
+            candidateSubjects.mapTo(HashSet(), CanonicalSubjectHash::of)
+        ).toList().mapNotNull { identity ->
             val encoded = identity.certificateDerBase64 ?: return@mapNotNull null
-            runCatching { identity to parseCertificate(encoded) }
+            runCatching { identity to parseCertificate(encoded, certificateFactory) }
                 .onFailure { log.warn(it) { "Ignoring invalid stored certificate for identity ${identity.identityId}" } }
                 .getOrNull()
         }
 
         val pathMatches = identitiesByAnchor.filter { (_, anchor) ->
-            validateCertificatePath(presentedCertificates, anchor, instant)
+            anchor.subjectX500Principal in candidateSubjects &&
+                validateCertificatePath(presentedCertificates, anchor, instant)
         }.map { it.first }
 
         if (pathMatches.isNotEmpty()) {
@@ -569,12 +581,17 @@ class DefaultTrustRegistryService(
                 freshnessState = freshness
             )
 
-            // Store everything atomically to prevent partial state on failure
+            // Store everything atomically to prevent partial state on failure. The subject key comes from the
+            // certificate itself, replacing whatever a parser or the list put there.
             store.replaceSourceData(
                 source = sourceWithFreshness,
                 entities = parsed.entities,
                 services = parsed.services,
-                identities = parsed.identities
+                identities = parsed.identities.map { identity ->
+                    identity.copy(
+                        canonicalSubjectSha256Hex = identity.certificateDerBase64?.let(CanonicalSubjectHash::ofCertificate)
+                    )
+                }
             )
 
             log.info { "Loaded source $sourceId: ${parsed.entities.size} entities, ${parsed.services.size} services, ${parsed.identities.size} identities" }
@@ -809,6 +826,8 @@ class DefaultTrustRegistryService(
     }
 
     companion object {
+        private val WHITESPACE = "\\s".toRegex()
+
         private val TRUSTED_STATUSES = setOf(
             TrustStatus.GRANTED,
             TrustStatus.RECOGNIZED,
@@ -830,18 +849,20 @@ class DefaultTrustRegistryService(
         }
     }
 
-    private fun parseCertificate(pemOrDer: String): X509Certificate {
+    private fun parseCertificate(
+        pemOrDer: String,
+        certificateFactory: CertificateFactory = CertificateFactory.getInstance("X.509"),
+    ): X509Certificate {
         val encoded = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
             pemOrDer
                 .replace("-----BEGIN CERTIFICATE-----", "")
                 .replace("-----END CERTIFICATE-----", "")
-                .replace("\\s".toRegex(), "")
+                .replace(WHITESPACE, "")
         } else {
-            pemOrDer.replace("\\s".toRegex(), "")
+            pemOrDer.replace(WHITESPACE, "")
         }
         val der = Base64.decode(encoded)
-        return CertificateFactory.getInstance("X.509")
-            .generateCertificate(ByteArrayInputStream(der)) as X509Certificate
+        return certificateFactory.generateCertificate(ByteArrayInputStream(der)) as X509Certificate
     }
 
     private fun validateCertificatePath(

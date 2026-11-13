@@ -57,6 +57,13 @@ import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
 
+internal fun WalletInstanceAttestationRequiredException.toStatusException(): StatusException =
+    StatusException(
+        HttpStatusCode.BadRequest.value,
+        message ?: "wallet_instance_attestation_required",
+        cause = this,
+    )
+
 internal fun TokenRequestException.toStatusException(): StatusException {
     val status = if (statusCode in 400..499) {
         HttpStatusCode.fromValue(statusCode)
@@ -886,6 +893,8 @@ object Wallet2RouteHandler {
                         attestationAssembler = attestationAssembler,
                     )
                     call.respondIssuanceResult(result, legacy = req.credentials == null)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -925,6 +934,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.requestToken(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -1071,6 +1082,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.exchangeCode(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -1165,6 +1178,8 @@ object Wallet2RouteHandler {
                     )
                 } catch (e: CredentialReceiveException) {
                     call.respondIssuanceResult(e.result, legacy = true)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -1203,6 +1218,8 @@ object Wallet2RouteHandler {
                             attestationAssembler = attestationAssembler,
                         )
                     )
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }

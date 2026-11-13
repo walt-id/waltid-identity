@@ -429,6 +429,13 @@ private fun MobileWalletPresentationResult.toDemoOperationResult(
         is MobileWalletPresentationResult.Transmitted.Failed -> WalletDemoOperationResult.Failure(failureMessage)
     }
 
+internal fun DemoWalletConfig.toWalletProviderConfig(): id.walt.wallet2.mobile.WalletProviderConfig? =
+    if (!walletProviderEnabled) null else id.walt.wallet2.mobile.WalletProviderConfig(
+        baseUrl = walletProviderBaseUrl,
+        servicePath = walletProviderServicePath,
+        bearerToken = walletProviderBearerToken,
+    )
+
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {
         WalletAttestationConfig(
