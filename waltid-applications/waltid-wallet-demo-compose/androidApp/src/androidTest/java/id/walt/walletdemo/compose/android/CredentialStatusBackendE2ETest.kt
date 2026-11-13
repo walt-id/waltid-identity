@@ -152,8 +152,7 @@ class CredentialStatusBackendE2ETest {
             capture("authenticated-clear")
             backend.setStatus(access, 1)
             refresh("Revoked")
-            val details = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-details-.*"))))
-            clickByTag(device, details.resourceName)
+            expandStatusDetails(device, accessCard)
             val checkedTag = "credential-status-last-checked-${accessCard.removePrefix("wallet.credentialCard.")}"
             val checked = requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000))
             val originalCheck = checked.text
@@ -298,8 +297,7 @@ class CredentialStatusBackendE2ETest {
             // no SDK data or status is injected, and automatic checks stay off during that read.
             tapStoredCard(device, accessCard)
             assertTrue(device.wait(Until.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))), 30_000))
-            val retentionDetails = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-details-.*"))))
-            clickByTag(device, retentionDetails.resourceName)
+            expandStatusDetails(device, accessCard)
             val retainedTime = requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000)).text
             assertFalse(retainedTime.isNullOrBlank())
             File(context.cacheDir, "credential-status-process-retention.json").writeText(JSONObject()
@@ -333,12 +331,8 @@ class CredentialStatusBackendE2ETest {
             val access = expected.getString("accessCard")
             tapStoredCard(device, access)
             assertTrue(device.wait(Until.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))), 30_000))
-            val disclosureTag = "credential-status-details-${access.removePrefix("wallet.credentialCard.")}"
             val checkedTag = "credential-status-last-checked-${access.removePrefix("wallet.credentialCard.")}"
-            val disclosure = requireNotNull(waitForResourceAfterScrolling(device, disclosureTag, 10_000))
-            val state = AccessibilityNodeInfoCompat.wrap(disclosure.accessibilityNodeInfo).stateDescription?.toString()
-            assertTrue("The disclosure must expose its accessible state: $state", state in setOf("Expanded", "Collapsed"))
-            if (state == "Collapsed") clickByTag(device, disclosureTag)
+            expandStatusDetails(device, access)
             val checked = waitForResourceAfterScrolling(device, checkedTag, 10_000)
             if (checked == null) {
                 WalletGalleryEvidence.capture(device, "android-status-process-retention-diagnostic")
@@ -352,6 +346,16 @@ class CredentialStatusBackendE2ETest {
         } finally {
             backend.setOutage(false)
         }
+    }
+
+    private fun expandStatusDetails(device: UiDevice, card: String) {
+        val tag = "credential-status-details-${card.removePrefix("wallet.credentialCard.")}"
+        val disclosure = requireNotNull(waitForResourceAfterScrolling(device, tag, 10_000)) {
+            "The selected credential's status disclosure must become visible: $tag"
+        }
+        val state = AccessibilityNodeInfoCompat.wrap(disclosure.accessibilityNodeInfo).stateDescription?.toString()
+        assertTrue("The disclosure must expose its accessible state: $state", state in setOf("Expanded", "Collapsed"))
+        if (state == "Collapsed") clickByTag(device, tag)
     }
 
     private fun tapStoredCard(device: UiDevice, id: String) {
