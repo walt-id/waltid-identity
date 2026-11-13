@@ -56,10 +56,20 @@ class Issuer2ServiceConfigTest {
         )
 
         assertNull(config.clientAuthenticationConfig)
+        assertFalse(config.requirePkce)
         assertNull(config.signedMetadata)
         assertNull(config.clientAttestationConfig())
         assertEquals(false, config.supportsPreAuthAnonymous())
         assertEquals("http://localhost:7002/openid4vci", config.openId4VciBaseUrl())
+    }
+
+    @Test
+    fun `service config decodes explicit PKCE enforcement`() {
+        for (required in listOf(false, true)) {
+            clearIssuer2TestEnvironment()
+            val config = loadServiceConfig("baseUrl = \"http://localhost\"\nrequirePkce = $required")
+            assertEquals(required, config.requirePkce)
+        }
     }
 
     @Test

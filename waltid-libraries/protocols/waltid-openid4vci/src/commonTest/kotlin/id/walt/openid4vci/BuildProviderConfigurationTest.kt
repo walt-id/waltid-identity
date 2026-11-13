@@ -374,7 +374,11 @@ class BuildProviderConfigurationTest {
 
         assertEquals(400, response.status)
         assertEquals(null, response.redirectUri)
-        assertEquals("Missing response_type", response.body)
+        val payload = Json.parseToJsonElement(requireNotNull(response.body)).jsonObject
+        assertEquals("invalid_request", payload["error"]?.jsonPrimitive?.content)
+        assertEquals("Missing response_type", payload["error_description"]?.jsonPrimitive?.content)
+        assertEquals("application/json", response.headers["Content-Type"])
+        assertEquals("no-store", response.headers["Cache-Control"])
     }
 
     @Test

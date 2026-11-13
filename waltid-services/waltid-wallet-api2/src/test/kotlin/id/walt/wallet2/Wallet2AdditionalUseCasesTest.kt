@@ -670,6 +670,7 @@ class Wallet2AdditionalUseCasesTest {
         runBlocking {
             authCodeRepo.save(
                 DefaultAuthorizationCodeRecord(
+                    pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
                     code = authCodeValue,
                     clientId = "wallet-client",
                     redirectUri = "openid://",

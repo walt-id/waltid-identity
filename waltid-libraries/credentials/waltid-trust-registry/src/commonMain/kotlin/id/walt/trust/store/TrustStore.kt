@@ -36,6 +36,17 @@ interface TrustStore {
 
     suspend fun findIdentitiesByCertificateSha256(sha256Hex: String): Flow<ServiceIdentity>
     suspend fun listCertificateIdentities(): Flow<ServiceIdentity>
+
+    /**
+     * The certificate-bearing identities whose [ServiceIdentity.canonicalSubjectSha256Hex] is one of [hashes],
+     * plus those that have none (stored before it existed, or with a certificate that does not parse).
+     *
+     * Chain resolution reads its candidate anchors through this instead of [listCertificateIdentities] and still
+     * compares each parsed subject, so a store may return more than asked for but never less. The default
+     * returns every certificate identity, which is correct for any store, just not narrowed.
+     */
+    suspend fun findCertificateIdentitiesByCanonicalSubject(hashes: Set<String>): Flow<ServiceIdentity> =
+        listCertificateIdentities()
     suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySkiHex(skiHex: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): Flow<ServiceIdentity>

@@ -29,6 +29,8 @@ data class Issuer2ServiceConfig(
     /** Optional dedicated metadata signer, separate from token and credential signing. */
     val signedMetadata: SignedMetadataConfig? = null,
     val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
+    /** Requires PKCE for authorization-code requests; supplied PKCE is always verified. */
+    val requirePkce: Boolean = false,
     val preAuthorizedCode: PreAuthorizedCodeConfig = PreAuthorizedCodeConfig(),
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */

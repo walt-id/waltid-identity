@@ -8,6 +8,7 @@ import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpoint
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
@@ -75,6 +76,7 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+    val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
     val preAuthorizedCodeConfig: PreAuthorizedCodeConfig = PreAuthorizedCodeConfig(),
     val preAuthorizedCodeAnonymousAccessSupported: Boolean = true,
     /** Resolve issuer-specific settings in the current request context, if supplied. */
