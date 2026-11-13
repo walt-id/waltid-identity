@@ -1,5 +1,7 @@
 package id.walt.verifier2
 
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+
 import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
@@ -23,6 +25,7 @@ object OSSVerifier2FeatureCatalog : ServiceFeatureCatalog {
     override val baseFeatures = listOf(verifierService)
     override val optionalFeatures: List<OptionalFeature> = listOf(
         devModeFeature,
+        CommonsFeatureCatalog.proximityVerifierFeature,
         transactionDataProfilesFeature,
     )
 }

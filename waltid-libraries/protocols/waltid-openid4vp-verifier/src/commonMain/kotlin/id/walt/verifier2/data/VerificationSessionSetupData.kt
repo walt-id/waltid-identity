@@ -32,6 +32,7 @@ import kotlin.time.Instant
 @Serializable
 data class GeneralFlowConfig(
     @SerialName("dcql_query") val dcqlQuery: DcqlQuery? = null,
+    val requestedElements: AnnexCDocTypeToRequestedElements? = null,
 
     @SerialName("signed_request") val signedRequest: Boolean = false,
     @SerialName("encrypted_response") val encryptedResponse: Boolean = false,
@@ -46,6 +47,10 @@ data class GeneralFlowConfig(
     /** Expiration date (takes precedence over expiration_duration if both set) */
     @SerialName("expiration_date") val expirationDate: Instant? =
         expirationDuration?.let { Clock.System.now().plus(it) },
+
+    /** Retention for completed sessions; per-session settings override the service default. */
+    @SerialName("retention_duration") val retentionDuration: Duration? = null,
+    @SerialName("retention_date") val retentionDate: Instant? = retentionDuration?.let { Clock.System.now().plus(it) },
 
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 
@@ -96,6 +101,7 @@ fun VerificationSessionSetup.withCoreKeyIfMissing(key: Key): VerificationSession
     if (core.key != null) return this
     val newCore = core.copy(key = DirectSerializedKey(key))
     return when (this) {
+        is ExternalReaderFlowSetup -> this
         is CrossDeviceFlowSetup -> copy(core = newCore)
         is SameDeviceFlowSetup -> copy(core = newCore)
         is DcApiAnnexDFlowSetup -> copy(core = newCore)
@@ -389,26 +395,7 @@ data class DcApiAnnexCFlowSetup(
         private fun buildAnnexCCore(
             namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
         ): GeneralFlowConfig {
-            val credentials = namespaceRequestedElements.entries
-
-            val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
-                CredentialQuery(
-                    id = docType,
-                    format = CredentialFormat.MSO_MDOC,
-                    meta = MsoMdocMeta(doctypeValue = docType),
-                    claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
-                        elements.distinct().sorted().map { elementId ->
-                            ClaimsQuery(pathStrings = listOf(namespace, elementId))
-                        }
-                    }
-                )
-            }
-
-            val dcqlQuery = DcqlQuery(credentials = dcqlIndividualQueries)
-
-            return GeneralFlowConfig(
-                dcqlQuery = dcqlQuery
-            )
+            return GeneralFlowConfig(dcqlQuery = buildRequestedElementsDcqlQuery(namespaceRequestedElements))
         }
 
         val EXTENDED_MDL_EXAMPLE = DcApiAnnexCFlowSetup(
@@ -539,4 +526,33 @@ data class DcApiAnnexCFlowSetup(
             )
         )
     }
+}
+
+/**
+ * Internal matching adapter only. Doctypes are valid ISO identifiers and are used as
+ * query ids here; this must not run OpenID4VP [DcqlQuery.precheck].
+ */
+internal fun buildRequestedElementsDcqlQuery(
+    namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
+): DcqlQuery {
+    require(namespaceRequestedElements.isNotEmpty()) {
+        "requestedElements cannot be empty"
+    }
+
+    val credentials = namespaceRequestedElements.entries
+
+    val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
+        CredentialQuery(
+            id = docType,
+            format = CredentialFormat.MSO_MDOC,
+            meta = MsoMdocMeta(doctypeValue = docType),
+            claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
+                elements.distinct().sorted().map { elementId ->
+                    ClaimsQuery(pathStrings = listOf(namespace, elementId))
+                }
+            }
+        )
+    }
+
+    return DcqlQuery(credentials = dcqlIndividualQueries)
 }

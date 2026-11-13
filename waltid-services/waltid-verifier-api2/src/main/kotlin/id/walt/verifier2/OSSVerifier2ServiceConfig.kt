@@ -2,6 +2,7 @@ package id.walt.verifier2
 
 import id.walt.commons.config.WaltConfig
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import kotlin.time.Duration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -12,5 +13,6 @@ data class OSSVerifier2ServiceConfig(
     val urlPrefix: String,
     val urlHost: String,
     val key: JsonObject? = null,
+    val sessionRetention: Duration? = null,
     val x5c: List<String>? = null
 ) : WaltConfig()

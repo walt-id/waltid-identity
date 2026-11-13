@@ -26,6 +26,7 @@ object OSSVerifier2Manager {
                     ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
 
                 is DcApiAnnexCFlowSetup -> setup.origin
+                is ExternalReaderFlowSetup -> throw IllegalArgumentException("Use proximity/device-response for external-reader submissions")
             },
             key = setup.core.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
             x5c = setup.core.x5c ?: config.x5c,

@@ -1,6 +1,17 @@
 
 package id.walt.verifier2
 
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager
+import id.walt.verifier2.data.ExternalReaderDeviceResponse
+import id.walt.verifier2.data.ExternalReaderFlowSetup
+import id.walt.verifier2.data.externalReaderOutcomeUpdate
+import id.walt.verifier2.data.publicView
+import id.walt.verifier2.handlers.ExternalReaderVerification
+import id.walt.verifier2.openapi.ExternalReaderDeviceResponseOpenApi
+import io.ktor.server.plugins.BadRequestException
+import io.github.smiley4.ktoropenapi.delete
+import kotlin.time.Clock
 import id.walt.commons.web.WebException
 
 import id.walt.commons.config.ConfigManager
@@ -60,6 +71,13 @@ object Verifier2Service {
 
     val sessions = ConcurrentHashMap<String, Verification2Session>()
 
+    private fun findSession(id: String): Verification2Session? = sessions[id]?.let { session ->
+        if (session.setup is ExternalReaderFlowSetup && session.retentionDate?.let { it < Clock.System.now() } == true) {
+            sessions.remove(id)
+            null
+        } else session
+    }
+
     /**
      * Update data for this session and send session update notifications
      */
@@ -77,7 +95,7 @@ object Verifier2Service {
         }
         sessions[newSession.id] = newSession
 
-        Verifier2SessionUpdate(session.id, event, session)
+        Verifier2SessionUpdate(session.id, event, session.publicView())
             .toKtorSessionUpdate()
             .notifySessionUpdate(session.id, session.notifications)
     }
@@ -100,6 +118,19 @@ object Verifier2Service {
             route("", {
                 tags("Verification Session Management")
             }) {
+                if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.proximityVerifierFeature)) {
+                    post<ExternalReaderDeviceResponse>("proximity/device-response", ExternalReaderDeviceResponseOpenApi.docs) { request ->
+                        val submission = try { request.parse() } catch (cause: Exception) {
+                            throw BadRequestException("Invalid external-reader submission: ${cause.message}", cause)
+                        }
+                        val outcome = ExternalReaderVerification.verify(
+                            request, submission, ConfigManager.getConfig<OSSVerifier2ServiceConfig>().sessionRetention,
+                        )
+                        updateSessionCallback(outcome.session, outcome.event) {}
+                        call.respond(outcome.session.publicView())
+                    }
+                }
+
                 post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
                     val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
                     sessions[newSession.id] = newSession
@@ -108,6 +139,17 @@ object Verifier2Service {
                 }
 
                 route("{$VERIFICATION_SESSION}") {
+                    delete("") {
+                        val id = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        if (sessions.remove(id) == null) throw WebException(404, "Unknown session id")
+                        call.respond(HttpStatusCode.NoContent)
+                    }
+                    delete("pii") {
+                        val session = findSession(call.parameters.getOrFail(VERIFICATION_SESSION)) ?: throw WebException(404, "Unknown session id")
+                        session.deletePII()
+                        call.respond(HttpStatusCode.NoContent)
+                    }
+
 
                     get("info", {
                         summary = "View data of existing verification session"
@@ -115,9 +157,9 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<Verification2Session>() } }
                     }) {
                         val verifierSession =
-                            sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                ?: throw IllegalArgumentException("Unknown session id")
-                        call.respond(verifierSession)
+                            findSession(call.parameters.getOrFail(VERIFICATION_SESSION))
+                                ?: throw WebException(404, "Unknown session id")
+                        call.respond(verifierSession.publicView())
                     }
 
                     route({
@@ -129,14 +171,17 @@ object Verifier2Service {
                             httpJson.encodeToString(serializer, it)
                         }) {
                             val verifierSession =
-                                sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                                    ?: throw IllegalArgumentException("Unknown session id")
+                                findSession(call.parameters.getOrFail(VERIFICATION_SESSION))
+                                    ?: throw WebException(404, "Unknown session id")
 
                             // Get the flow for this specific target.
                             val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
 
                             // This will suspend until the client disconnects.
                             send(JsonObject(emptyMap()))
+                            if (sseFlow.replayCache.isEmpty()) {
+                                verifierSession.externalReaderOutcomeUpdate()?.let { send(it.toKtorSessionUpdate()) }
+                            }
                             sseFlow.collect { event -> send(event) }
                         }
                     }
@@ -153,8 +198,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<AuthorizationRequest>() } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                        findSession(call.parameters.getOrFail(VERIFICATION_SESSION))
+                            ?: throw WebException(404, "Unknown session id")
 
                     call.respondAuthorizationRequest(
                         verificationSession = verificationSession,
@@ -170,8 +215,8 @@ object Verifier2Service {
                         response { HttpStatusCode.OK to { body<String> { description = "Signed request object JWT (application/oauth-authz-req+jwt)" } } }
                     }) {
                     val verificationSession =
-                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
-                            ?: throw IllegalArgumentException("Unknown session id")
+                        findSession(call.parameters.getOrFail(VERIFICATION_SESSION))
+                            ?: throw WebException(404, "Unknown session id")
 
                     call.respondRequestUriPost(
                         verificationSession = verificationSession,

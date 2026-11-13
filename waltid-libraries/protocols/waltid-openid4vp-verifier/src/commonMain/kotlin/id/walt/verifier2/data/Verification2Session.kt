@@ -51,7 +51,7 @@ data class Verification2Session(
      * After this date, it will be deleted with all associated verification information.
      * If you would like to keep data of successful/failed Verification Sessions indefinitely, set the retentionDate to null.
      */
-    val retentionDate: Instant = Clock.System.now().plus(10, DateTimeUnit.YEAR, TimeZone.UTC),
+    val retentionDate: Instant? = Clock.System.now().plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC),
 
     /**
      * Current status for this Verification Session
@@ -152,6 +152,7 @@ data class Verification2Session(
         )
 
     fun requireAvailable(now: Instant = Clock.System.now()) {
+        require(setup !is ExternalReaderFlowSetup) { "External-reader sessions do not accept wallet requests or responses." }
         require(expirationDate?.let { now < it } != false) { "This verification session is expired." }
         require(reattemptable || status != VerificationSessionStatus.SUCCESSFUL) {
             "This verification session has already completed successfully."
@@ -315,6 +316,9 @@ data class Verification2Session(
         /**
          * Data object passed to a platform API (optionally signed)
          */
-        DC_API
+        DC_API,
+
+        /** Completed ISO 18013-5 exchange owned by an external reader. */
+        EXTERNAL_READER
     }
 }
