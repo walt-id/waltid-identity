@@ -4,7 +4,9 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.isRedeemableAt
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -17,18 +19,24 @@ class ConfiguredPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
     )
 
     override suspend fun save(record: PreAuthorizedCodeRecord) {
-        if (records.contains(record.code)) {
+        if (!records.compareAndSet(record.code, null, record.toDefaultRecord(), ttlUntil(record.expiresAt))) {
             throw DuplicateCodeException()
         }
-        records.set(record.code, record.toDefaultRecord(), ttlUntil(record.expiresAt))
     }
 
     override suspend fun get(code: String): PreAuthorizedCodeRecord? =
-        records[code]?.takeIf { Clock.System.now() <= it.expiresAt }
+        records[code]?.takeIf { it.isRedeemableAt(Clock.System.now()) }
 
-    override suspend fun consume(code: String): PreAuthorizedCodeRecord? {
-        val record = records.getAndRemove(code) ?: return null
-        return record.takeIf { Clock.System.now() <= it.expiresAt }
+    override suspend fun compareAndSetRedemptionState(
+        expected: PreAuthorizedCodeRecord,
+        replacement: PreAuthorizedCodeRedemptionState,
+    ): Boolean {
+        val now = Clock.System.now()
+        if (!expected.isRedeemableAt(now)) return false
+        val current = expected.toDefaultRecord()
+        return records.compareAndSet(
+            current.code, current, current.copy(redemptionState = replacement), current.expiresAt - now,
+        )
     }
 }
 
@@ -42,4 +50,5 @@ private fun PreAuthorizedCodeRecord.toDefaultRecord() = DefaultPreAuthorizedCode
     session = session,
     expiresAt = expiresAt,
     issuanceSessionId = issuanceSessionId,
+    redemptionState = redemptionState,
 )

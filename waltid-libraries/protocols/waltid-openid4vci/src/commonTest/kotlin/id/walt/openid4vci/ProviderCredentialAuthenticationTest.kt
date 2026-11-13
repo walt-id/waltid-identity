@@ -117,7 +117,7 @@ class ProviderCredentialAuthenticationTest {
                 mapOf("grant_type" to listOf(GrantType.AuthorizationCode.value), "client_id" to listOf(CLIENT),
                     "code" to listOf(response.response.code), "redirect_uri" to listOf(CALLBACK))
             } else {
-                val issued = config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+                val issued = tokenProvider.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
                     clientId = if (anonymous) null else CLIENT, scopes = setOf("openid"), session = DefaultSession(subject = "offer"),
                 ))
                 mapOf("grant_type" to listOf(GrantType.PreAuthorizedCode.value), "pre-authorized_code" to listOf(issued.code)) +

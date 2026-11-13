@@ -371,7 +371,7 @@ Events raised while handling a single request are delivered in order, on both tr
 
 On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
 
-Only terminal credential endpoint failures conclude a session. Earlier stages and retryable credential proof or nonce failures leave it usable. An incorrect `tx_code`, for example, does not consume the pre-authorized code, so the wallet can retry and complete the same session.
+Only terminal credential endpoint failures conclude an issuance session. A wrong `tx_code` can be retried until the pre-authorized code reaches its failed attempt limit. At that point the code is locked and the holder needs a new offer.
 
 Published session payloads redact issuer signing key material (`issuerKey.type = "redacted"`). Credential data may still be present; use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
 
@@ -426,6 +426,29 @@ recovering the original offer session. Pre-authorized offers are unchanged.
 **Migration:** Send `"issuerStateMode": "INCLUDE"` to preserve the previous OSS behavior,
 including recovery of the original offer session and support for runtime overrides.
 Defaults for reference/value mode, expiry, and transaction codes are shared by both request forms.
+
+Issuer2 uses the OpenID4VCI library defaults of 300 seconds for both the default and maximum
+pre-authorized code lifetime and five incorrect transaction code attempts per grant. These values
+are issuer settings. Override them in `issuer-service.conf`:
+
+```hocon
+preAuthorizedCode {
+  defaultLifetimeSeconds = 120
+  maxLifetimeSeconds = 300
+  maxFailedTxCodeAttempts = 3
+}
+```
+
+If the request omits `expiresInSeconds`, the issuer uses `defaultLifetimeSeconds`. A request can choose a
+positive lifetime up to `maxLifetimeSeconds`. The default cannot exceed the maximum.
+A pre-authorized code can be redeemed once before its deadline. Issuer2 gives the offer and initial
+issuance session that same deadline. For immediate issuance the initial access token is bounded by
+that deadline. For deferred issuance the separately configured deferred deadline starts at token issuance.
+The library can also issue a code with a token deadline independent of the code's expiry.
+
+The failed attempt budget is per grant and persists until the original expiry. Deployment rate limits
+can also restrict request volume across grants. Authorized offers have their own lifetime and accept
+`-1` for no expiry. The authorization code issued later still has its own expiry and can be used once.
 
 ### Sessions, authorization and proof copies
 

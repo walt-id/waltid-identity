@@ -10,19 +10,25 @@ import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
-import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
-import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 class PreAuthorizedCodeGrantHandlerTest {
 
@@ -202,6 +208,79 @@ class PreAuthorizedCodeGrantHandlerTest {
         assertNull(failure.request.session)
     }
 
+    @Test
+    fun `fifth wrong tx_code permanently locks the grant`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                txCode = TxCode(length = 4),
+                txCodeValue = "4321",
+                session = DefaultSession(subject = "pin-subject"),
+            ),
+        )
+        repeat(5) { attempt ->
+            val result = handler.handleTokenEndpointRequest(createAccessRequestWithGrant(issued.code, txCode = "0000"))
+            assertTrue(result is AccessTokenResponseResult.Failure)
+            assertEquals("invalid_grant", result.error.error)
+            if (attempt < 4) assertEquals(attempt + 1, repository.get(issued.code)?.redemptionState?.failedAttempts)
+        }
+
+        val result = handler.handleTokenEndpointRequest(createAccessRequestWithGrant(issued.code, txCode = "4321"))
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", result.error.error)
+        assertNull(repository.get(issued.code))
+    }
+
+    @Test
+    fun `parallel wrong values cannot exceed the failed attempt limit`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                txCode = TxCode(length = 4),
+                txCodeValue = "4321",
+                session = DefaultSession(subject = "pin-subject"),
+            ),
+        )
+        val failures = List(20) {
+            async(Dispatchers.Default) {
+                val request = createAccessRequestWithGrant(issued.code, txCode = "0000")
+                assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(request)).error
+            }
+        }.awaitAll()
+
+        assertTrue(failures.all { it.error == "invalid_grant" })
+        assertEquals(4, failures.count { it.description == "tx_code is invalid" })
+        assertNull(repository.get(issued.code))
+    }
+
+    @Test
+    fun `issuer rejects an unbounded code lifetime`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            issuer.issue(
+                PreAuthorizedCodeIssueRequest(
+                    session = DefaultSession(subject = "subject"),
+                    lifetimeSeconds = Long.MAX_VALUE,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `an expired stored grant cannot be redeemed`() = runTest {
+        val record = DefaultPreAuthorizedCodeRecord(
+            code = "expired-grant",
+            clientId = null,
+            txCode = null,
+            txCodeValue = null,
+            grantedScopes = emptySet(),
+            grantedAudience = emptySet(),
+            session = DefaultSession(subject = "subject"),
+            expiresAt = Clock.System.now() - 1.seconds,
+        )
+        repository.save(record)
+        val request = createAccessRequestWithGrant(record.code)
+        val failure = assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(request))
+        assertEquals("invalid_grant", failure.error.error)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `stores tx_code metadata in the pre-authorized code record`() = runTest {
@@ -343,22 +422,4 @@ class PreAuthorizedCodeGrantHandlerTest {
             authenticationMethod = "test",
         )
 
-    private class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
-        private val records = mutableMapOf<String, PreAuthorizedCodeRecord>()
-
-        override suspend fun save(record: PreAuthorizedCodeRecord) {
-            records[record.code] = record
-        }
-
-        override suspend fun get(code: String): PreAuthorizedCodeRecord? =
-            records[code]
-
-        override suspend fun consume(code: String): PreAuthorizedCodeRecord? {
-            val record = records.remove(code) ?: return null
-            if (kotlin.time.Clock.System.now() > record.expiresAt) {
-                return null
-            }
-            return record
-        }
-    }
 }

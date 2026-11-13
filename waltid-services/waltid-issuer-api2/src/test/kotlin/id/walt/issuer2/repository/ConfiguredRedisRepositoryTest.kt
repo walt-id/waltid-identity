@@ -36,12 +36,15 @@ import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeStatus
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -109,10 +112,22 @@ class ConfiguredRedisRepositoryTest {
             assertNull(authorizationCodeRepository.consume(authorizationCode.code))
 
             preAuthorizedCodeRepository.save(preAuthorizedCode)
+            val attempted = PreAuthorizedCodeRedemptionState(1, PreAuthorizedCodeStatus.ACTIVE)
+            assertTrue(preAuthorizedCodeRepository.compareAndSetRedemptionState(preAuthorizedCode, attempted))
             val restartedPreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
-            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.get(preAuthorizedCode.code))
-            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.consume(preAuthorizedCode.code))
+            val reloaded = assertNotNull(restartedPreAuthorizedCodeRepository.get(preAuthorizedCode.code))
+            assertEquals(preAuthorizedCode.copy(redemptionState = attempted), reloaded)
+            val locked = attempted.copy(failedAttempts = 2, status = PreAuthorizedCodeStatus.LOCKED)
+            val (didLock, didConsume) = coroutineScope {
+                val lock = async(Dispatchers.IO) {
+                    preAuthorizedCodeRepository.compareAndSetRedemptionState(reloaded, locked)
+                }
+                val consume = async(Dispatchers.IO) { restartedPreAuthorizedCodeRepository.consume(reloaded.code) }
+                lock.await() to (consume.await() != null)
+            }
+            assertTrue(didLock xor didConsume)
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
+            assertNull(ConfiguredPreAuthorizedCodeRepository().consume(preAuthorizedCode.code))
 
             parRepository.save(pushedAuthorizationRequest)
             assertEquals(
@@ -132,7 +147,6 @@ class ConfiguredRedisRepositoryTest {
         } finally {
             sessionRepository.remove(session.sessionId)
             authorizationCodeRepository.consume(authorizationCode.code)
-            preAuthorizedCodeRepository.consume(preAuthorizedCode.code)
             parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now())
         }
     }

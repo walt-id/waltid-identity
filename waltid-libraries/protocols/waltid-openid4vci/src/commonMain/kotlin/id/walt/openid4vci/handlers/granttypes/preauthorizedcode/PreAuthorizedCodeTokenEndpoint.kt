@@ -11,8 +11,14 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeErrorDescriptions
 import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeStatus
+import id.walt.openid4vci.repository.preauthorized.isRedeemableAt
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
@@ -35,7 +41,7 @@ import kotlin.time.Instant
 /**
  * Token endpoint handler for the OpenID4VCI pre-authorized code grant.
  *
- * Consumes a stored pre-authorized code session. The business logic will be modified, is just the skeleton that is working.
+ * Redeems a stored pre-authorized code at most once.
  */
 class PreAuthorizedCodeTokenEndpoint(
     private val codeRepository: PreAuthorizedCodeRepository,
@@ -43,6 +49,7 @@ class PreAuthorizedCodeTokenEndpoint(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val refreshTokenIssuer: RefreshTokenIssuer,
     private val refreshTokenLifetimeSeconds: Long = DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS,
+    private val resolveConfig: suspend () -> PreAuthorizedCodeConfig = { PreAuthorizedCodeConfig() },
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -72,7 +79,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 request = unresolvedRequest,
                 error = OAuthError(
                     error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "Pre-authorized code is invalid or has already been used",
+                    description = PreAuthorizedCodeErrorDescriptions.INVALID_CODE,
                 ),
         )
         val resolvedRequest = unresolvedRequest.withSession(record.session.copy())
@@ -114,27 +121,26 @@ class PreAuthorizedCodeTokenEndpoint(
             )
         }
 
-        if (!record.txCodeValue.isNullOrBlank() &&
-            providedTxCode != null &&
-            record.txCodeValue != hashTxCode(providedTxCode)
-        ) {
-            return AccessTokenResponseResult.Failure(
+        val consumed = when (val redemption = redeem(
+            record, providedTxCode?.let(::hashTxCode), resolveConfig().maxFailedTxCodeAttempts,
+        )) {
+            is PreAuthorizedCodeRedemption.Redeemed -> redemption.record
+            PreAuthorizedCodeRedemption.WrongTxCode -> return AccessTokenResponseResult.Failure(
+                resolvedRequest,
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, PreAuthorizedCodeErrorDescriptions.WRONG_TX_CODE),
+            )
+            PreAuthorizedCodeRedemption.Locked -> return AccessTokenResponseResult.Failure(
+                resolvedRequest,
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, PreAuthorizedCodeErrorDescriptions.TX_CODE_ATTEMPTS_EXHAUSTED),
+            )
+            PreAuthorizedCodeRedemption.Invalid -> return AccessTokenResponseResult.Failure(
                 resolvedRequest,
                 OAuthError(
                     error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "tx_code is invalid",
+                    description = PreAuthorizedCodeErrorDescriptions.INVALID_CODE,
                 ),
             )
         }
-
-        val consumed = codeRepository.consume(code)
-            ?: return AccessTokenResponseResult.Failure(
-                resolvedRequest,
-                OAuthError(
-                    error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "Pre-authorized code is invalid or has already been used",
-                ),
-            )
 
         val session = consumed.session.copy()
         val updatedRequest = resolvedRequest
@@ -225,6 +231,50 @@ class PreAuthorizedCodeTokenEndpoint(
                 scope = scope,
             ),
         )
+    }
+
+    private sealed interface PreAuthorizedCodeRedemption {
+        data class Redeemed(val record: PreAuthorizedCodeRecord) : PreAuthorizedCodeRedemption
+        data object WrongTxCode : PreAuthorizedCodeRedemption
+        data object Locked : PreAuthorizedCodeRedemption
+        data object Invalid : PreAuthorizedCodeRedemption
+    }
+
+    private suspend fun redeem(
+        record: PreAuthorizedCodeRecord,
+        providedTxCodeHash: String?,
+        maxFailedAttempts: Int,
+    ): PreAuthorizedCodeRedemption {
+        var current = record
+        while (current.isRedeemableAt(Clock.System.now())) {
+            val expectedHash = current.txCodeValue
+            val requiresTxCode = current.txCode != null
+            val hasStoredVerifier = !expectedHash.isNullOrBlank()
+            // Fail closed on an incomplete stored grant or a submission that does not match its shape.
+            if (requiresTxCode != hasStoredVerifier || requiresTxCode != (providedTxCodeHash != null)) {
+                return PreAuthorizedCodeRedemption.Invalid
+            }
+            val failures = current.redemptionState?.failedAttempts ?: 0
+            if (failures >= maxFailedAttempts) return PreAuthorizedCodeRedemption.Invalid
+
+            val matches = expectedHash == providedTxCodeHash
+            val next = when {
+                matches -> PreAuthorizedCodeRedemptionState(failures, PreAuthorizedCodeStatus.REDEEMED)
+                failures + 1 >= maxFailedAttempts ->
+                    PreAuthorizedCodeRedemptionState(failures + 1, PreAuthorizedCodeStatus.LOCKED)
+                else -> PreAuthorizedCodeRedemptionState(failures + 1, PreAuthorizedCodeStatus.ACTIVE)
+            }
+            if (codeRepository.compareAndSetRedemptionState(current, next)) {
+                return when {
+                    !current.isRedeemableAt(Clock.System.now()) -> PreAuthorizedCodeRedemption.Invalid
+                    matches -> PreAuthorizedCodeRedemption.Redeemed(current)
+                    next.status == PreAuthorizedCodeStatus.LOCKED -> PreAuthorizedCodeRedemption.Locked
+                    else -> PreAuthorizedCodeRedemption.WrongTxCode
+                }
+            }
+            current = codeRepository.get(record.code) ?: return PreAuthorizedCodeRedemption.Invalid
+        }
+        return PreAuthorizedCodeRedemption.Invalid
     }
 
     private suspend fun issueRefreshToken(

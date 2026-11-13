@@ -34,16 +34,21 @@ import id.walt.issuer2.testsupport.referencedOfferUri
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import io.ktor.client.call.body
+import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.parameters
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CompletableDeferred
@@ -65,12 +70,42 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 class Issuer2PreAuthorizedWalletFlowTest {
 
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun configuredPreAuthorizedLifetimeAndPinLimitApplyAtBothEndpoints() = testApplication {
+        val settings = PreAuthorizedCodeConfig(defaultLifetimeSeconds = 60, maxLifetimeSeconds = 90, maxFailedTxCodeAttempts = 2)
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(preAuthorizedCode = settings) })
+        val client = apiClient()
+        val wallet = Issuer2WalletFlowDriver(client)
+        val before = Clock.System.now().toEpochMilliseconds()
+        val offer = client.createCredentialOffer(
+            Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+                txCode = TxCode(length = 6),
+                txCodeValue = "123456",
+            )
+        )
+        val after = Clock.System.now().toEpochMilliseconds()
+        assertTrue(offer.expiresAt in (before + 60_000)..(after + 60_000))
+        val resolved = wallet.resolve(offer)
+        val code = assertNotNull(resolved.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
+
+        for (pin in listOf("000000", "000000", "123456")) {
+            val response = client.submitForm("/openid4vci/token", parameters {
+                append("grant_type", GrantType.PreAuthorizedCode.value)
+                append("pre-authorized_code", code)
+                append("tx_code", pin)
+            })
+            assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+            assertEquals(OAuthErrorCodes.INVALID_GRANT, response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        }
     }
 
     @Test

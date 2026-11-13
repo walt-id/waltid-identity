@@ -51,12 +51,8 @@ internal fun WalletInstanceAttestationRequiredException.toStatusException(): Sta
     )
 
 internal fun TokenRequestException.toStatusException(): StatusException {
-    val status = if (statusCode in 400..499) {
-        HttpStatusCode.fromValue(statusCode)
-    } else {
-        HttpStatusCode.BadGateway
-    }
-    return StatusException(status.value, oauthError ?: "token_request_failed", cause = this)
+    val status = if (statusCode in 400..499) statusCode else HttpStatusCode.BadGateway.value
+    return StatusException(status, wallet2ErrorMessage(), cause = this)
 }
 
 // ---------------------------------------------------------------------------
