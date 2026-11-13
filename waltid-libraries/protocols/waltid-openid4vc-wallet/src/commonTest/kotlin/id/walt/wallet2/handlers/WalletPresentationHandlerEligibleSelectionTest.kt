@@ -65,11 +65,14 @@ class WalletPresentationHandlerEligibleSelectionTest {
         val fixture = PaymentConsentFixture.create()
         try {
             val healthy = StoredCredential("healthy", fixture.credential())
-            val malformed = StoredCredential("legacy", fixture.credential(buildJsonObject {
-                put("vct", "https://issuer.example/legacy"); put("vct#integrity", "")
-            }))
+            val malformed = listOf("https://issuer.example/legacy", "https://issuer.example/vct").mapIndexed { index, vct ->
+                StoredCredential("legacy-$index", fixture.credential(buildJsonObject {
+                    put("vct", vct); put("vct#integrity", "")
+                }))
+            }
             val store = InMemoryCredentialStore().also {
-                it.addCredential(malformed); it.addCredential(healthy)
+                malformed.forEach { credential -> it.addCredential(credential) }
+                it.addCredential(healthy)
             }
             val query = DcqlQuery(credentials = listOf(CredentialQuery(
                 id = "payment", format = CredentialFormat.DC_SD_JWT,
