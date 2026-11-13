@@ -45,7 +45,8 @@ class PaymentMetadataFetchSessionTest {
         })
         try {
             PaymentMetadataFetchSession(client).use { session ->
-                for (url in listOf("http://issuer.example/vct", "http://127.0.0.1:8080/vct",
+                for (url in listOf("identity", "/vct", "//issuer.example/vct", "https:issuer.example/vct",
+                    "urn:example:credential", "http://issuer.example/vct", "http://127.0.0.1:8080/vct",
                     "https://user:password@issuer.example/vct", "https://issuer.example/vct#fragment")) {
                     assertFailsWith<PaymentConsentException> { session.read(url) }
                 }
@@ -117,12 +118,30 @@ class PaymentMetadataFetchSessionTest {
     }
 
     @Test
+    fun parentDocumentsDoNotReceiveTheLeafOriginsConfiguredCredentials() = networkTest {
+        val seen = mutableListOf<Headers>()
+        val client = HttpClient(MockEngine { request -> seen += request.headers; respond("{}") })
+        try {
+            PaymentMetadataFetchSession(client, requestConfiguration = RequestConfiguration(
+                headers = mapOf("X-Tenant" to "private"),
+                auth = RequestConfiguration.HttpAuthConfiguration.BearerAuth("private"),
+            )).use { session ->
+                session.read("https://issuer.example/leaf")
+                session.read("https://types.example/parent")
+            }
+            assertEquals("Bearer private", seen.first()[HttpHeaders.Authorization])
+            assertNull(seen.last()[HttpHeaders.Authorization])
+            assertNull(seen.last()["X-Tenant"])
+        } finally { client.close() }
+    }
+
+    @Test
     fun boundsDocumentCountAndStreamedBodyWithoutContentLength() = networkTest {
         val small = HttpClient(MockEngine { respond("{}") })
         try {
             PaymentMetadataFetchSession(small).use { session ->
-                repeat(3) { session.read("https://issuer.example/$it") }
-                assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/fourth") }
+                repeat(16) { session.read("https://issuer.example/$it") }
+                assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/seventeenth") }
             }
         } finally { small.close() }
         val oversized = HttpClient(MockEngine { respond("x".repeat(262_145)) })
@@ -134,13 +153,20 @@ class PaymentMetadataFetchSessionTest {
     }
 
     @Test
-    fun propagatesCancellation() = networkTest {
+    fun normalizesPlatformTransportErrorsAndPropagatesCancellation() = networkTest {
         val cancelled = HttpClient(MockEngine { throw CancellationException("User cancelled") })
         try {
             PaymentMetadataFetchSession(cancelled).use { session ->
                 assertFailsWith<CancellationException> { session.read("https://issuer.example/vct") }
             }
         } finally { cancelled.close() }
+        val failed = HttpClient(MockEngine { throw Error("Platform fetch failed") })
+        try {
+            PaymentMetadataFetchSession(failed).use { session ->
+                assertEquals(PaymentConsentFailure.METADATA_UNAVAILABLE,
+                    assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/vct") }.reason)
+            }
+        } finally { failed.close() }
     }
     @Test
     fun relativeHttpsRedirectsResolveBeforeIntegrityVerification() = networkTest {

@@ -2052,7 +2052,7 @@ object WalletIssuanceHandler {
         val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
             proofRequired = request.effectiveProofs != null,
             holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
-            expectedConfiguration = storage.configuration)
+            expectedConfiguration = storage.configuration, typeMetadataHttpClient = httpClient)
         val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
             prepared, request.credentialConfigurationId, request.credentialIdentifier,
             persistable = true,
@@ -2747,7 +2747,7 @@ object WalletIssuanceHandler {
             if (value is JsonPrimitive) value.content else value.toString()
         }, bindings, storage.label, storage.metadata, proofRequired = request.proofRequired || request.holderBindings.size > 1,
             holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
-            expectedConfiguration = storage.configuration)
+            expectedConfiguration = storage.configuration, typeMetadataHttpClient = httpClient)
         val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
             prepared, request.credentialConfigurationId, credentialIdentifier = request.credentialIdentifier,
             persistable = true,

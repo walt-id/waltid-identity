@@ -21,7 +21,16 @@ import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.openapi.Verifier2OpenApiExamples
 import id.walt.verifier2.verifierApi
+import id.walt.verifier2.Verifier2Service
+import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.policies2.vc.policies.PolicyServiceKey
+import id.walt.policies2.vc.policies.CredentialTypeMetadataResolver
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import io.ktor.server.routing.routing
+import io.ktor.client.statement.readRawBytes
 import id.walt.wallet2.data.Wallet
+import kotlin.test.assertContentEquals
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -61,6 +70,9 @@ class ScaPaymentWalletIntegrationTest {
     fun clearConfig() = clearIssuer2TestEnvironment()
 
     @Test
+    fun inheritedPaymentCardMatchesParentAndReachesWalletAndVerifier() = paymentFlow(inherited = true)
+
+    @Test
     fun configuredPaymentCardReachesWalletAndVerifier() = paymentFlow()
 
     @Test
@@ -80,11 +92,33 @@ class ScaPaymentWalletIntegrationTest {
     private fun recurringTerms() = Json.parseToJsonElement(
         """{"recurrence":{"frequency":"MNTH","number":12,"mit_options":{"amount_variable":false,"min_amount":1.23,"max_amount":9007199254740993.01,"apr":0.1234567890123456789}}}""").jsonObject
 
-    private fun paymentFlow(missingMetadata: MissingMetadata? = null, extra: JsonObject? = null) = testApplication {
+    private fun paymentFlow(missingMetadata: MissingMetadata? = null, extra: JsonObject? = null, inherited: Boolean = false) = testApplication {
         val attester = Issuer2TestKeyAttester.create()
         installIssuer2WithConfigFiles(configureServiceConfig = {
             it.copy(baseUrl = "https://localhost", keyAttestationConfig = attester.issuerTrust)
         })
+        if (inherited) {
+            val config = ConfigManager.getConfig<Issuer2MetadataConfig>()
+            val leaf = config.sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+            val configuration = config.credentialConfigurations.getValue("sca_payment_card_sd_jwt")
+            val rootVct = "https://localhost/openid4vci/sca_base"
+            val middleVct = "https://localhost/openid4vci/sca_user"
+            ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] = config.copy(
+                credentialConfigurations = config.credentialConfigurations + mapOf(
+                    "sca_payment_card_sd_jwt" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive("HTTPS://localhost:443/openid4vci/bank_payment_type"))),
+                    "sca_base" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(rootVct))),
+                    "sca_user" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(middleVct))),
+                ),
+                sdJwtVcTypeMetadataConfiguration = config.sdJwtVcTypeMetadataConfiguration + mapOf(
+                    "sca_base" to leaf.copy(vct = rootVct),
+                    "sca_user" to SdJwtVcTypeMetadataDraft04(vct = middleVct, extends = rootVct),
+                    "sca_payment_card_sd_jwt" to SdJwtVcTypeMetadataDraft04(extends = middleVct, customParameters = mapOf(
+                        "display" to buildJsonArray { add(buildJsonObject { put("locale", "en"); put("name", "Inherited bank attestation") }) },
+                    )),
+                ),
+            )
+        }
+        lateinit var verifierMetadataHttp: HttpClient
         if (missingMetadata != null) {
             val config = ConfigManager.getConfig<Issuer2MetadataConfig>()
             val metadata = config.sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
@@ -119,15 +153,21 @@ class ScaPaymentWalletIntegrationTest {
                 // Match verifier2's HTTP encoding, including default policy identifiers.
                 install(ContentNegotiation) { json(Json(issuer2TestJson) { encodeDefaults = true }) }
                 install(SSE)
-                verifierApi()
+                routing {
+                    Verifier2Service.run { registerRoute(policyContextFactory = {
+                        PolicyExecutionContext(mapOf(PolicyServiceKey.TYPE_METADATA_RESOLVER to CredentialTypeMetadataResolver(verifierMetadataHttp)))
+                    }) }
+                }
             }
         }
         val issuerKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ProfilesConfig>()
             .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
-        paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
+        val http = apiClient()
+        verifierMetadataHttp = http
+        paymentFlow(http, "https://localhost", "https://verifier.example",
             issuerKey.getPublicKey().exportJWK(),
             "Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.",
-            missingMetadata != null, attester, extra)
+            missingMetadata != null, attester, extra, inherited)
     }
 
     @Test
@@ -154,6 +194,7 @@ class ScaPaymentWalletIntegrationTest {
         issuerPublicJwk: String, expectedSecurityHint: String, missingLabel: Boolean = false,
         attester: Issuer2TestKeyAttester? = null,
         extra: JsonObject? = null,
+        inherited: Boolean = false,
     ) {
         val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
         try {
@@ -185,8 +226,19 @@ class ScaPaymentWalletIntegrationTest {
                 wallet, ReceiveCredentialRequest(offerUrl = Url(offer.credentialOffer)), httpClient = http,
             ).toList().single()
             val vct = credential.credential.credentialData.getValue("vct").jsonPrimitive.content
-            assertEquals("$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
+            assertEquals(if (inherited) "HTTPS://localhost:443/openid4vci/bank_payment_type" else "$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
 
+            if (inherited) {
+                assertEquals(HttpStatusCode.OK, http.get(vct).status)
+                val aliases = listOf("$issuerBase/openid4vci/bank_payment_type", "$issuerBase/.well-known/vct/bank_payment_type")
+                    .map { url -> http.get(url).also { assertEquals(HttpStatusCode.OK, it.status) }.readRawBytes() }
+                assertContentEquals(aliases.first(), aliases.last())
+                MetadataIntegrity.verify(aliases.first(), credential.credential.credentialData.getValue("vct#integrity").jsonPrimitive.content)
+                assertTrue("vct#integrity" in credential.credential.credentialData)
+                assertTrue("Inherited bank attestation" in credential.metadata.toString())
+                assertEquals(listOf(vct, "$issuerBase/openid4vci/sca_user", "$issuerBase/openid4vci/sca_base"), credential.resolvedSdJwtVcTypes())
+                assertFalse("aka_vcts" in credential.credential.credentialData)
+            }
             // Reuse the shipped demo request. Only transport protection and the issuer VCT differ;
             // signed/encrypted transport variants already have their own protocol/app coverage.
             val shipped = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
@@ -197,7 +249,7 @@ class ScaPaymentWalletIntegrationTest {
             val setup = example.copy(core = example.core.copy(
                 clientId = null, signedRequest = false, encryptedResponse = false,
                 dcqlQuery = DcqlQuery(requireNotNull(example.core.dcqlQuery).credentials.map {
-                    it.copy(meta = SdJwtVcMeta(vctValues = listOf(vct)))
+                    it.copy(meta = SdJwtVcMeta(vctValues = listOf(if (inherited) "$issuerBase/openid4vci/sca_user" else vct)))
                 }),
             ))
             if (extra?.containsKey("recurrence") == true) assertEquals("9007199254740993.01",

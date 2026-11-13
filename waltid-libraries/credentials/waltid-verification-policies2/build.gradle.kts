@@ -41,6 +41,7 @@ val generateJsonSchemaTestFixtures = tasks.register("generateJsonSchemaTestFixtu
 kotlin {
 
     sourceSets {
+        commonTest.get().kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
         commonTest {
             kotlin.srcDir(generateJsonSchemaTestFixtures.map { it.outputs.files })
         }

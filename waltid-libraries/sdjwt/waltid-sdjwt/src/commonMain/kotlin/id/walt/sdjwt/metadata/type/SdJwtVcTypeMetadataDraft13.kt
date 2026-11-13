@@ -38,7 +38,7 @@ data class SdJwtVcTypeMetadataDraft13(
     }
 }
 
-private object SDJWTVCTypeMetadataDraft13Serializer :
+internal object SDJWTVCTypeMetadataDraft13Serializer :
     JsonDataObjectSerializer<SdJwtVcTypeMetadataDraft13>(SdJwtVcTypeMetadataDraft13.generatedSerializer())
 
 @Serializable

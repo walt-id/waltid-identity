@@ -1,5 +1,8 @@
 package id.walt.wallet2.consent
 
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
+import id.walt.sdjwt.metadata.type.TypeMetadataException
+import id.walt.sdjwt.metadata.type.TypeMetadataFailure
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto2.CryptoRuntime
@@ -54,6 +57,13 @@ class PaymentConsentResolver internal constructor(
         credential: SdJwtCredential,
         payload: JsonObject,
         preferredLocales: List<String>,
+    ): PaymentConsent = resolve(credential, payload, preferredLocales, null)
+
+    internal suspend fun resolve(
+        credential: SdJwtCredential,
+        payload: JsonObject,
+        preferredLocales: List<String>,
+        snapshot: JsonObject?,
     ): PaymentConsent {
         val authenticated = authenticate(credential)
         if ("transaction_data_types['$TS12_PAYMENT_TYPE'].schema_uri#integrity" in authenticated) {
@@ -63,18 +73,32 @@ class PaymentConsentResolver internal constructor(
         val values = paymentValues(payload)
         PaymentMetadataFetchSession(
             metadataFetcher.httpClient,
+            initialCredentialOrigin = vct,
             requestConfiguration = metadataFetcher.dataFetcherConfiguration.request,
             requireUrlAllowed = { url -> metadataFetcher.dataFetcherConfiguration.url?.requireUrlAllowed(url) },
         ).use { session ->
-            val metadata = session.read(vct, authenticated.integrity("vct#integrity")) as? JsonObject
-                ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            if (metadata["vct"] != JsonPrimitive(vct)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+            val metadata = try {
+                val pin = authenticated.integrity("vct#integrity").singleOrNull()
+                val cached = if (pin != null && snapshot != null) TypeMetadataResolver.snapshotDocuments(snapshot) else emptyMap()
+                val resolved = TypeMetadataResolver({ uri ->
+                    session.requireSourceAllowed(uri)
+                    cached[uri] ?: session.readBytes(uri)
+                }).resolve(
+                    vct, pin, requireParentIntegrity = true,
+                )
+                if (resolved.documents.any { document ->
+                    document.metadata["category"]?.let { it != JsonPrimitive(SCA_ATTESTATION_CATEGORY) } == true
+                }) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+                resolved.effective
+            } catch (cause: TypeMetadataException) {
+                consentFailure(when (cause.reason) {
+                    TypeMetadataFailure.INTEGRITY_MISMATCH -> PaymentConsentFailure.INTEGRITY_MISMATCH
+                    TypeMetadataFailure.UNAVAILABLE -> PaymentConsentFailure.METADATA_UNAVAILABLE
+                    else -> PaymentConsentFailure.INVALID_METADATA
+                })
+            }
             if (metadata["category"] != JsonPrimitive(SCA_ATTESTATION_CATEGORY)) {
                 consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            }
-            // Inheritance and top-level schema constraints need a separate, complete implementation.
-            if (metadata.keys.any { it in setOf("extends", "extends#integrity", "schema", "schema_uri", "schema_uri#integrity") }) {
-                consentFailure(PaymentConsentFailure.UNSUPPORTED_SCHEMA)
             }
             val types = metadata["transaction_data_types"] as? JsonObject
                 ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)

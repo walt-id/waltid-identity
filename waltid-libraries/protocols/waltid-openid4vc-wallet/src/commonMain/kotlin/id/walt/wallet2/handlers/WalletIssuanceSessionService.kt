@@ -992,7 +992,7 @@ class WalletIssuanceSessionService(
                     val value = it.credential
                     if (value is JsonPrimitive) value.content else value.toString()
                 }, bindings, request.label, request.metadata, configured?.proofRequired ?: false,
-                    expectedConfiguration = configured?.configuration)
+                    expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient)
                 record = record.copy(content = DeferredContent.Received(prepared), claimed = false,
                     public = record.public.copy(intervalSeconds = null))
             }

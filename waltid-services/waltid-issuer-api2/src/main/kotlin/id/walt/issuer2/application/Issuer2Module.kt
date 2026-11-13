@@ -21,6 +21,7 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
@@ -38,7 +39,8 @@ class Issuer2Module @JvmOverloads constructor(
     keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
     metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
-) {
+) : AutoCloseable {
+    private val typeMetadata = IssuerTypeMetadataCatalogue(serviceConfig, metadataConfig)
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
@@ -53,6 +55,7 @@ class Issuer2Module @JvmOverloads constructor(
         refreshTokenRepository = refreshTokenRepository,
         keyAttestationKeyResolver = keyAttestationKeyResolver,
         credentialProofVerifier = credentialProofVerifier,
+        metadataResolver = typeMetadata,
     )
 
     private val credentialProfileService = CredentialProfileService(
@@ -75,6 +78,7 @@ class Issuer2Module @JvmOverloads constructor(
         crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
         metadataSigningKeyResolver = metadataSigningKeyResolver,
         metadataSigningCertificateResolver = metadataSigningCertificateResolver,
+        typeMetadata = typeMetadata,
     )
 
     val credentialOfferService = CredentialOfferService(
@@ -83,6 +87,7 @@ class Issuer2Module @JvmOverloads constructor(
         preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
         config = serviceConfig,
         notificationService = notificationService,
+        typeMetadata = typeMetadata,
     )
 
     private val protocolService = OpenId4VciProtocolService(
@@ -112,6 +117,8 @@ class Issuer2Module @JvmOverloads constructor(
         offerService = credentialOfferService,
         notificationService = notificationService,
     )
+
+    override fun close() = typeMetadata.close()
 
     companion object {
         @JvmOverloads

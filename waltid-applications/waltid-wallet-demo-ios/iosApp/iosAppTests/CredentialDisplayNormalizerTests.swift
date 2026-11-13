@@ -4,6 +4,34 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
+    func testProjectedArraySelectorsRetainUniqueLabelsAndRestrictions() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(contentsOf: root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json"))
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let metadata = String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayClaims"]!), as: UTF8.self)
+        let claims = StoredCredentialMetadataParser.claims(from: metadata, preferredLocales: ["en"])
+        XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
+        XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("0"), .key("iban")], [.key("name")]])
+        XCTAssertEqual(claims.first?.mandatory, true)
+        let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
+            credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayCredentialData"]!), as: UTF8.self), metadataJSON: metadata)
+        let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: ["en"]).groups.flatMap(\.items)
+        guard case .list(let accounts) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
+              accounts.count == 2, case .object(let first) = accounts[0], case .object(let second) = accounts[1] else {
+            return XCTFail("Expected two structured accounts")
+        }
+        XCTAssertEqual(first.first?.label, "First IBAN")
+        XCTAssertEqual(first.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(second.first?.label, "Iban")
+        XCTAssertNotEqual(second.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(rows.first { $0.path.id == "name" }?.label, "Full name")
+        let option = PresentationCredentialOption(queryID: "account", credentialID: credential.id, format: credential.format,
+            issuer: nil, subject: nil, label: "Account", credentialDataJSON: credential.credentialDataJSON,
+            disclosures: [PresentationDisclosure(path: #"["accounts",0,"iban"]"#, name: "Iban", valueJSON: #""DE123""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
+        XCTAssertEqual(CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"]).groups.first { $0.id == "requested" }?.items.first?.label, "First IBAN")
+    }
+
     func testTimestampOffsetsAndUninterpretedCalendarValues() {
         let expected = WalletInstant(epochSeconds: 1793410200, nanoseconds: 123456789)
         for source in ["2026-10-30T23:30:00.123456789-02:00", "2026-10-31T03:30:00.123456789+02:00", "2026-10-31t01:30:00.123456789z", "2026-10-31T01:30:00.123456789-00:00"] {
@@ -640,6 +668,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
               "iat": 1736899200,
               "exp": 1894699800,
               "vct": "eu.europa.ec.eudi.pid.1",
+              "vct#integrity": "sha256-test",
               "_sd_alg": "sha-256",
               "cnf": {
                 "jwk": {
@@ -676,6 +705,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(credentialData.items.first { $0.path.id == "document_number" }?.label, "Document number")
 
         let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
+        XCTAssertEqual(technical.items.first { $0.label == "Type metadata integrity" }?.value, .text("sha256-test"))
         XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 undisclosed claim values"))
         XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
         XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .instant(WalletInstant(epochSeconds: 1736899200, nanoseconds: 0)))

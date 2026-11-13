@@ -31,7 +31,7 @@ substituting the Annex C matcher we already vendor, which implements no `transac
 
 ## Provenance
 
-The committed binary is **our build of unmodified upstream sources**, not an artifact Google publishes:
+The committed binary is **our build of upstream sources with the committed ancestor-index deduplication patch**, not an artifact Google publishes:
 upstream ships the Rust sources only.
 
 | | |
@@ -40,10 +40,10 @@ upstream ships the Rust sources only.
 | Branch | `wasm` |
 | Commit | `5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e` |
 | Upstream path | `CredentialProvider/wasm/matcher-rs` |
-| Source modifications | none |
+| Source modifications | `matcher-patches/5d966fc4-deduplicate-vct-ancestors.patch` |
 | Built artifact | `target/wasm32-unknown-unknown/release/presentation.wasm`, built here |
-| Size | 117,546 bytes |
-| SHA-256 | `5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79` |
+| Size | 118,727 bytes |
+| SHA-256 | `a4977b0adc4b11d3bf474022c0eba7dbb050b5354065f4236824aede8d6918ee` |
 | Toolchain | `rustc 1.99.0-nightly (12c36e253 2026-08-10)`, target `wasm32-unknown-unknown` |
 | License | Apache-2.0 |
 
@@ -63,6 +63,7 @@ git clone https://github.com/android/identity-samples
 git -C identity-samples checkout <pinned-commit>
 cd identity-samples/CredentialProvider/wasm/matcher-rs
 rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
+git apply --unidiff-zero <this-module>/matcher-patches/5d966fc4-deduplicate-vct-ancestors.patch
 bash build.sh
 cp target/wasm32-unknown-unknown/release/presentation.wasm \
   <this-module>/src/androidMain/assets/id/walt/wallet2/mobile/openid4vpmatcher.wasm
@@ -111,3 +112,11 @@ custom registry and see whether it still passes.
 
 Because the matcher is vendored rather than declared as a dependency, ordinary dependency-update
 tooling will not detect upstream changes to it.
+
+## Inherited VCT indexes
+
+The shared wallet revalidates pinned metadata snapshots before publishing an entry under its leaf
+and ancestor VCTs. These indexes retain one stable registry entry ID and the original credential ID.
+The local patch deduplicates successful candidates by that ID so a request naming both leaf and
+ancestor does not create duplicate picker entries. The credential returned to the verifier retains
+its issuer-signed leaf VCT. The patch includes the upstream-format regression case.

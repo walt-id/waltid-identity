@@ -1,6 +1,7 @@
 
 package id.walt.verifier2
 
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
@@ -173,6 +174,13 @@ object Verifier2Service {
     fun Route.registerRoute(
         repository: VerificationSessionRepository = defaultSessionRepository,
         surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+    ) = registerRoute(repository, surfaces) { PolicyExecutionContext.Empty }
+
+    /** Host-owned policy services are created per response, including metadata transport snapshots. */
+    fun Route.registerRoute(
+        repository: VerificationSessionRepository = defaultSessionRepository,
+        surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+        policyContextFactory: () -> PolicyExecutionContext,
     ) {
         require(surfaces.isNotEmpty()) { "At least one verifier route surface must be registered" }
         val updateSessionCallback = updateSessionCallback(repository)
@@ -316,6 +324,7 @@ object Verifier2Service {
                         try {
                             call.respondHandleDirectPostResponse(
                                 verificationSession = claim.original.session,
+                                policyContext = policyContextFactory(),
                                 updateSessionCallback = updateSessionCallback,
                                 failSessionCallback = failSessionCallback,
                                 beforeRespond = {

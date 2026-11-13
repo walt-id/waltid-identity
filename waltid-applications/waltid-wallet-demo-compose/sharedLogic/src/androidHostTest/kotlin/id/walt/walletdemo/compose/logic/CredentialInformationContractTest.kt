@@ -5,6 +5,28 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
+    @Test fun projectedArraySelectorsRetainUniqueLabelsAndRestrictions() {
+        val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
+        val metadata = fixture.getValue("projectedArrayClaims").toString()
+        val claims = StoredCredentialMetadataParser.claims(metadata, listOf("en"))
+        assertEquals(fixture.getValue("projectedArrayLabels").jsonArray.map { it.jsonPrimitive.content }, claims.map { it.displayName })
+        assertEquals(listOf(listOf(JsonPrimitive("accounts"), JsonPrimitive(0), JsonPrimitive("iban")), listOf(JsonPrimitive("name"))), claims.map { it.path })
+        assertEquals(true, claims.first().mandatory)
+        val summary = CredentialSummary(id = "array-contract", format = "dc+sd-jwt", label = "Account", issuer = null,
+            credentialDataJson = fixture.getValue("projectedArrayCredentialData").toString(), metadataJson = metadata)
+        val rows = CredentialDisplayNormalizer.toDetails(summary, listOf("en")).groups.flatMap { it.items }
+        val accounts = assertIs<DisplayValue.ListValue>(rows.single { it.path.id == "accounts" }.value).values
+        val entries = accounts.map { assertIs<DisplayValue.ObjectValue>(it).entries.single() }
+        assertEquals(listOf("First IBAN", "Iban"), entries.map { it.label })
+        assertEquals(listOf(ClaimLabelSource.IssuerMetadata, ClaimLabelSource.Wallet), entries.map { it.labelSource })
+        assertEquals("Full name", rows.single { it.path.id == "name" }.label)
+        val option = WalletDemoPresentationCredentialOption(queryId = "account", credentialId = summary.id,
+            format = summary.format, label = "Account", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
+            disclosures = listOf(WalletDemoPresentationDisclosure(label = "Iban", path = "[\"accounts\",0,\"iban\"]",
+                valueJson = "\"DE123\"", selectivelyDisclosable = true)))
+        assertEquals("First IBAN", option.toRequestedDisclosureGroup(listOf("en"))!!.items.single().label)
+    }
+
     @Test fun sharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() {
         val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
         fixture.getValue("sharingVisibility").jsonArray.forEach { row ->

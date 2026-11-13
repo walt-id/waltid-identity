@@ -82,6 +82,7 @@ kotlin {
         }
         commonTest {
             kotlin.srcDir("src/scaTestFixtures/kotlin")
+            kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
             kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
             kotlin.srcDir("../../crypto/waltid-x509/src/commonTestFixtures/kotlin")
         }

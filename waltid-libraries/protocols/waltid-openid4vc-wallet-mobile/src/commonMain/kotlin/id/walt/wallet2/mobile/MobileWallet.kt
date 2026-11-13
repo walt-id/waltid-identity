@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.handlers.resolvedSdJwtVcTypes
+
 import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.wallet2.consent.*
@@ -1200,23 +1202,25 @@ public class MobileWallet internal constructor(
             if (projection == MobileWalletRegistryProjection.MdocIdentity) {
                 // IdentityDocumentServices indexes only identity and type. Do not read metadata,
                 // serialize claims, or decode images that the native adapter would discard.
-                return@mapNotNull MobileWalletCredentialRegistryRecord(
+                return@mapNotNull listOf(MobileWalletCredentialRegistryRecord(
                     registryEntryId = registryEntryId,
                     credentialId = stored.id,
                     format = MobileWalletDigitalCredentialFormat.MDOC,
                     type = (credential as MdocsCredential).docType,
                     fields = emptyList(),
                     displayName = "",
-                )
+                ))
             }
             val metadata = stored.toMetadata()
-            when (credential) {
+            val record = when (credential) {
                 is MdocsCredential -> {
                     val display = MobileWalletRegistryDisplay.resolve(
                         format = MobileWalletDigitalCredentialFormat.MDOC,
                         type = credential.docType,
                         credentialData = credential.credentialData,
                         storedLabel = metadata.label,
+                        metadata = stored.metadata,
+                        preferredLocales = preferredLocales,
                     )
                     val cardArt = MobileWalletRegistryIcons.extractCardArt(
                         metadata = stored.metadata,
@@ -1258,6 +1262,8 @@ public class MobileWallet internal constructor(
                         type = type,
                         credentialData = data,
                         storedLabel = metadata.label,
+                        metadata = stored.metadata,
+                        preferredLocales = preferredLocales,
                     )
                     val cardArt = MobileWalletRegistryIcons.extractCardArt(
                         metadata = stored.metadata,
@@ -1284,7 +1290,19 @@ public class MobileWallet internal constructor(
                     )
                 } else null
             }
-        }.toList()
+            record?.let { entry ->
+                val types = if (entry.format == MobileWalletDigitalCredentialFormat.SD_JWT_VC) {
+                    try {
+                        stored.resolvedSdJwtVcTypes().ifEmpty { listOf(entry.type) }
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (_: IllegalArgumentException) {
+                        return@mapNotNull null
+                    }
+                } else listOf(entry.type)
+                types.map { entry.copy(type = it) }
+            }
+        }.toList().flatten()
 
     /**
      * Maps an SD-JWT VC claim path onto the object-key path used by registry fields.
@@ -1331,7 +1349,7 @@ public class MobileWallet internal constructor(
          * declaration is not, so it has to be excluded here.
          */
         private val SD_JWT_INFRASTRUCTURE_CLAIMS = setOf(
-            "vct", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
+            "vct", "vct#integrity", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
         )
     }
 }

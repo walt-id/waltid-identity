@@ -26,7 +26,10 @@ import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayload
 import kotlinx.serialization.json.*
 import id.walt.crypto2.keys.Key as Crypto2Key
 
-/** Generates credentials from an explicitly supplied binding. This signer rejects null bindings. */
+/**
+ * Low-level preparation/signing helpers. External type-metadata enforcement belongs to the configured
+ * OpenID4VCI handler; direct callers may validate a complete SDPayload before signing it.
+ */
 object SdJwtVcCredentialSigner {
     @Deprecated("Use the Crypto2Key overload")
     suspend fun generateSdJwtVC(
@@ -94,7 +97,26 @@ object SdJwtVcCredentialSigner {
         display: List<CredentialDisplay>?,
         sdJwtTypeHeader: String?,
         sdJwtCredentialClaims: JsonObject?,
-    ): String {
+    ): String = signPrepared(
+        prepare(
+            verifiedBinding, credentialData, issuerSigningKey, issuerId, vct, selectiveDisclosure,
+            dataMapping, x5Chain, display, sdJwtTypeHeader, sdJwtCredentialClaims,
+        ), issuerSigningKey,
+    )
+
+    internal suspend fun prepare(
+        verifiedBinding: VerifiedCredentialBinding?,
+        credentialData: JsonObject,
+        issuerSigningKey: IssuerSigningKey,
+        issuerId: String,
+        vct: String,
+        selectiveDisclosure: SDMap?,
+        dataMapping: JsonObject?,
+        x5Chain: List<X509Certificate>?,
+        display: List<CredentialDisplay>?,
+        sdJwtTypeHeader: String?,
+        sdJwtCredentialClaims: JsonObject?,
+    ): PreparedCredential {
         val binding = verifiedBinding
             ?: throw invalidCredentialProof("SD-JWT VC issuance requires a verified credential binding")
         val holderKeyJson = exportHolderJwk(binding.holderKey)
@@ -126,8 +148,9 @@ object SdJwtVcCredentialSigner {
 
 
         val alwaysDisclosedOverrides = defaultPayloadProperties.plus(sdJwtCredentialClaims ?: emptyMap())
+        val payload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides)
         val sdPayload = SDPayload.createSDPayload(
-            fullPayload = JsonObject(mappedCredentialData + alwaysDisclosedOverrides),
+            fullPayload = payload,
             disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
         )
 
@@ -148,25 +171,25 @@ object SdJwtVcCredentialSigner {
             }))
         } ?: mapOf())
 
-        val signable = sdPayload.undisclosedPayload.toString().encodeToByteArray()
+        return PreparedCredential(sdPayload, JsonObject(headers))
+    }
+
+    internal class PreparedCredential(val payload: SDPayload, val headers: JsonObject) {
+        val signable: ByteArray = payload.undisclosedPayload.toString().encodeToByteArray()
+    }
+
+    /** Signs the exact prepared representation; has no metadata or document-source dependency. */
+    internal suspend fun signPrepared(prepared: PreparedCredential, issuerSigningKey: IssuerSigningKey): String {
         val jwt = when (issuerSigningKey) {
-            is IssuerSigningKey.Legacy -> issuerSigningKey.key.signJws(signable, headers)
+            is IssuerSigningKey.Legacy -> issuerSigningKey.key.signJws(prepared.signable, prepared.headers)
             is IssuerSigningKey.Crypto2 -> CompactJws.sign(
-                payload = signable,
+                payload = prepared.signable,
                 key = issuerSigningKey.key,
                 algorithm = issuerSigningKey.algorithm,
-                protectedHeader = JsonObject(headers),
+                protectedHeader = prepared.headers,
             )
         }
-
-        val sdJwtVC = SDJwtVC(
-            sdJwt = SDJwt.createFromSignedJwt(
-                signedJwt = jwt,
-                sdPayload = sdPayload
-            )
-        )
-
-        return sdJwtVC.toString().plus(SEPARATOR_STR)
+        return SDJwtVC(SDJwt.createFromSignedJwt(jwt, prepared.payload)).toString().plus(SEPARATOR_STR)
     }
 
     private suspend fun exportHolderJwk(holderKey: Crypto2Key): JsonObject =
@@ -174,7 +197,7 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to holderKey.id.value.toJsonElement(),
         ).toJsonObject()
 
-    private sealed interface IssuerSigningKey {
+    internal sealed interface IssuerSigningKey {
         data class Legacy(val key: Key) : IssuerSigningKey
         data class Crypto2(val key: Crypto2Key, val algorithm: JwsAlgorithm) : IssuerSigningKey
     }

@@ -45,7 +45,7 @@ internal class RetainedPaymentConsent {
         prepared = null // Failed re-preparation cannot leave an older acknowledgment available.
         val payment = selectedPayment(request, selection) ?: return null
         val binding = binding(request, selection, credentials, disclosures, key, policy, holderDid)
-        val consent = policy.resolver.resolve(payment.first, payment.second, policy.preferredLocales)
+        val consent = policy.resolver.resolve(payment.credential, payment.payload, policy.preferredLocales, payment.snapshot)
         return PreparedPaymentConsent(CryptographyRandom.nextBytes(32).encodeToBase64Url(), consent, requiresUnsignedRequestWarning).also {
             prepared = binding to it
         }
@@ -71,20 +71,24 @@ internal class RetainedPaymentConsent {
     }
 }
 
+private data class SelectedPayment(val credential: SdJwtCredential, val payload: JsonObject, val snapshot: JsonObject?)
+
 private fun selectedPayment(
     request: AuthorizationRequest,
     selection: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
-): Pair<SdJwtCredential, JsonObject>? {
+): SelectedPayment? {
     val payments = decodeList(request.transactionData.orEmpty()).filter { it.transactionData.type == TS12_PAYMENT_TYPE }
-    val paymentCredentials = payments.flatMap { payment -> payment.transactionData.credentialIds.flatMap { query ->
-        selection[query].orEmpty().map { (it.credential as RawDcqlCredential).originalCredential as DigitalCredential }
+    val paymentEntries = payments.flatMap { payment -> payment.transactionData.credentialIds.flatMap { query ->
+        selection[query].orEmpty().map { it.credential as RawDcqlCredential }
     } }
+    val paymentCredentials = paymentEntries.map { it.originalCredential as DigitalCredential }
     if (paymentCredentials.none { it is SdJwtCredential }) return null // Legacy mdoc retains generic mandatory review.
     if (payments.size != 1 || paymentCredentials.size != 1) consentFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT)
     val details = payments.single().details
     if (details.keys != setOf("payload")) consentFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT)
-    return (paymentCredentials.single() as SdJwtCredential) to
-        (details["payload"] as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_PAYMENT))
+    return SelectedPayment(paymentCredentials.single() as SdJwtCredential,
+        details["payload"] as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_PAYMENT),
+        paymentEntries.single().typeMetadataSnapshot)
 }
 
 private data class PaymentConsentBinding(

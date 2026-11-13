@@ -2,10 +2,13 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.wallet2.consent.*
 
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlin.time.TimeSource
@@ -55,6 +58,7 @@ import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
@@ -574,9 +578,6 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val isolatedCredentialsById = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored }.toMap()
-        val rawCredentials = isolatedCredentialsById.mapNotNull { (id, stored) ->
-            stored.credential.toRawDcqlCredential(id)
-        }
 
         val result = presentWithKeyMaterial(
             wallet = wallet,
@@ -584,6 +585,7 @@ object WalletPresentationHandler {
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
+                val rawCredentials = isolatedCredentialsById.mapNotNull { (id, stored) -> stored.toRawDcqlCredential(id, query) }
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
@@ -1452,7 +1454,7 @@ object WalletPresentationHandler {
         // Build index: rawCredential index → wallet credential id
         val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
         val rawCredentials = request.credentials.mapIndexedNotNull { idx, stored ->
-            stored.credential.toRawDcqlCredential(idx.toString())
+            stored.toRawDcqlCredential(idx.toString(), request.dcqlQuery)
         }
         val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
         return buildMatchResult(matched, idByIndex)
@@ -1688,12 +1690,14 @@ object WalletPresentationHandler {
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
         eligibleCredentialIds: Set<String>? = null,
+        metadataHttpClient: HttpClient? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
         wallet = wallet,
         query = query,
         storedCredentials = wallet.streamAllCredentials().toList(),
         useWalletCredentialIds = useWalletCredentialIds,
         eligibleCredentialIds = eligibleCredentialIds,
+        metadataHttpClient = metadataHttpClient,
     )
 
     /**
@@ -1731,12 +1735,13 @@ object WalletPresentationHandler {
      * `multiple=false` query rematches the OS-selected credential instead of collapsing to the first
      * store match.
      */
-    private fun selectFromSnapshot(
+    private suspend fun selectFromSnapshot(
         wallet: Wallet,
         query: DcqlQuery,
         storedCredentials: List<StoredCredential>,
         useWalletCredentialIds: Boolean,
         eligibleCredentialIds: Set<String>? = null,
+        metadataHttpClient: HttpClient? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
@@ -1747,8 +1752,10 @@ object WalletPresentationHandler {
         }
         val rawCredentials = candidates.mapIndexedNotNull { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            stored.credential.toRawDcqlCredential(
+            stored.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
+                query = query,
+                metadataHttpClient = metadataHttpClient,
             )
         }
 
@@ -2174,7 +2181,7 @@ object WalletPresentationHandler {
     private fun DcqlMatcher.DcqlMatchResult.alwaysIncludedPresentationClaims(): List<PresentationDisclosure> {
         if (credential.format == "mso_mdoc") return emptyList()
         val original = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
-        val selective = original as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        val selective = original as? SelectivelyDisclosableVerifiableCredential
         // Only the original signed payload proves which SD-JWT values are unconditionally visible.
         val payload = if (!credential.disclosures.isNullOrEmpty()) selective?.originalCredentialData
             ?: return emptyList() else selective?.originalCredentialData ?: credential.data
@@ -2350,22 +2357,36 @@ object WalletPresentationHandler {
         }
     }
 
-    /** Null for a stored credential whose disclosures cannot be located, so it cannot fail matching for the others. */
-    private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential? {
-        val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+    /** An unusable stored credential cannot fail matching for the other candidates. */
+    private suspend fun StoredCredential.toRawDcqlCredential(
+        id: String, query: DcqlQuery? = null, metadataHttpClient: HttpClient? = null,
+    ): RawDcqlCredential? {
+        val credential = this.credential
+        val sdvc = credential as? SelectivelyDisclosableVerifiableCredential
         val disclosures = try {
             sdvc?.locatedDisclosures()
         } catch (e: IllegalArgumentException) {
             log.warn { "Skipping credential $id: its disclosures cannot be located in the issuer-signed payload (${e.message})" }
             return null
         }
+        val resolved = try {
+            resolveTypeMetadata(httpClient = metadataHttpClient, fetchIfMissing = query?.credentials?.any { item ->
+                val meta = item.meta as? SdJwtVcMeta
+                meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
+            } == true)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: IllegalArgumentException) {
+            log.warn { "Skipping credential $id: its type metadata is invalid" }
+            return null
+        }
         return RawDcqlCredential(
             id = id,
-            format = format,
-            data = credentialData,
-            originalCredential = this,
+            format = credential.format,
+            data = credential.credentialData,
+            originalCredential = credential,
             disclosures = disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
-        )
+        ).withResolvedVctTypes(resolved?.types.orEmpty()).withTypeMetadataSnapshot(resolved?.snapshot())
     }
 }
 
