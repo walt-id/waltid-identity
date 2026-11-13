@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import XCTest
 import WalletDemoSharingUI
@@ -6,6 +7,146 @@ import WalletDemoSharingUI
 
 @MainActor
 final class WalletViewModelCredentialStatusTests: XCTestCase {
+    func testExplicitReviewRefreshPreservesSelectionAndWaitsForItsRenderedAssessment() async throws {
+        let client = MockWalletClient(paymentTransaction: false)
+        let model = try await reviewModel(client, walletID: "status-review-completion-test")
+        let barrier = StatusRefreshBarrier()
+        defer {
+            model.handleApplicationEnteredBackground()
+            UserDefaults.standard.removeObject(forKey: "wallet.status-review-completion-test.status.automatic")
+            Task { await barrier.resume() }
+        }
+        await client.setStatusRefreshResults([], waitFor: { await barrier.wait() })
+        let preview = try XCTUnwrap(model.presentationPreview)
+        let credentialID = try XCTUnwrap(preview.credentialOptions.first?.credentialID)
+        let credentials = model.selectedPresentationCredentialOptions
+        let disclosures = model.selectedPresentationDisclosureOptions
+        let initialCalls = await client.statusRefreshCalls
+        XCTAssertEqual(initialCalls, 0, "Review entry performs no status refresh with automatic checks off")
+        model.checkPresentationCredentialStatus(credentialID, handle: preview.previewHandle, navigationKey: model.presentationNavigationResetKey)
+        XCTAssertEqual(model.presentationStatusRefresh?.phase, .checking)
+        try await waitUntil { await barrier.started }
+        model.submitPresentation(reviewedStatus: model.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
+        var submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty)
+        await barrier.resume()
+        try await waitUntil { model.presentationStatusRefresh?.phase == .awaitingRender }
+        XCTAssertEqual(model.selectedPresentationCredentialOptions, credentials)
+        XCTAssertEqual(model.selectedPresentationDisclosureOptions, disclosures)
+        model.submitPresentation(reviewedStatus: model.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
+        submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty, "Refresh completion cannot bypass the rendered-result acknowledgement")
+        model.presentationStatusRefreshRendered(UUID())
+        XCTAssertNotNil(model.presentationStatusRefresh)
+        model.presentationStatusRefreshRendered(try XCTUnwrap(model.presentationStatusRefresh).id)
+        XCTAssertNil(model.presentationStatusRefresh)
+        submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty, "Refresh does not automatically submit")
+        model.submitPresentation(reviewedStatus: model.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
+        try await waitUntil { await client.submittedPaymentConsentRevisions.count == 1 }
+    }
+
+    func testUnownedStatusWorkDoesNotBecomeANewSubmissionPrecondition() async throws {
+        let client = MockWalletClient(paymentTransaction: false)
+        let model = try await reviewModel(client, walletID: "status-unowned-refresh-test")
+        let barrier = StatusRefreshBarrier()
+        defer {
+            model.handleApplicationEnteredBackground()
+            UserDefaults.standard.removeObject(forKey: "wallet.status-unowned-refresh-test.status.automatic")
+            Task { await barrier.resume() }
+        }
+        await client.setStatusRefreshResults([], waitFor: { await barrier.wait() })
+        model.checkCredentialStatuses(ids: [try XCTUnwrap(model.presentationPreview?.credentialOptions.first?.credentialID)])
+        try await waitUntil { await barrier.started }
+        XCTAssertTrue(model.checkingCredentialStatuses)
+        XCTAssertNil(model.presentationStatusRefresh)
+        model.submitPresentation(reviewedStatus: model.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
+        try await waitUntil { await client.submittedPaymentConsentRevisions.count == 1 }
+        await barrier.resume()
+    }
+
+    func testFailedReviewRefreshRetainsEvidenceAndSettingsReportUntilErrorIsDisplayed() async throws {
+        let client = MockWalletClient(paymentTransaction: false)
+        let model = try await reviewModel(client, walletID: "status-review-failure-test")
+        defer {
+            model.handleApplicationEnteredBackground()
+            UserDefaults.standard.removeObject(forKey: "wallet.status-review-failure-test.status.automatic")
+        }
+        let previous = model.credentialStatuses
+        let report = CredentialStatusRefreshSummary(completed: 2, unchanged: 1, deferred: 0, checkErrors: 0)
+        model.credentialStatusSummary = report
+        await client.setStatusRefreshResults([], fails: true)
+        let preview = try XCTUnwrap(model.presentationPreview)
+        model.checkPresentationCredentialStatus(try XCTUnwrap(preview.credentialOptions.first?.credentialID),
+            handle: preview.previewHandle, navigationKey: model.presentationNavigationResetKey)
+        try await waitUntil { model.presentationStatusRefresh?.phase == .awaitingRender }
+        XCTAssertEqual(model.credentialStatuses, previous)
+        XCTAssertNotNil(model.credentialStatusError)
+        XCTAssertNil(model.credentialStatusBatchError)
+        XCTAssertEqual(model.credentialStatusSummary, report)
+        model.presentationStatusRefreshRendered(try XCTUnwrap(model.presentationStatusRefresh).id)
+        XCTAssertNil(model.presentationStatusRefresh)
+    }
+
+    func testReviewDisposalReplacementBackgroundAndLockIgnoreLateRefreshCompletion() async throws {
+        for exit in ["dispose", "replace", "background", "lock"] {
+            let client = MockWalletClient(paymentTransaction: false)
+            let walletID = "status-review-close-\(exit)-test"
+            let model = try await reviewModel(client, walletID: walletID)
+            let barrier = StatusRefreshBarrier()
+            defer {
+                model.handleApplicationEnteredBackground()
+                UserDefaults.standard.removeObject(forKey: "wallet.\(walletID).status.automatic")
+                Task { await barrier.resume() }
+            }
+            await client.setStatusRefreshResults([], waitFor: { await barrier.wait() })
+            let preview = try XCTUnwrap(model.presentationPreview)
+            let key = model.presentationNavigationResetKey
+            model.checkPresentationCredentialStatus(try XCTUnwrap(preview.credentialOptions.first?.credentialID), handle: preview.previewHandle, navigationKey: key)
+            try await waitUntil { await barrier.started }
+            model.releasePresentationStatusRefresh(handle: PresentationPreviewHandle(value: "foreign"), navigationKey: key)
+            XCTAssertNotNil(model.presentationStatusRefresh)
+            switch exit {
+            case "dispose": model.releasePresentationStatusRefresh(handle: preview.previewHandle, navigationKey: key)
+            case "replace": model.cancelPresentationReview()
+            case "background": model.handleApplicationEnteredBackground()
+            default: model.lock()
+            }
+            XCTAssertNil(model.presentationStatusRefresh, exit)
+            XCTAssertFalse(model.checkingCredentialStatuses, exit)
+            let snapshotReads = await client.statusSnapshotReads
+            let lateResult = expectation(description: "A closed \(exit) review must not install its late result")
+            lateResult.isInverted = true
+            let observation = model.$credentialStatuses.dropFirst().sink { _ in lateResult.fulfill() }
+            await barrier.resume()
+            try await waitUntil { await barrier.finished }
+            await fulfillment(of: [lateResult], timeout: 0.2)
+            withExtendedLifetime(observation) {}
+            let after = await client.statusSnapshotReads
+            XCTAssertEqual(after, snapshotReads, "A late \(exit) result must not fetch/install an assessment")
+            XCTAssertNil(model.presentationStatusRefresh)
+        }
+    }
+
+    private func reviewModel(_ client: MockWalletClient, walletID: String) async throws -> WalletViewModel {
+        let model = WalletViewModel(walletID: walletID, walletClient: client,
+            readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(), identityDocumentRegistrationUpdate: {},
+            pinStore: InMemoryDemoPinStore(), biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false))
+        model.automaticCredentialStatusChecks = false
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        model.presentationRequestUrl = "openid4vp://mock"
+        model.previewPresentation()
+        try await waitUntil { model.presentationReviewEnabled && model.paymentReview.canConfirm }
+        let credentialID = try XCTUnwrap(model.presentationPreview?.credentialOptions.first?.credentialID)
+        let clear = try WalletVisualFixtures().credentialStatus("clear")
+        await client.setCredentialStatusSnapshot(CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            .init(credentialID: credentialID, storeIndex: 0, value: clear),
+        ], refreshingCredentialIDs: []))
+        try await waitUntil { model.credentialStatuses[credentialID] != nil }
+        return model
+    }
+
     func testPendingInitialLocalStatusReadIsNeutralAndFailureIsUnavailable() async throws {
         let client = MockWalletClient()
         let model = WalletViewModel(walletID: "status-initial-read-test", walletClient: client,
@@ -217,4 +358,16 @@ final class WalletViewModelCredentialStatusTests: XCTestCase {
             pending.forEach { $0.resume() }
         }
     }
+}
+
+private actor StatusRefreshBarrier {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private(set) var started = false
+    private(set) var finished = false
+    func wait() async {
+        started = true
+        await withCheckedContinuation { continuation = $0 }
+        finished = true
+    }
+    func resume() { continuation?.resume(); continuation = nil }
 }

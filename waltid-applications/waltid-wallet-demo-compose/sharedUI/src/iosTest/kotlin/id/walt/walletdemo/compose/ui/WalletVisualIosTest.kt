@@ -38,6 +38,8 @@ class WalletVisualIosTest {
     }
 
     @Test fun credentialStatusHome() = scenario { credentialStatusHome() }
+    @Test fun credentialStatusMixedArtwork() = scenario { credentialStatusMixedArtwork() }
+    @Test fun credentialStatusMixedArtworkRtl() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { credentialStatusMixedArtwork(rtl = true) }
     @Test fun credentialStatusDetailsClear() = scenario { credentialStatusDetails() }
     @Test fun credentialStatusDetailsAdverse() = scenario { credentialStatusDetails(adverse = true) }
     @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
@@ -48,6 +50,7 @@ class WalletVisualIosTest {
     @Test fun credentialStatusPayment() = scenario { credentialStatusPayment() }
     @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
     @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
+    @Test fun credentialStatusSettingsHelp() = scenario { credentialStatusSettings(helpExpanded = true) }
     @Test fun credentialStatusCompactRtl() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }
 
     @Test fun walletOpening() = scenario { walletOpening() }

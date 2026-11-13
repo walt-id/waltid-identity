@@ -121,22 +121,25 @@ internal class WalletApi2Client(
         request(HttpStatusCode.NoContent) { put(walletPath(walletId, "dids/$did/set-default")) }
     }
 
-    suspend fun credentialStatusSnapshot(walletId: String): CredentialStatusSnapshotDto? {
-        val response = http.get(walletPath(walletId, "credential-status"))
+    suspend fun credentialStatusSnapshot(walletId: String, statusContext: String? = null): CredentialStatusSnapshotDto? {
+        val response = http.get(walletPath(walletId, "credential-status")) { statusContext?.let { parameter("statusContext", it) } }
         checkSession(response)
         if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.MethodNotAllowed) {
-            if (walletId in statusCapableWallets) throw response.toApiException()
+            if (statusContext != null || walletId in statusCapableWallets) throw response.toApiException()
             return null
         }
-        if (!response.status.isSuccess()) throw response.toApiException()
-        // A malformed successful response is still a status-aware integration failure, not
-        // permission to downgrade a later submission to the unguarded legacy endpoints.
-        statusCapableWallets += walletId
-        return response.body()
+        return statusResponse(walletId, response).body()
+    }
+
+    suspend fun createCredentialStatusContext(walletId: String): CredentialStatusSnapshotDto =
+        statusResponse(walletId, http.post(walletPath(walletId, "credential-status/context")) { jsonBody(Unit) }).body()
+
+    suspend fun closeCredentialStatusContext(walletId: String, statusContext: String) {
+        request { delete(walletPath(walletId, "credential-status/context/${statusContext.encodeURLPathPart()}")) }
     }
 
     suspend fun refreshCredentialStatuses(walletId: String, request: RefreshCredentialStatusesDto): List<CredentialStatusRefreshResultDto> =
-        request { post(walletPath(walletId, "credential-status/refresh")) { jsonBody(request) } }.body()
+        statusResponse(walletId, http.post(walletPath(walletId, "credential-status/refresh")) { jsonBody(request) }).body()
 
     suspend fun listCredentialMetadata(walletId: String): List<StoredCredentialMetadataDto> =
         request { get(walletPath(walletId, "credentials")) }.body()
@@ -248,7 +251,7 @@ internal class WalletApi2Client(
             }
         }.body()
 
-    private suspend fun statusReviewedResponse(response: HttpResponse): HttpResponse {
+    private suspend fun statusResponse(walletId: String, response: HttpResponse): HttpResponse {
         checkSession(response)
         if (response.status == HttpStatusCode.Conflict) {
             val error = walletApi2Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -256,24 +259,29 @@ internal class WalletApi2Client(
                 throw WalletDemoStatusReviewChanged()
         }
         if (!response.status.isSuccess()) throw response.toApiException()
+        // A malformed successful status response still establishes server capability. Later
+        // integration failures cannot permit an unguarded legacy submission.
+        statusCapableWallets += walletId
         return response
     }
 
-    suspend fun buildVpToken(walletId: String, request: BuildVpTokenRequestDto, reviewedStatus: Map<String, String>? = null): BuildVpTokenResultDto =
+    suspend fun buildVpToken(walletId: String, request: BuildVpTokenRequestDto, reviewedStatus: Map<String, String>? = null,
+        statusContext: String? = null): BuildVpTokenResultDto =
         if (reviewedStatus == null) request {
             post(walletPath(walletId, "credentials/present/build-vp-token")) { jsonBody(request) }
-        }.body() else statusReviewedResponse(http.post(walletPath(walletId, "credentials/present/build-vp-token/status-reviewed")) {
-            jsonBody(StatusReviewedBuildRequestDto(request, reviewedStatus))
+        }.body() else statusResponse(walletId, http.post(walletPath(walletId, "credentials/present/build-vp-token/status-reviewed")) {
+            jsonBody(StatusReviewedBuildRequestDto(request, reviewedStatus, statusContext))
         }).body()
 
     suspend fun sendPresentationResponse(
         walletId: String, request: SendAuthorizationResponseRequestDto,
         reviewedStatus: Map<String, String>? = null, selectedIds: Set<String> = emptySet(),
+        statusContext: String? = null,
     ): WalletPresentResultDto =
         if (reviewedStatus == null) request {
             post(walletPath(walletId, "credentials/present/send-response")) { jsonBody(request) }
-        }.body() else statusReviewedResponse(http.post(walletPath(walletId, "credentials/present/send-response/status-reviewed")) {
-            jsonBody(StatusReviewedSendRequestDto(request, selectedIds, reviewedStatus))
+        }.body() else statusResponse(walletId, http.post(walletPath(walletId, "credentials/present/send-response/status-reviewed")) {
+            jsonBody(StatusReviewedSendRequestDto(request, selectedIds, reviewedStatus, statusContext))
         }).body()
 
     suspend fun rejectPresentation(

@@ -1,7 +1,6 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoStatusRefreshSummary
 import id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged
 import kotlinx.coroutines.isActive
@@ -61,6 +60,7 @@ internal class WalletApi2DemoWallet(
     private val issuanceSessions = mutableMapOf<String, Api2IssuanceSession>()
     private val processingIssuanceSessions = mutableSetOf<String>()
     private val presentationSessions = mutableMapOf<String, Api2PresentationSession>()
+    private var statuses = WalletApi2CredentialStatuses(client, walletId)
     private var activeOperations = 0
     private var resetStage: WalletResetStage? = null
     private var resetInProgress = false
@@ -92,21 +92,11 @@ internal class WalletApi2DemoWallet(
     }
 
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = useWallet {
-        val snapshot = client.credentialStatusSnapshot(walletId)
-        if (snapshot == null) WalletDemoCredentialStatuses(
-            client.listCredentialMetadata(walletId).associate { it.id to WalletDemoCredentialStatus.ServerUnsupported },
-            legacySubmission = true)
-        else snapshot.toDemoStatuses()
+        statuses.snapshot()
     }
 
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = useWallet {
-        val snapshot = client.credentialStatusSnapshot(walletId)
-            ?: error("This server does not support credential status checks.")
-        val selection = ids?.let { selected -> snapshot.credentials.filter { it.reference.credentialId in selected }.map { it.reference } }
-        require(selection == null || selection.isNotEmpty())
-        val result = client.refreshCredentialStatuses(walletId, RefreshCredentialStatusesDto(selection, if (force) "FORCE" else "IF_DUE"))
-        WalletDemoStatusRefreshSummary(result.count { it.outcome == "COMPLETED" }, result.count { it.outcome == "UNCHANGED" },
-            result.count { it.outcome == "DEFERRED" }, result.count { it.outcome != "REMOVED" && it.hasCheckErrors })
+        statuses.refresh(ids, force)
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = useWallet {
@@ -337,8 +327,10 @@ internal class WalletApi2DemoWallet(
         reviewedStatus: Map<String, String>,
         did: String?,
         paymentConsentRevision: String?,
+        statusReviewEpoch: Long?,
     ): WalletDemoOperationResult = useWallet {
-        val supported = client.credentialStatusSnapshot(walletId) != null
+        val statusSnapshot = statuses.submissionSnapshot(statusReviewEpoch)
+        val supported = statusSnapshot != null
         if (supported && selectedCredentialOptions.any { reviewedStatus[it.credentialId].isNullOrBlank() }) throw WalletDemoStatusReviewChanged()
         val review = reviewedStatus.takeIf { supported }
         val session = presentationSessions[previewHandle.value]
@@ -354,6 +346,7 @@ internal class WalletApi2DemoWallet(
                 did = did ?: this.did,
             ),
             reviewedStatus = review,
+            statusContext = statusSnapshot?.statusContext?.id,
         )
         val result = client.sendPresentationResponse(
             walletId,
@@ -363,6 +356,7 @@ internal class WalletApi2DemoWallet(
                 idToken = built.idToken,
             ),
             reviewedStatus = review, selectedIds = selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
+            statusContext = statusSnapshot?.statusContext?.id,
         )
         presentationSessions.remove(previewHandle.value)
         result.toDemoOperationResult(
@@ -456,6 +450,7 @@ internal class WalletApi2DemoWallet(
             }
             if (resetStage == WalletResetStage.CreateReplacement) {
                 walletId = client.createWallet()
+                statuses = WalletApi2CredentialStatuses(client, walletId)
                 resetStage = WalletResetStage.PublishReplacement
             }
             onWalletIdChanged(walletId)

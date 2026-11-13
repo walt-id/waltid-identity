@@ -107,6 +107,11 @@ class ControlledIssuerTests(unittest.TestCase):
         self.assertEqual(self.request("/credential", body, token=token)[0], 200)
 
     def test_signed_transitions_are_scoped_and_revocation_cannot_be_undone(self):
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.public.server_port}/art/event_pass.png") as artwork:
+            self.assertEqual(artwork.headers.get("Access-Control-Allow-Origin"), "*")
+            self.assertEqual(artwork.headers.get_content_type(), "image/png")
+        with urllib.request.urlopen(f"http://127.0.0.1:{self.control.server_port}/state") as control:
+            self.assertIsNone(control.headers.get("Access-Control-Allow-Origin"))
         self.issue("staff_access")
         self.issue("staff_access_alternative")
         self.issue("event_pass")

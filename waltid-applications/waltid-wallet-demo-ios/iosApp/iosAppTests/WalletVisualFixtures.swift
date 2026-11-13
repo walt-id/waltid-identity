@@ -7,7 +7,7 @@ import XCTest
 /// Shared, non-personal input also consumed by Compose Android and Compose iOS.
 struct WalletVisualFixtures {
     private let root: [String: Any]
-    private let resourceDirectory: URL
+    let resourceDirectory: URL
 
     init() throws {
         let applications = URL(fileURLWithPath: #filePath)

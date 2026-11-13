@@ -48,6 +48,29 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status])), id: "status.home.issue")
     }
 
+    func testCredentialStatusMixedArtwork() async throws { try await credentialStatusMixedArtwork() }
+    func testCredentialStatusMixedArtworkRtl() async throws { try await credentialStatusMixedArtwork(rtl: true) }
+    private func credentialStatusMixedArtwork(rtl: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let artwork = try WalletVisualArtwork.load(from: fixtures.resourceDirectory)
+        WalletVisualArtworkProtocol.install(try artwork.images(from: fixtures.resourceDirectory))
+        defer { WalletVisualArtworkProtocol.uninstall() }
+        let values = try Dictionary(uniqueKeysWithValues: artwork.cards.map { ($0.id, try fixtures.credentialStatus($0.status)) })
+        let content = ScrollView {
+            CredentialCardStackView(cards: artwork.cardItems, onOpenDetails: { _ in })
+                .frame(maxWidth: credentialCardMaxWidth).frame(maxWidth: .infinity).padding(16)
+        }
+        .background(Color(.systemGroupedBackground))
+        .environment(\.credentialStatusUI, CredentialStatusUIContext(values: values))
+        .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+        try await captureWhenReady(content, id: rtl ? "status.home.mixed_artwork.dark_large_text_rtl" : "status.home.mixed_artwork",
+            config: rtl ? .iPhoneSe : .iPhone13, colorScheme: rtl ? .dark : .light,
+            sizeCategory: rtl ? .accessibilityMedium : .large,
+            layoutDirection: rtl ? .rightToLeft : .leftToRight,
+            isReady: { WalletVisualArtworkProtocol.ready }, isImageReady: WalletVisualArtwork.hasRenderedArtworksAndRightBadges,
+            failure: "All three issuer artworks must render with issue badges on the physical right")
+    }
+
     func testCredentialStatusDetailsClear() throws { try credentialStatusDetails(adverse: false) }
     func testCredentialStatusDetailsAdverse() throws { try credentialStatusDetails(adverse: true) }
     private func credentialStatusDetails(adverse: Bool) throws {
@@ -111,7 +134,8 @@ final class WalletVisualTests: XCTestCase {
 
     func testCredentialStatusSettingsPartial() async throws { try await credentialStatusSettings(checking: false) }
     func testCredentialStatusSettingsChecking() async throws { try await credentialStatusSettings(checking: true) }
-    private func credentialStatusSettings(checking: Bool) async throws {
+    func testCredentialStatusSettingsHelp() async throws { try await credentialStatusSettings(checking: false, helpExpanded: true) }
+    private func credentialStatusSettings(checking: Bool, helpExpanded: Bool = false) async throws {
         let model = makeModel(walletClient: MockWalletClient(operationDelayMilliseconds: 30_000))
         model.automaticCredentialStatusChecks = false
         model.auth = .unlocked; model.isReady = true
@@ -121,8 +145,8 @@ final class WalletVisualTests: XCTestCase {
         } else { model.credentialStatusSummary = CredentialStatusRefreshSummary(completed: 2, unchanged: 1, deferred: 1, checkErrors: 1) }
         defer { model.handleApplicationEnteredBackground() }
         await model.readerTrustSettings.awaitPendingOperations()
-        try capture(NavigationView { CredentialStatusSettingsView(viewModel: model) }.navigationViewStyle(.stack),
-            id: checking ? "status.settings.checking" : "status.settings.partial")
+        try capture(NavigationView { CredentialStatusSettingsView(viewModel: model, helpInitiallyExpanded: helpExpanded) }.navigationViewStyle(.stack),
+            id: helpExpanded ? "status.settings.help" : checking ? "status.settings.checking" : "status.settings.partial")
     }
 
     func testWalletOpening() async throws { try await walletOpening(failure: false) }
@@ -568,10 +592,11 @@ final class WalletVisualTests: XCTestCase {
 
     func testPaymentLocalizedCompact() async throws {
         let state = PaymentReviewState.ready(try WalletVisualFixtures().payment(localized: true))
+        let submission = ReviewSubmissionGate<ReviewSubmissionBinding<String>>()
         try await captureWhenReady(WalletReviewScaffold {
             PaymentConsentView(state: state)
         } actions: {
-            ReviewActions(selectionComplete: true, isLoading: false, reviewKey: "visual-payment", credentialStatuses: [], onSubmit: { _ in }, onReject: nil,
+            ReviewActions(gate: submission, selectionComplete: true, isLoading: false, reviewKey: "visual-payment", credentialStatuses: [], onSubmit: { _ in }, onReject: nil,
                 onCancel: {}, paymentReview: state)
         }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium,
             isReady: { state.canConfirm }, failure: "Payment review did not become available", scrollToBottom: true)
@@ -828,6 +853,7 @@ final class WalletVisualTests: XCTestCase {
 
     private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
                                                  colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                                 layoutDirection: LayoutDirection = .leftToRight,
                                                  isReady: () -> Bool, isImageReady: ((UIImage) -> Bool)? = nil,
                                                  failure: String, readinessDescription: () -> String = { "" },
                                                  scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
@@ -837,13 +863,17 @@ final class WalletVisualTests: XCTestCase {
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
-        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory)
+        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory).environment(\.colorScheme, colorScheme)
+            .environment(\.layoutDirection, layoutDirection).environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .environment(\.credentialStatusUI, try WalletVisualFixtures().noReferenceStatusContext()))
         host.scrollToBottom = scrollToBottom
         host.scrollFraction = scrollFraction
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
         let window = UIWindow(windowScene: scene)
+        window.overrideUserInterfaceStyle = colorScheme == .dark ? .dark : .light
         window.frame = CGRect(origin: .zero, size: size)
         window.rootViewController = host
         window.makeKeyAndVisible()
@@ -911,7 +941,7 @@ final class WalletVisualTests: XCTestCase {
         // Compare exactly the settled frame that passed readiness. Snapshotting the controller
         // again relays it out and can restart native scroll-edge/glass transitions.
         try capture(XCTUnwrap(lastImage), as: .image(precision: 1), id: id,
-            colorScheme: colorScheme, sizeCategory: sizeCategory)
+            colorScheme: colorScheme, sizeCategory: sizeCategory, layoutDirection: layoutDirection)
     }
 
     private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,

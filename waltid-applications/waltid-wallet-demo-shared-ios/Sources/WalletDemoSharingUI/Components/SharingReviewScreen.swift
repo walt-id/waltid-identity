@@ -16,6 +16,7 @@ import WalletSDK
 public struct SharingReviewScreen: View {
     @Environment(\.credentialStatusUI) private var statusUI
     @State private var renderedOptions: [PresentationCredentialOption] = []
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<SharingSubmissionKey>>()
     private let title: String
     private let statusNotice: String?
     private let review: SharingReviewModel?
@@ -78,6 +79,7 @@ public struct SharingReviewScreen: View {
             } actions: {
                 if let review, failure == nil {
                     ReviewActions(
+                        gate: submission,
                         selectionComplete: selectionComplete && renderedOptions == review.credentialOptions,
                         isLoading: isSubmitting,
                         reviewKey: SharingSubmissionKey(requestIdentity: requestIdentity, review: review, selection: selection),
@@ -96,11 +98,13 @@ public struct SharingReviewScreen: View {
             .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         }
         .onPreferenceChange(SharingReviewReadinessKey.self) { renderedOptions = $0 }
+        .environment(\.credentialStatusUI, statusUI.readOnly)
         .interactiveDismissDisabled(isSubmitting)
     }
 
     @ViewBuilder
     private var content: some View {
+        ReviewChangedNotice(submission)
         if let statusNotice { Text(statusNotice).font(.footnote).foregroundStyle(.secondary) }
         if failure != nil {
             Label("Unable to share", systemImage: "exclamationmark.shield")

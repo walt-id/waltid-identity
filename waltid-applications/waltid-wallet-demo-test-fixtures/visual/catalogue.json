@@ -77,7 +77,7 @@
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
       "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
-      "title": "Wallet — saved credential"
+      "title": "Wallet \u2014 saved credential"
     },
     {
       "id": "wallet.scan.empty",
@@ -91,7 +91,7 @@
     },
     {
       "id": "wallet.scan.fido",
-      "title": "Scanner — FIDO request",
+      "title": "Scanner \u2014 FIDO request",
       "requirements": [
         "Android system handoff action and iOS system scanner guidance"
       ],
@@ -142,7 +142,7 @@
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
-      "title": "Receiving — selected credentials"
+      "title": "Receiving \u2014 selected credentials"
     },
     {
       "id": "batch.offer.none_selected",
@@ -159,7 +159,7 @@
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
-      "title": "Receiving — saved and deferred"
+      "title": "Receiving \u2014 saved and deferred"
     },
     {
       "id": "payment.mixed_credentials.main",
@@ -209,7 +209,7 @@
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
-      "title": "Nearby sharing — hold near reader",
+      "title": "Nearby sharing \u2014 hold near reader",
       "note": "Synthetic engagement with the decorative animation paused (Compose reduced motion; native inactive scene); no radio session or system NFC prompt."
     },
     {
@@ -220,7 +220,7 @@
         "PIN setup guidance and input"
       ],
       "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
-      "title": "Onboarding — choose a PIN"
+      "title": "Onboarding \u2014 choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -283,7 +283,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "PIN — compact, dark, large text"
+      "title": "PIN \u2014 compact, dark, large text"
     },
     {
       "id": "onboarding.pin.unlock",
@@ -366,7 +366,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "Receiving — compact, dark, large text"
+      "title": "Receiving \u2014 compact, dark, large text"
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -438,7 +438,7 @@
       "composeTest": "missingSavedDetails",
       "swiftTest": "testMissingSavedDetails",
       "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
-      "title": "Receiving — saved details unavailable"
+      "title": "Receiving \u2014 saved details unavailable"
     },
     {
       "id": "onboarding.key.summary",
@@ -493,7 +493,7 @@
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
       "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
-      "title": "Sharing — selected information"
+      "title": "Sharing \u2014 selected information"
     },
     {
       "id": "sharing.information.dates",
@@ -1244,12 +1244,63 @@
     {
       "id": "status.home.issue",
       "requirements": [
-        "Issue-only icon on artwork with unchanged card geometry"
+        "Issue-only Home decoration at a fixed physical-right artwork anchor"
       ],
       "composeTest": "credentialStatusHome",
       "swiftTest": "testCredentialStatusHome",
-      "title": "Issue-only icon on artwork with unchanged card geometry",
-      "note": "Wallet-rendered titles use an icon prefix; supplied artwork uses a bottom-start overlay. Covered icons need not remain visible. Quiet credentials have no positive Home badge."
+      "title": "Issue-only Home decoration at a fixed physical-right artwork anchor",
+      "note": "Supplied, constructed, pending and failed artwork use the same card-relative badge anchor. Quiet credentials have no Home badge. Aspect ratio, 56-unit stack peek and transitions are preserved."
+    },
+    {
+      "id": "status.home.mixed_artwork",
+      "requirements": [
+        "All six chip/no-chip and quiet/warning/revoked combinations",
+        "One physical-right anchor with visible clearance above the next card"
+      ],
+      "composeTest": "credentialStatusMixedArtwork",
+      "swiftTest": "testCredentialStatusMixedArtwork",
+      "title": "Mixed real artwork with quiet, warning and revoked component fixtures",
+      "note": "Production card stack with three unchanged public issuer artworks and three wallet-constructed cards. Synthetic producer-derived assessments are layout fixtures, not adverse claims about issued PID/EMVCo/KYC credentials. Input bytes and provenance are shared in credential-artwork.json."
+    },
+    {
+      "id": "status.home.mixed_artwork.dark_large_text_rtl",
+      "requirements": [
+        "All six chip/no-chip and quiet/warning/revoked combinations",
+        "One physical-right anchor with visible clearance above the next card"
+      ],
+      "composeTest": "credentialStatusMixedArtworkRtl",
+      "swiftTest": "testCredentialStatusMixedArtworkRtl",
+      "title": "Mixed artwork at compact width, dark theme, large text and RTL",
+      "note": "Production card stack with three unchanged public issuer artworks and three wallet-constructed cards. Synthetic producer-derived assessments are layout fixtures, not adverse claims about issued PID/EMVCo/KYC credentials. Input bytes and provenance are shared in credential-artwork.json.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "status.details.clear",
@@ -1347,6 +1398,16 @@
       "note": "Check-error counts overlap processed/unchanged outcomes; expanded help explains the categories. Background scheduling is deferred."
     },
     {
+      "id": "status.settings.help",
+      "requirements": [
+        "Expanded four-point help with compact typography and unchanged batch/preference state"
+      ],
+      "composeTest": "credentialStatusSettingsHelp",
+      "swiftTest": "testCredentialStatusSettingsHelp",
+      "title": "Expanded How checks work and structured batch results",
+      "note": "Production settings content. Compose opens and closes the actual disclosure without invoking refresh or changing the preference; native pins its expanded state. Actual app-host open/close behavior is separate journey evidence."
+    },
+    {
       "id": "status.settings.checking",
       "requirements": [
         "Visible check progress and duplicate-action prevention"
@@ -1395,13 +1456,13 @@
     }
   ],
   "galleryPreview": [
-    "status.home.issue",
+    "status.home.mixed_artwork",
     "status.details.clear",
     "status.details.adverse",
     "status.details.expanded",
     "status.sharing.review",
     "status.payment.review",
-    "status.settings.partial",
+    "status.settings.help",
     "payment.scheduled.main",
     "payment.scheduled.details",
     "payment.recurring.main",
@@ -1422,6 +1483,7 @@
     "onboarding.pin.compact_dark_large_text",
     "batch.offer.compact_dark_large_text",
     "components.dates.compact_large_text_rtl",
-    "status.compact.dark_large_text_rtl"
+    "status.compact.dark_large_text_rtl",
+    "status.home.mixed_artwork.dark_large_text_rtl"
   ]
 }

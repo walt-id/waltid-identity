@@ -6,6 +6,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.PresentationStatusRefreshActions
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -97,6 +98,8 @@ internal fun WalletDemoAppHost(
         checkAll = { controller.checkCredentialStatuses() },
         summary = state.credentialStatusSummary, error = state.credentialStatusBatchError,
         contextKey = controller to state.credentialStatusContext,
+        reviewRefresh = PresentationStatusRefreshActions(controller::checkPresentationCredentialStatus,
+            controller::presentationStatusRefreshRendered, controller::releasePresentationStatusRefresh),
     )) {
     WalletDemoTheme(branding) {
         Surface(

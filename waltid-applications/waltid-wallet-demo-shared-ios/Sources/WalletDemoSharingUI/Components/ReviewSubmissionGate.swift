@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Transient ownership of one reviewed attempt, never persisted as authorization.
 @MainActor
-final class ReviewSubmissionGate<Key: Equatable>: ObservableObject {
+public final class ReviewSubmissionGate<Key: Equatable>: ObservableObject {
+    /// Creates an idle gate owned by one transient review host.
+    public init() {}
     struct Attempt {
         let id = UUID()
         let key: Key
@@ -13,10 +15,13 @@ final class ReviewSubmissionGate<Key: Equatable>: ObservableObject {
         let submit: ([String: String]) -> Void
     }
     @Published private(set) var pending: Attempt?
-    @Published private(set) var changed = false
-    private var current: Key?
+    @Published public private(set) var changed = false
+    @Published private var current: Key?
     private var enabled = false
-    private var consumed = false
+    @Published private var consumed = false
+
+    /// Manual refresh cannot begin during a confirmation or after this attempt was consumed.
+    public var canRefresh: Bool { pending == nil && !consumed && current != nil }
 
     func update(_ key: Key, enabled: Bool) {
         if current != key || self.enabled != enabled {
@@ -37,7 +42,7 @@ final class ReviewSubmissionGate<Key: Equatable>: ObservableObject {
         deliver(attempt)
     }
     func dismiss() { if pending != nil { pending = nil } }
-    func close() { dismiss(); enabled = false; consumed = false; current = nil }
+    func close() { dismiss(); changed = false; enabled = false; consumed = false; current = nil }
     private func deliver(_ attempt: Attempt) {
         guard enabled, !consumed, current == attempt.key else { return }
         consumed = true

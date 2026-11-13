@@ -18,6 +18,7 @@ with `{"configuration":"staff_access"}` or `event_pass` to obtain a fresh five-m
 `staff_access_alternative` supplies another option of the workplace-access type. The public listener
 exposes only metadata, token/nonce/credential endpoints, credential artwork and signed status lists.
 Keys exist only in memory. Offers, tokens and nonces are bounded and single use; access logs are off.
+Public artwork allows cross-origin browser loading; the private control listener does not.
 The authorization metadata advertises only the pre-authorized grant and intentionally omits
 `response_types_supported`, as OID4VCI 1.0 permits. It does not advertise an interactive flow.
 Status entries explicitly include `statusSize: 1`, interoperating with verifier parsers which

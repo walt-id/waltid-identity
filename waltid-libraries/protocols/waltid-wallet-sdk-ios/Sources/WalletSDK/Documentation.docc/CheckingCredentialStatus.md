@@ -42,8 +42,14 @@ credential validity, issuer trust or verifier acceptance. The producer owns the 
 and legacy values/purposes distinct. Unknown semantic codes do not become a clear result.
 
 Keep home-card decoration limited to an issue icon. Put the result, checked time and check action in
-a standalone Credential status section with a refresh icon; expand structured facts with its chevron.
-Sharing reviews use cached observations and selected-only warnings. They do not contact issuers.
+a standalone Credential status section with a refresh icon. The demos use Status clear only for
+qualifying evidence, retain scope and original check time, and expand only additional facts.
+Sharing reviews use cached observations and selected-only warnings. Opening or expanding them and
+submitting do not contact issuer status services. A normal online review can offer explicit refresh
+inside expanded facts. Preserve selection and previous evidence; wait for that review's own operation
+and render its result/error before another deliberate submit. Cancel the old UI interest on lock,
+disposal or request/wallet replacement, fencing late completion. Provider and nearby reviews retain
+their existing read-only capability.
 The demos add one final confirmation for known or retained revoked, invalid or suspended selections,
 combining it with any explicit unsigned-payment warning. Payment and nearby labels remain authoritative.
 

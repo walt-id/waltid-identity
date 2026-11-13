@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -48,7 +49,11 @@ import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialRow
 import id.walt.walletdemo.compose.ui.components.PaymentConsentSection
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.rememberSharingSubmission
+import id.walt.walletdemo.compose.ui.components.ReviewChangedNotice
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.CredentialStatusSection
 import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -258,19 +263,60 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(1, copies.value)
     }
 
+    fun compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability() = runComposeUiTest {
+        val id = "identity"
+        val snapshot = mutableStateOf(WalletDemoCredentialStatuses(mapOf(id to WalletVisualFixtures.credentialStatus("clear"))))
+        val capability = mutableStateOf(true)
+        var checks = 0
+        setContent {
+            CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(snapshot = snapshot.value,
+                checking = snapshot.value.refreshing.isNotEmpty(),
+                check = if (capability.value) ({ _: String -> checks++; snapshot.value = snapshot.value.copy(refreshing = setOf(id)) }) else null)) {
+                Column(Modifier.width(320.dp)) { CredentialStatusSection(id, compact = true) }
+            }
+        }
+        onNodeWithText("Status clear").assertIsDisplayed()
+        onNodeWithTag("credential-status-check-$id").assertDoesNotExist()
+        onNodeWithTag("credential-status-details-$id").performClick()
+        onNodeWithTag("credential-status-last-checked-$id").assertIsDisplayed()
+        assertEquals(0, checks, "Expansion must not check issuer status")
+        onNodeWithTag("credential-status-check-$id").performClick().assertIsNotEnabled()
+        assertEquals(1, checks)
+        onNodeWithTag("credential-status-details-$id").performClick()
+        onNodeWithTag("credential-status-check-$id").assertDoesNotExist()
+        onNodeWithTag("credential-status-details-$id").performClick()
+        onNodeWithTag("credential-status-check-$id").assertIsNotEnabled()
+        assertEquals(1, checks, "Collapsing/reopening does not restart the owned request")
+        runOnIdle { capability.value = false }
+        onNodeWithTag("credential-status-check-$id").assertDoesNotExist()
+        runOnIdle { snapshot.value = WalletDemoCredentialStatuses(mapOf(id to WalletVisualFixtures.credentialStatus("not_provided"))) }
+        onNodeWithText("Status not provided").assertIsDisplayed()
+        onNodeWithTag("credential-status-details-$id").assertDoesNotExist()
+    }
+
     fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() = runComposeUiTest {
         val consent = WalletDemoPaymentConsent("first", "en", null, null, "Pay", null, true, emptyList())
         val review = mutableStateOf<WalletDemoPaymentReview>(WalletDemoPaymentReview.Ready(consent))
         val enabled = mutableStateOf(true)
+        val statuses = mutableStateOf(WalletDemoCredentialStatuses())
         var submissions = 0
         setContent {
-            CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(snapshot = WalletDemoCredentialStatuses())) {
-                SharingActionsRow(enabled.value, true, reviewKey = "unsigned-payment", credentialStatuses = emptyList(),
-                    onSubmit = { submissions++ }, onCancel = {}, onReject = null, paymentReview = review.value)
+            CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(snapshot = statuses.value)) {
+                val submission = rememberSharingSubmission(enabled.value, true, reviewKey = "unsigned-payment", credentialStatuses = emptyList(),
+                    onSubmit = { submissions++ }, paymentReview = review.value)
+                ReviewScaffold(actions = { SharingActionsRow(submission, enabled.value, onCancel = {}, onReject = null, paymentReview = review.value) }) {
+                    ReviewChangedNotice(submission)
+                }
             }
         }
+        val footerHeight = onNodeWithTag(WalletUiTestTags.PresentationActions).fetchSemanticsNode().boundsInRoot.height
         onNodeWithText("Pay").performClick()
         onNodeWithTag("payment-unsigned-confirm").assertIsDisplayed()
+        runOnIdle { statuses.value = statuses.value.copy(reviewEpoch = 1) }
+        onNodeWithTag("payment-unsigned-confirm").assertDoesNotExist()
+        onNodeWithTag("credential-status-review-changed").assert(hasAnyAncestor(hasTestTag("wallet.review.content")))
+        assertEquals(footerHeight, onNodeWithTag(WalletUiTestTags.PresentationActions).fetchSemanticsNode().boundsInRoot.height)
+        onNodeWithText("Pay").performClick()
         runOnIdle { review.value = WalletDemoPaymentReview.Ready(consent.copy(revision = "second")) }
         onNodeWithTag("payment-unsigned-confirm").assertDoesNotExist()
         onNodeWithText("Pay").performClick()

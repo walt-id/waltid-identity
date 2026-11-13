@@ -16,12 +16,31 @@ import id.walt.walletdemo.compose.ui.resources.proximity_cancel
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun SharingActionsRow(
+internal fun rememberSharingSubmission(
     enabled: Boolean,
     selectionComplete: Boolean,
     reviewKey: Any,
     credentialStatuses: List<ReviewCredentialStatus>,
     onSubmit: (Map<String, String>) -> Unit,
+    presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
+    paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
+    isPayment: Boolean = false,
+    submitLabelOverride: String? = null,
+): ReviewedSubmission {
+    val revisions = credentialStatuses.reviewedRevisions(LocalCredentialStatusUi.current.snapshot)
+    val canSubmit = enabled && selectionComplete && paymentReview.canConfirm && revisions != null
+    val submitLabel = sharingSubmitLabel(presentation, paymentReview, isPayment, submitLabelOverride)
+    return rememberReviewedSubmission(listOf(LocalCredentialStatusUi.current.contextKey, reviewKey,
+        LocalCredentialStatusUi.current.snapshot.reviewEpoch),
+        credentialStatuses, paymentReview, canSubmit, revisions, submitLabel,
+        ordinarySharing = presentation == ReviewActionPresentation.Sharing && !isPayment && paymentReview.consent == null,
+        onSubmit = onSubmit)
+}
+
+@Composable
+internal fun SharingActionsRow(
+    submission: ReviewedSubmission,
+    enabled: Boolean,
     onCancel: () -> Unit,
     onReject: (() -> Unit)?,
     presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
@@ -31,16 +50,7 @@ internal fun SharingActionsRow(
     showCancel: Boolean = true,
     submitLabelOverride: String? = null,
 ) {
-    val revisions = credentialStatuses.reviewedRevisions(LocalCredentialStatusUi.current.snapshot)
-    val canSubmit = enabled && selectionComplete && paymentReview.canConfirm && revisions != null
-    val submitLabel = submitLabelOverride ?: paymentReview.consent?.affirmativeAction ?: if (isPayment) stringResource(Res.string.payment_confirm) else when (presentation) {
-        ReviewActionPresentation.Sharing -> "Share"
-        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
-    }
-    val submit = rememberReviewedSubmission(listOf(LocalCredentialStatusUi.current.contextKey, reviewKey),
-        credentialStatuses, paymentReview, canSubmit, revisions, submitLabel,
-        ordinarySharing = presentation == ReviewActionPresentation.Sharing && !isPayment && paymentReview.consent == null,
-        onSubmit = onSubmit)
+    val submitLabel = sharingSubmitLabel(presentation, paymentReview, isPayment, submitLabelOverride)
     val rejectLabel = paymentReview.consent?.denialAction ?: if (isPayment) stringResource(Res.string.payment_decline) else when (presentation) {
         ReviewActionPresentation.Sharing -> "Reject"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_decline)
@@ -52,11 +62,22 @@ internal fun SharingActionsRow(
     val cancel = WalletAction(cancelLabel, onCancel,
         enabled = enabled || presentation == ReviewActionPresentation.Proximity, testTag = presentation.cancelTestTag)
     WalletActions(
-        primary = WalletAction(submitLabel, submit, canSubmit, presentation.submitTestTag),
+        primary = WalletAction(submitLabel, submission.submit, submission.enabled, presentation.submitTestTag),
         secondary = onReject?.let { WalletAction(rejectLabel, it, enabled, presentation.rejectTestTag) } ?: cancel.takeIf { showCancel },
         tertiary = cancel.takeIf { onReject != null && showCancelWithReject && showCancel },
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
     )
+}
+
+@Composable
+private fun sharingSubmitLabel(
+    presentation: ReviewActionPresentation,
+    paymentReview: WalletDemoPaymentReview,
+    isPayment: Boolean,
+    labelOverride: String?,
+): String = labelOverride ?: paymentReview.consent?.affirmativeAction ?: if (isPayment) stringResource(Res.string.payment_confirm) else when (presentation) {
+    ReviewActionPresentation.Sharing -> "Share"
+    ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
 }
 
 internal enum class ReviewActionPresentation {

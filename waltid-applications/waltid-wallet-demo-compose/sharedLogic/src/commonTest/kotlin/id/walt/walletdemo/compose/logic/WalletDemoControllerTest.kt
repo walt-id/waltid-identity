@@ -35,6 +35,140 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun explicitReviewCheckWaitsForItsRenderedResultAndPreservesTheSelection() = runTest {
+        val finish = CompletableDeferred<Unit>()
+        var forcedChecks = 0
+        val base = FakeDemoWallet(presentationPreview = statusReviewPreview())
+        val wallet = object : DemoWallet by base {
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                if (force) {
+                    forcedChecks++
+                    assertEquals(setOf("cred-1"), ids)
+                    finish.await()
+                }
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.setAutomaticCredentialStatusChecks(false)
+        controller.updatePresentationRequestUrl("openid4vp://example"); controller.previewPresentation(); runCurrent()
+        assertEquals(0, forcedChecks, "Opening the review does not force a check")
+        val before = controller.state.value
+        val submission = assertNotNull(before.presentationSubmission(mapOf("cred-1" to "no-reference")))
+        controller.checkPresentationCredentialStatus("cred-1", presentationPreviewHandle, before.presentationNavigationResetKey)
+        assertEquals(WalletDemoReviewStatusRefresh.Phase.Checking, controller.state.value.presentationStatusRefresh?.phase)
+        controller.submitPresentation(submission); runCurrent()
+        assertEquals(0, base.submitPresentationCalls)
+        assertEquals(1, forcedChecks, "Manual checks remain available with automatic checks off")
+        finish.complete(Unit); runCurrent()
+        val completed = controller.state.value
+        val refresh = assertNotNull(completed.presentationStatusRefresh)
+        assertEquals(WalletDemoReviewStatusRefresh.Phase.AwaitingRender, refresh.phase)
+        assertFalse(completed.checkingCredentialStatuses)
+        assertEquals(before.selectedPresentationCredentialOptions, completed.selectedPresentationCredentialOptions)
+        assertEquals(before.selectedPresentationDisclosureOptions, completed.selectedPresentationDisclosureOptions)
+        controller.submitPresentation(submission); runCurrent()
+        assertEquals(0, base.submitPresentationCalls, "Completion alone cannot bypass the display acknowledgement")
+        controller.presentationStatusRefreshRendered(refresh.id - 1)
+        assertNotNull(controller.state.value.presentationStatusRefresh)
+        controller.presentationStatusRefreshRendered(refresh.id); runCurrent()
+        assertNull(controller.state.value.presentationStatusRefresh)
+        assertEquals(0, base.submitPresentationCalls, "Refresh never automatically submits")
+        controller.submitPresentation(assertNotNull(controller.state.value.presentationSubmission(mapOf("cred-1" to "no-reference")))); runCurrent()
+        assertEquals(1, base.submitPresentationCalls)
+    }
+
+    @Test
+    fun anUnownedStatusCheckDoesNotBecomeANewSubmissionPrecondition() = runTest {
+        val finish = CompletableDeferred<Unit>()
+        val base = FakeDemoWallet(presentationPreview = statusReviewPreview())
+        val wallet = object : DemoWallet by base {
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                if (force) finish.await()
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.setAutomaticCredentialStatusChecks(false)
+        controller.updatePresentationRequestUrl("openid4vp://example"); controller.previewPresentation(); runCurrent()
+        controller.checkCredentialStatuses(setOf("cred-1")); runCurrent()
+        assertTrue(controller.state.value.checkingCredentialStatuses)
+        assertNull(controller.state.value.presentationStatusRefresh)
+        controller.submitPresentation(assertNotNull(controller.state.value.presentationSubmission(mapOf("cred-1" to "no-reference")))); runCurrent()
+        assertEquals(1, base.submitPresentationCalls, "Only the explicit check owned by this review suspends its submit action")
+        finish.complete(Unit); runCurrent()
+    }
+
+    @Test
+    fun aFailedReviewCheckRetainsEvidenceAndWaitsForTheErrorToRender() = runTest {
+        val base = FakeDemoWallet(presentationPreview = statusReviewPreview())
+        val wallet = object : DemoWallet by base {
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                if (force) error("Unavailable transport")
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.setAutomaticCredentialStatusChecks(false)
+        controller.updatePresentationRequestUrl("openid4vp://example"); controller.previewPresentation(); runCurrent()
+        val before = controller.state.value
+        controller.checkPresentationCredentialStatus("cred-1", presentationPreviewHandle, before.presentationNavigationResetKey); runCurrent()
+        val failed = controller.state.value
+        assertEquals(before.credentialStatuses.credentials, failed.credentialStatuses.credentials)
+        assertNotNull(failed.credentialStatusError)
+        assertNull(failed.credentialStatusBatchError)
+        assertEquals(WalletDemoReviewStatusRefresh.Phase.AwaitingRender, failed.presentationStatusRefresh?.phase)
+        controller.presentationStatusRefreshRendered(assertNotNull(failed.presentationStatusRefresh).id)
+        assertNull(controller.state.value.presentationStatusRefresh)
+    }
+
+    @Test
+    fun reviewDisposalReplacementAndLockReleaseOnlyTheirOwnWaitAndIgnoreLateCompletion() = runTest {
+        for (exit in listOf("dispose", "replace", "background", "lock")) {
+            val finish = CompletableDeferred<Unit>()
+            var snapshotReads = 0
+            val base = FakeDemoWallet(presentationPreview = statusReviewPreview())
+            val wallet = object : DemoWallet by base {
+                override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses {
+                    snapshotReads++
+                    return base.credentialStatusSnapshot()
+                }
+                override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                    if (force) withContext(NonCancellable) { finish.await() }
+                    return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+                }
+            }
+            val controller = unlockedControllerWith(wallet, this)
+            controller.setAutomaticCredentialStatusChecks(false)
+            controller.updatePresentationRequestUrl("openid4vp://example"); controller.previewPresentation(); runCurrent()
+            val before = controller.state.value
+            controller.checkPresentationCredentialStatus("cred-1", presentationPreviewHandle, before.presentationNavigationResetKey); runCurrent()
+            controller.releasePresentationStatusRefresh(WalletDemoPresentationPreviewHandle("foreign"), before.presentationNavigationResetKey)
+            assertNotNull(controller.state.value.presentationStatusRefresh, "Another owner cannot release this refresh")
+            when (exit) {
+                "dispose" -> controller.releasePresentationStatusRefresh(presentationPreviewHandle, before.presentationNavigationResetKey)
+                "replace" -> controller.updatePresentationRequestUrl("openid4vp://replacement")
+                "background" -> controller.handleApplicationBackgrounded()
+                "lock" -> controller.lock()
+            }
+            runCurrent()
+            assertNull(controller.state.value.presentationStatusRefresh, exit)
+            assertFalse(controller.state.value.checkingCredentialStatuses, exit)
+            val readsAtClose = snapshotReads
+            finish.complete(Unit); runCurrent()
+            assertEquals(readsAtClose, snapshotReads, "A late $exit completion must not fetch/install its result")
+            assertNull(controller.state.value.presentationStatusRefresh)
+            assertEquals(0, base.submitPresentationCalls)
+            controller.handleApplicationBackgrounded(); runCurrent()
+        }
+    }
+
+    private fun statusReviewPreview() = WalletDemoPresentationPreview(presentationPreviewHandle, verifierMetadata = null, clientId = null,
+        responseEncryption = WalletDemoResponseEncryption.NotRequired, credentialOptions = listOf(
+            WalletDemoPresentationCredentialOption("pid", "cred-1", label = "Licence", issuer = "Issuer", format = "dc+sd-jwt",
+                credentialDataJson = "{}", disclosures = emptyList())))
+
+    @Test
     fun pendingInitialLocalStatusReadStaysNeutralUntilItCompletesOrFails() = runTest {
         val complete = CompletableDeferred<Unit>()
         val wallet = object : DemoWallet by FakeDemoWallet(credentials = listOf(sampleCredential)) {
@@ -82,6 +216,7 @@ class WalletDemoControllerTest {
                 selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
                 selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
                 reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
+                statusReviewEpoch: Long?,
             ): WalletDemoOperationResult {
                 unreadable = true
                 throw WalletDemoStatusReviewChanged()
@@ -106,7 +241,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun renderedSubmissionCannotApproveChangedDisclosuresOrWalletContext() = runTest {
+    fun renderedSubmissionCannotApproveChangedDisclosuresOrWalletContextOrStatusReview() = runTest {
         val option = WalletDemoPresentationCredentialOption("pid", "cred-1", label = "Licence", issuer = "Issuer",
             format = "dc+sd-jwt", credentialDataJson = "{}", disclosures = listOf(
                 WalletDemoPresentationDisclosure("Given name", path = "given_name", valueJson = "\"Ada\"",
@@ -122,6 +257,8 @@ class WalletDemoControllerTest {
         assertEquals(0, wallet.submitPresentationCalls)
         val current = assertNotNull(controller.state.value.presentationSubmission(mapOf("cred-1" to "no-reference")))
         controller.submitPresentation(current.copy(walletContext = current.walletContext + 1)); runCurrent()
+        assertEquals(0, wallet.submitPresentationCalls)
+        controller.submitPresentation(current.copy(statusReviewEpoch = current.statusReviewEpoch + 1)); runCurrent()
         assertEquals(0, wallet.submitPresentationCalls)
         controller.submitPresentation(current); runCurrent()
         assertEquals(1, wallet.submitPresentationCalls)

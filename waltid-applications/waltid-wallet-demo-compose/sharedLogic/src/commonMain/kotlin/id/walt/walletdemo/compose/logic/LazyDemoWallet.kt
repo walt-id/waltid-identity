@@ -42,7 +42,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
-    ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision)
+        statusReviewEpoch: Long?,
+    ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision, statusReviewEpoch)
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()

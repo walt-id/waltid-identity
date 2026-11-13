@@ -24,6 +24,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -107,6 +108,21 @@ class CredentialStatusBackendE2ETest {
                 ?: submit.contentDescription?.takeIf { it.isNotBlank() }
                 ?: submit.findObject(By.text(Pattern.compile("Share|Confirm payment")))?.text
         }
+        fun refreshReview(card: String, actionLabel: String) {
+            val id = card.removePrefix("wallet.credentialCard.")
+            val details = "credential-status-details-$id"
+            assertNotNull(waitForResourceAfterScrolling(device, details, 10_000))
+            clickByTag(device, details)
+            val checked = "credential-status-last-checked-$id"
+            val before = requireNotNull(waitForResourceAfterScrolling(device, checked, 10_000)).text
+            assertNotNull(waitForResourceAfterScrolling(device, "credential-status-check-$id", 10_000))
+            refresh("Revoked")
+            assertNotEquals("An explicit review refresh must display its new authenticated result", before,
+                requireNotNull(waitForResourceAfterScrolling(device, checked, 10_000)).text)
+            assertEquals(actionLabel, submitLabel())
+            assertFalse(device.hasObject(By.res("wallet.presentationDone")))
+            assertFalse(device.hasObject(By.text("Credential status warning")))
+        }
         fun awaitSubmission(rejected: Boolean = false) {
             assertTrue("The wallet must finish its intentional submission", waitForStatus(device, 90_000,
                 matcher = { it.startsWith("Presentation sent") || it.startsWith("Presentation finished") ||
@@ -141,32 +157,34 @@ class CredentialStatusBackendE2ETest {
             assertEquals(saved, cardIDs())
             openCard(pidCard, "Status not provided")
             capture("public-demo-no-reference")
-            openCard(eventCard, "Not suspended")
+            openCard(eventCard, "Status clear")
             backend.setStatus(event, 1)
             refresh("Suspended")
             capture("authenticated-suspended")
             backend.setStatus(event, 0)
-            refresh("Not suspended")
+            refresh("Status clear")
             capture("suspension-cleared")
-            openCard(accessCard, "Not revoked")
+            openCard(accessCard, "Status clear")
             capture("authenticated-clear")
             backend.setStatus(access, 1)
             refresh("Revoked")
-            expandStatusDetails(device, accessCard)
+            assertFalse("Simple issuer results have no redundant disclosure",
+                device.hasObject(By.res("credential-status-details-${accessCard.removePrefix("wallet.credentialCard.")}")))
             val checkedTag = "credential-status-last-checked-${accessCard.removePrefix("wallet.credentialCard.")}"
             val checked = requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000))
             val originalCheck = checked.text
             assertFalse(originalCheck.isNullOrBlank())
-            capture("authenticated-revoked-expanded")
+            capture("authenticated-revoked")
             backend.setOutage(true)
-            // The refresh remains above the expanded facts.
+            // The original successful-check time stays in the main box.
             device.swipe(device.displayWidth / 2, device.displayHeight / 3,
                 device.displayWidth / 2, device.displayHeight * 3 / 4, 30)
             refresh("Last known: revoked")
             assertEquals(originalCheck, requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000)).text)
+            expandStatusDetails(device, accessCard)
             assertTrue("Signed freshness must expire without changing the device clock",
-                device.wait(Until.hasObject(By.text("This result is out of date.")), 45_000))
-            assertTextVisibleAfterScrolling(device, listOf("This result is out of date."),
+                device.wait(Until.hasObject(By.text("Status outdated")), 45_000))
+            assertTextVisibleAfterScrolling(device, listOf("Status outdated"),
                 "The stale evidence note must remain reachable")
             assertEquals(originalCheck, requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000)).text)
             capture("outage-retained-evidence")
@@ -181,6 +199,8 @@ class CredentialStatusBackendE2ETest {
             assertTextVisibleAfterScrolling(device, listOf("Status not provided"), "The quiet PID must stay separate")
             assertTrue(device.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))))
             capture("mixed-sharing")
+            refreshReview(accessCard, "Share")
+            capture("sharing-refreshed")
             clickByTag(device, "wallet.presentationSubmitButton")
             assertTrue(device.wait(Until.hasObject(By.text("Share with status issues?")), 10_000))
             assertTrue(device.hasObject(By.text(Pattern.compile("(?s).*Workplace access.*"))))
@@ -242,6 +262,14 @@ class CredentialStatusBackendE2ETest {
             assertTrue(device.wait(Until.hasObject(By.text("Processed")), 30_000))
             assertTrue(device.wait(Until.hasObject(By.res("settings-credential-status-check-all").enabled(true)), 30_000))
             capture("settings-completed")
+            clickByTag(device, "settings-credential-status-how")
+            val helpText = "“With check errors” counts credentials with failed checks, conflicting results or unreadable status information. These credentials are also included in the other counts."
+            assertTextVisibleAfterScrolling(device, listOf(helpText), "Expanded settings help must explain the counts")
+            capture("settings-help")
+            clickByTag(device, "settings-credential-status-how")
+            assertFalse(device.hasObject(By.text(helpText)))
+            assertTrue(device.hasObject(By.text("Processed")))
+            assertTrue(device.hasObject(By.res(automatic.resourceName).checked(true)))
             clickByTag(device, automatic.resourceName)
             assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(false)), 5_000))
             home()
@@ -261,6 +289,8 @@ class CredentialStatusBackendE2ETest {
             assertTrue("Payment evidence must deliberately review the expired result in manual mode",
                 device.wait(Until.hasObject(By.text("Last known: revoked")), 45_000))
             capture("payment-selected-credentials")
+            refreshReview(accessCard, "Confirm payment")
+            capture("payment-refreshed")
             fun showPaymentWarning() {
                 clickByTag(device, "wallet.presentationSubmitButton")
                 val changed = "The review changed. Check the updated information before continuing."
@@ -297,7 +327,6 @@ class CredentialStatusBackendE2ETest {
             // no SDK data or status is injected, and automatic checks stay off during that read.
             tapStoredCard(device, accessCard)
             assertTrue(device.wait(Until.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))), 30_000))
-            expandStatusDetails(device, accessCard)
             val retainedTime = requireNotNull(waitForResourceAfterScrolling(device, checkedTag, 10_000)).text
             assertFalse(retainedTime.isNullOrBlank())
             File(context.cacheDir, "credential-status-process-retention.json").writeText(JSONObject()
@@ -332,7 +361,6 @@ class CredentialStatusBackendE2ETest {
             tapStoredCard(device, access)
             assertTrue(device.wait(Until.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))), 30_000))
             val checkedTag = "credential-status-last-checked-${access.removePrefix("wallet.credentialCard.")}"
-            expandStatusDetails(device, access)
             val checked = waitForResourceAfterScrolling(device, checkedTag, 10_000)
             if (checked == null) {
                 WalletGalleryEvidence.capture(device, "android-status-process-retention-diagnostic")
@@ -390,15 +418,13 @@ class CredentialStatusBackendE2ETest {
         assertEquals("Issuance must add exactly one real stored card", 1, added.size)
         val reference = backend.reference(offer)
         clickByTag(device, added.single().resourceName)
-        assertTrue("An authenticated clear result must appear", device.wait(Until.hasObject(By.text("Not revoked")), 30_000))
+        assertTrue("An authenticated clear result must appear", device.wait(Until.hasObject(By.text("Status clear")), 30_000))
         val refresh = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-check-.*"))))
-        val disclosure = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-details-.*"))))
+        assertFalse("A simple clear result must not expose an empty disclosure",
+            device.hasObject(By.res(Pattern.compile("credential-status-details-.*"))))
         val minimum = (48 * context.resources.displayMetrics.density).roundToInt()
-        for (controlNode in listOf(refresh, disclosure)) {
-            assertTrue("Independent controls need 48-dp targets", controlNode.visibleBounds.width() >= minimum)
-            assertTrue("Independent controls need 48-dp targets", controlNode.visibleBounds.height() >= minimum)
-        }
-        assertFalse(Rect.intersects(refresh.visibleBounds, disclosure.visibleBounds))
+        assertTrue("Refresh needs a 48-dp target", refresh.visibleBounds.width() >= minimum)
+        assertTrue("Refresh needs a 48-dp target", refresh.visibleBounds.height() >= minimum)
         WalletGalleryEvidence.capture(device, "android-status-authenticated-clear")
         backend.setStatus(reference, 1)
         clickByTag(device, refresh.resourceName)

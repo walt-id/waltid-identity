@@ -37,7 +37,7 @@ class WalletApi2MappingsTest {
     }
 
     @Test
-    fun overlappingStoreIdsCannotHideAnAdverseResultAndWireFailuresAreCounted() {
+    fun overlappingStoreIdsCannotHideAnAdverseResultAndRefreshesKeepTheirScope() {
         val checked = "2026-11-12T09:00:00Z"
         val reference = CredentialStatusReferencePresentationDto("ref", protocolName = "BITSTRING_STATUS_LIST",
             purpose = "revocation", result = "CLEAR", checkedAt = checked, freshUntil = "2026-11-12T11:00:00Z", freshness = "FRESH")
@@ -45,30 +45,28 @@ class WalletApi2MappingsTest {
             coverage = "COMPLETE", lastCheckedAt = checked, purposes = listOf("revocation"), references = listOf(reference))
         val revoked = clear.copy(kind = "REVOKED", issue = "REVOKED", advisoryRevision = "revoked",
             references = listOf(reference.copy(result = "REVOKED")))
-        val snapshot = CredentialStatusSnapshotDto(listOf(
+        val wire = CredentialStatusSnapshotDto(listOf(
             CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked),
             CredentialStatusRecordDto(CredentialStatusReferenceDto(1, "same-id"), clear),
-        )).toDemoStatuses()
+        ))
+        val snapshot = wire.toDemoStatuses()
         assertEquals("NEEDS_REVIEW", snapshot.credentials.getValue("same-id").issue)
         assertEquals("AMBIGUOUS_CREDENTIAL_ID", snapshot.credentials.getValue("same-id").failure)
         assertFailsWith<IllegalArgumentException> {
             val duplicate = CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked)
             CredentialStatusSnapshotDto(listOf(duplicate, duplicate))
         }
-        val failed = CredentialStatusRefreshResultDto("COMPLETED", Json.parseToJsonElement(
-            """{"type":"references","entries":[{"type":"token","referenceId":"token","check":{"type":"failed","attemptedAt":"2026-11-12T10:00:00Z","cause":{"type":"reason","reason":"TIMEOUT"}}}]}""").jsonObject)
-        assertTrue(failed.hasCheckErrors)
-        assertFalse(failed.copy(status = Json.parseToJsonElement(
-            """{"type":"references","entries":[{"type":"token","referenceId":"token","check":{"type":"observed","observation":{"value":1,"checkedAt":"2026-11-12T09:00:00Z","freshUntil":"2026-11-12T09:15:00Z"}}},
-                {"type":"unsupported","referenceId":"other","method":"OtherStatus"},{"type":"legacy","referenceId":"legacy","purpose":"suspension","check":{"type":"not_checked"}}]}""").jsonObject).hasCheckErrors)
-        for (status in listOf(
-            """{"type":"discovery_failed","problem":"RESOURCE_LIMIT"}""",
-            """{"type":"references","entries":[{"type":"malformed","referenceId":"broken","problem":"MALFORMED"}]}""",
-            """{"type":"references","entries":[{"type":"mso","referenceId":"mso","check":{"type":"conflict","attemptedAt":"2026-11-12T10:00:00Z","retained":{"value":"REVOKED","checkedAt":"2026-11-12T09:00:00Z","freshUntil":"2026-11-12T09:15:00Z"}}}]}""",
-        )) assertTrue(failed.copy(status = Json.parseToJsonElement(status).jsonObject).hasCheckErrors)
-        assertFailsWith<IllegalStateException> {
-            failed.copy(status = Json.parseToJsonElement("{}").jsonObject).hasCheckErrors
-        }
+        val context = CredentialStatusContextDto("active-review", "2026-11-12T10:05:00Z")
+        val active = wire.copy(statusContext = context)
+        val update = CredentialStatusRefreshResultDto(CredentialStatusReferenceDto(0, "same-id"), "COMPLETED",
+            revoked.copy(failure = CredentialStatusFailureDto("reason", "TRANSPORT")), checked, true, context)
+        val refreshed = active.withRefreshResults(listOf(update))
+        assertEquals(update.presentation, refreshed.credentials[0].presentation)
+        assertEquals(clear, refreshed.credentials[1].presentation, "A matching local ID in another store is a separate record")
+        assertEquals(listOf(wire.credentials[1]), active.withRefreshResults(listOf(update.copy(outcome = "REMOVED"))).credentials)
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update, update)) }
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update.copy(reference = CredentialStatusReferenceDto(2, "same-id")))) }
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update.copy(statusContext = context.copy(id = "foreign")))) }
     }
 
     @Test

@@ -6,13 +6,16 @@ final class ReviewSubmissionGateTests: XCTestCase {
     func testOrdinaryAttemptDeliversCapturedRevisionsOnce() {
         let gate = ReviewSubmissionGate<String>()
         var delivered: [[String: String]] = []
+        XCTAssertFalse(gate.canRefresh)
         gate.update("request-and-selection", enabled: true)
+        XCTAssertTrue(gate.canRefresh)
         let attempt = ReviewSubmissionGate<String>.Attempt(key: "request-and-selection", revisions: ["selected": "rendered"],
             unsigned: false, message: "", affirmative: "Share", submit: { delivered.append($0) })
         gate.begin(attempt, needsConfirmation: false)
         gate.begin(attempt, needsConfirmation: false)
         XCTAssertEqual(delivered, [["selected": "rendered"]])
         XCTAssertNil(gate.pending)
+        XCTAssertFalse(gate.canRefresh, "A consumed submission cannot start new refresh work")
     }
 
     func testWarningDismissalAndChangedReviewNeverDeliverOldAttempt() {
@@ -25,7 +28,9 @@ final class ReviewSubmissionGateTests: XCTestCase {
         gate.update("old", enabled: true)
         let old = attempt("old")
         gate.begin(old, needsConfirmation: true)
+        XCTAssertFalse(gate.canRefresh)
         gate.dismiss()
+        XCTAssertTrue(gate.canRefresh)
         gate.confirm(old)
         XCTAssertEqual(delivered, 0)
         gate.begin(old, needsConfirmation: true)

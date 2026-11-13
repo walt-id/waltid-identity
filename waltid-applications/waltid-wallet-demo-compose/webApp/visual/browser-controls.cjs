@@ -1,0 +1,50 @@
+const { expect } = require('@playwright/test');
+const { createHash } = require('node:crypto');
+
+// Compose's ARIA mirror supplies bounds, while the canvas receives the actual pointer input.
+async function clickControl(page, locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+async function fillControl(page, locator, value, inputMode) {
+  await clickControl(page, locator);
+  // ARIA textboxes are contenteditable mirrors. Filling them can race the
+  // canvas focus change without delivering text to Compose's backing editor.
+  const editor = page.locator('input.compose-backing-field');
+  await expect(editor).toHaveAttribute('inputmode', inputMode);
+  await expect(editor).toBeFocused();
+  await editor.fill(value);
+  await expect(editor).toHaveValue(value);
+}
+
+async function waitForSettledImage(page, clip) {
+  let previous;
+  let unchangedSince;
+  // CSS animation controls do not stop Compose's canvas animations. Two equal
+  // frames can occur before the enabled-state color transition has finished.
+  await expect.poll(async () => {
+    const pixels = await page.screenshot({ animations: 'disabled', caret: 'hide', ...(clip ? { clip } : {}) });
+    const current = createHash('sha256').update(pixels).digest('hex');
+    const now = performance.now();
+    if (current !== previous) {
+      previous = current;
+      unchangedSince = now;
+    }
+    return now - unchangedSince >= 500;
+  }, { timeout: 10000, intervals: [100] }).toBe(true);
+}
+
+async function submitEditedForm(page, locator) {
+  await page.keyboard.press('Tab');
+  // Filling the backing editor precedes Compose's rendered form/enabled state.
+  // Settle the action without waiting on a blinking canvas caret, then click once.
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  await waitForSettledImage(page, box);
+  await clickControl(page, locator);
+}
+
+module.exports = { clickControl, fillControl, waitForSettledImage, submitEditedForm };

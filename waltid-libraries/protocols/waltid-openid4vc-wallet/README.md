@@ -256,6 +256,16 @@ stable `trustPolicyId`, then `attachCredentialStatusService` before first status
 custom policy. Closing the service releases work; `closeCredentialStatusService()` does not initialize
 an unused service or delete wallet data.
 
+Long-lived services reconcile changed managed evidence on local reads and guard checks. Retained
+no-store observations keep their storage restriction after failed or conflicting refreshes; a new
+cacheable observation can replace that evidence. Request-scoped hosts can use `captureReviewState()`
+and `restoreReviewState()` with a stable, non-null `trustPolicyId` to retain detached evidence for an
+explicit bounded review. Bind that opaque, non-serializable state to the same authorized tenant,
+wallet lifecycle and store configuration. It contains no service, credential store or list body;
+restore checks signed-byte identity and reconciles current managed evidence without issuer I/O.
+This is transient host state, not a persistence format. The [HTTP adapter](../waltid-openid4vc-wallet-server/README.md#credential-status)
+provides bounded, expiring browser contexts instead of retaining an authorized service.
+
 Shared presentation semantics distinguish clear, adverse, stale, partial, unchecked, unsupported and
 unavailable. Domain reads derive presentation from evidence and evaluation time; HTTP responses use
 the separate presentation DTO and `WalletCredentialStatusSnapshotResponse`. Decoded transport values

@@ -319,6 +319,7 @@ internal class MobileDemoWallet(
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
+        statusReviewEpoch: Long?,
     ): WalletDemoOperationResult = try {
         mobileWallet.submitStatusReviewedPresentation(
             MobileWalletPresentationPreviewHandle(previewHandle.value),

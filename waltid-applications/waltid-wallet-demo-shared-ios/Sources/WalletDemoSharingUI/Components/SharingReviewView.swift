@@ -8,6 +8,7 @@ import WalletSDK
 /// only the rendering of what the user is being asked and the reporting of what they chose.
 public struct SharingReviewView: View {
     @Environment(\.credentialStatusUI) private var statusUI
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<SharingSubmissionKey?>>()
     private let review: SharingReviewModel
     private let selection: SharingSelection
     private let selectionComplete: Bool
@@ -73,6 +74,7 @@ public struct SharingReviewView: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if showActions { ReviewChangedNotice(submission) }
             SharingRequestSections(request: review.request, paymentReview: paymentReview)
 
             if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
@@ -126,6 +128,7 @@ public struct SharingReviewView: View {
 
             if !isReadOnly && showActions {
                 ReviewActions(
+                    gate: submission,
                     selectionComplete: selectionComplete && isNormalized && requestIdentity != nil,
                     isLoading: isLoading,
                     reviewKey: requestIdentity.map { SharingSubmissionKey(requestIdentity: $0, review: review, selection: selection) },

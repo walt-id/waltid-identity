@@ -35,6 +35,10 @@ class WalletVisualAndroidTest {
     @org.junit.After fun restoreTimeZone() { java.util.TimeZone.setDefault(previousTimeZone) }
 
     @Test fun credentialStatusHome() = scenario { credentialStatusHome() }
+    @Test fun credentialStatusMixedArtwork() = scenario { credentialStatusMixedArtwork() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun credentialStatusMixedArtworkRtl() = scenario(fontScale = 1.5f) { credentialStatusMixedArtwork(rtl = true) }
     @Test fun credentialStatusDetailsClear() = scenario { credentialStatusDetails() }
     @Test fun credentialStatusDetailsAdverse() = scenario { credentialStatusDetails(adverse = true) }
     @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
@@ -45,6 +49,7 @@ class WalletVisualAndroidTest {
     @Test fun credentialStatusPayment() = scenario(sheetHost = true) { credentialStatusPayment() }
     @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
     @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
+    @Test fun credentialStatusSettingsHelp() = scenario { credentialStatusSettings(helpExpanded = true) }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun credentialStatusCompactRtl() = scenario(fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }

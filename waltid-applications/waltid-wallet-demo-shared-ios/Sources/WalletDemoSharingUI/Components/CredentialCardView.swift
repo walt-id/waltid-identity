@@ -5,7 +5,14 @@ import WalletSDK
 
 public let id1AspectRatio: CGFloat = 1.586
 public let credentialCardPeek: CGFloat = 56
+public let credentialCardMaxWidth: CGFloat = 360
+private let credentialStatusBadgeSize: CGFloat = 20
 public let defaultWaltCardBlue = Color(red: 27 / 255, green: 79 / 255, blue: 219 / 255)
+
+/// Optical baseline calibrated against issuer assets, without runtime artwork inspection.
+func credentialStatusBadgeTop(_ cardWidth: CGFloat) -> CGFloat {
+    (credentialCardPeek + cardWidth * (104.0 / 1280.0) - credentialStatusBadgeSize) / 2
+}
 
 public struct CredentialCardView: View {
     public let details: CredentialDetails
@@ -30,6 +37,7 @@ public struct CredentialCardView: View {
 }
 
 public struct CredentialCardArtView: View {
+    @Environment(\.layoutDirection) private var layoutDirection
     public let summary: CredentialCardSummary
     private let credentialID: String?
     public var compact: Bool = false
@@ -74,14 +82,14 @@ public struct CredentialCardArtView: View {
                     metadataArtFailed: metadataArtFailed
                 ) {
                     if !compact {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            statusMark.alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
-                            Text(summary.title)
+                        Text(summary.title)
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(label)
                                 .lineLimit(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }.padding(padding)
+                                .frame(width: max(0, proxy.size.width - 2 * padding) * 0.72, alignment: .leading)
+                                .padding(padding)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                                    alignment: layoutDirection == .rightToLeft ? .topTrailing : .topLeading)
                     }
                     credentialLogo()
                         .frame(width: logoSize, height: logoSize)
@@ -89,12 +97,10 @@ public struct CredentialCardArtView: View {
                         .padding(padding)
                 }
             }
-            .overlay(alignment: .bottomLeading) {
-                if !showsConstructedCardArtOverlay(backgroundImageURI: artURI,
-                    hasLoadedMetadataArt: loadedMetadataArtURI == artURI && loadedMetadataArt != nil,
-                    metadataArtFailed: metadataArtFailed) {
-                    statusMark.padding(16)
-                }
+            .overlay {
+                statusMark.position(x: proxy.size.width - 16 - credentialStatusBadgeSize / 2,
+                    y: credentialStatusBadgeTop(proxy.size.width) + credentialStatusBadgeSize / 2)
+                    .environment(\.layoutDirection, .leftToRight)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(summary.title)
@@ -117,7 +123,7 @@ public struct CredentialCardArtView: View {
 
     @ViewBuilder private var statusMark: some View {
         if !compact, let statusDecoration, statusDecoration.hasStatusIssue {
-            CredentialStatusIcon(statusDecoration, contrast: true)
+            CredentialStatusIcon(statusDecoration, contrast: true, size: credentialStatusBadgeSize)
                 .accessibilityIdentifier("credential-status-icon-\(credentialID ?? "")")
         }
     }
@@ -172,7 +178,7 @@ public struct CredentialCardButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 CredentialCardView(details: details, compact: compact)
-                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary) }
+                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint) }
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())

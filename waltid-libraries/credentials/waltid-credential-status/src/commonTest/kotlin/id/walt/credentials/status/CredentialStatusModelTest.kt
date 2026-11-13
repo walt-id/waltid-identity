@@ -21,6 +21,27 @@ class CredentialStatusModelTest {
     private fun suspension(check: Check<UByte>) = CredentialStatusEntry.Bitstring("ref", BitstringPurpose.Known.SUSPENSION, check)
 
     @Test
+    fun localReconciliationKeepsTheNewestObservationAndAttemptInEitherUpdateOrder() {
+        val clear = observation(0u)
+        val revoked = observation(1u)
+        val newerRevoked = observation(1u, at + 10.seconds)
+        val laterClear = observation(0u, at + 10.seconds)
+        val attemptedAt = at + 20.seconds
+        val failed = suspension(Check.Failed(attemptedAt, CheckFailure.Reason.TRANSPORT, clear))
+        val cases = listOf(
+            Triple(suspension(Check.Observed(clear)), suspension(Check.Observed(newerRevoked)), suspension(Check.Observed(newerRevoked))),
+            Triple(failed, suspension(Check.Observed(newerRevoked)), suspension(Check.Failed(attemptedAt, CheckFailure.Reason.TRANSPORT, newerRevoked))),
+            Triple(revocation(Check.Conflict(attemptedAt, revoked)), revocation(Check.Observed(newerRevoked)), revocation(Check.Conflict(attemptedAt, newerRevoked))),
+            Triple(revocation(Check.Observed(revoked)), revocation(Check.Observed(laterClear)), revocation(Check.Conflict(attemptedAt, revoked))),
+            Triple(suspension(Check.NotChecked), suspension(Check.Observed(clear)), suspension(Check.Observed(clear))),
+        )
+        for ((first, second, expected) in cases) {
+            assertEquals(expected, first.mergePrevious(second, attemptedAt))
+            assertEquals(expected, second.mergePrevious(first, attemptedAt))
+        }
+    }
+
+    @Test
     fun tokenRegistrationsAndLegacyPurposeDoNotInheritOtherProfiles() {
         assertEquals(TokenStatus.Known.CLEAR, TokenStatus.fromCode(0u))
         assertEquals(TokenStatus.Known.INVALID, TokenStatus.fromCode(1u))

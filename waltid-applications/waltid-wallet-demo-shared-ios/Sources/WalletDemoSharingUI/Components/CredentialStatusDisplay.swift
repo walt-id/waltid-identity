@@ -45,7 +45,8 @@ public extension CredentialStatusUIContext {
 
 public extension CredentialStatusPresentation {
     var statusTitle: String {
-        switch kind {
+        if hasPositiveStatus { return String(localized: "Status clear", bundle: .module) }
+        return switch kind {
         case .notProvided: String(localized: "Status not provided", bundle: .module)
         case .notChecked: String(localized: "Not checked", bundle: .module)
         case .notRevoked: String(localized: "Not revoked", bundle: .module)

@@ -18,6 +18,8 @@ import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.ReviewChangedNotice
+import id.walt.walletdemo.compose.ui.components.rememberSharingSubmission
 import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.selectedReviewStatuses
@@ -67,6 +69,13 @@ fun WalletDemoSharingReviewScreen(
 
     CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses,
         contextKey = LocalCredentialStatusUi.current.contextKey ?: owner)) {
+    val submission = rememberSharingSubmission(
+        reviewKey = listOf(owner, review, selection.credentials, selection.disclosures),
+        credentialStatuses = selectedReviewStatuses(information, selection.credentials, statuses),
+        paymentReview = paymentReview,
+        isPayment = review.request.transactionData.any { it.isPaymentTransaction },
+        enabled = enabled, selectionComplete = selectionComplete, onSubmit = submit,
+    )
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
         ReviewScaffold(
             fillViewport = false,
@@ -80,13 +89,10 @@ fun WalletDemoSharingReviewScreen(
             },
             actions = {
                 SharingActionsRow(
-                    reviewKey = listOf(owner, review, selection.credentials, selection.disclosures),
-                    credentialStatuses = selectedReviewStatuses(information, selection.credentials, statuses),
+                    submission = submission,
                     paymentReview = paymentReview,
                     isPayment = review.request.transactionData.any { it.isPaymentTransaction },
                     enabled = enabled,
-                    selectionComplete = selectionComplete,
-                    onSubmit = submit,
                     onCancel = onCancel,
                     onReject = onReject,
                     showCancelWithReject = false,
@@ -94,6 +100,7 @@ fun WalletDemoSharingReviewScreen(
             },
         ) {
             statusReviewNotice?.let { Text(it) }
+            ReviewChangedNotice(submission)
             SharingReviewSection(
                 paymentReview = paymentReview,
                 review = review,

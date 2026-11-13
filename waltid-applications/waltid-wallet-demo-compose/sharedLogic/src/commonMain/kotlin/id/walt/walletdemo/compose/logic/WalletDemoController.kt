@@ -46,6 +46,13 @@ class WalletDemoController(
     private val statusNow: () -> Instant = { Clock.System.now() },
 ) {
     private var credentialStatusRefreshJob: Job? = null
+    private var credentialStatusRefreshSequence = 0L
+    private var credentialStatusRefreshToken: Any? = null
+    private data class StatusReviewOwner(val handle: WalletDemoPresentationPreviewHandle, val navigationKey: Int) {
+        fun matches(state: WalletDemoUiState): Boolean = state.presentationPreview?.previewHandle == handle &&
+            state.presentationNavigationResetKey == navigationKey && state.auth == WalletAuthState.Unlocked
+    }
+    private var statusReviewOwner: StatusReviewOwner? = null
     private val applicationForeground = MutableStateFlow(true)
     private val externalStatusReview = MutableStateFlow(false)
     private data class AutomaticStatusCheck(val at: Instant, val inventory: Set<String>)
@@ -82,6 +89,11 @@ class WalletDemoController(
     )
 
     init {
+        scope.launch(dispatcher) {
+            state.collect { current ->
+                statusReviewOwner?.takeUnless { it.matches(current) }?.let(::cancelReviewStatusRefresh)
+            }
+        }
         scope.launch(dispatcher) {
             combine(state, applicationForeground) { ui, foreground -> foreground && ui.auth == WalletAuthState.Unlocked && ui.session is WalletSessionState.Ready }
                 .distinctUntilChanged().collectLatest { active ->
@@ -196,6 +208,7 @@ class WalletDemoController(
 
     fun handleApplicationBackgrounded() {
         applicationForeground.value = false
+        statusReviewOwner?.let(::cancelReviewStatusRefresh)
         credentialStatusRefreshJob?.cancel()
     }
 
@@ -214,35 +227,92 @@ class WalletDemoController(
     fun dismissCredentialStatusNotice() { _state.update { it.copy(credentialStatusNotice = null) } }
 
     fun checkCredentialStatuses(ids: Set<String>? = null, force: Boolean = true) {
+        startCredentialStatusRefresh(ids, force)
+    }
+
+    /** Explicit online review action; provider and offline hosts do not receive this capability. */
+    fun checkPresentationCredentialStatus(credentialId: String, handle: WalletDemoPresentationPreviewHandle, navigationKey: Int) {
         val current = _state.value
-        if (!applicationForeground.value || current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready || credentialStatusRefreshJob?.isActive == true) return
-        if (!force && current.credentialStatuses.legacySubmission) return
-        if (!force && (!current.automaticCredentialStatusChecks || externalStatusReview.value || current.presentationReview != null || current.isBusy)) return
-        val generation = loadingGeneration.value
+        val owner = StatusReviewOwner(handle, navigationKey)
+        if (!owner.matches(current) || !current.presentationReviewEnabled ||
+            current.presentationPreview?.credentialOptions?.none { it.credentialId == credentialId } != false) return
+        startCredentialStatusRefresh(setOf(credentialId), force = true, reviewOwner = owner)
+    }
+
+    fun presentationStatusRefreshRendered(id: Long) {
+        _state.update { current ->
+            if (current.presentationStatusRefresh?.let { it.id == id && it.phase == WalletDemoReviewStatusRefresh.Phase.AwaitingRender } == true)
+                current.copy(presentationStatusRefresh = null) else current
+        }
+        if (_state.value.presentationStatusRefresh == null) statusReviewOwner = null
+    }
+
+    fun releasePresentationStatusRefresh(handle: WalletDemoPresentationPreviewHandle, navigationKey: Int) {
+        cancelReviewStatusRefresh(StatusReviewOwner(handle, navigationKey))
+    }
+
+    private fun cancelReviewStatusRefresh(owner: StatusReviewOwner) {
+        if (statusReviewOwner != owner) return
+        statusReviewOwner = null
+        credentialStatusRefreshToken = null
+        credentialStatusRefreshJob?.cancel()
+        credentialStatusRefreshJob = null
+        _state.update { it.copy(presentationStatusRefresh = null, checkingCredentialStatuses = false) }
+    }
+
+    private fun startCredentialStatusRefresh(ids: Set<String>?, force: Boolean, reviewOwner: StatusReviewOwner? = null) {
+        val token = Any()
+        val sequence = ++credentialStatusRefreshSequence
         val settingsBatch = force && ids == null
+        val reviewRefresh = reviewOwner?.let { WalletDemoReviewStatusRefresh(sequence, requireNotNull(ids).single(), WalletDemoReviewStatusRefresh.Phase.Checking) }
+        var current = _state.value
+        while (true) {
+            if (!applicationForeground.value || current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready ||
+                current.checkingCredentialStatuses || current.presentationStatusRefresh != null || credentialStatusRefreshJob?.isActive == true) return
+            if (reviewOwner != null && !reviewOwner.matches(current)) return
+            if (!force && current.credentialStatuses.legacySubmission) return
+            if (!force && (!current.automaticCredentialStatusChecks || externalStatusReview.value || current.presentationReview != null || current.isBusy)) return
+            if (_state.compareAndSet(current, current.copy(checkingCredentialStatuses = true, presentationStatusRefresh = reviewRefresh,
+                credentialStatusSummary = if (settingsBatch) null else current.credentialStatusSummary,
+                credentialStatusBatchError = if (settingsBatch) null else current.credentialStatusBatchError,
+                credentialStatusError = null))) break
+            current = _state.value
+        }
+        val generation = current.credentialStatusContext
+        credentialStatusRefreshToken = token
+        statusReviewOwner = reviewOwner
         if (!force) {
             automaticStatusCheck.value = AutomaticStatusCheck(statusNow(),
-                (current.session as WalletSessionState.Ready).credentials.mapTo(mutableSetOf()) { it.id })
+                current.session.credentials.mapTo(mutableSetOf()) { it.id })
         }
         credentialStatusRefreshJob = scope.launch(dispatcher) {
-            _state.update { it.copy(checkingCredentialStatuses = true,
-                credentialStatusSummary = if (settingsBatch) null else it.credentialStatusSummary,
-                credentialStatusBatchError = if (settingsBatch) null else it.credentialStatusBatchError,
-                credentialStatusError = null) }
+            var cancelled = false
+            fun currentRequest(): Boolean = loadingGeneration.value == generation && credentialStatusRefreshToken === token &&
+                (reviewOwner == null || reviewOwner.matches(_state.value))
             try {
+                if (!currentRequest()) throw CancellationException("The credential status owner changed")
                 val summary = wallet.refreshCredentialStatuses(ids, force)
                 currentCoroutineContext().ensureActive()
-                if (loadingGeneration.value == generation) {
-                    installCredentialStatuses(wallet.credentialStatusSnapshot())
+                val snapshot = wallet.credentialStatusSnapshot()
+                currentCoroutineContext().ensureActive()
+                if (currentRequest()) {
+                    installCredentialStatuses(snapshot)
                     _state.update { it.copy(credentialStatusSummary = if (settingsBatch) summary else it.credentialStatusSummary) }
                 }
-            } catch (cancelled: CancellationException) { throw cancelled }
+            } catch (cause: CancellationException) { cancelled = true; throw cause }
             catch (_: Exception) {
-                if (loadingGeneration.value == generation && (force || !_state.value.credentialStatuses.legacySubmission)) _state.update { it.copy(
+                if (currentRequest() && (force || !_state.value.credentialStatuses.legacySubmission)) _state.update { it.copy(
                     credentialStatusError = "Could not check credential status. Previous results are retained.",
                     credentialStatusBatchError = if (settingsBatch) "Could not check statuses. Try again." else it.credentialStatusBatchError) }
             }
-            finally { if (loadingGeneration.value == generation) _state.update { it.copy(checkingCredentialStatuses = false) } }
+            finally {
+                if (loadingGeneration.value == generation && credentialStatusRefreshToken === token) {
+                    val awaitingRender = reviewRefresh?.takeIf { !cancelled && reviewOwner.matches(_state.value) }
+                        ?.copy(phase = WalletDemoReviewStatusRefresh.Phase.AwaitingRender)
+                    _state.update { it.copy(checkingCredentialStatuses = false, presentationStatusRefresh = awaitingRender) }
+                    if (awaitingRender == null) statusReviewOwner = null
+                }
+            }
         }
     }
 
@@ -1503,10 +1573,11 @@ class WalletDemoController(
         if (!applicationForeground.value) return
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
-        if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm) return
+        if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm || current.presentationStatusRefresh != null) return
         val reviewed = submission.selection
         if (submission.previewHandle != current.presentationPreview?.previewHandle || submission.walletKeyId != ready.keyId ||
             submission.walletContext != current.credentialStatusContext ||
+            submission.statusReviewEpoch != current.credentialStatuses.reviewEpoch ||
             reviewed.credentials != current.selectedPresentationCredentialOptions ||
             reviewed.disclosures != current.selectedPresentationDisclosureOptions.forSelectedCredentials(current.selectedPresentationCredentialOptions) ||
             reviewed.paymentConsentRevision != current.paymentReview.consent?.revision) {
@@ -1545,6 +1616,7 @@ class WalletDemoController(
                     did = ready.did,
                     paymentConsentRevision = current.paymentReview.consent?.revision,
                     reviewedStatus = reviewed.credentialStatusRevisions,
+                    statusReviewEpoch = submission.statusReviewEpoch,
                 )
                 currentCoroutineContext().ensureActive()
                 updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
@@ -1959,9 +2031,11 @@ class WalletDemoController(
 
     @OptIn(DelicateCoroutinesApi::class)
     private fun cancelLoading(): Job {
+        statusReviewOwner?.let(::cancelReviewStatusRefresh)
         loadingGeneration.update { it + 1 }
         _state.update { it.copy(credentialStatusContext = loadingGeneration.value,
-            credentialStatuses = it.credentialStatuses.copy(readState = it.credentialStatuses.readState.awaitingRead), checkingCredentialStatuses = false) }
+            credentialStatuses = it.credentialStatuses.copy(readState = it.credentialStatuses.readState.awaitingRead), checkingCredentialStatuses = false,
+            presentationStatusRefresh = null) }
         val bootstrap = bootstrapJob
         val registration = registrationJob
         val previous = loadingCancellationJob

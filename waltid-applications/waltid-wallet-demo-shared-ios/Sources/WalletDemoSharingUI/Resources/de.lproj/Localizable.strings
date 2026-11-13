@@ -24,6 +24,11 @@
 "Share anyway" = "Trotzdem teilen";
 "Some status checks are unavailable" = "Einige Statusprüfungen sind nicht verfügbar";
 "Status checked" = "Status geprüft";
+"Status clear" = "Status unauffällig";
+"Status information is unavailable. Previous results are retained." = "Statusinformationen sind nicht verfügbar. Frühere Ergebnisse bleiben erhalten.";
+"Latest check failed" = "Letzte Prüfung fehlgeschlagen";
+"Conflicting update" = "Widersprüchliche Aktualisierung";
+"Checks: %@" = "Prüfungen: %@";
 "Status checking is disabled by the wallet host." = "Statusprüfungen sind durch die Wallet-Anwendung deaktiviert.";
 "Status could not be verified" = "Status konnte nicht verifiziert werden";
 "Status information is shown for your review and is not an additional claim to share." = "Die Statusinformationen dienen Ihrer Prüfung und werden nicht als zusätzliches Attribut geteilt.";

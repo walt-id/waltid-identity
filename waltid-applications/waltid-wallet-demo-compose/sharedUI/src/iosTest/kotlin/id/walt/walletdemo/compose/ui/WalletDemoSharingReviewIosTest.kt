@@ -38,6 +38,10 @@ class WalletDemoSharingReviewIosTest {
         scenarios.unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState()
 
     @Test
+    fun compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability() =
+        scenarios.compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability()
+
+    @Test
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =
         scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
 

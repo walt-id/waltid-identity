@@ -78,6 +78,8 @@ struct CredentialsTabView: View {
                         }
                     }
                 }
+                .frame(maxWidth: credentialCardMaxWidth)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal)
                 .padding(.top, 8)
                 .padding(.bottom)

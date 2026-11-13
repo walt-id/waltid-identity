@@ -93,6 +93,13 @@ private enum WalletStatusText {
     }
 }
 
+struct PresentationStatusRefresh: Equatable {
+    enum Phase: Equatable { case checking, awaitingRender }
+    let id: UUID
+    let credentialID: String
+    let phase: Phase
+}
+
 @MainActor
 class WalletViewModel: ObservableObject {
     let proximityPresentation: ProximityPresentationViewModel
@@ -104,6 +111,7 @@ class WalletViewModel: ObservableObject {
     private var credentialStatusStoreIndices: [String: Int] = [:]
     @Published private(set) var refreshingCredentialIDs: Set<String> = []
     @Published private(set) var checkingCredentialStatuses = false
+    @Published private(set) var presentationStatusRefresh: PresentationStatusRefresh?
     @Published var credentialStatusSummary: CredentialStatusRefreshSummary?
     @Published private(set) var credentialStatusBatchError: String?
     @Published var credentialStatusError: String?
@@ -125,6 +133,13 @@ class WalletViewModel: ObservableObject {
     private var automaticallyCheckedInventory: Set<String>?
     private var credentialStatusObservationTask: Task<Void, Never>?
     private var credentialStatusRefreshTask: Task<Void, Never>?
+    private var credentialStatusRefreshID: UUID?
+    private struct StatusReviewOwner: Equatable {
+        let handle: PresentationPreviewHandle
+        let navigationKey: Int
+        let generation: Int
+    }
+    private var statusReviewOwner: StatusReviewOwner?
     private var announcedCredentialStatuses: [String: String] = [:]
     private var pendingCredentialStatusNotices: Set<String> = []
     @Published var isReady = false { didSet { if isReady { startCredentialStatusObservation() } else { cancelCredentialStatusWork() } } }
@@ -157,6 +172,7 @@ class WalletViewModel: ObservableObject {
     @Published var presentationRequestUrl = ""
     @Published private(set) var presentationReview: PresentationPreviewResult? {
         didSet {
+            if let owner = statusReviewOwner, !isCurrentStatusReview(owner) { cancelReviewStatusRefresh(owner) }
             paymentConsentTask?.cancel()
             paymentReview = .notRequired
             if presentationReview == nil { presentDeferredCredentialStatusNotice() }
@@ -177,7 +193,9 @@ class WalletViewModel: ObservableObject {
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
     @Published var receiveNavigationResetKey = 0
-    @Published var presentationNavigationResetKey = 0
+    @Published var presentationNavigationResetKey = 0 {
+        didSet { if let owner = statusReviewOwner, !isCurrentStatusReview(owner) { cancelReviewStatusRefresh(owner) } }
+    }
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
     @Published var statusExpanded = false
@@ -453,6 +471,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func cancelCredentialStatusWork(preserveNotice: Bool = false) {
+        credentialStatusRefreshID = nil; statusReviewOwner = nil; presentationStatusRefresh = nil
         credentialStatusReadState = credentialStatusReadState.awaitingRead
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         credentialStatusGeneration += 1
@@ -464,8 +483,42 @@ class WalletViewModel: ObservableObject {
     }
 
     func checkCredentialStatuses(ids: [String]? = nil, force: Bool = true) {
-        guard applicationForeground, isReady, auth == .unlocked, !checkingCredentialStatuses else { return }
+        startCredentialStatusRefresh(ids: ids, force: force)
+    }
+
+    func checkPresentationCredentialStatus(_ credentialID: String, handle: PresentationPreviewHandle, navigationKey: Int) {
+        let owner = StatusReviewOwner(handle: handle, navigationKey: navigationKey, generation: credentialStatusGeneration)
+        guard isCurrentStatusReview(owner), presentationReviewEnabled,
+              presentationPreview?.credentialOptions.contains(where: { $0.credentialID == credentialID }) == true else { return }
+        startCredentialStatusRefresh(ids: [credentialID], force: true, reviewOwner: owner)
+    }
+
+    func presentationStatusRefreshRendered(_ id: UUID) {
+        guard presentationStatusRefresh?.id == id, presentationStatusRefresh?.phase == .awaitingRender else { return }
+        presentationStatusRefresh = nil; statusReviewOwner = nil
+    }
+
+    func releasePresentationStatusRefresh(handle: PresentationPreviewHandle, navigationKey: Int) {
+        cancelReviewStatusRefresh(StatusReviewOwner(handle: handle, navigationKey: navigationKey, generation: credentialStatusGeneration))
+    }
+
+    private func isCurrentStatusReview(_ owner: StatusReviewOwner) -> Bool {
+        owner.handle == presentationPreview?.previewHandle && owner.navigationKey == presentationNavigationResetKey &&
+            owner.generation == credentialStatusGeneration && auth == .unlocked
+    }
+
+    private func cancelReviewStatusRefresh(_ owner: StatusReviewOwner) {
+        guard statusReviewOwner == owner else { return }
+        credentialStatusRefreshID = nil; statusReviewOwner = nil; presentationStatusRefresh = nil
+        credentialStatusRefreshTask?.cancel(); credentialStatusRefreshTask = nil
+        checkingCredentialStatuses = false; refreshingCredentialIDs = []
+    }
+
+    private func startCredentialStatusRefresh(ids: [String]?, force: Bool, reviewOwner: StatusReviewOwner? = nil) {
+        guard applicationForeground, isReady, auth == .unlocked, !checkingCredentialStatuses, presentationStatusRefresh == nil else { return }
+        if let reviewOwner, !isCurrentStatusReview(reviewOwner) { return }
         let generation = credentialStatusGeneration
+        let refreshID = UUID()
         if !force && (!automaticCredentialStatusChecks || isLoading || presentationReview != nil || proximityPresentation.active) { return }
         let settingsBatch = force && ids == nil
         if !force {
@@ -474,19 +527,37 @@ class WalletViewModel: ObservableObject {
         }
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         checkingCredentialStatuses = true
+        credentialStatusRefreshID = refreshID
+        statusReviewOwner = reviewOwner
+        if reviewOwner != nil, let credentialID = ids?.first {
+            presentationStatusRefresh = PresentationStatusRefresh(id: refreshID, credentialID: credentialID, phase: .checking)
+        }
         credentialStatusError = nil
         if settingsBatch { credentialStatusSummary = nil; credentialStatusBatchError = nil }
         credentialStatusRefreshTask = Task { [weak self] in
             guard let self else { return }
-            defer { if credentialStatusGeneration == generation { checkingCredentialStatuses = false; refreshingCredentialIDs = []; scheduleCredentialStatusCheck() } }
+            defer {
+                if credentialStatusGeneration == generation && credentialStatusRefreshID == refreshID {
+                    checkingCredentialStatuses = false; refreshingCredentialIDs = []
+                    if let reviewOwner, isCurrentStatusReview(reviewOwner), !Task.isCancelled, let credentialID = ids?.first {
+                        presentationStatusRefresh = PresentationStatusRefresh(id: refreshID, credentialID: credentialID, phase: .awaitingRender)
+                    } else { presentationStatusRefresh = nil; statusReviewOwner = nil }
+                    scheduleCredentialStatusCheck()
+                }
+            }
             do {
                 let result = try await walletClient.refreshCredentialStatuses(ids: ids, force: force)
                 try Task.checkCancellation()
-                guard credentialStatusGeneration == generation else { return }
-                if let snapshot = try await walletClient.credentialStatusSnapshot() { installCredentialStatuses(snapshot) }
+                guard credentialStatusGeneration == generation, credentialStatusRefreshID == refreshID else { return }
+                if let reviewOwner, !isCurrentStatusReview(reviewOwner) { return }
+                let snapshot = try await walletClient.credentialStatusSnapshot()
+                try Task.checkCancellation()
+                guard credentialStatusGeneration == generation, credentialStatusRefreshID == refreshID else { return }
+                if let reviewOwner, !isCurrentStatusReview(reviewOwner) { return }
+                if let snapshot { installCredentialStatuses(snapshot) }
                 if settingsBatch { credentialStatusSummary = CredentialStatusRefreshSummary(results: result) }
             } catch is CancellationError {} catch {
-                if credentialStatusGeneration == generation {
+                if credentialStatusGeneration == generation && credentialStatusRefreshID == refreshID {
                     credentialStatusError = String(localized: "Could not check credential status. Previous results are retained.")
                     if settingsBatch { credentialStatusBatchError = String(localized: "Could not check statuses. Try again.") }
                 }
@@ -1612,6 +1683,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func submitPresentation(reviewedStatus: [String: String]) {
+        guard presentationStatusRefresh == nil else { return }
         resetInputFocus()
         guard presentationReviewEnabled, paymentReview.canConfirm else { return }
         guard let previewHandle = presentationPreview?.previewHandle else { return }

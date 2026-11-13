@@ -2511,7 +2511,14 @@ data class BuildVpTokenRequest(
     val did: String? = null,
 ) : VpRequestSource
 
-internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
+internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> =
+    resolveSelectedCredentialOptions(selectedCredentialOptions, selectedCredentialIds)
+
+/** Shared selection precedence for construction, status review and usage accounting. */
+fun resolveSelectedCredentialOptions(
+    selectedCredentialOptions: List<PresentationCredentialSelection>,
+    selectedCredentialIds: Map<String, List<String>>,
+): List<PresentationCredentialSelection> {
     if (selectedCredentialOptions.isNotEmpty()) return selectedCredentialOptions
     return selectedCredentialIds.flatMap { (queryId, credentialIds) ->
         credentialIds.map { credentialId ->

@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -59,6 +61,7 @@ internal fun WalletScanScreen(
     val hostActive = rememberScannerHostActive()
     val launchCamera = rememberSystemCameraLauncher()
     val kind = WalletLinkKind.classify(input)
+    val inputLabel = "Credential offer or request"
     val canOpen = kind in setOf(WalletLinkKind.Offer, WalletLinkKind.Presentation,
         WalletLinkKind.AuthorizationCallback, WalletLinkKind.Web) ||
         (kind == WalletLinkKind.FidoHybrid && handoffFidoQr != null)
@@ -163,10 +166,11 @@ internal fun WalletScanScreen(
     ) {
         if (manual) {
             OutlinedTextField(value = input, onValueChange = { input = it; resolutionError = null }, enabled = !resolving,
-                label = { Text("Credential offer or request") },
+                label = { Text(inputLabel) },
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { open(input) }),
-                modifier = Modifier.fillMaxWidth().focusRequester(inputFocus).testTag(WalletUiTestTags.ScanInput), maxLines = 4,
+                modifier = Modifier.fillMaxWidth().focusRequester(inputFocus).testTag(WalletUiTestTags.ScanInput)
+                    .semantics { contentDescription = inputLabel }, maxLines = 4,
                 trailingIcon = {
                     IconButton(onClick = ::paste, enabled = !resolving && !pasting, modifier = Modifier.testTag("wallet.scanPaste")) {
                         WalletIcon(WalletSymbol.Paste, "Paste link")

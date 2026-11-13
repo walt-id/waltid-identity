@@ -6,6 +6,7 @@ data class WalletDemoPresentationSubmission(
     val walletKeyId: String,
     val walletContext: Long,
     val selection: WalletDemoSharingSelection,
+    val statusReviewEpoch: Long,
 )
 
 fun WalletDemoUiState.presentationSubmission(reviewedStatus: Map<String, String>): WalletDemoPresentationSubmission? {
@@ -15,5 +16,5 @@ fun WalletDemoUiState.presentationSubmission(reviewedStatus: Map<String, String>
         selectedPresentationCredentialOptions.toSet(),
         selectedPresentationDisclosureOptions.forSelectedCredentials(selectedPresentationCredentialOptions).toSet(),
         paymentReview.consent?.revision, reviewedStatus.toMap(),
-    ))
+    ), credentialStatuses.reviewEpoch)
 }

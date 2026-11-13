@@ -8,6 +8,7 @@ import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.svg.SvgDecoder
+import coil3.map.Mapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -25,9 +26,19 @@ internal class WalletVisualImages {
     fun install() {
         SingletonImageLoader.setUnsafe { context ->
             ImageLoader.Builder(context)
-                .components { add(SvgDecoder.Factory()); add(walletImageDecoderFactory()) }
+                .components {
+                    add(SvgDecoder.Factory()); add(walletImageDecoderFactory())
+                    add(Mapper<String, ByteArray> { uri, _ ->
+                        if (uri.startsWith(WalletArtworkFixtures.Origin)) WalletArtworkFixtures.images[uri] else null
+                    })
+                }
                 .eventListenerFactory { object : EventListener() {
                     override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+                        val uri = request.data as? String
+                        if (uri?.startsWith(WalletArtworkFixtures.Origin) == true) {
+                            completed.update { it + uri }
+                            return
+                        }
                         val bytes = request.data as? ByteArray ?: return
                         fixtures.entries.firstOrNull { it.value.contentEquals(bytes) }?.key?.let { id ->
                             completed.update { it + id }

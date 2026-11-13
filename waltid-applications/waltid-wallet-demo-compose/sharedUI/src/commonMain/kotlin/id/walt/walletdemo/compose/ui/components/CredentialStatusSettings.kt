@@ -52,15 +52,21 @@ internal fun CredentialStatusSettings(custodial: Boolean) {
             { status.checkAll?.invoke() }, Modifier.testTag("settings-credential-status-check-all")
                 .semantics { if (status.checking) stateDescription = checking },
             enabled = supported && !status.checking && status.checkAll != null,
-            icon = {
+            trailingIcon = {
                 if (status.checking) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 else WalletIcon(WalletSymbol.Retry, null)
             })
         status.summary?.let { summary ->
             SettingsDivider()
             StatusCountRow(stringResource(Res.string.credential_status_processed), summary.completed)
-            if (summary.unchanged > 0) StatusCountRow(stringResource(Res.string.credential_status_not_refreshed), summary.unchanged)
-            if (summary.deferred > 0) StatusCountRow(stringResource(Res.string.credential_status_deferred_count), summary.deferred)
+            if (summary.unchanged > 0) {
+                SettingsDivider()
+                StatusCountRow(stringResource(Res.string.credential_status_not_refreshed), summary.unchanged)
+            }
+            if (summary.deferred > 0) {
+                SettingsDivider()
+                StatusCountRow(stringResource(Res.string.credential_status_deferred_count), summary.deferred)
+            }
             if (summary.checkErrors > 0) {
                 SettingsDivider()
                 StatusCountRow(stringResource(Res.string.credential_status_error_count), summary.checkErrors)
@@ -71,7 +77,7 @@ internal fun CredentialStatusSettings(custodial: Boolean) {
     }
     WalletSection {
         MetadataDisclosure(stringResource(Res.string.credential_status_how), initiallyExpanded = false,
-            modifier = Modifier.padding(horizontal = 16.dp)) {
+            modifier = Modifier.padding(horizontal = 16.dp).testTag("settings-credential-status-how")) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (text in listOf(Res.string.credential_status_how_network, Res.string.credential_status_how_privacy,
                     Res.string.credential_status_how_verifier, Res.string.credential_status_error_counts_detail)) {

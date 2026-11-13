@@ -107,6 +107,11 @@
 "Share anyway" = "Share anyway";
 "Some status checks are unavailable" = "Some status checks are unavailable";
 "Status checked" = "Status checked";
+"Status clear" = "Status clear";
+"Status information is unavailable. Previous results are retained." = "Status information is unavailable. Previous results are retained.";
+"Latest check failed" = "Latest check failed";
+"Conflicting update" = "Conflicting update";
+"Checks: %@" = "Checks: %@";
 "Status checking is disabled by the wallet host." = "Status checking is disabled by the wallet host.";
 "Status could not be verified" = "Status could not be verified";
 "Status information is shown for your review and is not an additional claim to share." = "Status information is shown for your review and is not an additional claim to share.";

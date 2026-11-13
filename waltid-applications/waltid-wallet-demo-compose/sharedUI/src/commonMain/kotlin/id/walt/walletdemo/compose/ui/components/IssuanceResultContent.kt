@@ -65,7 +65,7 @@ private fun SavedCredentialRow(credential: WalletDemoCredential) {
     }
         .testTag("issuance-saved-${credential.id}").padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
         CredentialSummaryRow(summary.toCardArt(), summary.issuer, Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.primary)
     }
     if (detailsOpen) {
         val details = remember(credential) { credential.toCredentialDetails() }

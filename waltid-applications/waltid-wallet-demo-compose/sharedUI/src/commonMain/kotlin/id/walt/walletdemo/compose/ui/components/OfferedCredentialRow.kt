@@ -89,7 +89,7 @@ internal fun OfferedCredentialRow(
                     CredentialSummaryRow(art, modifier = Modifier.weight(1f)
                         .testTag("issuance-identity-${credential.configurationId}"))
                     if (onSelectionChange != null) OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onSelectionChange)
-                    else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                    else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }

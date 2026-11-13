@@ -42,7 +42,10 @@ stay unchanged; transaction identifiers and other timestamp-looking text are nev
   Include the calendar era if a supported instant crosses into BCE in the viewer's zone.
 - Keep date, time and timezone as separate localized fields from one settings snapshot. Render
   them with the same reusable component on every timestamp surface: one text value in the normal
-  body style, with no forced line break. The timezone uses parentheses, never a middle-dot
+  body style by default, with no forced line break. Secondary status-time metadata uses the
+  existing secondary typography token for both its label and full value, below the status headline.
+  Callers select typography on the shared renderer; date content and formatting stay unchanged.
+  The timezone uses parentheses, never a middle-dot
   separator. Let the complete value wrap naturally in narrow layouts or at large text sizes;
   never truncate it or shrink the text to force one line. Accessibility reads the date, time and
   zone as one value. Isolate the parenthesized timezone with Unicode FSI/PDI so mixed scripts

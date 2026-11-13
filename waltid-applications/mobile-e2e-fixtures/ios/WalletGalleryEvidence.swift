@@ -58,7 +58,7 @@ extension XCTestCase {
         let reference = try await fixture.issuedReference(for: offer)
         XCTAssertTrue(card.isHittable)
         card.tap()
-        XCTAssertTrue(app.staticTexts["Not revoked"].waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Status clear"].waitForExistence(timeout: 30), app.debugDescription)
         captureGallery(app, name: capturePrefix + "-status-authenticated-clear")
         assertCredentialStatusControls(app)
         try await shareWithPolicy(clear: true)
@@ -139,6 +139,22 @@ extension XCTestCase {
             XCTAssertTrue(app.staticTexts[title].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
             XCTAssertTrue(refresh.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         }
+        func refreshReview(_ card: String, action: String) {
+            let id = String(card.dropFirst("wallet.credentialCard.".count))
+            let details = app.buttons["credential-status-details-" + id].firstMatch
+            XCTAssertTrue(details.waitForExistence(timeout: 10), app.debugDescription)
+            reveal(details); details.tap()
+            let checked = app.staticTexts["credential-status-last-checked-" + id].firstMatch
+            XCTAssertTrue(checked.waitForExistence(timeout: 10), app.debugDescription)
+            let before = checked.label
+            refresh(expect: "Revoked")
+            XCTAssertNotEqual(checked.label, before, "Explicit refresh must display its new authenticated result")
+            let submit = app.buttons["wallet.presentationSubmitButton"].firstMatch
+            XCTAssertTrue(submit.wait(for: \.isEnabled, toEqual: true, timeout: 15))
+            XCTAssertEqual(submit.label, action)
+            XCTAssertFalse(app.buttons["wallet.presentationDone"].exists)
+            XCTAssertFalse(app.staticTexts["Credential status warning"].exists)
+        }
         func captureStatus(_ suffix: String) async {
             let notice = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Status changed:")).firstMatch
             if notice.exists {
@@ -190,36 +206,39 @@ extension XCTestCase {
 
         openCard(pidCard, title: "Status not provided")
         captureGallery(app, name: capturePrefix + "-status-public-demo-no-reference")
-        openCard(eventCard, title: "Not suspended")
+        openCard(eventCard, title: "Status clear")
         try await fixture.setStatus(event, value: 1)
         refresh(expect: "Suspended")
         await captureStatus("-status-authenticated-suspended")
         try await fixture.setStatus(event, value: 0)
-        refresh(expect: "Not suspended")
+        refresh(expect: "Status clear")
         await captureStatus("-status-suspension-cleared")
 
-        openCard(accessCard, title: "Not revoked")
+        openCard(accessCard, title: "Status clear")
         assertCredentialStatusControls(app)
         captureGallery(app, name: capturePrefix + "-status-authenticated-clear")
         try await fixture.setStatus(access, value: 1)
         refresh(expect: "Revoked")
         let disclosure = button("credential-status-details-")
-        disclosure.tap()
+        XCTAssertFalse(disclosure.exists, "Simple issuer results have no redundant disclosure")
         let checked = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "credential-status-last-checked-")).firstMatch
         XCTAssertTrue(checked.waitForExistence(timeout: 10), app.debugDescription)
         let originalCheckTime = checked.label
         XCTAssertFalse(originalCheckTime.isEmpty)
         reveal(checked)
-        await captureStatus("-status-authenticated-revoked-expanded")
+        await captureStatus("-status-authenticated-revoked")
         try await fixture.setOutage(true)
         refresh(expect: "Last known: revoked")
         XCTAssertEqual(checked.label, originalCheckTime, "A failed check must preserve the original evidence timestamp")
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10), app.debugDescription)
+        assertCredentialStatusControls(app, expectsDisclosure: true)
+        reveal(disclosure); disclosure.tap()
         let latest = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@", "credential-status-latest-attempt-")).firstMatch
         XCTAssertTrue(latest.waitForExistence(timeout: 10), app.debugDescription)
         reveal(latest)
         // Compose exposes SettingsNotice as a labelled accessibility container, SwiftUI as text.
         let stale = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", "This result is out of date.")).firstMatch
+            .matching(NSPredicate(format: "label == %@", "Status outdated")).firstMatch
         XCTAssertTrue(stale.waitForExistence(timeout: 45), "The real signed freshness deadline must expire: \(app.debugDescription)")
         reveal(stale)
         XCTAssertEqual(checked.label, originalCheckTime)
@@ -240,6 +259,8 @@ extension XCTestCase {
         XCTAssertTrue(selectedAdverse.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertTrue(app.staticTexts["Status not provided"].firstMatch.exists)
         captureGallery(app, name: capturePrefix + "-status-mixed-sharing")
+        refreshReview(accessCard, action: "Share")
+        captureGallery(app, name: capturePrefix + "-status-sharing-refreshed")
         share.tap()
         // Native alerts and Compose dialogs expose the same heading and action IDs,
         // but only the native renderer exposes an XCUIElementTypeAlert container.
@@ -336,6 +357,8 @@ extension XCTestCase {
         XCTAssertTrue(app.staticTexts["Last known: revoked"].firstMatch.waitForExistence(timeout: 45),
                       "Payment evidence must deliberately review the expired result in manual mode")
         captureGallery(app, name: capturePrefix + "-status-payment-selected-credentials")
+        refreshReview(accessCard, action: "Confirm payment")
+        captureGallery(app, name: capturePrefix + "-status-payment-refreshed")
         let paymentWarning = app.staticTexts["Credential status warning"].firstMatch
         func showPaymentWarning() async {
             share.tap()
@@ -394,6 +417,17 @@ extension XCTestCase {
         XCTAssertTrue(app.staticTexts["Processed"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         captureGallery(app, name: capturePrefix + "-status-settings-completed")
+        let help = app.buttons["settings-credential-status-how"].firstMatch
+        XCTAssertTrue(help.waitForExistence(timeout: 10)); help.tap()
+        let explanation = app.staticTexts["Recipients verify credential status independently."].firstMatch
+        for _ in 0..<4 where !explanation.isHittable { app.swipeUp() }
+        XCTAssertTrue(explanation.isHittable, app.debugDescription)
+        captureGallery(app, name: capturePrefix + "-status-settings-help")
+        if !help.isHittable { app.swipeDown() }
+        help.tap()
+        XCTAssertFalse(explanation.exists)
+        XCTAssertTrue(app.staticTexts["Processed"].firstMatch.exists)
+        XCTAssertEqual(automaticStatusChecksState(automatic), true)
         if finishInManualMode { await setAutomaticStatusChecks(automatic, enabled: false) }
     }
 
@@ -429,16 +463,16 @@ extension XCTestCase {
         XCTAssertEqual(result, .completed, automatic.debugDescription)
     }
 
-    private func assertCredentialStatusControls(_ app: XCUIApplication) {
+    private func assertCredentialStatusControls(_ app: XCUIApplication, expectsDisclosure: Bool = false) {
         let refresh = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "credential-status-check-")).firstMatch
         let details = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "credential-status-details-")).firstMatch
         XCTAssertTrue(refresh.waitForExistence(timeout: 10))
-        XCTAssertTrue(details.exists)
-        for control in [refresh, details] {
+        XCTAssertEqual(details.exists, expectsDisclosure)
+        for control in expectsDisclosure ? [refresh, details] : [refresh] {
             XCTAssertGreaterThanOrEqual(control.frame.width, 44)
             XCTAssertGreaterThanOrEqual(control.frame.height, 44)
         }
-        XCTAssertFalse(refresh.frame.intersects(details.frame))
+        if expectsDisclosure { XCTAssertFalse(refresh.frame.intersects(details.frame)) }
     }
 
     func captureGallery(_ app: XCUIApplication, name: String) {

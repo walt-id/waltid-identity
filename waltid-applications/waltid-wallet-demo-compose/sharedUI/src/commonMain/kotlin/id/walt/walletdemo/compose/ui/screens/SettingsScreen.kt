@@ -130,7 +130,7 @@ internal fun SettingsScreen(
                         }
                         Column(
                             Modifier.weight(1f, fill = fillViewport).verticalScroll(rememberScrollState()).fillMaxWidth()
-                                .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
+                                .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletContentMaxWidth)
                                 .padding(horizontal = 20.dp, vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
@@ -288,7 +288,7 @@ internal fun SettingsScreen(
                                 }
                                 SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
                                 SettingsDestination.Server -> serverSettingsContent?.invoke()
-                                SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = serverSettingsContent != null)
+                                SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = onSignOut != null)
                                 SettingsDestination.DigitalCredentialsApi -> {
                                     WalletSection(footer = stringResource(Res.string.settings_review_description)) {
                                     SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,

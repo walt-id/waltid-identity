@@ -2,7 +2,6 @@ package id.walt.walletdemo.compose.logic.walletapi2
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 internal data class CredentialStatusReferenceDto(val storeIndex: Int, val credentialId: String) {
@@ -13,6 +12,7 @@ internal data class CredentialStatusSnapshotDto(
     val credentials: List<CredentialStatusRecordDto>,
     val refreshing: List<CredentialStatusReferenceDto> = emptyList(),
     val nextRefreshAt: String? = null,
+    val statusContext: CredentialStatusContextDto? = null,
 ) {
     init { require(credentials.map { it.reference }.distinct().size == credentials.size) }
 }
@@ -25,17 +25,35 @@ internal data class CredentialStatusRecordDto(
 internal data class RefreshCredentialStatusesDto(
     val credentials: List<CredentialStatusReferenceDto>? = null,
     val mode: String,
+    val statusContext: String? = null,
 )
 @Serializable
-internal data class CredentialStatusRefreshResultDto(val outcome: String, val status: JsonObject)
+internal data class CredentialStatusContextDto(val id: String, val expiresAt: String) {
+    init { require(id.isNotBlank() && expiresAt.isNotBlank()) }
+}
 
 @Serializable
-internal data class StatusReviewedBuildRequestDto(val request: BuildVpTokenRequestDto, val reviewedStatus: Map<String, String>)
+internal data class CredentialStatusRefreshResultDto(
+    val reference: CredentialStatusReferenceDto,
+    val outcome: String,
+    val presentation: CredentialStatusPresentationDto,
+    val evaluatedAt: String,
+    val hasCheckErrors: Boolean,
+    val statusContext: CredentialStatusContextDto? = null,
+)
+
+@Serializable
+internal data class StatusReviewedBuildRequestDto(
+    val request: BuildVpTokenRequestDto,
+    val reviewedStatus: Map<String, String>,
+    val statusContext: String? = null,
+)
 @Serializable
 internal data class StatusReviewedSendRequestDto(
     val request: SendAuthorizationResponseRequestDto,
     val selectedCredentialIds: Set<String>,
     val reviewedStatus: Map<String, String>,
+    val statusContext: String? = null,
 )
 
 /** Rendering DTO only; browser clients never evaluate issuer status bits. */

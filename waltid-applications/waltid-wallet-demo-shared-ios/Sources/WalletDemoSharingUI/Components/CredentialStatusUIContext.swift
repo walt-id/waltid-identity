@@ -17,6 +17,8 @@ public struct CredentialStatusUIContext {
     public var available: Bool { readState == .available }
     public var contextKey: AnyHashable?
     public var checking: Bool
+    /// Preserve local facts while withholding the host's networking capability.
+    public var readOnly: Self { var value = self; value.check = nil; return value }
     public init(values: [String: CredentialStatus] = [:], refreshing: Set<String> = [], check: ((String) -> Void)? = nil,
                 storeIndices: [String: Int] = [:], readState: CredentialStatusReadState = .available, contextKey: AnyHashable? = nil, checking: Bool = false) {
         self.values = values; self.refreshing = refreshing; self.check = check

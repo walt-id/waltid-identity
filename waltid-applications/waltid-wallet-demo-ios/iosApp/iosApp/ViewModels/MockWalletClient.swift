@@ -18,6 +18,8 @@ actor MockWalletClient: WalletClient {
     private(set) var statusRefreshCalls = 0
     private var statusRefreshResults: [CredentialStatusRefreshResult] = []
     private var statusRefreshFails = false
+    private var statusRefreshWait: (@Sendable () async -> Void)?
+    private(set) var statusSnapshotReads = 0
     private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
@@ -273,7 +275,7 @@ actor MockWalletClient: WalletClient {
         storedCredentials = []
     }
 
-    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { statusSnapshot }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { statusSnapshotReads += 1; return statusSnapshot }
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> {
         let id = UUID()
         return AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
@@ -294,12 +296,13 @@ actor MockWalletClient: WalletClient {
     }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
         statusRefreshCalls += 1
+        await statusRefreshWait?()
         try await delayOperation()
         if statusRefreshFails { throw NSError(domain: "MockWalletStatusTransport", code: 1) }
         return statusRefreshResults
     }
-    func setStatusRefreshResults(_ results: [CredentialStatusRefreshResult], fails: Bool = false) {
-        statusRefreshResults = results; statusRefreshFails = fails
+    func setStatusRefreshResults(_ results: [CredentialStatusRefreshResult], fails: Bool = false, waitFor: (@Sendable () async -> Void)? = nil) {
+        statusRefreshResults = results; statusRefreshFails = fails; statusRefreshWait = waitFor
     }
 
     private func delayOperation() async throws {
