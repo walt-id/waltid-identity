@@ -137,6 +137,66 @@ class WalletIssuanceSessionServiceTest {
         assertTrue(records.records.isEmpty())
     }
 
+    @Test
+    fun manualTokenHeadersDoNotReplaceParAuthentication() = runTest {
+        val provider = StaticAttestationProvider()
+        var parCalls = 0
+        var tokenCalls = 0
+        val service = service(ClientAttestationAssembler(provider)) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata())
+                CHALLENGE_ENDPOINT -> jsonResponse("""{"attestation_challenge":"par-challenge"}""")
+                PAR_ENDPOINT -> {
+                    parCalls++
+                    assertNotEquals("manual-wia", request.headers[ClientAttestationHeaders.HEADER_ATTESTATION])
+                    assertNotEquals("manual-pop", request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP])
+                    assertEquals("par-challenge", jwtPart(
+                        requireNotNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]), 1,
+                    )["challenge"]?.jsonPrimitive?.content)
+                    jsonResponse("""{"request_uri":"urn:example:request","expires_in":60}""", HttpStatusCode.Created)
+                }
+                TOKEN_ENDPOINT -> {
+                    tokenCalls++
+                    assertEquals(listOf("manual-wia"), request.headers.getAll(ClientAttestationHeaders.HEADER_ATTESTATION))
+                    assertEquals(listOf("manual-pop"), request.headers.getAll(ClientAttestationHeaders.HEADER_ATTESTATION_POP))
+                    jsonResponse("""{"error":"invalid_client"}""", HttpStatusCode.Unauthorized)
+                }
+                else -> error("Unexpected request ${request.url}")
+            }
+        }
+        val session = service.start(authRequest().copy(tokenRequestHeaders = manualAttestationHeaders()))
+        val authorization = service.beginAuthorization(session.id)
+        val outcome = service.continueAuthorization(
+            WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "code")),
+        )
+        assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, assertIs<WalletIssuanceOutcome.Failed>(outcome).error.code)
+        assertEquals(1, parCalls)
+        assertEquals(1, tokenCalls)
+        assertEquals(1, provider.calls, "Only PAR may obtain automatic WIA")
+    }
+
+    @Test
+    fun manualTokenHeadersCannotAuthenticateParWithoutItsOwnProvider() = runTest {
+        var parCalls = 0
+        val service = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata())
+                PAR_ENDPOINT -> {
+                    parCalls++
+                    assertNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION])
+                    assertNull(request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP])
+                    jsonResponse("""{"error":"invalid_client"}""", HttpStatusCode.Unauthorized)
+                }
+                else -> error("Unexpected request ${request.url}")
+            }
+        }
+        val session = service.start(authRequest().copy(tokenRequestHeaders = manualAttestationHeaders()))
+        assertFailsWith<Exception> { service.beginAuthorization(session.id) }
+        assertEquals(1, parCalls)
+    }
+
     private fun manualAttestationHeaders() = mapOf(
         ClientAttestationHeaders.HEADER_ATTESTATION to "manual-wia",
         ClientAttestationHeaders.HEADER_ATTESTATION_POP to "manual-pop",
