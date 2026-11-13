@@ -227,6 +227,26 @@ class CredentialStatusBackendE2ETest {
             capture("revoked-verifier-policy-result")
             home()
 
+            // Exercise the actual preference and batch before payment, then deliberately
+            // review expired evidence in manual mode without automatic warning invalidation.
+            clickByTag(device, "wallet.settingsButton")
+            capture("root-settings")
+            clickByTag(device, "settings-credential-status")
+            val automatic = requireNotNull(waitForResource(device, "settings-credential-status-automatic", 10_000))
+            assertTrue(automatic.isChecked)
+            clickByTag(device, automatic.resourceName)
+            assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(false)), 5_000))
+            capture("settings-manual")
+            clickByTag(device, automatic.resourceName)
+            assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(true)), 5_000))
+            clickByTag(device, "settings-credential-status-check-all")
+            assertTrue(device.wait(Until.hasObject(By.text("Processed")), 30_000))
+            assertTrue(device.wait(Until.hasObject(By.res("settings-credential-status-check-all").enabled(true)), 30_000))
+            capture("settings-completed")
+            clickByTag(device, automatic.resourceName)
+            assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(false)), 5_000))
+            home()
+
             val paymentCard = issue(DemoTestBackend.createOffer(DemoTestBackend.credentialStatusPaymentScenario).offerUrl)
             val payment = DemoTestBackend.createCredentialStatusPaymentVerifierSession()
             WalletGalleryEvidence.request("presentation", payment.authorizationRequestUri)
@@ -239,6 +259,8 @@ class CredentialStatusBackendE2ETest {
             assertTextVisibleAfterScrolling(device, listOf("Status not provided"), "The payment must include its credential rows")
             assertTextVisibleAfterScrolling(device, listOf("Revoked", "Last known: revoked"),
                 "The selected affected credential must remain reachable below the quiet payment rows")
+            assertTrue("Payment evidence must deliberately review the expired result in manual mode",
+                device.wait(Until.hasObject(By.text("Last known: revoked")), 45_000))
             capture("payment-selected-credentials")
             fun showPaymentWarning() {
                 clickByTag(device, "wallet.presentationSubmitButton")
@@ -272,25 +294,8 @@ class CredentialStatusBackendE2ETest {
             capture("payment-result")
             home()
 
-            clickByTag(device, "wallet.settingsButton")
-            capture("root-settings")
-            clickByTag(device, "settings-credential-status")
-            val automatic = requireNotNull(waitForResource(device, "settings-credential-status-automatic", 10_000))
-            assertTrue(automatic.isChecked)
-            clickByTag(device, automatic.resourceName)
-            assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(false)), 5_000))
-            capture("settings-manual")
-            clickByTag(device, automatic.resourceName)
-            assertTrue(device.wait(Until.hasObject(By.res(automatic.resourceName).checked(true)), 5_000))
-            clickByTag(device, "settings-credential-status-check-all")
-            assertTrue(device.wait(Until.hasObject(By.text("Processed")), 30_000))
-            capture("settings-completed")
-
             // Persist only test expectations. A separate invocation must kill/relaunch the process;
             // no SDK data or status is injected, and automatic checks stay off during that read.
-            clickByTag(device, "settings-credential-status-automatic")
-            assertTrue(device.wait(Until.hasObject(By.res("settings-credential-status-automatic").checked(false)), 5_000))
-            home()
             tapStoredCard(device, accessCard)
             assertTrue(device.wait(Until.hasObject(By.text(Pattern.compile("(?:Last known: )?revoked", Pattern.CASE_INSENSITIVE))), 30_000))
             val retentionDetails = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-details-.*"))))
