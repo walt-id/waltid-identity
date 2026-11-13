@@ -10,7 +10,7 @@ class CredentialInformationContractTest {
         val metadata = fixture.getValue("projectedArrayClaims").toString()
         val claims = StoredCredentialMetadataParser.claims(metadata, listOf("en"))
         assertEquals(fixture.getValue("projectedArrayLabels").jsonArray.map { it.jsonPrimitive.content }, claims.map { it.displayName })
-        assertEquals(listOf(listOf("accounts", "0", "iban"), listOf("name")), claims.map { it.path })
+        assertEquals(listOf(listOf(JsonPrimitive("accounts"), JsonPrimitive(0), JsonPrimitive("iban")), listOf(JsonPrimitive("name"))), claims.map { it.path })
         assertEquals(true, claims.first().mandatory)
         val summary = CredentialSummary(id = "array-contract", format = "dc+sd-jwt", label = "Account", issuer = null,
             credentialDataJson = fixture.getValue("projectedArrayCredentialData").toString(), metadataJson = metadata)
