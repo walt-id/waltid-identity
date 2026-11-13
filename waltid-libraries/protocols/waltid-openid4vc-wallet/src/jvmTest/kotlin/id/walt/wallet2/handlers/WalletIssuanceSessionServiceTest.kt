@@ -112,6 +112,37 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun manualTokenRejectionPreservesFailedSessionOutcomeWithoutProviderFallback() = runTest {
+        val records = RecordingSessionStore()
+        val provider = StaticAttestationProvider()
+        var tokenCalls = 0
+        val service = service(ClientAttestationAssembler(provider), records) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(attestedAuthorizationServerMetadata())
+                TOKEN_ENDPOINT -> {
+                    tokenCalls++
+                    assertEquals("manual-wia", request.headers[ClientAttestationHeaders.HEADER_ATTESTATION])
+                    assertEquals("manual-pop", request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP])
+                    jsonResponse("""{"error":"invalid_client"}""", HttpStatusCode.Unauthorized)
+                }
+                else -> error("Unexpected request ${request.url}")
+            }
+        }
+        val request = preAuthorizedRequest().copy(tokenRequestHeaders = manualAttestationHeaders())
+        val outcome = service.continuePreAuthorized(service.start(request).id)
+        assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, assertIs<WalletIssuanceOutcome.Failed>(outcome).error.code)
+        assertEquals(1, tokenCalls)
+        assertEquals(0, provider.calls)
+        assertTrue(records.records.isEmpty())
+    }
+
+    private fun manualAttestationHeaders() = mapOf(
+        ClientAttestationHeaders.HEADER_ATTESTATION to "manual-wia",
+        ClientAttestationHeaders.HEADER_ATTESTATION_POP to "manual-pop",
+    )
+
+    @Test
     fun unrecognizedOfferParametersCannotOverrideMetadataDiscovery() = runTest {
         val requestedUrls = mutableListOf<String>()
         val service = service { request ->
