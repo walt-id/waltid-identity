@@ -29,7 +29,12 @@ object IssuanceSessionStorageCodec {
             normalized["issuanceRequests"] = JsonArray(listOf(JsonObject(request)))
             stored["issuedCredentialFormat"]?.takeUnless { it is JsonNull }?.let { format ->
                 normalized["issuanceResults"] = buildJsonObject {
-                    put(identifier.jsonPrimitive.content, buildJsonObject { put("issuedCredentialFormat", format) })
+                    put(
+                        identifier.jsonPrimitive.content,
+                        buildJsonObject {
+                            put("issuedCredentialFormat", format)
+                        },
+                    )
                 }
             }
         }

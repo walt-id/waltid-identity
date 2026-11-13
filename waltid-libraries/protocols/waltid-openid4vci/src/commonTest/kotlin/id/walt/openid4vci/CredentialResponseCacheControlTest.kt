@@ -5,6 +5,7 @@ import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
@@ -53,4 +54,25 @@ class CredentialResponseCacheControlTest {
             assertEquals(JsonPrimitive(code), response.payload["error"])
         }
     }
+    @Test
+    fun protectedResourceErrorsRetainCallerHeadersAndMandatoryHeaders() {
+        for (code in listOf(OAuthErrorCodes.INVALID_TOKEN, OAuthErrorCodes.INVALID_DPOP_PROOF, OAuthErrorCodes.TEMPORARILY_UNAVAILABLE)) {
+            val error = OAuthError(code, "try again", responseHeaders = mapOf(
+                "Retry-After" to "30", "Cache-Control" to "public", "Pragma" to "cache",
+            ))
+            val credential = provider.writeCredentialError(error)
+            for (scheme in AccessTokenAuthorizationScheme.entries) {
+                val notification = provider.writeNotificationError(error, scheme)
+                for (headers in listOf(credential.headers, notification.headers)) {
+                    assertEquals("30", headers["Retry-After"])
+                    assertEquals("no-store", headers["Cache-Control"])
+                    assertEquals("no-cache", headers["Pragma"])
+                }
+                if (code != OAuthErrorCodes.TEMPORARILY_UNAVAILABLE) {
+                    assertTrue(notification.headers.getValue("WWW-Authenticate").startsWith(scheme.value + " "))
+                }
+            }
+        }
+    }
+
 }

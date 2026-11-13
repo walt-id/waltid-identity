@@ -4,6 +4,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -49,6 +50,12 @@ class IssuanceSessionService(
     }
 
     suspend fun createSession(session: IssuanceSession): IssuanceSession = repository.save(session)
+
+    /**
+     * Writes a session already removed by [claimSession].
+     * The snapshot keeps the deferred checkpoint it held at the claim; the stored row is gone until this write.
+     */
+    suspend fun saveClaimedSession(session: IssuanceSession): IssuanceSession = repository.save(session)
 
     suspend fun saveSession(session: IssuanceSession): IssuanceSession {
         if (session.deferredState == null) return repository.save(session)
@@ -97,4 +104,15 @@ class IssuanceSessionService(
         )
         return saveSession(updated)
     }
+}
+
+/** Applies the library's resolved change to the stored record. */
+internal fun IssuanceSession.applyWalletNotification(update: IssuedCredentialNotificationChange): IssuanceSession {
+    val result = requireNotNull(issuanceResults[update.credentialIdentifier])
+    return copy(issuanceResults = issuanceResults + (update.credentialIdentifier to result.copy(
+        walletNotification = requireNotNull(result.walletNotification).copy(
+            event = update.event,
+            eventDescription = update.eventDescription,
+        ),
+    )))
 }
