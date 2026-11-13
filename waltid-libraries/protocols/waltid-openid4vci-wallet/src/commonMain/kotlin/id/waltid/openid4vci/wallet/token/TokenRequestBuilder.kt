@@ -437,6 +437,11 @@ class TokenRequestBuilder(
         require(attestationHeaders == null || attestationHeadersFactory == null) {
             "Client attestation must be configured with either attestationHeaders or attestationHeadersFactory, not both"
         }
+        // A static signed PoP cannot be refreshed after either kind of challenge. This also applies
+        // to refresh-token requests; only a factory can provide fresh attestation on recovery.
+        val staticAttestation = attestationHeaders != null || additionalHeaders.keys.any {
+            it.equals(ClientAttestationHeaders.HEADER_ATTESTATION_POP, ignoreCase = true)
+        }
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
@@ -469,12 +474,12 @@ class TokenRequestBuilder(
             if (!response.status.isSuccess()) {
                 val errorResponse = response.oauthError()
                 val oauthError = errorResponse?.error
-                if (!dpopRetried && dpopProofFactory != null && oauthError == USE_DPOP_NONCE && suppliedNonce != null) {
+                if (!staticAttestation && !dpopRetried && dpopProofFactory != null && oauthError == USE_DPOP_NONCE && suppliedNonce != null) {
                     dpopRetried = true
                     return@repeat
                 }
                 if (attestationRecovery.shouldRetry(
-                        response.status, oauthError, response.headers, attestationHeadersFactory != null,
+                        response.status, oauthError, response.headers, !staticAttestation && attestationHeadersFactory != null,
                     )) return@repeat
                 throw TokenRequestException(
                     statusCode = response.status.value,
