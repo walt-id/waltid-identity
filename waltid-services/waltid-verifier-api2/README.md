@@ -62,6 +62,56 @@ Backed by `waltid-digital-credentials` for parsing and validation.
 - OpenAPI helpers for documentation and example payloads
 - VICAL helper endpoints (fetch/validate) for mdoc trust lists
 
+## External-reader proximity verification
+
+Enable `proximity-verifier` in `config/_features.conf` to register
+`POST /verification-session/proximity/device-response`. It is off by default in OSS and Enterprise.
+The route uses the session-creation authentication surface; Enterprise requires the verifier-session create permission.
+
+The kiosk owns engagement, the reader private key, DeviceRequest/ReaderAuth, session encryption, and termination.
+After decrypting SessionData, submit:
+
+```json
+{
+  "flow_type": "iso_18013_5_external_reader",
+  "core_flow": {
+    "requestedElements": {
+      "org.iso.18013.5.1.mDL": { "org.iso.18013.5.1": ["family_name"] }
+    }
+  },
+  "deviceResponse": "<base64 decrypted DeviceResponse CBOR>",
+  "deviceEngagement": "<base64 exact DeviceEngagement CBOR>",
+  "eReaderKey": "<base64 exact reader public COSE_Key CBOR>",
+  "handover": "qr"
+}
+```
+
+For static NFC handover, use an object with `type: "nfc"` and `handoverSelect`; omit
+`handoverRequest` or set it to null. Negotiated handover also supplies `handoverRequest`.
+Each byte field contains standard base64 of the exact observed message.
+Preserve transcript and signed inner bytes; do not reconstruct them from decoded objects.
+Malformed CBOR and encrypted SessionData return 400 without creating a session. A valid outer CBOR
+re-encoding cannot in general be distinguished from the original; changing signed bytes fails verification.
+
+`core_flow` also supports `dcql_query`, `policies`, `notifications.webhook`, and ISO duration/date retention overrides.
+The service-level HOCON `sessionRetention` uses Hoplite duration syntax, for example `30d`.
+ISO-8601 strings such as `P30D` are not accepted in HOCON; request JSON retention durations use ISO-8601.
+The verifier evaluates returned claims; it does not receive or attest to the kiosk's DeviceRequest.
+
+Both verified and rejected presentations return 200 with a terminal public `Verification2Session`.
+Decide access from `status` and `policy_results`. Each submission receives a fresh session id, including
+an authenticated replay of an identical body. This endpoint requires session-creation authorization;
+`reattemptable` does not deduplicate separate create-and-verify calls, and the completed session cannot receive another attempt.
+The session is available through the usual info, events,
+deletion, and PII-purge endpoints. Enterprise also includes it in session lists and honors
+`persistSessionResult=false`, returning the result but discarding it before a later info lookup.
+
+The session emits one terminal update: `presentation_validation_failed` for mdoc check failures,
+or `credential_policy_results_available` after checks pass and policies decide the outcome.
+The events stream replays the stored outcome when the kiosk subscribes after the POST.
+The kiosk sends termination SessionData itself with status 20 (`SESSION_TERMINATION`).
+`DeviceResponse.status` 0 means the wallet returned documents; it is not a SessionData close status.
+
 ## Offer lifecycle and callback correlation
 
 Set `core_flow.session_usage` on cross-device session creation requests (`core.session_usage`
