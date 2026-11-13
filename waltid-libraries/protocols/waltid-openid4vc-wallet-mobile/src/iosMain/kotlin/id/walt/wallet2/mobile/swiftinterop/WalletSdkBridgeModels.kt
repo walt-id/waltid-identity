@@ -26,6 +26,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.mobile.WalletProviderConfig
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
@@ -72,6 +73,8 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    /** Enterprise Wallet Provider. When set, it supplies WIA and is the fallback KA provider. */
+    public val walletProvider: WalletProviderConfig? = null,
     /** Signed metadata is neither requested nor accepted when this trust resolver is absent. */
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
@@ -254,6 +257,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
     return MobileWalletConfig(
         walletId = walletId,
         attestationConfig = attestation,
+        walletProvider = walletProvider,
         credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
             CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
                 bridgeResolver.verify(compactJwt, expectedCredentialIssuer).toMetadataSigner()

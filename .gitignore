@@ -186,10 +186,6 @@ iOSInjectionProject/
 /waltid-services/waltid-etsi-plugtest-cli/config/key.jwk
 /waltid-services/waltid-etsi-plugtest-cli/config/cert.pem
 
-# E2E test local config
-waltid-applications/waltid-wallet-demo-ios/scripts/e2e.env
-waltid-applications/waltid-wallet-demo-android/scripts/e2e.env
-
 # Firebase Android client configs. CI writes these from GitHub secrets.
 **/google-services.json
 

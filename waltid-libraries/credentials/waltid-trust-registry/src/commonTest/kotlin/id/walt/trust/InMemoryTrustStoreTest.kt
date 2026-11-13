@@ -98,6 +98,23 @@ class InMemoryTrustStoreTest {
     }
 
     @Test
+    fun `canonical subject lookup returns matching and unkeyed certificate identities only`() = runTest {
+        val store = createStore()
+        fun identity(id: String, der: String?, key: String?) =
+            ServiceIdentity(id, "src-1", "entity-1", certificateDerBase64 = der, canonicalSubjectSha256Hex = key)
+        store.upsertIdentities(listOf(
+            identity("match", "AAAA", "aa"),
+            identity("unkeyed", "BBBB", null),
+            identity("other-subject", "CCCC", "cc"),
+            identity("no-certificate", null, "aa"),
+        ))
+
+        val results = store.findCertificateIdentitiesByCanonicalSubject(setOf("aa", "bb")).toList()
+
+        assertEquals(setOf("match", "unkeyed"), results.map { it.identityId }.toSet())
+    }
+
+    @Test
     fun `find identities by certificate SHA-256 is case insensitive`() = runTest {
         val store = createStore()
         store.upsertIdentities(listOf(testIdentity))

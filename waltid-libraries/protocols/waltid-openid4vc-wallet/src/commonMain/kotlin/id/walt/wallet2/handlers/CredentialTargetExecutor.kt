@@ -19,7 +19,10 @@ internal class CredentialIssuanceAccess(
     val accessToken: String,
     val senderKey: WalletKeyStoreEntry,
     dpopAlgorithms: Set<String>?,
+    /** Credential proof `iss`. Absent for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1). */
     val proofIssuer: String?,
+    /** OAuth client id stored as the wallet-provider unit subject. Independent of [proofIssuer]. */
+    val walletClientId: String? = proofIssuer,
 ) {
     val dpop = dpopAlgorithms?.let { DpopRequestContext(it, senderKey) }
     val tokenType: String get() = if (dpop == null) "Bearer" else "DPoP"
@@ -57,7 +60,7 @@ internal suspend fun executeCredentialTargets(
                 issuerMetadata.nonceEndpoint, httpClient,
                 buildProof = algorithms?.let { { nonce ->
                     WalletIssuanceHandler.buildProofCollection(wallet, selected.bindings, configuration,
-                        issuerMetadata.credentialIssuer, nonce, access.proofIssuer)
+                        issuerMetadata.credentialIssuer, nonce, access.proofIssuer, access.walletClientId)
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
