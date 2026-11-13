@@ -13,6 +13,7 @@ class Wallet2TokenErrorMappingTest {
         val upstream = TokenRequestException(
             statusCode = HttpStatusCode.BadRequest.value,
             oauthError = "invalid_grant",
+            oauthErrorDescription = "unrecognized issuer description",
             cause = IllegalStateException("upstream body must not escape"),
         )
 

@@ -11,8 +11,9 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
-import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeErrorDescriptions
+import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
@@ -78,7 +79,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 request = unresolvedRequest,
                 error = OAuthError(
                     error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "Pre-authorized code is invalid or has already been used",
+                    description = PreAuthorizedCodeErrorDescriptions.INVALID_CODE,
                 ),
         )
         val resolvedRequest = unresolvedRequest.withSession(record.session.copy())
@@ -126,13 +127,17 @@ class PreAuthorizedCodeTokenEndpoint(
             is PreAuthorizedCodeRedemption.Redeemed -> redemption.record
             PreAuthorizedCodeRedemption.WrongTxCode -> return AccessTokenResponseResult.Failure(
                 resolvedRequest,
-                OAuthError(OAuthErrorCodes.INVALID_GRANT, "tx_code is invalid"),
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, PreAuthorizedCodeErrorDescriptions.WRONG_TX_CODE),
+            )
+            PreAuthorizedCodeRedemption.Locked -> return AccessTokenResponseResult.Failure(
+                resolvedRequest,
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, PreAuthorizedCodeErrorDescriptions.TX_CODE_ATTEMPTS_EXHAUSTED),
             )
             PreAuthorizedCodeRedemption.Invalid -> return AccessTokenResponseResult.Failure(
                 resolvedRequest,
                 OAuthError(
                     error = OAuthErrorCodes.INVALID_GRANT,
-                    description = "Pre-authorized code is invalid or has already been used",
+                    description = PreAuthorizedCodeErrorDescriptions.INVALID_CODE,
                 ),
             )
         }
@@ -231,6 +236,7 @@ class PreAuthorizedCodeTokenEndpoint(
     private sealed interface PreAuthorizedCodeRedemption {
         data class Redeemed(val record: PreAuthorizedCodeRecord) : PreAuthorizedCodeRedemption
         data object WrongTxCode : PreAuthorizedCodeRedemption
+        data object Locked : PreAuthorizedCodeRedemption
         data object Invalid : PreAuthorizedCodeRedemption
     }
 
@@ -262,7 +268,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 return when {
                     !current.isRedeemableAt(Clock.System.now()) -> PreAuthorizedCodeRedemption.Invalid
                     matches -> PreAuthorizedCodeRedemption.Redeemed(current)
-                    next.status == PreAuthorizedCodeStatus.LOCKED -> PreAuthorizedCodeRedemption.Invalid
+                    next.status == PreAuthorizedCodeStatus.LOCKED -> PreAuthorizedCodeRedemption.Locked
                     else -> PreAuthorizedCodeRedemption.WrongTxCode
                 }
             }
