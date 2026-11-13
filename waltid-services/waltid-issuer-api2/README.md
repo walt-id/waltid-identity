@@ -613,8 +613,12 @@ must also restart. Unaffected pre-authorized sessions remain usable.
 
 ## Client attestation challenges
 
+The shipped `issuer-service.conf` comments out `client-attestation`, so the public demo
+accepts authorization-code wallets without a client attestation. Uncomment that block to
+require `attest_jwt_client_auth`. Anonymous pre-authorized access stays enabled.
+
 Challenges are disabled in the shipped configurations. To enable them, add the following
-inside the `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
+inside the uncommented `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
 in `issuer-service.conf`, alongside `config`, and restart the issuer:
 
 ```hocon
