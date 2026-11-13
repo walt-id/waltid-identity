@@ -1291,8 +1291,15 @@ public class MobileWallet internal constructor(
                 } else null
             }
             record?.let { entry ->
-                val types = if (entry.format == MobileWalletDigitalCredentialFormat.SD_JWT_VC)
-                    stored.resolvedSdJwtVcTypes().ifEmpty { listOf(entry.type) } else listOf(entry.type)
+                val types = if (entry.format == MobileWalletDigitalCredentialFormat.SD_JWT_VC) {
+                    try {
+                        stored.resolvedSdJwtVcTypes().ifEmpty { listOf(entry.type) }
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (_: IllegalArgumentException) {
+                        return@mapNotNull null
+                    }
+                } else listOf(entry.type)
                 types.map { entry.copy(type = it) }
             }
         }.toList().flatten()
