@@ -19,6 +19,7 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataResolver
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallengeService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
@@ -92,6 +93,7 @@ data class OpenId4VciModule(
             refreshTokenRepository: RefreshTokenRepository,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver?,
             credentialProofVerifier: CredentialProofVerifier,
+            metadataResolver: SdJwtVcMetadataResolver? = null,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {
@@ -163,7 +165,7 @@ data class OpenId4VciModule(
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers().apply {
                         register(CredentialFormat.MSO_MDOC, MdocCredentialHandler(roundValidityToTwelveHours = true))
-                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true))
+                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true, metadataResolver = metadataResolver))
                     },
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),

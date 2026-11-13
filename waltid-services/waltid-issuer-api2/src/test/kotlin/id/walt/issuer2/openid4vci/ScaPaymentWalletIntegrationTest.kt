@@ -26,8 +26,11 @@ import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vc.policies.PolicyServiceKey
 import id.walt.policies2.vc.policies.CredentialTypeMetadataResolver
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
 import io.ktor.server.routing.routing
+import io.ktor.client.statement.readRawBytes
 import id.walt.wallet2.data.Wallet
+import kotlin.test.assertContentEquals
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -102,6 +105,7 @@ class ScaPaymentWalletIntegrationTest {
             val middleVct = "https://localhost/openid4vci/sca_user"
             ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] = config.copy(
                 credentialConfigurations = config.credentialConfigurations + mapOf(
+                    "sca_payment_card_sd_jwt" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive("https://localhost/openid4vci/bank_payment_type"))),
                     "sca_base" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(rootVct))),
                     "sca_user" to JsonObject(configuration.jsonObject + ("vct" to JsonPrimitive(middleVct))),
                 ),
@@ -222,9 +226,13 @@ class ScaPaymentWalletIntegrationTest {
                 wallet, ReceiveCredentialRequest(offerUrl = Url(offer.credentialOffer)), httpClient = http,
             ).toList().single()
             val vct = credential.credential.credentialData.getValue("vct").jsonPrimitive.content
-            assertEquals("$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
+            assertEquals("$issuerBase/openid4vci/${if (inherited) "bank_payment_type" else "sca_payment_card_sd_jwt"}", vct)
 
             if (inherited) {
+                val aliases = listOf("$issuerBase/openid4vci/bank_payment_type", "$issuerBase/.well-known/vct/bank_payment_type")
+                    .map { url -> http.get(url).also { assertEquals(HttpStatusCode.OK, it.status) }.readRawBytes() }
+                assertContentEquals(aliases.first(), aliases.last())
+                MetadataIntegrity.verify(aliases.first(), credential.credential.credentialData.getValue("vct#integrity").jsonPrimitive.content)
                 assertTrue("vct#integrity" in credential.credential.credentialData)
                 assertTrue("Inherited bank attestation" in credential.metadata.toString())
                 assertEquals(listOf(vct, "$issuerBase/openid4vci/sca_user", "$issuerBase/openid4vci/sca_base"), credential.resolvedSdJwtVcTypes())

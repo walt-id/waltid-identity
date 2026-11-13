@@ -35,10 +35,10 @@ class BoundedDocumentSession(
     private val started = TimeSource.Monotonic.markNow()
 
     suspend fun read(uri: String): ByteArray = try {
-        requireSourceAllowed(uri)
+        val requestedUrl = checkedUrl(uri)
         val bytes = documents[uri] ?: withTimeoutOrNull(minOf(10_000L, (30_000L - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L))) {
             if (documents.size >= MAX_DOCUMENTS) throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded")
-            retrieve(uri).also {
+            retrieve(requestedUrl).also {
                 require(documents.values.sumOf { value -> value.size.toLong() } + it.size <= MAX_TOTAL_BYTES) { "Metadata byte budget exceeded" }
                 documents[uri] = it
             }
@@ -51,8 +51,7 @@ class BoundedDocumentSession(
         throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded", cause)
     }
 
-    private suspend fun retrieve(originalUri: String): ByteArray {
-        val origin = checkedUrl(originalUri)
+    private suspend fun retrieve(origin: Url): ByteArray {
         val configuredOrigin = credentialOrigin ?: origin.also { credentialOrigin = it }
         var uri = origin
         repeat(MAX_REDIRECTS + 1) { redirects ->

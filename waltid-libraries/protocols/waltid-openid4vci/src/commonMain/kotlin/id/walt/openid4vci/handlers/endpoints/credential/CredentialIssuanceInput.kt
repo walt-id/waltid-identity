@@ -1,6 +1,5 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
-import id.walt.sdjwt.metadata.type.PublishedTypeMetadata
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -19,20 +18,7 @@ import kotlinx.serialization.json.JsonPrimitive
 data class CredentialIssuanceInput(
     val credentialData: JsonObject,
     val credentialStatus: Status? = null,
-) {
-    private var payloadValidator: ((JsonObject) -> Unit)? = null
-    val sdJwtPayloadValidator: ((JsonObject) -> Unit)? get() = payloadValidator
-
-    fun withSdJwtPayloadValidator(validator: (JsonObject) -> Unit): CredentialIssuanceInput =
-        copy().also { it.metadataBinding = metadataBinding; it.payloadValidator = validator }
-
-    private var metadataBinding: PublishedTypeMetadata? = null
-    val sdJwtTypeMetadata: PublishedTypeMetadata? get() = metadataBinding
-
-    /** Bind server-owned publication bytes without placing authoritative pins in caller claim data. */
-    fun withTypeMetadata(metadata: PublishedTypeMetadata?): CredentialIssuanceInput =
-        copy().also { it.metadataBinding = metadata; it.payloadValidator = payloadValidator }
-}
+)
 
 /**
  * Supplies one issuance input per credential after the complete proof collection passed validation.

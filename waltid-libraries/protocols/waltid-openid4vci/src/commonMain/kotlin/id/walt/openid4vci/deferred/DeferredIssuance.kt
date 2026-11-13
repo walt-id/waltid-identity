@@ -172,6 +172,11 @@ class DeferredIssuance(
         }
     }
 
+    /** A permanent preparation rejection is stored under the same claim fence as signed responses. */
+    suspend fun deny(sessionId: String, claim: DeferredTransaction) {
+        mutateClaim(sessionId, claim) { it.copy(denied = true) }
+    }
+
     suspend fun release(sessionId: String, claim: DeferredTransaction) {
         mutateClaim(sessionId, claim) { it.copy(claimId = null, claimExpiresAt = null) }
     }

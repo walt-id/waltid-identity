@@ -1371,7 +1371,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     CredentialIssuanceInput(
                         credentialData = credentialDataWithStatus,
                         credentialStatus = mDocStatus,
-                    ).withTypeMetadata(metadataService.getIssuanceTypeMetadata(issuanceRequest.credentialConfigurationId))
+                    )
                 }
             }
             val credentialResponseResult = deferredClaim?.response?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {
@@ -1415,6 +1415,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 is CredentialResponseResult.Success -> credentialResponseResult.response
                 is CredentialResponseResult.Failure -> {
                     if (deferredClaim != null && credentialResponseResult.error.error == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
+                        withContext(NonCancellable) { deferredIssuance.deny(sessionId, deferredClaim) }
                         return oauth2Provider.writeDeferredCredentialError(credentialResponseResult.error)
                     }
                     val response = if (credentialResponseResult.error.isRetryableProofFailure()) {

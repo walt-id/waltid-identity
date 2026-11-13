@@ -143,6 +143,27 @@ class DeferredIssuanceTest {
         assertEquals("invalid_transaction_id", assertFailsWith<DeferredProtocolException> { service().accept("offer", original) }.error.error)
     }
 
+    @Test fun permanentRejectionIsFencedAndSurvivesRestartWithoutAffectingOtherCredentials() = runTest {
+        val coordinator = service()
+        coordinator.start("offer", time + 7.days)
+        coordinator.decide("offer", DeferredStatus.READY)
+        val first = coordinator.accept("offer", accepted())
+        val sibling = coordinator.accept("offer", accepted("sibling"))
+        val stale = assertIs<DeferredIssuance.Collection.Claimed>(coordinator.collect("offer", first.id, setOf("credential"), "wallet")).transaction
+        time += 6.minutes
+        val current = assertIs<DeferredIssuance.Collection.Claimed>(coordinator.collect("offer", first.id, setOf("credential"), "wallet")).transaction
+        assertFailsWith<IllegalStateException> { coordinator.deny("offer", stale) }
+        coordinator.deny("offer", current)
+        coordinator.release("offer", current)
+        store.value = store.value!!.let { it.copy(state = Json.decodeFromString(Json.encodeToString(it.state!!))) }
+        repeat(2) {
+            assertEquals("credential_request_denied", assertFailsWith<DeferredProtocolException> {
+                service().collect("offer", first.id, setOf("credential"), "wallet")
+            }.error.error)
+        }
+        assertIs<DeferredIssuance.Collection.Claimed>(service().collect("offer", sibling.id, setOf("sibling"), "wallet"))
+    }
+
     private class Store(var value: DeferredSessionSnapshot?) : DeferredIssuanceStore {
         private val mutex = Mutex()
         override suspend fun get(id: String) = mutex.withLock { value?.takeIf { it.id == id } }

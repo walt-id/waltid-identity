@@ -27,6 +27,38 @@ class PublishedTypeMetadata private constructor(val metadata: JsonObject, bytes:
 
 /** Prepares configured hosted types together, filling absent parent pins and validating supplied ones. */
 class TypeMetadataPublisher(private val loadExternal: suspend (String) -> ByteArray) {
+    /** Reconcile configured types with immutable retained publications, including historical versions. */
+    suspend fun retain(
+        configured: Map<String, JsonObject>,
+        previous: Map<String, TypeMetadataPublication>,
+    ): Map<String, TypeMetadataPublication> {
+        for ((vct, source) in configured) {
+            val existing = previous[vct]
+            if (existing != null && existing.source != source) {
+                throw TypeMetadataException(TypeMetadataFailure.INVALID_METADATA, "Published type metadata is immutable; use a new versioned VCT")
+            }
+        }
+        val cached = mutableMapOf<String, ByteArray>()
+        for (publication in previous.values) for (document in publication.resolved.documents) {
+            val bytes = document.bytes()
+            val existing = cached.put(document.vct, bytes)
+            require(existing == null || existing.contentEquals(bytes)) { "Retained metadata has conflicting document bytes" }
+        }
+        val sources = previous.mapValues { it.value.source } + configured
+        val load: suspend (String) -> ByteArray = { uri ->
+            cached[uri] ?: loadExternal(uri).also { cached[uri] = it }
+        }
+        val published = TypeMetadataPublisher(load).publish(sources.mapValues { (vct, source) ->
+            previous[vct]?.published?.metadata ?: source
+        })
+        val publicationBytes: suspend (String) -> ByteArray = { uri -> published[uri]?.bytes() ?: load(uri) }
+        return published.mapValues { (vct, artifact) ->
+            previous[vct]?.also { existing ->
+                require(existing.published.bytes().contentEquals(artifact.bytes())) { "Retained publication bytes changed" }
+            } ?: TypeMetadataPublication.create(sources.getValue(vct), artifact, publicationBytes)
+        }
+    }
+
     suspend fun publish(configured: Map<String, JsonObject>): Map<String, PublishedTypeMetadata> {
         val published = mutableMapOf<String, PublishedTypeMetadata>()
         val visiting = mutableSetOf<String>()
@@ -56,5 +88,39 @@ class TypeMetadataPublisher(private val loadExternal: suspend (String) -> ByteAr
         val loader: suspend (String) -> ByteArray = { vct -> published[vct]?.bytes() ?: external[vct] ?: loadExternal(vct).also { external[vct] = it } }
         for ((vct, metadata) in published) TypeMetadataResolver(loader).resolve(vct, metadata.integrity)
         return published.toMap()
+    }
+}
+
+/** Verified publication and original chain bytes. Storage and configuration lifetime belong to the issuer. */
+class TypeMetadataPublication private constructor(
+    val source: JsonObject,
+    val published: PublishedTypeMetadata,
+    val resolved: ResolvedTypeMetadata,
+) {
+    fun snapshot(): JsonObject = buildJsonObject {
+        put("version", 1); put("source", source); put("chain", resolved.snapshot())
+    }
+
+    companion object {
+        internal suspend fun create(
+            source: JsonObject,
+            published: PublishedTypeMetadata,
+            load: suspend (String) -> ByteArray,
+        ): TypeMetadataPublication = TypeMetadataPublication(
+            source, published,
+            TypeMetadataResolver({ if (it == published.vct) published.bytes() else load(it) })
+                .resolve(published.vct, published.integrity),
+        )
+
+        suspend fun restore(snapshot: JsonObject): TypeMetadataPublication {
+            require(snapshot["version"] == JsonPrimitive(1)) { "Unsupported publication snapshot" }
+            val source = snapshot.getValue("source").jsonObject
+            val vct = source.getValue("vct").jsonPrimitive.content
+            val documents = TypeMetadataResolver.snapshotDocuments(snapshot.getValue("chain").jsonObject)
+            val published = PublishedTypeMetadata.fromRetrieved(vct, documents.getValue(vct))
+            val expected = if ("extends#integrity" in source) published.metadata else JsonObject(published.metadata - "extends#integrity")
+            require(source == expected) { "Retained publication does not match its configured source" }
+            return create(source, published) { documents.getValue(it) }
+        }
     }
 }
