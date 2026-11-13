@@ -1173,7 +1173,9 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationJwt = obtainAttestationJwt(active)
+        val attestationJwt = if (parseManualClientAttestationHeaders(active.request.tokenRequestHeaders) == null) {
+            obtainAttestationJwt(active)
+        } else null
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
         active.tokenRequestAnonymous = anonymous
@@ -1209,7 +1211,9 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationJwt = obtainAttestationJwt(active)
+        val attestationJwt = if (parseManualClientAttestationHeaders(active.request.tokenRequestHeaders) == null) {
+            obtainAttestationJwt(active)
+        } else null
         active.tokenRequestAnonymous = false
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
