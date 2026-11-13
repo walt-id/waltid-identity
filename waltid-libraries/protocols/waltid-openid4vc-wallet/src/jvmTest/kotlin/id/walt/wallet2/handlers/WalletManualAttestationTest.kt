@@ -5,6 +5,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
@@ -23,6 +25,7 @@ import io.ktor.http.headersOf
 import io.ktor.http.parseQueryString
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
@@ -56,16 +59,28 @@ class WalletManualAttestationTest {
 
     @Test
     fun manualTokenExchangeDoesNotRequireAWalletSigningKey() = runTest {
+        var keyStoreCalls = 0
+        val unavailableStore = object : WalletKeyStore {
+            override suspend fun getKey(keyId: String): Key? = error("Unused key lookup")
+            override suspend fun listKeys(): Flow<WalletKeyInfo> {
+                keyStoreCalls++
+                error("Signing key store unavailable")
+            }
+            override suspend fun addKey(key: Key): String = error("Unused key write")
+            override suspend fun removeKey(keyId: String): Boolean = error("Unused key deletion")
+        }
         var calls = 0
         client("\"attest_jwt_client_auth\"") { request ->
             calls++
             assertManualRequest(request)
             jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
         }.use {
-            val wallet = Wallet("empty")
-            assertEquals("access", WalletIssuanceHandler.requestToken(wallet, preAuthorized(), assembler, it).accessToken)
-            assertEquals("access", WalletIssuanceHandler.exchangeCode(wallet, authorized(), assembler, it).accessToken)
-            assertEquals(2, calls)
+            val wallets = listOf(Wallet("empty"), Wallet("unavailable", keyStores = listOf(unavailableStore)))
+            for (wallet in wallets) for (authorizationCode in listOf(false, true)) for (detailed in listOf(false, true)) {
+                assertEquals("access", exchange(wallet, authorizationCode, detailed, it, assembler))
+            }
+            assertEquals(8, calls)
+            assertEquals(0, keyStoreCalls)
         }
     }
 
