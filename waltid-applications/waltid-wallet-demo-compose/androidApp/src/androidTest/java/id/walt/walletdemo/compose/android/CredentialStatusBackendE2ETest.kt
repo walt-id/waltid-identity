@@ -267,7 +267,8 @@ class CredentialStatusBackendE2ETest {
             assertTextVisibleAfterScrolling(device, listOf(helpText), "Expanded settings help must explain the counts")
             capture("settings-help")
             clickByTag(device, "settings-credential-status-how")
-            assertFalse(device.hasObject(By.text(helpText)))
+            assertTrue("Help must disappear after the disclosure animation",
+                device.wait(Until.gone(By.text(helpText)), 5_000))
             assertTrue(device.hasObject(By.text("Processed")))
             assertTrue(device.hasObject(By.res(automatic.resourceName).checked(true)))
             clickByTag(device, automatic.resourceName)
