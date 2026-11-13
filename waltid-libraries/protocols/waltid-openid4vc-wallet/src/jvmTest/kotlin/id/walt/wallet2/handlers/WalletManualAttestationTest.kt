@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpServer
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
@@ -27,6 +28,8 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -81,6 +84,25 @@ class WalletManualAttestationTest {
             }
             assertEquals(8, calls)
             assertEquals(0, keyStoreCalls)
+        }
+    }
+
+    @Test
+    fun manualAuthorizationCodeExchangeStillCreatesDpopWithTheWalletKeyWhenRequested() = runTest {
+        val wallet = Wallet("manual-dpop", staticKey = JWKKey.generate(KeyType.secp256r1))
+        var calls = 0
+        client("\"attest_jwt_client_auth\"", dpop = true) { request ->
+            calls++
+            assertManualRequest(request)
+            val proof = assertNotNull(request.headers["DPoP"])
+            val claims = Json.parseToJsonElement(proof.split('.')[1].decodeFromBase64Url().decodeToString()).jsonObject
+            assertEquals("POST", claims["htm"]?.jsonPrimitive?.content)
+            assertEquals("$issuer/token", claims["htu"]?.jsonPrimitive?.content)
+            jsonResponse("""{"access_token":"access","token_type":"DPoP"}""")
+        }.use {
+            val token = WalletIssuanceHandler.exchangeCodeDetailed(wallet, authorized(), assembler, it, useDpop = true)
+            assertEquals("DPoP", token.tokenType)
+            assertEquals(1, calls)
         }
     }
 
@@ -272,11 +294,11 @@ class WalletManualAttestationTest {
         clientId = "manual-client", tokenRequestHeaders = headers)
     private fun authorized() = ExchangeCodeRequest("code", issuer, clientId = "manual-client", tokenRequestHeaders = headers)
 
-    private fun client(methods: String, anonymous: Boolean = false,
+    private fun client(methods: String, anonymous: Boolean = false, dpop: Boolean = false,
         token: suspend MockRequestHandleScope.(HttpRequestData) -> io.ktor.client.request.HttpResponseData) = HttpClient(MockEngine) {
         engine { addHandler { request -> when (request.url.toString()) {
             "$issuer/.well-known/openid-credential-issuer" -> jsonResponse(issuerMetadata(issuer))
-            "$issuer/.well-known/oauth-authorization-server" -> jsonResponse(asMetadata(issuer, methods, anonymous))
+            "$issuer/.well-known/oauth-authorization-server" -> jsonResponse(asMetadata(issuer, methods, anonymous, dpop))
             "$issuer/token" -> token(request)
             else -> error("Unexpected request ${request.url}")
         } } }
@@ -285,11 +307,14 @@ class WalletManualAttestationTest {
 
     private fun issuerMetadata(base: String) = """{"credential_issuer":"$base","credential_endpoint":"$base/credential",
         "credential_configurations_supported":{"identity":{"format":"jwt_vc_json","scope":"identity"}}}"""
-    private fun asMetadata(base: String, methods: String, anonymous: Boolean = false) = """{"issuer":"$base","token_endpoint":"$base/token",
+    private fun asMetadata(base: String, methods: String, anonymous: Boolean = false, dpop: Boolean = false): String {
+        val dpopMetadata = if (dpop) """, "dpop_signing_alg_values_supported":["ES256"]""" else ""
+        return """{"issuer":"$base","token_endpoint":"$base/token",
         "authorization_endpoint":"$base/authorize","response_types_supported":["code"],
         "token_endpoint_auth_methods_supported":[$methods],"token_endpoint_auth_signing_alg_values_supported":["ES256"],
         "client_attestation_signing_alg_values_supported":["ES256"],"client_attestation_pop_signing_alg_values_supported":["ES256"],
-        "pre-authorized_grant_anonymous_access_supported":$anonymous}"""
+        "pre-authorized_grant_anonymous_access_supported":$anonymous$dpopMetadata}"""
+    }
     private fun MockRequestHandleScope.jsonResponse(body: String, status: HttpStatusCode = HttpStatusCode.OK) =
         respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
 }
