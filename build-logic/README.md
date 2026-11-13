@@ -71,11 +71,11 @@ without declaring another plugin. Keep explicit plugin versions in the root's
 
 Use a local `@OptIn` when an implementation intentionally uses an experimental API.
 Applying the experimental marker itself makes the declaration experimental for its
-callers. Avoid module-wide opt-ins: they also hide accidental experimental API use
-in consumer tests such as `ClientMetadataTest`.
+callers. Avoid module-wide opt-ins, which hide unintended experimental API use in
+both production and test code.
 
-Once a module's remaining warnings are resolved, enable the stricter policy in its
-build script:
+Once a module's supported production and test compilations are warning-free,
+enable the stricter policy in its build script:
 
 ```kotlin
 kotlin {
