@@ -9,6 +9,7 @@ import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecor
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.random.CryptoRand
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -48,6 +49,10 @@ data class PreAuthorizedCodeIssueRequest(
     val session: Session,
     /** Optional issuance session ID for O(1) lookup on credential endpoint */
     val issuanceSessionId: String? = null,
+    /** Code validity from issuance. Omit to use the issuer's configured default. */
+    val lifetimeSeconds: Long? = null,
+    /** Cap the initial access token at the code deadline for offers sharing one expiry. */
+    val accessTokenExpiresWithCode: Boolean = false,
 )
 
 data class PreAuthorizedCodeIssueResult(
@@ -60,10 +65,11 @@ class DefaultPreAuthorizedCodeIssuer(
     private val repository: PreAuthorizedCodeRepository,
     override val anonymousAccessSupported: Boolean = true,
     private val maxGenerateAttempts: Int = 3,
-    private val policy: PreAuthorizedCodePolicy = PreAuthorizedCodePolicy(),
+    private val resolveConfig: suspend () -> PreAuthorizedCodeConfig = { PreAuthorizedCodeConfig() },
 ) : PreAuthorizedCodeIssuer {
 
     override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
+        val lifetime = resolveConfig().resolveLifetimeSeconds(request.lifetimeSeconds)
         val subject = request.session.subject?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("Session subject is required for pre-authorized code issuance")
 
@@ -74,15 +80,12 @@ class DefaultPreAuthorizedCodeIssuer(
 
         val resolvedTxCodeValue = resolveTxCodeValue(request.txCode, request.txCodeValue)
 
-        val now = kotlin.time.Clock.System.now()
-        val expiresAt = request.session.expiresAt[TokenType.ACCESS_TOKEN]
-            ?: (now + minOf(PreAuthorizedCodePolicy.DEFAULT_LIFETIME_SECONDS, policy.maxLifetimeSeconds).seconds)
-        require(expiresAt > now && expiresAt <= now + policy.maxLifetimeSeconds.seconds) {
-            "Pre-authorized code expiry must be in the future and at most ${policy.maxLifetimeSeconds} seconds away"
-        }
-        val sessionSnapshot = request.session.copy()
-            .withSubject(subject)
-            .withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
+        val expiresAt = Clock.System.now() + lifetime.seconds
+        val session = request.session.copy().withSubject(subject)
+        val sessionSnapshot = if (request.accessTokenExpiresWithCode) {
+            val tokenExpiry = session.expiresAt[TokenType.ACCESS_TOKEN]?.let { minOf(it, expiresAt) } ?: expiresAt
+            session.withExpiresAt(TokenType.ACCESS_TOKEN, tokenExpiry)
+        } else session
 
         val hashedTxCode = resolvedTxCodeValue?.let { hashTxCode(it) }
         val (code, _) = generateAndSaveUnique { generatedCode ->

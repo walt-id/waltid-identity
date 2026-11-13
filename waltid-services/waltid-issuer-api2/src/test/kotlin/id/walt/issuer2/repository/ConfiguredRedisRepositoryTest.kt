@@ -113,9 +113,17 @@ class ConfiguredRedisRepositoryTest {
             val restartedPreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
             val reloaded = assertNotNull(restartedPreAuthorizedCodeRepository.get(preAuthorizedCode.code))
             assertEquals(preAuthorizedCode.copy(redemptionState = attempted), reloaded)
-            val redeemed = attempted.copy(status = PreAuthorizedCodeStatus.REDEEMED)
-            assertTrue(restartedPreAuthorizedCodeRepository.compareAndSetRedemptionState(reloaded, redeemed))
+            val locked = attempted.copy(failedAttempts = 2, status = PreAuthorizedCodeStatus.LOCKED)
+            val (didLock, didConsume) = coroutineScope {
+                val lock = async(Dispatchers.IO) {
+                    preAuthorizedCodeRepository.compareAndSetRedemptionState(reloaded, locked)
+                }
+                val consume = async(Dispatchers.IO) { restartedPreAuthorizedCodeRepository.consume(reloaded.code) }
+                lock.await() to (consume.await() != null)
+            }
+            assertTrue(didLock xor didConsume)
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
+            assertNull(ConfiguredPreAuthorizedCodeRepository().consume(preAuthorizedCode.code))
 
             parRepository.save(pushedAuthorizationRequest)
             assertEquals(

@@ -427,9 +427,28 @@ recovering the original offer session. Pre-authorized offers are unchanged.
 including recovery of the original offer session and support for runtime overrides.
 Defaults for reference/value mode, expiry, and transaction codes are shared by both request forms.
 
-Pre-authorized offers default to 300 seconds and must specify a positive lifetime no greater than
-`preAuthorizedCodePolicy.maxLifetimeSeconds` (300 by default). Use `-1` only for authorized offers.
-`preAuthorizedCodePolicy.maxFailedTxCodeAttempts` defaults to five wrong values per code.
+Issuer2 uses the OpenID4VCI library defaults of 300 seconds for both the default and maximum
+pre-authorized code lifetime and five incorrect transaction code attempts per grant. These values
+are issuer settings. Override them in `issuer-service.conf`:
+
+```hocon
+preAuthorizedCode {
+  defaultLifetimeSeconds = 120
+  maxLifetimeSeconds = 300
+  maxFailedTxCodeAttempts = 3
+}
+```
+
+If the request omits `expiresInSeconds`, the issuer uses `defaultLifetimeSeconds`. A request can choose a
+positive lifetime up to `maxLifetimeSeconds`. The default cannot exceed the maximum.
+A pre-authorized code can be redeemed once before its deadline. Issuer2 gives the offer and initial
+issuance session that same deadline. For immediate issuance the initial access token is bounded by
+that deadline. For deferred issuance the separately configured deferred deadline starts at token issuance.
+The library can also issue a code with a token deadline independent of the code's expiry.
+
+The failed attempt budget is per grant and persists until the original expiry. Deployment rate limits
+can also restrict request volume across grants. Authorized offers have their own lifetime and accept
+`-1` for no expiry. The authorization code issued later still has its own expiry and can be used once.
 
 ### Sessions, authorization and proof copies
 

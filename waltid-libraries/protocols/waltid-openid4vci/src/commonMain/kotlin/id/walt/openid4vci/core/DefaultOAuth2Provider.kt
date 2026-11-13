@@ -8,6 +8,7 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
@@ -102,6 +103,11 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
+    override val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
+        repository = config.preAuthorizedCodeRepository,
+        anonymousAccessSupported = config.preAuthorizedCodeAnonymousAccessSupported,
+        resolveConfig = config::resolvePreAuthorizedCodeConfig,
+    )
     private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
 
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
@@ -318,7 +324,7 @@ class DefaultOAuth2Provider(
     ): AccessTokenRequestResult {
         if (config.clientAuthenticationServiceResolver == null &&
             isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
-            !config.preAuthorizedCodeIssuer.anonymousAccessSupported
+            !preAuthorizedCodeIssuer.anonymousAccessSupported
         ) {
             return AccessTokenRequestResult.Failure(
                 OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Anonymous pre-authorized code access is not supported"),
@@ -415,7 +421,7 @@ class DefaultOAuth2Provider(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
     ): Boolean =
-        config.preAuthorizedCodeIssuer.anonymousAccessSupported &&
+        preAuthorizedCodeIssuer.anonymousAccessSupported &&
                 isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
 
     private fun validateAccessTokenRequest(

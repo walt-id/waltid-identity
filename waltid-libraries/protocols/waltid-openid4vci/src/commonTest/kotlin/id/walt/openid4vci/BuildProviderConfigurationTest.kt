@@ -18,7 +18,6 @@ import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.PushedAuthorizationConfig
-import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
@@ -446,7 +445,7 @@ class BuildProviderConfigurationTest {
                 },
                 authorizationCodeRepository = authorizationCodeRepository,
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
+
                 accessTokenIssuer = StubTokenIssuer(),
                 refreshTokenIssuer = TestRefreshTokenIssuer(),
                 refreshTokenVerifier = TestRefreshTokenIssuer(),
@@ -477,7 +476,7 @@ class BuildProviderConfigurationTest {
             },
             authorizationCodeRepository = authorizationCodeRepository,
             preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-            preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
+
             accessTokenIssuer = StubTokenIssuer(),
             refreshTokenIssuer = TestRefreshTokenIssuer(),
             refreshTokenVerifier = TestRefreshTokenIssuer(),

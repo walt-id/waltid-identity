@@ -168,7 +168,7 @@ class Issuer2CredentialOfferEndpointTest {
                     setBody("""{$selector,"authMethod":"PRE_AUTHORIZED","expiresInSeconds":$lifetime}""")
                 }
                 assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
-                assertTrue(response.bodyAsText().contains("expiresInSeconds"))
+                assertTrue(response.bodyAsText().contains("Pre-authorized code lifetime"))
             }
         }
     }

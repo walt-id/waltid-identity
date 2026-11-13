@@ -378,6 +378,23 @@ class Issuer2ServiceConfigTest {
         assertEquals(true, config.supportsPreAuthAnonymous())
     }
 
+    @Test
+    fun `service config reads pre-authorized code overrides from HOCON`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                preAuthorizedCode {
+                    defaultLifetimeSeconds = 40
+                    maxLifetimeSeconds = 60
+                    maxFailedTxCodeAttempts = 2
+                }
+            """.trimIndent(),
+        )
+        assertEquals(40L, config.preAuthorizedCode.defaultLifetimeSeconds)
+        assertEquals(60L, config.preAuthorizedCode.maxLifetimeSeconds)
+        assertEquals(2, config.preAuthorizedCode.maxFailedTxCodeAttempts)
+    }
+
     private fun loadServiceConfig(content: String): Issuer2ServiceConfig {
         registerIssuer2ConfigDecoders()
         val configFile = Files.createTempFile("issuer-service", ".conf")

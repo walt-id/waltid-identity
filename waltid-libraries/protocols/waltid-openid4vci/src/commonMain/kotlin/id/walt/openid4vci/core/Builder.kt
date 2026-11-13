@@ -120,7 +120,7 @@ private fun registerDefaultGrantTypeHandlers(
     if (includePreAuthorizedCodeDefaultHandlers) {
         val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
-            policy = config.preAuthorizedCodePolicy,
+            resolveConfig = config::resolvePreAuthorizedCodeConfig,
             accessTokenIssuer = config.accessTokenIssuer,
             refreshTokenRepository = config.refreshTokenRepository,
             refreshTokenIssuer = config.refreshTokenIssuer,

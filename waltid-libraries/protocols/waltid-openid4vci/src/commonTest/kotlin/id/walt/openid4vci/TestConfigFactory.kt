@@ -4,7 +4,6 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.dpop.DPoPProofVerifier
-import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
@@ -56,7 +55,7 @@ internal fun createTestConfig(
         tokenEndpointHandlers = TokenEndpointHandlers(),
         authorizationCodeRepository = authorizationCodeRepository,
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-        preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
+
         accessTokenIssuer = accessTokenIssuer,
         accessTokenVerifier = accessTokenVerifier,
         dpopProofVerifier = dpopProofVerifier,

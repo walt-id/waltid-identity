@@ -78,7 +78,7 @@ class DPoPRefreshFlowTest {
             val code = assertIs<AuthorizationResponseResult.Success>(provider.createAuthorizationResponse(request, DefaultSession(subject = "offer"))).response.code
             mapOf("grant_type" to listOf(grant.value), "client_id" to listOf("wallet"), "code" to listOf(code), "redirect_uri" to listOf("https://wallet.example/callback"))
         } else {
-            val code = config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+            val code = provider.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
                 scopes = setOf("credential"), session = DefaultSession(subject = "offer"),
             )).code
             mapOf("grant_type" to listOf(grant.value), "pre-authorized_code" to listOf(code))

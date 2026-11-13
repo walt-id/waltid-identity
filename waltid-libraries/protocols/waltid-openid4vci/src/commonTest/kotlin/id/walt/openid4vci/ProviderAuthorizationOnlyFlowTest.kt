@@ -16,7 +16,6 @@ import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
-import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -476,10 +475,7 @@ class ProviderAuthorizationOnlyFlowTest {
         val config = createTestConfig()
         val provider = buildOAuth2Provider(
             config.copy(
-                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
-                    repository = config.preAuthorizedCodeRepository,
-                    anonymousAccessSupported = false,
-                ),
+                preAuthorizedCodeAnonymousAccessSupported = false,
                 clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                     methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
                     methodsByEndpoint = mapOf(
@@ -508,10 +504,7 @@ class ProviderAuthorizationOnlyFlowTest {
         val config = createTestConfig()
         val provider = buildOAuth2Provider(
             config.copy(
-                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
-                    repository = config.preAuthorizedCodeRepository,
-                    anonymousAccessSupported = false,
-                ),
+                preAuthorizedCodeAnonymousAccessSupported = false,
             )
         )
 

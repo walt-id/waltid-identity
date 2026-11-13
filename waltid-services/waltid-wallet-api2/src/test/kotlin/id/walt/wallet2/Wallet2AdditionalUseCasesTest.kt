@@ -23,7 +23,6 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
-import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
@@ -334,7 +333,7 @@ class Wallet2AdditionalUseCasesTest {
                 tokenEndpointHandlers = TokenEndpointHandlers(),
                 authorizationCodeRepository = authCodeRepo,
                 preAuthorizedCodeRepository = preAuthRepo,
-                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
+
                 accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
                 accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
                 refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
@@ -654,7 +653,7 @@ class Wallet2AdditionalUseCasesTest {
                 tokenEndpointHandlers = TokenEndpointHandlers(),
                 authorizationCodeRepository = authCodeRepo,
                 preAuthorizedCodeRepository = preAuthRepo,
-                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
+
                 accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
                 accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
                 refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),

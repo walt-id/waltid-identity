@@ -1,6 +1,6 @@
 package id.walt.issuer2.service
 
-import id.walt.openid4vci.preauthorized.InvalidPreAuthorizedOfferLifetimeException
+import id.walt.openid4vci.preauthorized.InvalidPreAuthorizedCodeLifetimeException
 import io.ktor.server.plugins.BadRequestException
 
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -16,7 +16,6 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
@@ -96,14 +95,6 @@ class CredentialOfferService(
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
-        val expiresAt = when (request.authMethod) {
-            AuthenticationMethod.PRE_AUTHORIZED -> try {
-                config.preAuthorizedCodePolicy.offerExpiresAt(request.expiresInSeconds, Clock.System.now())
-            } catch (e: InvalidPreAuthorizedOfferLifetimeException) {
-                throw BadRequestException(e.message.orEmpty(), e)
-            }
-            AuthenticationMethod.AUTHORIZED -> expirationTimestamp(request.expiresInSeconds)
-        }
         val notifications = resolvedCredentials.map { it.third }.distinct().singleOrNull()
         require(resolvedCredentials.all { it.third == notifications }) {
             "All credentials in an issuance session must resolve to the same notification configuration"
@@ -113,29 +104,32 @@ class CredentialOfferService(
             AuthenticationMethod.PRE_AUTHORIZED -> null
             AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: if (request.deferred) IssuerStateMode.INCLUDE else IssuerStateMode.OMIT
         }
-        var resolvedTxCodeValue: String? = null
+        val preAuthorizedCode = if (request.authMethod == AuthenticationMethod.PRE_AUTHORIZED) {
+            try {
+                preAuthorizedCodeIssuer.issue(
+                    PreAuthorizedCodeIssueRequest(
+                        txCode = request.txCode,
+                        txCodeValue = request.txCodeValue,
+                        session = DefaultSession(subject = sessionId),
+                        issuanceSessionId = sessionId,
+                        lifetimeSeconds = request.expiresInSeconds,
+                        accessTokenExpiresWithCode = true,
+                    )
+                )
+            } catch (e: InvalidPreAuthorizedCodeLifetimeException) {
+                throw BadRequestException(e.message.orEmpty(), e)
+            }
+        } else null
+        val expiresAt = preAuthorizedCode?.expiresAt ?: expirationTimestamp(request.expiresInSeconds)
         val credentialConfigurationIds = resolvedCredentials
             .map { it.second.credentialConfigurationId }
             .distinct()
         val credentialOffer = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
-                val oauthSession = DefaultSession(subject = sessionId)
-                    .withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
-                val preAuthorizedCode = preAuthorizedCodeIssuer.issue(
-                    PreAuthorizedCodeIssueRequest(
-                        txCode = request.txCode,
-                        txCodeValue = request.txCodeValue,
-                        session = oauthSession,
-                        scopes = emptySet(),
-                        audience = emptySet(),
-                        issuanceSessionId = sessionId,
-                    )
-                )
-                resolvedTxCodeValue = preAuthorizedCode.txCodeValue
                 CredentialOffer.withPreAuthorizedCodeGrant(
                     credentialIssuer = issuerBaseUrl(),
                     credentialConfigurationIds = credentialConfigurationIds,
-                    preAuthorizedCode = preAuthorizedCode.code,
+                    preAuthorizedCode = checkNotNull(preAuthorizedCode).code,
                     txCode = request.txCode,
                 )
             }
@@ -178,7 +172,7 @@ class CredentialOfferService(
             authMethod = request.authMethod,
             issuerStateMode = issuerStateMode,
             expiresAt = expiresAt.toEpochMilliseconds(),
-            txCodeValue = resolvedTxCodeValue,
+            txCodeValue = preAuthorizedCode?.txCodeValue,
             credentialOffer = offerRequest.toUrl(),
         )
     }
@@ -200,10 +194,10 @@ class CredentialOfferService(
 
     private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 
-    private fun expirationTimestamp(expiresInSeconds: Long): Instant =
+    private fun expirationTimestamp(expiresInSeconds: Long?): Instant =
         when (expiresInSeconds) {
             -1L -> Instant.DISTANT_FUTURE
-            else -> Clock.System.now().plus(expiresInSeconds.seconds)
+            else -> Clock.System.now().plus((expiresInSeconds ?: 300L).seconds)
         }
 
     private fun JsonObject.mergeCredentialDataOverride(override: JsonObject?): JsonObject =

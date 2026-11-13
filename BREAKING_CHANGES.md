@@ -2,10 +2,15 @@
 
 ## OpenID4VCI pre-authorized code redemption
 
-- Custom `PreAuthorizedCodeRepository` implementations must replace `consume` with an atomic
-  `compareAndSetRedemptionState` and persist `PreAuthorizedCodeRedemptionState` through the grant's original expiry.
+- `OAuth2ProviderConfig` takes the repository and `PreAuthorizedCodeConfig` (or a configuration resolver).
+  Issue grants through `provider.preAuthorizedCodeIssuer`. Set `PreAuthorizedCodeIssueRequest.lifetimeSeconds`
+  for explicit code validity. Session token deadlines no longer determine code validity.
+- Custom `PreAuthorizedCodeRepository` implementations must provide atomic `compareAndSetRedemptionState`
+  and retain the updated state through the original expiry. Use the default `consume` implementation or
+  ensure any override performs the same atomic active-to-redeemed transition. `consume` is for trusted
+  callers that have already authenticated the grant. Custom implementations still require an update.
 - New issuer2 pre-authorized offers require a positive lifetime within the configured maximum (300 seconds by default).
-  Existing grants retain their stored expiry. A rolling deployment enforces the new attempt limit after all token handlers are upgraded.
+  Existing grants retain their stored expiry. Upgrade all token handlers sharing a repository to enforce the new attempt limit.
 
 ## waltid-sdjwt payload validation
 
