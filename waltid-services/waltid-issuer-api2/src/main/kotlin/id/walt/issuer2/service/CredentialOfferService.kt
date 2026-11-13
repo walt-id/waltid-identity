@@ -1,5 +1,8 @@
 package id.walt.issuer2.service
 
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
+import id.walt.sdjwt.metadata.type.validateIssuanceInput
+
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
@@ -34,6 +37,7 @@ class CredentialOfferService(
     private val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
     private val config: Issuer2ServiceConfig,
     private val notificationService: IssuanceNotificationService,
+    private val typeMetadata: IssuerTypeMetadataCatalogue? = null,
 ) {
     suspend fun createCredentialOffer(
         request: CredentialOfferCreateRequest,
@@ -91,6 +95,16 @@ class CredentialOfferService(
                 credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
             )
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
+        }
+        for ((_, issuance, _) in resolvedCredentials) {
+            val configuration = typeMetadata?.credentialConfigurations?.get(issuance.credentialConfigurationId) ?: continue
+            typeMetadata.resolve(configuration)?.use { context ->
+                context.resolved.validateIssuanceInput(
+                    issuance.credentialData, issuance.selectiveDisclosure,
+                    issuance.mapping.orEmpty().keys + setOf("iss", "cnf", "vct", "vct#integrity", "_sd_alg", "display", "status") +
+                        if (issuance.idTokenClaimsMapping.isNullOrEmpty()) emptySet() else issuance.credentialData.keys,
+                )
+            }
         }
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)

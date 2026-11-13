@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
@@ -65,7 +66,7 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
-    fun `hosted publication uses the VCT slug independently of configuration id`() {
+    fun `hosted publication uses the VCT slug independently of configuration id`() = runBlocking {
         val vct = "https://issuer.example/openid4vci/identity_type"
         val configured = sdJwtMetadata("identity_config", vct)
         for (config in listOf(configured, configured.copy(sdJwtVcTypeMetadataConfiguration = mapOf(
