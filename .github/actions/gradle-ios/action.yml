@@ -216,6 +216,8 @@ runs:
           -skip-testing:iosAppEnterpriseTests \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testCredentialStatusLifecycleWithPublicAndControlledIssuers \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testControlledStatusIssuanceAndRevocation \
           -skip-testing:iosAppTests/WalletVisualTests \
           -resultBundlePath TestResults \
           -enableCodeCoverage NO \
@@ -267,6 +269,8 @@ runs:
         xcodebuild "${test_build[@]}" -collect-test-diagnostics "$XCODE_TEST_DIAGNOSTICS" \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testCredentialStatusLifecycleWithPublicAndControlledIssuers \
+          -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testControlledStatusIssuanceAndRevocation \
           -destination "platform=iOS Simulator,id=$simulator" \
           -resultBundlePath TestResults \
           -enableCodeCoverage NO \

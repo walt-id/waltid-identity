@@ -29,8 +29,8 @@ case "$phase" in
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**\nwaltid-identity/build/reports/wallet-recovery/**'
     ;;
   compose-demo)
-    # Provider and Enterprise journeys run in lanes supplying their required environment.
-    script="ANDROID_TEST_NOT_ANNOTATION=id.walt.mobile.test.DigitalCredentialProviderTest,id.walt.mobile.test.EnterpriseMobileTest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
+    # Provider, Enterprise and controlled issuer journeys require their dedicated environments.
+    script="ANDROID_TEST_NOT_CLASS=id.walt.walletdemo.compose.android.CredentialStatusBackendE2ETest ANDROID_TEST_NOT_ANNOTATION=id.walt.mobile.test.DigitalCredentialProviderTest,id.walt.mobile.test.EnterpriseMobileTest ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**'
