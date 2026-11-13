@@ -1,6 +1,7 @@
 package id.walt.credentials.signatures
 
 import id.walt.credentials.keyresolver.JwtKeyResolver
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
 import id.walt.crypto.keys.Key
@@ -18,6 +19,8 @@ interface JwtBasedSignature {
 
     suspend fun getCrypto2JwtBasedIssuer(
         credentialData: JsonObject,
-        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(),
+        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
+            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+        ),
     ): ResolvedJwtVerificationKey? = resolver.resolveFromJwt(jwtHeader, credentialData)
 }
