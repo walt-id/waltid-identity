@@ -61,7 +61,7 @@ extension ClaimItem {
     }
 }
 
-private func bestClaimMetadata(_ metadata: [CredentialClaimMetadata], expression: ClaimPathExpression, format: String)
+func bestClaimMetadata(_ metadata: [CredentialClaimMetadata], expression: ClaimPathExpression, format: String)
     -> (offset: Int, element: CredentialClaimMetadata)? {
     guard !expression.segments.isEmpty else { return nil }
     let paths = metadataPaths(expression, format: format)

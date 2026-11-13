@@ -2,6 +2,34 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testEffectiveReviewAndReviewedSubmissionPreserveTypedPathsAndCurrentRevision() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let handle = PresentationPreviewHandle(value: "review-handle")
+        let credentials: [PresentationCredentialSelection] = [.init(queryID: "q", credentialID: "credential")]
+        let disclosures: [PresentationDisclosureSelection] = [.init(queryID: "q", credentialID: "credential", path: #""items".1"#)]
+        bridge.effectiveReview = .init(revision: "current", credentials: [.init(queryID: "q", credentialID: "credential",
+            format: "dc+sd-jwt", claimsJSON: #"{"items":[false]}"#, wholeCredential: false, locations: [
+                .init(sourcePathJSON: #"["items",1]"#, receivedPathJSON: #"["items",0]"#,
+                      sharedBy: [#""items".1"#], alwaysCarried: false)])])
+        let review = try await wallet.reviewPresentation(previewHandle: handle, selectedCredentialOptions: credentials,
+            selectedDisclosureOptions: disclosures, did: "did:example:holder")
+        XCTAssertEqual(review, bridge.effectiveReview)
+        XCTAssertEqual(bridge.effectiveReviewArguments?.0, handle)
+        XCTAssertEqual(bridge.effectiveReviewArguments?.1, credentials)
+        XCTAssertEqual(bridge.effectiveReviewArguments?.2, disclosures)
+        XCTAssertEqual(bridge.effectiveReviewArguments?.3, "did:example:holder")
+        _ = try await wallet.submitReviewedPresentation(previewHandle: handle, selectedCredentialOptions: credentials,
+            selectedDisclosureOptions: disclosures, did: "did:example:holder", paymentConsentRevision: "payment", presentationReviewRevision: review.revision)
+        XCTAssertEqual(bridge.reviewedSubmissionRevision, "current")
+        XCTAssertEqual(bridge.submitCalls.last?.paymentConsentRevision, "payment")
+        bridge.error = .invalidInput("Stale review")
+        do {
+            _ = try await wallet.reviewPresentation(previewHandle: handle, selectedCredentialOptions: credentials)
+            XCTFail("Expected typed error")
+        } catch let error as WalletError { XCTAssertEqual(error, .invalidInput("Stale review")) }
+    }
+
     func testTypedPaymentFailuresRemainActionableThroughFacade() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
@@ -1276,6 +1304,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             credentialOptions: []
         )
     )
+    var effectiveReview = PreparedPresentationReview(revision: "review", credentials: [])
+    var effectiveReviewArguments: (PresentationPreviewHandle, [PresentationCredentialSelection], [PresentationDisclosureSelection]?, String?)?
+    var reviewedSubmissionRevision: String?
     var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var digitalCredentialCapabilitiesResult = DigitalCredentialCapabilities(
@@ -1447,6 +1478,21 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         previewCalls.append(request)
         return previewResult
+    }
+
+    func reviewPresentation(previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
+                            selectedDisclosureOptions: [PresentationDisclosureSelection]?, did: String?) async throws -> PreparedPresentationReview {
+        if let error { throw error }
+        effectiveReviewArguments = (previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+        return effectiveReview
+    }
+    func submitReviewedPresentation(previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
+                                    selectedDisclosureOptions: [PresentationDisclosureSelection]?, did: String?, runPolicies: Bool?,
+                                    paymentConsentRevision: String?, presentationReviewRevision: String) async throws -> PresentationResult {
+        if let error { throw error }
+        reviewedSubmissionRevision = presentationReviewRevision
+        return try await submitPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did, runPolicies: runPolicies, paymentConsentRevision: paymentConsentRevision)
     }
 
     func preparePaymentConsent(

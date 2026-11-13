@@ -20,6 +20,8 @@ public struct SharingReviewView: View {
     private let compact: Bool
     private let showActions: Bool
     private let paymentReview: PaymentReviewState
+    private let claimReview: ClaimReviewState
+    private let onRetryClaimReview: () -> Void
     @State private var normalizedDetails: [CredentialDetails] = []
     @State private var normalizedOptions: [PresentationCredentialOption]?
     private var isNormalized: Bool { normalizedOptions == review.credentialOptions }
@@ -50,7 +52,9 @@ public struct SharingReviewView: View {
         onCancel: @escaping () -> Void,
         compact: Bool = false,
         showActions: Bool = true,
-        paymentReview: PaymentReviewState = .notRequired
+        paymentReview: PaymentReviewState = .notRequired,
+        claimReview: ClaimReviewState = .legacy,
+        onRetryClaimReview: @escaping () -> Void = {}
     ) {
         self.review = review
         self.selection = selection
@@ -65,6 +69,8 @@ public struct SharingReviewView: View {
         self.compact = compact
         self.showActions = showActions
         self.paymentReview = paymentReview
+        self.claimReview = claimReview
+        self.onRetryClaimReview = onRetryClaimReview
     }
 
     public var body: some View {
@@ -92,6 +98,7 @@ public struct SharingReviewView: View {
                     }
                 }
             }
+            if case .legacy = claimReview {
             let groups = review.informationToShare(selection: selection, details: credentialDetails)
             WalletSection(String(localized: "Information to share", bundle: .module)) {
                 VStack(spacing: 0) {
@@ -119,10 +126,14 @@ public struct SharingReviewView: View {
                 }
             }.accessibilityElement(children: .contain)
                 .accessibilityIdentifier("review-information-to-share")
+            } else {
+                EffectiveSharingInformationView(state: claimReview, enabled: !isLoading, readOnly: isReadOnly,
+                    onToggle: onToggleDisclosure, onRetry: onRetryClaimReview)
+            }
 
             if !isReadOnly && showActions {
                 ReviewActions(
-                    selectionComplete: selectionComplete && isNormalized,
+                    selectionComplete: selectionComplete && isNormalized && claimReview.canConfirm,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
                     onReject: onReject,

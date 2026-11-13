@@ -407,6 +407,10 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
+    static func effectiveReviewValue(_ value: CredentialDisplayJSONValue, path: DisplayClaimPath, format: String) -> DisplayValue {
+        displayValue(for: value, path: path, format: format)
+    }
+
     private static func displayValue(
         for value: CredentialDisplayJSONValue,
         path: DisplayClaimPath,

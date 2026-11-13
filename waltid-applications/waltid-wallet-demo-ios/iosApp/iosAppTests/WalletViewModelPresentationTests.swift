@@ -6,6 +6,70 @@ import XCTest
 @testable import iosApp
 
 final class WalletViewModelPresentationTests: XCTestCase {
+    @MainActor
+    func testClaimReviewBlocksSubmissionOnFailureAndRetryUsesCurrentRevision() async throws {
+        let preparation = PendingClaimPreparation()
+        let client = claimClient(preparation)
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        XCTAssertFalse(viewModel.claimReview.canConfirm)
+        viewModel.submitPresentation()
+        let firstSubmissions = await client.submittedClaimRevisions
+        XCTAssertTrue(firstSubmissions.isEmpty)
+        await preparation.fail(0)
+        try await waitUntil { if case .failed = viewModel.claimReview { true } else { false } }
+        viewModel.submitPresentation()
+        let failedSubmissions = await client.submittedClaimRevisions
+        XCTAssertTrue(failedSubmissions.isEmpty)
+        viewModel.retryPresentationClaimReview()
+        try await waitUntilAsync { await preparation.count == 2 }
+        await preparation.complete(1, revision: "retried")
+        try await waitUntil { viewModel.claimReview.revision == "retried" }
+        viewModel.submitPresentation()
+        try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
+        let revisions = await client.submittedClaimRevisions
+        XCTAssertEqual(revisions, ["retried"])
+    }
+
+    @MainActor
+    func testSelectionChangeDiscardsLateClaimReviewAndSubmitsTheNewRevision() async throws {
+        let preparation = PendingClaimPreparation()
+        let client = claimClient(preparation)
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        let credential = try XCTUnwrap(viewModel.selectedPresentationCredentialOptions.first)
+        viewModel.togglePresentationDisclosure(.init(queryID: credential.queryID, credentialID: credential.credentialID, path: "$.given_name"))
+        try await waitUntilAsync { await preparation.count == 2 }
+        await preparation.complete(1, revision: "current")
+        try await waitUntil { viewModel.claimReview.revision == "current" }
+        let stale = expectation(description: "Old projection must not replace current review")
+        stale.isInverted = true
+        let observation = viewModel.$claimReview.sink { if $0.revision == "stale" { stale.fulfill() } }
+        await preparation.complete(0, revision: "stale")
+        await fulfillment(of: [stale], timeout: 0.2)
+        withExtendedLifetime(observation) {}
+        XCTAssertEqual(viewModel.claimReview.revision, "current")
+        viewModel.submitPresentation()
+        try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
+        let revisions = await client.submittedClaimRevisions
+        XCTAssertEqual(revisions, ["current"])
+    }
+
+    @MainActor
+    func testLockCancelsClaimPreparationWithoutRestoringAnOldReview() async throws {
+        let preparation = PendingClaimPreparation()
+        let client = claimClient(preparation)
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        viewModel.lock()
+        await preparation.complete(0, revision: "late")
+        try await waitUntil { viewModel.presentationReview == nil }
+        XCTAssertNil(viewModel.claimReview.revision)
+        let revisions = await client.submittedClaimRevisions
+        XCTAssertTrue(revisions.isEmpty)
+    }
+
+
 
     @MainActor
     func testPaymentPreparationBlocksSubmissionWhileLoadingAndAfterFailure() async throws {
@@ -76,6 +140,19 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(viewModel.paymentReview, .notRequired)
         let submitted = await client.submittedPaymentConsentRevisions
         XCTAssertTrue(submitted.isEmpty)
+    }
+
+    private func claimClient(_ preparation: PendingClaimPreparation) -> MockWalletClient {
+        let option = PresentationCredentialOption(queryID: "pid", credentialID: "claim-credential", format: "dc+sd-jwt",
+            issuer: nil, subject: nil, label: "Employee", credentialDataJSON: #"{"given_name":"Ada"}"#,
+            disclosures: [.init(path: "$.given_name", name: "Given name", valueJSON: #""Ada""#,
+                displayValue: nil, selectivelyDisclosable: true)])
+        let preview = PresentationPreview(previewHandle: .init(value: "claim-preview"),
+            request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
+                nonce: "fixture", responseEncryption: .notRequired), credentialOptions: [option])
+        return MockWalletClient(presentationPreviewResult: .ready(preview), claimPreparation: { credentials, disclosures in
+            try await preparation.prepare(credentials, disclosures)
+        })
     }
 
     @MainActor
@@ -586,5 +663,25 @@ private actor PendingPaymentPreparation {
 
     func complete(_ index: Int, with result: Result<PaymentConsent?, Error>) {
         continuations[index].resume(with: result)
+    }
+}
+
+private actor PendingClaimPreparation {
+    private var pending: [([PresentationCredentialSelection], [PresentationDisclosureSelection], CheckedContinuation<PreparedPresentationReview, Error>)] = []
+    var count: Int { pending.count }
+    func prepare(_ credentials: [PresentationCredentialSelection], _ disclosures: [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview {
+        try await withCheckedThrowingContinuation { pending.append((credentials, disclosures, $0)) }
+    }
+    func fail(_ index: Int) { pending[index].2.resume(throwing: WalletError.internalFailure("Projection unavailable")) }
+    func complete(_ index: Int, revision: String) {
+        let selected = !pending[index].1.isEmpty
+        let claims = pending[index].0.map { credential in
+            PresentationCredentialClaims(queryID: credential.queryID, credentialID: credential.credentialID, format: "dc+sd-jwt",
+                claimsJSON: selected ? #"{"given_name":"Ada"}"# : "{}", wholeCredential: false, locations: [
+                    .init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true),
+                    .init(sourcePathJSON: #"["given_name"]"#, receivedPathJSON: #"["given_name"]"#,
+                          sharedBy: ["$.given_name"], alwaysCarried: false)].prefix(selected ? 2 : 1).map { $0 })
+        }
+        pending[index].2.resume(returning: .init(revision: revision, credentials: claims))
     }
 }

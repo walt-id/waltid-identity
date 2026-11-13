@@ -9,6 +9,176 @@ import XCTest
 /// claim and which actions are offered, so it is where a transport could start describing a request as
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
+    func testEffectiveReviewKeepsSourceIndexesParentsAndOptionalObjectTypes() throws {
+        let option = effectiveOption()
+        let prepared = effectivePrepared(#"{"employment":{"department":"Engineering","job_title":"Engineer"},"certifications":[{"name":"Cloud security"}]}"#)
+        let review = try effectiveReview(prepared, option)
+        let nodes = try XCTUnwrap(review.contributions.first).nodes
+        let always = nodes.sharingSection(always: true)
+        let requested = nodes.sharingSection(always: false)
+        let employment = try XCTUnwrap(always.first { $0.path == [.key("employment")] })
+        XCTAssertEqual(employment.children.map(\.label), ["Department"])
+        let requestedEmployment = try XCTUnwrap(requested.first { $0.path == [.key("employment")] })
+        XCTAssertEqual(requestedEmployment.children.first { $0.label == "Job title" }?.reason, "Required")
+        let salary = try XCTUnwrap(requestedEmployment.children.first { $0.label == "Salary" })
+        XCTAssertEqual(salary.kind, .object)
+        XCTAssertEqual(salary.choice?.status, "Not shared")
+        XCTAssertTrue(salary.contextOnly)
+        XCTAssertEqual(salary.children.map(\.value), [.number("0"), .bool(false), .null])
+        let cert = try XCTUnwrap(requested.first { $0.path == [.key("certifications")] }?.children.first)
+        XCTAssertEqual(cert.path, [.key("certifications"), .index(1)])
+        XCTAssertEqual(cert.label, "Cloud security")
+        XCTAssertEqual(cert.reason, "Required")
+        XCTAssertNil(cert.children.first?.reason, "Children of a requested object must not be called extra sharing")
+        XCTAssertFalse(nodes.flatMap { $0.children }.contains { $0.label == "Manager name" })
+    }
+
+    func testEffectiveReviewOptionalObjectRetainsItsShapeWhenSelectedAndDeselected() throws {
+        let option = effectiveOption()
+        let off = effectivePrepared(#"{"employment":{"job_title":"Engineer"}}"#)
+        let on = effectivePrepared(#"{"employment":{"job_title":"Engineer","salary":{"amount":0,"eligible":false,"until":null}}}"#)
+        let key = PresentationDisclosureSelection(queryID: "employee", credentialID: "one", path: #""employment"."salary""#)
+        func salary(_ prepared: PreparedPresentationReview, selected: Bool) throws -> EffectiveClaimNode {
+            let tree = try effectiveReview(prepared, option, disclosures: selected ? [key] : []).contributions[0].nodes.sharingSection(always: false)
+            return try XCTUnwrap(tree.first { $0.label == "Employment" }?.children.first { $0.label == "Salary" })
+        }
+        let before = try salary(off, selected: false), included = try salary(on, selected: true), after = try salary(off, selected: false)
+        XCTAssertEqual(before.path, included.path)
+        XCTAssertEqual(before.kind, included.kind)
+        XCTAssertEqual(before.children.map(\.value), included.children.map(\.value))
+        XCTAssertEqual(included.choice?.status, "Included")
+        XCTAssertTrue(included.children.allSatisfy { $0.reason == nil })
+        XCTAssertEqual(before, after)
+    }
+
+    func testCityShowsCollateralCountryWithoutInventingWithheldPostalCode() throws {
+        let option = effectiveOption()
+        let prepared = effectivePrepared(#"{"home_address":{"city":"Bengaluru","country":"IN"}}"#)
+        let key = PresentationDisclosureSelection(queryID: "employee", credentialID: "one", path: #""home_address"."city""#)
+        let nodes = try effectiveReview(prepared, option, disclosures: [key]).contributions[0].nodes.sharingSection(always: false)
+        let address = try XCTUnwrap(nodes.first { $0.label == "Home address" })
+        XCTAssertEqual(address.children.map(\.label), ["City", "Country"])
+        XCTAssertEqual(address.children.first { $0.label == "Country" }?.reason, "Shared with City")
+        XCTAssertEqual(address.children.first { $0.label == "City" }?.choice?.status, "Included")
+    }
+
+    func testEffectiveReviewFailsClosedForMissingOrNonConcreteIdentityAndStaleCredentialSelection() throws {
+        let option = effectiveOption()
+        for locations in [[], [.init(sourcePathJSON: "[null]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)],
+                          [.init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)]] as [[PresentationClaimLocation]] {
+            let prepared = PreparedPresentationReview(revision: "review", credentials: [.init(queryID: "employee", credentialID: "one",
+                format: option.format, claimsJSON: #"{"name":"Maya"}"#, wholeCredential: false, locations: locations)])
+            XCTAssertThrowsError(try effectiveReview(prepared, option))
+        }
+        let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
+        XCTAssertThrowsError(try EffectivePresentationReview(prepared: effectivePrepared("{}"), model: model,
+            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init()))
+        XCTAssertFalse(ClaimReviewState.loading().canConfirm)
+        XCTAssertFalse(ClaimReviewState.failed("Unavailable").canConfirm)
+    }
+
+    func testSdkPathsPreserveQuotedKeysEmptyKeysAndTypedArraySegments() {
+        XCTAssertEqual(ClaimPathExpression.sdkDisclosure(#""items".null."0"." ""#, format: "dc+sd-jwt").segments,
+                       [.key("items"), .wildcard, .key("0"), .key(" ")])
+        XCTAssertEqual(ClaimPathExpression.sdkDisclosure(#"["items",1,""]"#, format: "dc+sd-jwt").segments,
+                       [.key("items"), .index(1), .key("")])
+        XCTAssertNotEqual(ClaimPathExpression.sdkDisclosure(#""a.b".1"#, format: "dc+sd-jwt").segments,
+                          ClaimPathExpression.sdkDisclosure(#""a"."b"."1""#, format: "dc+sd-jwt").segments)
+    }
+
+    func testOptionalArrayControlUsesIssuerMetadataAtItsOriginalIndex() throws {
+        let base = effectiveOption()
+        let option = PresentationCredentialOption(queryID: base.queryID, credentialID: base.credentialID, format: base.format,
+            issuer: nil, subject: nil, label: base.label, credentialDataJSON: base.credentialDataJSON,
+            disclosures: [.init(path: #""certifications".1"#, name: "SDK fallback", valueJSON: #"{"name":"Cloud security"}"#,
+                displayValue: nil, selectivelyDisclosable: true)], metadataJSON: base.metadataJSON)
+        let nodes = try effectiveReview(effectivePrepared("{}"), option).contributions[0].nodes.sharingSection(always: false)
+        let candidate = try XCTUnwrap(nodes.first?.children.first)
+        XCTAssertEqual(candidate.path, [.key("certifications"), .index(1)])
+        XCTAssertEqual(candidate.label, "Cloud security")
+        XCTAssertEqual(candidate.choice?.item.label, "Cloud security")
+        XCTAssertEqual(candidate.choice?.status, "Not shared")
+    }
+
+    func testEqualContributionsMergeOnlyWhenOriginalArrayIdentitiesAlsoMatch() throws {
+        let base = effectiveOption()
+        func option(_ query: String, index: Int) -> PresentationCredentialOption {
+            .init(queryID: query, credentialID: base.credentialID, format: base.format, issuer: nil, subject: nil,
+                label: base.label, credentialDataJSON: base.credentialDataJSON,
+                disclosures: [.init(path: "\"certifications\".\(index)", name: "Certification", valueJSON: #"{"name":"Cloud security"}"#,
+                    displayValue: nil, selectivelyDisclosable: true, required: true)], metadataJSON: base.metadataJSON)
+        }
+        let raw = effectivePrepared(#"{"certifications":[{"name":"Cloud security"}]}"#).credentials[0]
+        func contribution(_ query: String, index: Int) -> PresentationCredentialClaims {
+            .init(queryID: query, credentialID: raw.credentialID, format: raw.format, claimsJSON: raw.claimsJSON,
+                wholeCredential: false, locations: raw.locations.map {
+                    .init(sourcePathJSON: $0.sourcePathJSON.replacingOccurrences(of: ",1", with: ",\(index)"),
+                        receivedPathJSON: $0.receivedPathJSON,
+                        sharedBy: $0.sharedBy.map { $0.replacingOccurrences(of: ".1", with: ".\(index)") }, alwaysCarried: $0.alwaysCarried)
+                })
+        }
+        for index in [1, 2] {
+            let options = [option("first", index: 1), option("second", index: index)]
+            let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: options)
+            let review = try EffectivePresentationReview(prepared: .init(revision: "review", credentials: [
+                contribution("first", index: 1), contribution("second", index: index)]), model: model,
+                details: options.map(CredentialDisplayNormalizer.details(for:)),
+                selection: .init(credentials: Set(options.map(\.selection))))
+            XCTAssertEqual(review.groups.count, 1)
+            XCTAssertEqual(review.contributions.count, index == 1 ? 1 : 2)
+            if index == 2 {
+                let sourcePaths = review.contributions.compactMap { $0.nodes.first?.children.first?.path }
+                XCTAssertEqual(sourcePaths, [[.key("certifications"), .index(1)], [.key("certifications"), .index(2)]])
+            }
+        }
+    }
+
+    private func effectiveOption() -> PresentationCredentialOption {
+        let disclosures: [PresentationDisclosure] = [
+            .init(path: #""employment"."job_title""#, name: "Job title", valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: true, required: true),
+            .init(path: #""certifications".1"#, name: "Cloud security", valueJSON: #"{"name":"Cloud security"}"#, displayValue: nil, selectivelyDisclosable: true, required: true),
+            .init(path: #""employment"."salary""#, name: "Salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
+            .init(path: #""home_address"."city""#, name: "City", valueJSON: #""Bengaluru""#, displayValue: nil, selectivelyDisclosable: true),
+        ]
+        return .init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Employee",
+            credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#,
+            disclosures: disclosures,
+            metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#)
+    }
+
+    private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
+                                 disclosures: Set<PresentationDisclosureSelection> = []) throws -> EffectivePresentationReview {
+        try .init(prepared: prepared, model: .init(request: .init(requester: nil), credentialOptions: [option]),
+            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init(credentials: [option.selection], disclosures: disclosures))
+    }
+
+    private func effectivePrepared(_ claims: String) -> PreparedPresentationReview {
+        var locations: [PresentationClaimLocation] = []
+        func encoded(_ path: [ClaimPathExpression.Segment]) -> String {
+            let values: [Any] = path.map { switch $0 { case .key(let key): return key; case .index(let index): return index; case .wildcard: return NSNull() } }
+            return String(data: try! JSONSerialization.data(withJSONObject: values), encoding: .utf8)!
+        }
+        func walk(_ value: CredentialDisplayJSONValue, received: [ClaimPathExpression.Segment]) {
+            var source = received
+            if source.count >= 2, source[0] == .key("certifications"), source[1] == .index(0) { source[1] = .index(1) }
+            var causes: [String] = []
+            if source.starts(with: [.key("certifications"), .index(1)]) { causes = [#""certifications".1"#] }
+            if source.starts(with: [.key("employment"), .key("job_title")]) { causes = [#""employment"."job_title""#] }
+            if source.starts(with: [.key("employment"), .key("salary")]) { causes = [#""employment"."salary""#] }
+            if source.starts(with: [.key("home_address")]) { causes = [#""home_address"."city""#] }
+            locations.append(.init(sourcePathJSON: encoded(source), receivedPathJSON: encoded(received), sharedBy: causes, alwaysCarried: causes.isEmpty))
+            switch value {
+            case .object(let fields): fields.forEach { walk($0.value, received: received + [.key($0.key)]) }
+            case .array(let values): for (index, child) in values.enumerated() { walk(child, received: received + [.index(index)]) }
+            default: break
+            }
+        }
+        walk(CredentialDisplayJSONParser.parse(claims)!, received: [])
+        return .init(revision: "review", credentials: [.init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
+            claimsJSON: claims, wholeCredential: false, locations: locations)])
+    }
+
+
 
     func testPaymentScheduleAndMonetaryTermsKeepTheirGroupsAndIssuerPlacement() throws {
         let fixtures = try WalletVisualFixtures()

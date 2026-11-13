@@ -130,6 +130,7 @@ class WalletViewModel: ObservableObject {
         didSet {
             paymentConsentTask?.cancel()
             paymentReview = .notRequired
+            claimReview = .legacy
         }
     }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
@@ -206,6 +207,7 @@ class WalletViewModel: ObservableObject {
     private var presentationTask: Task<Void, Never>?
     private var paymentConsentTask: Task<Void, Never>?
     @Published var paymentReview: PaymentReviewState = .notRequired
+    @Published private(set) var claimReview: ClaimReviewState = .legacy
     private var biometricSigningAvailabilityTask: Task<Void, Never>?
     private var foregroundSequence = 0
     private var lastWarnedForegroundSequence: Int?
@@ -1404,15 +1406,43 @@ class WalletViewModel: ObservableObject {
         prepareSelectedPaymentConsent()
     }
 
+    func retryPresentationClaimReview() {
+        guard presentationReviewEnabled else { return }
+        prepareSelectedPaymentConsent()
+    }
+
     private func prepareSelectedPaymentConsent() {
         paymentConsentTask?.cancel()
-        guard let preview = presentationPreview else { return }
+        guard let preview = presentationPreview, let model = presentationSharingReview else { return }
         let credentials = selectedPresentationCredentialOptions
         let disclosures = selectedPresentationDisclosureOptions
         let selectedDid = did.isEmpty ? nil : did
+        let supportsReview = walletClient.supportsClaimReview
+        claimReview = supportsReview ? .loading(claimReview.previous) : .legacy
         paymentReview = .loading
         guard presentationCredentialSelectionComplete else { return }
         paymentConsentTask = Task {
+            let information: ClaimReviewState
+            do {
+                if supportsReview {
+                    let prepared = try await walletClient.reviewPresentation(previewHandle: preview.previewHandle,
+                        selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
+                    try Task.checkCancellation()
+                    let details = await CredentialDisplayNormalizer.details(for: model.credentialOptions)
+                    try Task.checkCancellation()
+                    information = .ready(try EffectivePresentationReview(prepared: prepared, model: model, details: details,
+                        selection: SharingSelection(credentials: credentials, disclosures: disclosures)))
+                } else { information = .legacy }
+            } catch is CancellationError { return
+            } catch {
+                guard !Task.isCancelled, presentationPreview?.previewHandle == preview.previewHandle,
+                      selectedPresentationCredentialOptions == credentials,
+                      selectedPresentationDisclosureOptions == disclosures else { return }
+                claimReview = .failed(error.localizedDescription)
+                paymentReview = .notRequired
+                return
+            }
+            // Both preparations use the retained request lease, so never run them concurrently.
             do {
                 let consent = try await walletClient.preparePaymentConsent(previewHandle: preview.previewHandle,
                     selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
@@ -1420,10 +1450,14 @@ class WalletViewModel: ObservableObject {
                 guard presentationPreview?.previewHandle == preview.previewHandle,
                       selectedPresentationCredentialOptions == credentials,
                       selectedPresentationDisclosureOptions == disclosures else { return }
+                claimReview = information
                 paymentReview = consent.map { .ready($0) } ?? .notRequired
             } catch is CancellationError { return
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, presentationPreview?.previewHandle == preview.previewHandle,
+                      selectedPresentationCredentialOptions == credentials,
+                      selectedPresentationDisclosureOptions == disclosures else { return }
+                claimReview = information
                 paymentReview = .blocked(error.localizedDescription)
             }
         }
@@ -1431,7 +1465,7 @@ class WalletViewModel: ObservableObject {
 
     func submitPresentation() {
         resetInputFocus()
-        guard !isLoading, paymentReview.canConfirm else { return }
+        guard !isLoading, paymentReview.canConfirm, claimReview.canConfirm else { return }
         guard let previewHandle = presentationPreview?.previewHandle else { return }
         guard presentationCredentialSelectionComplete else {
             setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.selectCredentialForEveryRequest), tab: .present)
@@ -1443,16 +1477,24 @@ class WalletViewModel: ObservableObject {
         let selectedDid = did.isEmpty ? nil : did
 
         let consentRevision = paymentReview.consent?.revision
+        let claimRevision = claimReview.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
-                let result = try await walletClient.submitPresentation(
+                let result: PresentationResult
+                if let claimRevision {
+                    result = try await walletClient.submitReviewedPresentation(previewHandle: previewHandle,
+                        selectedCredentialOptions: selectedCredentialOptions, selectedDisclosureOptions: Array(selectedDisclosureOptions),
+                        did: selectedDid, paymentConsentRevision: consentRevision, presentationReviewRevision: claimRevision)
+                } else {
+                result = try await walletClient.submitPresentation(
                     previewHandle: previewHandle,
                     selectedCredentialOptions: selectedCredentialOptions,
                     selectedDisclosureOptions: Array(selectedDisclosureOptions),
                     did: selectedDid,
                     paymentConsentRevision: consentRevision
                 )
+                }
                 try Task.checkCancellation()
                 resetPresentationToEntry()
                 handlePresentationResult(

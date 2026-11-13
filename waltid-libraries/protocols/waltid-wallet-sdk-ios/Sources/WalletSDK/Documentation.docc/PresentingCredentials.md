@@ -64,6 +64,36 @@ combining mutually exclusive response artifacts. Keep `.prepared(.openURL)` and
 `.prepared(.submitForm)` operations pending until the handoff or navigation
 succeeds, and surface delivery failures so the user can retry.
 
+### Review the Effective Claims
+
+After selecting credentials and disclosures, call `reviewPresentation` on the retained preview handle.
+The returned claims include clear-text data carried by selected ancestor disclosures. Preserve each query's
+contribution and use source paths for labels/controls, received paths for its compacted presentation data.
+Do not fill withheld values from the stored credential. Keep optional candidate values visibly separate.
+
+```swift
+let information = try await wallet.reviewPresentation(
+    previewHandle: preview.previewHandle,
+    selectedCredentialOptions: selectedCredentials,
+    selectedDisclosureOptions: selectedDisclosures,
+    did: identity.did
+)
+// Display information.credentials; recompute whenever these choices change.
+// Prepare any payment consent sequentially on the same preview handle.
+let result = try await wallet.submitReviewedPresentation(
+    previewHandle: preview.previewHandle,
+    selectedCredentialOptions: selectedCredentials,
+    selectedDisclosureOptions: selectedDisclosures,
+    did: identity.did,
+    paymentConsentRevision: paymentConsent?.revision,
+    presentationReviewRevision: information.revision
+)
+```
+
+Disable confirmation while preparing or after an error. Submission rejects a stale review revision;
+reviewing does not sign, refetch the authorization request, or send a presentation. Existing clients
+that never prepare an effective review can continue using `submitPresentation`.
+
 ### Reject a Presentation Request
 
 Use ``Wallet/rejectPresentation(previewHandle:error:errorDescription:)`` after a preview.

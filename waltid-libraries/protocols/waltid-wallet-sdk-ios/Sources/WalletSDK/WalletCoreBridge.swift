@@ -22,6 +22,19 @@ protocol WalletCoreBridge: Sendable {
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview
+    func submitReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?, paymentConsentRevision: String?, presentationReviewRevision: String
+    ) async throws -> PresentationResult
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -218,4 +231,26 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
+}
+
+// Unsupported bridges fail closed instead of silently submitting an unreviewed selection.
+@available(macOS 10.15, *)
+extension WalletCoreBridge {
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        throw WalletError.invalidInput("Effective claim review is unavailable")
+    }
+    func submitReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?,
+        runPolicies: Bool?, paymentConsentRevision: String?, presentationReviewRevision: String
+    ) async throws -> PresentationResult {
+        throw WalletError.invalidInput("Reviewed submission is unavailable")
+    }
 }
