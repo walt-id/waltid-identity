@@ -8,6 +8,8 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.pkce.PkceAuthorizationResult
+import id.walt.openid4vci.pkce.PkceService
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
@@ -31,6 +33,7 @@ class AuthorizationCodeAuthorizationEndpoint(
     private val codeRepository: AuthorizationCodeRepository,
     private val codeLifetimeSeconds: Long = DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS,
     private val maxGenerateAttempts: Int = 3,
+    private val pkceService: PkceService = PkceService(),
 ) : AuthorizationEndpointHandler {
 
     override suspend fun handleAuthorizationEndpointRequest(
@@ -71,6 +74,11 @@ class AuthorizationCodeAuthorizationEndpoint(
                 OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Session subject is required"),
             )
 
+        val pkceBinding = when (val result = pkceService.validateAuthorizationRequest(authorizationRequest.requestForm)) {
+            is PkceAuthorizationResult.Success -> result.binding
+            is PkceAuthorizationResult.Failure -> return AuthorizationResponseResult.Failure(result.error)
+        }
+
         val (code, _) = generateAndSaveUnique {
             DefaultAuthorizationCodeRecord(
                 code = it,
@@ -80,6 +88,7 @@ class AuthorizationCodeAuthorizationEndpoint(
                 grantedAudience = updated.grantedAudience.toSet(),
                 session = session.copy().withSubject(subject).withExpiresAt(TokenType.AUTHORIZATION_CODE, expiresAt),
                 expiresAt = expiresAt,
+                pkceBinding = pkceBinding,
             )
         }
 

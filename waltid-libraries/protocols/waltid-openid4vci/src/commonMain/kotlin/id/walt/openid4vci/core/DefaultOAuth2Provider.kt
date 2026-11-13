@@ -9,6 +9,9 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.pkce.PkceAuthorizationResult
+import id.walt.openid4vci.pkce.PkceService
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
@@ -103,6 +106,7 @@ import kotlin.time.Instant
  */
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
+    private val pkceService: PkceService = PkceService(config.pkceServiceConfig),
 ) : OAuth2Provider {
     private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
     private val attestationStatusValidator = AttestationStatusValidator(config.attestationStatusResolver)
@@ -110,11 +114,11 @@ class DefaultOAuth2Provider(
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
             is AuthorizationParameterResolution.Direct ->
-                config.authorizationRequestValidator.validate(resolution.parameters)
+                validateAuthorizationParameters(resolution.parameters)
 
             is AuthorizationParameterResolution.Pushed -> {
                 // RFC 9126 section 4: policy may have changed since the request was pushed.
-                when (val validation = config.authorizationRequestValidator.validate(resolution.request.requestForm)) {
+                when (val validation = validateAuthorizationParameters(resolution.request.requestForm)) {
                     is AuthorizationRequestResult.Failure -> validation
                     is AuthorizationRequestResult.Success -> AuthorizationRequestResult.Success(resolution.request)
                 }
@@ -124,10 +128,26 @@ class DefaultOAuth2Provider(
                 AuthorizationRequestResult.Failure(resolution.error)
         }
 
+    private suspend fun validateAuthorizationParameters(parameters: Map<String, List<String>>): AuthorizationRequestResult =
+        when (val result = config.authorizationRequestValidator.validate(parameters)) {
+            is AuthorizationRequestResult.Failure -> result
+            is AuthorizationRequestResult.Success -> validatePkce(result.request)
+                ?.let { AuthorizationRequestResult.Failure(it) } ?: result
+        }
+
+    private suspend fun validatePkce(request: AuthorizationRequest): OAuthError? {
+        if (ResponseType.CODE.value !in request.responseTypes) return null
+        return when (val result = pkceService.validateAuthorizationRequest(request.requestForm)) {
+            is PkceAuthorizationResult.Success -> null
+            is PkceAuthorizationResult.Failure -> result.error
+        }
+    }
+
     override suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         session: Session
     ): AuthorizationResponseResult {
+        validatePkce(authorizationRequest)?.let { return AuthorizationResponseResult.Failure(it) }
         val responses = mutableListOf<AuthorizationResponseResult>()
         for (handler in config.authorizationEndpointHandlers) {
             responses += handler.handleAuthorizationEndpointRequest(authorizationRequest, session)
@@ -152,7 +172,9 @@ class DefaultOAuth2Provider(
         AuthorizationResponseHttp(
             status = 400,
             redirectUri = null,
-            body = error.description ?: error.error,
+            headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA +
+                    ("Content-Type" to "application/json"),
+            body = JsonObject(oauthErrorPayload(error)).toString(),
         )
 
     override fun writeAuthorizationError(
@@ -178,11 +200,7 @@ class DefaultOAuth2Provider(
                 headers = headers,
             )
         } else {
-            AuthorizationResponseHttp(
-                status = 400,
-                redirectUri = null,
-                body = error.description ?: error.error,
-            )
+            writeAuthorizationError(error)
         }
     }
 
@@ -243,7 +261,7 @@ class DefaultOAuth2Provider(
             )
         }
 
-        return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
+        return when (val result = validateAuthorizationParameters(effectiveParameters)) {
             is AuthorizationRequestResult.Success ->
                 AuthorizationRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
 
@@ -255,6 +273,7 @@ class DefaultOAuth2Provider(
         authorizationRequest: AuthorizationRequest,
         clientAuthentication: Map<String, String>,
     ): PushedAuthorizationResponseResult {
+        validatePkce(authorizationRequest)?.let { return PushedAuthorizationResponseResult.Failure(it) }
         if (config.pushedAuthorizationConfig == null && config.pushedAuthorizationEndpointHandlers.count() == 0) {
             return PushedAuthorizationResponseResult.Failure(
                 OAuthError(

@@ -11,6 +11,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -78,6 +79,7 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+    val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
     val attestationStatusResolver: AttestationStatusResolver? = null,
 )
 

@@ -53,6 +53,7 @@ import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -67,6 +68,7 @@ data class OpenId4VciModule(
     val crypto2TokenSigningKey: Crypto2JwtSigningKey?,
     val keyAttestation: KeyAttestationVerificationOptions? = null,
     val attestationChallengeService: AttestationChallengeService? = null,
+    val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
 ) {
 
     companion object {
@@ -164,11 +166,13 @@ data class OpenId4VciModule(
                     }
                 )
             } ?: JwtRefreshTokenVerifier(verificationKeyResolver)
+            val pkceServiceConfig = PkceServiceConfig(requirePkce = { config.requirePkce })
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
                     attestationStatusResolver = statusResolver,
                     authorizationServerIssuer = config.openId4VciBaseUrl(),
+                    pkceServiceConfig = pkceServiceConfig,
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
@@ -207,6 +211,7 @@ data class OpenId4VciModule(
 
             return OpenId4VciModule(
                 oauth2Provider = provider,
+                pkceServiceConfig = pkceServiceConfig,
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,

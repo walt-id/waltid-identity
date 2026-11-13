@@ -43,6 +43,13 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
+internal fun WalletInstanceAttestationRequiredException.toStatusException(): StatusException =
+    StatusException(
+        HttpStatusCode.BadRequest.value,
+        message ?: "wallet_instance_attestation_required",
+        cause = this,
+    )
+
 internal fun TokenRequestException.toStatusException(): StatusException {
     val status = if (statusCode in 400..499) {
         HttpStatusCode.fromValue(statusCode)
@@ -817,6 +824,8 @@ object Wallet2RouteHandler {
                         attestationAssembler = attestationAssembler,
                     )
                     call.respondIssuanceResult(result, legacy = req.credentials == null)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -856,6 +865,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.requestToken(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -1002,6 +1013,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.exchangeCode(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -1046,6 +1059,9 @@ object Wallet2RouteHandler {
                             "Polls the issuer's deferred credential endpoint for a previously " +
                             "deferred credential. Returns a pending transaction and retry interval when issuance is not ready. " +
                             "A partial local save returns storageOutcome and a retained handle with HTTP 207; resume the handle instead of polling the issuer again. " +
+                            "Structured issuer 4xx errors retain their status and CredentialError body, including error and optional error_description. " +
+                            "Issuer-originated 401 and 403 errors are separate from wallet authentication or permission failures. " +
+                            "Other issuer 4xx statuses are relayed in the same way; malformed errors and issuer 5xx use the existing exception handling. " +
                             "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
                             "issuer display metadata and labels are stored like the full receive path. " +
                             "When the response can contain an mdoc, keyId must identify the exact wallet " +
@@ -1056,11 +1072,31 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<PollDeferredResult>() }
                     HttpStatusCode.MultiStatus to { body<PollDeferredResult>() }
                     HttpStatusCode.InternalServerError to { body<PollDeferredResult>() }
+                    HttpStatusCode.BadRequest to {
+                        description = "The issuer rejected the deferred request (for example credential_request_denied or invalid_transaction_id); preserves its error code and optional error_description"
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.Unauthorized to {
+                        description = "Issuer rejected the issuance access token, with a CredentialError body. Wallet authentication failures also use 401 with their normal wallet error response."
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.Forbidden to {
+                        description = "Issuer denied the deferred request, with a CredentialError body. Wallet permission failures also use 403 with their normal wallet error response."
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.TooManyRequests to {
+                        description = "Issuer refused the poll, with its CredentialError body and optional error_description"
+                        body<CredentialError>()
+                    }
                 }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                 val req = call.receive<PollDeferredRequest>()
-                call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req), req)
+                try {
+                    call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req), req)
+                } catch (error: CredentialEndpointException) {
+                    call.respondCredentialEndpointError(error)
+                }
             }
             post("/authorized", {
                 summary = "Complete the authorization-code grant"
@@ -1096,6 +1132,8 @@ object Wallet2RouteHandler {
                     )
                 } catch (e: CredentialReceiveException) {
                     call.respondIssuanceResult(e.result, legacy = true)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -1134,6 +1172,8 @@ object Wallet2RouteHandler {
                             attestationAssembler = attestationAssembler,
                         )
                     )
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
