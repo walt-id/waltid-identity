@@ -5,7 +5,6 @@ package id.walt.policies2.vp.policies
 import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -18,7 +17,7 @@ import kotlin.time.Instant
 private const val policyId = "dc+sd-jwt/exp-check"
 
 /**
- * Checks the `exp` claim on the SD-JWT core (the issuer-signed JWT).
+ * Checks the `exp` claim in the reconstructed SD-JWT credential (RFC 9901 §7.1 step 6).
  *
  * Per draft-ietf-oauth-sd-jwt-vc §2.2.2 and RFC 7519 §4.1.4:
  * the credential MUST NOT be accepted on or after the expiration time.
@@ -34,7 +33,7 @@ class ExpCheckSdJwtVPPolicy(
 ) : DcSdJwtVPPolicy() {
 
     override val id = policyId
-    override val description = "Check the SD-JWT core 'exp' claim — reject expired credentials"
+    override val description = "Check the SD-JWT credential 'exp' claim - reject expired credentials"
 
     companion object {
         private val log = KotlinLogging.logger { }
@@ -44,7 +43,7 @@ class ExpCheckSdJwtVPPolicy(
         presentation: DcSdJwtPresentation,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        val expSeconds = presentation.sdJwt.decodeJws().payload["exp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        val expSeconds = presentation.credential.credentialData["exp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
             ?: return success() // absent exp claim is allowed
 
         val now = Clock.System.now()
