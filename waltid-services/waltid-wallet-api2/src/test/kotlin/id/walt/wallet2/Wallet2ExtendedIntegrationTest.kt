@@ -18,6 +18,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
@@ -338,6 +341,7 @@ class Wallet2ExtendedIntegrationTest {
                 tokenEndpointHandlers = TokenEndpointHandlers(),
                 authorizationCodeRepository = authCodeRepo,
                 preAuthorizedCodeRepository = preAuthRepo,
+                preAuthorizedCodeConfig = PreAuthorizedCodeConfig(maxFailedTxCodeAttempts = 2),
 
                 accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
                 accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
@@ -428,19 +432,23 @@ class Wallet2ExtendedIntegrationTest {
                         mapOf(
                             "grant_type" to listOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"),
                             "pre-authorized_code" to listOf(code),
-                            "client_id" to listOf(params["client_id"] ?: "wallet-client")
+                            "client_id" to listOf(params["client_id"] ?: "wallet-client"),
+                            "tx_code" to params.getAll("tx_code").orEmpty(),
                         )
                     )
                     if (tokenRequest !is AccessTokenRequestResult.Success) return@post call.respond(
                         HttpStatusCode.BadRequest, buildJsonObject { put("error", "invalid_grant") }
                     )
-                    val tokenResponse = provider.createAccessTokenResponse(tokenRequest.request.withIssuer(issuerBase))
-                    if (tokenResponse !is AccessTokenResponseResult.Success) return@post call.respond(
-                        HttpStatusCode.InternalServerError, buildJsonObject { put("error", "server_error") }
-                    )
+                    val tokenResponse = when (val result = provider.createAccessTokenResponse(tokenRequest.request.withIssuer(issuerBase))) {
+                        is AccessTokenResponseResult.Success -> result.response
+                        is AccessTokenResponseResult.Failure -> {
+                            val error = provider.writeAccessTokenError(result.request, result.error)
+                            return@post call.respond(HttpStatusCode.fromValue(error.status), JsonObject(error.payload))
+                        }
+                    }
                     val nonce = proofSupport.issueNonce()
                     call.respond(buildJsonObject {
-                        put("access_token", tokenResponse.response.accessToken)
+                        put("access_token", tokenResponse.accessToken)
                         put("token_type", "Bearer")
                     })
                 }
@@ -711,6 +719,36 @@ class Wallet2ExtendedIntegrationTest {
                         .body<ReceiveCredentialResult>()
                 }
                 assertTrue(receiveResult.credentialIds.isNotEmpty(), "Full receive must store credential")
+
+                testAndReturn("Full receive explains transaction code lockout") {
+                    val txCode = TxCode(length = 6)
+                    val grant = provider.preAuthorizedCodeIssuer.issue(
+                        PreAuthorizedCodeIssueRequest(txCode = txCode, txCodeValue = "123456", session = session),
+                    )
+                    val pinOffer = CredentialOffer.withPreAuthorizedCodeGrant(
+                        credentialIssuer = issuerBase,
+                        credentialConfigurationIds = listOf(credentialConfigId),
+                        preAuthorizedCode = grant.code,
+                        txCode = txCode,
+                    )
+                    val attempts = listOf(
+                        "000000" to "Incorrect transaction code. Check the code and try again.",
+                        "000000" to "Too many incorrect transaction code attempts. Request a new credential offer from the issuer.",
+                        "123456" to "This credential offer is no longer usable. Request a new credential offer from the issuer.",
+                    )
+                    for ((pin, expectedMessage) in attempts) {
+                        val response = http.post("/wallet/$walletId/credentials/receive") {
+                            contentType(ContentType.Application.Json)
+                            setBody(ReceiveCredentialRequest(
+                                offerJson = Json.encodeToJsonElement(pinOffer).jsonObject,
+                                keyId = keyInfo.keyId,
+                                txCode = pin,
+                            ))
+                        }
+                        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+                        assertEquals(expectedMessage, response.body<JsonObject>()["message"]?.jsonPrimitive?.content)
+                    }
+                }
 
                 // -- Verify credential is now in wallet --
                 testAndReturn("Credential now in wallet after full receive") {
