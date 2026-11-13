@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.credentials.CredentialParser
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -85,6 +86,18 @@ class MobileWalletMetadataChainTest {
             ))
             assertIs<WalletIssuanceOutcome.Stored>(first.continuePreAuthorizedIssuance(session.id))
             assertEquals(3, metadataRequests, "Metadata requests: $requested")
+            // A signed legacy neighbour with a malformed reference must not suppress healthy
+            // platform registration or the later presentation preview after reopening the store.
+            val legacyPayload = SDPayload.createSDPayload(
+                JsonObject(payload.fullPayload + ("vct#integrity" to JsonPrimitive(""))), payload.sdMap,
+            )
+            val legacyWire = SDJwt.createFromSignedJwt(
+                signer.sign(legacyPayload.undisclosedPayload, "issuer", "dc+sd-jwt", emptyMap()), legacyPayload,
+            ).toString()
+            store.addCredential(store.listCredentials().toList().single().copy(
+                id = "legacy-invalid-reference", credential = CredentialParser.detectAndParse(legacyWire).second,
+                metadata = null,
+            ))
             val serialized = Json.encodeToString(store.listCredentials().toList())
             val restored = InMemoryCredentialStore().also { target ->
                 Json.decodeFromString<List<StoredCredential>>(serialized).forEach { target.addCredential(it) }
@@ -93,6 +106,7 @@ class MobileWalletMetadataChainTest {
             assertTrue(reopened.refreshDigitalCredentialRegistration().available)
             assertEquals(setOf(leaf, parent, "https://types.example/sca"), publishedRecords.map { it.type }.toSet())
             assertEquals(1, publishedRecords.map { it.registryEntryId }.distinct().size)
+            assertTrue(publishedRecords.none { it.credentialId == "legacy-invalid-reference" })
             assertEquals(setOf("Bank attestation"), publishedRecords.map { it.displayName }.toSet())
             assertTrue(publishedRecords.flatMap { it.fields }.none { it.path == listOf("vct#integrity") },
                 "The type metadata pin is protocol data, not a matchable user claim")
