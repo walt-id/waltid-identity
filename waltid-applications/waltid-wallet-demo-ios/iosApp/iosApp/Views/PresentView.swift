@@ -158,12 +158,13 @@ struct PresentView: View {
         let reviewedSelection = viewModel.presentationSharingSelection
         let reviewedPayment = viewModel.paymentReview
         let reviewedClaims = viewModel.claimReview
-        let reviewedStatuses = viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision }
-        let submit = {
+        let context = viewModel.credentialStatusUIContext
+        let submit: ([String: String]) -> Void = { reviewedStatuses in
             guard informationReady, review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
                   reviewedPayment == viewModel.paymentReview,
-                  reviewedClaims == viewModel.claimReview else { return }
+                  reviewedClaims == viewModel.claimReview,
+                  context.contextKey == viewModel.credentialStatusUIContext.contextKey else { return }
             viewModel.submitPresentation(reviewedStatus: reviewedStatuses)
         }
         return WalletReviewScaffold(showsActions: true) {
@@ -194,6 +195,9 @@ struct PresentView: View {
             ReviewActions(
                 selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete && viewModel.claimReview.canConfirm,
                 isLoading: !viewModel.presentationReviewEnabled,
+                reviewKey: OnlineSubmissionKey(handle: viewModel.presentationPreview?.previewHandle,
+                    review: review, selection: reviewedSelection),
+                credentialStatuses: context.selectedStatuses(review: review, selection: reviewedSelection),
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
                 onCancel: closeReview,
@@ -215,6 +219,12 @@ struct PresentView: View {
             .allowsHitTesting(proximityPresentation.active && !proximityPresentation.closing)
     }
 
+}
+
+private struct OnlineSubmissionKey: Equatable {
+    let handle: PresentationPreviewHandle?
+    let review: SharingReviewModel
+    let selection: SharingSelection
 }
 
 private struct PresentationFormPostWebView: UIViewRepresentable {

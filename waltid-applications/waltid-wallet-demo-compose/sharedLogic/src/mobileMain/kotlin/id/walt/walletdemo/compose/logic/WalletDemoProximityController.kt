@@ -288,10 +288,13 @@ class WalletDemoProximityController(
         mutableState.update { it.copy(continueAfterResponse = enabled, actionError = null) }
     }
 
-    fun approve(reviewedStatus: Map<String, String>? = null) {
+    fun approve(reviewedStatus: Map<String, String>? = null, reviewedState: WalletDemoProximityUiState? = null) {
         val current = mutableState.value
         val review = current.review ?: return
         if (!current.canApprove) return
+        if (reviewedStatus != null && (reviewedState == null || reviewedState.review != review ||
+                reviewedState.selections != current.selections || reviewedState.continueAfterResponse != current.continueAfterResponse ||
+                reviewedState.preparingApproval != current.preparingApproval)) return
         val submission = ProximitySubmission(
             documents = review.documents.map { document ->
                 val selection = current.selections.single { it.requestIndex == document.requestIndex }

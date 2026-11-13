@@ -1,12 +1,19 @@
 package id.walt.credentials.status
 
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.model.IETFEntry
 import id.walt.policies2.vc.policies.status.model.StatusEntry
 import id.walt.policies2.vc.policies.status.model.StatusVerificationError
-import id.walt.policies2.vc.policies.status.signature.*
+import id.walt.policies2.vc.policies.status.signature.IetfStatusListTokenClaims
+import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
+import id.walt.policies2.vc.policies.status.signature.VerifiedStatusList
+import id.walt.policies2.vc.policies.status.signature.authorizeMsoStatusListSigner
+import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
+import id.walt.policies2.vc.policies.status.signature.embeddedKeyReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import id.walt.certificate.x509.X509CertificateUtil
@@ -32,7 +39,7 @@ internal fun certificateDeadline(chain: List<String>, at: Instant): Instant? {
         val body = encoded.lineSequence().map(String::trim).filter { !it.startsWith("-----") }.joinToString("")
         val certificate = X509CertificateUtil.parseCertificateDerEncoded(ByteString(body.decodeFromBase64()))
         val validity = certificate.data.validity
-        if (at < validity.notBefore || at >= validity.notAfter) fail(StatusFailure.INVALID_VALIDITY)
+        if (at < validity.notBefore || at >= validity.notAfter) fail(CheckFailure.Reason.INVALID_VALIDITY)
         validity.notAfter
     }.minOrNull()
 }
@@ -50,16 +57,16 @@ internal suspend fun authenticateStatusList(
     val verified = when (content) {
         is StatusListContent.Text -> {
             if (!content.content.startsWith("ey") || content.content.count { it == '.' } != 2) {
-                throw CredentialStatusException(StatusFailure.UNSUPPORTED_PROOF,
+                throw CredentialStatusException(CheckFailure.Reason.UNSUPPORTED_PROOF,
                     StatusVerificationError("Unsupported unsigned status-list text format"))
             }
             verifier.verifyJwtWithSigner(content.content, credential).getOrElse {
-                throw CredentialStatusException(StatusFailure.INVALID_SIGNATURE,
+                throw CredentialStatusException(CheckFailure.Reason.INVALID_SIGNATURE,
                     StatusVerificationError("Status list JWT signature verification failed: ${it.message}"))
             }
         }
         is StatusListContent.Binary -> verifier.verifyCwtWithSigner(content.content, credential).getOrElse {
-            throw CredentialStatusException(StatusFailure.INVALID_SIGNATURE,
+            throw CredentialStatusException(CheckFailure.Reason.INVALID_SIGNATURE,
                 StatusVerificationError("Status list CWT signature verification failed: ${it.message}"))
         }
     }
@@ -72,7 +79,7 @@ internal suspend fun authenticateStatusList(
     } catch (cause: CancellationException) {
         throw cause
     } catch (cause: Throwable) {
-        throw CredentialStatusException(StatusFailure.UNAUTHORIZED_SIGNER, cause)
+        throw CredentialStatusException(CheckFailure.Reason.UNAUTHORIZED_SIGNER, cause)
     }
     if (entry is IETFEntry) {
         try {
@@ -88,7 +95,7 @@ internal suspend fun authenticateStatusList(
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Throwable) {
-            throw CredentialStatusException(StatusFailure.INVALID_VALIDITY, cause)
+            throw CredentialStatusException(CheckFailure.Reason.INVALID_VALIDITY, cause)
         }
     }
     return verified

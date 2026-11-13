@@ -65,8 +65,17 @@ public final class AnnexCPresentationModel: ObservableObject {
     /// request ID or the platform request context - those stay here, with the orchestration that has
     /// to submit them.
     @Published public private(set) var credentialStatuses: [String: CredentialStatus] = [:]
+    @Published public private(set) var credentialStatusReadState = CredentialStatusReadState.loading
+    public var credentialStatusAvailable: Bool { credentialStatusReadState == .available }
+    private var credentialStatusStoreIndices: [String: Int] = [:]
+    public var credentialStatusUIContext: CredentialStatusUIContext {
+        CredentialStatusUIContext(values: credentialStatuses, storeIndices: credentialStatusStoreIndices,
+            readState: credentialStatusReadState, contextKey: ObjectIdentifier(self))
+    }
     @Published public private(set) var statusReviewNotice: String?
     private var statusObservation: Task<Void, Never>?
+
+    deinit { statusObservation?.cancel() }
     @Published public private(set) var review: SharingReviewModel?
     /// Credentials and disclosures the user has chosen.
     @Published public private(set) var selection = SharingSelection()
@@ -119,14 +128,31 @@ public final class AnnexCPresentationModel: ObservableObject {
             }
             let parsed = try parsedRequest(from: context.requestSnapshot)
             let wallet = try await makeWallet()
-            try Task.checkCancellation()
-            guard phase == .preparing else { return }
+            guard phase == .preparing, !Task.isCancelled else {
+                // Opening may finish after the request or preparation task ended. A fresh,
+                // awaited cleanup task can close the wallet even when this task is cancelled.
+                _ = await Task { try? await wallet.closeStatusWallet() }.value
+                try Task.checkCancellation()
+                return
+            }
             self.wallet = wallet
-            if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+            do {
+                if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+                else { credentialStatusReadState = .unavailable }
+            } catch is CancellationError { throw CancellationError() }
+            catch {
+                credentialStatusReadState = .unavailable
+                statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+            }
             statusObservation = Task { [weak self] in
                 do { for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
                     try Task.checkCancellation(); self?.installStatuses(snapshot)
-                } } catch is CancellationError {} catch { self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.") }
+                }
+                    if !Task.isCancelled, self?.credentialStatusReadState == .loading { self?.credentialStatusReadState = .unavailable }
+                } catch is CancellationError {} catch {
+                    self?.credentialStatusReadState = .unavailable
+                    self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+                }
             }
             let prepared = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
@@ -191,8 +217,15 @@ public final class AnnexCPresentationModel: ObservableObject {
             statusObservation?.cancel()
             try? await wallet.closeStatusWallet()
         } catch WalletError.credentialStatusReviewChanged {
-            if let snapshot = try? await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
-            statusReviewNotice = WalletError.credentialStatusReviewChanged.localizedDescription
+            guard !Task.isCancelled else { return }
+            do {
+                let snapshot = try await wallet.cachedCredentialStatuses()
+                try Task.checkCancellation()
+                if let snapshot { installStatuses(snapshot) } else { credentialStatusReadState = .unavailable }
+            } catch is CancellationError { return }
+            catch { credentialStatusReadState = .unavailable }
+            statusReviewNotice = credentialStatusAvailable ? WalletError.credentialStatusReviewChanged.localizedDescription
+                : String(localized: "Status changed, but its latest details are unavailable. Try again.")
             phase = .reviewing
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
@@ -202,7 +235,10 @@ public final class AnnexCPresentationModel: ObservableObject {
     }
 
     private func installStatuses(_ snapshot: CredentialStatusSnapshot) {
-        credentialStatuses = Dictionary(snapshot.credentials.map { ($0.credentialID, $0.value) }, uniquingKeysWith: { _, latest in latest })
+        let context = CredentialStatusUIContext(snapshot: snapshot)
+        credentialStatuses = context.values
+        credentialStatusStoreIndices = context.storeIndices
+        credentialStatusReadState = .available
     }
 
     /// Dismisses the request without releasing anything.

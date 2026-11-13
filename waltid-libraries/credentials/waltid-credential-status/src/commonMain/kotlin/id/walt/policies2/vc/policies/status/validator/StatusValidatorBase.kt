@@ -18,8 +18,11 @@ import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifie
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Clock
+import id.walt.credentials.status.StatusProtocol
+import id.walt.policies2.vc.policies.status.model.StatusEntry
+import kotlin.time.Instant
 
-abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.policies.status.model.StatusEntry, T : StatusPolicyAttribute>(
+abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
     private vararg val reader: StatusValueReader<K>,
     private val signatureVerifier: StatusListSignatureVerifier? = null,
@@ -52,7 +55,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         signerAuthorizer: StatusListSignerAuthorizer?,
         suppliedContent: StatusListContent? = null,
         nowEpochSeconds: Long = Clock.System.now().epochSeconds,
-        profile: id.walt.credentials.status.StatusProtocol? = null,
+        profile: StatusProtocol? = null,
     ): Result<EvaluatedCredentialStatus> = runStatusCheck {
         val statusListContent = suppliedContent ?: fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
@@ -74,7 +77,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         if (bitValue.isEmpty()) throw StatusVerificationError("Null or empty bit value")
         if (bitValue.any { it != '0' && it != '1' }) throw StatusVerificationError("Invalid bit value: $bitValue")
         EvaluatedCredentialStatus(bitValue.joinToString("").toUInt(2),
-            verified?.let { certificateDeadline(it.signer.certificateChain, kotlin.time.Instant.fromEpochSeconds(nowEpochSeconds)) })
+            verified?.let { certificateDeadline(it.signer.certificateChain, Instant.fromEpochSeconds(nowEpochSeconds)) })
     }
 
     protected abstract suspend fun getBitValue(statusList: K, entry: M): List<Char>

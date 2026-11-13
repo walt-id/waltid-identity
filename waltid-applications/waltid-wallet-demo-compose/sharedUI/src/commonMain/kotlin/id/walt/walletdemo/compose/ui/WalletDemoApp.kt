@@ -95,7 +95,8 @@ internal fun WalletDemoAppHost(
         automatic = state.automaticCredentialStatusChecks,
         setAutomatic = controller::setAutomaticCredentialStatusChecks,
         checkAll = { controller.checkCredentialStatuses() },
-        summary = state.credentialStatusSummary, error = state.credentialStatusError,
+        summary = state.credentialStatusSummary, error = state.credentialStatusBatchError,
+        contextKey = controller to state.credentialStatusContext,
     )) {
     WalletDemoTheme(branding) {
         Surface(

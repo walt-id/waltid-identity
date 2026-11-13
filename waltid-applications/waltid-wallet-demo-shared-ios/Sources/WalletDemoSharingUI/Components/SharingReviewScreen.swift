@@ -26,7 +26,8 @@ public struct SharingReviewScreen: View {
     private let paymentReview: PaymentReviewState
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onSubmit: () -> Void
+    private let onSubmit: ([String: String]) -> Void
+    private let requestIdentity: AnyHashable
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
 
@@ -40,6 +41,7 @@ public struct SharingReviewScreen: View {
     ///   - onReject: Protocol-level refusal, or `nil` for transports with no such message.
     public init(
         title: String,
+        requestIdentity: AnyHashable,
         review: SharingReviewModel?,
         selection: SharingSelection,
         selectionComplete: Bool,
@@ -48,13 +50,14 @@ public struct SharingReviewScreen: View {
         paymentReview: PaymentReviewState = .notRequired,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onSubmit: @escaping () -> Void,
+        onSubmit: @escaping ([String: String]) -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         statusNotice: String? = nil
     ) {
         self.statusNotice = statusNotice
         self.title = title
+        self.requestIdentity = requestIdentity
         self.review = review
         self.selection = selection
         self.selectionComplete = selectionComplete
@@ -68,27 +71,22 @@ public struct SharingReviewScreen: View {
         self.onCancel = onCancel
     }
 
-    private var statusAdvisories: [(String, CredentialStatusPresentation)] {
-        (review?.credentialOptions ?? []).filter { selection.credentials.contains($0.selection) }.compactMap { option in
-            statusUI.values[option.credentialID].map { (CredentialDisplayNormalizer.details(for: option).cardSummary.title, $0.presentation) }
-        }
-    }
-
     public var body: some View {
         WalletNavigationContainer {
             WalletReviewScaffold(showsActions: review != nil || failure != nil) {
                 content
             } actions: {
-                if review != nil && failure == nil {
+                if let review, failure == nil {
                     ReviewActions(
-                        selectionComplete: selectionComplete && renderedOptions == review?.credentialOptions,
+                        selectionComplete: selectionComplete && renderedOptions == review.credentialOptions,
                         isLoading: isSubmitting,
+                        reviewKey: SharingSubmissionKey(requestIdentity: requestIdentity, review: review, selection: selection),
+                        credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
                         onSubmit: onSubmit,
                         onReject: onReject,
                         onCancel: onCancel,
-                        paymentReview: paymentReview, isPayment: review?.request.hasPaymentTransaction == true,
-                        showCancelWithReject: false,
-                        credentialStatuses: statusAdvisories
+                        paymentReview: paymentReview, isPayment: review.request.hasPaymentTransaction,
+                        showCancelWithReject: false
                     )
                 } else if let failure {
                     Text(failure).font(.subheadline).foregroundStyle(.red)

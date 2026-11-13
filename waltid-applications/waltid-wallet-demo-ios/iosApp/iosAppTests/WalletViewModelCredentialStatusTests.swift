@@ -6,6 +6,84 @@ import WalletDemoSharingUI
 
 @MainActor
 final class WalletViewModelCredentialStatusTests: XCTestCase {
+    func testPendingInitialLocalStatusReadIsNeutralAndFailureIsUnavailable() async throws {
+        let client = MockWalletClient()
+        let model = WalletViewModel(walletID: "status-initial-read-test", walletClient: client,
+            readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(), identityDocumentRegistrationUpdate: {},
+            pinStore: InMemoryDemoPinStore(), biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false))
+        model.automaticCredentialStatusChecks = false
+        defer {
+            model.handleApplicationEnteredBackground()
+            UserDefaults.standard.removeObject(forKey: "wallet.status-initial-read-test.status.automatic")
+        }
+        model.auth = .unlocked; model.isReady = true
+        try await waitUntil { await client.statusCollectorCount == 1 }
+        XCTAssertEqual(model.credentialStatusReadState, .loading)
+        XCTAssertFalse(model.credentialStatusAvailable)
+        if case .loading(nil) = model.credentialStatusUIContext.displayStatus(for: "pending") {} else {
+            XCTFail("A pending initial local read must remain neutral")
+        }
+        await client.failCredentialStatusObservation()
+        try await waitUntil { model.credentialStatusReadState == .unavailable }
+        if case .unavailable(nil) = model.credentialStatusUIContext.displayStatus(for: "pending") {} else {
+            XCTFail("A completed failed read must show unavailable feedback")
+        }
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+        await client.setCredentialStatusSnapshot(snapshot)
+        model.handleApplicationEnteredBackground()
+        model.handleApplicationBecameActive()
+        try await waitUntil { model.credentialStatusAvailable }
+        XCTAssertEqual(model.credentialStatusReadState, .available)
+    }
+
+    func testOnlySettingsBatchesReplaceTheirStructuredReportAndErrors() async throws {
+        let fixtures = try WalletVisualFixtures()
+        let failed = try fixtures.credentialStatus("unverified").status
+        let clear = try fixtures.credentialStatus("clear").status
+        func result(_ id: String, _ outcome: CredentialStatusRefreshOutcome, _ status: CredentialStatusMetadata) throws -> CredentialStatusRefreshResult {
+            let data = try JSONSerialization.data(withJSONObject: ["storeIndex": 0, "credentialId": id])
+            return CredentialStatusRefreshResult(reference: try JSONDecoder().decode(CredentialStatusReference.self, from: data),
+                outcome: outcome, status: status)
+        }
+        let results = try [result("processed", .completed, failed), result("cached", .unchanged, clear),
+                           result("later", .deferred, clear), result("removed", .removed, failed)]
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+        let client = MockWalletClient(credentialStatusSnapshot: snapshot)
+        let model = WalletViewModel(walletID: "status-batch-test", walletClient: client,
+            readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(), identityDocumentRegistrationUpdate: {},
+            pinStore: InMemoryDemoPinStore(), biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false))
+        model.automaticCredentialStatusChecks = false
+        defer {
+            model.handleApplicationEnteredBackground()
+            UserDefaults.standard.removeObject(forKey: "wallet.status-batch-test.status.automatic")
+        }
+        model.auth = .unlocked; model.isReady = true
+        await client.setStatusRefreshResults(results)
+        model.checkCredentialStatuses()
+        try await waitUntil { model.credentialStatusSummary != nil && !model.checkingCredentialStatuses }
+        let report = CredentialStatusRefreshSummary(completed: 1, unchanged: 1, deferred: 1, checkErrors: 1)
+        XCTAssertEqual(model.credentialStatusSummary, report)
+        await client.setStatusRefreshResults([])
+        model.checkCredentialStatuses(ids: ["processed"])
+        try await waitUntil { !model.checkingCredentialStatuses }
+        XCTAssertEqual(model.credentialStatusSummary, report)
+        model.automaticCredentialStatusChecks = true
+        try await waitUntil { !model.checkingCredentialStatuses }
+        XCTAssertEqual(model.credentialStatusSummary, report)
+        await client.setStatusRefreshResults([], fails: true)
+        model.checkCredentialStatuses()
+        try await waitUntil { model.credentialStatusBatchError != nil && !model.checkingCredentialStatuses }
+        XCTAssertNil(model.credentialStatusSummary)
+        let error = model.credentialStatusBatchError
+        await client.setStatusRefreshResults([])
+        model.checkCredentialStatuses(ids: ["processed"])
+        try await waitUntil { !model.checkingCredentialStatuses }
+        XCTAssertEqual(model.credentialStatusBatchError, error)
+        model.checkCredentialStatuses()
+        try await waitUntil { model.credentialStatusSummary != nil && !model.checkingCredentialStatuses }
+        XCTAssertNil(model.credentialStatusBatchError)
+    }
+
     func testDeferredNoticesAccumulateNamesAndOnlyAnnounceNewAdverseTransitions() async throws {
         let fixtures = try WalletVisualFixtures()
         let first = try fixtures.credential()
@@ -43,10 +121,7 @@ final class WalletViewModelCredentialStatusTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(model.credentialStatusNotice).contains("Address card"))
         model.credentialStatusNotice = nil
 
-        let p = revoked.presentation
-        let newer = CredentialStatus(status: revoked.status, presentation: .init(kind: p.kind, issue: p.issue,
-            freshness: .fresh, action: p.action, lastCheckedAt: p.lastCheckedAt, lastAttemptAt: p.lastAttemptAt,
-            failure: p.failure, purposes: p.purposes, coverage: p.coverage), evaluatedAt: Date())
+        let newer = try fixtures.credentialStatus("revoked_current")
         await client.setCredentialStatusSnapshot(snapshot(newer, suspended))
         try await waitUntil { model.credentialStatuses[first.id]?.presentation.freshness == .fresh }
         XCTAssertNil(model.credentialStatusNotice, "Freshness changes do not report a new issuer status")

@@ -1,18 +1,32 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class)
 package id.walt.credentials.status
 
 import id.walt.policies2.vc.policies.status.StatusListContent
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.*
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockEngineConfig
+import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.http.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.test.*
-import kotlin.test.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class StatusListTransportTest {
     @Test
@@ -72,12 +86,12 @@ class StatusListTransportTest {
             CredentialStatusLimits(maxResponseBytes = 10))
         try {
             for (uri in listOf("http://status.example/list", "https://user:secret@status.example/list", "https://status.example/list#fragment")) {
-                assertEquals(StatusFailure.REFERENCE_MALFORMED, assertFailsWith<CredentialStatusException> { transport.fetch(uri, true) }.reason)
+                assertEquals(CheckFailure.Reason.INVALID_LIST, assertFailsWith<CredentialStatusException> { transport.fetch(uri, true) }.reason)
             }
             assertEquals(0, requests)
-            assertEquals(StatusFailure.TRANSPORT, assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/redirect", true) }.reason)
+            assertEquals(CheckFailure.Reason.TRANSPORT, assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/redirect", true) }.reason)
             assertEquals(1, requests)
-            repeat(2) { assertEquals(StatusFailure.RESOURCE_LIMIT,
+            repeat(2) { assertEquals(CheckFailure.Reason.RESOURCE_LIMIT,
                 assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/large", false) }.reason) }
             assertEquals(3, requests)
         } finally { transport.close(); client.close() }
@@ -92,7 +106,7 @@ class StatusListTransportTest {
         val transport = StatusListTransport(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) },
             CredentialStatusLimits(requestTimeout = 1.seconds))
         try {
-            assertEquals(StatusFailure.TIMEOUT, assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/list", true) }.reason)
+            assertEquals(CheckFailure.Reason.TIMEOUT, assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/list", true) }.reason)
             val work = async { transport.fetch("https://status.example/list", true) }
             runCurrent(); work.cancel()
             assertFailsWith<CancellationException> { work.await() }

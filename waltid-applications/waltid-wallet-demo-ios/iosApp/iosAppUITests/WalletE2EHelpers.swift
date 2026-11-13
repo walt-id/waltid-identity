@@ -31,12 +31,33 @@ final class WalletE2EUI {
         }
         if app.launchEnvironment["E2E_MOCK_WALLET"] == "1" {
             addCredentialImageFixtures()
+            addCredentialStatusFixture()
         }
         app.launch()
         unlockWallet()
         if initializeSigningIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
             completeKeySetupIfNeeded()
         }
+    }
+
+    private func addCredentialStatusFixture() {
+        guard app.launchEnvironment["E2E_MOCK_STATUS_JSON"] == nil else { return }
+        do {
+            let applications = URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent()
+            let url = applications.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-status.json")
+            let root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+            let values = try XCTUnwrap(root["values"] as? [String: [String: Any]])
+            let value = try XCTUnwrap(values[app.launchEnvironment["E2E_MOCK_STATUS"] ?? "not_provided"])
+            let records: [[String: Any]] = try ["cred-1", "photo-id-1"].map { id in
+                ["reference": ["storeIndex": 0, "credentialId": id],
+                 "status": try XCTUnwrap(value["status"]), "presentation": try XCTUnwrap(value["presentation"])]
+            }
+            let data = try JSONSerialization.data(withJSONObject: ["evaluatedAt": try XCTUnwrap(value["evaluatedAt"]),
+                "credentials": records, "refreshing": []])
+            app.launchEnvironment["E2E_MOCK_STATUS_JSON"] = String(decoding: data, as: UTF8.self)
+        } catch { XCTFail("Could not load the shared credential status fixture: \(error)") }
     }
 
     private func addCredentialImageFixtures() {
@@ -65,7 +86,10 @@ final class WalletE2EUI {
     }
 
     func waitForOfferReview(timeout: TimeInterval) -> Bool {
-        app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: timeout)
+        let accept = app.buttons["wallet.offerAcceptButton"]
+        let failed = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Receive failed")).firstMatch
+        let prepared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in accept.exists || failed.exists }, object: nil)
+        return XCTWaiter.wait(for: [prepared], timeout: timeout) == .completed && accept.exists
     }
 
     func waitForPresentationReview(timeout: TimeInterval) -> Bool {

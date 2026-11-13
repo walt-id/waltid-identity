@@ -149,10 +149,6 @@ internal fun SettingsScreen(
                                         }
                                     }
                                     WalletSection(stringResource(Res.string.settings_wallet)) {
-                                        WalletNavigationRow(stringResource(Res.string.credential_status_title),
-                                            { open(SettingsDestination.CredentialStatus) }, Modifier.testTag("settings-credential-status"),
-                                            icon = { WalletIcon(WalletSymbol.Info, null) })
-                                        SettingsDivider()
                                         if (currentState.pinLockEnabled) {
                                             if (walletAccessContent != null) {
                                                 WalletNavigationRow(stringResource(Res.string.settings_wallet_access),
@@ -165,6 +161,11 @@ internal fun SettingsScreen(
                                                 icon = { SettingsSymbol(Res.drawable.settings_key) })
                                             SettingsDivider()
                                         }
+                                        WalletNavigationRow(stringResource(Res.string.credential_status_title),
+                                            { open(SettingsDestination.CredentialStatus) }, Modifier.testTag("settings-credential-status"),
+                                            summary = stringResource(Res.string.credential_status_settings_summary),
+                                            icon = { WalletIcon(WalletSymbol.StatusClear, null) })
+                                        SettingsDivider()
                                         WalletNavigationRow(stringResource(Res.string.settings_technical),
                                             { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_code) })
@@ -287,23 +288,7 @@ internal fun SettingsScreen(
                                 }
                                 SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
                                 SettingsDestination.Server -> serverSettingsContent?.invoke()
-                                SettingsDestination.CredentialStatus -> {
-                                    val status = LocalCredentialStatusUi.current
-                                    WalletSection(footer = stringResource(Res.string.credential_status_auto_detail)) {
-                                        SettingsToggleRow(stringResource(Res.string.credential_status_auto), status.automatic,
-                                            { status.setAutomatic?.invoke(it) }, Modifier.testTag("settings-credential-status-automatic"))
-                                    }
-                                    WalletSection(footer = stringResource(Res.string.credential_status_privacy)) {
-                                        SettingsActionRow(stringResource(if (status.checking) Res.string.credential_status_checking else Res.string.credential_status_check_all),
-                                            { status.checkAll?.invoke() }, Modifier.testTag("settings-credential-status-check-all"), enabled = !status.checking)
-                                    }
-                                    status.summary?.let { summary ->
-                                        val result = stringResource(Res.string.credential_status_summary, summary.completed, summary.unchanged, summary.deferred, summary.failed)
-                                        val deferred = if (summary.deferred > 0) "\n" + stringResource(Res.string.credential_status_deferred) else ""
-                                        SettingsNotice(result + deferred)
-                                    }
-                                    status.error?.let { SettingsNotice(it, error = true) }
-                                }
+                                SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = serverSettingsContent != null)
                                 SettingsDestination.DigitalCredentialsApi -> {
                                     WalletSection(footer = stringResource(Res.string.settings_review_description)) {
                                     SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,

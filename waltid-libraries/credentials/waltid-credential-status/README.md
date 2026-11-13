@@ -9,10 +9,10 @@ policy acceptance remains in the policy module. Wallet apps consume the composed
 
 | Reference | Supported list/proof | Meaning |
 | --- | --- | --- |
-| Token Status List | Signed JWT or CWT, draft-ietf-oauth-status-list-21 | 0 clear, 1 invalid, 2 suspended; other values application-specific |
+| Token Status List | Signed JWT or CWT, draft-ietf-oauth-status-list-21 | 0 clear, 1 invalid, 2 suspended; 3 and 12–15 application-specific; other unassigned values reserved |
 | ISO MSO `status_list` | Signed CWT, protected certificate chain, one-bit profile | Clear or revoked; authenticated MSO trust point or issuing CA authorizes the signer |
 | W3C Bitstring Status List | Signed JWT status-list credential | Purpose-aware revocation, suspension, refresh or application-specific value |
-| Legacy StatusList2021 | Signed JWT status-list credential | Purpose-aware value |
+| Legacy StatusList2021 | Signed JWT status-list credential, single-bit profile | Revocation/suspension; other purpose strings remain extensions |
 
 The W3C wallet profile requires at least 131,072 entries, so its minimum expanded size scales with
 `statusSize`. A supplied list credential ID must match the referenced URL; the ID may be omitted.
@@ -24,15 +24,30 @@ This is a profile list, not a claim of full ISO, EUDI or W3C proof-suite conform
 
 ## Observation and acceptance
 
-`CredentialStatusResolver.discover` reads references locally. `resolve` first authenticates the
+The suspending `CredentialStatusResolver.discover` reparses canonical signed bytes locally, before
+deciding whether references exist. A mutable stored projection cannot hide or replace those references.
+`resolve` authenticates the
 credential containing the reference, then authenticates and authorizes the list signer, validates
 applicability and validity, and reads the applicable value. A byte-cache hit still requires the
 current credential's signer authorization. Creating a resolver or reading metadata makes no request.
 
-`CredentialStatusMetadata` retains each reference, including unsupported and failed entries.
-`Unavailable` can retain a dated previous authenticated observation. Empty entries mean that no
-status was provided. `metadata.presentation(at)` supplies shared kind, issue, freshness, coverage,
-action and semantic `advisoryRevision`; user interfaces should use these meanings instead of bits.
+`CredentialStatus` is either `References` or an explicit `DiscoveryFailed`. Identifiable malformed
+and unsupported entries preserve useful siblings; an empty reference collection means no status
+was provided. Each entry owns its protocol and `Check<V>`: Token status, MSO clear/revoked, Bitstring
+unsigned byte, or legacy Boolean. W3C purposes live on their owning entry, with separate Bitstring
+and legacy types. Meaning is derived rather than supplied on an observation.
+
+A check is `NotChecked`, `Observed`, `Failed` with optional previous evidence, or `Conflict` with
+retained irreversible evidence. Observations carry their original check/freshness/validity times.
+Not-yet-valid and rate-limited failures carry eligibility deadlines; they are distinct from expiry.
+Legacy extensions named `refresh` do not acquire Bitstring update or irreversible semantics.
+
+`status.presentation(at)` derives shared kind, issue, freshness, coverage, per-reference facts and an
+opaque `advisoryRevision`. Its separate wire DTO is display data, never authority to override the
+assessment. Known wire cases validate protocol-specific values, fields, identities and lifetimes;
+deserialization does not itself authenticate evidence. Collections are detached from caller inputs.
+Consumers carry the producer revision unchanged; timestamp-only changes with unchanged review
+semantics do not invalidate it. A secondary warning can change it even under a stronger headline.
 A clear observation is not proof that the credential is unexpired, trusted or acceptable to a verifier.
 
 ## Network, cache and lifecycle
@@ -71,7 +86,8 @@ adds Kotlin Flow and the [Swift SDK](../../protocols/waltid-wallet-sdk-ios/READM
 native stream. Hosts own foreground/manual triggers, preferences and any future background scheduling.
 
 Managed stores persist only minimal last-known observations under the credential fingerprint and
-trust-policy identity. They do not persist list bodies or history. Custom stores may implement
+trust-policy identity. Snapshot schema 2 discards incompatible advisory data and rediscovers it
+without deleting credentials. Stores do not persist list bodies or history. Custom stores may implement
 `CredentialStatusSnapshotStore` for the same conditional-write contract; otherwise snapshots are
 instance-local. Missing or changed trust-policy identity restores historical evidence as stale.
 

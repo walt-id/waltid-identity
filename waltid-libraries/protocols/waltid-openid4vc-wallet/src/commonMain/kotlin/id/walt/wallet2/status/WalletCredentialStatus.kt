@@ -1,8 +1,8 @@
 package id.walt.wallet2.status
 
-import id.walt.credentials.status.CredentialStatusMetadata
+import id.walt.credentials.status.CredentialStatus
 import id.walt.credentials.status.CredentialStatusPresentation
-import id.walt.credentials.status.presentation
+import id.walt.credentials.status.assess
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.StoredCredentialMetadata
 import kotlinx.serialization.Serializable
@@ -16,39 +16,54 @@ data class WalletCredentialReference(val storeIndex: Int, val credentialId: Stri
 }
 
 /** New composed read APIs preserve the published low-level storage model and constructors. */
-@Serializable
 data class WalletCredentialRead(
     val credential: StoredCredential,
     val reference: WalletCredentialReference,
-    val status: CredentialStatusMetadata,
+    val status: CredentialStatus,
     val evaluatedAt: Instant,
-    val presentation: CredentialStatusPresentation = status.presentation(evaluatedAt),
-)
+) {
+    private val assessment = status.assess(evaluatedAt)
+    val presentation: CredentialStatusPresentation get() = assessment.presentation
+}
 
-@Serializable
 data class WalletCredentialMetadataRead(
     val credential: StoredCredentialMetadata,
     val reference: WalletCredentialReference,
-    val status: CredentialStatusMetadata,
+    val status: CredentialStatus,
     val evaluatedAt: Instant,
-    val presentation: CredentialStatusPresentation = status.presentation(evaluatedAt),
-)
+) {
+    private val assessment = status.assess(evaluatedAt)
+    val presentation: CredentialStatusPresentation get() = assessment.presentation
+}
 
-@Serializable
-data class WalletCredentialStatusSnapshot(
+/** Domain snapshots keep detached collections; transports use explicit response DTOs. */
+class WalletCredentialStatusSnapshot(
     val evaluatedAt: Instant,
-    val credentials: List<WalletCredentialStatus>,
-    val refreshing: Set<WalletCredentialReference> = emptySet(),
-    /** Earliest useful IfDue check under current freshness/backoff; hosts decide whether to schedule it. */
+    credentials: List<WalletCredentialStatus>,
+    refreshing: Set<WalletCredentialReference> = emptySet(),
     val nextRefreshAt: Instant? = null,
-)
+) {
+    private val values = credentials.toList()
+    private val active = refreshing.toSet()
+    val credentials: List<WalletCredentialStatus> get() = values.toList()
+    val refreshing: Set<WalletCredentialReference> get() = active.toSet()
+    init {
+        require(values.all { it.evaluatedAt == evaluatedAt })
+        require(values.map { it.reference }.distinct().size == values.size)
+    }
+    override fun equals(other: Any?) = other is WalletCredentialStatusSnapshot && evaluatedAt == other.evaluatedAt &&
+        values == other.values && active == other.active && nextRefreshAt == other.nextRefreshAt
+    override fun hashCode() = listOf(evaluatedAt, values, active, nextRefreshAt).hashCode()
+}
 
-@Serializable
 data class WalletCredentialStatus(
     val reference: WalletCredentialReference,
-    val status: CredentialStatusMetadata,
-    val presentation: CredentialStatusPresentation,
-)
+    val status: CredentialStatus,
+    val evaluatedAt: Instant,
+) {
+    private val assessment = status.assess(evaluatedAt)
+    val presentation: CredentialStatusPresentation get() = assessment.presentation
+}
 
 @Serializable
 enum class CredentialStatusRefreshMode { IF_DUE, FORCE }
@@ -60,16 +75,16 @@ enum class CredentialStatusRefreshOutcome { COMPLETED, UNCHANGED, DEFERRED, REMO
 data class CredentialStatusRefreshResult(
     val reference: WalletCredentialReference,
     val outcome: CredentialStatusRefreshOutcome,
-    val status: CredentialStatusMetadata,
+    val status: CredentialStatus,
 )
 
 /** Minimal protected metadata, never a signed list body or an observation history. */
 @Serializable
 data class PersistedCredentialStatus(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val credentialFingerprint: String,
     val trustPolicyId: String?,
-    val metadata: CredentialStatusMetadata,
+    val metadata: CredentialStatus,
 )
 
 /** Optional capability: implementing a custom credential store gains no new required methods. */

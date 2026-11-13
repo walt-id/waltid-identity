@@ -8,8 +8,16 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.did.dids.DidService
 import id.walt.statuslist.codec.TokenStatusListCodec
 import id.walt.statuslist.codec.BitstringStatusListCodec
+import id.walt.statuslist.codec.StatusList2021Codec
 import id.walt.statuslist.model.IndexedStatus
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /** Real signatures for protocol-to-wallet adapter tests, shared by those distinct boundaries. */
 class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val keyId: String) {
@@ -25,9 +33,10 @@ class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val
         }
     }
 
-    suspend fun credential(index: Int = 0, expiry: Long = 4_000_000_000): DigitalCredential =
+    suspend fun credential(index: Int = 0, expiry: Long = 4_000_000_000, validFrom: Long? = null): DigitalCredential =
         CredentialParser.detectAndParse(sign(buildJsonObject {
             put("iss", did); put("sub", "urn:example:holder"); put("exp", expiry)
+            validFrom?.let { put("nbf", it) }
             putJsonObject("vc") {
                 putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
                 putJsonArray("type") { add("VerifiableCredential") }
@@ -39,16 +48,17 @@ class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val
             }
         })).second
 
-    suspend fun list(value: UInt = 0u, ttl: Long = 30, expiry: Long = 4_000_000_000): String = sign(buildJsonObject {
+    suspend fun list(value: UInt = 0u, ttl: Long = 30, expiry: Long = 4_000_000_000, bits: Int = 1): String = sign(buildJsonObject {
         put("iss", did); put("sub", uri); put("iat", 1_700_000_000); put("exp", expiry); put("ttl", ttl)
         putJsonObject("status_list") {
-            put("bits", 1)
-            put("lst", TokenStatusListCodec.encode(listOf(IndexedStatus(0, value), IndexedStatus(1, value)), 1, 16))
+            put("bits", bits)
+            put("lst", TokenStatusListCodec.encode(listOf(IndexedStatus(0, value), IndexedStatus(1, value)), bits, 16))
         }
     }, "statuslist+jwt")
 
     suspend fun w3cCredential(includeUnsupported: Boolean = false, size: Int = 1, purpose: String = "revocation",
-        index: JsonPrimitive = JsonPrimitive("0"), reference: JsonElement? = null): DigitalCredential =
+        index: JsonPrimitive = JsonPrimitive("0"), reference: JsonElement? = null,
+        legacy: Boolean = false, extraEntries: List<JsonElement> = emptyList()): DigitalCredential =
         CredentialParser.detectAndParse(sign(buildJsonObject {
             put("iss", did); put("exp", 4_000_000_000)
             putJsonObject("vc") {
@@ -58,7 +68,7 @@ class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val
                 putJsonObject("credentialSubject") { put("id", "urn:example:holder") }
                 putJsonArray("credentialStatus") {
                     add(buildJsonObject {
-                        put("id", "$uri#0"); put("type", "BitstringStatusListEntry"); put("statusPurpose", purpose)
+                        put("id", "$uri#0"); put("type", if (legacy) "StatusList2021Entry" else "BitstringStatusListEntry"); put("statusPurpose", purpose)
                         put("statusListIndex", index); put("statusListCredential", uri)
                         if (size != 1) {
                             put("statusSize", size)
@@ -69,26 +79,27 @@ class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val
                         reference?.let { put("statusReference", it) }
                     })
                     if (includeUnsupported) add(buildJsonObject { put("type", "UnknownStatusMethod") })
+                    extraEntries.forEach { add(it) }
                 }
             }
         })).second
 
     suspend fun w3cList(value: UInt = 0u, purpose: String = "revocation", id: String? = uri, bytes: Int = 16_384,
         size: Int = 1, purposes: List<String> = listOf(purpose), validUntil: String? = null,
-        declaredSize: Int? = size.takeUnless { it == 1 }): String =
+        declaredSize: Int? = size.takeUnless { it == 1 }, legacy: Boolean = false): String =
         sign(buildJsonObject {
             put("iss", did); put("exp", 4_000_000_000)
             putJsonObject("vc") {
                 id?.let { put("id", it) }; put("issuer", did)
                 validUntil?.let { put("validUntil", it) }
-                putJsonArray("type") { add("VerifiableCredential"); add("BitstringStatusListCredential") }
+                putJsonArray("type") { add("VerifiableCredential"); add(if (legacy) "StatusList2021Credential" else "BitstringStatusListCredential") }
                 putJsonObject("credentialSubject") {
-                    put("id", "$uri#list"); put("type", "BitstringStatusList")
+                    put("id", "$uri#list"); put("type", if (legacy) "StatusList2021" else "BitstringStatusList")
                     if (purposes.size == 1) put("statusPurpose", purposes.single())
                     else putJsonArray("statusPurpose") { purposes.forEach { add(it) } }
                     declaredSize?.let { put("statusSize", it) }
                     put("ttl", 60_000)
-                    put("encodedList", BitstringStatusListCodec.encode(listOf(IndexedStatus(0, value)), size, bytes))
+                    put("encodedList", (if (legacy) StatusList2021Codec else BitstringStatusListCodec).encode(listOf(IndexedStatus(0, value)), size, bytes))
                 }
             }
         }, "vc+jwt")

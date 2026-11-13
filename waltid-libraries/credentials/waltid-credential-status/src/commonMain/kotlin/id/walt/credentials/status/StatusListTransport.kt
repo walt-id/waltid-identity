@@ -32,6 +32,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import org.kotlincrypto.hash.sha2.SHA256
 
 /** Limits are local policy, not issuer freshness promises. */
 data class CredentialStatusLimits(
@@ -97,12 +98,12 @@ internal class StatusListTransport(
     private val permits = Semaphore(limits.concurrency)
 
     suspend fun fetch(uri: String, force: Boolean, session: CredentialStatusRefreshSession? = null): StatusListResource {
-        requireEndpoint(uri)
+        requireStatusEndpoint(uri)
         val flight = mutex.withLock {
             require(session == null || session.owner === this) { "Refresh session belongs to another resolver" }
             session?.cached(uri)?.let { return it.getOrThrow() }
             val at = now()
-            if (rateLimits[uri]?.let { it > at } == true) fail(StatusFailure.RATE_LIMITED)
+            if (rateLimits[uri]?.let { it > at } == true) fail(CheckFailure.RateLimited(rateLimits[uri]))
             rateLimits.remove(uri)
             val stored = cache[uri]
             if (!force && stored != null && !stored.revalidate &&
@@ -113,7 +114,7 @@ internal class StatusListTransport(
                     runStatusCheck {
                     permits.withPermit {
                         withTimeoutOrNull(limits.requestTimeout) { download(uri) }
-                            ?: fail(StatusFailure.TIMEOUT)
+                            ?: fail(CheckFailure.Reason.TIMEOUT)
                     }
                     }
                 })
@@ -179,7 +180,7 @@ internal class StatusListTransport(
                 val wait = response.headers[HttpHeaders.RetryAfter]?.toLongOrNull()?.coerceIn(1, 3600) ?: 30
                 mutex.withLock { rateLimits[uri] = receivedAt + wait.seconds }
                 response.bodyAsChannel().cancel(null)
-                fail(StatusFailure.RATE_LIMITED)
+                fail(CheckFailure.RateLimited(receivedAt + wait.seconds))
             }
             val notModified = response.status == HttpStatusCode.NotModified
             if (notModified && (!conditional || previous == null)) {
@@ -189,7 +190,7 @@ internal class StatusListTransport(
             }
             if (!notModified && response.status.value !in 200..299) {
                 response.bodyAsChannel().cancel(null)
-                fail(StatusFailure.TRANSPORT)
+                fail(CheckFailure.Reason.TRANSPORT)
             }
             val bytes = if (notModified) {
                 response.bodyAsChannel().cancel(null)
@@ -198,7 +199,7 @@ internal class StatusListTransport(
                 val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
                 if (declared != null && declared > limits.maxResponseBytes) {
                     response.bodyAsChannel().cancel(null)
-                    fail(StatusFailure.RESOURCE_LIMIT)
+                    fail(CheckFailure.Reason.RESOURCE_LIMIT)
                 }
                 val channel = response.bodyAsChannel()
                 val chunks = mutableListOf<ByteArray>()
@@ -209,7 +210,7 @@ internal class StatusListTransport(
                         val count = channel.readAvailable(buffer)
                         if (count < 0) break
                         if (count == 0) continue
-                        if (count > limits.maxResponseBytes - size) fail(StatusFailure.RESOURCE_LIMIT)
+                        if (count > limits.maxResponseBytes - size) fail(CheckFailure.Reason.RESOURCE_LIMIT)
                         chunks += buffer.copyOf(count)
                         size += count
                     }
@@ -263,15 +264,10 @@ internal class StatusListTransport(
             }
             return resource
         }
-        fail(StatusFailure.TRANSPORT)
+        fail(CheckFailure.Reason.TRANSPORT)
     }
 
-    private fun requireEndpoint(uri: String) {
-        val url = try { Url(uri) } catch (_: IllegalArgumentException) { fail(StatusFailure.REFERENCE_MALFORMED) }
-        if (url.protocol != URLProtocol.HTTPS || !url.user.isNullOrEmpty() || !url.password.isNullOrEmpty() || url.fragment.isNotEmpty()) {
-            fail(StatusFailure.REFERENCE_MALFORMED)
-        }
-    }
+
 
     fun close() { client.close() }
 }
@@ -279,13 +275,20 @@ internal class StatusListTransport(
 private val StatusOriginalUrl = AttributeKey<Url>("credential-status-original-url")
 private val StatusRequestBoundary = createClientPlugin("CredentialStatusRequestBoundary") {
     on(SendingRequest) { request, _ ->
-        if (request.url.build() != request.attributes[StatusOriginalUrl]) fail(StatusFailure.TRANSPORT)
+        if (request.url.build() != request.attributes[StatusOriginalUrl]) fail(CheckFailure.Reason.TRANSPORT)
         request.headers.remove(HttpHeaders.Authorization)
         request.headers.remove(HttpHeaders.Cookie)
         request.headers.remove(HttpHeaders.ProxyAuthorization)
     }
 }
 
-internal fun fail(reason: StatusFailure): Nothing = throw CredentialStatusException(reason)
+internal fun fail(reason: CheckFailure): Nothing = throw CredentialStatusException(reason)
 
-internal fun fingerprint(bytes: ByteArray): String = org.kotlincrypto.hash.sha2.SHA256().digest(bytes).toHexString()
+internal fun fingerprint(bytes: ByteArray): String = SHA256().digest(bytes).toHexString()
+
+internal fun requireStatusEndpoint(uri: String) {
+    val url = try { Url(uri) } catch (_: IllegalArgumentException) { fail(CheckFailure.Reason.INVALID_LIST) }
+    if (url.protocol != URLProtocol.HTTPS || !url.user.isNullOrEmpty() || !url.password.isNullOrEmpty() || url.fragment.isNotEmpty()) {
+        fail(CheckFailure.Reason.INVALID_LIST)
+    }
+}

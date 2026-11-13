@@ -1,14 +1,21 @@
 package id.walt.wallet2.persistence.stores
 
+import kotlinx.serialization.json.Json
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
-import id.walt.credentials.status.*
+import id.walt.credentials.status.CredentialStatus
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.PersistedCredentialStatus
+import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.test.runTest
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 
 class SqlDelightCredentialStatusStoreTest {
@@ -26,8 +33,7 @@ class SqlDelightCredentialStatusStoreTest {
             assertEquals(raw, credential.credential.signed)
             val at = Instant.fromEpochSeconds(1_800_000_000)
             val snapshot = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
-                metadata = CredentialStatusMetadata(listOf(CredentialStatusEntry.Observed(StatusObservation("ref", StatusProtocol.ISO_MSO_STATUS_LIST,
-                    "revocation", 1u, at, at, meaning = StatusMeaning.REVOKED)))))
+                metadata = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"ref","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}"""))
             assertTrue(store.saveCredentialStatusIfCurrent(credential, snapshot))
             assertEquals(snapshot, SqlDelightCredentialStore(WalletPersistenceDatabase(driver).walletPersistenceQueries).readCredentialStatus("resident"))
             assertTrue(store.removeCredential("resident"))

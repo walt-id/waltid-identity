@@ -27,6 +27,16 @@ struct WalletVisualFixtures {
         return try decodeCredentialStatus(CredentialStatus.self, json: XCTUnwrap(String(data: encoded, encoding: .utf8)))
     }
 
+    func noReferenceStatusContext() throws -> CredentialStatusUIContext {
+        var ids = [try text(object(root, "credential"), "id"), try nearbyCredential().id]
+        for group in ["sharing", "sharingInformation", "sharingDates"] {
+            ids += try array(object(root, group), "credentials").map { try text($0, "credentialId") }
+        }
+        let status = try credentialStatus("not_provided")
+        return CredentialStatusUIContext(values: Dictionary(uniqueKeysWithValues: Set(ids).map { ($0, status) }),
+            storeIndices: Dictionary(uniqueKeysWithValues: Set(ids).map { ($0, 0) }))
+    }
+
     func readerTrustImport() throws -> ProximityReaderTrustImportPreview {
         let value = try object(root, "readerTrust")
         let authority = ProximityReaderTrustAnchorImportPreview(displayName: try text(value, "displayName"),

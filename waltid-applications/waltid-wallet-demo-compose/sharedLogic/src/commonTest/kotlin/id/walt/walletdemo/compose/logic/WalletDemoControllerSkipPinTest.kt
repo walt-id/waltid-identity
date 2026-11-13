@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.StandardTestDispatcher
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoControllerSkipPinTest {
@@ -24,7 +25,7 @@ class WalletDemoControllerSkipPinTest {
             pinStore = InMemoryDemoPinStore(),
             skipPin = true,
             scope = backgroundScope,
-            dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+            dispatcher = StandardTestDispatcher(testScheduler),
         )
         runCurrent()
 
@@ -40,7 +41,7 @@ class WalletDemoControllerSkipPinTest {
         val settings = InMemoryDemoSharingSettingsStore().apply { setAutomaticCredentialStatusChecks(false) }
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore(), sharingSettings = settings,
             skipPin = true, scope = backgroundScope,
-            dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))
+            dispatcher = StandardTestDispatcher(testScheduler))
         runCurrent()
         assertEquals(1, wallet.statusCollectors)
         assertTrue(wallet.statusRefreshModes.isEmpty(), "Reading/observing status must not refresh it")
@@ -62,7 +63,7 @@ class WalletDemoControllerSkipPinTest {
             statuses.value = WalletDemoCredentialStatuses(nextRefreshAt = (start + 60.seconds).toString())
         }
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore(), skipPin = true,
-            scope = backgroundScope, dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler),
+            scope = backgroundScope, dispatcher = StandardTestDispatcher(testScheduler),
             statusNow = { start + testScheduler.currentTime.milliseconds })
         runCurrent()
         assertEquals(listOf(false), wallet.statusRefreshModes)
@@ -93,7 +94,7 @@ class WalletDemoControllerSkipPinTest {
         val settings = InMemoryDemoSharingSettingsStore().apply { setAutomaticCredentialStatusChecks(false) }
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore(), sharingSettings = settings,
             skipPin = true, scope = backgroundScope,
-            dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler))
+            dispatcher = StandardTestDispatcher(testScheduler))
         val clear = WalletDemoCredentialStatus("NOT_REVOKED", "NONE", "FRESH", "CHECK", "clear")
         wallet.statuses.value = WalletDemoCredentialStatuses(mapOf("identity" to clear))
         runCurrent()
@@ -134,7 +135,7 @@ class WalletDemoControllerSkipPinTest {
                 requiresIssuerAuthentication = true,
             ),
         )
-        val dispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
+        val dispatcher = StandardTestDispatcher(testScheduler)
         val controller = WalletDemoController(
             wallet = wallet,
             pinStore = InMemoryDemoPinStore(),

@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
 interface DemoWallet {
-    fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> = kotlinx.coroutines.flow.emptyFlow()
+    fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = emptyFlow()
     suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses()
     suspend fun refreshCredentialStatuses(ids: Set<String>? = null, force: Boolean = false): WalletDemoStatusRefreshSummary =
         WalletDemoStatusRefreshSummary(0, 0, 0, 0)
@@ -14,7 +17,10 @@ interface DemoWallet {
         paymentConsentRevision: String? = null,
     ): WalletDemoOperationResult {
         val latest = credentialStatusSnapshot().credentials
-        if (selectedCredentialOptions.any { latest[it.credentialId]?.advisoryRevision != reviewedStatus[it.credentialId] }) throw WalletDemoStatusReviewChanged()
+        if (selectedCredentialOptions.any {
+                val revision = reviewedStatus[it.credentialId]
+                revision.isNullOrBlank() || latest[it.credentialId]?.advisoryRevision != revision
+            }) throw WalletDemoStatusReviewChanged()
         return submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
     }
 

@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +27,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -34,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
@@ -100,10 +105,12 @@ internal fun CredentialCardArt(
     art: CredentialCardArtModel,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    statusDecoration: WalletDemoCredentialStatus? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val status = LocalCredentialStatusUi.current.snapshot.credentials[art.id]?.takeIf { it.hasIssue && !compact }
+    val status = statusDecoration?.takeIf { it.hasIssue && !compact }
     val statusTitle = status?.title()
+    val titleBaselineOffset = with(LocalDensity.current) { 6.sp.roundToPx() }
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
@@ -127,7 +134,7 @@ internal fun CredentialCardArt(
             .clip(shape)
             .then(if (onClick == null) Modifier else Modifier.clickable(
                 role = Role.Button, onClickLabel = "View credential details", onClick = onClick))
-            .then(if (statusTitle != null) Modifier.semantics { contentDescription = "${art.name}, $statusTitle" } else Modifier)
+            .semantics { contentDescription = statusTitle?.let { "${art.name}, $it" } ?: art.name }
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
         val logoSize = if (compact) minOf(28.dp, maxHeight - 8.dp) else 36.dp
@@ -191,21 +198,19 @@ internal fun CredentialCardArt(
                 )
                 CredentialCardLogoSource.BundledWalt -> if (!compact) DefaultWaltLogo(logoModifier)
             }
-            if (!compact) Text(
-                text = art.name,
-                color = labelColor,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(namePadding)
-                    .fillMaxWidth(0.72f),
-            )
+            if (!compact) Row(
+                modifier = Modifier.align(Alignment.TopStart).padding(namePadding).fillMaxWidth(0.72f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                if (status != null) CredentialStatusIcon(status,
+                    Modifier.alignBy { it.measuredHeight / 2 + titleBaselineOffset }.testTag("credential-status-icon-${art.id}"), contrast = true)
+                Text(art.name, Modifier.weight(1f).alignBy(FirstBaseline), color = labelColor, fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
         }
-        if (status != null) CredentialStatusIcon(status,
-            Modifier.align(Alignment.TopEnd).padding(12.dp).testTag("credential-status-icon-${art.id}"))
+        if (status != null && !showConstructedCardArtOverlay(metadataArtState)) CredentialStatusIcon(status,
+            Modifier.align(Alignment.BottomStart).padding(16.dp).testTag("credential-status-icon-${art.id}"), contrast = true)
     }
 }
 

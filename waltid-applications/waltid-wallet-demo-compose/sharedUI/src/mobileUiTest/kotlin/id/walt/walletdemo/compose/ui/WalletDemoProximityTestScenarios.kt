@@ -1,11 +1,17 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.ComposeUiTest
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
+
 import id.walt.wallet2.mobile.ProximityReaderTrustDecision
 import id.walt.wallet2.mobile.ProximityReaderAuthenticationOutcome
 import id.walt.wallet2.mobile.ProximityReviewId
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximityRuntimeObservation
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -66,7 +72,7 @@ import kotlin.uuid.Uuid
 class WalletDemoProximityTestScenarios {
     fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() = runComposeUiTest {
         var remediated: ProximityRemediationAction? = null
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
@@ -84,7 +90,7 @@ class WalletDemoProximityTestScenarios {
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, _ -> },
                 onContinueAfterResponseChange = {},
-                onApprove = {},
+                onApprove = { _, _ -> },
                 onDecline = {},
                 onRetry = {},
                 onRemediate = { action, _ -> remediated = action },
@@ -99,7 +105,7 @@ class WalletDemoProximityTestScenarios {
     }
 
     fun connectingHidesEngagementChoicesAndQrCode() = runComposeUiTest {
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
@@ -115,7 +121,7 @@ class WalletDemoProximityTestScenarios {
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, _ -> },
                 onContinueAfterResponseChange = {},
-                onApprove = {},
+                onApprove = { _, _ -> },
                 onDecline = {},
                 onRetry = {},
                 onRemediate = { _, _ -> },
@@ -137,7 +143,7 @@ class WalletDemoProximityTestScenarios {
             sessionState = ProximityState.EngagementReady(listOf(ProximityEngagement.Nfc)),
             nfcRequiresUserAction = requiresUserAction,
         ))
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(
                 state = state.value,
                 credentialDetailsById = emptyMap(),
@@ -145,7 +151,7 @@ class WalletDemoProximityTestScenarios {
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, _ -> },
                 onContinueAfterResponseChange = {},
-                onApprove = {},
+                onApprove = { _, _ -> },
                 onDecline = {},
                 onRetry = {},
                 onRemediate = { _, _ -> },
@@ -171,13 +177,13 @@ class WalletDemoProximityTestScenarios {
                 ProximityEngagement.Nfc,
                 ProximityEngagement.Qr("mdoc:" + "A7v9kQ2_x-".repeat(120)),
             ))))
-        setContent {
+        setProximityContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
                 MaterialTheme(colorScheme = darkColorScheme()) {
                     WalletDemoProximityScreen(state.value, emptyMap(), hostActions,
                         onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                        onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                        onContinueAfterResponseChange = {}, onApprove = { _, _ -> }, onDecline = {}, onRetry = {},
                         onRemediate = { _, _ -> }, onCancel = {}, onDismiss = {}, onRestart = {},
                         onShowEngagement = { state.value = state.value.copy(preferredEngagement = it) })
                 }
@@ -197,12 +203,12 @@ class WalletDemoProximityTestScenarios {
 
     fun completedPresentationShowsDoneAndNoConnectionControls() = runComposeUiTest {
         val sessionState = mutableStateOf<ProximityState>(ProximityState.Completed(1, false))
-        setContent {
+        setProximityContent {
             MaterialTheme {
                 WalletDemoProximityScreen(WalletDemoProximityUiState(active = true,
                     sessionState = sessionState.value), emptyMap(), hostActions,
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                    onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                    onContinueAfterResponseChange = {}, onApprove = { _, _ -> }, onDecline = {}, onRetry = {},
                     onRemediate = { _, _ -> }, onCancel = {}, onDismiss = {}, onRestart = {})
             }
         }
@@ -226,7 +232,7 @@ class WalletDemoProximityTestScenarios {
         var continued = false
         val review = proximityReview()
         val element = ProximityElementReference(namespace, "portrait")
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
@@ -251,7 +257,7 @@ class WalletDemoProximityTestScenarios {
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, selected -> toggled = selected },
                 onContinueAfterResponseChange = { continued = it },
-                onApprove = { approved = true },
+                onApprove = { _, _ -> approved = true },
                 onDecline = { declined = true },
                 onRetry = {},
                 onRemediate = { _, _ -> },
@@ -311,10 +317,10 @@ class WalletDemoProximityTestScenarios {
         val state = mutableStateOf(WalletDemoProximityUiState(active = true,
             sessionState = ProximityState.ReviewRequired(first)))
         var cancelled = false
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(state.value, proximityCredentialDetails(), hostActions,
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                onContinueAfterResponseChange = {}, onApprove = { _, _ -> }, onDecline = {}, onRetry = {},
                 onRemediate = { _, _ -> }, onCancel = { cancelled = true }, onDismiss = {}, onRestart = {})
         }
         onNodeWithTag(WalletUiTestTags.ProximityReview).assertIsDisplayed()
@@ -343,7 +349,7 @@ class WalletDemoProximityTestScenarios {
         )
             )
         )
-        setContent {
+        setProximityContent {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(
                     active = true,
@@ -355,7 +361,7 @@ class WalletDemoProximityTestScenarios {
                 onSelectCredential = { _, _ -> },
                 onToggleElement = { _, _ -> },
                 onContinueAfterResponseChange = {},
-                onApprove = {},
+                onApprove = { _, _ -> },
                 onDecline = {},
                 onRetry = {},
                 onRemediate = { _, _ -> },
@@ -376,6 +382,7 @@ class WalletDemoProximityTestScenarios {
 
 private val hostActions = WalletDemoProximityHostActionExecutor {
     ProximityHostActionResult.Completed
+
 }
 
 internal val permissionBlockedCapabilities = ProximityCapabilities(
@@ -536,3 +543,13 @@ private fun proximityReview(): ProximityReview = ProximityReview(
     useCases = emptyList(),
     applicationAuthorizations = emptyList(),
 )
+
+@OptIn(ExperimentalTestApi::class)
+private fun ComposeUiTest.setProximityContent(content: @Composable () -> Unit) {
+    setContent {
+        val statuses = WalletDemoCredentialStatuses(proximityCredentialDetails().keys.associateWith {
+            WalletVisualFixtures.credentialStatus("not_provided")
+        })
+        CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses)) { content() }
+    }
+}

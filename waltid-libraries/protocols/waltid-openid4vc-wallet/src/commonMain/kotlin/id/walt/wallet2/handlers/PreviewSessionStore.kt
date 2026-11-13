@@ -16,6 +16,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.minutes
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
 
 /** Why a reviewed preview session can no longer be used. */
 public enum class PreviewSessionFailureReason {
@@ -164,7 +165,7 @@ public class PreviewSessionStore<T>(
 
     internal suspend fun <R> useStatusReviewedOnce(walletId: String, id: String, block: suspend (T) -> R): R =
         use(walletId, id, consumeOnSuccess = true, consumeOnFailure = true,
-            retainOnFailure = { it is id.walt.wallet2.status.CredentialStatusReviewChangedException }, block = block)
+            retainOnFailure = { it is CredentialStatusReviewChangedException }, block = block)
 
     private suspend fun <R> use(
         walletId: String,

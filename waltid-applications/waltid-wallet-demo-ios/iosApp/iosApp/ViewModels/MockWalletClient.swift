@@ -16,6 +16,8 @@ actor MockWalletClient: WalletClient {
     private var statusCollectors: [UUID: AsyncThrowingStream<CredentialStatusSnapshot, Error>.Continuation] = [:]
     var statusCollectorCount: Int { statusCollectors.count }
     private(set) var statusRefreshCalls = 0
+    private var statusRefreshResults: [CredentialStatusRefreshResult] = []
+    private var statusRefreshFails = false
     private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
@@ -28,6 +30,7 @@ actor MockWalletClient: WalletClient {
     nonisolated var supportsClaimReview: Bool { claimPreparation != nil }
     private(set) var submittedClaimSelections: [[PresentationDisclosureSelection]] = []
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
+    private let paymentTransaction: Bool
     private(set) var submittedPaymentConsentRevisions: [String?] = []
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
@@ -51,6 +54,7 @@ actor MockWalletClient: WalletClient {
         presentationPreviewResult: PresentationPreviewResult? = nil,
         claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)? = nil,
         paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
+        paymentTransaction: Bool = true,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
         mdocMetadata: Bool = false,
@@ -72,6 +76,7 @@ actor MockWalletClient: WalletClient {
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.claimPreparation = claimPreparation
         self.paymentConsent = paymentConsent
+        self.paymentTransaction = paymentTransaction
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
@@ -82,8 +87,13 @@ actor MockWalletClient: WalletClient {
     }
 
     #if DEBUG
+    nonisolated static func uiTestCredentialStatusSnapshot(_ json: String?) -> CredentialStatusSnapshot? {
+        guard let json else { return nil }
+        return try? decodeCredentialStatusSnapshot(json)
+    }
+
     nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
-        guard let scenario else { return nil }
+        guard let scenario, scenario != "none" else { return nil }
         if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
         if scenario == "recurring" {
             let fields: [PaymentConsentField] = [
@@ -290,10 +300,19 @@ actor MockWalletClient: WalletClient {
         statusSnapshot = snapshot
         for continuation in statusCollectors.values { continuation.yield(snapshot) }
     }
+    func failCredentialStatusObservation() {
+        for continuation in statusCollectors.values {
+            continuation.finish(throwing: NSError(domain: "MockWalletStatusRead", code: 1))
+        }
+    }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
         statusRefreshCalls += 1
         try await delayOperation()
-        return []
+        if statusRefreshFails { throw NSError(domain: "MockWalletStatusTransport", code: 1) }
+        return statusRefreshResults
+    }
+    func setStatusRefreshResults(_ results: [CredentialStatusRefreshResult], fails: Bool = false) {
+        statusRefreshResults = results; statusRefreshFails = fails
     }
 
     private func delayOperation() async throws {
@@ -322,7 +341,7 @@ actor MockWalletClient: WalletClient {
             state: "state-123",
             nonce: "nonce-456",
             responseEncryption: responseEncryption,
-            transactionData: [Self.paymentAuthorizationTransactionData]
+            transactionData: paymentTransaction ? [Self.paymentAuthorizationTransactionData] : []
         )
     }
 

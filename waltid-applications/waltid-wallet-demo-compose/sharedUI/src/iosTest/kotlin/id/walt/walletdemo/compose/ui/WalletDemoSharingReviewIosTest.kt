@@ -12,6 +12,17 @@ class WalletDemoSharingReviewIosTest {
     @Test
     fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() =
         scenarios.selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff()
+    @Test
+    fun statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions() = scenarios.statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions()
+
+    @Test
+    fun statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges() = scenarios.statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges()
+
+    @Test
+    fun unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit() = scenarios.unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit()
+
+    @Test
+    fun unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions() = scenarios.unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions()
 
     @Test
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =

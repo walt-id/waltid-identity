@@ -25,7 +25,7 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("wallet.settingsSigningKey")
                 NavigationLink { CredentialStatusSettingsView(viewModel: viewModel) } label: {
-                    SettingsDestinationLabel("Credential status", systemImage: "checkmark.shield", summary: String(localized: "Checks and last-known results"))
+                    SettingsDestinationLabel("Credential status", systemImage: "checkmark.circle", summary: String(localized: "Checks and last-known results"))
                 }.accessibilityIdentifier("settings-credential-status")
                 NavigationLink { TechnicalDetailsView(viewModel: viewModel) } label: {
                     SettingsDestinationLabel("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"))
@@ -179,17 +179,49 @@ struct CredentialStatusSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Automatic status checks", isOn: $viewModel.automaticCredentialStatusChecks)
+                Toggle("Automatic checks", isOn: $viewModel.automaticCredentialStatusChecks)
                     .accessibilityIdentifier("settings-credential-status-automatic")
-            } footer: { Text("Check while the wallet is open and unlocked. No background checks.") }
+            } footer: { Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.") }
             Section {
-                Button(viewModel.checkingCredentialStatuses ? String(localized: "Checking…") : String(localized: "Check all statuses")) { viewModel.checkCredentialStatuses() }
-                    .disabled(viewModel.checkingCredentialStatuses).accessibilityIdentifier("settings-credential-status-check-all")
-                if let summary = viewModel.credentialStatusSummary {
-                    Text(summary + "\n" + String(localized: "Deferred checks can be retried shortly.")).font(.footnote)
+                Button { viewModel.checkCredentialStatuses() } label: {
+                    HStack {
+                        Text("Check statuses")
+                        Spacer()
+                        if viewModel.checkingCredentialStatuses { ProgressView().accessibilityHidden(true) }
+                        else { Image(systemName: "arrow.clockwise").accessibilityHidden(true) }
+                    }
                 }
-                if let error = viewModel.credentialStatusError { Text(error).font(.footnote).foregroundStyle(.red) }
-            } footer: { Text("Checks contact the issuer’s status service. Credential contents and status indexes are not sent in the request.") }
+                .disabled(viewModel.checkingCredentialStatuses || !viewModel.isReady || viewModel.auth != .unlocked)
+                .accessibilityValue(viewModel.checkingCredentialStatuses ? String(localized: "Checking…") : "")
+                .accessibilityIdentifier("settings-credential-status-check-all")
+                if let summary = viewModel.credentialStatusSummary {
+                    countRow(String(localized: "Processed"), summary.completed)
+                    if summary.unchanged > 0 { countRow(String(localized: "Not refreshed"), summary.unchanged) }
+                    if summary.deferred > 0 { countRow(String(localized: "Deferred"), summary.deferred) }
+                    if summary.checkErrors > 0 {
+                        countRow(String(localized: "With check errors"), summary.checkErrors)
+                            .padding(.top, 8)
+                    }
+                }
+                if let error = viewModel.credentialStatusBatchError { Text(error).font(.footnote).foregroundStyle(.red) }
+            } footer: {
+                if viewModel.credentialStatusSummary?.deferred ?? 0 > 0 { Text("Some checks were deferred. Try again later.") }
+            }
+            Section {
+                MetadataDisclosure(title: String(localized: "How checks work"), initiallyExpanded: false) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Checks download status lists. The credential itself is not sent.")
+                        Text("List addresses and network metadata can correlate requests.")
+                        Text("Recipients verify credential status independently.")
+                        Text("With check errors counts returned records with failed checks, conflicts or unreadable references. It overlaps the outcome rows.")
+                    }.font(.footnote).foregroundStyle(.secondary)
+                }
+            }
         }.navigationTitle("Credential status").navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func countRow(_ title: String, _ value: Int) -> some View {
+        HStack { Text(title); Spacer(); Text(value.formatted()).monospacedDigit() }
+            .foregroundStyle(Color.primary).accessibilityElement(children: .combine)
     }
 }

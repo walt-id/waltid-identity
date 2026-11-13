@@ -13,7 +13,13 @@ fun StatusListCodec.decodeBounded(encoded: String, maxOutputBytes: Int): ByteArr
     BitstringStatusListCodec -> GzipCompressor.decompress(
         StatusListEncoding.decode(encoded, StatusListStringEncoding.MultibaseBase64Url), maxOutputBytes,
     )
-    StatusList2021Codec, RevocationList2020Codec -> GzipCompressor.decompress(
+    StatusList2021Codec -> GzipCompressor.decompress(
+        // Preserve the legacy codec's Base64 and the published URL-alphabet examples.
+        try { StatusListEncoding.decode(encoded, StatusListStringEncoding.Base64) }
+        catch (_: IllegalArgumentException) { StatusListEncoding.decode(encoded, StatusListStringEncoding.Base64Url) },
+        maxOutputBytes,
+    )
+    RevocationList2020Codec -> GzipCompressor.decompress(
         StatusListEncoding.decode(encoded, StatusListStringEncoding.Base64Url), maxOutputBytes,
     )
     else -> throw IllegalArgumentException("Unsupported status-list codec")

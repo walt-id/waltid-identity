@@ -193,7 +193,7 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
       await page.goto('/');
       await clickControl(page, page.getByText(metadata.label, { exact: true }));
       if (!dates) {
-        const title = page.getByText(oldServer ? 'This server does not support credential status' : 'Not revoked', { exact: true });
+        const title = page.getByText(oldServer ? 'Status unavailable' : 'Not revoked', { exact: true });
         await expect(title).toHaveCount(1);
         // Wide credential artwork puts the standalone status section below the fold.
         await page.mouse.move(scenario.width / 2, scenario.height / 2);
@@ -206,13 +206,12 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
         }
         await expect(title).toBeVisible();
         if (oldServer) {
-          await expect(page.getByRole('button', { name: 'Check now', exact: true })).toHaveCount(0);
-          await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Refresh status', exact: true })).toHaveCount(0);
           expect(refreshes).toEqual([]);
         } else {
-          await clickControl(page, page.getByRole('button', { name: 'Check now', exact: true }));
-          await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
-          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toBeVisible();
+          await clickControl(page, page.getByRole('button', { name: 'Refresh status', exact: true }));
+          await expect(page.getByText('Last known: revoked', { exact: true })).toBeVisible();
+          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(0);
           expect(refreshes.filter(request => request.mode === 'FORCE')).toEqual([{ credentials: [reference], mode: 'FORCE' }]);
           const notice = page.getByText('Status changed: Status review credential. Open the marked cards for details.', { exact: true });
           await expect(notice).toBeVisible();
@@ -224,13 +223,50 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('cre
         await waitForSettledImage(page);
         await expect(page.getByText(oldServer
           ? 'This server does not expose credential status checks. The credential can still be shared, and the recipient performs its own checks.'
-          : 'This check only reports the issuer’s status information. It does not confirm every aspect of the credential’s validity. The recipient performs its own checks.', { exact: true })).toBeVisible();
-        if (!oldServer) await expect(page.getByText('Checked purposes: Revocation', { exact: true })).toBeVisible();
+          : 'The recipient may reject this credential.', { exact: true })).toBeVisible();
+        if (!oldServer) {
+          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toBeVisible();
+          await expect(page.getByText('Revocation', { exact: true })).toBeVisible();
+          await expect(page.getByText('Last checked', { exact: true })).toBeVisible();
+          await expect(page.getByText('Latest attempt', { exact: true })).toBeVisible();
+        }
         await waitForSettledImage(page);
         expect(unexpected).toEqual([]);
         expect(errors).toEqual([]);
         await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
         await testInfo.attach(scenario.id, { body: await page.screenshot(), contentType: 'image/png' });
+        if (!oldServer) {
+          // Pointer focus belongs to the actual Compose canvas. Verify keyboard activation by
+          // observing content, rather than trusting the ARIA mirror's focused attribute.
+          await clickControl(page, page.getByRole('button', { name: 'Details', exact: true }));
+          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(0);
+          await page.keyboard.press('Space');
+          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(1);
+          // Popup dismissal can leave the pinned renderer's ARIA mirror stale. Compare the
+          // actual canvas below the focused header, so Escape must restore the full backdrop.
+          await page.mouse.move(scenario.width / 2, scenario.height / 2);
+          await page.mouse.wheel(0, -scenario.height * 4);
+          await waitForSettledImage(page);
+          const more = page.getByRole('button', { name: 'More', exact: true });
+          const header = await more.boundingBox();
+          expect(header).not.toBeNull();
+          // Keep hover on the same header control in both frames, away from the clickable art.
+          await page.mouse.move(header.x + header.width / 2, header.y + header.height / 2);
+          await waitForSettledImage(page);
+          // Include the toolbar's bottom inset; its focus indication is intentionally different.
+          const top = Math.ceil(header.y + header.height + 8);
+          const clip = { x: 0, y: top, width: scenario.width, height: scenario.height - top };
+          const backdrop = await page.screenshot({ clip });
+          await clickControl(page, more);
+          await expect(page.getByText('Copy', { exact: true })).toBeVisible();
+          await page.keyboard.press('Escape');
+          await waitForSettledImage(page);
+          await testInfo.attach('keyboard-backdrop-before-popup', { body: backdrop, contentType: 'image/png' });
+          await testInfo.attach('keyboard-backdrop-after-escape', { body: await page.screenshot({ clip }), contentType: 'image/png' });
+          await expect.poll(async () => (await page.screenshot({ clip })).equals(backdrop)).toBe(true);
+          expect(unexpected).toEqual([]);
+          expect(errors).toEqual([]);
+        }
         return;
       }
       const birthDate = page.getByText('1990-05-21', { exact: true });

@@ -15,7 +15,8 @@ public struct SharingReviewView: View {
     private let isReadOnly: Bool
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onSubmit: () -> Void
+    private let onSubmit: ([String: String]) -> Void
+    private let requestIdentity: AnyHashable?
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
     private let compact: Bool
@@ -56,14 +57,15 @@ public struct SharingReviewView: View {
         isReadOnly: Bool = false,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onSubmit: @escaping () -> Void,
+        onSubmit: @escaping ([String: String]) -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         compact: Bool = false,
         showActions: Bool = true,
         paymentReview: PaymentReviewState = .notRequired,
         claimReview: ClaimReviewState = .legacy,
-        onRetryClaimReview: @escaping () -> Void = {}
+        onRetryClaimReview: @escaping () -> Void = {},
+        requestIdentity: AnyHashable? = nil
     ) {
         self.review = review
         self.selection = selection
@@ -80,12 +82,7 @@ public struct SharingReviewView: View {
         self.paymentReview = paymentReview
         self.claimReview = claimReview
         self.onRetryClaimReview = onRetryClaimReview
-    }
-
-    private var statusAdvisories: [(String, CredentialStatusPresentation)] {
-        (review.credentialOptions).filter { selection.credentials.contains($0.selection) }.compactMap { option in
-            statusUI.values[option.credentialID].map { (CredentialDisplayNormalizer.details(for: option).cardSummary.title, $0.presentation) }
-        }
+        self.requestIdentity = requestIdentity
     }
 
     public var body: some View {
@@ -149,14 +146,15 @@ public struct SharingReviewView: View {
 
             if !isReadOnly && showActions {
                 ReviewActions(
-                    selectionComplete: selectionComplete && isNormalized && claimReview.canConfirm,
+                    selectionComplete: selectionComplete && isNormalized && claimReview.canConfirm && requestIdentity != nil,
                     isLoading: isLoading,
+                    reviewKey: requestIdentity.map { SharingSubmissionKey(requestIdentity: $0, review: review, selection: selection) },
+                    credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
                     onSubmit: onSubmit,
                     onReject: onReject,
                     onCancel: onCancel,
                     paymentReview: paymentReview,
-                    isPayment: review.request.hasPaymentTransaction,
-                    credentialStatuses: statusAdvisories
+                    isPayment: review.request.hasPaymentTransaction
                 )
             }
         }

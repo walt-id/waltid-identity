@@ -44,6 +44,8 @@ import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.components.rememberSuccessDismissal
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
+import id.walt.walletdemo.compose.ui.components.ReviewCredentialStatus
 
 @Composable
 internal fun WalletDemoProximityScreen(
@@ -55,7 +57,7 @@ internal fun WalletDemoProximityScreen(
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
-    onApprove: (Map<String, String>) -> Unit,
+    onApprove: (Map<String, String>, WalletDemoProximityUiState) -> Unit,
     onDecline: () -> Unit,
     onRetry: () -> Unit,
     onRemediate: (ProximityRemediationAction, WalletDemoProximityHostActionExecutor) -> Unit,
@@ -70,8 +72,6 @@ internal fun WalletDemoProximityScreen(
     headerOwnsClose: Boolean = false,
     fillViewport: Boolean = !LocalWalletSheet.current,
 ) {
-    val statuses = id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi.current.snapshot.credentials
-    val approve = { onApprove(statuses.mapValues { it.value.advisoryRevision }) }
     val sessionState = state.sessionState
     val terminal = state.isTerminal
     val canCancel = !state.closing && !terminal && (
@@ -105,7 +105,7 @@ internal fun WalletDemoProximityScreen(
                 onSelectCredential = onSelectCredential,
                 onToggleElement = onToggleElement,
                 onContinueAfterResponseChange = onContinueAfterResponseChange,
-                onApprove = approve,
+                onApprove = { onApprove(it, state) },
                 onDecline = onDecline,
                 onCancel = onCancel,
                 onRestart = onRestart,
@@ -213,7 +213,7 @@ private fun WalletDemoProximityReview(
     onSelectCredential: (Int, String) -> Unit,
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
-    onApprove: () -> Unit,
+    onApprove: (Map<String, String>) -> Unit,
     onDecline: () -> Unit,
     onCancel: () -> Unit,
     onRestart: () -> Unit,
@@ -225,11 +225,11 @@ private fun WalletDemoProximityReview(
         modifier = modifier,
         feedback = state.actionError?.let { error -> { ProximityErrorCard(error) } },
         actions = {
-            if (state.preparingApproval) {
-                val expired = (state.sessionState as ProximityState.PreparationRequired).plan.isExpired
+            val expired = (state.sessionState as? ProximityState.PreparationRequired)?.plan?.isExpired == true
+            if (expired) {
                 WalletActions(
-                    primary = WalletAction(stringResource(if (expired) Res.string.proximity_refresh_request else Res.string.proximity_approve_and_prepare),
-                        onClick = if (expired) onRestart else onApprove, enabled = expired || state.canApprove,
+                    primary = WalletAction(stringResource(Res.string.proximity_refresh_request),
+                        onClick = onRestart,
                         testTag = WalletUiTestTags.ProximityApprove),
                     secondary = if (headerOwnsClose) null else WalletAction(stringResource(Res.string.proximity_cancel), onCancel,
                         testTag = WalletUiTestTags.ProximityCancel),
@@ -237,14 +237,21 @@ private fun WalletDemoProximityReview(
             } else SharingActionsRow(
                 enabled = state.pendingReviewId == null,
                 selectionComplete = state.canApprove,
+                reviewKey = listOf(review, state.selections, state.continueAfterResponse, state.preparingApproval),
                 onSubmit = onApprove,
                 onCancel = onCancel,
-                onReject = onDecline,
-                credentialStatuses = state.selections.mapNotNull { selected ->
-                    id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi.current.snapshot.credentials[selected.credentialId]?.let { (credentialDetailsById[selected.credentialId]?.toCardDisplayData()?.title ?: "Credential") to it }
+                onReject = onDecline.takeUnless { state.preparingApproval },
+                credentialStatuses = state.selections.distinctBy { it.credentialId }.map { selected ->
+                    val summary = credentialDetailsById[selected.credentialId]?.toCardDisplayData()
+                    val option = review.documents.flatMap { it.credentialOptions }.firstOrNull { it.credentialId == selected.credentialId }
+                    ReviewCredentialStatus(selected.credentialId, summary?.title ?: option?.label?.takeIf { it.isNotBlank() } ?: "Credential",
+                        summary?.issuer ?: option?.issuer,
+                        LocalCredentialStatusUi.current.snapshot.credentials[selected.credentialId])
                 },
                 presentation = ReviewActionPresentation.Proximity,
                 showCancelWithReject = !headerOwnsClose,
+                showCancel = !state.preparingApproval || !headerOwnsClose,
+                submitLabelOverride = if (state.preparingApproval) stringResource(Res.string.proximity_approve_and_prepare) else null,
             )
         },
     ) {
