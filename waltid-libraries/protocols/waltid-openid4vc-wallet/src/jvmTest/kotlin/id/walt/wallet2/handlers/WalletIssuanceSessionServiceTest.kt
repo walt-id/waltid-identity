@@ -93,6 +93,25 @@ class WalletIssuanceSessionServiceTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun malformedManualAttestationIsRejectedBeforeDiscoveryOrSessionPersistence() = runTest {
+        val records = RecordingSessionStore()
+        val provider = StaticAttestationProvider()
+        val service = service(ClientAttestationAssembler(provider), records) {
+            error("Malformed manual attestation must be rejected before HTTP requests")
+        }
+        for (batch in listOf(false, true)) {
+            val request = preAuthorizedRequest().copy(tokenRequestHeaders = mapOf(
+                ClientAttestationHeaders.HEADER_ATTESTATION to "manual-wia",
+            ))
+            assertFailsWith<IllegalArgumentException> {
+                if (batch) service.startBatch(request) else service.start(request)
+            }
+        }
+        assertEquals(0, provider.calls)
+        assertTrue(records.records.isEmpty())
+    }
+
+    @Test
     fun unrecognizedOfferParametersCannotOverrideMetadataDiscovery() = runTest {
         val requestedUrls = mutableListOf<String>()
         val service = service { request ->
