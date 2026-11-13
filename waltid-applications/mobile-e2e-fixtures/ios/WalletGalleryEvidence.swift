@@ -425,7 +425,10 @@ extension XCTestCase {
         captureGallery(app, name: capturePrefix + "-status-settings-help")
         if !help.isHittable { app.swipeDown() }
         help.tap()
-        XCTAssertFalse(explanation.exists)
+        let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in !explanation.exists }, object: nil)
+        let collapseResult = await XCTWaiter.fulfillment(of: [collapsed], timeout: 5)
+        XCTAssertEqual(collapseResult, .completed,
+                       "Help must disappear after the disclosure animation")
         XCTAssertTrue(app.staticTexts["Processed"].firstMatch.exists)
         XCTAssertEqual(automaticStatusChecksState(automatic), true)
         if finishInManualMode { await setAutomaticStatusChecks(automatic, enabled: false) }
