@@ -78,6 +78,7 @@ import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class Issuer2AttestationChallengeTest {
     private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
@@ -543,8 +544,7 @@ class Issuer2AttestationChallengeTest {
         suspend fun session(method: AuthenticationMethod): DefaultSession {
             val now = Clock.System.now()
             val expiresAt = if (method == AuthenticationMethod.PRE_AUTHORIZED) {
-                val policy = config.preAuthorizedCodePolicy
-                policy.offerExpiresAt(policy.maxLifetimeSeconds, now)
+                now + config.preAuthorizedCode.defaultLifetimeSeconds.seconds
             } else {
                 now + 10.minutes
             }

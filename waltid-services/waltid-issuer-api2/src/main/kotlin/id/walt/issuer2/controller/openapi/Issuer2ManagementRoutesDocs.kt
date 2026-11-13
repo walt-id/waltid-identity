@@ -97,7 +97,7 @@ object Issuer2ManagementRoutesDocs {
               Missing, null, or `OMIT` with overrides returns Bad Request.
             - Migration: send `"issuerStateMode": "INCLUDE"` to preserve previous OSS behavior and recover
               the original offer session. Without it, authorization creates a profile-derived session.
-            - `expiresInSeconds` defaults to `300` (five minutes). Pre-authorized offers require a positive lifetime within the configured maximum (300 seconds by default). Authorized offers accept `-1` for no expiry.
+            - For pre-authorized offers, `expiresInSeconds` defaults to the issuer's configured lifetime and accepts a positive value up to its maximum (both 300 seconds by default). Authorized offers default to 300 seconds and accept `-1` for no expiry.
 
             **Runtime overrides**
 

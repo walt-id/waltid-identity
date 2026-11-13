@@ -16,7 +16,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlin.time.Duration.Companion.minutes
 
 // The management API and offer service currently use the same data shape.
 // Keep one shared model instead of duplicating DTO and service variants until those contracts diverge.
@@ -45,7 +44,7 @@ data class CredentialOfferCreateRequest(
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
     val valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
-    val expiresInSeconds: Long = 5.minutes.inWholeSeconds,
+    val expiresInSeconds: Long? = null,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
     val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
@@ -57,7 +56,8 @@ data class CredentialOfferCreateRequest(
             "Deferred AUTHORIZED offers require issuerStateMode INCLUDE"
         }
         require(profileId.isNotBlank()) { "profileId must not be blank" }
-        require(expiresInSeconds == -1L || expiresInSeconds > 0) {
+        require(authMethod != AuthenticationMethod.AUTHORIZED ||
+                expiresInSeconds == null || expiresInSeconds == -1L || expiresInSeconds > 0) {
             "expiresInSeconds must be positive, or -1 for no expiry"
         }
         require(txCode == null || authMethod == AuthenticationMethod.PRE_AUTHORIZED) {
@@ -107,7 +107,7 @@ data class MultiCredentialOfferCreateRequest(
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
     val valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
-    val expiresInSeconds: Long = 5.minutes.inWholeSeconds,
+    val expiresInSeconds: Long? = null,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
     val sessionId: String? = null,
@@ -118,7 +118,8 @@ data class MultiCredentialOfferCreateRequest(
             "Deferred AUTHORIZED offers require issuerStateMode INCLUDE"
         }
         require(credentials.isNotEmpty()) { "credentials must not be empty" }
-        require(expiresInSeconds == -1L || expiresInSeconds > 0) {
+        require(authMethod != AuthenticationMethod.AUTHORIZED ||
+                expiresInSeconds == null || expiresInSeconds == -1L || expiresInSeconds > 0) {
             "expiresInSeconds must be positive, or -1 for no expiry"
         }
         require(txCode == null || authMethod == AuthenticationMethod.PRE_AUTHORIZED) {

@@ -40,7 +40,7 @@ class DeferredRefreshRegressionTest {
         }
         val config = createTestConfig(accessTokenIssuer = signer, dpopProofVerifier = DefaultDPoPProofVerifier(), refreshTokenRepository = repository)
         val provider = buildOAuth2Provider(config)
-        val code = config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+        val code = provider.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
             scopes = setOf("credential"), audience = setOf(issuer), session = DefaultSession(subject = "offer"),
         )).code
         suspend fun proof(id: String) = wallet.signJws(buildJsonObject {

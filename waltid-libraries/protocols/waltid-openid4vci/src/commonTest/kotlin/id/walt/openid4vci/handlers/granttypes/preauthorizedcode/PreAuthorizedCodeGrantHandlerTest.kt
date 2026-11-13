@@ -3,7 +3,6 @@ package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.StubTokenIssuer
 import id.walt.openid4vci.TestRefreshTokenIssuer
@@ -30,7 +29,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 class PreAuthorizedCodeGrantHandlerTest {
 
@@ -254,11 +252,12 @@ class PreAuthorizedCodeGrantHandlerTest {
     }
 
     @Test
-    fun `issuer rejects an unbounded session deadline`() = runTest {
+    fun `issuer rejects an unbounded code lifetime`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             issuer.issue(
                 PreAuthorizedCodeIssueRequest(
-                    session = DefaultSession(subject = "subject").withExpiresAt(TokenType.ACCESS_TOKEN, Instant.DISTANT_FUTURE),
+                    session = DefaultSession(subject = "subject"),
+                    lifetimeSeconds = Long.MAX_VALUE,
                 ),
             )
         }

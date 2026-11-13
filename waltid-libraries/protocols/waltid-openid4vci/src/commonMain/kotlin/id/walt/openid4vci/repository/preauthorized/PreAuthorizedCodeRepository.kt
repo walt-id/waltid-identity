@@ -21,47 +21,21 @@ interface PreAuthorizedCodeRepository {
         expected: PreAuthorizedCodeRecord,
         replacement: PreAuthorizedCodeRedemptionState,
     ): Boolean
-}
 
-internal sealed interface PreAuthorizedCodeRedemption {
-    data class Redeemed(val record: PreAuthorizedCodeRecord) : PreAuthorizedCodeRedemption
-    data object WrongTxCode : PreAuthorizedCodeRedemption
-    data object Invalid : PreAuthorizedCodeRedemption
-}
-
-internal suspend fun PreAuthorizedCodeRepository.redeem(
-    record: PreAuthorizedCodeRecord,
-    providedTxCodeHash: String?,
-    maxFailedAttempts: Int,
-): PreAuthorizedCodeRedemption {
-    var current = record
-    while (current.isRedeemableAt(Clock.System.now())) {
-        val expectedHash = current.txCodeValue
-        val requiresTxCode = current.txCode != null
-        val hasStoredVerifier = !expectedHash.isNullOrBlank()
-        // Fail closed on an incomplete stored grant or a submission that does not match its shape.
-        if (requiresTxCode != hasStoredVerifier || requiresTxCode != (providedTxCodeHash != null)) {
-            return PreAuthorizedCodeRedemption.Invalid
-        }
-        val failures = current.redemptionState?.failedAttempts ?: 0
-        if (failures >= maxFailedAttempts) return PreAuthorizedCodeRedemption.Invalid
-
-        val matches = expectedHash == providedTxCodeHash
-        val next = when {
-            matches -> PreAuthorizedCodeRedemptionState(failures, PreAuthorizedCodeStatus.REDEEMED)
-            failures + 1 >= maxFailedAttempts ->
-                PreAuthorizedCodeRedemptionState(failures + 1, PreAuthorizedCodeStatus.LOCKED)
-            else -> PreAuthorizedCodeRedemptionState(failures + 1, PreAuthorizedCodeStatus.ACTIVE)
-        }
-        if (compareAndSetRedemptionState(current, next)) {
-            return when {
-                !current.isRedeemableAt(Clock.System.now()) -> PreAuthorizedCodeRedemption.Invalid
-                matches -> PreAuthorizedCodeRedemption.Redeemed(current)
-                next.status == PreAuthorizedCodeStatus.LOCKED -> PreAuthorizedCodeRedemption.Invalid
-                else -> PreAuthorizedCodeRedemption.WrongTxCode
+    /**
+     * Claims a code after the trusted caller has performed any required authentication.
+     * Token handlers must validate the transaction code before claiming the grant.
+     */
+    suspend fun consume(code: String): PreAuthorizedCodeRecord? {
+        while (true) {
+            val current = get(code)?.takeIf { it.isRedeemableAt(Clock.System.now()) } ?: return null
+            val redeemed = PreAuthorizedCodeRedemptionState(
+                current.redemptionState?.failedAttempts ?: 0,
+                PreAuthorizedCodeStatus.REDEEMED,
+            )
+            if (compareAndSetRedemptionState(current, redeemed)) {
+                return current.takeIf { it.isRedeemableAt(Clock.System.now()) }
             }
         }
-        current = get(record.code) ?: return PreAuthorizedCodeRedemption.Invalid
     }
-    return PreAuthorizedCodeRedemption.Invalid
 }

@@ -286,7 +286,7 @@ class ProviderRefreshTokenFlowTest {
             accessTokenIssuer = CountingTokenIssuer(),
         )
         val provider = buildOAuth2Provider(config)
-        val issued = config.preAuthorizedCodeIssuer.issue(
+        val issued = provider.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = null,
                 scopes = setOf("openid"),
