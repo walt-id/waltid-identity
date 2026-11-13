@@ -1,8 +1,6 @@
 package id.waltid.openid4vci.wallet.oauth
 
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import org.kotlincrypto.hash.sha2.SHA256
-import kotlin.uuid.Uuid
+import id.walt.openid4vci.pkce.Pkce
 
 /**
  * PKCE (Proof Key for Code Exchange) manager for OAuth 2.0 authorization code flow.
@@ -38,15 +36,7 @@ object PKCEManager {
      * Length: 43-128 characters (spec requires 43-128)
      * Character set: [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~"
      */
-    fun generateCodeVerifier(length: Int = 128): String {
-        require(length in 43..128) { "Code verifier length must be between 43 and 128 characters" }
-
-        return buildString {
-            while (this.length < length) {
-                append(Uuid.random().toString().replace("-", ""))
-            }
-        }.take(length)
-    }
+    fun generateCodeVerifier(length: Int = 128): String = Pkce.generateCodeVerifier(length)
 
     /**
      * Generates PKCE data with the specified code challenge method
@@ -72,16 +62,8 @@ object PKCEManager {
         method: CodeChallengeMethod = CodeChallengeMethod.S256,
     ): String = when (method) {
         CodeChallengeMethod.PLAIN -> codeVerifier
-        CodeChallengeMethod.S256 -> {
-            // SHA-256 hash of the code verifier, then base64url encode
-            codeVerifier.encodeToByteArray().sha256().encodeToBase64Url()
-        }
+        CodeChallengeMethod.S256 -> Pkce.generateS256CodeChallenge(codeVerifier)
     }
-
-    /**
-     * Computes SHA-256 hash of a byte array
-     */
-    private fun ByteArray.sha256(): ByteArray = SHA256().digest(this)
 
     /**
      * Validates that a code challenge method is supported

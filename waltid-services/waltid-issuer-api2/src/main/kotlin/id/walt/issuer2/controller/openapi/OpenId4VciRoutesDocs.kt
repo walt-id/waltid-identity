@@ -15,6 +15,20 @@ import io.ktor.http.HttpHeaders
 import kotlinx.serialization.json.JsonObject
 
 object OpenId4VciRoutesDocs {
+    // RFC 7636 Appendix B; examples only. Wallets generate a fresh verifier for each authorization.
+    const val PKCE_VERIFIER_EXAMPLE = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    val pkceAuthorizationExample: Map<String, List<String>> = mapOf(
+        "response_type" to listOf("code"), "client_id" to listOf("wallet"),
+        "redirect_uri" to listOf("https://example.com"),
+        "code_challenge" to listOf("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"),
+        "code_challenge_method" to listOf("S256"),
+    )
+    val pkceTokenExample: Map<String, List<String>> = mapOf(
+        "grant_type" to listOf("authorization_code"), "client_id" to listOf("wallet"),
+        "redirect_uri" to listOf("https://example.com"), "code" to listOf("<authorization-code>"),
+        "code_verifier" to listOf(PKCE_VERIFIER_EXAMPLE),
+    )
+
     const val OPENID4VCI_TAG = "Issuer Service API v2 - OpenID4VCI"
 
     fun credentialIssuerMetadata(): RouteConfig.() -> Unit = {
@@ -154,6 +168,7 @@ object OpenId4VciRoutesDocs {
         request {
             body<Map<String, List<String>>> {
                 description = "Authorization request parameters (form-encoded)"
+                example("S256 PKCE authorization") { value = pkceAuthorizationExample }
                 mediaTypes(ContentType.Application.FormUrlEncoded)
             }
         }
@@ -183,7 +198,9 @@ object OpenId4VciRoutesDocs {
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
         description =
-            "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example."
+            "When requirePkce is true in issuer-service.conf, authorization-code requests require S256 PKCE. " +
+                "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example. " +
+                "For PKCE, include code_challenge and code_challenge_method=S256 as shown in the PAR example; retain the verifier for /token."
         response {
             HttpStatusCode.Found to {
                 description = "Redirect containing authorization response parameters"
@@ -204,6 +221,11 @@ object OpenId4VciRoutesDocs {
         description = "The token endpoint. A DPoP proof binds the issued access token to the proof key." +
                 ATTESTATION_CHALLENGE_RETRY
         request {
+            body<Map<String, List<String>>> {
+                description = "Token parameters (form-encoded). Include code_verifier when PKCE was used. A PKCE failure requires a new authorization code."
+                mediaTypes(ContentType.Application.FormUrlEncoded)
+                example("S256 authorization-code exchange") { value = pkceTokenExample }
+            }
             headerParameter<String>("DPoP") {
                 required = false
                 description = "RFC 9449 DPoP proof JWT for this token request"
