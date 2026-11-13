@@ -58,6 +58,7 @@ import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
@@ -1718,12 +1719,14 @@ object WalletPresentationHandler {
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
         eligibleCredentialIds: Set<String>? = null,
+        metadataHttpClient: HttpClient? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
         wallet = wallet,
         query = query,
         storedCredentials = wallet.streamAllCredentials().toList(),
         useWalletCredentialIds = useWalletCredentialIds,
         eligibleCredentialIds = eligibleCredentialIds,
+        metadataHttpClient = metadataHttpClient,
     )
 
     /**
@@ -1767,6 +1770,7 @@ object WalletPresentationHandler {
         storedCredentials: List<StoredCredential>,
         useWalletCredentialIds: Boolean,
         eligibleCredentialIds: Set<String>? = null,
+        metadataHttpClient: HttpClient? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
@@ -1780,6 +1784,7 @@ object WalletPresentationHandler {
             stored.toRawDcqlCredential(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
                 query = query,
+                metadataHttpClient = metadataHttpClient,
             )
         }
 
@@ -2382,7 +2387,9 @@ object WalletPresentationHandler {
     }
 
     /** An unusable stored credential cannot fail matching for the other candidates. */
-    private suspend fun StoredCredential.toRawDcqlCredential(id: String, query: DcqlQuery? = null): RawDcqlCredential? {
+    private suspend fun StoredCredential.toRawDcqlCredential(
+        id: String, query: DcqlQuery? = null, metadataHttpClient: HttpClient? = null,
+    ): RawDcqlCredential? {
         val credential = this.credential
         val sdvc = credential as? SelectivelyDisclosableVerifiableCredential
         val disclosures = try {
@@ -2392,7 +2399,7 @@ object WalletPresentationHandler {
             return null
         }
         val resolved = try {
-            resolveTypeMetadata(fetchIfMissing = query?.credentials?.any { item ->
+            resolveTypeMetadata(httpClient = metadataHttpClient, fetchIfMissing = query?.credentials?.any { item ->
                 val meta = item.meta as? SdJwtVcMeta
                 meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
             } == true)
