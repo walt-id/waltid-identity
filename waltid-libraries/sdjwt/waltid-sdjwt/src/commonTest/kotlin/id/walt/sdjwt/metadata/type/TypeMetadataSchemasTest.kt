@@ -78,7 +78,7 @@ class TypeMetadataSchemasTest {
         for (inherited in listOf(false, true)) {
             val leaf = buildJsonObject {
                 put("vct", vct); put("schema", schema)
-            if (inherited) {
+                if (inherited) {
                     put("extends", parentVct)
                     put("extends#integrity", MetadataIntegrity.sha256(parent))
                 }
@@ -92,7 +92,6 @@ class TypeMetadataSchemasTest {
             assertTrue(schemas.all { it.validate(Json.parseToJsonElement("""{"name":"Ada"}""")) {} })
             assertFalse(schemas.all { it.validate(Json.parseToJsonElement("""{"name":"x"}""")) {} })
             if (inherited) assertFalse(schemas.all { it.validate(Json.parseToJsonElement("{}")) {} })
-            }
+        }
     }
-
 }

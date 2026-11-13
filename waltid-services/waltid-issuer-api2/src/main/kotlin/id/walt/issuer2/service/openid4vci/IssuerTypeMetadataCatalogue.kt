@@ -2,6 +2,7 @@ package id.walt.issuer2.service.openid4vci
 
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.Persistence
+import id.walt.commons.http.relativeHostedPath
 import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -31,6 +32,7 @@ class IssuerTypeMetadataCatalogue(
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     private val issuerHttpBaseUrl = serviceConfig.baseUrl.trimEnd('/')
     private val baseUrl = serviceConfig.openId4VciBaseUrl()
+    private val baseUri = URI(baseUrl)
     private val scope = "${baseUrl.length}:$baseUrl:"
     private val mutex = Mutex()
 
@@ -89,6 +91,8 @@ class IssuerTypeMetadataCatalogue(
             val next = BoundedDocumentSession(fetcher, initialCredentialOrigin = baseUrl).use { documents ->
                 TypeMetadataPublisher(documents::read).retain(hostedSources, previous)
             }
+            val names = next.keys.mapNotNull(::hostedTypeName)
+            require(names.distinct().size == next.size) { "Distinct VCTs cannot share one hosted metadata path" }
             var raced = false
             for ((vct, record) in next) if (vct !in previous &&
                 !store.compareAndSet(scope + vct, null, record.snapshot().toString())) {
@@ -103,7 +107,7 @@ class IssuerTypeMetadataCatalogue(
     suspend fun publication(credentialType: String): PublishedTypeMetadata {
         if (credentialType in Issuer2EndpointPaths.reservedVctNames) throw NotFoundException("Credential type metadata not found")
         val types = publications()
-        return (types[credentialType] ?: types[selfHostedVct(credentialType)])?.published
+        return types.values.firstOrNull { hostedTypeName(it.published.vct) == credentialType }?.published
             ?: throw NotFoundException("Credential type metadata not found")
     }
 
@@ -138,32 +142,14 @@ class IssuerTypeMetadataCatalogue(
         try { fetcher.close() } finally { (store as? AutoCloseable)?.close() }
     }
 
-    fun getTypeMetadata(credentialType: String): SdJwtVcTypeMetadataDraft04 {
-        if (credentialType in Issuer2EndpointPaths.reservedVctNames) {
-            throw NotFoundException("Credential type metadata not found: $credentialType")
-        }
-        val hostedVct = selfHostedVct(credentialType)
-        val resolvedVct = credentialConfigurations.values.firstNotNullOfOrNull { configuration ->
-            val vct = configuration.vct ?: return@firstNotNullOfOrNull null
-            when {
-                vct == hostedVct -> vct
-                vct == credentialType && vctKind(vct) == VctKind.URN -> vct
-                else -> null
-            }
-        } ?: throw NotFoundException("Credential type metadata not found: $credentialType")
-
-        return configuredTypeMetadata[resolvedVct] ?: defaultTypeMetadata(credentialType, resolvedVct)
-    }
-
     private fun CredentialConfiguration.withResolvedVct(credentialType: String): CredentialConfiguration =
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
 
-    private fun hostedTypeName(vct: String): String? = when {
-        vctKind(vct) == VctKind.URN -> vct
-        vct.startsWith("$baseUrl/") -> vct.removePrefix("$baseUrl/").takeIf { name ->
-            name.isNotBlank() && name.none { it in "/?#" }
-        }
-        else -> null
+    private fun hostedTypeName(vct: String): String? {
+        if (vctKind(vct) == VctKind.URN) return vct
+        val uri = URI(vct)
+        if (uri.rawQuery != null || uri.rawFragment != null || uri.rawUserInfo != null) return null
+        return uri.relativeHostedPath(baseUri)?.takeIf { name -> name.isNotBlank() && name.none { it in "/?#" } }
     }
 
     private fun selfHostedVct(credentialType: String): String =
@@ -211,24 +197,12 @@ class IssuerTypeMetadataCatalogue(
     private fun validateSelfHostedVct(configurationId: String, vct: String) {
         // Only HTTP(S) VCTs that share this issuer's origin can collide with protocol routes.
         val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
-        val issuerUri = URI(baseUrl)
-        if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
-            !vctUri.host.equals(issuerUri.host, ignoreCase = true) ||
-            vctUri.effectivePort() != issuerUri.effectivePort()
-        ) return
-
-        val prefix = issuerUri.normalize().path.trimEnd('/') + "/"
-        val path = vctUri.normalize().path ?: return
-        if (!path.startsWith(prefix)) return
-        val name = path.removePrefix(prefix).substringBefore('/')
+        val name = vctUri.relativeHostedPath(baseUri)?.substringBefore('/') ?: return
         require(name !in Issuer2EndpointPaths.reservedVctNames) {
             "Credential configuration '$configurationId' has self-hosted VCT '$vct' under reserved " +
                     "OpenID4VCI path '$name'. Choose a different VCT path or an externally hosted VCT URL."
         }
     }
-
-    private fun URI.effectivePort(): Int =
-        if (port >= 0) port else if (scheme.equals("https", ignoreCase = true)) 443 else 80
 
     private enum class VctKind { HTTP, URN }
     private companion object {

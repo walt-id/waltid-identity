@@ -1,5 +1,8 @@
 package id.walt.wallet2.mobile
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
@@ -36,7 +39,7 @@ class AndroidDigitalCredentialRegistryTest {
         )
         val entries = with(registry) { listOf(record.toAndroidEntry(), record.copy(type = "https://types.example/parent").toAndroidEntry()) }
         val bytes = OpenId4VpRegistry(entries, "registry").credentials
-        val offset = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        val offset = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).int
         val payload = Json.parseToJsonElement(bytes.copyOfRange(offset, bytes.size).decodeToString()).jsonObject
         val types = payload.getValue("credentials").jsonObject.getValue("dc+sd-jwt").jsonObject
         assertEquals(setOf("https://issuer.example/leaf", "https://types.example/parent"), types.keys)
@@ -203,7 +206,7 @@ class AndroidDigitalCredentialRegistryTest {
         }
         val bytes = OpenId4VpRegistry(entries, "registry").credentials
         assertTrue(bytes.size < 50_000, "Platform registry must not contain encoded media payloads")
-        val offset = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        val offset = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).int
         val payload = Json.parseToJsonElement(bytes.copyOfRange(offset, bytes.size).decodeToString()).jsonObject
         val jsonText = payload.toString()
         mediaValues.keys.forEach { assertTrue(jsonText.contains(it), "Field presence must survive: $it") }
@@ -243,8 +246,8 @@ class AndroidDigitalCredentialRegistryTest {
             explainer = "Save a credential to this wallet.",
             icon = icon,
         )
-        val jsonOffset = java.nio.ByteBuffer.wrap(bytes, 0, 4)
-            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val jsonOffset = ByteBuffer.wrap(bytes, 0, 4)
+            .order(ByteOrder.LITTLE_ENDIAN)
             .int
         assertEquals(4 + icon.size, jsonOffset)
         assertEquals(icon.toList(), bytes.slice(4 until jsonOffset))
