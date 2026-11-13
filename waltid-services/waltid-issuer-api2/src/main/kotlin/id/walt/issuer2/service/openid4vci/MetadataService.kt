@@ -131,9 +131,9 @@ class MetadataService @JvmOverloads constructor(
         BoundedDocumentSession(
             typeMetadataFetcher, initialCredentialOrigin = baseUrl,
         ).use { documents ->
-            TypeMetadataPublisher(documents::read).publish(credentialConfigurations.mapNotNull { (id, configuration) ->
-                configuration.vct?.takeIf { it == selfHostedVct(id) || vctKind(it) == VctKind.URN }
-                    ?.let { vct -> vct to (configuredTypeMetadata[vct] ?: defaultTypeMetadata(id, vct)).toJSON() }
+            TypeMetadataPublisher(documents::read).publish(credentialConfigurations.mapNotNull { (_, configuration) ->
+                configuration.vct?.takeIf { hostedTypeName(it) != null }
+                    ?.let { vct -> vct to (configuredTypeMetadata[vct] ?: defaultTypeMetadata(requireNotNull(hostedTypeName(vct)), vct)).toJSON() }
             }.toMap())
         }
     }
@@ -330,6 +330,14 @@ class MetadataService @JvmOverloads constructor(
 
     private fun CredentialConfiguration.withResolvedVct(credentialType: String): CredentialConfiguration =
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
+
+    private fun hostedTypeName(vct: String): String? = when {
+        vctKind(vct) == VctKind.URN -> vct
+        vct.startsWith("$baseUrl/") -> vct.removePrefix("$baseUrl/").takeIf { name ->
+            name.isNotBlank() && name.none { it in "/?#" }
+        }
+        else -> null
+    }
 
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
