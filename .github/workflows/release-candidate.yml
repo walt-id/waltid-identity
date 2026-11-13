@@ -165,6 +165,37 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
+  integration-test-postgresql:
+    name: Integration Tests - PostgreSQL
+    runs-on: ubuntu-latest
+    needs: tag
+    steps:
+      # The run takes about 30 minutes and its job times out after 180; wait past that. On a wait
+      # timeout the dispatch action only warns, so the next step requires a successful run.
+      - name: Dispatch integration-test-postgresql.yml and wait
+        id: dispatch
+        uses: benc-uk/workflow-dispatch@v1.3.3
+        with:
+          workflow: integration-test-postgresql.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.tag.outputs.tag }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          wait-timeout-seconds: 11700
+          wait-interval-seconds: 30
+          sync-status: true
+      - name: Require a successful PostgreSQL run
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.dispatch.outputs.runId }}
+        run: |
+          set -euo pipefail
+          run="$(gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/${RUN_ID}" --jq '{status, conclusion, html_url}')"
+          echo "$run"
+          if [ "$(jq -r '.conclusion' <<< "$run")" != "success" ]; then
+            echo "::error::integration-test-postgresql.yml did not succeed: $(jq -r '.html_url' <<< "$run")"
+            exit 1
+          fi
   sonar-snapshot:
     name: SonarCloud snapshot
     runs-on: ubuntu-latest
@@ -223,7 +254,7 @@ jobs:
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure, integration-test-postgresql ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
