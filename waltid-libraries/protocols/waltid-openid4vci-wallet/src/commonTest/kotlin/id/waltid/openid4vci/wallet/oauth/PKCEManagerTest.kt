@@ -18,14 +18,12 @@ class PKCEManagerTest {
     fun testGenerateCodeChallengeS256() {
         // Example from RFC 7636 Appendix B
         // Code Verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
-        // SHA-256 Hash: [ 107, 137, 237, 213, 222, 169, 137, 101, 14, 212, 132, 222, 114, 186, 232, 12, 18, 232, 150, 110, 123, 117, 218, 140, 228, 112, 189, 58, 230, 22, 137, 122 ]
-        // Base64URL-encoded Hash: E9Mel-PQDx0nm_7i_9yvSg9SclU
 
         val verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 
         val actualChallenge = PKCEManager.generateCodeChallenge(verifier, PKCEManager.CodeChallengeMethod.S256)
 
-        assertTrue(actualChallenge.isNotEmpty())
+        assertEquals("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", actualChallenge)
     }
 
     @Test

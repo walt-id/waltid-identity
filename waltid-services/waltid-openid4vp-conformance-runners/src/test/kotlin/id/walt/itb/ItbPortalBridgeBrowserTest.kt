@@ -6,6 +6,7 @@ import com.microsoft.playwright.Playwright
 import com.microsoft.playwright.Route
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Tag
+import java.util.Base64
 import kotlin.test.*
 
 /** Offline DOM contract tests. All browser requests are intercepted; no tenant credentials are used. */
@@ -38,14 +39,43 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun readsTheCompleteInlineInteractionWithoutADownloadControl() = runBlocking<Unit> {
-        val url = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort"
-        withPage(inlineInteraction = url) { page ->
+        val url = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Fshort"
+        withPage(inlineInteraction = url, interactionLabel = "VCI request") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite, case)
-            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
-            assertEquals("https://verifier.example/short", interaction.url.parameters["request_uri"])
-            assertEquals(0, page.locator("button[ngbtooltip=Download]").count())
+            val interaction = assertIs<ItbWalletInteraction.Offer>(bridge.read(session))
+            assertEquals("https://issuer.example/short", interaction.url.parameters["credential_offer_uri"])
+            assertEquals(0, page.evaluate("window.textDownloadCount"))
+            assertEquals(0, page.evaluate("window.qrDownloadCount"))
             assertEquals(0, page.evaluate("window.copyCount"))
+            assertEquals(1, page.evaluate("window.startCount"))
+        }
+    }
+
+    @Test
+    fun readsThePresentationQrWhenDerivedTextIsANumericBarcode() = runBlocking<Unit> {
+        withPage(inlineInteraction = "12345678") { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(bridge.prepare(suite, case)))
+            assertEquals("openid4vp", interaction.url.protocol.name)
+            assertEquals("https://verifier.example/request", interaction.url.parameters["request_uri"])
+            assertEquals(1, page.evaluate("window.qrDownloadCount"))
+            assertEquals(0, page.evaluate("window.textDownloadCount"))
+            assertEquals(0, page.evaluate("window.copyCount"))
+            assertEquals(1, page.evaluate("window.startCount"))
+        }
+    }
+
+    @Test
+    fun neverFallsBackToTextWhenThePresentationQrIsInvalid() = runBlocking<Unit> {
+        withPage(
+            inlineInteraction = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort",
+            presentationQr = byteArrayOf(1, 2, 3),
+        ) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            assertFailsWith<IllegalArgumentException> { bridge.read(bridge.prepare(suite, case)) }
+            assertEquals(1, page.evaluate("window.qrDownloadCount"))
+            assertEquals(0, page.evaluate("window.textDownloadCount"))
             assertEquals(1, page.evaluate("window.startCount"))
         }
     }
@@ -122,11 +152,14 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun waitsForTheSamePreviewDownloadBeyondTheOrdinaryDomTimeout() = runBlocking<Unit> {
-        withPage(downloadDelayMillis = 200) { page ->
+        withPage(downloadDelayMillis = 200, interactionLabel = "VCI request") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite, case)
             page.setDefaultTimeout(100.0)
-            assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            val offer = assertIs<ItbWalletInteraction.Offer>(bridge.read(session))
+            assertEquals("https://issuer.example/request", offer.url.parameters["credential_offer_uri"])
+            assertEquals(1, page.evaluate("window.textDownloadCount"))
+            assertEquals(0, page.evaluate("window.qrDownloadCount"))
             assertEquals(1, page.evaluate("window.startCount"))
         }
     }
@@ -213,6 +246,8 @@ class ItbPortalBridgeBrowserTest {
         systemName: String = catalogue.systemName,
         applicationDelayMillis: Int = 0,
         inlineInteraction: String? = null,
+        interactionLabel: String = "VP request",
+        presentationQr: ByteArray = ItbQrFixtures.qr("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"),
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -227,8 +262,12 @@ class ItbPortalBridgeBrowserTest {
                     context.route("**/*") { route ->
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
-                            route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction)))
+                            val html = fixture(
+                                session, systemName, interactionDelayMillis, downloadDelayMillis, failStart,
+                                startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction,
+                                interactionLabel, Base64.getEncoder().encodeToString(presentationQr),
+                            )
+                            route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(html))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -242,6 +281,7 @@ class ItbPortalBridgeBrowserTest {
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
         startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
+        interactionLabel: String, qrBase64: String,
     ) = """
         <script>
         setTimeout(() => {
@@ -257,6 +297,8 @@ class ItbPortalBridgeBrowserTest {
         window.started = false;
         window.startCount = 0;
         window.copyCount = 0;
+        window.qrDownloadCount = 0;
+        window.textDownloadCount = 0;
         window.interactive = false;
         function selectStatement() {
             if ($actorVisible) document.querySelector('#actors').innerHTML = '<button onclick="showTests()">User</button>';
@@ -298,20 +340,26 @@ class ItbPortalBridgeBrowserTest {
                     return;
                 }
                 const dialog = document.createElement('ngb-modal-window');
-                dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button>Download</button></app-any-content-view>
-                  <app-any-content-view><div> VP request </div>${
-                      if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download()">Download</button>"""
+                // Exact QR label observed in the deployed interaction, independent of the bridge selector.
+                dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> Credential QR code </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> $interactionLabel </div>${
+                      if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download(false)">Download</button>"""
                       else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""
                   }</app-any-content-view>
                   <button onclick="this.parentElement.remove()">Close</button>`;
                 document.body.append(dialog);
             }, $interactionDelayMillis);
         }
-        function download() {
+        function download(qr) {
+            if (qr) window.qrDownloadCount++; else window.textDownloadCount++;
             setTimeout(() => {
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob(['openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest']));
-                a.download = 'interaction.txt';
+                a.href = qr ? 'data:image/png;base64,$qrBase64' : URL.createObjectURL(new Blob(['${
+                    if (interactionLabel == "VCI request") "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Frequest"
+                    else "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+                }']));
+                a.download = qr ? 'interaction.png' : 'interaction.txt';
                 a.click();
             }, $downloadDelayMillis);
         }
