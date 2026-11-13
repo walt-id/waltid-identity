@@ -2154,8 +2154,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private suspend fun restoreClaimedSession(session: IssuanceSession) {
         withContext(NonCancellable) {
-            if (session.deferredState != null) sessionService.saveDeferredProgress(session)
-            else sessionService.saveSession(session)
+            if (session.deferredState != null) {
+                // Recovery adds no issued results; retain the latest persisted wallet reports.
+                sessionService.saveDeferredProgress(session.copy(issuanceResults = emptyMap()))
+            } else sessionService.saveSession(session)
         }
     }
 
