@@ -375,7 +375,18 @@ extension XCTestCase {
         XCTAssertTrue(destination.waitForExistence(timeout: 10)); destination.tap()
         let automatic = app.switches["settings-credential-status-automatic"].firstMatch
         XCTAssertTrue(automatic.waitForExistence(timeout: 10))
-        func toggleAutomatic(expect value: String) async {
+        func automaticState() -> Bool? {
+            guard automatic.exists else { return nil }
+            switch automatic.value as? String {
+            case "1": return true
+            case "0": return false
+            // Compose exposes its toggleable state through the selected trait;
+            // SwiftUI exposes the native switch's numeric accessibility value.
+            case "": return automatic.isSelected
+            default: return nil
+            }
+        }
+        func toggleAutomatic(expect enabled: Bool) async {
             // SwiftUI may expose an outer labelled switch and a nested native thumb.
             var target = automatic
             for _ in 0..<3 {
@@ -384,20 +395,22 @@ extension XCTestCase {
                 target = child
             }
             target.tap()
-            let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", value), object: automatic)
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                automaticState() == enabled
+            }, object: nil)
             let result = await XCTWaiter.fulfillment(of: [changed], timeout: 5)
             XCTAssertEqual(result, .completed, app.debugDescription)
         }
-        XCTAssertEqual(automatic.value as? String, "1")
-        await toggleAutomatic(expect: "0")
+        XCTAssertEqual(automaticState(), true)
+        await toggleAutomatic(expect: false)
         captureGallery(app, name: capturePrefix + "-status-settings-manual")
-        await toggleAutomatic(expect: "1")
+        await toggleAutomatic(expect: true)
         let batch = app.buttons["settings-credential-status-check-all"].firstMatch
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30)); batch.tap()
         XCTAssertTrue(app.staticTexts["Processed"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
         XCTAssertTrue(batch.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         captureGallery(app, name: capturePrefix + "-status-settings-completed")
-        if finishInManualMode { await toggleAutomatic(expect: "0") }
+        if finishInManualMode { await toggleAutomatic(expect: false) }
     }
 
     private func assertCredentialStatusControls(_ app: XCUIApplication) {
