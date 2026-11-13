@@ -12,6 +12,10 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() =
+        scenarios.selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff()
+
+    @Test
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =
         scenarios.choosingFromTheWholeRowUpdatesInformationAndSubmission()
 

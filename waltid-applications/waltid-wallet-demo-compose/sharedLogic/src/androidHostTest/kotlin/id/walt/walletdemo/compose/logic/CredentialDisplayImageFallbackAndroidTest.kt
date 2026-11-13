@@ -73,8 +73,10 @@ class CredentialDisplayImageFallbackAndroidTest {
             assertEquals("image/jpeg", image.mimeType)
             assertTrue(image.bytes.contentEquals(jpeg))
 
+            val address = assertIs<DisplayValue.ObjectValue>(claims.single { it.path.id == "resident_address" }.value)
+            val nested = address.entries.single { it.path.id == "resident_address.visual_proof" }
             val nestedImage = assertIs<DisplayValue.Image>(
-                (claims.first { it.path.id == "resident_address.visual_proof" }.value as DisplayValue.DeferredImage).resolve()
+                assertIs<DisplayValue.DeferredImage>(nested.value).resolve()
             )
             assertEquals("image/png", nestedImage.mimeType)
             assertTrue(nestedImage.bytes.contentEquals(png))

@@ -347,6 +347,7 @@ class WalletDemoController(
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                 presentationReview = null,
                 paymentReview = WalletDemoPaymentReview.NotRequired,
+                claimReview = WalletDemoClaimReview.Legacy,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -394,6 +395,7 @@ class WalletDemoController(
                                     session = currentReady.copy(credentials = credentials),
                                     presentationReview = null,
                                     paymentReview = WalletDemoPaymentReview.NotRequired,
+                                    claimReview = WalletDemoClaimReview.Legacy,
                                     selectedPresentationCredentialOptions = emptySet(),
                                     selectedPresentationDisclosureOptions = emptySet(),
                                     presentationCompleted = false,
@@ -543,6 +545,7 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value),
                 presentationReview = null,
                 paymentReview = WalletDemoPaymentReview.NotRequired,
+                claimReview = WalletDemoClaimReview.Legacy,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -607,6 +610,7 @@ class WalletDemoController(
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                 presentationReview = null,
                 paymentReview = WalletDemoPaymentReview.NotRequired,
+                claimReview = WalletDemoClaimReview.Legacy,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -670,6 +674,7 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                 presentationReview = null,
                 paymentReview = WalletDemoPaymentReview.NotRequired,
+                claimReview = WalletDemoClaimReview.Legacy,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -1225,6 +1230,7 @@ class WalletDemoController(
                     it.copy(
                         operation = WalletOperationState.Idle,
                         presentationReview = resolvedPreview,
+                        claimReview = if (wallet.supportsClaimReview && resolvedPreview is WalletDemoPresentationPreviewResult.Ready) WalletDemoClaimReview.Loading() else WalletDemoClaimReview.Legacy,
                         paymentReview = if (resolvedPreview is WalletDemoPresentationPreviewResult.Ready && resolvedPreview.preview.requiresPaymentConsent) WalletDemoPaymentReview.Loading else WalletDemoPaymentReview.NotRequired,
                         selectedPresentationCredentialOptions = when (resolvedPreview) {
                             is WalletDemoPresentationPreviewResult.Ready ->
@@ -1317,27 +1323,50 @@ class WalletDemoController(
             if (_state.compareAndSet(previous, previous.copy(
                 selectedPresentationCredentialOptions = next.credentials,
                 selectedPresentationDisclosureOptions = next.disclosures,
+                claimReview = if (wallet.supportsClaimReview) WalletDemoClaimReview.Loading(previous.claimReview.previousReady) else WalletDemoClaimReview.Legacy,
                 paymentReview = if (preview.requiresPaymentConsent) WalletDemoPaymentReview.Loading else WalletDemoPaymentReview.NotRequired,
             ))) break
         }
         prepareSelectedPaymentConsent()
     }
 
+    fun retryPresentationClaimReview() {
+        if (_state.value.presentationReviewEnabled) prepareSelectedPaymentConsent()
+    }
+
     private fun prepareSelectedPaymentConsent() {
         paymentConsentJob?.cancel()
         val current = _state.value
         val preview = current.presentationPreview ?: return
-        if (!preview.requiresPaymentConsent) {
-            _state.update { it.copy(paymentReview = WalletDemoPaymentReview.NotRequired) }
+        if (!preview.requiresPaymentConsent && !wallet.supportsClaimReview) {
+            _state.update { it.copy(paymentReview = WalletDemoPaymentReview.NotRequired, claimReview = WalletDemoClaimReview.Legacy) }
             return
         }
-        _state.update { it.copy(paymentReview = WalletDemoPaymentReview.Loading) }
+        _state.update { it.copy(
+            paymentReview = if (preview.requiresPaymentConsent) WalletDemoPaymentReview.Loading else WalletDemoPaymentReview.NotRequired,
+            claimReview = if (wallet.supportsClaimReview) WalletDemoClaimReview.Loading(it.claimReview.previousReady) else WalletDemoClaimReview.Legacy,
+        ) }
         if (!current.presentationCredentialSelectionComplete()) return
         paymentConsentJob = scope.launch(dispatcher) {
+            val did = (current.session as? WalletSessionState.Ready)?.did
+            // Claim review and payment preparation share the SDK preview lease; never race them.
+            val information = try {
+                if (!wallet.supportsClaimReview) WalletDemoClaimReview.Legacy else {
+                    val prepared = wallet.reviewPresentation(preview.previewHandle, current.selectedPresentationCredentialOptions.toList(),
+                        current.selectedPresentationDisclosureOptions.toList(), did)
+                    val groups = withContext(Dispatchers.Default) {
+                        prepared.toEffectiveSharingInformation(preview.credentialOptions, current.selectedPresentationDisclosureOptions)
+                    }
+                    WalletDemoClaimReview.Ready(prepared, groups)
+                }
+            } catch (cause: CancellationException) { throw cause
+            } catch (cause: Exception) { WalletDemoClaimReview.Failed(cause.message ?: "Couldn't update the information to share.") }
             val review = try {
-                wallet.preparePaymentConsent(preview.previewHandle, current.selectedPresentationCredentialOptions.toList(),
-                    current.selectedPresentationDisclosureOptions.toList(), (current.session as? WalletSessionState.Ready)?.did)
-                    ?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
+                if (preview.requiresPaymentConsent && information.canConfirm)
+                    wallet.preparePaymentConsent(preview.previewHandle, current.selectedPresentationCredentialOptions.toList(),
+                        current.selectedPresentationDisclosureOptions.toList(), did)
+                        ?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
+                else WalletDemoPaymentReview.NotRequired
             } catch (cause: CancellationException) { throw cause
             } catch (cause: Exception) { WalletDemoPaymentReview.Blocked(cause.message ?: "Payment instructions are unavailable.") }
             currentCoroutineContext().ensureActive()
@@ -1345,7 +1374,7 @@ class WalletDemoController(
                 if (latest.presentationPreview?.previewHandle == preview.previewHandle &&
                     latest.selectedPresentationCredentialOptions == current.selectedPresentationCredentialOptions &&
                     latest.selectedPresentationDisclosureOptions == current.selectedPresentationDisclosureOptions)
-                    latest.copy(paymentReview = review) else latest
+                    latest.copy(paymentReview = review, claimReview = information) else latest
             }
         }
     }
@@ -1353,7 +1382,7 @@ class WalletDemoController(
     fun submitPresentation() {
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
-        if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm) return
+        if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm || !current.claimReview.canConfirm) return
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
         val previewHandle = current.presentationPreview?.previewHandle ?: return
         val selectedCredentialOptions = current.selectedPresentationCredentialOptions.toList()
@@ -1379,11 +1408,12 @@ class WalletDemoController(
 
         presentationJob = scope.launch(dispatcher) {
             try {
-                val result = wallet.submitPresentation(
-                    previewHandle,
-                    selectedCredentialOptions,
-                    selectedDisclosureOptions,
-                    ready.did,
+                val revision = current.claimReview.revision
+                val result = if (revision != null) wallet.submitReviewedPresentation(
+                    previewHandle, selectedCredentialOptions, selectedDisclosureOptions, ready.did,
+                    current.paymentReview.consent?.revision, revision,
+                ) else wallet.submitPresentation(
+                    previewHandle, selectedCredentialOptions, selectedDisclosureOptions, ready.did,
                     paymentConsentRevision = current.paymentReview.consent?.revision,
                 )
                 currentCoroutineContext().ensureActive()
@@ -1404,6 +1434,7 @@ class WalletDemoController(
                     ).copy(
                         presentationReview = null,
                         paymentReview = WalletDemoPaymentReview.NotRequired,
+                        claimReview = WalletDemoClaimReview.Legacy,
                         requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1442,6 +1473,7 @@ class WalletDemoController(
                 )
             },
             presentationReview = if (clearPreview) null else presentationReview,
+            claimReview = if (clearPreview) WalletDemoClaimReview.Legacy else claimReview,
             requestDrafts = if (clearPreview) {
                 requestDrafts.copy(presentationRequestUrl = "")
             } else {
@@ -1471,6 +1503,7 @@ class WalletDemoController(
                     ),
                     presentationReview = null,
                     paymentReview = WalletDemoPaymentReview.NotRequired,
+                    claimReview = WalletDemoClaimReview.Legacy,
                     requestDrafts = current.requestDrafts.copy(presentationRequestUrl = ""),
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
@@ -1525,6 +1558,7 @@ class WalletDemoController(
                     ).copy(
                         presentationReview = null,
                         paymentReview = WalletDemoPaymentReview.NotRequired,
+                        claimReview = WalletDemoClaimReview.Legacy,
                         requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1899,6 +1933,7 @@ class WalletDemoController(
         receiveNavigationResetKey = receiveNavigationResetKey + 1,
         presentationReview = null,
         paymentReview = WalletDemoPaymentReview.NotRequired,
+        claimReview = WalletDemoClaimReview.Legacy,
         selectedPresentationCredentialOptions = emptySet(),
         selectedPresentationDisclosureOptions = emptySet(),
         presentationCompleted = false,

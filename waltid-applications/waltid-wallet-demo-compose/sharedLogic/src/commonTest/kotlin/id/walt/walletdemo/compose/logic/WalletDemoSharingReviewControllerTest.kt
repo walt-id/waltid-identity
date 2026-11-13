@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -90,4 +91,43 @@ class WalletDemoSharingReviewControllerTest {
         assertNull(owner.selectionForSubmission())
         owner.close()
     }
+    private fun claimReview(revision: String) = WalletDemoPreparedClaimReview(revision, listOf(
+        WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt", "{}", false,
+            listOf(WalletDemoClaimLocation("[]", "[]", emptyList(), true)))))
+
+    @Test fun effectiveReviewRunsBeforePaymentAndBlocksStaleRenderedSubmission() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val calls = mutableListOf<String>()
+        val owner = WalletDemoSharingReviewController(review, backgroundScope,
+            project = { selection -> calls += "claims"; release.await(); claimReview(if (name in selection.disclosures) "on" else "off") },
+            prepare = { calls += "payment"; consent("payment") })
+        runCurrent()
+        assertEquals(listOf("claims"), calls)
+        assertNull(owner.selectionForSubmission())
+        release.complete(Unit)
+        val rendered = owner.state.first { it.information is WalletDemoClaimReview.Ready }
+        assertEquals(listOf("claims", "payment"), calls)
+        assertEquals("off", owner.selectionForSubmission(rendered)?.presentationReviewRevision)
+        owner.toggleDisclosure(name)
+        assertNull(owner.selectionForSubmission(rendered))
+        val current = owner.state.first { it.information is WalletDemoClaimReview.Ready }
+        assertEquals("on", owner.selectionForSubmission(current)?.presentationReviewRevision)
+        assertEquals(setOf(name), owner.selectionForSubmission(current)?.disclosures)
+        owner.close()
+    }
+
+    @Test fun failedClaimReviewKeepsChoicesAndRetryCannotReuseAnOlderRevision() = runTest {
+        var attempts = 0
+        val owner = WalletDemoSharingReviewController(review, backgroundScope,
+            project = { if (++attempts == 1) error("Request expired") else claimReview("retry") })
+        val failed = owner.state.first { it.information is WalletDemoClaimReview.Failed }
+        assertNull(owner.selectionForSubmission())
+        owner.retry()
+        assertNull(owner.selectionForSubmission(failed))
+        val ready = owner.state.first { it.information is WalletDemoClaimReview.Ready }
+        assertEquals(failed.selection.credentials, ready.selection.credentials)
+        assertEquals("retry", owner.selectionForSubmission(ready)?.presentationReviewRevision)
+        owner.close()
+    }
+
 }

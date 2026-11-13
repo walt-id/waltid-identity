@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -41,6 +42,8 @@ internal fun MetadataDisclosure(
     title: String,
     initiallyExpanded: Boolean,
     modifier: Modifier = Modifier,
+    indicatorColor: Color = MaterialTheme.colorScheme.primary,
+    supportingText: String? = null,
     content: @Composable () -> Unit,
 ) {
     var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
@@ -57,16 +60,20 @@ internal fun MetadataDisclosure(
                 .semantics(mergeDescendants = true) {
                     heading()
                     text = AnnotatedString(title)
-                    stateDescription = stateLabel
+                    stateDescription = listOfNotNull(stateLabel, supportingText).joinToString(", ")
                 }
                 .heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, Modifier.weight(1f).clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Column(Modifier.weight(1f)) {
+                Text(title, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                supportingText?.let { Text(it, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
-                modifier = Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
+                modifier = Modifier.rotate(rotation), tint = indicatorColor)
         }
         WalletExpandableContent(expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }

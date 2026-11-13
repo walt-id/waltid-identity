@@ -21,6 +21,8 @@ enum class ClaimRole {
     ExpiryDate,
     Image,
     CredentialType,
+    /** Display category only; it never decides disclosure or inclusion policy. */
+    Technical,
 }
 
 private data class ClaimDescriptor(
@@ -149,7 +151,7 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("valid_to", aliases = setOf("Valid to"), roles = setOf(ClaimRole.Temporal, ClaimRole.ExpiryDate), displayOrder = 216),
         ClaimDescriptor("status", label = "Credential status", group = ClaimGroupKind.Technical, displayOrder = 220),
         ClaimDescriptor("credential_status", aliases = setOf("credentialStatus"), label = "Credential status", displayOrder = 221),
-        ClaimDescriptor("_sd", label = "Undisclosed claims", group = ClaimGroupKind.Technical, displayOrder = 230),
+        ClaimDescriptor("_sd", label = "Disclosure digests", group = ClaimGroupKind.Technical, displayOrder = 230),
         ClaimDescriptor("_sd_alg", label = "Selective disclosure algorithm", group = ClaimGroupKind.Technical, displayOrder = 231),
         ClaimDescriptor("cnf", label = "Confirmation key", group = ClaimGroupKind.Technical, displayOrder = 240),
         ClaimDescriptor("credential_type", aliases = setOf("Credential type", "credentialType"), roles = setOf(ClaimRole.CredentialType), displayOrder = 250),

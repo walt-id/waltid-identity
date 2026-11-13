@@ -459,6 +459,8 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag(WalletUiTestTags.credentialDetails(details.summary.id)).assertExists()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("resident_address"))
+            .performScrollTo().performClick()
         onNodeWithText("Vienna").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").assertIsDisplayed()
         capture("credential.details.identity")
@@ -472,8 +474,12 @@ internal class WalletVisualScenarios(
         }
         onNodeWithText("Familienname").assertIsDisplayed()
         onNodeWithText("Vorname").assertIsDisplayed()
-        onNodeWithText("Name im Namensraum").assertIsDisplayed()
-        onNodeWithText("Straße").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim(ClaimItemPath.topLevel("ns.with.dots").id))
+            .performScrollTo().performClick()
+        onNodeWithText("Name im Namensraum").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("address"))
+            .performScrollTo().performClick()
+        onNodeWithText("Straße").performScrollTo().assertIsDisplayed()
         capture("credential.details.localized_metadata")
     }
 

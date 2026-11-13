@@ -13,6 +13,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -2447,6 +2448,52 @@ class WalletDemoControllerTest {
         assertEquals(WalletOperationState.Idle, controller.state.value.operation)
         assertEquals(null, controller.state.value.presentationPreview)
         assertEquals(1, wallet.submitPresentationCalls)
+    }
+
+    @Test
+    fun regularPresentationWaitsForEffectiveClaimsAndSubmitsTheDisplayedReviewRevision() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var reviewedRevision: String? = null
+        val option = WalletDemoPresentationCredentialOption("pid", "card", label = "Identity", issuer = "Issuer",
+            format = "dc+sd-jwt", credentialDataJson = "{}", disclosures = emptyList())
+        val base = FakeDemoWallet(presentationPreview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle, responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = null, clientId = null, credentialOptions = listOf(option)))
+        val wallet = object : DemoWallet by base {
+            override val supportsClaimReview = true
+            override suspend fun reviewPresentation(
+                previewHandle: WalletDemoPresentationPreviewHandle,
+                selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+                selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, did: String?,
+            ): WalletDemoPreparedClaimReview {
+                gate.await()
+                return WalletDemoPreparedClaimReview("reviewed-claims", listOf(WalletDemoCredentialClaims("pid", "card",
+                    "dc+sd-jwt", "{}", false, listOf(WalletDemoClaimLocation("[]", "[]", emptyList(), true)))))
+            }
+            override suspend fun submitReviewedPresentation(
+                previewHandle: WalletDemoPresentationPreviewHandle,
+                selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+                selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, did: String?,
+                paymentConsentRevision: String?, presentationReviewRevision: String,
+            ): WalletDemoOperationResult {
+                reviewedRevision = presentationReviewRevision
+                return WalletDemoOperationResult.Success("Shared")
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation(); runCurrent()
+        assertIs<WalletDemoClaimReview.Loading>(controller.state.value.claimReview)
+        controller.submitPresentation(); runCurrent()
+        assertNull(reviewedRevision)
+        assertEquals(0, base.submitPresentationCalls)
+        gate.complete(Unit)
+        controller.state.first { it.claimReview is WalletDemoClaimReview.Ready }
+        controller.submitPresentation(); runCurrent()
+        assertEquals("reviewed-claims", reviewedRevision)
+        assertEquals(0, base.submitPresentationCalls)
+        assertNull(controller.state.value.presentationPreview)
+        assertIs<WalletDemoClaimReview.Legacy>(controller.state.value.claimReview)
     }
 
     @Test

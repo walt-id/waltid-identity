@@ -40,12 +40,35 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
+import id.waltid.openid4vp.wallet.presentation.PresentationClaimsProjection
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
+    @Test
+    fun wholeCredentialProjectionUsesTheSignedJwtIncludingUnrequestedClaims() {
+        val payload = Json.parseToJsonElement("""{"iss":"https://issuer.example","vc":{"credentialSubject":{
+            "name":"Ada","address":{"city":"London","country":"GB"}}}}""").jsonObject
+        fun encoded(value: JsonObject) = value.toString().encodeToByteArray().encodeToBase64Url()
+        val credential = W3C11(credentialData = buildJsonObject { put("untrusted-stored-only", "not sent") },
+            signed = "${encoded(buildJsonObject { put("alg", "ES256") })}.${encoded(payload)}.c2ln",
+            signature = JwtCredentialSignature("signature", buildJsonObject {}))
+        val match = DcqlMatcher.DcqlMatchResult(
+            RawDcqlCredential("credential", "jwt_vc_json", credential.credentialData, originalCredential = credential),
+            selectedDisclosures = null,
+            originalQuery = CredentialQuery("vc", CredentialFormat.JWT_VC_JSON, meta = NoMeta),
+        )
+        val projection = PresentationClaimsProjection.prepare(credential, match)
+        assertTrue(projection.wholeCredential)
+        assertEquals(payload, projection.claims)
+        val city = projection.locations.single {
+            it.receivedPath == listOf("vc", "credentialSubject", "address", "city").map(::JsonPrimitive)
+        }
+        assertEquals(listOf("credentialSubject", "address", "city").map(::JsonPrimitive), city.sourcePath)
+    }
+
     @Test fun scheduledPaymentCannotExpireWhileAnotherCredentialIsResolved() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val key = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(KeyId("review-holder"),

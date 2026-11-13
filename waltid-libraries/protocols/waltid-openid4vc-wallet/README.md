@@ -69,6 +69,30 @@ selected wallet bindings and existing polling behavior; this does not add deferr
 - **Format-specific presenters** — JWT VP, SD-JWT KB, mdoc DeviceResponse
 - **Holder policies** — Configurable policies for presentation consent
 
+Retained previews support selection-aware claim review with `reviewPresentation` (URL requests) and
+`reviewDcApiPresentation` (Digital Credentials API). Both reuse the resolved, wallet-bound request,
+validate the chosen options, and prepare effective claims without signing, sending or consuming the
+preview. The returned contributions remain separate per query and credential; a partial array in one
+presentation must not be merged with another presentation by its received indexes. Typed source and
+received paths preserve original control and metadata identities after array compaction. Each node
+also identifies the SDK claim choices carrying it, or marks it as intrinsically carried. A clear
+sibling inside a disclosed parent is attributed to the selecting claim rather than labelled as
+always shared. These are presentation consequences, not additional per-leaf selection controls.
+
+After displaying a review, submit its revision as `presentationReviewRevision`. Submission checks the
+same selection and an immutable fingerprint of each selected credential before signing. Omitting the
+revision cannot bypass a review once one has been prepared, and failed re-preparation invalidates the
+old review. Existing clients that never opt into this operation retain their previous flow. Request
+expiry, wallet ownership, cancellation and consumption follow the existing preview session. Prepare
+claim review and payment consent sequentially for the same choices; they share the preview's exclusive
+lease. Review never extends its lifetime.
+
+The mobile facade exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
+`reviewDigitalCredentialPresentation`. Use `submitReviewedPresentation` or
+`submitReviewedDigitalCredentialPresentation` with the displayed revision; released submission method
+signatures remain available. The stateless HTTP preview contract is unchanged. A reliable projection
+must be available for the selected format; unsupported formats fail instead of guessing shared data.
+
 ### Wallet Architecture
 
 - **Multi-store support** — Multiple key stores, credential stores per wallet

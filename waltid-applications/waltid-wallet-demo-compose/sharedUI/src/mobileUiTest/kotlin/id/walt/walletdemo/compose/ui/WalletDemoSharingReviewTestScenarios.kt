@@ -130,6 +130,76 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(1, copies.value)
     }
 
+    fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() = runComposeUiTest {
+        val cityPath = "\"address\".\"city\""
+        val option = WalletDemoPresentationCredentialOption("employee", "employee-1", label = "Employee credential",
+            issuer = "Example issuer", format = "dc+sd-jwt",
+            credentialDataJson = """{"employee_id":"EMP-42","address":{"city":"Bengaluru","country":"IN","postal_code":"560038"}}""",
+            disclosures = listOf(
+                WalletDemoPresentationDisclosure("Employee id", "\"employee_id\"", "\"EMP-42\"", selectivelyDisclosable = false),
+                WalletDemoPresentationDisclosure("City", cityPath, "\"Bengaluru\"", selectivelyDisclosable = true, required = false),
+            ))
+        val review = digitalCredentialReview(listOf(option))
+        val city = WalletDemoPresentationDisclosureSelection("employee", "employee-1", cityPath)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val owner = WalletDemoSharingReviewController(review, scope, project = { selection ->
+            val selected = city in selection.disclosures
+            fun location(path: String, carried: Boolean) = WalletDemoClaimLocation(path, path,
+                if (carried) emptyList() else listOf(cityPath), carried)
+            WalletDemoPreparedClaimReview(if (selected) "on" else "off", listOf(WalletDemoCredentialClaims(
+                "employee", "employee-1", "dc+sd-jwt",
+                if (selected) """{"iat":1700000000,"_sd_alg":"sha-256","employee_id":"EMP-42","address":{"city":"Bengaluru","country":"IN"}}""" else """{"iat":1700000000,"_sd_alg":"sha-256","employee_id":"EMP-42"}""",
+                false, buildList {
+                    add(location("[]", true)); add(location("""["employee_id"]""", true))
+                    add(location("""["iat"]""", true)); add(location("""["_sd_alg"]""", true))
+                    if (selected) {
+                        add(location("""["address"]""", false))
+                        add(location("""["address","city"]""", false))
+                        add(location("""["address","country"]""", false))
+                    }
+                })))
+        })
+        var submitted: WalletDemoSharingSelection? = null
+        try {
+            setContent { WalletDemoTheme {
+                WalletDemoSharingReviewScreen(review, "Share employee credential?", onSubmit = { submitted = it },
+                    onCancel = {}, controller = owner)
+            } }
+            waitUntil(timeoutMillis = 10_000) { onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText("Always shared").performScrollToContent(this).performClick()
+            onNodeWithText("EMP-42").assertDoesNotExist()
+            onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).assertExists()
+            onNodeWithText("Always shared").performScrollToContent(this).performClick()
+            onNodeWithText("EMP-42").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("Always included by this credential").assertDoesNotExist()
+            onNodeWithText("Requested information").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("Not shared").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("IN").assertDoesNotExist()
+            onNodeWithText("sha-256").assertDoesNotExist()
+            onNode(hasText("Technical details") and hasAnyAncestor(hasTestTag("review-information-to-share")))
+                .performScrollToContent(this).performClick()
+            onNodeWithText("sha-256").performScrollToContent(this).assertIsDisplayed()
+            onNode(hasText("Technical details") and hasAnyAncestor(hasTestTag("review-information-to-share")))
+                .performScrollToContent(this).performClick()
+            onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).performScrollToContent(this).performClick()
+            waitUntil(timeoutMillis = 10_000) { onAllNodesWithText("IN").fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText("IN").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("Shared with City").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("Requested information").performScrollToContent(this).performClick()
+            onNodeWithText("IN").assertDoesNotExist()
+            assertEquals(setOf(city), owner.state.value.selection.disclosures)
+            onNodeWithText("Requested information").performScrollToContent(this).performClick()
+            onNodeWithText("Shared with City").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithText("560038").assertDoesNotExist()
+            onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).performScrollToContent(this).performClick()
+            waitUntil(timeoutMillis = 10_000) { owner.state.value.information is WalletDemoClaimReview.Ready && owner.state.value.selection.disclosures.isEmpty() }
+            onNodeWithText("IN").assertDoesNotExist()
+            onNodeWithText("Not shared").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
+            assertEquals("off", submitted?.presentationReviewRevision)
+        } finally { owner.close(); scope.cancel() }
+    }
+
     fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() = runComposeUiTest {
         val consent = WalletDemoPaymentConsent("first", "en", null, null, "Pay", null, true, emptyList())
         val review = mutableStateOf<WalletDemoPaymentReview>(WalletDemoPaymentReview.Ready(consent))

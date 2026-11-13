@@ -105,9 +105,15 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals(MobileWalletReaderAuthentication.NOT_APPLICABLE, preview.readerAuthentication)
         assertEquals(null, preview.readerTrust)
 
-        val response = fixture.wallet.submitDigitalCredentialPresentation(
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+        assertFalse(review.credentials.single().wholeCredential)
+        val response = fixture.wallet.submitReviewedDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            presentationReviewRevision = review.revision,
         )
 
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, response.protocol)
@@ -118,6 +124,8 @@ class MobileWalletDigitalCredentialPresentationTest {
         // rather than replaying an earlier presentation.
         val presentation = fixture.presentationFor("pid", data)
         assertEquals(3, presentation.substringAfterLast('~').split('.').size, "missing KB-JWT: $presentation")
+        assertEquals(SDJwt.parse(presentation).fullPayload, Json.parseToJsonElement(review.credentials.single().claimsJson))
+        assertTrue(review.credentials.single().locations.isNotEmpty())
     }
 
     @Test
@@ -138,17 +146,24 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         assertEquals("mso_mdoc", preview.credentialOptions.single().format)
 
-        val response = fixture.wallet.submitDigitalCredentialPresentation(
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+        assertFalse(review.credentials.single().wholeCredential)
+        val response = fixture.wallet.submitReviewedDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            presentationReviewRevision = review.revision,
         )
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
         assertEquals(setOf("vp_token"), data.keys)
-        assertTrue(
-            fixture.presentationFor("mdl", data).isNotBlank(),
-            "mdoc DeviceResponse missing from the vp_token: $data",
-        )
+        val document = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(
+            fixture.presentationFor("mdl", data).decodeFromBase64Url()).documents!!.single()
+        val expected = buildJsonObject { put(MDOC_NAMESPACE, buildJsonObject { put("given_name", "Inga") }) }
+        assertEquals(expected, document.issuerSigned.namespacesToJson())
+        assertEquals(expected, Json.parseToJsonElement(review.credentials.single().claimsJson))
     }
 
     @Test

@@ -290,6 +290,34 @@ internal class MobileDemoWallet(
                 )
         }
 
+    override val supportsClaimReview: Boolean get() = true
+
+    override suspend fun reviewPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPreparedClaimReview = mobileWallet.reviewPresentation(
+        MobileWalletPresentationPreviewHandle(previewHandle.value),
+        selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+        selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did,
+    ).toDemoClaimReview()
+
+    override suspend fun submitReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+        paymentConsentRevision: String?,
+        presentationReviewRevision: String,
+    ): WalletDemoOperationResult = mobileWallet.submitReviewedPresentation(
+        previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
+        selectedCredentialOptions = selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+        selectedDisclosureOptions = selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) },
+        did = did, paymentConsentRevision = paymentConsentRevision, presentationReviewRevision = presentationReviewRevision,
+    ).toDemoOperationResult(successMessage = WalletDisplayText.PresentationSent,
+        failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
+
     override suspend fun preparePaymentConsent(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
@@ -557,3 +585,11 @@ internal fun SigningIdentityFailure.explanation(): String = when (this) {
     SigningIdentityFailure.ProviderConflict -> "A different backup already uses this identifier. Choose another backup destination. The existing backup has not been overwritten."
     SigningIdentityFailure.ProviderConfirmationPending -> "The backup provider has not confirmed the backup yet. Check again later to continue setup with the same key."
 }
+
+fun id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview.toDemoClaimReview() =
+    WalletDemoPreparedClaimReview(revision, credentials.map { contribution ->
+        WalletDemoCredentialClaims(contribution.queryId, contribution.credentialId, contribution.format,
+            contribution.claimsJson, contribution.wholeCredential, contribution.locations.map { location ->
+                WalletDemoClaimLocation(location.sourcePathJson, location.receivedPathJson, location.sharedBy, location.alwaysCarried)
+            })
+    })

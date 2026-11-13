@@ -399,12 +399,41 @@ object MdocPresenter {
         )
         log.trace { "Wallet-created device auth: $deviceAuth" }
 
+        val issuerSignedWithSelectedNamespaceItems = prepareIssuerSigned(mdocsCredential, matchResult)
+
+        // 5. Assemble the final DeviceResponse
+        val deviceResponse = DeviceResponse(
+            version = "1.0",
+            documents = arrayOf(
+                Document(
+                    docType = mdocsCredential.docType,
+                    issuerSigned = issuerSignedWithSelectedNamespaceItems,
+                    //issuerSigned = issuerSigned,
+                    deviceSigned = DeviceSigned(ByteStringWrapper(disclosedDeviceNamespaces), deviceAuth)
+                )
+            ),
+            status = 0u
+        )
+
+        // 6. CBOR-encode and base64url-encode the response string
+        val deviceResponseBytes = coseCompliantCbor.encodeToByteArray(deviceResponse)
+        return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
+    }
+
+    /** The selected signed elements, prepared without device authentication or holder-key access. */
+    fun previewClaims(digitalCredential: DigitalCredential, matchResult: DcqlMatcher.DcqlMatchResult) =
+        prepareIssuerSigned(digitalCredential as MdocsCredential, matchResult).namespacesToJson()
+
+    private fun prepareIssuerSigned(
+        mdocsCredential: MdocsCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+    ): IssuerSigned {
+        val issuerSigned = mdocsCredential.document.issuerSigned
         val selectedClaimKeys = matchResult.selectedDisclosures?.keys.orEmpty()
         val dcqlQueryClaims = matchResult.originalQuery.claims
             .orEmpty()
             .filter { it.path.joinToString(".") in selectedClaimKeys }
 
-        //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
             // Group by the string content of the first path element (Namespace)
             .groupBy {
@@ -442,30 +471,10 @@ object MdocPresenter {
             }
         log.trace { "Selected disclosures: ${matchResult.selectedDisclosures}" }
 
-        val issuerSignedWithSelectedNamespaceItems =
-            IssuerSigned.fromIssuerSignedLists(
-                namespaces = selectedIssuerSignedItems.mapValues { IssuerSignedList(it.value) },
-                issuerAuth = issuerSigned.issuerAuth
-            )
-        //--- SD END
-
-        // 5. Assemble the final DeviceResponse
-        val deviceResponse = DeviceResponse(
-            version = "1.0",
-            documents = arrayOf(
-                Document(
-                    docType = mdocsCredential.docType,
-                    issuerSigned = issuerSignedWithSelectedNamespaceItems,
-                    //issuerSigned = issuerSigned,
-                    deviceSigned = DeviceSigned(ByteStringWrapper(disclosedDeviceNamespaces), deviceAuth)
-                )
-            ),
-            status = 0u
+        return IssuerSigned.fromIssuerSignedLists(
+            namespaces = selectedIssuerSignedItems.mapValues { IssuerSignedList(it.value) },
+            issuerAuth = issuerSigned.issuerAuth,
         )
-
-        // 6. CBOR-encode and base64url-encode the response string
-        val deviceResponseBytes = coseCompliantCbor.encodeToByteArray(deviceResponse)
-        return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
     }
 
     /**

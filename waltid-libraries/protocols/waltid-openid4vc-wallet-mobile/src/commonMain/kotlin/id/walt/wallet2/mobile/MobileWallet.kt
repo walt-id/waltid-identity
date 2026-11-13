@@ -886,6 +886,25 @@ public class MobileWallet internal constructor(
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
         paymentConsentRevision: String? = null,
+    ): MobileWalletDigitalCredentialResponse = submitDigitalCredentialPresentationWithReview(requestId, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision, null)
+
+    /** Submits only if the displayed effective claim review still matches this selection and credential data. */
+    public suspend fun submitReviewedDigitalCredentialPresentation(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        paymentConsentRevision: String? = null,
+        presentationReviewRevision: String,
+    ): MobileWalletDigitalCredentialResponse = submitDigitalCredentialPresentationWithReview(requestId, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision, presentationReviewRevision)
+
+    private suspend fun submitDigitalCredentialPresentationWithReview(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        paymentConsentRevision: String? = null,
+        presentationReviewRevision: String?,
     ): MobileWalletDigitalCredentialResponse = lifecycle.use {
         require(selectedCredentialOptions.isNotEmpty()) { "At least one credential must be selected after consent" }
         val response = WalletPresentationHandler.submitDcApiPresentation(
@@ -900,6 +919,7 @@ public class MobileWallet internal constructor(
                 },
                 did = did,
                 paymentConsentRevision = paymentConsentRevision,
+                presentationReviewRevision = presentationReviewRevision,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
@@ -1043,6 +1063,34 @@ public class MobileWallet internal constructor(
         }
     }
 
+    /** Recomputes exactly what the selected credentials disclose, without signing or sending. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewPresentation(wallet,
+            SubmitPresentationRequest(PresentationPreviewHandle(previewHandle.value),
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
+    /** Same selection review for a retained Digital Credentials API request. */
+    public suspend fun reviewDigitalCredentialPresentation(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewDcApiPresentation(wallet,
+            SubmitDcApiPresentationRequest(requestId,
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
     /** Resolves authoritative payment instructions for the current credential/disclosure selection. */
     public suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -1068,6 +1116,27 @@ public class MobileWallet internal constructor(
         did: String? = null,
         runPolicies: Boolean? = null,
         paymentConsentRevision: String? = null,
+    ): MobileWalletPresentationResult = submitPresentationWithReview(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, runPolicies, paymentConsentRevision, null)
+
+    /** Submits only if the displayed effective claim review still matches this selection and credential data. */
+    public suspend fun submitReviewedPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+        paymentConsentRevision: String? = null,
+        presentationReviewRevision: String,
+    ): MobileWalletPresentationResult = submitPresentationWithReview(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, runPolicies, paymentConsentRevision, presentationReviewRevision)
+
+    private suspend fun submitPresentationWithReview(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+        paymentConsentRevision: String? = null,
+        presentationReviewRevision: String?,
     ): MobileWalletPresentationResult = lifecycle.use {
         WalletPresentationHandler.submitPresentation(
             wallet = wallet,
@@ -1088,6 +1157,7 @@ public class MobileWallet internal constructor(
                 },
                 did = did,
                 paymentConsentRevision = paymentConsentRevision,
+                presentationReviewRevision = presentationReviewRevision,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
@@ -1478,3 +1548,11 @@ internal fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): Mo
 private fun String.includesWalletInstanceAttestation(): Boolean = this == "wia" || this == "wia_ka"
 
 private fun String.includesKeyAttestation(): Boolean = this == "ka" || this == "wia_ka"
+
+private fun id.walt.wallet2.handlers.PreparedPresentationReview.toMobileReview() =
+    MobileWalletPreparedPresentationReview(revision, credentials.map {
+        MobileWalletPresentationCredentialClaims(it.queryId, it.credentialId, it.format, it.claims.toString(), it.wholeCredential,
+            it.locations.map { location -> MobileWalletPresentationClaimLocation(
+                kotlinx.serialization.json.JsonArray(location.sourcePath).toString(),
+                kotlinx.serialization.json.JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
+    })

@@ -319,3 +319,27 @@ public enum class MobileWalletPresentationErrorCode(
     invalidTransactionData("invalid_transaction_data"),
     walletUnavailable("wallet_unavailable"),
 }
+
+/** Effective claims for a selection, prepared without signing or consuming the retained request. */
+public data class MobileWalletPreparedPresentationReview(
+    val revision: String,
+    val credentials: List<MobileWalletPresentationCredentialClaims>,
+)
+
+/** Keep query contributions distinct: their received array indexes are not stored control paths. */
+public data class MobileWalletPresentationCredentialClaims(
+    val queryId: String,
+    val credentialId: String,
+    val format: String,
+    val claimsJson: String,
+    val wholeCredential: Boolean,
+    val locations: List<MobileWalletPresentationClaimLocation>,
+)
+
+/** Typed JSON claim paths preserve object keys, numeric indexes and compacted received positions. */
+public data class MobileWalletPresentationClaimLocation(
+    val sourcePathJson: String,
+    val receivedPathJson: String,
+    val sharedBy: List<String>,
+    val alwaysCarried: Boolean,
+)

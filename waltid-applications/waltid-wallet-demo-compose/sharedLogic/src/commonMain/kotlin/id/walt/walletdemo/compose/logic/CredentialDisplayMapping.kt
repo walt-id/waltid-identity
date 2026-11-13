@@ -37,7 +37,7 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales:
 }
 
 fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(preferredLocales: List<String> = platformPreferredLocales()): ClaimGroup? {
-    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales)
+    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales, format)
     val requestedItems = disclosures.mapIndexed { index, disclosure ->
         val path = ClaimPath.disclosure(index = index, rawPath = disclosure.path, format = format)
         ClaimItem(
