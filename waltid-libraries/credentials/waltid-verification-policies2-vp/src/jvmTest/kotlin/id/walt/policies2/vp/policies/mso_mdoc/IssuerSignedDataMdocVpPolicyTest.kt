@@ -3,6 +3,7 @@
 
 package id.walt.policies2.vp.policies
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.cose.*
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.mdoc.objects.digest.ValueDigest
@@ -13,7 +14,7 @@ import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
-import id.walt.mdoc.verification.MdocVerifier
+import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -62,7 +63,7 @@ class IssuerSignedDataMdocVpPolicyTest {
         val result = policy.runPolicy(document, mso, dummyVerificationContext())
 
         assertTrue(result.success)
-        MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso)
+        verifyIssuerSignedItemDigests(document, mso)
         val matchingDigest = result.results["matching_digest"]?.jsonObject
         assertNotNull(matchingDigest)
         val ids = matchingDigest[namespace]?.jsonArray
@@ -98,7 +99,7 @@ class IssuerSignedDataMdocVpPolicyTest {
 
         assertFalse(result.success)
         assertFailsWith<IllegalArgumentException> {
-            MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso)
+            verifyIssuerSignedItemDigests(document, mso)
         }
     }
 

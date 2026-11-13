@@ -418,7 +418,6 @@ class Wallet2RegressionTest {
                             "Matched ID should equal the wallet-assigned credential ID"
                         )
                     }
-                    result
                 }
             }
         }

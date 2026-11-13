@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "en-rUS-w393dp-h852dp-notnight-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class, ExperimentalRoborazziApi::class)
 class WalletVisualAndroidTest {
     private lateinit var previousTimeZone: java.util.TimeZone
     @org.junit.Before fun pinTimeZone() {

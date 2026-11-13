@@ -9,6 +9,10 @@ waltidMobile {
 }
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))

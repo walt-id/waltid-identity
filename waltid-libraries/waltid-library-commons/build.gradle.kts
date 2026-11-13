@@ -6,6 +6,10 @@ plugins {
 group = "id.walt.library-commons"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName = "library-commons"
     }

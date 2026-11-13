@@ -163,9 +163,9 @@ class IsoIaCaRootX509CertificateProfileTest {
             }
         }.awaitAll()
 
-        assertTrue {
+        assertTrue(
             bundles.all { it.encodedDer.size != 0 }
-        }
+        )
         //all serial numbers are unique -> hence all generated certificates different
         assertEquals(
             bundles.size,

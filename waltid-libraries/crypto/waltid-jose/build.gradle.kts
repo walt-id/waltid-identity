@@ -17,6 +17,10 @@ plugins {
 group = "id.walt.crypto2"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     abiValidation {
         binariesSource.set(BinariesSource.MAIN_COMPILATION)
     }

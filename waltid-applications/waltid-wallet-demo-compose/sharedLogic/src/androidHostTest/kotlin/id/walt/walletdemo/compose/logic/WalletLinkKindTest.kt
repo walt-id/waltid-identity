@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 import java.io.File
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -51,7 +53,8 @@ class WalletLinkResolverTest {
         assertEquals(WalletLinkKind.Presentation, result.kind)
     }
 
-    @Test fun oneDeadlineCoversRedirectsAndCancelsTheCurrentFetch() = kotlinx.coroutines.test.runTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun oneDeadlineCoversRedirectsAndCancelsTheCurrentFetch() = runTest {
         var fetches = 0
         var cancelled = false
         val error = kotlin.test.assertFailsWith<WalletLinkException> {

@@ -51,7 +51,7 @@ data class JwtVcJsonPresentation(
         presentationRequireNotNull(holderKey, W3CPresentationValidationError.ISSUER_NOT_FOUND) {
             "Could not resolve VP signer key for issuer '$issuer'"
         }
-        val vpJwtStringVerification = holderKey!!.verifyJws(jwt)
+        val vpJwtStringVerification = holderKey.verifyJws(jwt)
 
         presentationRequireSuccess(
             vpJwtStringVerification,

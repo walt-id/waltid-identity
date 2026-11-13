@@ -275,7 +275,7 @@ class ComprehensiveMigrationTest {
                 val serialized = row[Wallet2Tables.Credentials.serializedCredential]
                 val json = runCatching { Json.parseToJsonElement(serialized).jsonObject }.getOrNull()
                 assertNotNull(json, "Credential $id must serialize to JSON object")
-                assertNotNull(json!!["credentialData"], "Credential $id must have credentialData")
+                assertNotNull(json["credentialData"], "Credential $id must have credentialData")
                 println("  $id → type=${json["type"]?.jsonPrimitive?.content}")
             }
 

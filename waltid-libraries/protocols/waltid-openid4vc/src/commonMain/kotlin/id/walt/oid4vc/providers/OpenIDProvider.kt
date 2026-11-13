@@ -239,7 +239,7 @@ abstract class OpenIDProvider<S : AuthorizationSession>(
                         put("scope", "openid")
                         when (responseType) {
                             ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
-                            else -> null
+                            else -> {}
                         }
                     }, buildJsonObject {
                         put(JWTClaims.Header.algorithm, "ES256")

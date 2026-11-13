@@ -8,6 +8,10 @@ group = "id.walt.credentials"
 
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName.set("digital-credentials-examples")
     }

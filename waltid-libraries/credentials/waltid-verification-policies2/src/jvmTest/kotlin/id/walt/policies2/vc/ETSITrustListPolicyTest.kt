@@ -1,5 +1,6 @@
 package id.walt.policies2.vc
 
+import id.walt.crypto.keys.Key as LegacyKey
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
@@ -486,10 +487,13 @@ class ETSITrustListPolicyTest {
             }
         )
 
-        override suspend fun resolveToKey(did: String): Result<id.walt.crypto.keys.Key> =
+        // The interface still requires these legacy methods; this fixture only resolves crypto2 keys.
+        @Suppress("OVERRIDE_DEPRECATION")
+        override suspend fun resolveToKey(did: String): Result<LegacyKey> =
             Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
 
-        override suspend fun resolveToKeys(did: String): Result<Set<id.walt.crypto.keys.Key>> =
+        @Suppress("OVERRIDE_DEPRECATION")
+        override suspend fun resolveToKeys(did: String): Result<Set<LegacyKey>> =
             Result.failure(UnsupportedOperationException("crypto2 key resolution only"))
     }
 

@@ -137,9 +137,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Check ordinary and coordinated verification defaults
+      - name: Check build conventions
         run: >-
-          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --max-workers=2
+          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --tests KotlinWarningsPluginTest --max-workers=2
           -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
       - name: Generate the PR reference gallery
         id: reference_gallery

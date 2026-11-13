@@ -10,6 +10,10 @@ plugins {
 group = "id.walt.cli"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     jvm {
         binaries {
             executable {

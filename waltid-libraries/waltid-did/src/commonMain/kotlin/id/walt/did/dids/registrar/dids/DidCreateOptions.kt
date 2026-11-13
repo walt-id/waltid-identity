@@ -42,8 +42,6 @@ open class DidCreateOptions(
         }
 }
 
-@OptIn(ExperimentalJsExport::class)
-@JsExport
 internal fun didCreateConfig(config: Map<String, Any>, secret: Map<String, Any> = emptyMap()) = mapOf(
     "config" to config,
     "didDocument" to mapOf(
@@ -54,6 +52,4 @@ internal fun didCreateConfig(config: Map<String, Any>, secret: Map<String, Any> 
     "secret" to secret
 )
 
-@OptIn(ExperimentalJsExport::class)
-@JsExport
 internal fun config(vararg inlineConfig: Pair<String, Any>) = didCreateConfig(mapOf(*inlineConfig))

@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.dif-definitions-parser"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName = "definitions-parser"
     }

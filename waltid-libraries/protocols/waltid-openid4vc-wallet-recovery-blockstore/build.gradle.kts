@@ -9,6 +9,10 @@ group = "id.walt.protocols"
 waltidMobile { androidNamespace.set("id.walt.wallet2.recovery.blockstore") }
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     explicitApi()
     abiValidation { binariesSource.set(org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource.MAIN_COMPILATION) }
     sourceSets {

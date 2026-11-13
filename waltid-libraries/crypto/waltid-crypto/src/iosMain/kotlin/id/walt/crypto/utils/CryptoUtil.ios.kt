@@ -1,6 +1,7 @@
 package id.walt.crypto.utils
 
 import id.walt.crypto.utils.Base64Utils.base64Decode
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
@@ -9,11 +10,11 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArrayOf
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
-import platform.CoreFoundation.CFDataRef
 import platform.CoreFoundation.CFDictionaryAddValue
 import platform.CoreFoundation.CFDictionaryCreateMutable
 import platform.CoreFoundation.CFErrorRefVar
@@ -36,7 +37,7 @@ import platform.Security.kSecClassKey
 import platform.Security.kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256
 import platform.posix.memcpy
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
 
     memScoped {
@@ -67,7 +68,7 @@ actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
         return try {
             val secKeyRef = checkErrorResult { error ->
                 SecKeyCreateWithData(
-                    keyCfData as CFDataRef, keyCfAttributes, error
+                    checkNotNull(keyCfData).reinterpret(), keyCfAttributes, error
                 )
             }
 
@@ -75,7 +76,7 @@ actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
                 SecKeyCreateSignature(
                     secKeyRef,
                     kSecKeyAlgorithmRSASignatureDigestPKCS1v15SHA256,
-                    cfData as CFDataRef,
+                    checkNotNull(cfData).reinterpret(),
                     error
                 )
             }

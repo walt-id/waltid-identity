@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.objects.document
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -24,6 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
 import id.walt.crypto2.keys.Key as Crypto2Key
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Represents the `IssuerSigned` structure within a `Document`, containing data elements attested to
@@ -84,6 +87,8 @@ data class IssuerSigned private constructor(
 
                     val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
                         ?.runCatching {
+                            // The registry erases serializer types; a mismatch uses the fallback below.
+                            @Suppress("UNCHECKED_CAST")
                             Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
                         ?: item.elementValue.toSerializedJsonElement()

@@ -5,7 +5,6 @@ import id.walt.crypto.keys.tse.TSEKeyMetadata
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -72,15 +71,15 @@ class TSEKeyTest {
     private suspend fun tse2TestPublicKeys() {
         keys.forEach { key ->
             val publicKey = key.getPublicKey()
-            assertTrue { !publicKey.hasPrivateKey }
+            assertTrue(!publicKey.hasPrivateKey)
         }
         // TODO: assert keyId, thumbprint, export
     }
 
     private suspend fun tse3TestSignRaw() {
         keys.forEach { key ->
-            val signed = key.signRaw(Config.payload.toString().encodeToByteArray()) as String
-            val verificationResult = key.verifyRaw(signed.decodeBase64Bytes(), Config.payload.toString().encodeToByteArray())
+            val signed = key.signRaw(Config.payload.toString().encodeToByteArray())
+            val verificationResult = key.verifyRaw(signed, Config.payload.toString().encodeToByteArray())
             assertTrue(verificationResult.isSuccess)
             assertEquals(Config.payload.toString(), verificationResult.getOrThrow().decodeToString())
         }

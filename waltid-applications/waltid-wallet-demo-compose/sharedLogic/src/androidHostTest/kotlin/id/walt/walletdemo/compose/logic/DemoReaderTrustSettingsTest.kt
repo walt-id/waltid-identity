@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.mobile.ProximityReaderPolicy
 import id.walt.wallet2.mobile.ProximityReaderTrustSettings
 import id.walt.wallet2.mobile.ProximityStoredReaderTrustAnchor
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -11,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DemoReaderTrustSettingsTest {
     @Test
     fun `cancelled queued import cannot restore a preview and failed save retains policy`() = runTest {

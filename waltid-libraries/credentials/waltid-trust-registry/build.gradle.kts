@@ -6,6 +6,10 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
 
     sourceSets {
         commonMain.dependencies {

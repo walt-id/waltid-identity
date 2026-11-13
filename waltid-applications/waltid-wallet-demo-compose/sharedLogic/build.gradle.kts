@@ -15,6 +15,10 @@ group = "id.walt.walletdemo.compose"
 val enableMobileWallet = enableAndroidBuild || enableIosBuild
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser {
