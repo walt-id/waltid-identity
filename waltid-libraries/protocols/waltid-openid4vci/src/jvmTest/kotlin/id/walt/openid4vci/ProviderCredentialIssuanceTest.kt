@@ -54,6 +54,11 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.time.Clock
@@ -245,7 +250,7 @@ class ProviderCredentialIssuanceTest {
     }
 
     @Test
-    fun `credential signing key selects compatible configured algorithm`() = runBlocking {
+    fun `credential signing key selects compatible configured algorithm`() = runBlocking<Unit> {
         val key = crypto2Runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("algorithm-selection"),
@@ -475,6 +480,34 @@ class ProviderCredentialIssuanceTest {
             SDJwt.parse(it.credential.jsonPrimitive.content).fullPayload
         }
 
+    @Test
+    fun `cancelled schema preparation closes its context without signing with either backend`() = runBlocking {
+        val metadata = PublishedTypeMetadata.create(buildJsonObject {
+            put("vct", "https://issuer.example/identity")
+            put("schema_uri", "https://issuer.example/schema")
+        })
+        for (legacy in listOf(false, true)) withTimeout(10_000) {
+            val preparing = CompletableDeferred<Unit>()
+            val signatures = mutableListOf<Unit>()
+            val request = launch {
+                issueTimeMappedSdJwt(
+                    null, "2026-09-10T17:43:28Z", legacy = legacy, metadata = metadata,
+                    signatures = signatures, loadDocument = {
+                        preparing.complete(Unit)
+                        awaitCancellation()
+                    },
+                )
+                fail("Cancelled preparation must not return a credential response")
+            }
+            try {
+                preparing.await()
+            } finally {
+                request.cancelAndJoin()
+            }
+            assertTrue(signatures.isEmpty())
+        }
+    }
+
     private suspend fun issueTimeMappedSdJwt(
         mapping: JsonObject?,
         time: String,
@@ -486,6 +519,7 @@ class ProviderCredentialIssuanceTest {
         inputs: List<CredentialIssuanceInput>? = null,
         selectiveDisclosure: SDMap? = null,
         signatures: MutableList<Unit> = mutableListOf(),
+        loadDocument: suspend (String) -> ByteArray = { error("Inline schemas need no transport") },
     ): CredentialResponseResult {
         suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -511,7 +545,7 @@ class ProviderCredentialIssuanceTest {
             object : SdJwtVcMetadataContext {
                 override val publication = publication
                 override val resolved = resolved
-                override suspend fun readDocument(uri: String): ByteArray = error("Inline schemas need no transport")
+                override suspend fun readDocument(uri: String): ByteArray = loadDocument(uri)
                 override fun close() { closed++ }
             }
         } }
@@ -527,24 +561,27 @@ class ProviderCredentialIssuanceTest {
             })
         }
         val legacyIssuer = if (legacy) ObservedLegacyKey(JWKKey.generate(KeyType.secp256r1)) { signatures += Unit } else null
-        val result = if (legacyIssuer != null) {
-            handler.sign(
-                request, configuration, legacyIssuer, "https://issuer.example", batch,
-                dataMapping = mapping, selectiveDisclosure = selectiveDisclosure, x5Chain = null, display = null,
-                w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                validFrom = null, validUntil = null, expectedUpdate = null,
-            )
-        } else {
-            handler.sign(
-                request, configuration, Crypto2CredentialSigningKey.select(issuer, configuration), "https://issuer.example", batch,
-                dataMapping = mapping, selectiveDisclosure = selectiveDisclosure, x5Chain = null, display = null,
-                w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                validFrom = null, validUntil = null, expectedUpdate = null,
-            )
+        val result = try {
+            if (legacyIssuer != null) {
+                handler.sign(
+                    request, configuration, legacyIssuer, "https://issuer.example", batch,
+                    dataMapping = mapping, selectiveDisclosure = selectiveDisclosure, x5Chain = null, display = null,
+                    w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
+                    validFrom = null, validUntil = null, expectedUpdate = null,
+                )
+            } else {
+                handler.sign(
+                    request, configuration, Crypto2CredentialSigningKey.select(issuer, configuration), "https://issuer.example", batch,
+                    dataMapping = mapping, selectiveDisclosure = selectiveDisclosure, x5Chain = null, display = null,
+                    w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
+                    validFrom = null, validUntil = null, expectedUpdate = null,
+                )
+            }
+        } finally {
+            assertEquals(resolutions, closed)
         }
         assertEquals(if (round && mapping != null) 1 else 0, clockReads)
         assertEquals(if (metadata == null) 0 else 1, resolutions)
-        assertEquals(resolutions, closed)
         if (result is CredentialResponseResult.Success) {
             result.response.credentials!!.forEach {
                 val jwt = it.credential.jsonPrimitive.content.substringBefore("~")

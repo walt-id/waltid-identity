@@ -156,9 +156,6 @@ class MetadataService @JvmOverloads constructor(
             }
             .keys
 
-    fun getVctTypeMetadata(credentialType: String): SdJwtVcTypeMetadataDraft04 =
-        typeMetadata.getTypeMetadata(credentialType)
-
     fun issuerBaseUrl(): String = baseUrl
 
     /**

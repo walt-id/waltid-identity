@@ -27,6 +27,29 @@ class IssuerTypeMetadataCatalogueTest {
     private val parent = "https://types.example/person/v1"
 
     @Test
+    fun `hosted origin variants preserve exact VCT and retained slug lookup without self fetch`() = runBlocking {
+        for (type in listOf(vct, vct.replace("https:", "HTTPS:"), vct.replace("issuer.example", "ISSUER.EXAMPLE:443"))) {
+            val store = InMemoryPersistence<String>("publications", Duration.INFINITE)
+            fun catalogue(config: Issuer2MetadataConfig) = IssuerTypeMetadataCatalogue(
+                Issuer2ServiceConfig(baseUrl = base), config, store,
+                fetcher { error("Hosted metadata must not fetch itself") },
+            )
+            val published = catalogue(config(SdJwtVcTypeMetadataDraft04(name = "Identity"), type)).use { current ->
+                val publication = current.publication("identity_type")
+                assertEquals(type, publication.vct)
+                current.resolve(current.credentialConfigurations.getValue("identity_config"))!!.use { context ->
+                    assertContentEquals(publication.bytes(), context.publication.bytes())
+                    MetadataIntegrity.verify(publication.bytes(), context.publication.integrity)
+                }
+                publication
+            }
+            catalogue(Issuer2MetadataConfig()).use { removed ->
+                assertContentEquals(published.bytes(), removed.publication("identity_type").bytes())
+            }
+        }
+    }
+
+    @Test
     fun `restart retains original parent bytes and removed configurations remain published`() = runBlocking {
         val store = InMemoryPersistence<String>("publications", Duration.INFINITE)
         val reads = AtomicInteger()
@@ -93,6 +116,12 @@ class IssuerTypeMetadataCatalogueTest {
         IssuerTypeMetadataCatalogue(Issuer2ServiceConfig(baseUrl = base), shared, store, fetcher { error("Hosted type fetched itself") }).use {
             assertEquals(setOf(vct), it.publications().keys)
         }
+        val conflictingAlias = config(source, vct.replace("issuer.example", "issuer.example:443"))
+        IssuerTypeMetadataCatalogue(Issuer2ServiceConfig(baseUrl = base), conflictingAlias, store,
+            fetcher { error("Hosted type fetched itself") }).use {
+            assertFailsWith<IllegalArgumentException> { it.publications() }
+        }
+        assertEquals(1, store.listAllKeys().size, "An equivalent URL must not replace or shadow a retained VCT")
         val otherBase = "https://other.example/tenant"
         val otherVct = "$otherBase/openid4vci/identity_type"
         IssuerTypeMetadataCatalogue(Issuer2ServiceConfig(baseUrl = otherBase), config(source, otherVct), store,
