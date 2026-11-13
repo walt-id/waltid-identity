@@ -125,10 +125,10 @@ extension XCTestCase {
         }
         func reveal(_ element: XCUIElement) {
             for _ in 0..<8 where !element.isHittable {
-                if !element.frame.isEmpty && element.frame.minY < app.frame.midY { app.swipeDown() }
+                if element.exists && !element.frame.isEmpty && element.frame.minY < app.frame.midY { app.swipeDown() }
                 else { app.swipeUp() }
             }
-            XCTAssertTrue(element.isHittable, app.debugDescription)
+            XCTAssertTrue(element.exists && element.isHittable, app.debugDescription)
         }
         func refresh(expect title: String) {
             let refresh = button("credential-status-check-")
