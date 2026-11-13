@@ -470,6 +470,7 @@ class WalletIssuanceSessionService(
         request: WalletIssuanceSessionRequest,
         preferredLocales: List<String>,
     ): ActiveSession {
+        parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         ensureOpen()
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request, preferredLocales, keyMaterial)
