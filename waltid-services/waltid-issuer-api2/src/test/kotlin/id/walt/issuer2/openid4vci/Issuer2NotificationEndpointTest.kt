@@ -13,6 +13,7 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
@@ -46,6 +47,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -84,13 +89,24 @@ class Issuer2NotificationEndpointTest {
         }
         assertEquals(HttpStatusCode.NoContent, accepted.status, accepted.bodyAsText())
         assertEquals("", accepted.bodyAsText())
-        val invalidToken = client.post(issuance.notificationEndpoint) {
-            bearerAuth("invalid")
-            contentType(ContentType.Application.Json)
-            setBody("{")
+        val excessive = """{"notification_id":"${issuance.notificationId}","event":"credential_accepted","ignored":""" +
+            "[".repeat(20_000) + "0" + "]".repeat(20_000) + "}"
+        for (body in listOf("{", excessive)) {
+            val invalidToken = client.post(issuance.notificationEndpoint) {
+                bearerAuth("invalid")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.Unauthorized, invalidToken.status)
+            assertEquals("invalid_token", invalidToken.body<JsonObject>()["error"]?.jsonPrimitive?.content)
         }
-        assertEquals(HttpStatusCode.Unauthorized, invalidToken.status)
-        assertEquals("invalid_token", invalidToken.body<JsonObject>()["error"]?.jsonPrimitive?.content)
+        val invalidBody = client.post(issuance.notificationEndpoint) {
+            bearerAuth(issuance.accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(excessive)
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalidBody.status)
+        assertEquals("invalid_notification_request", invalidBody.body<JsonObject>()["error"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -431,8 +447,22 @@ class Issuer2NotificationEndpointTest {
     }
 
     @Test
-    fun deferredCollectionKeepsAnEarlierWalletReport() = testApplication {
-        installIssuer2WithConfigFiles()
+    fun deferredCollectionKeepsAnOverlappingWalletReportOnSuccess() = verifyOverlappingWalletReport(rejectCollection = false)
+
+    @Test
+    fun deferredCollectionKeepsAnOverlappingWalletReportOnRejection() = verifyOverlappingWalletReport(rejectCollection = true)
+
+    private fun verifyOverlappingWalletReport(rejectCollection: Boolean) = testApplication {
+        val collectionStarted = CompletableDeferred<Unit>()
+        val resumeCollection = CompletableDeferred<Unit>()
+        var overlap = false
+        installIssuer2WithConfigFiles(credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, _ ->
+            if (overlap) {
+                collectionStarted.complete(Unit)
+                withTimeout(10_000) { resumeCollection.await() }
+                !rejectCollection
+            } else true
+        })
         val client = apiClient()
         val wallet = Issuer2WalletFlowDriver(client)
         val scenarios = listOf(Issuer2CredentialScenarios.identitySdJwt, Issuer2CredentialScenarios.isoMdl)
@@ -466,26 +496,40 @@ class Issuer2NotificationEndpointTest {
         val first = collect(transactions[0])
         assertEquals(HttpStatusCode.OK, first.status, first.bodyAsText())
         val notificationId = first.body<JsonObject>().getValue("notification_id").jsonPrimitive.content
-        val reported = client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
-            bearerAuth(token.access_token)
-            contentType(ContentType.Application.Json)
-            setBody(notificationBody(notificationId, "credential_accepted", "stored"))
+        overlap = true
+        coroutineScope {
+            val collecting = async { collect(transactions[1]) }
+            withTimeout(10_000) { collectionStarted.await() }
+            try {
+                val reported = client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
+                    bearerAuth(token.access_token)
+                    contentType(ContentType.Application.Json)
+                    setBody(notificationBody(notificationId, "credential_accepted", "stored"))
+                }
+                assertEquals(HttpStatusCode.NoContent, reported.status, reported.bodyAsText())
+                val reportedSession = client.getSession(offer.offerId)
+                val reportedIdentifier = reportedSession.issuanceResults.entries.single {
+                    it.value.walletNotification?.notificationId == notificationId
+                }.key
+                assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, reportedSession.issuanceResults.getValue(reportedIdentifier).walletNotification?.event)
+            } finally {
+                resumeCollection.complete(Unit)
+            }
+            val second = collecting.await()
+            assertEquals(if (rejectCollection) HttpStatusCode.BadRequest else HttpStatusCode.OK, second.status, second.bodyAsText())
+            if (rejectCollection) assertEquals("invalid_proof", second.body<JsonObject>()["error"]?.jsonPrimitive?.content)
         }
-        assertEquals(HttpStatusCode.NoContent, reported.status, reported.bodyAsText())
-        val reportedSession = client.getSession(offer.offerId)
-        val reportedIdentifier = reportedSession.issuanceResults.entries.single {
+        val finished = client.getSession(offer.offerId)
+        val reportedIdentifier = finished.issuanceResults.entries.single {
             it.value.walletNotification?.notificationId == notificationId
         }.key
-        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, reportedSession.issuanceResults.getValue(reportedIdentifier).walletNotification?.event)
-        val second = collect(transactions[1])
-        assertEquals(HttpStatusCode.OK, second.status, second.bodyAsText())
-        val finished = client.getSession(offer.offerId)
         assertEquals(
             NotificationEvent.CREDENTIAL_ACCEPTED,
             finished.issuanceResults.getValue(reportedIdentifier).walletNotification?.event,
         )
         assertEquals("stored", finished.issuanceResults.getValue(reportedIdentifier).walletNotification?.eventDescription)
-        assertNull(finished.issuanceResults.entries.single { it.key != reportedIdentifier }.value.walletNotification?.event)
+        assertEquals(if (rejectCollection) 1 else 2, finished.issuanceResults.size)
+        assertTrue(finished.issuanceResults.filterKeys { it != reportedIdentifier }.values.all { it.walletNotification?.event == null })
     }
 
     private suspend fun HttpClient.issueCredential(webhookUrl: String? = null): IssuedNotificationContext {
