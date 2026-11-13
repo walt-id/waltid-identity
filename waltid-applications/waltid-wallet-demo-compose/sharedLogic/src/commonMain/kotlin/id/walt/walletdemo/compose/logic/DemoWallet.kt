@@ -15,8 +15,11 @@ interface DemoWallet {
         reviewedStatus: Map<String, String>,
         did: String? = null,
         paymentConsentRevision: String? = null,
+        statusReviewEpoch: Long? = null,
     ): WalletDemoOperationResult {
-        val latest = credentialStatusSnapshot().credentials
+        val snapshot = credentialStatusSnapshot()
+        if (statusReviewEpoch != null && statusReviewEpoch != snapshot.reviewEpoch) throw WalletDemoStatusReviewChanged()
+        val latest = snapshot.credentials
         if (selectedCredentialOptions.any {
                 val revision = reviewedStatus[it.credentialId]
                 revision.isNullOrBlank() || latest[it.credentialId]?.advisoryRevision != revision

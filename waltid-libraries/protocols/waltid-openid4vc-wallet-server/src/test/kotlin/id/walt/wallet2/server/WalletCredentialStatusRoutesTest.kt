@@ -18,6 +18,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.get
+import io.ktor.client.request.delete
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -25,6 +26,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -75,27 +77,44 @@ class WalletCredentialStatusRoutesTest {
         assertFalse(metadata.contains("private_claim"), "Metadata listing must not add raw credential contents")
         assertTrue(metadata.contains("advisoryRevision"), "Default-valued consent revisions must be on the wire")
         for (account in listOf(null, "other")) {
-            val response = client.post("$base/credential-status/refresh") {
-                account?.let { header("X-Test-Account", it) }
-                contentType(ContentType.Application.Json); setBody("{}")
+            for (operation in listOf("refresh", "context")) {
+                val response = client.post("$base/credential-status/$operation") {
+                    account?.let { header("X-Test-Account", it) }
+                    contentType(ContentType.Application.Json); setBody("{}")
+                }
+                assertEquals(if (account == null) HttpStatusCode.Unauthorized else HttpStatusCode.Forbidden, response.status)
             }
-            assertEquals(if (account == null) HttpStatusCode.Unauthorized else HttpStatusCode.Forbidden, response.status)
         }
+        val opened = client.post("$base/credential-status/context") { header("X-Test-Account", "owner") }
+        assertEquals(HttpStatusCode.Created, opened.status, opened.bodyAsText())
+        assertEquals("no-store", opened.headers[HttpHeaders.CacheControl])
+        val contextId = Json.parseToJsonElement(opened.bodyAsText()).jsonObject.getValue("statusContext").jsonObject.getValue("id").jsonPrimitive.content
+        assertEquals(HttpStatusCode.Forbidden, client.get("$base/credential-status?statusContext=$contextId") { header("X-Test-Account", "other") }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.delete("$base/credential-status/context/$contextId") { header("X-Test-Account", "other") }.status)
+        assertEquals(HttpStatusCode.OK, client.get("$base/credential-status?statusContext=$contextId") { header("X-Test-Account", "owner") }.status)
+        assertEquals(HttpStatusCode.NoContent, client.delete("$base/credential-status/context/$contextId") { header("X-Test-Account", "owner") }.status)
+        assertEquals(HttpStatusCode.Conflict, client.get("$base/credential-status?statusContext=$contextId") { header("X-Test-Account", "owner") }.status)
         val foreign = client.post("$base/credential-status/refresh") {
             header("X-Test-Account", "owner"); contentType(ContentType.Application.Json)
             setBody("""{"credentials":[{"storeIndex":0,"credentialId":"foreign"}]}""")
         }
         assertEquals(HttpStatusCode.BadRequest, foreign.status)
-        val changed = client.post("$base/credentials/present/build-vp-token/status-reviewed") {
-            header("X-Test-Account", "owner"); contentType(ContentType.Application.Json)
-            setBody(Json.encodeToString(StatusReviewedBuildVpTokenRequest(
-                BuildVpTokenRequest(Url("https://must-not-resolve.invalid/request"),
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection("identity", "identity"))),
-                reviewedStatus = mapOf("identity" to "old-warning"),
-            )))
+        val options = listOf(PresentationCredentialSelection("identity", "identity"))
+        val legacy = mapOf("identity" to listOf("identity"))
+        for (request in listOf(
+            BuildVpTokenRequest(Url("https://must-not-resolve.invalid/request"), selectedCredentialOptions = options),
+            BuildVpTokenRequest(Url("https://must-not-resolve.invalid/request"), selectedCredentialIds = legacy),
+            BuildVpTokenRequest(Url("https://must-not-resolve.invalid/request"), selectedCredentialOptions = options,
+                selectedCredentialIds = mapOf("ignored" to listOf("foreign"))),
+        )) {
+            val changed = client.post("$base/credentials/present/build-vp-token/status-reviewed") {
+                header("X-Test-Account", "owner"); contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(StatusReviewedBuildVpTokenRequest(request,
+                    reviewedStatus = mapOf("identity" to "old-warning"))))
+            }
+            assertEquals(HttpStatusCode.Conflict, changed.status, changed.bodyAsText())
+            assertEquals("credential_status_review_changed", Json.parseToJsonElement(changed.bodyAsText()).jsonObject.getValue("code").jsonPrimitive.content)
         }
-        assertEquals(HttpStatusCode.Conflict, changed.status, changed.bodyAsText())
-        assertEquals("credential_status_review_changed", Json.parseToJsonElement(changed.bodyAsText()).jsonObject.getValue("code").jsonPrimitive.content)
     }
 
     @Test

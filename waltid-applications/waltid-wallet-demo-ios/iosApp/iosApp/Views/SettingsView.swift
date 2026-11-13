@@ -176,6 +176,7 @@ struct SettingsView: View {
 
 struct CredentialStatusSettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
+    var helpInitiallyExpanded = false
     var body: some View {
         Form {
             Section {
@@ -208,12 +209,13 @@ struct CredentialStatusSettingsView: View {
                 if viewModel.credentialStatusSummary?.deferred ?? 0 > 0 { Text("Some checks were deferred. Try again later.") }
             }
             Section {
-                MetadataDisclosure(title: String(localized: "How checks work"), initiallyExpanded: false) {
+                MetadataDisclosure(title: String(localized: "How checks work"), initiallyExpanded: helpInitiallyExpanded,
+                    accessibilityIdentifier: "settings-credential-status-how") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Checks download status lists. The credential itself is not sent.")
                         Text("List addresses and network metadata can correlate requests.")
                         Text("Recipients verify credential status independently.")
-                        Text("With check errors counts returned records with failed checks, conflicts or unreadable references. It overlaps the outcome rows.")
+                        Text("“With check errors” counts credentials with failed checks, conflicting results or unreadable status information. These credentials are also included in the other counts.")
                     }.font(.footnote).foregroundStyle(.secondary)
                 }
             }

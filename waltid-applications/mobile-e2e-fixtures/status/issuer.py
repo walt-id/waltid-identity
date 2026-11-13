@@ -255,6 +255,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", cache)
         self.send_header("Content-Length", str(len(body)))
+        if not self.server.control and content_type == "image/png":
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 

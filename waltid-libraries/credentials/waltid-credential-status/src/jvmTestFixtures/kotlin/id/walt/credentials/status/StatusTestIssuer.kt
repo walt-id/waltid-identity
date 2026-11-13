@@ -20,16 +20,15 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
 /** Real signatures for protocol-to-wallet adapter tests, shared by those distinct boundaries. */
-class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val keyId: String) {
-    val uri = "https://status.example/list"
+class StatusTestIssuer private constructor(val key: JWKKey, val did: String, val keyId: String, val uri: String) {
 
     companion object {
-        suspend fun create(): StatusTestIssuer {
+        suspend fun create(uri: String = "https://status.example/list"): StatusTestIssuer {
             DidService.minimalInit()
             val key = JWKKey.generate(KeyType.Ed25519)
             val did = DidService.registerByKey("key", key).did
             val keyId = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
-            return StatusTestIssuer(key, did, keyId)
+            return StatusTestIssuer(key, did, keyId, uri)
         }
     }
 

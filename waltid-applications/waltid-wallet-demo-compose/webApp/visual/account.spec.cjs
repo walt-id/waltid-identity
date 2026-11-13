@@ -1,53 +1,8 @@
 const { test, expect } = require('@playwright/test');
-const { createHash } = require('node:crypto');
 const catalogue = require('./catalogue.json');
-const statusFixtures = require('../../../waltid-wallet-demo-test-fixtures/resources/files/credential-status.json').values;
 
-// Compose's ARIA mirror supplies bounds, while the canvas receives the actual pointer input.
-async function clickControl(page, locator) {
-  await expect(locator).toBeVisible();
-  const box = await locator.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-}
-
-async function fillControl(page, locator, value, inputMode) {
-  await clickControl(page, locator);
-  // ARIA textboxes are contenteditable mirrors. Filling them can race the
-  // canvas focus change without delivering text to Compose's backing editor.
-  const editor = page.locator('input.compose-backing-field');
-  await expect(editor).toHaveAttribute('inputmode', inputMode);
-  await expect(editor).toBeFocused();
-  await editor.fill(value);
-  await expect(editor).toHaveValue(value);
-}
-
-async function waitForSettledImage(page, clip) {
-  let previous;
-  let unchangedSince;
-  // CSS animation controls do not stop Compose's canvas animations. Two equal
-  // frames can occur before the enabled-state color transition has finished.
-  await expect.poll(async () => {
-    const pixels = await page.screenshot({ animations: 'disabled', caret: 'hide', ...(clip ? { clip } : {}) });
-    const current = createHash('sha256').update(pixels).digest('hex');
-    const now = performance.now();
-    if (current !== previous) {
-      previous = current;
-      unchangedSince = now;
-    }
-    return now - unchangedSince >= 500;
-  }, { timeout: 10000, intervals: [100] }).toBe(true);
-}
-
-async function submitEditedForm(page, locator) {
-  await page.keyboard.press('Tab');
-  // Filling the backing editor precedes Compose's rendered form/enabled state.
-  // Settle the action without waiting on a blinking canvas caret, then click once.
-  const box = await locator.boundingBox();
-  expect(box).not.toBeNull();
-  await waitForSettledImage(page, box);
-  await clickControl(page, locator);
-}
+const { clickControl, fillControl, waitForSettledImage, submitEditedForm } = require('./browser-controls.cjs');
+const { createWalletFixture } = require('./wallet-fixture.cjs');
 
 for (const scenario of catalogue.states.filter(state => state.id.startsWith('account.'))) {
   test(scenario.id, async ({ page }, testInfo) => {
@@ -125,171 +80,34 @@ for (const scenario of catalogue.states.filter(state => state.id.startsWith('acc
   });
 }
 
-for (const scenario of catalogue.states.filter(state => state.id.startsWith('credential.'))) {
+for (const scenario of catalogue.states.filter(state => state.state === 'credential-dates')) {
   test.describe(scenario.id, () => {
     test.use({ locale: scenario.locale, timezoneId: scenario.timezoneId });
     test(scenario.id, async ({ page }, testInfo) => {
       await page.setViewportSize({ width: scenario.width, height: scenario.height });
       testInfo.annotations.push({ type: 'requirements', description: scenario.requirements.join(', ') });
-      await page.addInitScript(() => {
-        localStorage.setItem('waltid.wallet2.baseUrl', location.origin);
-        localStorage.setItem('waltid.wallet2.token', 'synthetic-browser-token');
-        localStorage.setItem('waltid.wallet2.walletId', 'synthetic-wallet');
-        localStorage.setItem('waltid.wallet2.walletTargets', JSON.stringify(['synthetic-wallet']));
-      });
-      const dates = scenario.state === 'credential-dates';
-      const oldServer = scenario.state === 'status-unsupported';
-      const metadata = {
-        id: 'synthetic-date-credential', format: 'jwt_vc_json', label: 'Date display credential',
-        issuer: 'Synthetic Issuer', subject: 'did:example:holder', addedAt: '2026-10-25T00:35:00Z',
-      };
-      if (!dates) metadata.label = 'Status review credential';
-      const reference = { storeIndex: 0, credentialId: metadata.id };
-      let status = dates ? statusFixtures.not_provided : statusFixtures.clear;
-      const refreshes = [];
-      const responses = {
-        '/wallet': ['synthetic-wallet'],
-        '/wallet/synthetic-wallet': { walletId: 'synthetic-wallet', defaultKeyId: 'synthetic-key', defaultDidId: 'did:example:holder' },
-        '/wallet/synthetic-wallet/dids': [{ did: 'did:example:holder' }],
-        '/wallet/synthetic-wallet/credentials': [metadata],
-        '/wallet/synthetic-wallet/credentials/receive/deferred': [],
-        '/wallet/synthetic-wallet/credentials/synthetic-date-credential': {
-          ...metadata,
-          credential: {
-            ...metadata,
-            credentialData: {
-              // Both instants are 02:30 in Budapest, on opposite sides of the DST overlap.
-              iat: 1792888200, exp: 1792891800,
-              validFrom: '2026-10-25T00:30:00.123456789Z',
-              credentialSubject: { birth_date: '1990-05-21' },
-            },
-          },
-        },
-      };
-      const unexpected = [];
-      const errors = [];
-      page.on('pageerror', error => errors.push(error.message));
-      await page.route(url => url.pathname === '/wallet' || url.pathname.startsWith('/wallet/'), async route => {
-        const path = new URL(route.request().url()).pathname;
-        const method = route.request().method();
-        if (path === '/wallet/synthetic-wallet/credential-status' && method === 'GET') {
-          await route.fulfill(oldServer ? { status: 404, json: {} } : { json: {
-            evaluatedAt: status.evaluatedAt, credentials: [{ reference, ...status }], refreshing: [], nextRefreshAt: null,
-          } });
-        } else if (path === '/wallet/synthetic-wallet/credential-status/refresh' && method === 'POST' && !oldServer) {
-          const request = route.request().postDataJSON();
-          refreshes.push(request);
-          if (request.mode === 'FORCE') status = statusFixtures.revoked_partial;
-          await route.fulfill({ json: [{ reference, outcome: request.mode === 'FORCE' ? 'COMPLETED' : 'UNCHANGED', status: status.status }] });
-        } else if (path.endsWith('/set-default') && method === 'PUT') {
-          await route.fulfill({ status: 204 });
-        } else if (route.request().method() === 'GET' && Object.hasOwn(responses, path)) {
-          await route.fulfill({ json: responses[path] });
-        } else {
-          unexpected.push(`${route.request().method()} ${path}`);
-          await route.fulfill({ status: 404, json: {} });
-        }
-      });
+      const fixture = await createWalletFixture(page, { cards: [{
+        id: 'synthetic-date-credential', title: 'Date display credential', status: 'not_provided', addedAt: '2026-10-25T00:35:00Z',
+        credentialData: { iat: 1792888200, exp: 1792891800,
+          validFrom: '2026-10-25T00:30:00.123456789Z', credentialSubject: { birth_date: '1990-05-21' } },
+      }] });
       await page.goto('/');
-      await clickControl(page, page.getByText(metadata.label, { exact: true }));
-      if (!dates) {
-        const title = page.getByText(oldServer ? 'Status unavailable' : 'Not revoked', { exact: true });
-        await expect(title).toHaveCount(1);
-        // Wide credential artwork puts the standalone status section below the fold.
-        await page.mouse.move(scenario.width / 2, scenario.height / 2);
-        await page.mouse.wheel(0, scenario.height);
-        await waitForSettledImage(page);
-        for (let attempt = 0; !await title.isVisible() && attempt < 4; attempt++) {
-          await page.mouse.move(scenario.width / 2, scenario.height / 2);
-          await page.mouse.wheel(0, scenario.height / 2);
-          await waitForSettledImage(page);
-        }
-        await expect(title).toBeVisible();
-        if (oldServer) {
-          await expect(page.getByRole('button', { name: 'Refresh status', exact: true })).toHaveCount(0);
-          expect(refreshes).toEqual([]);
-        } else {
-          await clickControl(page, page.getByRole('button', { name: 'Refresh status', exact: true }));
-          await expect(page.getByText('Last known: revoked', { exact: true })).toBeVisible();
-          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(0);
-          expect(refreshes.filter(request => request.mode === 'FORCE')).toEqual([{ credentials: [reference], mode: 'FORCE' }]);
-          const notice = page.getByText('Status changed: Status review credential. Open the marked cards for details.', { exact: true });
-          await expect(notice).toBeVisible();
-          await expect(notice).toHaveCount(0);
-        }
-        await clickControl(page, page.getByRole('button', { name: 'Details', exact: true }));
-        await page.mouse.move(scenario.width / 2, scenario.height / 2);
-        await page.mouse.wheel(0, scenario.height);
-        await waitForSettledImage(page);
-        await expect(page.getByText(oldServer
-          ? 'This server does not expose credential status checks. The credential can still be shared, and the recipient performs its own checks.'
-          : 'The recipient may reject this credential.', { exact: true })).toBeVisible();
-        if (!oldServer) {
-          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toBeVisible();
-          await expect(page.getByText('Revocation', { exact: true })).toBeVisible();
-          await expect(page.getByText('Last checked', { exact: true })).toBeVisible();
-          await expect(page.getByText('Latest attempt', { exact: true })).toBeVisible();
-        }
-        await waitForSettledImage(page);
-        expect(unexpected).toEqual([]);
-        expect(errors).toEqual([]);
-        await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
-        await testInfo.attach(scenario.id, { body: await page.screenshot(), contentType: 'image/png' });
-        if (!oldServer) {
-          // Pointer focus belongs to the actual Compose canvas. Verify keyboard activation by
-          // observing content, rather than trusting the ARIA mirror's focused attribute.
-          await clickControl(page, page.getByRole('button', { name: 'Details', exact: true }));
-          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(0);
-          await page.keyboard.press('Space');
-          await expect(page.getByText('Some status references could not be checked.', { exact: true })).toHaveCount(1);
-          // Popup dismissal can leave the pinned renderer's ARIA mirror stale. Compare the
-          // actual canvas below the focused header, so Escape must restore the full backdrop.
-          await page.mouse.move(scenario.width / 2, scenario.height / 2);
-          await page.mouse.wheel(0, -scenario.height * 4);
-          await waitForSettledImage(page);
-          const more = page.getByRole('button', { name: 'More', exact: true });
-          const header = await more.boundingBox();
-          expect(header).not.toBeNull();
-          // Keep hover on the same header control in both frames, away from the clickable art.
-          await page.mouse.move(header.x + header.width / 2, header.y + header.height / 2);
-          await waitForSettledImage(page);
-          // Include the toolbar's bottom inset; its focus indication is intentionally different.
-          const top = Math.ceil(header.y + header.height + 8);
-          const clip = { x: 0, y: top, width: scenario.width, height: scenario.height - top };
-          const backdrop = await page.screenshot({ clip });
-          await clickControl(page, more);
-          await expect(page.getByText('Copy', { exact: true })).toBeVisible();
-          await page.keyboard.press('Escape');
-          await waitForSettledImage(page);
-          await testInfo.attach('keyboard-backdrop-before-popup', { body: backdrop, contentType: 'image/png' });
-          await testInfo.attach('keyboard-backdrop-after-escape', { body: await page.screenshot({ clip }), contentType: 'image/png' });
-          await expect.poll(async () => (await page.screenshot({ clip })).equals(backdrop)).toBe(true);
-          expect(unexpected).toEqual([]);
-          expect(errors).toEqual([]);
-        }
-        return;
-      }
+      await clickControl(page, page.getByRole('button', { name: /^Date display credential(,|$)/ }));
       const birthDate = page.getByText('1990-05-21', { exact: true });
       await expect(birthDate).toHaveCount(1);
-      // Wide cards put the details below the fold. Scroll the actual canvas, not its ARIA mirror.
       await page.mouse.move(scenario.width / 2, scenario.height / 2);
       await page.mouse.wheel(0, scenario.height);
       await waitForSettledImage(page);
       await expect(birthDate).toBeVisible();
       await clickControl(page, page.getByRole('button', { name: 'Technical details', exact: true }));
-      // Assertions exercise the real API2 mapping, normalizer, Intl adapter and claim component.
-      // Bidi isolates keep the parenthesized zone readable in either text direction.
       for (const value of [
         '25 Oct 2026, 02:30 \u2068(Budapest, CEST)\u2069',
         '25 Oct 2026, 02:30 \u2068(Budapest, CET)\u2069',
         '25 Oct 2026, 02:30:00.123456789 \u2068(Budapest, CEST)\u2069',
         '25 Oct 2026, 02:35 \u2068(Budapest, CEST)\u2069',
-      ]) {
-        await expect(page.getByText(value, { exact: true })).toBeVisible();
-      }
+      ]) await expect(page.getByText(value, { exact: true })).toBeVisible();
       await waitForSettledImage(page);
-      expect(unexpected).toEqual([]);
-      expect(errors).toEqual([]);
+      expect(fixture.unexpected).toEqual([]); expect(fixture.errors).toEqual([]);
       await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
       await testInfo.attach(scenario.id, { body: await page.screenshot(), contentType: 'image/png' });
     });

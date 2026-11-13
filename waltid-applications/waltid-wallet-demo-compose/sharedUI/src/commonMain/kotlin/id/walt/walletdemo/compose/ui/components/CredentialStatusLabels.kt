@@ -6,6 +6,7 @@ import id.walt.walletdemo.compose.ui.resources.Res
 import id.walt.walletdemo.compose.ui.resources.credential_status_loading
 import id.walt.walletdemo.compose.ui.resources.credential_status_checked
 import id.walt.walletdemo.compose.ui.resources.credential_status_clear
+import id.walt.walletdemo.compose.ui.resources.credential_status_clear_title
 import id.walt.walletdemo.compose.ui.resources.credential_status_invalid
 import id.walt.walletdemo.compose.ui.resources.credential_status_last_known_invalid
 import id.walt.walletdemo.compose.ui.resources.credential_status_last_known_revoked
@@ -31,6 +32,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun WalletDemoCredentialStatus.title(): String = stringResource(when {
+    positive -> Res.string.credential_status_clear_title
     lastKnown && kind == "REVOKED" -> Res.string.credential_status_last_known_revoked
     lastKnown && kind == "INVALID" -> Res.string.credential_status_last_known_invalid
     lastKnown && kind == "SUSPENDED" -> Res.string.credential_status_last_known_suspended

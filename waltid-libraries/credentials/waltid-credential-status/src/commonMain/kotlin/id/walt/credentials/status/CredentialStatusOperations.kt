@@ -96,29 +96,43 @@ fun CredentialStatusEntry.matches(other: CredentialStatusEntry): Boolean =
         is CredentialStatusEntry.Malformed -> other is CredentialStatusEntry.Malformed && problem == other.problem
     }
 
-/** Retain earlier evidence only for the exact same owner. No caller can rebind its protocol/purpose. */
+/** Reconcile dated evidence for the exact same owner without regressing observations or attempts. */
 fun CredentialStatusEntry.mergePrevious(previous: CredentialStatusEntry, at: Instant): CredentialStatusEntry {
     require(matches(previous)) { "Credential status reference does not match" }
+    val observed = lastObservation()
+    val old = previous.lastObservation()
+    val earlier = if (observed != null && old != null && observed.checkedAt < old.checkedAt) this else previous
+    val conflict = observed != null && old != null && earlier.irreversible && meaning != previous.meaning
     return when {
         this is CredentialStatusEntry.Token && previous is CredentialStatusEntry.Token ->
-            CredentialStatusEntry.Token(referenceId, check.merge(previous.check, at, previous.irreversible, ::tokenMeaning))
+            CredentialStatusEntry.Token(referenceId, check.merge(previous.check, at, conflict))
         this is CredentialStatusEntry.Mso && previous is CredentialStatusEntry.Mso ->
-            CredentialStatusEntry.Mso(referenceId, check.merge(previous.check, at, previous.irreversible, { if (it == MsoStatus.REVOKED) StatusMeaning.REVOKED else StatusMeaning.CLEAR }))
+            CredentialStatusEntry.Mso(referenceId, check.merge(previous.check, at, conflict))
         this is CredentialStatusEntry.Bitstring && previous is CredentialStatusEntry.Bitstring ->
-            CredentialStatusEntry.Bitstring(referenceId, purpose, check.merge(previous.check, at, previous.irreversible,
-                { bitstringMeaning(purpose, it) }))
+            CredentialStatusEntry.Bitstring(referenceId, purpose, check.merge(previous.check, at, conflict))
         this is CredentialStatusEntry.Legacy && previous is CredentialStatusEntry.Legacy ->
-            CredentialStatusEntry.Legacy(referenceId, purpose, check.merge(previous.check, at, previous.irreversible, { legacyMeaning(purpose, it) }))
+            CredentialStatusEntry.Legacy(referenceId, purpose, check.merge(previous.check, at, conflict))
         else -> this
     }
 }
 
-private fun <V : Any> Check<V>.merge(previous: Check<V>, at: Instant, irreversible: Boolean, meaning: (V) -> StatusMeaning): Check<V> {
-    val old = previous.lastObservation() ?: return this
-    return when (this) {
-        is Check.Failed -> Check.Failed(attemptedAt, cause, old)
-        is Check.Observed -> if (irreversible && meaning(old.value) != meaning(observation.value)) Check.Conflict(at, old) else this
-        else -> this
+private val Check<*>.updatedAt: Instant? get() = when (this) {
+    Check.NotChecked -> null
+    is Check.Observed -> observation.checkedAt
+    is Check.Failed -> attemptedAt
+    is Check.Conflict -> attemptedAt
+}
+
+private fun <V : Any> Check<V>.merge(previous: Check<V>, at: Instant, conflict: Boolean): Check<V> {
+    val observed = listOfNotNull(lastObservation(), previous.lastObservation())
+    val retained = if (conflict) observed.minByOrNull { it.checkedAt } else observed.maxByOrNull { it.checkedAt }
+    val latest = if (compareValues(updatedAt, previous.updatedAt) >= 0) this else previous
+    return when (latest) {
+        Check.NotChecked -> Check.NotChecked
+        is Check.Failed -> Check.Failed(latest.attemptedAt, latest.cause, retained)
+        is Check.Conflict -> Check.Conflict(latest.attemptedAt, requireNotNull(retained))
+        is Check.Observed -> if (conflict) Check.Conflict(at, requireNotNull(retained))
+            else Check.Observed(requireNotNull(retained))
     }
 }
 

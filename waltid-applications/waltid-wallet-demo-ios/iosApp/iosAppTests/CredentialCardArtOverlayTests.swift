@@ -1,7 +1,17 @@
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import XCTest
 
 final class CredentialCardArtOverlayTests: XCTestCase {
+    func testBadgeClearsMeasuredIssuerChipsAndTheUnchangedStackPeek() {
+        for width in [CGFloat(280), 320, 353, 360] {
+            let top = credentialStatusBadgeTop(width)
+            for chipBottom in [CGFloat(97), 109] {
+                XCTAssertGreaterThan(top - chipBottom * width / 1280, 1.5)
+            }
+            XCTAssertGreaterThan(56 - top - 20, 2.5)
+        }
+    }
+
     func testThumbnailUsesMetadataBackgroundInsteadOfArtwork() {
         let art = "https://issuer.example/art.png"
         XCTAssertNil(credentialCardMetadataArtURI(backgroundColor: "#123456", backgroundImageURI: art, compact: true))

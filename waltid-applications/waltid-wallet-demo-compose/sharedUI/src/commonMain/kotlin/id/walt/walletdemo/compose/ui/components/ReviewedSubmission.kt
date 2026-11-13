@@ -43,6 +43,14 @@ private class SubmissionAttempt(
     val submit: (Map<String, String>) -> Unit,
 )
 
+internal class ReviewedSubmission(
+    val enabled: Boolean,
+    val changed: Boolean,
+    val refreshAllowed: Boolean,
+    val canRefresh: () -> Boolean,
+    val submit: () -> Unit,
+)
+
 /** One final gate for status and unsigned-payment warnings; all protocol guards remain downstream. */
 @Composable
 internal fun rememberReviewedSubmission(
@@ -54,7 +62,7 @@ internal fun rememberReviewedSubmission(
     affirmativeLabel: String,
     ordinarySharing: Boolean,
     onSubmit: (Map<String, String>) -> Unit,
-): () -> Unit {
+): ReviewedSubmission {
     val binding = SubmissionBinding(reviewKey, credentials.map {
         Triple(it.credentialId, it.status?.storeIndex, it.status?.advisoryRevision)
     }.sortedBy { it.first }, payment.consent?.revision)
@@ -116,9 +124,7 @@ internal fun rememberReviewedSubmission(
             },
         )
     }
-    if (changed) Text(stringResource(Res.string.credential_status_review_changed),
-        Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-    return {
+    val submit = {
         if (!disposed && canSubmit && !submitted && currentBinding == binding && revisions != null) {
             changed = false
             val captured = SubmissionAttempt(binding, revisions.toMap(), onSubmit)
@@ -128,4 +134,13 @@ internal fun rememberReviewedSubmission(
             }
         }
     }
+    return ReviewedSubmission(enabled && revisions != null, changed, pending == null && !submitted && !disposed,
+        canRefresh = { pending == null && !submitted && !disposed }, submit = submit)
+}
+
+/** A review notice belongs to scrollable content; it must not change pinned action geometry. */
+@Composable
+internal fun ReviewChangedNotice(submission: ReviewedSubmission) {
+    if (submission.changed) Text(stringResource(Res.string.credential_status_review_changed),
+        Modifier.testTag("credential-status-review-changed").semantics { liveRegion = LiveRegionMode.Polite })
 }

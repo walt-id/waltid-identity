@@ -15,6 +15,7 @@ import id.walt.credentials.status.StatusTestIssuer
 import id.walt.credentials.status.TokenStatus
 import id.walt.credentials.status.entries
 import id.walt.credentials.status.failure
+import id.walt.credentials.status.hasConflict
 import id.walt.credentials.status.lastObservation
 import id.walt.credentials.status.meaning
 import id.walt.credentials.status.presentation
@@ -94,6 +95,213 @@ class WalletCredentialStatusServiceTest {
             snapshots[credential.id] = status
             return true
         }
+    }
+
+    @Test
+    fun detachedReviewBindsPolicySignedBytesAndCurrentManagedEvidenceWithoutNetworking() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val credential = StoredCredential("resident", issuer.credential())
+        val store = Store().apply { addCredential(credential) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var cacheControl = "no-store"
+        var value = 0u
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler {
+                requests++
+                respond(issuer.list(value, ttl = 600), headers = Headers.build {
+                    append(HttpHeaders.ContentType, "application/statuslist+jwt")
+                    append(HttpHeaders.CacheControl, cacheControl)
+                })
+            }
+        }))
+        fun service(walletId: String = "wallet", policy: String? = "test-v1", managed: Boolean = true) = WalletCredentialStatusService(
+            Wallet(walletId, credentialStores = listOf(if (managed) store else object : WalletCredentialStore by store {})),
+            client, now = { at }, trustPolicyId = policy, parentScope = backgroundScope,
+        )
+        try {
+            val detached = service().use { initial ->
+                initial.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                initial.captureReviewState()
+            }
+            assertEquals(1, detached.recordCount)
+            for (mismatch in listOf(service(walletId = "other"), service(policy = "other-policy"), service(policy = null))) {
+                mismatch.use { assertFailsWith<CredentialStatusReviewChangedException> { it.restoreReviewState(detached) } }
+            }
+            // A later ordinary request's managed write must take precedence over the old clear review.
+            at += 31.seconds; cacheControl = "max-age=600"; value = 1u
+            service().use { it.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+            service().use { restored ->
+                restored.restoreReviewState(detached)
+                assertEquals(CredentialStatusKind.INVALID, restored.snapshot().credentials.single().presentation.kind)
+            }
+            assertEquals(2, requests)
+            store.addCredential(credential.copy(credential = issuer.credential(index = 1)))
+            service().use { replaced ->
+                replaced.restoreReviewState(detached)
+                assertEquals(CredentialStatusKind.NOT_CHECKED, replaced.snapshot().credentials.single().presentation.kind)
+            }
+            assertEquals(2, requests, "Restoring a review must remain local")
+            // Custom adapters without snapshot storage also retain evidence only for this active review.
+            val custom = service(managed = false).use { initial ->
+                initial.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                initial.captureReviewState()
+            }
+            assertEquals(1, custom.recordCount)
+            service(managed = false).use { reopened ->
+                reopened.restoreReviewState(custom)
+                assertEquals(CredentialStatusKind.INVALID, reopened.snapshot().credentials.single().presentation.kind)
+            }
+            assertEquals(3, requests)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun reviewGuardReconcilesStatusCommittedByAnotherServiceWithoutIssuerNetworking() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.list()
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler {
+                requests++
+                respond(body, headers = Headers.build {
+                    append(HttpHeaders.ContentType, "application/statuslist+jwt")
+                    append(HttpHeaders.CacheControl, "max-age=600")
+                })
+            }
+        }))
+        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        val presenting = service()
+        val refreshing = service()
+        try {
+            presenting.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val reviewed = presenting.snapshot().credentials.single().presentation.advisoryRevision
+            val guard = presenting.reviewGuard(setOf("resident"), mapOf("resident" to reviewed))
+            guard.check()
+
+            at += 1.seconds
+            body = issuer.list(value = 1u)
+            refreshing.refresh(mode = CredentialStatusRefreshMode.FORCE)
+
+            assertFailsWith<CredentialStatusReviewChangedException> { guard.check() }
+            assertEquals(CredentialStatusKind.INVALID, presenting.readCredential("resident")!!.presentation.kind)
+            assertEquals(2, requests, "Guard and credential reads only reconcile locally stored evidence")
+        } finally { presenting.close(); refreshing.close(); client.close() }
+    }
+
+    @Test
+    fun reconcilingAnOlderStoreWritePreservesNewerInstanceOwnedNoStoreEvidence() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.list()
+        var cacheControl = "max-age=600"
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler {
+                requests++
+                respond(body, headers = Headers.build {
+                    append(HttpHeaders.ContentType, "application/statuslist+jwt")
+                    append(HttpHeaders.CacheControl, cacheControl)
+                })
+            }
+        }))
+        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        try {
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val older = store.snapshots.getValue("resident")
+            at += 1.seconds
+            body = issuer.list(value = 1u)
+            cacheControl = "no-store"
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val latest = service.snapshot().credentials.single()
+            assertEquals(CredentialStatusKind.INVALID, latest.presentation.kind)
+            assertTrue(store.snapshots.isEmpty())
+
+            // A slower independent writer can finish an older check after this instance's refresh.
+            store.snapshots["resident"] = older
+            val reconciled = service.snapshot().credentials.single()
+            assertEquals(latest.status, reconciled.status)
+            service.reviewGuard(setOf("resident"), mapOf("resident" to latest.presentation.advisoryRevision)).check()
+            assertEquals(2, requests)
+            assertEquals(older, store.snapshots.getValue("resident"), "A read must not persist instance-only evidence")
+        } finally { service.close(); client.close() }
+    }
+
+    @Test
+    fun failedRefreshCannotPersistRetainedNoStoreEvidenceButANewCacheableObservationCan() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.list(value = 1u)
+        var response = HttpStatusCode.OK
+        var cacheControl = "no-store"
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(body, response, Headers.build {
+                append(HttpHeaders.ContentType, "application/statuslist+jwt")
+                append(HttpHeaders.CacheControl, cacheControl)
+            }) }
+        }))
+        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        try {
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val observed = service.snapshot().credentials.single().status.entries.single().lastObservation()
+            assertTrue(store.snapshots.isEmpty())
+
+            at += 1.seconds
+            response = HttpStatusCode.ServiceUnavailable
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val retained = service.snapshot().credentials.single().status.entries.single()
+            assertEquals(CheckFailure.Reason.TRANSPORT, retained.failure)
+            assertEquals(observed, retained.lastObservation())
+            assertTrue(store.snapshots.isEmpty(), "Failure cannot make the retained no-store observation persistable")
+
+            at += 1.seconds
+            response = HttpStatusCode.OK
+            cacheControl = "max-age=600"
+            body = issuer.list()
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            assertEquals(StatusMeaning.CLEAR, store.snapshots.values.single().metadata.entries.single().meaning)
+        } finally { service.close(); client.close() }
+    }
+
+    @Test
+    fun cacheableConflictingResponseCannotPersistAnEarlierNoStoreObservation() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.w3cCredential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.w3cList(value = 1u)
+        var cacheControl = "no-store"
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(body, headers = Headers.build {
+                append(HttpHeaders.ContentType, "application/vc+jwt")
+                append(HttpHeaders.CacheControl, cacheControl)
+            }) }
+        }))
+        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        try {
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val observed = service.snapshot().credentials.single().status.entries.single().lastObservation()
+            at += 1.seconds
+            cacheControl = "max-age=600"
+            body = issuer.w3cList()
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val conflict = service.snapshot().credentials.single().status.entries.single()
+            assertTrue(conflict.hasConflict)
+            assertEquals(observed, conflict.lastObservation())
+            assertTrue(store.snapshots.isEmpty(), "A new cacheable response cannot change the retained observation's storage policy")
+        } finally { service.close(); client.close() }
     }
 
     @Test

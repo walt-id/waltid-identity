@@ -5,6 +5,7 @@ data class WalletDemoUiState(
     val credentialStatusContext: Long = 0,
     val automaticCredentialStatusChecks: Boolean = true,
     val checkingCredentialStatuses: Boolean = false,
+    val presentationStatusRefresh: WalletDemoReviewStatusRefresh? = null,
     val credentialStatusSummary: WalletDemoStatusRefreshSummary? = null,
     val credentialStatusBatchError: String? = null,
     val credentialStatusError: String? = null,

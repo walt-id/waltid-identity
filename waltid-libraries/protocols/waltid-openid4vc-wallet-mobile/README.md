@@ -106,7 +106,12 @@ wallet.close() // Cancels owned work; does not delete wallet data.
 `id.walt.wallet2.status.CredentialStatusRefreshMode`. Inspect per-credential outcomes and use the
 snapshot's shared `presentation` for wording, coverage, freshness and consent revisions.
 A previous result after a failed check, no status, unchecked and unsupported are not all-clear.
-Reads, matching and sharing reviews never trigger issuer checks. The app owns preferences and
+Reads, matching, opening review facts and submitting never trigger issuer status checks. An app can
+offer explicit refresh inside an online review: keep its selection and prior evidence, wait only for
+that review's requested operation, render the result/error, then require a new deliberate submit
+with the displayed revisions. Cancel the old UI interest on lock, disposal or request/wallet replacement;
+do not apply its late result to a successor review. Provider/nearby hosts need no additional networking.
+The app owns preferences and
 foreground/manual scheduling; the SDK installs no background worker. The snapshot
 `nextRefreshAt` supports an app-owned timer while active. Cancel it during lock, background and consent,
 and use bounded retry spacing for a past due time.

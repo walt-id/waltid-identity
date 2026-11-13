@@ -3,10 +3,6 @@ package id.walt.walletdemo.compose.logic.walletapi2
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoStatusReference
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /** The current browser UI selects by credential ID; overlapping custom stores remain explicit. */
 internal fun CredentialStatusSnapshotDto.toDemoStatuses(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses(
@@ -30,22 +26,18 @@ private fun CredentialStatusPresentationDto.toDemoStatus(): WalletDemoCredential
     ) }, lastKnown, discoveryProblem,
 )
 
-/** Count returned records with check errors; this overlaps the batch admission/completion counts. */
-internal val CredentialStatusRefreshResultDto.hasCheckErrors: Boolean
-    get() = when (status["type"]?.jsonPrimitive?.contentOrNull) {
-        "discovery_failed" -> true
-        "references" -> requireNotNull(status["entries"]).jsonArray.any {
-            val entry = it.jsonObject
-            when (entry["type"]?.jsonPrimitive?.contentOrNull) {
-                "malformed" -> true
-                "unsupported" -> false
-                "token", "mso", "bitstring", "legacy" -> when (entry["check"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull) {
-                    "failed", "conflict" -> true
-                    "observed", "not_checked" -> false
-                    else -> error("Invalid credential status check")
-                }
-                else -> error("Invalid credential status entry")
-            }
-        }
-        else -> error("Invalid credential status discovery result")
-    }
+/** Applies immediate producer facts by the complete stored reference; no protocol interpretation. */
+internal fun CredentialStatusSnapshotDto.withRefreshResults(results: List<CredentialStatusRefreshResultDto>): CredentialStatusSnapshotDto {
+    val updates = results.associateBy { it.reference }
+    require(updates.size == results.size && updates.keys.all { ref -> credentials.any { it.reference == ref } })
+    val contexts = results.mapNotNull { it.statusContext }.distinct()
+    require(contexts.size <= 1 && contexts.all { it.id == statusContext?.id })
+    return copy(
+        credentials = credentials.mapNotNull { record ->
+            val update = updates[record.reference] ?: return@mapNotNull record
+            if (update.outcome == "REMOVED") null else CredentialStatusRecordDto(record.reference, update.presentation)
+        },
+        refreshing = refreshing.filterNot { it in updates },
+        statusContext = contexts.singleOrNull() ?: statusContext,
+    )
+}

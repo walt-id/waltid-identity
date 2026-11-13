@@ -5,6 +5,7 @@ import WalletDemoIdentityDocumentSupport
 
 struct ProximityPresentationView: View {
     @Environment(\.credentialStatusUI) private var statusUI
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<NearbySubmissionKey>>()
     @ObservedObject var viewModel: ProximityPresentationViewModel
     @Binding var approvalMode: WalletDemoProximityApprovalMode
     var headerOwnsClose = false
@@ -23,7 +24,7 @@ struct ProximityPresentationView: View {
                     presentationBody
                 } actions: { actions }
             }
-        }
+        }.environment(\.credentialStatusUI, statusUI.readOnly)
     }
 
     private var presentationBody: some View {
@@ -33,6 +34,7 @@ struct ProximityPresentationView: View {
                     onConnectionOptions: onConnectionOptions)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
+                    if viewModel.review != nil { ReviewChangedNotice(submission) }
                     if let onConnectionOptions {
                         WalletSection { WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
                             .accessibilityIdentifier("proximity-connection-options") }
@@ -84,6 +86,7 @@ struct ProximityPresentationView: View {
             continueAfterResponse: viewModel.continueAfterResponse, preparing: viewModel.preparingApproval)
         let reject: (() -> Void)? = viewModel.preparingApproval ? nil : { viewModel.decline() }
         return ReviewActions<NearbySubmissionKey>(
+                    gate: submission,
                     selectionComplete: viewModel.canApprove,
                     isLoading: viewModel.pendingReviewID != nil,
                     reviewKey: key,

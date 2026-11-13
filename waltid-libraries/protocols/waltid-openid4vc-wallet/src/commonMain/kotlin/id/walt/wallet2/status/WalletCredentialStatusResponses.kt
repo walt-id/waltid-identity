@@ -54,22 +54,44 @@ fun WalletCredentialRead.toMetadataResponse(): WalletCredentialMetadataResponse 
 data class RefreshCredentialStatusesRequest(
     val credentials: Set<WalletCredentialReference>? = null,
     val mode: CredentialStatusRefreshMode = CredentialStatusRefreshMode.IF_DUE,
+    val statusContext: String? = null,
 ) {
     init { require(credentials == null || credentials.isNotEmpty() && credentials.size <= 100) }
 }
 
 @Serializable
-data class StatusReviewedBuildVpTokenRequest(val request: BuildVpTokenRequest, val reviewedStatus: Map<String, String>)
+data class StatusReviewedBuildVpTokenRequest(
+    val request: BuildVpTokenRequest,
+    val reviewedStatus: Map<String, String>,
+    val statusContext: String? = null,
+)
 
 @Serializable
 data class StatusReviewedSendResponseRequest(
     val request: SendAuthorizationResponseRequest,
     val selectedCredentialIds: Set<String>,
     val reviewedStatus: Map<String, String>,
+    val statusContext: String? = null,
 ) { init { require(selectedCredentialIds.isNotEmpty() && selectedCredentialIds.size <= 100) } }
 
 @Serializable
 data class CredentialStatusReviewChangedResponse(val code: String = "credential_status_review_changed")
+
+/** An explicit, bounded active review; the identifier is opaque and conveys no authorization. */
+@Serializable
+data class CredentialStatusContext(val id: String, val expiresAt: Instant)
+
+/** Immediate producer-derived data; the array shape and raw result fields remain additive. */
+@Serializable
+data class WalletCredentialStatusRefreshResponse(
+    val reference: WalletCredentialReference,
+    val outcome: CredentialStatusRefreshOutcome,
+    val status: CredentialStatus,
+    val presentation: CredentialStatusPresentationData,
+    val evaluatedAt: Instant,
+    val hasCheckErrors: Boolean,
+    val statusContext: CredentialStatusContext? = null,
+)
 
 /** Transport-only snapshot; decoded presentations never enter the local service state. */
 @Serializable
@@ -78,6 +100,7 @@ data class WalletCredentialStatusSnapshotResponse(
     val credentials: List<WalletCredentialStatusResponse>,
     val refreshing: Set<WalletCredentialReference> = emptySet(),
     val nextRefreshAt: Instant? = null,
+    val statusContext: CredentialStatusContext? = null,
 )
 
 @Serializable

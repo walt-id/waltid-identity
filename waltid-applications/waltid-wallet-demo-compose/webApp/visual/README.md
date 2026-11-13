@@ -1,22 +1,29 @@
 # Browser wallet visual checks
 
-This small [Playwright comparison lane](https://playwright.dev/docs/test-snapshots) runs the
-production Wasm host. It covers the browser-specific account form at compact/wide widths,
-busy submission, invalid credentials, registration conflict and expired sessions. Credential-details
-cases also exercise browser-local timestamp formatting at compact/wide widths, including the two
-02:30 instants in Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
-Other shared wallet content stays in the [mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md).
-Browser status cases use the same semantic fixtures as mobile. They cover the server-local snapshot,
-an explicit refresh of a stored record that changes to a partial adverse result, and an older server's
-404 fallback without an unsupported refresh request. No browser request fetches an issuer status list.
+This [Playwright comparison lane](https://playwright.dev/docs/test-snapshots) runs the production
+Wasm host. Account cases cover compact/wide forms, busy submission, invalid credentials,
+registration conflict and expired sessions. Credential dates retain the two 02:30 instants in
+Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
+
+Status cases share producer assessments and unchanged public artwork with the
+[mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md). They cover mixed
+chip/no-chip Home cards, the centered bounded wide column, simple clear and expanded adverse details,
+inline sharing facts and manual refresh, selected-only confirmation, and signed-in settings with
+expanded help. Interaction cases check review-owned refresh, deliberate guarded submission and
+context loss with unchanged issuer facts, including the first deliberate consent to the recovered
+review. Generic transaction metadata has its own sharing reference; this does not imply native
+prepared-payment support in the browser. The older-server case retains explicit capability fallback
+without an unsupported refresh request. The browser never fetches an issuer status list directly.
 The [browser catalogue](catalogue.json) records exact states, requirements and environment.
 
-The tests intercept only synthetic local account/wallet HTTP requests. They exercise the actual
+The tests intercept synthetic account/wallet HTTP and serve the shared artwork bytes locally. Forced
+status overlays on public artwork are component fixtures, not issuer results for PID/EMVCo/KYC.
+They exercise the actual
 Compose form, validate submitted credentials and recovery messages, and check that empty/busy
 actions cannot send an extra request. Submitted responses are held until the working state
 has rendered; recovery cases release that gate after its image settles, so fast synthetic
 responses cannot skip the intermediate state. No application test route, separate gallery app or live
-account is needed. Real API2 authentication and protocol tests remain separate evidence.
+account is needed. Real API2 authentication, issuance and verifier journeys remain separate evidence.
 A separate immediate-response interaction case uses actual canvas pointer/backing-editor input to
 prove that registration failure restores editable fields and permits a retry with new credentials.
 Credential cases open the real stored card through the API2 mapper, shared normalizer and browser
@@ -72,8 +79,11 @@ Text entry waits for the actual backing editor's input mode and focus, fills tha
 then verifies its value. Keyboard navigation also targets that editor. Filling the contenteditable
 ARIA mirror can race canvas focus without entering text into Compose. ARIA focus and disabled attributes are not reliable
 proxies for Compose state in the pinned version; submitted request assertions remain required.
-The status interaction case also exercises Space activation and Escape dismissal. The pinned
+The sharing driver enters its URL through the scanner's actual keyboard path and asserts the exact
+preview request. It scrolls within the real sheet and checks that controls fit above the pinned
+actions; ARIA visibility alone does not prove canvas hit testing or reachability. Help exercises
+Space activation without changing preference or batch results. The pinned
 renderer can leave its ARIA mirror stale after closing a popup, so the Escape assertion compares
 the actual canvas backdrop. This does not establish screen-reader acceptance after popup dismissal.
-This pilot does not prove screen-reader acceptance, every browser/viewport, browser authorization
+These fixtures do not prove screen-reader acceptance, every browser/viewport, browser authorization
 redirects or mobile system hosts.

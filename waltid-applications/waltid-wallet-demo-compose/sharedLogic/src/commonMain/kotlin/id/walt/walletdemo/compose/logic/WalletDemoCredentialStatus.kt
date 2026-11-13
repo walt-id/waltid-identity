@@ -2,6 +2,11 @@ package id.walt.walletdemo.compose.logic
 
 import kotlinx.serialization.Serializable
 
+/** One explicit review-owned check, including the frame that displays its completed assessment. */
+data class WalletDemoReviewStatusRefresh(val id: Long, val credentialId: String, val phase: Phase) {
+    enum class Phase { Checking, AwaitingRender }
+}
+
 /** Renderer input. LOADING/server capability are host-only; issuer semantics come from the shared producer. */
 @Serializable
 data class WalletDemoCredentialStatus(
@@ -72,6 +77,8 @@ data class WalletDemoCredentialStatuses(
     val readState: WalletDemoStatusReadState = WalletDemoStatusReadState.Available,
     /** Only an explicitly detected older server may use the legacy submission contract. */
     val legacySubmission: Boolean = false,
+    /** Host-only review lifetime marker. It is neither issuer status nor persisted evidence. */
+    val reviewEpoch: Long = 0,
 ) {
     val available: Boolean get() = readState == WalletDemoStatusReadState.Available
 }

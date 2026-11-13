@@ -85,6 +85,12 @@ import id.walt.wallet2.mobile.ProximityEngagement
 import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialCardStack
+import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.Alignment
+import kotlin.test.assertTrue
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialDetails
 import id.walt.walletdemo.compose.ui.screens.ReceiveTab
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
@@ -151,6 +157,42 @@ internal class WalletVisualScenarios(
         walletHome()
     }
 
+    fun credentialStatusMixedArtwork(rtl: Boolean = false) = with(test) {
+        val images = WalletVisualImages()
+        images.install()
+        statusContext = CredentialStatusUiContext(WalletArtworkFixtures.statuses)
+        layoutDirection = if (rtl) "rtl" else "ltr"
+        try {
+            content {
+                CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletCredentialContentMaxWidth).padding(20.dp)) {
+                        CredentialCardStack(WalletArtworkFixtures.cards, onOpenDetails = {})
+                    }
+                }
+            }
+            WalletArtworkFixtures.images.keys.forEach { uri -> waitUntil { images.isReady(uri) } }
+            waitForIdle()
+            WalletArtworkFixtures.cards.forEachIndexed { index, card ->
+                val status = WalletArtworkFixtures.statuses.credentials.getValue(card.id)
+                val badge = onNodeWithTag("credential-status-icon-${card.id}", useUnmergedTree = true)
+                if (!status.hasIssue) badge.assertDoesNotExist()
+                else {
+                    badge.assertIsDisplayed()
+                    val bounds = badge.fetchSemanticsNode().boundsInRoot
+                    val cardBounds = onNodeWithTag(WalletUiTestTags.credentialCard(card.id)).fetchSemanticsNode().boundsInRoot
+                    assertTrue(bounds.left > cardBounds.center.x, "Artwork decoration remains physically right in both reading directions")
+                    assertTrue(bounds.right < cardBounds.right)
+                    WalletArtworkFixtures.cards.getOrNull(index + 1)?.let { next ->
+                        val nextTop = onNodeWithTag(WalletUiTestTags.credentialCard(next.id)).fetchSemanticsNode().boundsInRoot.top
+                        assertTrue(bounds.bottom < nextTop, "The complete badge must clear the next stacked card")
+                    }
+                }
+            }
+            capture(if (rtl) "status.home.mixed_artwork.dark_large_text_rtl" else "status.home.mixed_artwork")
+        } finally { images.close() }
+    }
+
     fun credentialStatusDetails(adverse: Boolean = false, expanded: Boolean = false) = with(test) {
         val details = WalletVisualFixtures.credentialDetails
         val status = WalletVisualFixtures.credentialStatus(if (adverse) "revoked_partial" else "clear")
@@ -161,12 +203,12 @@ internal class WalletVisualScenarios(
             }
         }
         onNodeWithTag("credential-status-${details.summary.id}").performScrollTo().assertIsDisplayed()
-        onNodeWithText(if (adverse) "Last known: revoked" else "Not revoked").assertIsDisplayed()
+        onNodeWithText(if (adverse) "Last known: revoked" else "Status clear").assertIsDisplayed()
         onNodeWithTag("credential-status-check-${details.summary.id}").assertIsEnabled()
         if (expanded) {
             onNodeWithTag("credential-status-details-${details.summary.id}").performScrollTo().performClick()
             onNodeWithText("Revocation").assertExists()
-            onNodeWithText("Some status references could not be checked.").assertExists()
+            onNodeWithText("Partly checked").assertExists()
             onNodeWithText("The latest check could not complete. Previous results keep their original check time.")
                 .performScrollTo().assertIsDisplayed()
         }
@@ -212,7 +254,7 @@ internal class WalletVisualScenarios(
         val id = review.credentialOptions.first().credentialId
         onNodeWithTag("credential-status-details-$id").performScrollToContent(this).performClick()
         onNodeWithText("Revocation").assertExists()
-        onNodeWithText("Some status references could not be checked.").assertExists()
+        onNodeWithText("Partly checked").assertExists()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
         onNodeWithText("Share with status issues?").assertIsDisplayed()
         assertEquals(null, submitted)
@@ -264,7 +306,7 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag(WalletUiTestTags.presentationCredential(affected.selection.id))
             .performScrollToContent(this).assertIsDisplayed()
-        onNodeWithTag("credential-status-details-${review.credentialOptions.last().credentialId}")
+        onNodeWithTag("credential-status-${review.credentialOptions.last().credentialId}")
             .performScrollToContent(this).assertIsDisplayed()
         onNodeWithText("Status not provided").assertIsDisplayed()
         onNodeWithText("Last known: revoked").assertIsDisplayed()
@@ -274,15 +316,28 @@ internal class WalletVisualScenarios(
         capture("status.payment.review")
     }
 
-    fun credentialStatusSettings(checking: Boolean = false) {
-        statusContext = CredentialStatusUiContext(automatic = false, checking = checking, checkAll = {}, setAutomatic = {},
+    fun credentialStatusSettings(checking: Boolean = false, helpExpanded: Boolean = false) {
+        var checks = 0
+        val preferenceChanges = mutableListOf<Boolean>()
+        statusContext = CredentialStatusUiContext(automatic = false, checking = checking, checkAll = { checks++ },
+            setAutomatic = { preferenceChanges += it },
             summary = if (checking) null else WalletDemoStatusRefreshSummary(2, 1, 1, 1))
-        captureIdentifier = if (checking) "status.settings.checking" else "status.settings.partial"
-        settingsRoot("credential_status")
+        captureIdentifier = if (helpExpanded) "status.settings.help" else if (checking) "status.settings.checking" else "status.settings.partial"
+        settingsRoot(if (helpExpanded) "credential_status_help" else "credential_status")
         with(test) {
             onNodeWithTag("settings-credential-status-automatic").assertIsOff()
             if (checking) onNodeWithTag("settings-credential-status-check-all").assertIsNotEnabled()
             else onNodeWithText("Some checks were deferred. Try again later.").assertIsDisplayed()
+            if (helpExpanded) {
+                val explanation = onNodeWithText("“With check errors” counts credentials with failed checks, conflicting results or unreadable status information. These credentials are also included in the other counts.")
+                explanation.assertIsDisplayed()
+                onNodeWithTag("settings-credential-status-how").performClick()
+                explanation.assertDoesNotExist()
+                onNodeWithTag("settings-credential-status-automatic").assertIsOff()
+                onNodeWithText("Processed").assertIsDisplayed()
+                assertEquals(0, checks)
+                assertEquals(emptyList(), preferenceChanges)
+            }
         }
     }
 
@@ -555,7 +610,10 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsSigningKey).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).assertIsDisplayed()
         when (destination) {
-            "credential_status" -> onNodeWithTag("settings-credential-status").performClick()
+            "credential_status", "credential_status_help" -> {
+                onNodeWithTag("settings-credential-status").performClick()
+                if (destination == "credential_status_help") onNodeWithTag("settings-credential-status-how").performClick()
+            }
             "dc_api" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
                 val toggle = onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
