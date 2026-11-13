@@ -10,11 +10,6 @@ import kotlinx.serialization.json.JsonPrimitive
 
 internal const val WWW_AUTHENTICATE_HEADER = "WWW-Authenticate"
 
-internal val NO_STORE_HEADERS = mapOf(
-    "Cache-Control" to "no-store",
-    "Pragma" to "no-cache",
-)
-
 internal data class ProtectedResourceOAuthErrorHttp(
     val status: Int,
     val payload: Map<String, JsonElement>,
@@ -25,12 +20,12 @@ internal fun protectedResourceOAuthErrorHttp(
     error: OAuthError,
     scheme: AccessTokenAuthorizationScheme,
 ): ProtectedResourceOAuthErrorHttp {
-    val headers = when (error.error) {
+    val headers = error.responseHeaders + OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA + when (error.error) {
         OAuthErrorCodes.INVALID_TOKEN,
         OAuthErrorCodes.INVALID_DPOP_PROOF,
-        -> NO_STORE_HEADERS + (WWW_AUTHENTICATE_HEADER to authenticationChallenge(error, scheme))
+        -> mapOf(WWW_AUTHENTICATE_HEADER to authenticationChallenge(error, scheme))
 
-        else -> NO_STORE_HEADERS
+        else -> emptyMap()
     }
     return ProtectedResourceOAuthErrorHttp(
         status = protectedResourceOAuthStatus(error),

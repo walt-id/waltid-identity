@@ -8,7 +8,7 @@ import id.walt.openid4vci.deferred.DeferredIssuanceStore
 import id.walt.openid4vci.deferred.DeferredSessionSnapshot
 import id.walt.openid4vci.deferred.DeferredIssuanceState
 import id.walt.openid4vci.deferred.DeferredStatus
-import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -111,7 +111,7 @@ class IssuanceSessionService(
 }
 
 /** Applies the library's resolved change to the stored record. */
-internal fun IssuanceSession.applyWalletNotification(update: IssuedCredentialNotificationUpdate.Changed): IssuanceSession {
+internal fun IssuanceSession.applyWalletNotification(update: IssuedCredentialNotificationChange): IssuanceSession {
     val result = requireNotNull(issuanceResults[update.credentialIdentifier])
     return copy(issuanceResults = issuanceResults + (update.credentialIdentifier to result.copy(
         walletNotification = requireNotNull(result.walletNotification).copy(

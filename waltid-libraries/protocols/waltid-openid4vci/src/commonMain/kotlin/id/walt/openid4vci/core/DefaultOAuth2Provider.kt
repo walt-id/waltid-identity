@@ -63,8 +63,7 @@ import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.requests.notification.NotificationRequestValidationResult
 import id.walt.openid4vci.requests.notification.NotificationRequest
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
-import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
-import id.walt.openid4vci.requests.notification.applyIssuedCredentialNotification
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import id.walt.openid4vci.responses.notification.NotificationResponseResult
 import id.walt.openid4vci.responses.notification.notificationErrorHttp
@@ -758,8 +757,8 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: ProtectedResourceAccessTokenContext?
     ): CredentialRequestResult {
-        val tokenClaims = when (val tokenResult = verifyAccessToken(accessTokenContext)) {
-            is AccessTokenVerification.Success -> tokenResult.claims
+        val authentication = when (val tokenResult = verifyAccessToken(accessTokenContext)) {
+            is AccessTokenVerification.Success -> tokenResult.authentication
             is AccessTokenVerification.Failure -> return CredentialRequestResult.OAuthFailure(tokenResult.error)
         }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
@@ -772,7 +771,7 @@ class DefaultOAuth2Provider(
                         )
                     )
                 } else {
-                    CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(tokenClaims?.let(::verifiedCredentialAuthentication)))
+                    CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(authentication))
                 }
 
             is CredentialRequestResult.Failure -> result
@@ -785,8 +784,8 @@ class DefaultOAuth2Provider(
         session: Session?,
         accessTokenContext: ProtectedResourceAccessTokenContext?
     ): CredentialRequestResult {
-        val tokenClaims = when (val tokenResult = verifyAccessToken(accessTokenContext)) {
-            is AccessTokenVerification.Success -> tokenResult.claims
+        val authentication = when (val tokenResult = verifyAccessToken(accessTokenContext)) {
+            is AccessTokenVerification.Success -> tokenResult.authentication
             is AccessTokenVerification.Failure -> return CredentialRequestResult.OAuthFailure(tokenResult.error)
         }
         val decryptor = config.credentialRequestDecryptor
@@ -812,7 +811,7 @@ class DefaultOAuth2Provider(
         }
         return when (val result = config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())) {
             is CredentialRequestResult.Success ->
-                CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(tokenClaims?.let(::verifiedCredentialAuthentication)))
+                CredentialRequestResult.Success(result.request.withAccessTokenAuthentication(authentication))
 
             is CredentialRequestResult.Failure -> result
             is CredentialRequestResult.OAuthFailure -> result
@@ -1010,18 +1009,19 @@ class DefaultOAuth2Provider(
         request: NotificationRequest,
         storedNotifications: List<IssuedCredentialNotification>,
         authorizedCredentialIdentifiers: Set<String>,
-    ): NotificationResponseResult = when (val update = applyIssuedCredentialNotification(
-        issued = storedNotifications,
-        notificationId = request.notificationId,
-        event = request.event,
-        eventDescription = request.eventDescription,
-        authorizedCredentialIdentifiers = authorizedCredentialIdentifiers,
-    )) {
-        IssuedCredentialNotificationUpdate.UnknownNotificationId -> NotificationResponseResult.Failure(
-            NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
-        )
-        IssuedCredentialNotificationUpdate.Unchanged -> NotificationResponseResult.Success()
-        is IssuedCredentialNotificationUpdate.Changed -> NotificationResponseResult.Success(change = update)
+    ): NotificationResponseResult {
+        val match = storedNotifications.firstOrNull { it.notificationId == request.notificationId }
+        if (match == null || match.credentialIdentifier !in authorizedCredentialIdentifiers) {
+            return NotificationResponseResult.Failure(NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID))
+        }
+        if (match.event == request.event && match.eventDescription == request.eventDescription) {
+            return NotificationResponseResult.Success()
+        }
+        return NotificationResponseResult.Success(change = IssuedCredentialNotificationChange(
+            credentialIdentifier = match.credentialIdentifier,
+            event = request.event,
+            eventDescription = request.eventDescription,
+        ))
     }
 
     override fun writeNotificationError(error: NotificationError): NotificationResponseHttp = notificationErrorHttp(error)
@@ -1061,7 +1061,7 @@ class DefaultOAuth2Provider(
             )
             verifyAccessTokenBinding(accessTokenContext, claims)
                 ?.let { AccessTokenVerification.Failure(it) }
-                ?: AccessTokenVerification.Success(claims)
+                ?: AccessTokenVerification.Success(claims, verifiedCredentialAuthentication(claims))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -1251,7 +1251,10 @@ class DefaultOAuth2Provider(
         OAuthError(OAuthErrorCodes.INVALID_DPOP_PROOF, description)
 
     private sealed class AccessTokenVerification {
-        data class Success(val claims: JsonObject?) : AccessTokenVerification()
+        data class Success(
+            val claims: JsonObject?,
+            val authentication: CredentialRequestAuthentication? = null,
+        ) : AccessTokenVerification()
         data class Failure(val error: OAuthError) : AccessTokenVerification()
     }
 

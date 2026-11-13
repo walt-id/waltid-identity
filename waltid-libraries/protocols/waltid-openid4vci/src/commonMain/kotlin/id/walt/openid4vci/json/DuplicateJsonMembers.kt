@@ -1,14 +1,14 @@
 package id.walt.openid4vci.json
 
+import kotlinx.serialization.json.Json
+
 /**
  * Returns true when [raw] is a JSON text whose objects contain a repeated member name.
- * Malformed JSON returns false so callers can report a protocol-level invalid request.
+ * Rejects containers deeper than 128 levels before the JSON tree parser runs.
+ * Malformed strings and excessive nesting throw [IllegalArgumentException].
  */
-internal fun jsonHasDuplicateMembers(raw: String): Boolean = try {
+internal fun jsonHasDuplicateMembers(raw: String): Boolean =
     JsonMemberScanner(raw).hasDuplicateMembers()
-} catch (_: Exception) {
-    false
-}
 
 private class JsonMemberScanner(private val raw: String) {
     private var index = 0
@@ -16,17 +16,23 @@ private class JsonMemberScanner(private val raw: String) {
     fun hasDuplicateMembers(): Boolean {
         skipWhitespace()
         if (index >= raw.length) return false
-        val duplicate = parseValue()
+        val duplicate = parseValue(0)
         skipWhitespace()
         return duplicate
     }
 
-    private fun parseValue(): Boolean {
+    private fun parseValue(depth: Int): Boolean {
         skipWhitespace()
         if (index >= raw.length) return false
         return when (raw[index]) {
-            '{' -> parseObject()
-            '[' -> parseArray()
+            '{' -> {
+                require(depth < 128) { "JSON nesting exceeds 128 containers" }
+                parseObject(depth + 1)
+            }
+            '[' -> {
+                require(depth < 128) { "JSON nesting exceeds 128 containers" }
+                parseArray(depth + 1)
+            }
             '"' -> {
                 parseString()
                 false
@@ -38,7 +44,7 @@ private class JsonMemberScanner(private val raw: String) {
         }
     }
 
-    private fun parseObject(): Boolean {
+    private fun parseObject(depth: Int): Boolean {
         index++
         val seen = mutableSetOf<String>()
         skipWhitespace()
@@ -54,7 +60,7 @@ private class JsonMemberScanner(private val raw: String) {
             skipWhitespace()
             if (index >= raw.length || raw[index] != ':') return false
             index++
-            if (parseValue()) return true
+            if (parseValue(depth)) return true
             skipWhitespace()
             if (index >= raw.length) return false
             when (raw[index]) {
@@ -69,7 +75,7 @@ private class JsonMemberScanner(private val raw: String) {
         return false
     }
 
-    private fun parseArray(): Boolean {
+    private fun parseArray(depth: Int): Boolean {
         index++
         skipWhitespace()
         if (index < raw.length && raw[index] == ']') {
@@ -77,7 +83,7 @@ private class JsonMemberScanner(private val raw: String) {
             return false
         }
         while (index < raw.length) {
-            if (parseValue()) return true
+            if (parseValue(depth)) return true
             skipWhitespace()
             if (index >= raw.length) return false
             when (raw[index]) {
@@ -93,32 +99,14 @@ private class JsonMemberScanner(private val raw: String) {
     }
 
     private fun parseString(): String {
-        index++
-        val value = StringBuilder()
+        val start = index++
         while (index < raw.length) {
-            val character = raw[index]
-            index++
-            when (character) {
-                '"' -> return value.toString()
-                '\\' -> {
-                    if (index >= raw.length) return value.toString()
-                    val escaped = raw[index]
-                    index++
-                    value.append(
-                        when (escaped) {
-                            'u' -> {
-                                val hex = raw.substring(index, (index + 4).coerceAtMost(raw.length))
-                                index += hex.length
-                                hex.toIntOrNull(16)?.toChar() ?: '?'
-                            }
-                            else -> escaped
-                        }
-                    )
-                }
-                else -> value.append(character)
+            when (raw[index++]) {
+                '"' -> return Json.decodeFromString<String>(raw.substring(start, index))
+                '\\' -> index++
             }
         }
-        return value.toString()
+        throw IllegalArgumentException("Unterminated JSON string")
     }
 
     private fun skipLiteral() {

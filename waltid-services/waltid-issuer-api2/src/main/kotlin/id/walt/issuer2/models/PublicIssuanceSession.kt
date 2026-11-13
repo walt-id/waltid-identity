@@ -1,9 +1,12 @@
 package id.walt.issuer2.models
 
+import id.walt.issuer2.domain.IssuanceResult
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.issuer2.domain.IssuanceSession
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.mapSerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.builtins.nullable
@@ -15,12 +18,28 @@ import kotlinx.serialization.json.*
 @Serializable(with = PublicIssuanceSessionSerializer::class)
 data class PublicIssuanceSession(val session: IssuanceSession)
 
+private val publicIssuanceResultDescriptor: SerialDescriptor =
+    buildClassSerialDescriptor("id.walt.issuer2.models.PublicIssuanceResult") {
+        val result = IssuanceResult.serializer().descriptor
+        for (index in 0 until result.elementsCount) {
+            val name = result.getElementName(index)
+            if (name != "walletNotification") element(name, result.getElementDescriptor(index), isOptional = result.isElementOptional(index))
+        }
+        element("walletNotificationId", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEvent", NotificationEvent.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEventDescription", String.serializer().nullable.descriptor, isOptional = true)
+    }
+
 val multiIssuanceSessionDescriptor: SerialDescriptor =
     buildClassSerialDescriptor("id.walt.issuer2.models.MultiIssuanceSession") {
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name != "deferredState") element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
+            if (name != "deferredState") element(
+                name,
+                if (name == "issuanceResults") mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor) else session.getElementDescriptor(index),
+                isOptional = session.isElementOptional(index),
+            )
         }
     }
 
@@ -44,6 +63,9 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         }
         element("expectedCredentialProofKeyJwk", JsonObject.serializer().nullable.descriptor, isOptional = true)
         element("issuedCredentialFormat", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationId", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEvent", NotificationEvent.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEventDescription", String.serializer().nullable.descriptor, isOptional = true)
     }
 
 object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {

@@ -58,7 +58,7 @@ class NotificationProviderTest {
         assertSame(customRequest, success.request)
         assertSame(claims, success.tokenClaims)
         val response = assertIs<NotificationResponseResult.Success>(provider.createNotificationResponse(success.request, records, setOf("a")))
-        assertEquals(IssuedCredentialNotificationUpdate.Changed("a", customRequest.event, "custom"), response.change)
+        assertEquals(IssuedCredentialNotificationChange("a", customRequest.event, "custom"), response.change)
 
         calls.clear()
         val unconfigured = buildOAuth2Provider(createTestConfig().copy(notificationRequestValidator = validator))
@@ -93,7 +93,7 @@ class NotificationProviderTest {
             assertEquals(400, provider.writeNotificationResponse(failure).status)
         }
         val first = assertIs<NotificationResponseResult.Success>(provider.createNotificationResponse(request, records, setOf("a")))
-        assertEquals(IssuedCredentialNotificationUpdate.Changed("a", request.event, "stored"), first.change)
+        assertEquals(IssuedCredentialNotificationChange("a", request.event, "stored"), first.change)
         assertNull(records.first().event)
         assertNull(records.last().event)
         val saved = listOf(records.first().copy(event = request.event, eventDescription = "stored"), records.last())

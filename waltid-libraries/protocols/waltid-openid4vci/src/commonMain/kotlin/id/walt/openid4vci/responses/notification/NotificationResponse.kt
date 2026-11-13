@@ -1,9 +1,9 @@
 package id.walt.openid4vci.responses.notification
 
-import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
-import id.walt.openid4vci.responses.NO_STORE_HEADERS
+import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.openid4vci.responses.protectedResourceOAuthErrorHttp
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import kotlinx.serialization.json.JsonElement
@@ -15,7 +15,7 @@ data object NotificationResponse
 sealed class NotificationResponseResult {
     data class Success(
         val response: NotificationResponse = NotificationResponse,
-        val change: IssuedCredentialNotificationUpdate.Changed? = null,
+        val change: IssuedCredentialNotificationChange? = null,
     ) : NotificationResponseResult()
 
     data class Failure(val error: NotificationError) : NotificationResponseResult()
@@ -33,7 +33,7 @@ internal fun notificationErrorHttp(error: NotificationError): NotificationRespon
     NotificationResponseHttp(
         status = 400,
         payload = mapOf("error" to JsonPrimitive(error.error)),
-        headers = NO_STORE_HEADERS,
+        headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
     )
 
 internal fun notificationOAuthErrorHttp(
@@ -49,4 +49,4 @@ internal fun notificationOAuthErrorHttp(
 }
 
 internal fun notificationSuccessHttp(): NotificationResponseHttp =
-    NotificationResponseHttp(status = 204, headers = NO_STORE_HEADERS)
+    NotificationResponseHttp(status = 204, headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA)
