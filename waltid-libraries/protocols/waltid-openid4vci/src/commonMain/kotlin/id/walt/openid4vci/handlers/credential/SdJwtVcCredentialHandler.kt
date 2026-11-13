@@ -144,7 +144,9 @@ class SdJwtVcCredentialHandler(
     } catch (cause: TypeMetadataValidationException) {
         CredentialResponseResult.Failure(CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, cause.message))
     } catch (cause: SDJwtVerificationException) {
-        CredentialResponseResult.Failure(CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential data breaks SD-JWT processing"))
+        CredentialResponseResult.Failure(CredentialError(
+            CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential data breaks SD-JWT processing: ${cause.message}",
+        ))
     } catch (cause: TypeMetadataException) {
         logger.error(cause) { "SD-JWT type metadata preparation failed" }
         CredentialResponseResult.Failure(CredentialError(OAuthErrorCodes.SERVER_ERROR, "Credential type metadata preparation failed"))
