@@ -85,7 +85,7 @@ object SdJwtVcCredentialSigner {
         verifiedBinding = verifiedBinding,
     )
 
-    internal suspend fun generateSdJwtVC(
+    private suspend fun generateSdJwtVC(
         verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
