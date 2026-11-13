@@ -87,3 +87,40 @@ renderer can leave its ARIA mirror stale after closing a popup, so the Escape as
 the actual canvas backdrop. This does not establish screen-reader acceptance after popup dismissal.
 These fixtures do not prove screen-reader acceptance, every browser/viewport, browser authorization
 redirects or mobile system hosts.
+
+## Real server journey
+
+`live-status.cjs` is an explicit, separate journey through the production Wasm app and a real
+loopback Wallet API 2 service with auth disabled. It creates a new wallet, issues public-demo PID
+and controlled conference/workplace credentials, checks signed suspension/recovery/revocation,
+refreshes expanded sharing details and completes a real public-verifier presentation. It does not
+intercept wallet, issuer or verifier responses. This qualifies the supported browser host, not
+account authentication or native prepared payments.
+
+Start the built app and an immutable copy of the current wallet-service JAR on loopback, and run
+the [controlled issuer](../../../mobile-e2e-fixtures/status/README.md). Keep its control port private.
+Run serially with mobile controlled-status journeys: their outage control is shared. From this
+directory, on a clean committed checkout:
+
+```sh
+WALLET_API2_E2E_BASE_URL=http://127.0.0.1:7018 \
+WALLET_STATUS_CONTROL_URL=http://127.0.0.1:8090 \
+WALLET_BROWSER_APP_URL=http://127.0.0.1:8074 \
+WALLET_API2_E2E_PRODUCER=/private/evidence/backend-producer.json \
+WALLET_BROWSER_EVIDENCE_DIR=/private/evidence/unused-browser-run \
+node live-status.cjs
+```
+
+The producer receipt identifies the service source revision and immutable JAR digest. The runner
+retains its own source revision, browser/platform, twelve full-frame captures, producer projections,
+hash-only request bodies and the verifier's terminal verdict in `evidence.json`. The output must not
+already exist; diagnostics and request-derived data remain private. A page reload verifies server
+retention after issuance; the browser's runtime-owned manual preference is explicitly restored.
+Refreshes respect the API's existing 30-second admission cooldown without automatic retries.
+
+Set `WALLET_BROWSER_EXECUTABLE` explicitly when using an installed Chromium instead of Playwright's
+bundled browser, and label that actual environment separately from Linux reference comparisons.
+For a free ngrok test tunnel, optional `WALLET_BROWSER_USER_AGENT=waltid-evidence/1` uses its
+[documented programmatic-access option](https://ngrok.com/docs/pricing-limits/free-plan-limits#using-a-custom-user-agent)
+to avoid an HTML interstitial replacing public artwork. Record that transport accommodation;
+it adds no application networking exception or simulated result.
