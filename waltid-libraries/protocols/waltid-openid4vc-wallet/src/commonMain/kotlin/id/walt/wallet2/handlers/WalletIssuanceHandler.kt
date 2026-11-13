@@ -2587,7 +2587,9 @@ object WalletIssuanceHandler {
         val asMetadata = asResolution.metadata
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
-        val resolvedKeyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+        val resolvedKeyMaterial = keyMaterial ?: if (manualAttestation == null || useDpop) {
+            wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
+        } else null
         val tokenAttestation = if (manualAttestation == null) clientAttestationForRequest(
             flowId = attestationFlowId(request.codeVerifier),
             wallet = wallet,
