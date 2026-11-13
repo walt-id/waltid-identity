@@ -181,6 +181,21 @@ jobs:
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - *wait-for-dispatched-run
+  integration-test-postgresql:
+    name: Integration Tests - PostgreSQL
+    runs-on: ubuntu-latest
+    needs: tag
+    timeout-minutes: 195
+    steps:
+      - name: Dispatch integration-test-postgresql.yml
+        id: dispatch
+        uses: benc-uk/workflow-dispatch@v1.3.3
+        with:
+          workflow: integration-test-postgresql.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.tag.outputs.tag }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+      - *wait-for-dispatched-run
   sonar-snapshot:
     name: SonarQube Cloud release scan
     runs-on: ubuntu-latest
@@ -258,7 +273,7 @@ jobs:
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure, integration-test-postgresql ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml
