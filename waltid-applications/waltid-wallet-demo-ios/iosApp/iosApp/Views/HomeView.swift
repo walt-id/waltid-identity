@@ -61,7 +61,7 @@ struct HomeView: View {
                 .walletSheetSizing()
         }
         .fullScreenCover(isPresented: $showingSettings, onDismiss: { dismissingSettings = false }) {
-            NavigationView {
+            WalletNavigationContainer {
                 SettingsView(viewModel: viewModel)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
@@ -71,7 +71,7 @@ struct HomeView: View {
                             .accessibilityIdentifier("wallet.settingsBack")
                         }
                     }
-            }.navigationViewStyle(.stack)
+            }
         }
         .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false; showingScanner = false } }
         .onChange(of: NearbySheetSessionState(active: proximity.active, entryReady: proximity.hasEntryContent,

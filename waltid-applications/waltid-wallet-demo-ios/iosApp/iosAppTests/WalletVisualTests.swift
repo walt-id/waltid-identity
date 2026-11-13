@@ -400,7 +400,7 @@ final class WalletVisualTests: XCTestCase {
         await model.readerTrustSettings.awaitPendingOperations()
         XCTAssertTrue(model.showDcApiPresentationPreview)
         XCTAssertEqual(model.proximityTransportProfile, .defaultProfile)
-        try capture(NavigationView { SettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.root.default")
+        try capture(WalletNavigationContainer { SettingsView(viewModel: model) }, id: "settings.root.default")
     }
 
     func testSettingsReader() async throws { try await readerSettings(required: false) }
@@ -431,7 +431,7 @@ final class WalletVisualTests: XCTestCase {
     func testSettingsNearby() async throws {
         let model = makeModel()
         await model.readerTrustSettings.awaitPendingOperations()
-        try capture(NavigationView { NearbySettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.nearby.default")
+        try capture(WalletNavigationContainer { NearbySettingsView(viewModel: model) }, id: "settings.nearby.default")
     }
 
     func testSettingsConnection() async throws {
