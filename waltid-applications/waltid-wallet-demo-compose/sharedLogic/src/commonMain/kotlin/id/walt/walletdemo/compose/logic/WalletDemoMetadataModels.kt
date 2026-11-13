@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -19,10 +22,23 @@ data class WalletDemoIssuerMetadata(
 )
 
 data class WalletDemoCredentialClaimMetadata(
-    val path: List<String>,
+    val path: List<JsonElement>,
     val mandatory: Boolean?,
     val displayName: String?,
-)
+) {
+    constructor(path: Collection<String>, mandatory: Boolean?, displayName: String?) :
+        this(path.map(::JsonPrimitive), mandatory, displayName)
+
+    init {
+        require(path.isValidClaimMetadataPath()) { "Claim metadata requires a non-empty path of strings, integers or null wildcards" }
+    }
+}
+
+internal fun List<JsonElement>.isValidClaimMetadataPath(): Boolean = isNotEmpty() && all { segment ->
+    segment == JsonNull || segment is JsonPrimitive && (segment.isString || metadataInteger.matches(segment.content))
+}
+
+private val metadataInteger = Regex("-?(0|[1-9][0-9]*)")
 
 data class WalletDemoCredentialClaimDisplay(
     val label: String,
@@ -73,10 +89,15 @@ fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCre
         },
     ))
 
-fun WalletDemoCredentialClaimMetadata.displayLabel(format: String): String =
-    displayName?.takeIf { it.isNotBlank() }
-        ?: MdocClaimDisplaySemantics.describe(format = format, path = path)?.label
-        ?: CredentialDisplayVocabulary.humanizedClaimLabel(path.lastOrNull().orEmpty())
+fun WalletDemoCredentialClaimMetadata.displayLabel(format: String): String {
+    displayName?.takeIf { it.isNotBlank() }?.let { return it }
+    val objectKeys = path.mapNotNull { (it as? JsonPrimitive)?.takeIf { key -> key.isString }?.content }
+    if (objectKeys.size == path.size) {
+        MdocClaimDisplaySemantics.describe(format = format, path = objectKeys)?.label?.let { return it }
+    }
+    return objectKeys.lastOrNull()?.takeIf { it.isNotBlank() }
+        ?.let(CredentialDisplayVocabulary::humanizedClaimLabel) ?: "Claim"
+}
 
 enum class WalletDemoTransactionCodeInputMode {
     Numeric,

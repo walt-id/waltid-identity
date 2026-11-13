@@ -284,7 +284,7 @@ internal data class OfferedCredentialMetadataDto(
 
 @Serializable
 internal data class OfferClaimMetadataDto(
-    val path: List<String> = emptyList(),
+    val path: List<JsonElement> = emptyList(),
     val mandatory: Boolean? = null,
     val displayName: String? = null,
 )

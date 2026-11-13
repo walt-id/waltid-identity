@@ -10,6 +10,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplayLogo
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.CredentialMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +20,46 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OfferedCredentialResolverTest {
+
+    @Test
+    fun `unoffered mdoc array paths do not block resolving an sd jwt offer`() {
+        val metadata = Json.decodeFromString<CredentialIssuerMetadata>(
+            """
+            {
+              "credential_issuer": "https://issuer.example.com",
+              "credential_endpoint": "https://issuer.example.com/credential",
+              "credential_configurations_supported": {
+                "mdl": {
+                  "format": "mso_mdoc",
+                  "doctype": "org.iso.18013.5.1.mDL",
+                  "credential_metadata": {"claims": [{
+                    "path": ["org.iso.18013.5.1", "driving_privileges", null, "vehicle_category_code"]
+                  }]}
+                },
+                "pid": {
+                  "format": "dc+sd-jwt",
+                  "vct": "urn:example:pid",
+                  "credential_metadata": {"claims": [{"path": ["nationalities", 0]}]}
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        val offer = CredentialOffer(
+            credentialIssuer = metadata.credentialIssuer,
+            credentialConfigurationIds = listOf("pid"),
+        )
+        val offered = OfferedCredentialResolver.resolveOfferedCredentials(offer, metadata)
+        assertEquals(listOf("pid"), offered.map { it.credentialConfigurationId })
+        assertEquals(
+            listOf(JsonPrimitive("nationalities"), JsonPrimitive(0)),
+            offered.single().configuration.credentialMetadata!!.claims!!.single().path,
+        )
+        assertEquals(
+            JsonNull,
+            metadata.credentialConfigurationsSupported.getValue("mdl").credentialMetadata!!.claims!!.single().path[2],
+        )
+    }
 
     private fun issuerMetadata(configuration: CredentialConfiguration): CredentialIssuerMetadata =
         CredentialIssuerMetadata(
