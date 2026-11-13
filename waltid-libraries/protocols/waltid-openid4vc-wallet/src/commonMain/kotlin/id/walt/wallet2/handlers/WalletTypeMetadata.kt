@@ -69,7 +69,7 @@ internal fun projectTypeMetadata(resolved: ResolvedTypeMetadata, credential: Dig
     (resolved.effective["claims"] as? JsonArray)?.let {
         // More specific selectors supply display metadata; restrictions from every selector survive.
         // Equal specificity follows document order. This is a projection policy, not inheritance.
-        val claims = linkedMapOf<List<String>, JsonObject>()
+        val claims = linkedMapOf<List<JsonElement>, JsonObject>()
         for (entry in resolved.claims.sortedByDescending { it.path.count { part -> part == MetadataClaimPathComponent.AnyIndex } }) {
             val claim = entry.json
             val display = (claim["display"] as? JsonArray)?.let { values -> JsonArray(values.map { value ->
@@ -78,7 +78,7 @@ internal fun projectTypeMetadata(resolved: ResolvedTypeMetadata, credential: Dig
             for (path in concretePaths(credential.credentialData, claim.getValue("path").jsonArray)) {
                 val previous = claims[path]
                 claims[path] = JsonObject((previous.orEmpty() + claim).toMutableMap().apply {
-                    put("path", JsonArray(path.map(::JsonPrimitive)))
+                    put("path", JsonArray(path))
                     display?.let { put("display", it) }
                     if (previous?.get("mandatory") == JsonPrimitive(true)) put("mandatory", JsonPrimitive(true))
                     val previousSd = previous?.get("sd")?.jsonPrimitive?.content?.takeUnless { it == "allowed" }
@@ -95,15 +95,15 @@ internal fun projectTypeMetadata(resolved: ResolvedTypeMetadata, credential: Dig
     return JsonObject(result)
 }
 
-private fun concretePaths(root: JsonElement, path: JsonArray): List<List<String>> {
-    var matches = listOf(emptyList<String>() to root)
+private fun concretePaths(root: JsonElement, path: JsonArray): List<List<JsonElement>> {
+    var matches = listOf(emptyList<JsonElement>() to root)
     for (segment in path) matches = matches.flatMap { (prefix, value) ->
         when {
-            segment == JsonNull -> (value as? JsonArray)?.mapIndexed { index, element -> (prefix + index.toString()) to element }.orEmpty()
+            segment == JsonNull -> (value as? JsonArray)?.mapIndexed { index, element -> (prefix + JsonPrimitive(index)) to element }.orEmpty()
             segment.jsonPrimitive.isString -> (value as? JsonObject)?.get(segment.jsonPrimitive.content)
-                ?.let { listOf((prefix + segment.jsonPrimitive.content) to it) }.orEmpty()
+                ?.let { listOf((prefix + segment) to it) }.orEmpty()
             else -> (value as? JsonArray)?.getOrNull(segment.jsonPrimitive.int)
-                ?.let { listOf((prefix + segment.jsonPrimitive.content) to it) }.orEmpty()
+                ?.let { listOf((prefix + segment) to it) }.orEmpty()
         }
     }
     return matches.map { it.first }
