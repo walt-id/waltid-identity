@@ -35,6 +35,7 @@ class BoundedDocumentSession(
     private val started = TimeSource.Monotonic.markNow()
 
     suspend fun read(uri: String): ByteArray = try {
+        requireSourceAllowed(uri)
         val bytes = documents[uri] ?: withTimeoutOrNull(minOf(10_000L, (30_000L - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L))) {
             if (documents.size >= MAX_DOCUMENTS) throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded")
             retrieve(uri).also {
@@ -85,6 +86,9 @@ class BoundedDocumentSession(
         }
         throw IllegalArgumentException("Metadata document unavailable or retrieval limit exceeded")
     }
+
+    /** Apply the same source policy before using bytes from an external snapshot. */
+    fun requireSourceAllowed(uri: String) { checkedUrl(uri) }
 
     private fun checkedUrl(value: String): Url {
         require(value.startsWith("https://", ignoreCase = true) ||

@@ -73,13 +73,17 @@ class PaymentConsentResolver internal constructor(
         val values = paymentValues(payload)
         PaymentMetadataFetchSession(
             metadataFetcher.httpClient,
+            initialCredentialOrigin = vct,
             requestConfiguration = metadataFetcher.dataFetcherConfiguration.request,
             requireUrlAllowed = { url -> metadataFetcher.dataFetcherConfiguration.url?.requireUrlAllowed(url) },
         ).use { session ->
             val metadata = try {
                 val pin = authenticated.integrity("vct#integrity").singleOrNull()
                 val cached = if (pin != null && snapshot != null) TypeMetadataResolver.snapshotDocuments(snapshot) else emptyMap()
-                val resolved = TypeMetadataResolver({ uri -> cached[uri] ?: session.readBytes(uri) }).resolve(
+                val resolved = TypeMetadataResolver({ uri ->
+                    session.requireSourceAllowed(uri)
+                    cached[uri] ?: session.readBytes(uri)
+                }).resolve(
                     vct, pin, requireParentIntegrity = true,
                 )
                 if (resolved.documents.any { document ->

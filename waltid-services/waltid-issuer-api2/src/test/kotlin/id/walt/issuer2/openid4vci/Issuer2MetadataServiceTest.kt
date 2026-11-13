@@ -1,6 +1,7 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -61,6 +62,21 @@ class Issuer2MetadataServiceTest {
         val metadata = metadataService(metadataConfig = config).getVctTypeMetadata("payment")
         assertEquals(configured.copy(vct = "http://localhost/openid4vci/payment"), metadata)
         assertEquals(extension, metadata.toJSON()["transaction_data_types"])
+    }
+
+    @Test
+    fun `hosted publication uses the VCT slug independently of configuration id`() {
+        val vct = "https://issuer.example/openid4vci/identity_type"
+        val configured = sdJwtMetadata("identity_config", vct)
+        for (config in listOf(configured, configured.copy(sdJwtVcTypeMetadataConfiguration = mapOf(
+            "identity_config" to SdJwtVcTypeMetadataDraft04(name = "Identity"),
+        )))) {
+            val service = metadataService(metadataConfig = config, baseUrl = "https://issuer.example")
+            assertEquals(vct, service.getVctTypeMetadata("identity_type").vct)
+            val publication = service.getPublishedTypeMetadata("identity_type")
+            assertEquals(vct, publication.vct)
+            assertEquals(MetadataIntegrity.sha256(publication.bytes()), publication.integrity)
+        }
     }
 
     @Test

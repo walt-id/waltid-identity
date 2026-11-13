@@ -15,8 +15,16 @@ internal class PaymentMetadataFetchSession(
     httpClient: HttpClient,
     requestConfiguration: RequestConfiguration? = null,
     requireUrlAllowed: (String) -> Unit = {},
+    initialCredentialOrigin: String? = null,
 ) : AutoCloseable {
-    private val documents = BoundedDocumentSession(httpClient, requestConfiguration, requireUrlAllowed)
+    private val documents = BoundedDocumentSession(
+        httpClient, requestConfiguration, requireUrlAllowed, initialCredentialOrigin = initialCredentialOrigin,
+    )
+
+    fun requireSourceAllowed(uri: String) {
+        try { documents.requireSourceAllowed(uri)
+        } catch (_: IllegalArgumentException) { consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE) }
+    }
 
     suspend fun readBytes(uri: String): ByteArray = try {
         documents.read(uri)
