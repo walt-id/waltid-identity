@@ -12,7 +12,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let metadata = String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayClaims"]!), as: UTF8.self)
         let claims = StoredCredentialMetadataParser.claims(from: metadata, preferredLocales: ["en"])
         XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
-        XCTAssertEqual(claims.map(\.path), [["accounts", "0", "iban"], ["name"]])
+        XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("0"), .key("iban")], [.key("name")]])
         XCTAssertEqual(claims.first?.mandatory, true)
         let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
             credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: fixture["projectedArrayCredentialData"]!), as: UTF8.self), metadataJSON: metadata)

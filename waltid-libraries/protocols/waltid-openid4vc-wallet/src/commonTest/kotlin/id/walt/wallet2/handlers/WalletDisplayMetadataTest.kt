@@ -64,7 +64,7 @@ class WalletDisplayMetadataTest {
             assertEquals(JsonPrimitive("retained"), stored.metadata?.get("custom"))
             assertEquals("Bank attestation", stored.metadata?.get("credentialDisplay")?.jsonArray?.single()?.jsonObject?.get("name")?.jsonPrimitive?.content)
             val claim = stored.metadata!!.getValue("credentialClaims").jsonArray.single().jsonObject
-            assertEquals(listOf("accounts", "0", "iban"), claim.getValue("path").jsonArray.map { it.jsonPrimitive.content })
+            assertEquals(Json.parseToJsonElement("""["accounts",0,"iban"]"""), claim.getValue("path"))
             assertEquals("IBAN", claim.getValue("display").jsonArray.single().jsonObject.getValue("name").jsonPrimitive.content)
             val restored = Json.decodeFromString(StoredCredential.serializer(), Json.encodeToString(StoredCredential.serializer(), stored))
             assertEquals(3, requests)
@@ -160,17 +160,25 @@ class WalletDisplayMetadataTest {
         val metadata = """{"vct":"$vct","claims":[
             {"path":["accounts",0,"iban"],"display":[{"locale":"en","label":"First IBAN"}]},
             {"path":["accounts",null,"iban"],"mandatory":true,"sd":"always","display":[{"locale":"en","label":"IBAN"}]},
-            {"path":["name"],"display":[{"locale":"en","label":"Full name"}]}
+            {"path":["name"],"display":[{"locale":"en","label":"Full name"}]},
+            {"path":["by_code","0","iban"],"display":[{"locale":"en","label":"Account code"}]}
         ]}""".encodeToByteArray()
         try {
             val credential = fixture.credential(buildJsonObject {
                 put("vct", vct); put("name", "Ada")
-                put("accounts", buildJsonArray { add(buildJsonObject { put("iban", "DE123") }) })
+                put("accounts", buildJsonArray {
+                    add(buildJsonObject { put("iban", "DE123") })
+                    add(buildJsonObject { put("iban", "DE456") })
+                })
+                put("by_code", buildJsonObject { put("0", buildJsonObject { put("iban", "DE789") }) })
             })
             val resolved = TypeMetadataResolver({ metadata }).resolve(vct)
             val claims = projectTypeMetadata(resolved, credential, null).getValue("credentialClaims").jsonArray
-            assertEquals(listOf(listOf("accounts", "0", "iban"), listOf("name")), claims.map { it.jsonObject.getValue("path").jsonArray.map { it.jsonPrimitive.content } })
-            assertEquals(listOf("First IBAN", "Full name"), claims.map { it.jsonObject.getValue("display").jsonArray.single().jsonObject.getValue("name").jsonPrimitive.content })
+            assertEquals(
+                Json.parseToJsonElement("""[["accounts",0,"iban"],["accounts",1,"iban"],["name"],["by_code","0","iban"]]"""),
+                JsonArray(claims.map { it.jsonObject.getValue("path") }),
+            )
+            assertEquals(listOf("First IBAN", "IBAN", "Full name", "Account code"), claims.map { it.jsonObject.getValue("display").jsonArray.single().jsonObject.getValue("name").jsonPrimitive.content })
             assertEquals(JsonPrimitive(true), claims.first().jsonObject["mandatory"])
             assertEquals(JsonPrimitive("always"), claims.first().jsonObject["sd"])
             val conflicting = metadata.decodeToString().replace("\"path\":[\"accounts\",0,\"iban\"]", "\"path\":[\"accounts\",0,\"iban\"],\"sd\":\"never\"").encodeToByteArray()
