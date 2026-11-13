@@ -33,7 +33,8 @@ struct EffectiveSharingInformationView: View {
                     }
                 }
             }
-        }.accessibilityIdentifier("review-information-to-share")
+        }.accessibilityElement(children: .contain)
+            .accessibilityIdentifier("review-information-to-share")
     }
     private var controlsEnabled: Bool { enabled && state.canConfirm }
     @ViewBuilder private func contributionBody(_ contribution: EffectiveClaimContribution) -> some View {
@@ -119,7 +120,8 @@ private struct EffectiveClaimNodeView: View {
                 if let status { Text(status).font(.footnote).foregroundStyle(.secondary) }
                 containerBody
             }
-        }.accessibilityIdentifier("review-claim-" + node.id.id)
+        }.accessibilityElement(children: .contain)
+            .accessibilityIdentifier("review-claim-" + node.id.id)
     }
     @ViewBuilder private var containerBody: some View {
         if let choice = node.choice {

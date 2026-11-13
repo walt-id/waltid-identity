@@ -24,6 +24,7 @@ public struct SharingReviewView: View {
     private let onRetryClaimReview: () -> Void
     @State private var normalizedDetails: [CredentialDetails] = []
     @State private var normalizedOptions: [PresentationCredentialOption]?
+    private var usesLegacyClaimReview: Bool { if case .legacy = claimReview { return true }; return false }
     private var isNormalized: Bool { normalizedOptions == review.credentialOptions }
     private var credentialDetails: [CredentialDetails] { isNormalized ? normalizedDetails : [] }
 
@@ -93,7 +94,8 @@ public struct SharingReviewView: View {
                             SharingCredentialRow(option: option, details: details, selection: selection,
                                 isLoading: isLoading, isReadOnly: isReadOnly || !review.allowsCredentialSelection(option),
                                 onToggleCredential: onToggleCredential,
-                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1)
+                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1,
+                                showAdditionalInformationHint: usesLegacyClaimReview)
                         }
                     }
                 }
