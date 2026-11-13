@@ -11,9 +11,11 @@ const required = name => {
   if (!value) throw Error(`Set ${name} explicitly for the isolated real-backend journey`);
   return value;
 };
-const loopback = name => {
+const localService = name => {
   const value = new URL(required(name));
-  if (!['localhost', '127.0.0.1', '[::1]'].includes(value.hostname)) throw Error(`${name} must use a loopback test service`);
+  if (!['localhost', '127.0.0.1', '[::1]', 'host.docker.internal'].includes(value.hostname)) {
+    throw Error(`${name} must use a local test service`);
+  }
   return value.href.replace(/\/$/, '');
 };
 const git = (directory, ...args) => execFileSync('git', ['-C', directory, ...args], { encoding: 'utf8' }).trim();
@@ -36,9 +38,9 @@ async function json(url, body) {
 
 async function run() {
   clean();
-  const server = loopback('WALLET_API2_E2E_BASE_URL');
-  const control = loopback('WALLET_STATUS_CONTROL_URL');
-  const app = loopback('WALLET_BROWSER_APP_URL');
+  const server = localService('WALLET_API2_E2E_BASE_URL');
+  const control = localService('WALLET_STATUS_CONTROL_URL');
+  const app = localService('WALLET_BROWSER_APP_URL');
   const output = path.resolve(required('WALLET_BROWSER_EVIDENCE_DIR'));
   const backend = JSON.parse(fs.readFileSync(required('WALLET_API2_E2E_PRODUCER'), 'utf8'));
   fs.mkdirSync(output); // Never overwrite a previous journey or its diagnostics.
@@ -81,8 +83,8 @@ async function run() {
         if (url.pathname.endsWith('/refresh') && Array.isArray(item.projection) &&
           item.projection.some(result => result.outcome !== 'DEFERRED')) admittedAt = Date.now();
       }
-    } catch {
-      errors.push(`Unreadable status response at ${item.path}`);
+    } catch (error) {
+      errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
     } finally { requests.push(item); }
   });
   const button = name => page.getByRole('button', { name, exact: true });
@@ -166,7 +168,9 @@ async function run() {
     const before = refreshes().length;
     await click(button('Refresh status'));
     await expect.poll(() => refreshes().length, { timeout: 30000 }).toBe(before + 1);
-    expect(refreshes().at(-1).projection.some(result => result.outcome !== 'DEFERRED')).toBe(true);
+    const projection = refreshes().at(-1).projection;
+    expect(Array.isArray(projection), 'Refresh response must contain producer results').toBe(true);
+    expect(projection.some(result => result.outcome !== 'DEFERRED')).toBe(true);
     await expect(headline(title)).toBeVisible({ timeout: 30000 });
   }
   const setStatus = (reference, value) => json(`${control}/status`, { purpose: reference.purpose, index: reference.index, value });
