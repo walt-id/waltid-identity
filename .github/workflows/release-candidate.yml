@@ -142,6 +142,9 @@ jobs:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
     needs: tag
+    timeout-minutes: 300
+    env:
+      WAIT_MINUTES: '290'
     steps:
       - name: Dispatch integration-test-aws.yml
         id: dispatch
@@ -153,6 +156,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - &wait-for-dispatched-run
         name: Require the dispatched run to succeed
+        timeout-minutes: ${{ fromJSON(env.WAIT_MINUTES || '360') }}
         env:
           GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           RUN_URL: ${{ steps.dispatch.outputs.runUrl }}
@@ -171,6 +175,9 @@ jobs:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
     needs: tag
+    timeout-minutes: 260
+    env:
+      WAIT_MINUTES: '250'
     steps:
       - name: Dispatch integration-test-azure.yml
         id: dispatch
@@ -185,7 +192,9 @@ jobs:
     name: Integration Tests - PostgreSQL
     runs-on: ubuntu-latest
     needs: tag
-    timeout-minutes: 195
+    timeout-minutes: 205
+    env:
+      WAIT_MINUTES: '195'
     steps:
       - name: Dispatch integration-test-postgresql.yml
         id: dispatch
