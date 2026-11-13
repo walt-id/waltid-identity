@@ -197,6 +197,11 @@ data class WalletIssuanceSessionRequest(
     val did: String? = null,
     val clientId: String = "eudiw-abca",
     val redirectUri: Url = Url("openid://"),
+    /**
+     * Manual token authentication; see [ReceiveCredentialRequest.tokenRequestHeaders]. Validated
+     * before session creation. PAR authenticates independently; issuer refusals retain the session
+     * outcome contract. A static manual PoP cannot be regenerated for automatic recovery.
+     */
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val credentialIssuer: String? = null,
     val credentialConfigurationIds: List<String>? = null,
