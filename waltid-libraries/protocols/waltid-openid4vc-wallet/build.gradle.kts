@@ -9,6 +9,7 @@ group = "id.walt.protocols"
 kotlin {
     sourceSets {
         commonTest.get().kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
+        commonTest.get().kotlin.srcDir("src/consentTestFixtures/kotlin")
         commonMain.dependencies {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
