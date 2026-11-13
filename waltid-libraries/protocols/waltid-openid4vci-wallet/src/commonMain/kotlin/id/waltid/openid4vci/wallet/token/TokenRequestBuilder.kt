@@ -86,6 +86,11 @@ class TokenRequestException(
  * Builds OAuth 2.0 token requests for OpenID4VCI.
  * Implements §6 of OpenID4VCI 1.0 specification (Token Endpoint).
  *
+ * Static client-attestation headers, supplied through additional headers or [ClientAttestationHeaders],
+ * cannot be regenerated after an attestation challenge or DPoP nonce response, so these requests are
+ * not retried automatically. Callers must supply a fresh PoP on their next attempt. A fresh-PoP
+ * factory enables the existing bounded recovery, including for refresh-token requests.
+ *
  * @property clientConfig The OAuth 2.0 client configuration
  * @property httpClient The HTTP client for token requests
  */
