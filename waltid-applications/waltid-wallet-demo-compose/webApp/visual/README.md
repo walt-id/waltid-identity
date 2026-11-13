@@ -120,6 +120,11 @@ Delivery is proved by the real verifier's terminal verdict and the actual return
 manufacturing a persistent receipt screen or publishing a duplicate Home capture as a receipt.
 Refreshes respect the API's existing 30-second admission cooldown without automatic retries.
 
+For the pinned Linux Playwright container, use `host.docker.internal` instead of `127.0.0.1`
+to reach those same host-local services. Mount the checkout and its Git common directory read-only,
+with only the chosen evidence output writable. The runner also accepts this explicit local alias;
+it does not allow arbitrary remote wallet or control endpoints.
+
 Set `WALLET_BROWSER_EXECUTABLE` explicitly when using an installed Chromium instead of Playwright's
 bundled browser, and label that actual environment separately from Linux reference comparisons.
 For a free ngrok test tunnel, optional `WALLET_BROWSER_USER_AGENT=waltid-evidence/1` uses its
