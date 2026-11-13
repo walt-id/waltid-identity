@@ -1268,6 +1268,7 @@ object WalletIssuanceHandler {
         onCredentialStored: suspend (StoredCredential) -> Unit,
         metadataTrustResolver: CredentialIssuerMetadataTrustResolver?,
     ): Flow<StoredCredential> = channelFlow {
+        val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         wallet.issuanceSessions(httpClient).ensureOpen()
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -1319,7 +1320,7 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val tokenAttestation = clientAttestationForRequest(
+        val tokenAttestation = if (manualAttestation == null) clientAttestationForRequest(
             wallet = wallet,
             asMetadata = asMetadata,
             discoveryHeaders = effectiveResolvedOffer.authorizationServerHeaders,
@@ -1330,7 +1331,7 @@ object WalletIssuanceHandler {
             onAttestationObtained = { onEvent.emitSafely(WalletSessionEvent.issuance_attestation_obtained) },
             httpClient = httpClient,
             anonymousPreAuthorizedAccessSupported = asMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
-        )
+        ) else null
 
         // private_key_jwt (RFC 7523). Engaged from authorization server metadata for the same reason
         // attestation is: the wallet cannot know out of band which method a given issuer requires.
@@ -1340,7 +1341,7 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             keyMaterial = keyMaterial,
-        ).takeIf { tokenAttestation == null }
+        ).takeIf { tokenAttestation == null && manualAttestation == null }
 
         val anonymousPreAuthorizedCode =
             asMetadata.preAuthorizedGrantAnonymousAccessSupported == true &&
@@ -1636,12 +1637,14 @@ object WalletIssuanceHandler {
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenResult = requestTokenDetailed(wallet, request, attestationAssembler, httpClient, onAttestationObtained).toReleasedResult()
 
-    suspend fun requestTokenDetailed(request: RequestTokenRequest): RequestTokenDetailedResult =
-        requestTokenDetailed(
+    suspend fun requestTokenDetailed(request: RequestTokenRequest): RequestTokenDetailedResult {
+        parseManualClientAttestationHeaders(request.tokenRequestHeaders)
+        return requestTokenDetailed(
             request = request,
             tokenAttestation = null,
             anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
         )
+    }
 
     suspend fun requestTokenDetailed(
         wallet: Wallet,
@@ -1650,6 +1653,7 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
     ): RequestTokenDetailedResult {
+        val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
         val asResolution = credentialIssuer?.let {
             val metadataResolver = IssuerMetadataResolver(httpClient)
@@ -1657,7 +1661,7 @@ object WalletIssuanceHandler {
             metadataResolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
         }
         val asMetadata = asResolution?.metadata
-        val tokenAttestation = asMetadata?.let {
+        val tokenAttestation = asMetadata?.takeIf { manualAttestation == null }?.let {
             clientAttestationForRequest(
                 wallet = wallet,
                 asMetadata = it,
@@ -1692,6 +1696,7 @@ object WalletIssuanceHandler {
         anonymousPreAuthorizedCode: Boolean,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): RequestTokenDetailedResult {
+        parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
@@ -2540,6 +2545,7 @@ object WalletIssuanceHandler {
     ).toReleasedResult()
 
     suspend fun exchangeCodeDetailed(request: ExchangeCodeRequest): RequestTokenDetailedResult {
+        parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
@@ -2570,6 +2576,7 @@ object WalletIssuanceHandler {
         /** See [ReceiveAuthorizedCredentialRequest.useDpop]. Client authentication is unaffected. */
         useDpop: Boolean = false,
     ): RequestTokenDetailedResult {
+        val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asResolution = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
@@ -2577,7 +2584,7 @@ object WalletIssuanceHandler {
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
         val resolvedKeyMaterial = keyMaterial ?: wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
-        val tokenAttestation = clientAttestationForRequest(
+        val tokenAttestation = if (manualAttestation == null) clientAttestationForRequest(
             flowId = attestationFlowId(request.codeVerifier),
             wallet = wallet,
             asMetadata = asMetadata,
@@ -2590,7 +2597,7 @@ object WalletIssuanceHandler {
             },
             onAttestationObtained = onAttestationObtained,
             httpClient = httpClient,
-        )
+        ) else null
         val tokenResult = exchangeCodeDetailed(
             request = request,
             tokenEndpoint = tokenEndpoint,
@@ -2624,6 +2631,7 @@ object WalletIssuanceHandler {
         keyMaterial: WalletKeyStoreEntry? = null,
         useDpop: Boolean = false,
     ): RequestTokenDetailedResult {
+        val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
@@ -2632,7 +2640,7 @@ object WalletIssuanceHandler {
         // Mirrors the pre-authorized-code exchange. Attestation wins over private_key_jwt when both
         // are advertised, because it additionally attests the wallet instance rather than only proving
         // key control.
-        val clientAssertionFactory = if (tokenAttestation == null && asMetadata != null && keyMaterial != null) {
+        val clientAssertionFactory = if (manualAttestation == null && tokenAttestation == null && asMetadata != null && keyMaterial != null) {
             clientAssertionFactory(asMetadata = asMetadata, clientId = request.clientId, keyMaterial = keyMaterial)
         } else {
             null
