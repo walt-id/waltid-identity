@@ -38,6 +38,7 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.*
+import kotlinx.coroutines.withContext
 
 /** Independent Nimbus signature/decryption checks. All authentication in these tests is simulated. */
 class ScaPresentationInteropTest {
@@ -72,7 +73,7 @@ class ScaPresentationInteropTest {
             }
         }
         assertFailsWith<IllegalStateException> {
-            kotlinx.coroutines.withContext(PresentationReviewGuard { check(current) { "Review changed" } }) { present(fixture, authorizer) }
+            withContext(PresentationReviewGuard { check(current) { "Review changed" } }) { present(fixture, authorizer) }
         }
         assertEquals(0, signatures)
     }

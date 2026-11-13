@@ -55,6 +55,16 @@ Use the same sheet host for context QR scanning, independent credential/technica
 
 Fully completed receive/share success returns after five idle foreground seconds. Touching or scrolling the result keeps it open; a screen reader disables automatic dismissal, and Android's recommended accessibility timeout can extend it. Backgrounding cancels the timer, and a replaced operation cannot close its successor. Partial, pending, uncertain, declined and error outcomes require an explicit action. Keep Done reachable. OS-owned provider results follow their caller's completion contract.
 
+## Credential status
+
+Render the shared assessment and producer-derived reference facts; views do not interpret protocol values or create consent revisions. Red circle-X means revoked/invalid, amber triangle means another issue, and green check is reserved for understood, fresh, complete clear evidence on details. Checking is separate activity. Missing/unreadable data is unavailable, never no-reference or clear.
+
+Home shows an issue icon only, on the artwork: before a wallet-rendered title with an 8-unit gap, or bottom-start with a 16-unit inset and opaque backing when supplied art has no wallet title. Preserve artwork, card geometry and stack peek; a covered card's icon may be covered. Details use one standalone status island, separate refresh and rotating disclosure controls, a short headline/time caption and divided facts. Sharing attaches one collapsed status line below the credential identity divider. Opening status details changes neither selection nor networking.
+
+Keep the primary action's ordinary/payment/nearby wording. Selected revoked/invalid/suspended evidence opens one final warning, combined with any required unsigned-payment warning. Ordinary sharing uses Share anyway only inside this dialog; payment and nearby retain their authoritative action. Bind the captured submission to request, choices, disclosures, payment revision, selected scoped status revisions and live host context. Back/dismiss grants no consent and sends no refusal. Meaningful changes invalidate it; unrelated/timestamp-only changes do not. Submit at most once and retain downstream SDK guards. Supported wallet-owned hosts share this behavior; OS picker geometry remains platform-owned.
+
+Status settings show the latest manual batch as numeric outcome rows with conditional error/deferred explanation. Automatic or individual checks do not overwrite that report. Check errors can overlap completed/unchanged outcomes, so counts are not a success percentage. Common root order is Wallet access, Signing key, Credential status, Technical; platform capabilities remain explicit.
+
 ## Structure and evidence workflow
 
 Prefer one public rendering entry per file, with small private helpers beside it. Split orchestration, reusable content and platform hosting when they have different responsibilities. Extract stable concepts, not identical-looking fragments with different semantics. Reuse the Kotlin shared UI and the existing shared Swift package instead of adding a new public SDK UI layer.

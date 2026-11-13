@@ -72,5 +72,8 @@ Text entry waits for the actual backing editor's input mode and focus, fills tha
 then verifies its value. Keyboard navigation also targets that editor. Filling the contenteditable
 ARIA mirror can race canvas focus without entering text into Compose. ARIA focus and disabled attributes are not reliable
 proxies for Compose state in the pinned version; submitted request assertions remain required.
+The status interaction case also exercises Space activation and Escape dismissal. The pinned
+renderer can leave its ARIA mirror stale after closing a popup, so the Escape assertion compares
+the actual canvas backdrop. This does not establish screen-reader acceptance after popup dismissal.
 This pilot does not prove screen-reader acceptance, every browser/viewport, browser authorization
 redirects or mobile system hosts.

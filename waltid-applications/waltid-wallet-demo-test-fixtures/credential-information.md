@@ -26,6 +26,10 @@ Stored data, requested disclosures and offered definitions share `CredentialData
 
 The SDK preview identifies unrequested clear-text data that will also be transmitted. For SD-JWT, only the original signed payload establishes those unavoidable values; do not infer them from the fully reconstructed credential. An mdoc never adds unrequested elements to this list. The additional `requested` preview flag defaults to true for existing callers and passes through the mobile, Swift and wallet API adapters. Extra personal values remain visible in the information section and produce a brief candidate warning. Only unrequested issuer/type paths already represented by the credential selector are omitted (SD-JWT `iss`/`vct`, JWT VC `iss`/`vc.issuer`/`vc.type`, linked-data VC `issuer`/`type`). All other unavoidable values stay visible, including subject/credential identifiers and custom nested fields whose names coincide with technical vocabulary. Requested metadata always remains visible. Merged sharing rows use the canonical full claim path within their credential group, independently of disclosure position or display order. This is display projection only: SDK validation and presentation retain their query identities and own the transmitted field set.
 
+## Credential status
+
+Credential status is wallet-local advisory information, separate from issuer identity and the disclosed claim set. Stored details have one standalone status island; sharing credential islands have an inset divider and one collapsed status line with its own disclosure. Expanded facts preserve each reference's original result/check time and latest attempt. Reuse the [status conventions](design-system.md#credential-status), including on-artwork Home decoration and unavailable-data handling. Expanding status does not select a credential, change disclosure choices or fetch issuer data.
+
 ## Values and media
 
 Details, receipt information and consent normalize the source JSON value through the same renderer.

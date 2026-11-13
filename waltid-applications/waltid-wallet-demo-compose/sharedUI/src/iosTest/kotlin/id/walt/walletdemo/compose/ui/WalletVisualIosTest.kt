@@ -43,6 +43,8 @@ class WalletVisualIosTest {
     @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
     @Test fun credentialStatusKinds() = scenario { credentialStatusKinds() }
     @Test fun credentialStatusSharing() = scenario { credentialStatusSharing() }
+    @Test fun credentialStatusConfirmation() = scenario { credentialStatusConfirmation() }
+    @Test fun credentialStatusPaymentConfirmation() = scenario { credentialStatusConfirmation(payment = true) }
     @Test fun credentialStatusPayment() = scenario { credentialStatusPayment() }
     @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
     @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }

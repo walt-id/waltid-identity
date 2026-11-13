@@ -99,9 +99,13 @@ class WalletViewModel: ObservableObject {
     let readerTrustSettings: DemoReaderTrustSettingsController
     @Published var identityScreen: WalletIdentityScreenModel?
     @Published private(set) var credentialStatuses: [String: CredentialStatus] = [:]
+    @Published private(set) var credentialStatusReadState = CredentialStatusReadState.loading
+    var credentialStatusAvailable: Bool { credentialStatusReadState == .available }
+    private var credentialStatusStoreIndices: [String: Int] = [:]
     @Published private(set) var refreshingCredentialIDs: Set<String> = []
     @Published private(set) var checkingCredentialStatuses = false
-    @Published var credentialStatusSummary: String?
+    @Published var credentialStatusSummary: CredentialStatusRefreshSummary?
+    @Published private(set) var credentialStatusBatchError: String?
     @Published var credentialStatusError: String?
     @Published var credentialStatusNotice: String?
     @Published var automaticCredentialStatusChecks = true {
@@ -304,7 +308,7 @@ class WalletViewModel: ObservableObject {
     }
 
     var presentationReviewEnabled: Bool {
-        !isLoading && presentationReview != nil
+        applicationForeground && isReady && auth == .unlocked && !isLoading && presentationReview != nil
     }
 
     /// The review the shared SwiftUI surface renders for a ready OpenID4VP preview.
@@ -409,7 +413,10 @@ class WalletViewModel: ObservableObject {
 
     var credentialStatusUIContext: CredentialStatusUIContext {
         CredentialStatusUIContext(values: credentialStatuses, refreshing: refreshingCredentialIDs,
-            check: { [weak self] id in self?.checkCredentialStatuses(ids: [id]) })
+            check: { [weak self] id in self?.checkCredentialStatuses(ids: [id]) },
+            storeIndices: credentialStatusStoreIndices, readState: credentialStatusReadState,
+            contextKey: StatusContextKey(owner: ObjectIdentifier(self), generation: credentialStatusGeneration),
+            checking: checkingCredentialStatuses)
     }
 
     deinit {
@@ -424,20 +431,29 @@ class WalletViewModel: ObservableObject {
         let client = walletClient
         credentialStatusObservationTask = Task { [weak self] in
             defer { if self?.credentialStatusGeneration == generation { self?.credentialStatusObservationTask = nil } }
-            do {
-                for try await snapshot in try await client.credentialStatusUpdates() {
-                    try Task.checkCancellation()
+            while !Task.isCancelled {
+                do {
+                    for try await snapshot in try await client.credentialStatusUpdates() {
+                        try Task.checkCancellation()
+                        guard let self, credentialStatusGeneration == generation else { return }
+                        installCredentialStatuses(snapshot)
+                    }
+                    guard let self, credentialStatusGeneration == generation, !Task.isCancelled else { return }
+                    if credentialStatusReadState == .loading { credentialStatusReadState = .unavailable }
+                    return
+                } catch is CancellationError { return } catch {
                     guard let self, credentialStatusGeneration == generation else { return }
-                    installCredentialStatuses(snapshot)
+                    credentialStatusReadState = .unavailable
+                    credentialStatusError = String(localized: "Credential status is unavailable. Try checking again.")
                 }
-            } catch is CancellationError {} catch {
-                if self?.credentialStatusGeneration == generation { self?.credentialStatusError = String(localized: "Credential status is unavailable. Try checking again.") }
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
             }
         }
         if automaticCredentialStatusChecks { checkCredentialStatuses(force: false) }
     }
 
     private func cancelCredentialStatusWork(preserveNotice: Bool = false) {
+        credentialStatusReadState = credentialStatusReadState.awaitingRead
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         credentialStatusGeneration += 1
         credentialStatusObservationTask?.cancel(); credentialStatusObservationTask = nil
@@ -451,6 +467,7 @@ class WalletViewModel: ObservableObject {
         guard applicationForeground, isReady, auth == .unlocked, !checkingCredentialStatuses else { return }
         let generation = credentialStatusGeneration
         if !force && (!automaticCredentialStatusChecks || isLoading || presentationReview != nil || proximityPresentation.active) { return }
+        let settingsBatch = force && ids == nil
         if !force {
             lastAutomaticStatusCheckAt = statusNow()
             automaticallyCheckedInventory = Set(credentials.map(\.id))
@@ -458,7 +475,7 @@ class WalletViewModel: ObservableObject {
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         checkingCredentialStatuses = true
         credentialStatusError = nil
-        if force { credentialStatusSummary = nil }
+        if settingsBatch { credentialStatusSummary = nil; credentialStatusBatchError = nil }
         credentialStatusRefreshTask = Task { [weak self] in
             guard let self else { return }
             defer { if credentialStatusGeneration == generation { checkingCredentialStatuses = false; refreshingCredentialIDs = []; scheduleCredentialStatusCheck() } }
@@ -467,18 +484,22 @@ class WalletViewModel: ObservableObject {
                 try Task.checkCancellation()
                 guard credentialStatusGeneration == generation else { return }
                 if let snapshot = try await walletClient.credentialStatusSnapshot() { installCredentialStatuses(snapshot) }
-                if force {
-                    let failed = result.filter { $0.status.entries.contains { if case .unavailable = $0 { true } else { false } } }.count
-                    credentialStatusSummary = String(localized: "Checked: \(result.filter { $0.outcome == .completed }.count) · unchanged: \(result.filter { $0.outcome == .unchanged }.count) · deferred: \(result.filter { $0.outcome == .deferred }.count) · with unavailable checks: \(failed)")
-                }
+                if settingsBatch { credentialStatusSummary = CredentialStatusRefreshSummary(results: result) }
             } catch is CancellationError {} catch {
-                if credentialStatusGeneration == generation { credentialStatusError = String(localized: "Could not check credential status. Previous results are retained.") }
+                if credentialStatusGeneration == generation {
+                    credentialStatusError = String(localized: "Could not check credential status. Previous results are retained.")
+                    if settingsBatch { credentialStatusBatchError = String(localized: "Could not check statuses. Try again.") }
+                }
             }
         }
     }
 
     private func installCredentialStatuses(_ snapshot: CredentialStatusSnapshot) {
-        let next = Dictionary(snapshot.credentials.map { ($0.credentialID, $0.value) }, uniquingKeysWith: { _, newer in newer })
+        let context = CredentialStatusUIContext(snapshot: snapshot)
+        let next = context.values
+        if !credentialStatusAvailable { credentialStatusError = nil }
+        credentialStatusStoreIndices = context.storeIndices
+        credentialStatusReadState = .available
         announcedCredentialStatuses = announcedCredentialStatuses.filter { next[$0.key]?.presentation.hasAdverseStatus == true }
         pendingCredentialStatusNotices = pendingCredentialStatusNotices.filter { next[$0]?.presentation.hasAdverseStatus == true }
         let changed = next.filter { id, value in
@@ -1590,9 +1611,9 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    func submitPresentation(reviewedStatus renderedStatuses: [String: String]? = nil) {
+    func submitPresentation(reviewedStatus: [String: String]) {
         resetInputFocus()
-        guard !isLoading, paymentReview.canConfirm else { return }
+        guard presentationReviewEnabled, paymentReview.canConfirm else { return }
         guard let previewHandle = presentationPreview?.previewHandle else { return }
         guard presentationCredentialSelectionComplete else {
             setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.selectCredentialForEveryRequest), tab: .present)
@@ -1603,7 +1624,6 @@ class WalletViewModel: ObservableObject {
         let selectedCredentialOptions = Array(selectedPresentationCredentialOptions)
         let selectedDid = did.isEmpty ? nil : did
 
-        let reviewedStatus = renderedStatuses ?? credentialStatuses.mapValues { $0.presentation.advisoryRevision }
         let consentRevision = paymentReview.consent?.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
@@ -1626,9 +1646,16 @@ class WalletViewModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch WalletError.credentialStatusReviewChanged {
-                if let snapshot = try? await walletClient.credentialStatusSnapshot() { installCredentialStatuses(snapshot) }
+                guard !Task.isCancelled else { return }
+                do {
+                    let snapshot = try await walletClient.credentialStatusSnapshot()
+                    try Task.checkCancellation()
+                    if let snapshot { installCredentialStatuses(snapshot) } else { credentialStatusReadState = .unavailable }
+                } catch is CancellationError { return }
+                catch { credentialStatusReadState = .unavailable }
                 isLoading = false
-                credentialStatusError = WalletError.credentialStatusReviewChanged.localizedDescription
+                credentialStatusError = credentialStatusAvailable ? WalletError.credentialStatusReviewChanged.localizedDescription
+                    : String(localized: "Status changed, but its latest details are unavailable. Try again.")
             } catch {
                 guard !Task.isCancelled else { return }
                 resetPresentationToEntry()
@@ -1936,6 +1963,8 @@ class WalletViewModel: ObservableObject {
     }
 
     private func clearWalletState() {
+        credentialStatusSummary = nil; credentialStatusBatchError = nil
+        credentialStatuses = [:]; credentialStatusStoreIndices = [:]; credentialStatusReadState = .loading
         externalFlow = nil
         selectedTab = .credentials
         did = ""
@@ -2129,6 +2158,11 @@ class WalletViewModel: ObservableObject {
     private func logE2E(_ message: String) {
         NSLog("[WalletE2E] \(message)")
     }
+}
+
+private struct StatusContextKey: Hashable {
+    let owner: ObjectIdentifier
+    let generation: Int
 }
 
 private extension PresentationPreviewResult {

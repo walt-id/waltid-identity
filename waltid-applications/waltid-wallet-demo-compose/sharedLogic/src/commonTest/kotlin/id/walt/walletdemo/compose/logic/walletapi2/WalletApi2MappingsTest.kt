@@ -4,6 +4,7 @@ import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.incomingWalletPageLink
 import io.ktor.http.encodeURLParameter
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -14,23 +15,60 @@ import kotlin.test.assertNull
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class WalletApi2MappingsTest {
     @Test
+    fun futurePresentationAndUnsupportedMethodNamesStayConservative() {
+        fun render(presentation: CredentialStatusPresentationDto) = CredentialStatusSnapshotDto(listOf(
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "identity"), presentation),
+        )).toDemoStatuses().credentials.getValue("identity")
+        val future = render(CredentialStatusPresentationDto("FUTURE_STATUS", "NONE", "FRESH", "CHECK", "opaque",
+            lastKnown = false, coverage = "COMPLETE"))
+        assertTrue(future.hasIssue)
+        assertFalse(future.positive)
+
+        val unsupported = render(CredentialStatusPresentationDto("UNSUPPORTED", "UNSUPPORTED", "UNKNOWN", "NONE", "opaque",
+            lastKnown = false, references = listOf(CredentialStatusReferencePresentationDto("reference", method = "TOKEN_STATUS_LIST"))))
+        val reference = unsupported.references.single()
+        assertNull(reference.protocolName, "An unsupported method spelling is not a recognized protocol tag")
+        assertEquals("TOKEN_STATUS_LIST", reference.method)
+    }
+
+    @Test
     fun overlappingStoreIdsCannotHideAnAdverseResultAndWireFailuresAreCounted() {
-        val clear = id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus("NOT_REVOKED", "NONE", "FRESH", "CHECK", "clear")
-        val revoked = clear.copy(kind = "REVOKED", issue = "REVOKED", advisoryRevision = "revoked")
+        val checked = "2026-11-12T09:00:00Z"
+        val reference = CredentialStatusReferencePresentationDto("ref", protocolName = "BITSTRING_STATUS_LIST",
+            purpose = "revocation", result = "CLEAR", checkedAt = checked, freshUntil = "2026-11-12T11:00:00Z", freshness = "FRESH")
+        val clear = CredentialStatusPresentationDto("NOT_REVOKED", "NONE", "FRESH", "CHECK", "clear", lastKnown = false,
+            coverage = "COMPLETE", lastCheckedAt = checked, purposes = listOf("revocation"), references = listOf(reference))
+        val revoked = clear.copy(kind = "REVOKED", issue = "REVOKED", advisoryRevision = "revoked",
+            references = listOf(reference.copy(result = "REVOKED")))
         val snapshot = CredentialStatusSnapshotDto(listOf(
             CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked),
             CredentialStatusRecordDto(CredentialStatusReferenceDto(1, "same-id"), clear),
         )).toDemoStatuses()
         assertEquals("NEEDS_REVIEW", snapshot.credentials.getValue("same-id").issue)
         assertEquals("AMBIGUOUS_CREDENTIAL_ID", snapshot.credentials.getValue("same-id").failure)
-        val failed = CredentialStatusRefreshResultDto("COMPLETED", kotlinx.serialization.json.Json.parseToJsonElement(
-            """{"entries":[{"type":"unavailable","reason":"TIMEOUT"}]}""").jsonObject)
-        assertTrue(failed.hasUnavailableChecks)
-        assertFalse(failed.copy(status = kotlinx.serialization.json.Json.parseToJsonElement("{}").jsonObject).hasUnavailableChecks)
+        assertFailsWith<IllegalArgumentException> {
+            val duplicate = CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked)
+            CredentialStatusSnapshotDto(listOf(duplicate, duplicate))
+        }
+        val failed = CredentialStatusRefreshResultDto("COMPLETED", Json.parseToJsonElement(
+            """{"type":"references","entries":[{"type":"token","referenceId":"token","check":{"type":"failed","attemptedAt":"2026-11-12T10:00:00Z","cause":{"type":"reason","reason":"TIMEOUT"}}}]}""").jsonObject)
+        assertTrue(failed.hasCheckErrors)
+        assertFalse(failed.copy(status = Json.parseToJsonElement(
+            """{"type":"references","entries":[{"type":"token","referenceId":"token","check":{"type":"observed","observation":{"value":1,"checkedAt":"2026-11-12T09:00:00Z","freshUntil":"2026-11-12T09:15:00Z"}}},
+                {"type":"unsupported","referenceId":"other","method":"OtherStatus"},{"type":"legacy","referenceId":"legacy","purpose":"suspension","check":{"type":"not_checked"}}]}""").jsonObject).hasCheckErrors)
+        for (status in listOf(
+            """{"type":"discovery_failed","problem":"RESOURCE_LIMIT"}""",
+            """{"type":"references","entries":[{"type":"malformed","referenceId":"broken","problem":"MALFORMED"}]}""",
+            """{"type":"references","entries":[{"type":"mso","referenceId":"mso","check":{"type":"conflict","attemptedAt":"2026-11-12T10:00:00Z","retained":{"value":"REVOKED","checkedAt":"2026-11-12T09:00:00Z","freshUntil":"2026-11-12T09:15:00Z"}}}]}""",
+        )) assertTrue(failed.copy(status = Json.parseToJsonElement(status).jsonObject).hasCheckErrors)
+        assertFailsWith<IllegalStateException> {
+            failed.copy(status = Json.parseToJsonElement("{}").jsonObject).hasCheckErrors
+        }
     }
 
     @Test

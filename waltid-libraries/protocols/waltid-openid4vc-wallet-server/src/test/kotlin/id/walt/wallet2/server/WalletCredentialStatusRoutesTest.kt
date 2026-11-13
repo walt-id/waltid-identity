@@ -7,15 +7,25 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshOutcome
+import id.walt.wallet2.status.RefreshCredentialStatusesRequest
+import id.walt.wallet2.status.StatusReviewedBuildVpTokenRequest
+import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
-import io.ktor.client.request.*
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.*
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -24,8 +34,16 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
-import kotlin.test.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import id.walt.wallet2.data.WalletCredentialStore
 
 class WalletCredentialStatusRoutesTest {
     @Test
@@ -86,7 +104,7 @@ class WalletCredentialStatusRoutesTest {
         val client = HttpClient(MockEngine { issuerRequests++; respond("unexpected issuer request") })
         val store = InMemoryCredentialStore()
         // This custom adapter deliberately has no snapshot capability, so each admitted request discovers it anew.
-        val wallet = Wallet("same-path", credentialStores = listOf(object : id.walt.wallet2.data.WalletCredentialStore by store {}))
+        val wallet = Wallet("same-path", credentialStores = listOf(object : WalletCredentialStore by store {}))
         val requests = WalletCredentialStatusRequests { WalletCredentialStatusService(it, client, parentScope = backgroundScope) }
         val backend = Any()
         val scope = WalletCredentialStatusRequests.Scope(backend, wallet.id, "first")

@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.logic.walletapi2
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoStatusRefreshSummary
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged
 import kotlinx.coroutines.isActive
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
@@ -30,6 +31,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 fun createWalletApi2DemoWallet(
     baseUrl: String,
@@ -80,27 +84,29 @@ internal class WalletApi2DemoWallet(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
 
-    override fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> = kotlinx.coroutines.flow.flow {
-        while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = flow {
+        while (currentCoroutineContext().isActive) {
             emit(credentialStatusSnapshot())
-            kotlinx.coroutines.delay(30_000)
+            delay(30_000)
         }
     }
 
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = useWallet {
         val snapshot = client.credentialStatusSnapshot(walletId)
-        if (snapshot == null) WalletDemoCredentialStatuses(client.listCredentialMetadata(walletId).associate { it.id to WalletDemoCredentialStatus.ServerUnsupported })
+        if (snapshot == null) WalletDemoCredentialStatuses(
+            client.listCredentialMetadata(walletId).associate { it.id to WalletDemoCredentialStatus.ServerUnsupported },
+            legacySubmission = true)
         else snapshot.toDemoStatuses()
     }
 
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = useWallet {
         val snapshot = client.credentialStatusSnapshot(walletId)
-            ?: return@useWallet WalletDemoStatusRefreshSummary(0, 0, 0, client.listCredentialMetadata(walletId).size)
+            ?: error("This server does not support credential status checks.")
         val selection = ids?.let { selected -> snapshot.credentials.filter { it.reference.credentialId in selected }.map { it.reference } }
         require(selection == null || selection.isNotEmpty())
         val result = client.refreshCredentialStatuses(walletId, RefreshCredentialStatusesDto(selection, if (force) "FORCE" else "IF_DUE"))
         WalletDemoStatusRefreshSummary(result.count { it.outcome == "COMPLETED" }, result.count { it.outcome == "UNCHANGED" },
-            result.count { it.outcome == "DEFERRED" }, result.count { it.hasUnavailableChecks })
+            result.count { it.outcome == "DEFERRED" }, result.count { it.outcome != "REMOVED" && it.hasCheckErrors })
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = useWallet {
@@ -333,6 +339,7 @@ internal class WalletApi2DemoWallet(
         paymentConsentRevision: String?,
     ): WalletDemoOperationResult = useWallet {
         val supported = client.credentialStatusSnapshot(walletId) != null
+        if (supported && selectedCredentialOptions.any { reviewedStatus[it.credentialId].isNullOrBlank() }) throw WalletDemoStatusReviewChanged()
         val review = reviewedStatus.takeIf { supported }
         val session = presentationSessions[previewHandle.value]
         val built = client.buildVpToken(

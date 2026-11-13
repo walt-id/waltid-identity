@@ -1,8 +1,24 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package id.walt.wallet2.status
 
-import id.walt.credentials.status.*
+import id.walt.credentials.status.Check
+import id.walt.credentials.status.CheckFailure
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusEntry
+import id.walt.credentials.status.CredentialStatusFreshness
+import id.walt.credentials.status.CredentialStatusKind
+import id.walt.credentials.status.CredentialStatusRefreshAction
+import id.walt.credentials.status.Observation
+import id.walt.credentials.status.StatusMeaning
+import id.walt.credentials.status.StatusTestIssuer
+import id.walt.credentials.status.TokenStatus
+import id.walt.credentials.status.entries
+import id.walt.credentials.status.failure
+import id.walt.credentials.status.lastObservation
+import id.walt.credentials.status.meaning
+import id.walt.credentials.status.presentation
+import id.walt.credentials.formats.W3C11
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -19,14 +35,47 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.test.*
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.time.Duration
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class WalletCredentialStatusServiceTest {
+    @Test
+    fun snapshotsDetachCollectionsValidateTheirTimeAndKeepStoreScopedIdentities() {
+        val at = Instant.fromEpochSeconds(1_800_000_000)
+        val first = WalletCredentialStatus(WalletCredentialReference(0, "same-id"), CredentialStatus.references(), at)
+        val second = WalletCredentialStatus(WalletCredentialReference(1, "same-id"), CredentialStatus.references(), at)
+        val records = mutableListOf(first, second)
+        val active = mutableSetOf(first.reference, second.reference)
+        val snapshot = WalletCredentialStatusSnapshot(at, records, active)
+        records.clear(); active.clear()
+        assertEquals(listOf(first, second), snapshot.credentials)
+        assertEquals(setOf(first.reference, second.reference), snapshot.refreshing)
+        runCatching { (snapshot.credentials as MutableList<WalletCredentialStatus>).clear() }
+        runCatching { (snapshot.refreshing as MutableSet<WalletCredentialReference>).clear() }
+        assertEquals(listOf(first, second), snapshot.credentials)
+        assertEquals(setOf(first.reference, second.reference), snapshot.refreshing)
+        assertFailsWith<IllegalArgumentException> { WalletCredentialStatusSnapshot(at, listOf(first, first)) }
+        assertFailsWith<IllegalArgumentException> { WalletCredentialStatusSnapshot(at + 1.seconds, listOf(first)) }
+    }
+
     private class Store : WalletCredentialStore, CredentialStatusSnapshotStore {
         val credentials = linkedMapOf<String, StoredCredential>()
         val snapshots = mutableMapOf<String, PersistedCredentialStatus>()
@@ -98,12 +147,11 @@ class WalletCredentialStatusServiceTest {
                 service.refresh(mode = CredentialStatusRefreshMode.FORCE)
                 val updated = service.snapshot().credentials.single().status.entries.single()
                 if (purpose in listOf("revocation", "refresh")) {
-                    val conflict = assertIs<CredentialStatusEntry.Unavailable>(updated, purpose)
-                    assertEquals(StatusFailure.CONFLICTING_IRREVERSIBLE_STATUS, conflict.reason, purpose)
-                    assertEquals(original, conflict.previous, purpose)
+                    val conflict = assertIs<Check.Conflict<*>>(assertIs<CredentialStatusEntry.Bitstring>(updated).check, purpose)
+                    assertEquals(original, conflict.retained, purpose)
                     assertEquals(original, store.snapshots.values.single().metadata.entries.single().lastObservation(), purpose)
                 } else {
-                    assertEquals(StatusMeaning.CLEAR, assertIs<CredentialStatusEntry.Observed>(updated, purpose).observation.meaning, purpose)
+                    assertEquals(StatusMeaning.CLEAR, updated.meaning, purpose)
                 }
             } finally { service.close(); client.close() }
         }
@@ -112,7 +160,9 @@ class WalletCredentialStatusServiceTest {
     @Test
     fun localReadsPreserveCallerMetadataAndFailedRefreshKeepsThePriorObservation() = runTest {
         val issuer = StatusTestIssuer.create()
-        val entry = StoredCredential("resident", issuer.credential(), metadata = buildJsonObject { put("custom", "retained") })
+        val signed = assertIs<W3C11>(issuer.credential())
+        val entry = StoredCredential("resident", signed.copy(credentialData = JsonObject(signed.credentialData - "status")),
+            metadata = buildJsonObject { put("custom", "retained") })
         val store = Store().apply { addCredential(entry) }
         var body = issuer.list(value = 1u)
         var status = HttpStatusCode.OK
@@ -138,13 +188,26 @@ class WalletCredentialStatusServiceTest {
             status = HttpStatusCode.ServiceUnavailable
             advanceTimeBy(1000)
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            val failed = assertIs<CredentialStatusEntry.Unavailable>(service.snapshot().credentials.single().status.entries.single())
-            assertEquals(StatusFailure.TRANSPORT, failed.reason)
-            assertEquals(first, failed.previous)
+            val failedEntry = assertIs<CredentialStatusEntry.Token>(service.snapshot().credentials.single().status.entries.single())
+            val failed = assertIs<Check.Failed<TokenStatus>>(failedEntry.check)
+            assertEquals(CheckFailure.Reason.TRANSPORT, failed.cause)
+            assertEquals<Observation<*>?>(first, failed.previous)
             assertEquals(failed.attemptedAt + 30.seconds, service.snapshot().nextRefreshAt)
             assertEquals(entry.metadata, service.readCredentials().single().credential.metadata)
-            assertEquals(StatusMeaning.INVALID, failed.previous?.meaning)
+            assertEquals(StatusMeaning.INVALID, failedEntry.meaning)
             assertEquals(2, requests)
+            val malformedProjection = assertIs<W3C11>(entry.credential).copy(
+                credentialData = JsonObject(entry.credential.credentialData + ("status" to JsonPrimitive(true))))
+            store.credentials[entry.id] = entry.copy(credential = malformedProjection)
+            advanceTimeBy(1000)
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val retained = assertIs<CredentialStatusEntry.Token>(service.snapshot().credentials.single().status.entries.single())
+            val latestFailure = assertIs<Check.Failed<TokenStatus>>(retained.check)
+            assertEquals(CheckFailure.Reason.TRANSPORT, latestFailure.cause)
+            assertEquals<Observation<*>?>(first, latestFailure.previous,
+                "Projection drift must not erase the original canonical evidence after a failed refresh")
+            assertEquals(StatusMeaning.INVALID, retained.meaning)
+            assertEquals(3, requests, "A malformed projection must not suppress the canonical signed reference")
         } finally { service.close(); client.close() }
     }
 
@@ -283,13 +346,73 @@ class WalletCredentialStatusServiceTest {
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
             val rendered = service.snapshot().credentials.single().presentation.advisoryRevision
             val guard = service.reviewGuard(setOf("resident"), mapOf("resident" to rendered, "unselected" to "ignored"))
-            at += kotlin.time.Duration.parse("1s")
+            at += Duration.parse("1s")
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
             guard.check()
-            at += kotlin.time.Duration.parse("31s")
+            at += Duration.parse("31s")
             assertFailsWith<CredentialStatusReviewChangedException> { guard.check() }
             service.reviewGuard(setOf("resident"), mapOf("resident" to service.snapshot().credentials.single().presentation.advisoryRevision)).check()
         } finally { service.close(); client.close() }
+    }
+
+    @Test
+    fun notYetValidBecomesDueAtItsStartWithoutTreatingItAsExpired() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val start = Instant.fromEpochSeconds(1_800_000_060)
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential(validFrom = start.epochSeconds))) }
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { requests++; respond(issuer.list(), headers = Headers.build { append(HttpHeaders.ContentType, "application/statuslist+jwt") }) }
+        }))
+        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { Instant.fromEpochMilliseconds(1_800_000_000_000 + testScheduler.currentTime) }, parentScope = backgroundScope)
+        try {
+            service.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val waiting = service.snapshot()
+            assertEquals(CheckFailure.NotYetValid(start), waiting.credentials.single().presentation.failure)
+            assertEquals(CredentialStatusRefreshAction.NONE, waiting.credentials.single().presentation.action)
+            assertEquals(start, waiting.nextRefreshAt)
+            assertEquals(0, requests)
+            assertEquals(CredentialStatusRefreshOutcome.UNCHANGED, service.refresh(mode = CredentialStatusRefreshMode.FORCE).single().outcome)
+            val snapshots = async { service.observe().take(2).toList() }
+            runCurrent(); advanceTimeBy(60_001); runCurrent()
+            assertEquals(CredentialStatusRefreshAction.RETRY, snapshots.await().last().credentials.single().presentation.action)
+            service.refresh()
+            assertEquals(1, requests)
+            assertEquals(CredentialStatusKind.CHECKED, service.snapshot().credentials.single().presentation.kind)
+        } finally { service.close(); client.close() }
+    }
+
+    @Test
+    fun restoreRejectsAnOldSchemaAndSameIdEvidenceWithADifferentProtocolOrPurpose() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val at = Instant.fromEpochSeconds(1_800_000_000)
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.w3cCredential())) }
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { requests++; respond(issuer.w3cList(), headers = Headers.build { append(HttpHeaders.ContentType, "application/vc+jwt") }) }
+        }))
+        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "stable-policy", parentScope = backgroundScope)
+        val first = service()
+        try { first.refresh(mode = CredentialStatusRefreshMode.FORCE) } finally { first.close() }
+        val valid = assertNotNull(store.snapshots["resident"])
+        val id = valid.metadata.entries.single().referenceId
+        val wrongProtocol = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"$id","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}""")
+        val wrongPurpose = Json.decodeFromString(CredentialStatus.serializer(), Json.encodeToString(CredentialStatus.serializer(), valid.metadata)
+            .replace("\"purpose\":\"revocation\"", "\"purpose\":\"suspension\""))
+        assertNotEquals(valid.metadata, wrongPurpose)
+        try {
+            for (saved in listOf(valid.copy(schemaVersion = 1), valid.copy(metadata = wrongProtocol), valid.copy(metadata = wrongPurpose))) {
+                store.snapshots["resident"] = saved
+                val reopened = service()
+                try { assertEquals(CredentialStatusKind.NOT_CHECKED, reopened.snapshot().credentials.single().presentation.kind) }
+                finally { reopened.close() }
+            }
+            assertEquals(1, requests, "Restore and local reads must not contact the status endpoint")
+        } finally { client.close() }
     }
 
 }

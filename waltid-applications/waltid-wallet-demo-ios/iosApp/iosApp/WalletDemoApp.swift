@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import WalletDemoSharingUI
+import WalletSDK
 
 @main
 struct WalletDemoApp: App {
@@ -26,9 +27,11 @@ struct WalletDemoApp: App {
                 initialCredentialRead = { await Self.initialCredentialReadGate.wait() }
             }
             let imageCredential = Self.mockImageCredential(environment: env)
+            let statusSnapshot = MockWalletClient.uiTestCredentialStatusSnapshot(env["E2E_MOCK_STATUS_JSON"])
             let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
             let imageCredential: (dataJSON: String, portraitValueJSON: String)? = nil
+            let statusSnapshot: CredentialStatusSnapshot? = nil
             let registrationUpdate: (@Sendable () async throws -> Void)? = nil
             #endif
             return WalletViewModel(
@@ -48,10 +51,12 @@ struct WalletDemoApp: App {
                         return nil
                         #endif
                     },
+                    paymentTransaction: env["E2E_MOCK_PAYMENT"] != "none",
                     responseEncryptionRequired: env["E2E_MOCK_UNENCRYPTED_RESPONSE"] != "1",
                     mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1",
                     sampleCredentialDataJSON: imageCredential?.dataJSON,
-                    samplePortraitDisclosureValueJSON: imageCredential?.portraitValueJSON
+                    samplePortraitDisclosureValueJSON: imageCredential?.portraitValueJSON,
+                    credentialStatusSnapshot: statusSnapshot
                 ),
                 identityDocumentRegistrationUpdate: registrationUpdate
             )

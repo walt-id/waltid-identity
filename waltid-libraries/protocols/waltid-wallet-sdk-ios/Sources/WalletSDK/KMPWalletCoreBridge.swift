@@ -220,9 +220,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             reads = values.compactMap { $0 as? WalletBridgeCredentialRead }
             guard reads.count == values.count else { throw WalletError.internalFailure("Invalid credential read result") }
         } else { throw WalletError.internalFailure("Unexpected credentials result type") }
-        return try reads.map { read in
-            read.credential.toSwiftCredential(status: try decodeCredentialStatus(CredentialStatus.self, json: read.statusJson))
-        }
+        return reads.map { $0.toSwiftCredential() }
     }
 
     func deleteCredential(id: String) async throws -> Bool {
@@ -1795,6 +1793,14 @@ private extension Waltid_crypto2KeyUseAuthorizationFailure {
         case .protectedKeyUnavailable: return .protectedKeyUnavailable
         case .invalidStoredKeyMetadata: return .invalidStoredKeyMetadata
         }
+    }
+}
+
+extension WalletBridgeCredentialRead {
+    func toSwiftCredential() -> Credential {
+        // Advisory decoding cannot remove an otherwise readable credential. The status snapshot /
+        // stream still reports invalid status data explicitly; nil is never a clear assessment.
+        credential.toSwiftCredential(status: try? decodeCredentialStatus(CredentialStatus.self, json: statusJson))
     }
 }
 

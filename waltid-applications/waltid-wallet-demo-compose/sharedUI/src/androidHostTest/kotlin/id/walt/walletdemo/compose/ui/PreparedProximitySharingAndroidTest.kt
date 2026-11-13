@@ -5,6 +5,10 @@ import android.R as AndroidR
 import android.graphics.Bitmap
 import android.view.View
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import android.graphics.Canvas
 import androidx.compose.material3.Surface
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -57,15 +61,18 @@ class PreparedProximitySharingAndroidTest {
         var approved = false
         var cancelled = false
         setContent {
+            CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(
+                snapshot = WalletDemoCredentialStatuses(mapOf("credential" to WalletVisualFixtures.credentialStatus("revoked_current"))))) {
             WalletDemoTheme {
                 Surface {
                 WalletDemoProximityScreen(state = state.value, credentialDetailsById = emptyMap(),
                     hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                    onContinueAfterResponseChange = {}, onApprove = { approved = true }, onDecline = {},
+                    onContinueAfterResponseChange = {}, onApprove = { _, _ -> approved = true }, onDecline = {},
                     onRetry = {}, onRemediate = { _, _ -> }, onCancel = { cancelled = true },
                     onDismiss = {}, onRestart = {})
                 }
+            }
             }
         }
         onNodeWithText("Review before reconnecting").assertIsDisplayed()
@@ -75,6 +82,12 @@ class PreparedProximitySharingAndroidTest {
         assertFalse(approved)
         capture("compose-preparation")
         onNodeWithText("Approve and get ready").performClick()
+        onNodeWithText("Credential status warning").assertIsDisplayed()
+        assertFalse(approved)
+        onNodeWithTag("credential-status-back").performClick()
+        assertFalse(approved)
+        onNodeWithText("Approve and get ready").performClick()
+        onNodeWithTag("credential-status-confirm").assert(hasText("Approve and get ready")).performClick()
         assertTrue(approved)
         runOnIdle { state.value = state.value.copy(sessionState = ProximityState.PreparationRequired(
             plan, ProximityReviewReason.PreparedSharingChanged)) }

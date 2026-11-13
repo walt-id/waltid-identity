@@ -257,9 +257,12 @@ custom policy. Closing the service releases work; `closeCredentialStatusService(
 an unused service or delete wallet data.
 
 Shared presentation semantics distinguish clear, adverse, stale, partial, unchecked, unsupported and
-unavailable. They do not replace verifier acceptance. New status-reviewed submission paths compare
+unavailable. Domain reads derive presentation from evidence and evaluation time; HTTP responses use
+the separate presentation DTO and `WalletCredentialStatusSnapshotResponse`. Decoded transport values
+never override local service assessment. They do not replace verifier acceptance. Status-reviewed submission paths compare
 only the selected credentials' displayed semantic revisions before signing and delivery; existing
-public submission paths retain their behavior. See the [status module](../../credentials/waltid-credential-status/README.md)
+public submission paths retain their behavior. Capture the request, selection and displayed revisions
+when starting a UI confirmation; do not rebuild an acknowledgement at its final button. See the [status module](../../credentials/waltid-credential-status/README.md)
 for supported profiles, trust, network bounds, no-store and batch-session rules.
 
 ## Session Events

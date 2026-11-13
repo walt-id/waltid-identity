@@ -1,7 +1,11 @@
 package id.walt.wallet2.persistence
 
-import id.walt.wallet2.status.*
-import id.walt.credentials.status.*
+import kotlinx.serialization.json.Json
+import id.walt.wallet2.status.PersistedCredentialStatus
+import id.walt.wallet2.status.statusFingerprint
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.code
+import id.walt.credentials.status.failure
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -28,7 +32,9 @@ import java.sql.Connection
 import java.sql.DriverManager
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Instant
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -50,8 +56,7 @@ class Wallet2DatabaseMigrationTest {
             first.addCredential(credential); second.addCredential(credential)
             val at = Instant.fromEpochSeconds(1_800_000_000)
             val saved = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
-                metadata = CredentialStatusMetadata(listOf(CredentialStatusEntry.Observed(StatusObservation("ref", StatusProtocol.ISO_MSO_STATUS_LIST,
-                    "revocation", 1u, at, at, meaning = StatusMeaning.REVOKED)))))
+                metadata = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"ref","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}"""))
             assertTrue(first.saveCredentialStatusIfCurrent(credential, saved))
             assertEquals(saved, ExposedCredentialStore("first", initWallet2Database(config(url))).readCredentialStatus(credential.id))
             assertNull(second.readCredentialStatus(credential.id))

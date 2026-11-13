@@ -42,6 +42,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import kotlin.js.ExperimentalWasmJsInterop
+import org.w3c.dom.events.Event
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -165,7 +166,7 @@ private fun WebWalletSession(
     }
 
     DisposableEffect(controller) {
-        val visibility: (org.w3c.dom.events.Event) -> Unit = {
+        val visibility: (Event) -> Unit = {
             if (isWalletDocumentVisible()) controller.handleApplicationForegrounded()
             else controller.handleApplicationBackgrounded()
         }

@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.credentials.status.presentation
+import id.walt.credentials.status.CredentialStatus
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
@@ -18,6 +18,7 @@ import id.walt.wallet2.mobile.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletCredentialRead
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
@@ -45,8 +46,17 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -626,14 +636,14 @@ class WalletSdkBridgeTest {
     fun statusStreamSerializesEmptyCollectionsAndReleasesTheNativeCollector() = runTest {
         var released = false
         val operations = FakeWalletSdkBridgeOperations()
-        operations.statusFlow = kotlinx.coroutines.flow.flow {
+        operations.statusFlow = flow {
             try {
-                emit(id.walt.wallet2.status.WalletCredentialStatusSnapshot(
-                    kotlin.time.Instant.parse("2026-11-12T10:00:00Z"), emptyList()))
-                kotlinx.coroutines.awaitCancellation()
+                emit(WalletCredentialStatusSnapshot(
+                    Instant.parse("2026-11-12T10:00:00Z"), emptyList()))
+                awaitCancellation()
             } finally { released = true }
         }
-        val bridge = WalletSdkBridge.forOperations(operations, kotlinx.coroutines.flow.emptyFlow())
+        val bridge = WalletSdkBridge.forOperations(operations, emptyFlow())
         val update = assertIs<WalletBridgeCredentialStatusUpdate.Snapshot>(bridge.credentialStatuses.first())
         val json = Json.parseToJsonElement(update.snapshotJson).jsonObject
         assertEquals("[]", json.getValue("credentials").toString())
@@ -644,13 +654,13 @@ class WalletSdkBridgeTest {
     @Test
     fun statusStreamSanitizesFailuresAndDoesNotConvertCancellationToAnUpdate() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
-        val bridge = WalletSdkBridge.forOperations(operations, kotlinx.coroutines.flow.emptyFlow())
-        operations.statusFlow = kotlinx.coroutines.flow.flow { throw IllegalStateException("secret-status-url") }
+        val bridge = WalletSdkBridge.forOperations(operations, emptyFlow())
+        operations.statusFlow = flow { throw IllegalStateException("secret-status-url") }
         val failure = assertIs<WalletBridgeCredentialStatusUpdate.Failure>(bridge.credentialStatuses.first())
         assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
         assertEquals("Credential status observation failed", failure.error.message)
-        operations.statusFlow = kotlinx.coroutines.flow.flow { throw CancellationException("owner ended") }
-        kotlin.test.assertFailsWith<CancellationException> { bridge.credentialStatuses.first() }
+        operations.statusFlow = flow { throw CancellationException("owner ended") }
+        assertFailsWith<CancellationException> { bridge.credentialStatuses.first() }
     }
 
     @Test
@@ -744,17 +754,15 @@ class WalletSdkBridgeTest {
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")
 
-        override suspend fun credentialReads(): List<id.walt.wallet2.mobile.MobileWalletCredentialRead> = credentials().map {
-            val status = id.walt.credentials.status.CredentialStatusMetadata()
-            id.walt.wallet2.mobile.MobileWalletCredentialRead(it, status,
-                status.presentation(kotlin.time.Clock.System.now()), kotlin.time.Clock.System.now().toString())
+        override suspend fun credentialReads(): List<MobileWalletCredentialRead> = credentials().map {
+            MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now().toString())
         }
-        var statusFlow: kotlinx.coroutines.flow.Flow<id.walt.wallet2.status.WalletCredentialStatusSnapshot> = kotlinx.coroutines.flow.emptyFlow()
-        override val credentialStatuses: kotlinx.coroutines.flow.Flow<id.walt.wallet2.status.WalletCredentialStatusSnapshot>
+        var statusFlow: Flow<WalletCredentialStatusSnapshot> = emptyFlow()
+        override val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
             get() = statusFlow
-        override suspend fun credentialStatusSnapshot(): id.walt.wallet2.status.WalletCredentialStatusSnapshot =
-            id.walt.wallet2.status.WalletCredentialStatusSnapshot(kotlin.time.Clock.System.now(), emptyList())
-        override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: id.walt.wallet2.status.CredentialStatusRefreshMode): List<id.walt.wallet2.status.CredentialStatusRefreshResult> = emptyList()
+        override suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot =
+            WalletCredentialStatusSnapshot(Clock.System.now(), emptyList())
+        override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult> = emptyList()
         override suspend fun close() = Unit
 
         override suspend fun credentials(): List<MobileWalletCredential> =

@@ -5,6 +5,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
@@ -20,6 +22,7 @@ import org.jetbrains.compose.resources.painterResource
 /** App actions only. Transaction field display remains controlled by its verified metadata. */
 internal enum class WalletSymbol {
     Back, Next, Accept, Decline, Share, Receive, Retry, Scan, Paste, Manual, Camera, Lock, Key, Nearby, Info, Delete,
+    StatusClear, StatusAdverse, StatusWarning,
 }
 
 /** Pass null beside a text label so assistive technology announces the action only once. */
@@ -33,6 +36,7 @@ internal fun WalletIcon(symbol: WalletSymbol, contentDescription: String?, modif
         WalletSymbol.Receive -> painterResource(Res.drawable.settings_import)
         WalletSymbol.Nearby -> painterResource(Res.drawable.settings_nearby)
         WalletSymbol.Key -> painterResource(Res.drawable.settings_key)
+        WalletSymbol.StatusAdverse -> painterResource(Res.drawable.credential_status_adverse)
         else -> rememberVectorPainter(when (symbol) {
             WalletSymbol.Back -> Icons.AutoMirrored.Filled.ArrowBack
             WalletSymbol.Next -> Icons.AutoMirrored.Filled.ArrowForward
@@ -43,6 +47,8 @@ internal fun WalletIcon(symbol: WalletSymbol, contentDescription: String?, modif
             WalletSymbol.Lock -> Icons.Filled.Lock
             WalletSymbol.Info -> Icons.Filled.Info
             WalletSymbol.Delete -> Icons.Filled.Delete
+            WalletSymbol.StatusClear -> Icons.Filled.CheckCircle
+            WalletSymbol.StatusWarning -> Icons.Filled.Warning
         })
     }
     Icon(painter, contentDescription, modifier)

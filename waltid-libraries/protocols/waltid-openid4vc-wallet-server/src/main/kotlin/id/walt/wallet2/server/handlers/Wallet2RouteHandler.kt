@@ -1,6 +1,16 @@
 package id.walt.wallet2.server.handlers
 
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import id.walt.wallet2.status.CredentialStatusReviewChangedResponse
+import id.walt.wallet2.status.RefreshCredentialStatusesRequest
+import id.walt.wallet2.status.StatusReviewedBuildVpTokenRequest
+import id.walt.wallet2.status.StatusReviewedSendResponseRequest
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
+import id.walt.wallet2.status.WalletCredentialResponse
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import id.walt.wallet2.status.toMetadataResponse
+import id.walt.wallet2.status.toResponse
 import id.walt.wallet2.server.WalletCredentialStatusRequests
 import id.walt.errors.StatusException
 import id.walt.crypto.keys.KeyManager
@@ -42,6 +52,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
+import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
 
@@ -715,7 +727,7 @@ object Wallet2RouteHandler {
                             call.respond(credentialStatuses.withReviewedStatus(wallet, ids, req.reviewedStatus) {
                                 WalletPresentationHandler.buildVpToken(wallet, req.request, transactionDataTypeRegistry = transactionDataTypeRegistry,
                                     clientIdTrustConfiguration = clientIdTrustConfiguration).also {
-                                    kotlinx.coroutines.currentCoroutineContext()[id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard]?.check()
+                                    currentCoroutineContext()[PresentationReviewGuard]?.check()
                                 }
                             })
                         } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }

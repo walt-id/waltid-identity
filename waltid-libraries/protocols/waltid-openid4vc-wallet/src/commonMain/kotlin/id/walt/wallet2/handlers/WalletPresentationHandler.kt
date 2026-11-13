@@ -3,7 +3,8 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.WalletCredentialStatusService
+import id.walt.wallet2.status.reviewGuard
 import kotlinx.coroutines.withContext
 import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 import id.walt.wallet2.consent.*
@@ -68,6 +69,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.jvm.JvmInline
+import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
 
@@ -1134,7 +1136,7 @@ object WalletPresentationHandler {
         paymentConsentPolicy: PaymentConsentPolicy? = null,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        val statusReviewed = kotlinx.coroutines.currentCoroutineContext()[PresentationReviewGuard] != null
+        val statusReviewed = currentCoroutineContext()[PresentationReviewGuard] != null
         suspend fun execute(block: suspend (PreviewedPresentation) -> WalletPresentResult): WalletPresentResult =
             if (statusReviewed) previewedAuthorizationRequests.useStatusReviewedOnce(wallet.id, request.previewHandle.value, block)
             else previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->

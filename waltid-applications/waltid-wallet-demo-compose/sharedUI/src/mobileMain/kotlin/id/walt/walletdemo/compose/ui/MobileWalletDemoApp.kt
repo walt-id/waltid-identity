@@ -193,7 +193,7 @@ fun MobileWalletDemoApp(
                                             onSelectCredential = proximityController::selectCredential,
                                             onToggleElement = proximityController::toggleElement,
                                             onContinueAfterResponseChange = proximityController::setContinueAfterResponse,
-                                            onApprove = { proximityController.approve(it) },
+                                            onApprove = { revisions, reviewed -> proximityController.approve(revisions, reviewed) },
                                             onDecline = proximityController::decline,
                                             onRetry = proximityController::retryPrerequisites,
                                             onRemediate = proximityController::remediate,

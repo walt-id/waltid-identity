@@ -1,8 +1,25 @@
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(ExperimentalCoroutinesApi::class)
 
 package id.walt.wallet2.status
 
-import id.walt.credentials.status.*
+import id.walt.credentials.status.CheckFailure
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusEntry
+import id.walt.credentials.status.CredentialStatusLimits
+import id.walt.credentials.status.CredentialStatusRefreshSession
+import id.walt.credentials.status.CredentialStatusResolver
+import id.walt.credentials.status.DiscoveryProblem
+import id.walt.credentials.status.eligibleAt
+import id.walt.credentials.status.entries
+import id.walt.credentials.status.CredentialStatusReferenceAuthorizer
+import id.walt.credentials.status.hasCheckError
+import id.walt.credentials.status.historical
+import id.walt.credentials.status.isCheckable
+import id.walt.credentials.status.lastAttemptAt
+import id.walt.credentials.status.lastObservation
+import id.walt.credentials.status.matches
+import id.walt.credentials.status.mergePrevious
+import id.walt.credentials.status.withFailure
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -11,11 +28,40 @@ import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.TimeoutConfiguration
 import id.walt.webdatafetching.config.LoggingConfiguration
 import io.ktor.client.HttpClient
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
@@ -23,6 +69,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 /**
  * Wallet-owned observations and explicit work. Hosts own foreground/background scheduling.
@@ -35,13 +83,13 @@ class WalletCredentialStatusService(
     private val trustPolicyId: String? = null,
     limits: CredentialStatusLimits = CredentialStatusLimits(),
     referenceAuthorizer: CredentialStatusReferenceAuthorizer? = null,
-    signerAuthorizer: id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer? = null,
+    signerAuthorizer: StatusListSignerAuthorizer? = null,
     parentScope: CoroutineScope? = null,
 ) : AutoCloseable {
     private data class Record(val reference: WalletCredentialReference, val store: WalletCredentialStore, val credential: StoredCredential) {
         val fingerprint = credential.statusFingerprint()
     }
-    private data class State(val store: WalletCredentialStore, val fingerprint: String, val generation: Long, val metadata: CredentialStatusMetadata)
+    private data class State(val store: WalletCredentialStore, val fingerprint: String, val generation: Long, val metadata: CredentialStatus)
     private class Flight(val fingerprint: String, val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
     private val job = SupervisorJob(parentScope?.coroutineContext?.get(Job))
@@ -69,17 +117,19 @@ class WalletCredentialStatusService(
         val records = records()
         val metadata = records.map { record -> record.reference to local(record) }
         val at = now()
-        val entries = metadata.map { (reference, status) -> WalletCredentialStatus(reference, status, status.presentation(at)) }
+        val entries = metadata.map { (reference, status) -> WalletCredentialStatus(reference, status, at) }
         mutex.withLock {
             val retained = records.mapTo(mutableSetOf(), Record::reference)
             states.keys.filter { it !in retained }.forEach {
                 states.remove(it); retryAfter.remove(it); flights.remove(it)?.result?.cancel()
             }
             val next = metadata.flatMap { (reference, status) ->
-                status.entries.filter(::checkable).map { entry ->
+                status.entries.mapNotNull { entry ->
+                    val eligible = maxOf(at, entry.eligibleAt ?: at)
+                    if (!entry.isCheckable(eligible)) return@mapNotNull null
                     val freshUntil = entry.lastObservation()?.takeIf { it.isFresh(at) }?.freshUntil ?: at
-                    val failedAttempt = (entry as? CredentialStatusEntry.Unavailable)?.attemptedAt?.plus(30.seconds) ?: at
-                    maxOf(freshUntil, failedAttempt, retryAfter[reference] ?: at)
+                    val failedAttempt = entry.lastAttemptAt?.plus(30.seconds) ?: at
+                    maxOf(eligible, freshUntil, failedAttempt, retryAfter[reference] ?: at)
                 }
             }.minOrNull()
             return WalletCredentialStatusSnapshot(at, entries, flights.keys.toSet(), next)
@@ -105,7 +155,8 @@ class WalletCredentialStatusService(
                     val snapshot = snapshot()
                     emit(snapshot)
                     val next = snapshot.credentials.flatMap { it.status.entries }
-                        .mapNotNull { it.lastObservation()?.freshUntil }.filter { it > snapshot.evaluatedAt }.minOrNull()
+                        .flatMap { listOfNotNull(it.lastObservation()?.freshUntil, it.eligibleAt) }
+                        .filter { it > snapshot.evaluatedAt }.minOrNull()
                     if (next == null) awaitCancellation()
                     delay((next - now()).coerceAtLeast(Duration.ZERO) + 1.milliseconds)
                 }
@@ -132,7 +183,7 @@ class WalletCredentialStatusService(
         // Untouched records go first; then prefer the oldest attempt rather than fixed store order.
         val selected = all.filter { selection == null || it.reference in selection }.map { it to local(it) }
             .sortedBy { (_, metadata) -> metadata.entries.flatMap { entry ->
-                listOfNotNull(entry.lastObservation()?.checkedAt, (entry as? CredentialStatusEntry.Unavailable)?.attemptedAt)
+                listOfNotNull(entry.lastObservation()?.checkedAt, entry.lastAttemptAt)
             }.maxOrNull() }
         val refreshSession = resolver.newRefreshSession()
         try {
@@ -162,17 +213,22 @@ class WalletCredentialStatusService(
         store.listCredentials().toList().map { Record(WalletCredentialReference(index, it.id), store, it) }
     }
 
-    private suspend fun local(record: Record): CredentialStatusMetadata {
+    private suspend fun local(record: Record): CredentialStatus {
         check(job.isActive) { "Credential status service is closed" }
         mutex.withLock { states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint }?.let { return it.metadata } }
         val discovered = resolver.discover(record.credential.credential)
         val stored = (record.store as? CredentialStatusSnapshotStore)?.readCredentialStatus(record.credential.id)
-        val restored = stored?.takeIf { it.schemaVersion == 1 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
-            val reusable = trustPolicyId != null && saved.trustPolicyId == trustPolicyId
+        val restored = stored?.takeIf { it.schemaVersion == 2 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
+            if (discovered !is CredentialStatus.References) return@let discovered
+            val samePolicy = trustPolicyId != null && saved.trustPolicyId == trustPolicyId
             val known = saved.metadata.entries.associateBy(CredentialStatusEntry::referenceId)
-            CredentialStatusMetadata(discovered.entries.map { entry ->
-                val previous = known[entry.referenceId] ?: return@map entry
-                if (reusable) previous else previous.historical(now())
+            val at = now()
+            CredentialStatus.references(discovered.entries.map { entry ->
+                val previous = known[entry.referenceId]?.takeIf { entry.matches(it) } ?: return@map entry
+                val observation = previous.lastObservation()
+                val validUntil = observation?.validUntil
+                val applicable = observation == null || observation.checkedAt <= at && (validUntil == null || at < validUntil)
+                if (samePolicy && applicable) previous else previous.historical(at)
             })
         } ?: discovered
         return mutex.withLock {
@@ -184,20 +240,13 @@ class WalletCredentialStatusService(
         }
     }
 
-    private suspend fun due(reference: WalletCredentialReference, metadata: CredentialStatusMetadata): Boolean {
+    private suspend fun due(reference: WalletCredentialReference, metadata: CredentialStatus): Boolean {
         val at = now()
         if (mutex.withLock { retryAfter[reference]?.let { it > at } == true }) return false
         return metadata.entries.any { checkable(it) && it.lastObservation()?.isFresh(at) != true }
     }
 
-    private fun checkable(entry: CredentialStatusEntry): Boolean = when (entry) {
-        is CredentialStatusEntry.Unsupported -> false
-        is CredentialStatusEntry.Unavailable -> entry.reason !in setOf(
-            StatusFailure.UNSUPPORTED_METHOD, StatusFailure.UNSUPPORTED_PROOF,
-            StatusFailure.REFERENCE_MALFORMED, StatusFailure.CREDENTIAL_EXPIRED,
-        )
-        else -> true
-    }
+    private fun checkable(entry: CredentialStatusEntry): Boolean = entry.isCheckable(now())
 
     private suspend fun refreshRecord(record: Record, mode: CredentialStatusRefreshMode, refreshSession: CredentialStatusRefreshSession): CredentialStatusRefreshResult {
         val flight = mutex.withLock {
@@ -225,25 +274,29 @@ class WalletCredentialStatusService(
         currentCoroutineContext().ensureActive()
         val current = record.store.getCredential(record.credential.id)
         if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store || current?.statusFingerprint() != record.fingerprint) {
-            return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
+            return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
         }
         val merged = mutex.withLock {
             val previous = states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint && it.generation == version }
-                ?: return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
+                ?: return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
             val known = previous.metadata.entries.associateBy(CredentialStatusEntry::referenceId)
-            CredentialStatusMetadata(resolved.metadata.entries.map { entry ->
-                val prior = known[entry.referenceId]?.lastObservation()
-                when {
-                    entry is CredentialStatusEntry.Unavailable && prior != null -> entry.copy(previous = prior)
-                    entry is CredentialStatusEntry.Observed && prior?.meaning in setOf(StatusMeaning.REVOKED, StatusMeaning.REFRESH) &&
-                        entry.observation.meaning != prior?.meaning -> CredentialStatusEntry.Unavailable(
-                            entry.referenceId, StatusFailure.CONFLICTING_IRREVERSIBLE_STATUS, now(), prior,
-                        )
-                    else -> entry
+            when (val metadata = resolved.metadata) {
+                is CredentialStatus.DiscoveryFailed -> {
+                    // The fingerprint/generation fence above still binds these real earlier references.
+                    // Preserve their dated warning when a later container cannot be enumerated.
+                    if (previous.metadata.entries.any { it.lastObservation() != null }) {
+                        val cause = if (metadata.problem == DiscoveryProblem.RESOURCE_LIMIT) CheckFailure.Reason.RESOURCE_LIMIT else CheckFailure.Reason.INVALID_LIST
+                        CredentialStatus.references(previous.metadata.entries.map { it.withFailure(cause, now()) })
+                    } else metadata
                 }
-            })
+                is CredentialStatus.References -> CredentialStatus.references(metadata.entries.map { entry ->
+                    val prior = known[entry.referenceId]?.takeIf { entry.matches(it) }
+                    if (prior == null) entry else entry.mergePrevious(prior, now())
+                })
+            }
         }
-        val persistent = CredentialStatusMetadata(merged.entries.mapNotNull { entry ->
+
+        val persistent = CredentialStatus.references(merged.entries.mapNotNull { entry ->
             entry.takeUnless { it.referenceId in resolved.nonPersistentReferenceIds }
         })
         val snapshotStore = record.store as? CredentialStatusSnapshotStore
@@ -253,7 +306,7 @@ class WalletCredentialStatusService(
                     credentialFingerprint = record.fingerprint, trustPolicyId = trustPolicyId, metadata = persistent,
                 ))
             if (!stored) {
-                return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
+                return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
             }
         }
         currentCoroutineContext().ensureActive()
@@ -262,23 +315,14 @@ class WalletCredentialStatusService(
             val state = states[record.reference]
             if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store ||
                 state == null || state.store !== record.store || state.fingerprint != record.fingerprint || state.generation != version) {
-                return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatusMetadata())
+                return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
             }
             states[record.reference] = state.copy(metadata = merged)
-            if (merged.entries.any { it is CredentialStatusEntry.Unavailable }) retryAfter[record.reference] = now() + 30.seconds
+            if (merged.hasCheckError) retryAfter[record.reference] = now() + 30.seconds
             else retryAfter.remove(record.reference)
         }
         changes.tryEmit(Unit)
         return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.COMPLETED, merged)
-    }
-
-    private fun CredentialStatusEntry.historical(at: Instant): CredentialStatusEntry {
-        fun StatusObservation.stale() = copy(freshUntil = minOf(freshUntil, at))
-        return when (this) {
-            is CredentialStatusEntry.Observed -> copy(observation = observation.stale())
-            is CredentialStatusEntry.Unavailable -> copy(previous = previous?.stale())
-            else -> this
-        }
     }
 
     override fun close() {

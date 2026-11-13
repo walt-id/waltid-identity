@@ -1,9 +1,13 @@
 package id.walt.walletdemo.compose.android
 
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReadState
 import id.walt.walletdemo.compose.logic.toDemoStatuses
 import id.walt.wallet2.status.CredentialStatusReviewChangedException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.retryWhen
 
 import android.content.Intent
 import android.util.Log
@@ -33,14 +37,15 @@ import android.content.Context
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
 
 internal class DigitalCredentialProviderModel(context: Context) : DigitalCredentialActivityModel() {
-    var credentialStatuses by mutableStateOf(WalletDemoCredentialStatuses())
+    var credentialStatuses by mutableStateOf(WalletDemoCredentialStatuses(readState = WalletDemoStatusReadState.Loading))
         private set
     var statusReviewNotice by mutableStateOf<String?>(null)
         private set
     private var statusWallet: MobileWallet? = null
-    private var statusObservation: kotlinx.coroutines.Job? = null
+    private var statusObservation: Job? = null
     private var statusReviewEnabled = false
     private val context = context.applicationContext
     private val resultIntent = Intent()
@@ -66,8 +71,21 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         val showPreview = createAndroidDemoSharingSettingsStore(context).showDcApiPresentationPreview()
         statusReviewEnabled = showPreview
         if (showPreview) {
-            credentialStatuses = wallet.credentialStatusSnapshot().toDemoStatuses()
-            statusObservation = scope.launch { wallet.credentialStatuses.collect { credentialStatuses = it.toDemoStatuses() } }
+            try { credentialStatuses = wallet.credentialStatusSnapshot().toDemoStatuses() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { credentialStatuses = credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable) }
+            statusObservation = scope.launch {
+                wallet.credentialStatuses.retryWhen { cause, _ ->
+                    if (cause is CancellationException) throw cause
+                    credentialStatuses = credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable)
+                    statusReviewNotice = "Credential status is unavailable. Previous results are retained."
+                    delay(5_000)
+                    true
+                }.collect {
+                    if (!credentialStatuses.available) statusReviewNotice = null
+                    credentialStatuses = it.toDemoStatuses()
+                }
+            }
         }
         if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
             val request = wallet.annexCRequest(input.request)

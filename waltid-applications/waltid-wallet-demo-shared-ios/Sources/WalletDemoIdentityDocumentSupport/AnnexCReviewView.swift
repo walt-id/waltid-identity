@@ -43,11 +43,13 @@ public struct AnnexCReviewView: View {
     }
 
     public var body: some View {
-        let reviewedStatuses = model.credentialStatuses.mapValues { $0.presentation.advisoryRevision }
+        let renderedSelection = model.selection
+        let renderedReview = model.review
         Group {
             if showDcApiPresentationPreview || model.failure != nil {
                 SharingReviewScreen(
                     title: "Share documents",
+                    requestIdentity: ObjectIdentifier(model),
                     review: model.review,
                     selection: model.selection,
                     selectionComplete: model.hasCompleteSelection,
@@ -55,8 +57,11 @@ public struct AnnexCReviewView: View {
                     isSubmitting: model.isSubmitting,
                     onToggleCredential: model.toggleCredential,
                     onToggleDisclosure: model.toggleDisclosure,
-                    onSubmit: {
-                        Task { await model.submit(reviewedStatus: reviewedStatuses) }
+                    onSubmit: { revisions in
+                        Task {
+                            guard renderedSelection == model.selection, renderedReview == model.review else { return }
+                            await model.submit(reviewedStatus: revisions)
+                        }
                     },
                     // No Reject action: IdentityDocumentServices has no way to tell the reader it was
                     // refused, so cancelling is the only truthful decline. Offering both would promise the
@@ -71,7 +76,7 @@ public struct AnnexCReviewView: View {
                     .accessibilityIdentifier(WalletAccessibilityID.presentationPreparing)
             }
         }
-        .environment(\.credentialStatusUI, CredentialStatusUIContext(values: model.credentialStatuses))
+        .environment(\.credentialStatusUI, model.credentialStatusUIContext)
         .task {
             await model.prepare()
             if !showDcApiPresentationPreview, model.failure == nil {

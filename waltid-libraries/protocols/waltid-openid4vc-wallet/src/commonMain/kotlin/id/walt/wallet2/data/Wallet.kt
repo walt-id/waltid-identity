@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import id.walt.wallet2.status.WalletCredentialRead
 
 /**
  * Represents a wallet instance composed of its storage backends.
@@ -88,17 +89,17 @@ data class Wallet(
     val defaultDidId: String? = null,
 ) {
     private val credentialStatusMutex = Mutex()
-    private var statusService: id.walt.wallet2.status.WalletCredentialStatusService? = null
+    private var statusService: WalletCredentialStatusService? = null
 
     /** Configures status ownership without changing the published wallet constructor. */
-    fun attachCredentialStatusService(service: id.walt.wallet2.status.WalletCredentialStatusService): Wallet = apply {
+    fun attachCredentialStatusService(service: WalletCredentialStatusService): Wallet = apply {
         require(service.wallet === this) { "Status service belongs to a different wallet instance" }
         check(statusService == null || statusService === service) { "Status service is already configured" }
         statusService = service
     }
 
     /** Local metadata is initialized lazily; obtaining the service never checks an issuer endpoint. */
-    suspend fun credentialStatuses(): id.walt.wallet2.status.WalletCredentialStatusService = credentialStatusMutex.withLock {
+    suspend fun credentialStatuses(): WalletCredentialStatusService = credentialStatusMutex.withLock {
         statusService ?: WalletCredentialStatusService(this).also { statusService = it }
     }
 
@@ -109,11 +110,11 @@ data class Wallet(
     fun notifyCredentialStatusInventoryChanged() { statusService?.notifyCredentialInventoryChanged() }
 
     /** Read parsed credentials together with local status observations. */
-    suspend fun readCredentialsWithStatus(): List<id.walt.wallet2.status.WalletCredentialRead> =
+    suspend fun readCredentialsWithStatus(): List<WalletCredentialRead> =
         credentialStatuses().readCredentials()
 
     /** Read one wallet-owned credential with the same status semantics as collection reads. */
-    suspend fun readCredentialWithStatus(id: String): id.walt.wallet2.status.WalletCredentialRead? =
+    suspend fun readCredentialWithStatus(id: String): WalletCredentialRead? =
         credentialStatuses().readCredential(id)
 
     private var resolvedStaticCrypto2Key: Crypto2Key? = null

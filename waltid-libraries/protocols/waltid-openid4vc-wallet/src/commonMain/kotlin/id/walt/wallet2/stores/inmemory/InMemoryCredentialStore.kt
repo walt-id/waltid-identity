@@ -2,7 +2,9 @@ package id.walt.wallet2.stores.inmemory
 
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.CredentialStatusSnapshotStore
+import id.walt.wallet2.status.PersistedCredentialStatus
+import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.sync.Mutex

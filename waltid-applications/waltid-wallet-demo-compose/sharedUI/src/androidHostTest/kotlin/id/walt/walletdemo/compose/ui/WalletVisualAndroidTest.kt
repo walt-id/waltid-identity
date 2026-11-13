@@ -40,6 +40,8 @@ class WalletVisualAndroidTest {
     @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
     @Test fun credentialStatusKinds() = scenario { credentialStatusKinds() }
     @Test fun credentialStatusSharing() = scenario(sheetHost = true) { credentialStatusSharing() }
+    @Test fun credentialStatusConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation() }
+    @Test fun credentialStatusPaymentConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation(payment = true) }
     @Test fun credentialStatusPayment() = scenario(sheetHost = true) { credentialStatusPayment() }
     @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
     @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }

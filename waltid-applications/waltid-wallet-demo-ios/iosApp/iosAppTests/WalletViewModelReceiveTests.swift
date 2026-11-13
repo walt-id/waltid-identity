@@ -186,7 +186,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         model.handleDeepLink(url)
         model.prepareExternalFlow()
         try await waitUntil { model.presentationPreview != nil && !model.isLoading && model.paymentReview.canConfirm }
-        model.submitPresentation()
+        model.submitPresentation(reviewedStatus: model.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         XCTAssertTrue(model.isLoading, "The assertion must exercise an active submission")
         XCTAssertFalse(model.closeExternalFlow())
         model.handleDeepLink(URL(string: "openid-credential-offer://replacement")!)
@@ -588,8 +588,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.previewPresentation()
         try await waitUntil { viewModel.presentationPreview != nil && viewModel.paymentReview.canConfirm }
 
-        viewModel.submitPresentation()
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         viewModel.rejectPresentation()
         try await waitUntilAsync { await client.presentationSubmitCalls == 1 }
 

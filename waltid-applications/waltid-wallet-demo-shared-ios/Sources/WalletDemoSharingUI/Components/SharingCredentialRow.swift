@@ -26,7 +26,6 @@ struct SharingCredentialRow: View {
             }
             .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
         CredentialStatusSection(credentialID: option.credentialID, compact: true)
-            .padding(.leading, isReadOnly ? 4 : 36).padding(.trailing, 4)
         }
     }
 }

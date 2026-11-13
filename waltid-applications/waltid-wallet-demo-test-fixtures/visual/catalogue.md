@@ -808,35 +808,35 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 ## status-home-issue
 
-**Issue-only home-card icon with title clearance and no positive badge**
+**Issue-only icon on artwork with unchanged card geometry**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.issue.png" alt="Issue-only home-card icon with title clearance and no positive badge, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.issue.png" alt="Issue-only home-card icon with title clearance and no positive badge, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-issue.native-ios27_0-phone-en-light.png" alt="Issue-only home-card icon with title clearance and no positive badge, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.issue.png" alt="Issue-only icon on artwork with unchanged card geometry, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.issue.png" alt="Issue-only icon on artwork with unchanged card geometry, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-issue.native-ios27_0-phone-en-light.png" alt="Issue-only icon on artwork with unchanged card geometry, Native iOS" width="240"> |
 
 ## status-details-clear
 
-**Standalone clear-status section, checked time and manual action**
+**Standalone status island with green check, check time and icon controls**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.clear.png" alt="Standalone clear-status section, checked time and manual action, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.clear.png" alt="Standalone clear-status section, checked time and manual action, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-clear.native-ios27_0-phone-en-light.png" alt="Standalone clear-status section, checked time and manual action, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.clear.png" alt="Standalone status island with green check, check time and icon controls, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.clear.png" alt="Standalone status island with green check, check time and icon controls, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-clear.native-ios27_0-phone-en-light.png" alt="Standalone status island with green check, check time and icon controls, Native iOS" width="240"> |
 
 ## status-details-adverse
 
-**Adverse previous observation with stale and partial essentials visible**
+**One last-known adverse headline with refresh and disclosure icons**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.adverse.png" alt="Adverse previous observation with stale and partial essentials visible, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.adverse.png" alt="Adverse previous observation with stale and partial essentials visible, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-adverse.native-ios27_0-phone-en-light.png" alt="Adverse previous observation with stale and partial essentials visible, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.adverse.png" alt="One last-known adverse headline with refresh and disclosure icons, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.adverse.png" alt="One last-known adverse headline with refresh and disclosure icons, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-adverse.native-ios27_0-phone-en-light.png" alt="One last-known adverse headline with refresh and disclosure icons, Native iOS" width="240"> |
 
 ## status-details-expanded
 
-**Expanded explanation, previous attempt, failure and privacy wording**
+**Grouped per-reference facts, original check times and latest-attempt outcomes**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.expanded.png" alt="Expanded explanation, previous attempt, failure and privacy wording, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.expanded.png" alt="Expanded explanation, previous attempt, failure and privacy wording, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-expanded.native-ios27_0-phone-en-light.png" alt="Expanded explanation, previous attempt, failure and privacy wording, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.details.expanded.png" alt="Grouped per-reference facts, original check times and latest-attempt outcomes, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.details.expanded.png" alt="Grouped per-reference facts, original check times and latest-attempt outcomes, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-details-expanded.native-ios27_0-phone-en-light.png" alt="Grouped per-reference facts, original check times and latest-attempt outcomes, Native iOS" width="240"> |
 
 ## status-states
 
@@ -848,27 +848,43 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 ## status-sharing-review
 
-**Cached row status and selected-only advisory with ordinary Share anyway action**
+**Compact status row below an inset divider with ordinary Share action**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.sharing.review.png" alt="Cached row status and selected-only advisory with ordinary Share anyway action, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.sharing.review.png" alt="Cached row status and selected-only advisory with ordinary Share anyway action, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-sharing-review.native-ios27_0-phone-en-light.png" alt="Cached row status and selected-only advisory with ordinary Share anyway action, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.sharing.review.png" alt="Compact status row below an inset divider with ordinary Share action, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.sharing.review.png" alt="Compact status row below an inset divider with ordinary Share action, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-sharing-review.native-ios27_0-phone-en-light.png" alt="Compact status row below an inset divider with ordinary Share action, Native iOS" width="240"> |
+
+## status-sharing-confirmation
+
+**Selected adverse credential warning with Share anyway and Back to review**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.sharing.confirmation.png" alt="Selected adverse credential warning with Share anyway and Back to review, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.sharing.confirmation.png" alt="Selected adverse credential warning with Share anyway and Back to review, Compose iOS" width="240"> | No reference |
 
 ## status-payment-review
 
-**Cached status warnings preserve payment consent and payment action labels**
+**Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.payment.review.png" alt="Cached status warnings preserve payment consent and payment action labels, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.payment.review.png" alt="Cached status warnings preserve payment consent and payment action labels, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-payment-review.native-ios27_0-phone-en-light.png" alt="Cached status warnings preserve payment consent and payment action labels, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.payment.review.png" alt="Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.payment.review.png" alt="Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-payment-review.native-ios27_0-phone-en-light.png" alt="Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions, Native iOS" width="240"> |
+
+## status-payment-confirmation
+
+**One combined unsigned-payment and credential-status warning with the payment action**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.payment.confirmation.png" alt="One combined unsigned-payment and credential-status warning with the payment action, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.payment.confirmation.png" alt="One combined unsigned-payment and credential-status warning with the payment action, Compose iOS" width="240"> | No reference |
 
 ## status-settings-partial
 
-**Foreground preference, explicit batch check and partial/deferred result summary**
+**Foreground preference and structured completed, unchanged, deferred and error counts**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.settings.partial.png" alt="Foreground preference, explicit batch check and partial/deferred result summary, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.settings.partial.png" alt="Foreground preference, explicit batch check and partial/deferred result summary, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-settings-partial.native-ios27_0-phone-en-light.png" alt="Foreground preference, explicit batch check and partial/deferred result summary, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.settings.partial.png" alt="Foreground preference and structured completed, unchanged, deferred and error counts, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.settings.partial.png" alt="Foreground preference and structured completed, unchanged, deferred and error counts, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-settings-partial.native-ios27_0-phone-en-light.png" alt="Foreground preference and structured completed, unchanged, deferred and error counts, Native iOS" width="240"> |
 
 ## status-settings-checking
 

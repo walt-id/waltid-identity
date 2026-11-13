@@ -449,33 +449,3 @@ internal data class ResolveBatchOfferResponseDto(
     val offer: ResolveOfferDetailedResponseDto,
     val batchSize: Int? = null,
 )
-
-@Serializable
-internal data class CredentialStatusReferenceDto(val storeIndex: Int, val credentialId: String)
-@Serializable
-internal data class CredentialStatusSnapshotDto(
-    val credentials: List<CredentialStatusRecordDto>,
-    val refreshing: List<CredentialStatusReferenceDto> = emptyList(),
-    val nextRefreshAt: String? = null,
-)
-@Serializable
-internal data class CredentialStatusRecordDto(
-    val reference: CredentialStatusReferenceDto,
-    val presentation: id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus,
-)
-@Serializable
-internal data class RefreshCredentialStatusesDto(
-    val credentials: List<CredentialStatusReferenceDto>? = null,
-    val mode: String,
-)
-@Serializable
-internal data class CredentialStatusRefreshResultDto(val outcome: String, val status: JsonObject)
-
-@Serializable
-internal data class StatusReviewedBuildRequestDto(val request: BuildVpTokenRequestDto, val reviewedStatus: Map<String, String>)
-@Serializable
-internal data class StatusReviewedSendRequestDto(
-    val request: SendAuthorizationResponseRequestDto,
-    val selectedCredentialIds: Set<String>,
-    val reviewedStatus: Map<String, String>,
-)

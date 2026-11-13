@@ -10,82 +10,6 @@ public struct CredentialStatus: Decodable, Equatable, Sendable {
     public let evaluatedAt: Date
 }
 
-/// Local metadata. An empty collection means that no status reference was supplied.
-public struct CredentialStatusMetadata: Decodable, Equatable, Sendable {
-    /// Per-reference results; an empty collection means no status was provided.
-    public let entries: [CredentialStatusEntry]
-    private enum CodingKeys: String, CodingKey { case entries }
-    /// Decodes shared status data, retaining unknown semantic codes conservatively.
-    /// - Parameter decoder: Decoder positioned at the shared status value.
-    public init(from decoder: Decoder) throws {
-        entries = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent([CredentialStatusEntry].self, forKey: .entries) ?? []
-    }
-}
-
-/// Mutually exclusive results for one credential-status reference.
-public enum CredentialStatusEntry: Decodable, Equatable, Sendable {
-    /// A supported reference that has not yet been checked.
-    case notChecked(referenceID: String, method: String, purpose: String)
-    /// A reference whose method or proof this wallet cannot evaluate.
-    case unsupported(referenceID: String, method: String)
-    /// An authenticated, applicable issuer observation.
-    case observed(CredentialStatusObservation)
-    /// A failed attempt, optionally retaining the dated previous authenticated observation.
-    case unavailable(referenceID: String, reason: String, attemptedAt: Date, previous: CredentialStatusObservation?)
-    /// A future entry type that this SDK cannot interpret.
-    case unknown
-
-    private enum CodingKeys: String, CodingKey { case type, referenceId, `protocol`, purpose, method, observation, reason, attemptedAt, previous }
-    /// Decodes shared status data, retaining unknown semantic codes conservatively.
-    /// - Parameter decoder: Decoder positioned at the shared status value.
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        switch try c.decode(String.self, forKey: .type) {
-        case "not_checked": self = .notChecked(referenceID: try c.decode(String.self, forKey: .referenceId),
-            method: try c.decode(String.self, forKey: .protocol), purpose: try c.decode(String.self, forKey: .purpose))
-        case "unsupported": self = .unsupported(referenceID: try c.decode(String.self, forKey: .referenceId),
-            method: try c.decode(String.self, forKey: .method))
-        case "observed": self = .observed(try c.decode(CredentialStatusObservation.self, forKey: .observation))
-        case "unavailable": self = .unavailable(referenceID: try c.decode(String.self, forKey: .referenceId),
-            reason: try c.decode(String.self, forKey: .reason), attemptedAt: try c.decode(Date.self, forKey: .attemptedAt),
-            previous: try c.decodeIfPresent(CredentialStatusObservation.self, forKey: .previous))
-        default: self = .unknown
-        }
-    }
-
-    /// The previous successful result remains available after a failed update.
-    public var lastObservation: CredentialStatusObservation? {
-        switch self {
-        case .observed(let value): value
-        case .unavailable(_, _, _, let previous): previous
-        default: nil
-        }
-    }
-}
-
-/// Authenticated evidence without a status-list URL, credential index or signed token.
-public struct CredentialStatusObservation: Decodable, Equatable, Sendable {
-    /// Opaque reference identity, excluding the list URI and credential index.
-    public let referenceID: String
-    /// Shared protocol code, preserved as a string for future protocols.
-    public let method: String
-    /// The applicable status purpose, such as revocation, suspension or token status.
-    public let purpose: String
-    /// Authenticated status value; use meaning for interpretation.
-    public let value: UInt8
-    /// Purpose-aware meaning computed by the shared evaluator.
-    public let meaning: CredentialStatusMeaning
-    /// Time of the successful authenticated check.
-    public let checkedAt: Date
-    /// Exclusive deadline for treating this observation as current.
-    public let freshUntil: Date
-    /// Optional signed or certificate validity bound, independent of HTTP revalidation.
-    public let validUntil: Date?
-    private enum CodingKeys: String, CodingKey {
-        case referenceID = "referenceId", method = "protocol", purpose, value, meaning, checkedAt, freshUntil, validUntil
-    }
-}
-
 /// Protocol meaning computed by the shared evaluator.
 public enum CredentialStatusMeaning: String, Decodable, Sendable {
     /// The applicable standardized status value is clear.
@@ -100,6 +24,8 @@ public enum CredentialStatusMeaning: String, Decodable, Sendable {
     case refresh = "REFRESH"
     /// The purpose or value requires application-specific interpretation.
     case applicationSpecific = "APPLICATION_SPECIFIC"
+    /// Reserved for future registration in the supported Token Status List draft.
+    case reserved = "RESERVED"
     /// A meaning added by a newer shared evaluator.
     case unknown = "UNKNOWN"
     /// Decodes shared status data, retaining unknown semantic codes conservatively.
@@ -113,7 +39,7 @@ public enum CredentialStatusKind: String, Decodable, Sendable {
     case notProvided = "NOT_PROVIDED"
     /// A provided reference has not yet been checked.
     case notChecked = "NOT_CHECKED"
-    /// The applicable revocation or token-status observations are clear.
+    /// The applicable revocation-purpose observations are clear.
     case notRevoked = "NOT_REVOKED"
     /// The applicable suspension observations are clear.
     case notSuspended = "NOT_SUSPENDED"
@@ -227,15 +153,96 @@ public struct CredentialStatusPresentation: Decodable, Equatable, Sendable {
     /// Latest failed attempt time, when a check has failed.
     public let lastAttemptAt: Date?
     /// Sanitized shared failure code, without exception text or list contents.
-    public let failure: String?
-    /// Distinct sorted purposes covered by retained observations.
+    public let failure: CredentialStatusCheckFailure?
+    /// Distinct sorted purpose localization keys, derived with each protocol’s vocabulary.
     public let purposes: [String]
     /// Whether all supplied references have usable observations.
     public let coverage: CredentialStatusCoverage
 
-    /// Compare what was actually rendered before confirmation; check-time-only updates are excluded.
-    public var advisoryRevision: String {
-        "\(kind.rawValue)|\(issue.rawValue)|\(freshness.rawValue)|\(coverage.rawValue)|\(purposes.joined(separator: ","))"
+    /// Opaque revision from the shared producer. Native clients carry it unchanged.
+    public let advisoryRevision: String
+    /// The primary adverse observation is historical rather than a current confirmation.
+    public let lastKnown: Bool
+    /// Producer-interpreted per-reference detail facts; views do not parse protocol values.
+    public let references: [CredentialStatusReferencePresentation]
+    /// A bounded cause when the reference container could not be enumerated.
+    public let discoveryProblem: CredentialStatusDiscoveryProblem?
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, issue, freshness, action, lastCheckedAt, lastAttemptAt, failure, purposes, coverage, advisoryRevision, lastKnown, references, discoveryProblem
+    }
+    /// Decodes the shared revision instead of synthesizing a native approximation.
+    /// - Parameter decoder: Decoder positioned at the shared credential-status value.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(CredentialStatusKind.self, forKey: .kind)
+        issue = try c.decode(CredentialStatusIssue.self, forKey: .issue)
+        freshness = try c.decode(CredentialStatusFreshness.self, forKey: .freshness)
+        action = try c.decode(CredentialStatusRefreshAction.self, forKey: .action)
+        lastCheckedAt = try c.decodeIfPresent(Date.self, forKey: .lastCheckedAt)
+        lastAttemptAt = try c.decodeIfPresent(Date.self, forKey: .lastAttemptAt)
+        failure = try c.decodeIfPresent(CredentialStatusCheckFailure.self, forKey: .failure)
+        purposes = try c.decode([String].self, forKey: .purposes)
+        coverage = try c.decode(CredentialStatusCoverage.self, forKey: .coverage)
+        advisoryRevision = try c.decode(String.self, forKey: .advisoryRevision)
+        lastKnown = try c.decode(Bool.self, forKey: .lastKnown)
+        references = try c.decodeIfPresent([CredentialStatusReferencePresentation].self, forKey: .references) ?? []
+        discoveryProblem = try c.decodeIfPresent(CredentialStatusDiscoveryProblem.self, forKey: .discoveryProblem)
+        guard !advisoryRevision.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              Set(references.map(\.referenceID)).count == references.count else { throw invalidStatusData(decoder) }
+    }
+}
+
+/// Shared detail facts for one reference. These are rendering data, not independent evidence.
+public struct CredentialStatusReferencePresentation: Decodable, Equatable, Sendable {
+    /// Opaque reference identity.
+    public let referenceID: String
+    /// Shared protocol code for a supported reference.
+    public let protocolName: String?
+    /// Method name for an unsupported reference.
+    public let method: String?
+    /// Protocol-aware purpose localization key; extension names remain in typed metadata.
+    public let purpose: String?
+    /// Protocol-aware observed meaning.
+    public let result: CredentialStatusMeaning?
+    /// Original successful check time.
+    public let checkedAt: Date?
+    /// Exclusive freshness deadline.
+    public let freshUntil: Date?
+    /// Signed or authorization validity bound.
+    public let validUntil: Date?
+    /// Latest failed/conflicting attempt time.
+    public let attemptedAt: Date?
+    /// Typed latest check failure.
+    public let failure: CredentialStatusCheckFailure?
+    /// Shared irreversible-conflict fact.
+    public let conflict: Bool
+    /// Diagnostic for an identifiable malformed reference.
+    public let problem: CredentialStatusReferenceProblem?
+    /// Per-reference freshness computed by the shared evaluator, never recomputed by native views.
+    public let freshness: CredentialStatusFreshness
+    private enum CodingKeys: String, CodingKey {
+        case referenceID = "referenceId", protocolName = "protocol", method, purpose, result,
+            checkedAt, freshUntil, validUntil, attemptedAt, failure, conflict, problem, freshness
+    }
+    /// Decodes shared facts while retaining the distinction between missing evidence and clear.
+    /// - Parameter decoder: Decoder positioned at the shared credential-status value.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        referenceID = try c.decode(String.self, forKey: .referenceID)
+        protocolName = try c.decodeIfPresent(String.self, forKey: .protocolName)
+        method = try c.decodeIfPresent(String.self, forKey: .method)
+        purpose = try c.decodeIfPresent(String.self, forKey: .purpose)
+        result = try c.decodeIfPresent(CredentialStatusMeaning.self, forKey: .result)
+        checkedAt = try c.decodeIfPresent(Date.self, forKey: .checkedAt)
+        freshUntil = try c.decodeIfPresent(Date.self, forKey: .freshUntil)
+        validUntil = try c.decodeIfPresent(Date.self, forKey: .validUntil)
+        attemptedAt = try c.decodeIfPresent(Date.self, forKey: .attemptedAt)
+        failure = try c.decodeIfPresent(CredentialStatusCheckFailure.self, forKey: .failure)
+        conflict = try c.decodeIfPresent(Bool.self, forKey: .conflict) ?? false
+        problem = try c.decodeIfPresent(CredentialStatusReferenceProblem.self, forKey: .problem)
+        freshness = try c.decodeIfPresent(CredentialStatusFreshness.self, forKey: .freshness) ?? .unknown
+        guard !referenceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw invalidStatusData(decoder) }
     }
 }
 
@@ -300,6 +307,14 @@ public struct CredentialStatusReference: Decodable, Hashable, Sendable {
     /// Stored credential ID within that store.
     public let credentialID: String
     private enum CodingKeys: String, CodingKey { case storeIndex, credentialID = "credentialId" }
+    /// Validates the store-scoped identity received from the shared producer.
+    /// - Parameter decoder: Decoder positioned at the shared credential-status value.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        storeIndex = try c.decode(Int.self, forKey: .storeIndex)
+        credentialID = try c.decode(String.self, forKey: .credentialID)
+        guard storeIndex >= 0, !credentialID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw invalidStatusData(decoder) }
+    }
 }
 
 private func decodeStatusCode<T: RawRepresentable>(_ type: T.Type, from decoder: Decoder, fallback: T) throws -> T where T.RawValue == String {
@@ -333,6 +348,9 @@ private struct StatusSnapshotWire: Decodable {
 
 func decodeCredentialStatusSnapshot(_ json: String) throws -> CredentialStatusSnapshot {
     let wire = try decodeCredentialStatus(StatusSnapshotWire.self, json: json)
+    guard Set(wire.credentials.map(\.reference)).count == wire.credentials.count else {
+        throw WalletError.internalFailure("Invalid credential status data")
+    }
     return CredentialStatusSnapshot(evaluatedAt: wire.evaluatedAt, credentials: wire.credentials.map {
         CredentialStatusRecord(credentialID: $0.reference.credentialID, storeIndex: $0.reference.storeIndex,
             value: CredentialStatus(status: $0.status, presentation: $0.presentation, evaluatedAt: wire.evaluatedAt))

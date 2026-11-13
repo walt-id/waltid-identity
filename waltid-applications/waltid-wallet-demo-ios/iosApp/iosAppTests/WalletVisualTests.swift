@@ -62,6 +62,7 @@ final class WalletVisualTests: XCTestCase {
     func testCredentialStatusDetailsExpanded() async throws {
         let status = try WalletVisualFixtures().credentialStatus("revoked_partial")
         let content = ScrollView { CredentialStatusSection(credentialID: "identity").padding(16) }
+            .background(Color(.systemGroupedBackground))
             .environment(\.credentialStatusUI, CredentialStatusUIContext(values: ["identity": status], check: { _ in }))
             .environment(\.credentialStatusDetailsInitiallyExpanded, true)
         try await captureWhenReady(content, id: "status.details.expanded", isReady: { true },
@@ -93,14 +94,19 @@ final class WalletVisualTests: XCTestCase {
         let fixtures = try WalletVisualFixtures()
         let review = try fixtures.sharingReview(payment: payment)
         let status = try fixtures.credentialStatus("revoked_partial")
-        let context = CredentialStatusUIContext(values: Dictionary(uniqueKeysWithValues: review.credentialOptions.map { ($0.credentialID, status) }))
-        let screen = SharingReviewScreen(title: payment ? "Payment" : "Share documents", review: review,
+        let quiet = try fixtures.credentialStatus("not_provided")
+        let affected = review.credentialOptions.first?.credentialID
+        let context = CredentialStatusUIContext(values: Dictionary(uniqueKeysWithValues: review.credentialOptions.map {
+            ($0.credentialID, $0.credentialID == affected ? status : quiet)
+        }),
+            storeIndices: Dictionary(uniqueKeysWithValues: review.credentialOptions.map { ($0.credentialID, 0) }))
+        let screen = SharingReviewScreen(title: payment ? "Payment" : "Share documents", requestIdentity: "visual-status-review", review: review,
             selection: SharingSelection(credentials: review.defaultCredentialSelection()), selectionComplete: true,
             paymentReview: payment ? .ready(try fixtures.payment(recurring: false)) : .notRequired,
-            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {})
             .environment(\.credentialStatusUI, context)
         try await captureReview(screen, id: payment ? "status.payment.review" : "status.sharing.review",
-            expected: Set(review.credentialOptions.map { $0.selection.id }))
+            expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: payment)
     }
 
     func testCredentialStatusSettingsPartial() async throws { try await credentialStatusSettings(checking: false) }
@@ -108,13 +114,13 @@ final class WalletVisualTests: XCTestCase {
     private func credentialStatusSettings(checking: Bool) async throws {
         let model = makeModel(walletClient: MockWalletClient(operationDelayMilliseconds: 30_000))
         model.automaticCredentialStatusChecks = false
+        model.auth = .unlocked; model.isReady = true
         if checking {
-            model.auth = .unlocked; model.isReady = true
             model.checkCredentialStatuses()
             XCTAssertTrue(model.checkingCredentialStatuses)
-        } else { model.credentialStatusSummary = "Checked: 2 · unchanged: 1 · deferred: 1 · with unavailable checks: 1" }
+        } else { model.credentialStatusSummary = CredentialStatusRefreshSummary(completed: 2, unchanged: 1, deferred: 1, checkErrors: 1) }
         defer { model.handleApplicationEnteredBackground() }
-        try await model.readerTrustSettings.awaitPendingOperations()
+        await model.readerTrustSettings.awaitPendingOperations()
         try capture(NavigationView { CredentialStatusSettingsView(viewModel: model) }.navigationViewStyle(.stack),
             id: checking ? "status.settings.checking" : "status.settings.partial")
     }
@@ -499,8 +505,8 @@ final class WalletVisualTests: XCTestCase {
             XCTAssertEqual(groups[0].fields.map { $0.item.value }, [.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)), .instant(WalletInstant(epochSeconds: 1801094400, nanoseconds: 0))])
             XCTAssertTrue(groups[0].fields.allSatisfy { $0.alwaysIncluded })
         }
-        let screen = SharingReviewScreen(title: "Share credentials", review: review, selection: selection,
-            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+        let screen = SharingReviewScreen(title: "Share credentials", requestIdentity: "visual-review", review: review, selection: selection,
+            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {})
         try await captureReview(screen, id: "sharing.information." + (dates ? "dates" : multiple ? "multiple" : alternative ? "alternative" : "selected"),
             expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: multiple)
     }
@@ -514,8 +520,8 @@ final class WalletVisualTests: XCTestCase {
         let review = try WalletVisualFixtures().sharingReview()
         let selection = SharingSelection(credentials: review.defaultCredentialSelection())
         XCTAssertTrue(review.hasCompleteCredentialSelection(selection.credentials))
-        let screen = SharingReviewScreen(title: "Share documents", review: review, selection: selection,
-            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+        let screen = SharingReviewScreen(title: "Share documents", requestIdentity: "visual-review", review: review, selection: selection,
+            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {})
         let id = (compact ? "sharing.provider.compact_dark_large_text" : "sharing.provider.review")
             + (scrollToBottom ? ".last" : "")
         try await captureReview(screen, id: id,
@@ -528,9 +534,9 @@ final class WalletVisualTests: XCTestCase {
     func testProviderFailure() throws { try providerStatus(failure: "The request could not be verified.") }
 
     private func providerStatus(failure: String?) throws {
-        try capture(SharingReviewScreen(title: "Share documents", review: nil, selection: SharingSelection(),
+        try capture(SharingReviewScreen(title: "Share documents", requestIdentity: "visual-review", review: nil, selection: SharingSelection(),
             selectionComplete: false, failure: failure,
-            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {}),
             id: failure == nil ? "sharing.provider.preparing" : "sharing.provider.failure")
     }
 
@@ -540,9 +546,9 @@ final class WalletVisualTests: XCTestCase {
         let selection = SharingSelection(credentials: review.defaultCredentialSelection())
         XCTAssertEqual(selection.credentials.count, 2)
         XCTAssertTrue(review.hasCompleteCredentialSelection(selection.credentials))
-        try await captureReview(SharingReviewScreen(title: "Payment", review: review, selection: selection,
+        try await captureReview(SharingReviewScreen(title: "Payment", requestIdentity: "visual-review", review: review, selection: selection,
             selectionComplete: true, paymentReview: .ready(try fixtures.payment()),
-            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {}),
             id: "payment.mixed_credentials.main", expected: Set(review.credentialOptions.map { $0.selection.id }))
     }
 
@@ -552,10 +558,10 @@ final class WalletVisualTests: XCTestCase {
     }
     private func paymentStatus(_ state: PaymentReviewState, id: String) async throws {
         let review = try WalletVisualFixtures().sharingReview(payment: true)
-        try await captureReview(SharingReviewScreen(title: "Payment", review: review,
+        try await captureReview(SharingReviewScreen(title: "Payment", requestIdentity: "visual-review", review: review,
             selection: SharingSelection(credentials: review.defaultCredentialSelection()),
             selectionComplete: true, paymentReview: state,
-            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {}),
             id: id, expected: Set(review.credentialOptions.map { $0.selection.id }))
         XCTAssertFalse(state.canConfirm)
     }
@@ -565,7 +571,7 @@ final class WalletVisualTests: XCTestCase {
         try await captureWhenReady(WalletReviewScaffold {
             PaymentConsentView(state: state)
         } actions: {
-            ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
+            ReviewActions(selectionComplete: true, isLoading: false, reviewKey: "visual-payment", credentialStatuses: [], onSubmit: { _ in }, onReject: nil,
                 onCancel: {}, paymentReview: state)
         }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium,
             isReady: { state.canConfirm }, failure: "Payment review did not become available", scrollToBottom: true)
@@ -623,10 +629,10 @@ final class WalletVisualTests: XCTestCase {
         var rendered: Set<String> = []
         var positioned = !details && !compact
         let content = ScrollViewReader { proxy in
-            SharingReviewScreen(title: "Payment", review: review,
+            SharingReviewScreen(title: "Payment", requestIdentity: "visual-review", review: review,
                 selection: SharingSelection(credentials: review.defaultCredentialSelection()),
                 selectionComplete: true, paymentReview: state,
-                onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+                onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: { _ in }, onCancel: {})
                 .environment(\.paymentDetailsInitiallyExpanded, details)
                 .onPreferenceChange(SharingReviewReadinessKey.self) {
                     rendered = Set($0.map { $0.selection.id })
@@ -831,7 +837,8 @@ final class WalletVisualTests: XCTestCase {
         UIView.setAnimationsEnabled(false)
         defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
-        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory))
+        let host = WalletVisualHostingController(rootView: content.environment(\.sizeCategory, sizeCategory)
+            .environment(\.credentialStatusUI, try WalletVisualFixtures().noReferenceStatusContext()))
         host.scrollToBottom = scrollToBottom
         host.scrollFraction = scrollFraction
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -913,6 +920,7 @@ final class WalletVisualTests: XCTestCase {
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.timeZone, TimeZone(identifier: "UTC")!)
+        .environment(\.credentialStatusUI, try WalletVisualFixtures().noReferenceStatusContext())
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)

@@ -1,8 +1,8 @@
 package id.walt.wallet2.status
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.credentials.status.CredentialStatusMetadata
-import id.walt.credentials.status.CredentialStatusPresentation
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusPresentationData
 import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
@@ -20,8 +20,8 @@ data class WalletCredentialResponse(
     val metadata: JsonObject? = null,
     val holderKeyBinding: HolderKeyBinding? = null,
     val reference: WalletCredentialReference,
-    val status: CredentialStatusMetadata,
-    val statusPresentation: CredentialStatusPresentation,
+    val status: CredentialStatus,
+    val statusPresentation: CredentialStatusPresentationData,
     val statusEvaluatedAt: Instant,
 )
 
@@ -34,19 +34,19 @@ data class WalletCredentialMetadataResponse(
     val label: String? = null,
     val addedAt: Instant? = null,
     val reference: WalletCredentialReference,
-    val status: CredentialStatusMetadata,
-    val statusPresentation: CredentialStatusPresentation,
+    val status: CredentialStatus,
+    val statusPresentation: CredentialStatusPresentationData,
     val statusEvaluatedAt: Instant,
 )
 
 fun WalletCredentialRead.toResponse(): WalletCredentialResponse = WalletCredentialResponse(
     credential.id, credential.credential, credential.label, credential.addedAt, credential.metadata,
-    credential.holderKeyBinding, reference, status, presentation, evaluatedAt,
+    credential.holderKeyBinding, reference, status, presentation.toData(), evaluatedAt,
 )
 
 fun WalletCredentialRead.toMetadataResponse(): WalletCredentialMetadataResponse = WalletCredentialMetadataResponse(
     credential.id, credential.credential.format, credential.credential.issuer, credential.credential.subject,
-    credential.label, credential.addedAt, reference, status, presentation, evaluatedAt,
+    credential.label, credential.addedAt, reference, status, presentation.toData(), evaluatedAt,
 )
 
 /** IDs refer only to records already stored in this wallet. A host never accepts a caller's status URL. */
@@ -70,3 +70,24 @@ data class StatusReviewedSendResponseRequest(
 
 @Serializable
 data class CredentialStatusReviewChangedResponse(val code: String = "credential_status_review_changed")
+
+/** Transport-only snapshot; decoded presentations never enter the local service state. */
+@Serializable
+data class WalletCredentialStatusSnapshotResponse(
+    val evaluatedAt: Instant,
+    val credentials: List<WalletCredentialStatusResponse>,
+    val refreshing: Set<WalletCredentialReference> = emptySet(),
+    val nextRefreshAt: Instant? = null,
+)
+
+@Serializable
+data class WalletCredentialStatusResponse(
+    val reference: WalletCredentialReference,
+    val status: CredentialStatus,
+    val presentation: CredentialStatusPresentationData,
+)
+
+fun WalletCredentialStatusSnapshot.toResponse(): WalletCredentialStatusSnapshotResponse = WalletCredentialStatusSnapshotResponse(
+    evaluatedAt, credentials.map { WalletCredentialStatusResponse(it.reference, it.status, it.presentation.toData()) },
+    refreshing, nextRefreshAt,
+)

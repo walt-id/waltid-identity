@@ -16,6 +16,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -32,9 +33,23 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentField
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentFieldPlacement
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentReview
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
+import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReadState
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialRow
 import id.walt.walletdemo.compose.ui.components.PaymentConsentSection
+import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
@@ -68,13 +83,126 @@ import kotlinx.coroutines.cancel
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
 
+    fun statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions() = runComposeUiTest {
+        val first = credentialOption(queryId = "one", credentialId = "selected", label = "Selected licence")
+        val repeated = first.copy(queryId = "two")
+        val other = first.copy(credentialId = "unselected", label = "Unselected card")
+        val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(first, other, repeated),
+            listOf(WalletDemoPresentationCredentialRequirement(listOf(listOf("one", "two")))))
+        val adverse = WalletVisualFixtures.credentialStatus("revoked_current")
+        val snapshot = WalletDemoCredentialStatuses(mapOf("selected" to adverse, "unselected" to adverse))
+        val submissions = mutableListOf<WalletDemoSharingSelection>()
+        setContent {
+            TestSharingReviewScreen(review, "Share documents", { submissions += it }, {}, credentialStatuses = snapshot)
+        }
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().performClick()
+        onNodeWithText("Share with status issues?").assertIsDisplayed()
+        onNodeWithText("Unselected card:", substring = true).assertDoesNotExist()
+        onNodeWithText("2 selected credentials", substring = true).assertDoesNotExist()
+        onNodeWithTag("sharing-credential-status-advisory").assertDoesNotExist()
+        val confirm = onNodeWithTag("credential-status-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        runOnIdle { confirm(); confirm() }
+        assertEquals(1, submissions.size)
+        assertEquals(setOf(first.selection, repeated.selection), submissions.single().credentials)
+        assertEquals(mapOf("selected" to adverse.advisoryRevision), submissions.single().credentialStatusRevisions)
+    }
+
+    fun statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges() = runComposeUiTest {
+        val first = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
+        val other = first.copy(credentialId = "other", label = "Alternative licence")
+        val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(first, other))
+        val adverse = WalletVisualFixtures.credentialStatus("revoked_current")
+        val statuses = mutableStateOf(WalletDemoCredentialStatuses(mapOf(first.credentialId to adverse, "other" to adverse)))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val owner = WalletDemoSharingReviewController(review, scope)
+        var submissions = 0
+        try {
+            setContent {
+                TestSharingReviewScreen(review, "Share documents", { submissions++ }, {},
+                    controller = owner, credentialStatuses = statuses.value)
+            }
+            onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+            runOnIdle { statuses.value = statuses.value.copy(credentials = statuses.value.credentials +
+                ("other" to adverse.copy(advisoryRevision = "unselected-change"))) }
+            onNodeWithTag("credential-status-confirm").assertIsDisplayed()
+            runOnIdle { statuses.value = statuses.value.copy(credentials = statuses.value.credentials +
+                (first.credentialId to adverse.copy(lastCheckedAt = "2026-11-12T19:30:00Z"))) }
+            onNodeWithTag("credential-status-confirm").assertIsDisplayed()
+            runOnIdle { statuses.value = statuses.value.copy(credentials = statuses.value.credentials +
+                (first.credentialId to adverse.copy(advisoryRevision = "selected-change"))) }
+            onNodeWithTag("credential-status-confirm").assertDoesNotExist()
+            onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+            val staleClick = onNodeWithTag("credential-status-confirm").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+            // Exercise a host change before recomposition, as well as the rendered invalidation.
+            runOnIdle { owner.toggleDisclosure(disclosureSelection(first, OPTIONAL_DISCLOSURE_PATH)); staleClick() }
+            onNodeWithTag("credential-status-confirm").assertDoesNotExist()
+            assertEquals(0, submissions)
+            onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+            onNodeWithTag("credential-status-back").performClick()
+            assertEquals(0, submissions)
+        } finally { owner.close(); scope.cancel() }
+    }
+
+    fun unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit() = runComposeUiTest {
+        val option = credentialOption()
+        val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(option))
+        val snapshot = mutableStateOf(WalletDemoCredentialStatuses())
+        var submitted: WalletDemoSharingSelection? = null
+        setContent {
+            TestSharingReviewScreen(review, "Share documents", { submitted = it }, {}, credentialStatuses = snapshot.value)
+        }
+        onNodeWithText("Status unavailable").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
+        runOnIdle { snapshot.value = WalletDemoCredentialStatuses(mapOf(option.credentialId to
+            WalletVisualFixtures.credentialStatus("clear").copy(storeIndex = null))) }
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
+        runOnIdle { snapshot.value = WalletDemoCredentialStatuses(mapOf(option.credentialId to
+            WalletVisualFixtures.credentialStatus("revoked_current")), readState = WalletDemoStatusReadState.Unavailable) }
+        onNodeWithText("Last known: revoked").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled()
+        runOnIdle { snapshot.value = WalletDemoCredentialStatuses(mapOf(option.credentialId to
+            WalletDemoCredentialStatus.ServerUnsupported), legacySubmission = true) }
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+        assertEquals(emptyMap(), submitted?.credentialStatusRevisions)
+        onNodeWithTag("credential-status-confirm").assertDoesNotExist()
+    }
+
+    fun unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions() = runComposeUiTest {
+        val option = credentialOption()
+        val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), listOf(option))
+        val consent = WalletDemoPaymentConsent("payment-revision", "en", null, null, "Authorize payment", "Decline payment", true, emptyList())
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val owner = WalletDemoSharingReviewController(review, scope) { consent }
+        val snapshot = WalletDemoCredentialStatuses(mapOf(option.credentialId to WalletVisualFixtures.credentialStatus("revoked_current")))
+        var submitted: WalletDemoSharingSelection? = null
+        var refused = 0
+        try {
+            setContent {
+                TestSharingReviewScreen(review, "Payment", { submitted = it }, { refused++ }, onReject = { refused++ },
+                    controller = owner, credentialStatuses = snapshot)
+            }
+            onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+            onNodeWithText("Unsigned payment request").assertIsDisplayed()
+            onNodeWithText("This request has no signature", substring = true).assertIsDisplayed()
+            onNodeWithText("revoked. The recipient", substring = true).assertIsDisplayed()
+            onNodeWithTag("credential-status-confirm").assertDoesNotExist()
+            onNodeWithTag("payment-unsigned-back").performClick()
+            assertEquals(0, refused)
+            assertNull(submitted)
+            onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+            onNodeWithTag("payment-unsigned-confirm").assert(hasText("Authorize payment")).performClick()
+            assertEquals("payment-revision", submitted?.paymentConsentRevision)
+            assertEquals(0, refused)
+        } finally { owner.close(); scope.cancel() }
+    }
+
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() = runComposeUiTest {
         val options = WalletVisualFixtures.informationCredentials.take(2)
         val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), options)
         val city = options[1]
         var submitted: WalletDemoSharingSelection? = null
         setContent {
-            WalletDemoSharingReviewScreen(review = review, title = "Share credentials", compact = false,
+            TestSharingReviewScreen(review = review, title = "Share credentials", compact = false,
                 onSubmit = { submitted = it }, onCancel = {})
         }
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[0].selection.id)).performScrollToContent(this).assertIsSelected()
@@ -136,8 +264,10 @@ class WalletDemoSharingReviewTestScenarios {
         val enabled = mutableStateOf(true)
         var submissions = 0
         setContent {
-            id.walt.walletdemo.compose.ui.components.SharingActionsRow(enabled.value, true,
-                onSubmit = { submissions++ }, onCancel = {}, onReject = null, paymentReview = review.value)
+            CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(snapshot = WalletDemoCredentialStatuses())) {
+                SharingActionsRow(enabled.value, true, reviewKey = "unsigned-payment", credentialStatuses = emptyList(),
+                    onSubmit = { submissions++ }, onCancel = {}, onReject = null, paymentReview = review.value)
+            }
         }
         onNodeWithText("Pay").performClick()
         onNodeWithTag("payment-unsigned-confirm").assertIsDisplayed()
@@ -167,7 +297,7 @@ class WalletDemoSharingReviewTestScenarios {
             WalletDemoPaymentConsent("revision-$prepared", "en", "Payment", null, "Approve", "Cancel", false, emptyList())
         }
         setContent {
-            if (visible.value) WalletDemoSharingReviewScreen(review = review, controller = owner, title = "Review request",
+            if (visible.value) TestSharingReviewScreen(review = review, controller = owner, title = "Review request",
                 compact = false, onSubmit = { submitted = it }, onCancel = {},
                 onBackAtRoot = {})
         }
@@ -193,7 +323,7 @@ class WalletDemoSharingReviewTestScenarios {
         )
         val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
         setContent {
-            WalletDemoSharingReviewScreen(compact = false, review = digitalCredentialReview(listOf(option)),
+            TestSharingReviewScreen(compact = false, review = digitalCredentialReview(listOf(option)),
                 title = "Share digital credential?", onSubmit = { submitted = it }, onCancel = {})
         }
         onNodeWithText("Given name").performScrollToContent(this).assertIsDisplayed()
@@ -217,7 +347,7 @@ class WalletDemoSharingReviewTestScenarios {
             ))
         var submitted: WalletDemoSharingSelection? = null
         setContent {
-            WalletDemoSharingReviewScreen(review = digitalCredentialReview(), title = "Payment", compact = false,
+            TestSharingReviewScreen(review = digitalCredentialReview(), title = "Payment", compact = false,
                 onSubmit = { submitted = it }, onCancel = {}, preparePaymentConsent = { consent })
         }
         onNodeWithText("Zahlung prüfen").performScrollToContent(this).assertIsDisplayed()
@@ -300,7 +430,7 @@ class WalletDemoSharingReviewTestScenarios {
         })) }
         var submitted = false
         setContent {
-            WalletDemoSharingReviewScreen(review = review, title = "Payment", compact = false,
+            TestSharingReviewScreen(review = review, title = "Payment", compact = false,
                 onSubmit = { submitted = true }, onCancel = {},
                 preparePaymentConsent = { error("Required payment instructions are unavailable in your preferred languages.") })
         }
@@ -316,7 +446,7 @@ class WalletDemoSharingReviewTestScenarios {
      */
     fun digitalCredentialReviewShowsOriginTransactionDataAndEncryption() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
@@ -361,7 +491,7 @@ class WalletDemoSharingReviewTestScenarios {
      */
     fun verifiedOriginStaysVisibleBesideSelfAssertedVerifierMetadata() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview().let { review ->
                     review.copy(
@@ -399,7 +529,7 @@ class WalletDemoSharingReviewTestScenarios {
         var submitted: WalletDemoSharingSelection? = null
         var cancelled = false
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
@@ -426,7 +556,7 @@ class WalletDemoSharingReviewTestScenarios {
     /** A submission in flight must not be able to start a second one for the same request. */
     fun disabledReviewCannotBeSubmittedTwice() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
@@ -446,7 +576,7 @@ class WalletDemoSharingReviewTestScenarios {
      */
     fun reviewWithoutReaderAuthenticationShowsNoReaderSection() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview(),
                 title = "Share digital credential?",
@@ -464,7 +594,7 @@ class WalletDemoSharingReviewTestScenarios {
      */
     fun untrustedReaderIsDescribedAsATrustDecisionNotASignatureFailure() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Untrusted("No reader trust policy is configured")),
                 title = "Share mobile document?",
@@ -484,7 +614,7 @@ class WalletDemoSharingReviewTestScenarios {
     /** A trusted reader is named, which is the only state in which the wallet can identify the reader. */
     fun trustedReaderIsNamedOnTheReview() = runComposeUiTest {
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = annexCReview(WalletDemoReaderTrust.Trusted("CN=Example Reader")),
                 title = "Share mobile document?",
@@ -513,7 +643,7 @@ class WalletDemoSharingReviewTestScenarios {
         // The request requires both documents, but the second match is not available yet.
         val review = mutableStateOf(completeReview.copy(credentialOptions = listOf(mdl)))
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = review.value,
                 title = "Share mobile document?",
@@ -555,7 +685,7 @@ class WalletDemoSharingReviewTestScenarios {
             disclosures = listOf(requiredDisclosure(), optionalDisclosure()),
         )
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = true,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
@@ -605,7 +735,7 @@ class WalletDemoSharingReviewTestScenarios {
         var submitted: WalletDemoSharingSelection? = null
         val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
         setContent {
-            WalletDemoSharingReviewScreen(
+            TestSharingReviewScreen(
                 compact = false,
                 review = digitalCredentialReview(credentialOptions = listOf(option, credentialOption(queryId = "other", credentialId = "other"))),
                 title = "Share digital credential?",

@@ -34,25 +34,37 @@ Closing the wallet cancels owned status work and rejects new operations while pr
 
 ### Display the shared meaning
 
-Use the presentation's kind, issue, freshness, coverage and action. Do not interpret protocol bits in
+Use the presentation's kind, issue, freshness, coverage, action and per-reference facts. Do not interpret protocol bits in
 Swift. No status, unchecked, unsupported, unavailable, stale and partially checked are distinct from
 a fresh clear observation. Failure can retain a dated previous result. A clear result does not prove
-credential validity, issuer trust or verifier acceptance.
+credential validity, issuer trust or verifier acceptance. The producer owns the opaque
+`advisoryRevision`; Swift carries it unchanged. Protocol-owned metadata keeps Token, MSO, Bitstring
+and legacy values/purposes distinct. Unknown semantic codes do not become a clear result.
 
 Keep home-card decoration limited to an issue icon. Put the result, checked time and check action in
-a standalone Credential status section; expand explanations and partial coverage under Details.
+a standalone Credential status section with a refresh icon; expand structured facts with its chevron.
 Sharing reviews use cached observations and selected-only warnings. They do not contact issuers.
+The demos add one final confirmation for known or retained revoked, invalid or suspended selections,
+combining it with any explicit unsigned-payment warning. Payment and nearby labels remain authoritative.
 
 If your UI records the presented `advisoryRevision`, use
 ``Wallet/submitStatusReviewedPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:reviewedStatus:did:runPolicies:paymentConsentRevision:)``
-for ordinary reviewed submission. A changed warning throws
+for ordinary reviewed submission. Bind the captured request, credential/disclosure selection, payment
+revision, wallet context and selected status revisions. Dismissal grants no consent; changed inputs,
+lock or disposal invalidate the pending attempt. Confirm with those captured revisions once.
+A changed warning throws
 ``WalletError/credentialStatusReviewChanged`` before delivery. Refresh the local review and ask for
 the existing consent again. A timestamp-only update does not invalidate consent. Adverse status is
 advisory; existing payment, reader-trust and protocol acceptance rules still apply.
 
+Malformed advisory JSON does not hide an otherwise readable credential. Snapshot/stream decoding
+still fails explicitly. Show unavailable feedback and suppress a retained green assertion until
+current status is available; retain adverse facts and their original times. Missing selected review
+revisions are an unavailable binding, never a fabricated empty acknowledgement.
+
 ### Own the trigger and persistence
 
-The SDK installs no timer, WorkManager job or BGTask. The app owns foreground/manual triggers,
+The SDK installs no issuer-check scheduler, WorkManager job or BGTask. The app owns foreground/manual triggers,
 preferences and lifecycle cancellation. Use the optional snapshot `nextRefreshAt` to schedule the
 next IfDue check while the app remains active, and cancel that timer during lock, background or consent.
 Apply bounded retry spacing when a due time remains in the past. Avoid refreshing from status getters, credential matching

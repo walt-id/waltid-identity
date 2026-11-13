@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
@@ -27,6 +28,7 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
 
 class WalletDemoController(
     private val wallet: DemoWallet,
@@ -83,12 +85,27 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             combine(state, applicationForeground) { ui, foreground -> foreground && ui.auth == WalletAuthState.Unlocked && ui.session is WalletSessionState.Ready }
                 .distinctUntilChanged().collectLatest { active ->
-                    if (!active) { credentialStatusRefreshJob?.cancel(); return@collectLatest }
+                    if (!active) {
+                        credentialStatusRefreshJob?.cancel()
+                        _state.update { it.copy(credentialStatuses = it.credentialStatuses.copy(readState = it.credentialStatuses.readState.awaitingRead)) }
+                        return@collectLatest
+                    }
                     if (_state.value.automaticCredentialStatusChecks) checkCredentialStatuses(force = false)
-                    try {
-                        wallet.credentialStatusSnapshots().collect { snapshot -> installCredentialStatuses(snapshot) }
-                    } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { _state.update { it.copy(credentialStatusError = "Credential status is unavailable. Try checking again.") } }
+                    while (currentCoroutineContext().isActive) {
+                        try {
+                            wallet.credentialStatusSnapshots().collect { snapshot -> installCredentialStatuses(snapshot) }
+                            _state.update { if (it.credentialStatuses.readState == WalletDemoStatusReadState.Loading)
+                                it.copy(credentialStatuses = it.credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable)) else it }
+                            break
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) {
+                            _state.update { it.copy(credentialStatuses = it.credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable),
+                                credentialStatusError = "Credential status is unavailable. Try checking again.") }
+                        }
+                        // Reattach the read observer, without forcing an issuer check. The active
+                        // wallet/foreground owner cancels this loop on lock or replacement.
+                        delay(5.seconds)
+                    }
                 }
         }
         scope.launch(dispatcher) {
@@ -112,7 +129,7 @@ class WalletDemoController(
                 StatusCheckSchedule(maxOf(due, automatic?.at?.plus(30.seconds) ?: due), inventory)
             }.distinctUntilChanged().collectLatest { schedule ->
                 if (schedule == null) return@collectLatest
-                delay((schedule.at - statusNow()).coerceIn(kotlin.time.Duration.ZERO, 3_600.seconds))
+                delay((schedule.at - statusNow()).coerceIn(Duration.ZERO, 3_600.seconds))
                 checkCredentialStatuses(force = false)
             }
         }
@@ -199,23 +216,32 @@ class WalletDemoController(
     fun checkCredentialStatuses(ids: Set<String>? = null, force: Boolean = true) {
         val current = _state.value
         if (!applicationForeground.value || current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready || credentialStatusRefreshJob?.isActive == true) return
+        if (!force && current.credentialStatuses.legacySubmission) return
         if (!force && (!current.automaticCredentialStatusChecks || externalStatusReview.value || current.presentationReview != null || current.isBusy)) return
         val generation = loadingGeneration.value
+        val settingsBatch = force && ids == null
         if (!force) {
             automaticStatusCheck.value = AutomaticStatusCheck(statusNow(),
                 (current.session as WalletSessionState.Ready).credentials.mapTo(mutableSetOf()) { it.id })
         }
         credentialStatusRefreshJob = scope.launch(dispatcher) {
-            _state.update { it.copy(checkingCredentialStatuses = true, credentialStatusSummary = null, credentialStatusError = null) }
+            _state.update { it.copy(checkingCredentialStatuses = true,
+                credentialStatusSummary = if (settingsBatch) null else it.credentialStatusSummary,
+                credentialStatusBatchError = if (settingsBatch) null else it.credentialStatusBatchError,
+                credentialStatusError = null) }
             try {
                 val summary = wallet.refreshCredentialStatuses(ids, force)
                 currentCoroutineContext().ensureActive()
                 if (loadingGeneration.value == generation) {
                     installCredentialStatuses(wallet.credentialStatusSnapshot())
-                    _state.update { it.copy(credentialStatusSummary = if (force) summary else it.credentialStatusSummary) }
+                    _state.update { it.copy(credentialStatusSummary = if (settingsBatch) summary else it.credentialStatusSummary) }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { if (loadingGeneration.value == generation) _state.update { it.copy(credentialStatusError = "Could not check credential status. Previous results are retained.") } }
+            catch (_: Exception) {
+                if (loadingGeneration.value == generation && (force || !_state.value.credentialStatuses.legacySubmission)) _state.update { it.copy(
+                    credentialStatusError = "Could not check credential status. Previous results are retained.",
+                    credentialStatusBatchError = if (settingsBatch) "Could not check statuses. Try again." else it.credentialStatusBatchError) }
+            }
             finally { if (loadingGeneration.value == generation) _state.update { it.copy(checkingCredentialStatuses = false) } }
         }
     }
@@ -230,7 +256,8 @@ class WalletDemoController(
         }
         changed.forEach { (id, status) -> announcedCredentialStatuses[id] = status.issue }
         pendingCredentialStatusNotices += changed.keys
-        _state.update { it.copy(credentialStatuses = snapshot) }
+        _state.update { it.copy(credentialStatuses = snapshot,
+            credentialStatusError = if (!it.credentialStatuses.available) null else it.credentialStatusError) }
         showPendingCredentialStatusNotices()
     }
 
@@ -561,7 +588,7 @@ class WalletDemoController(
             }
             val pinCleared = runCatching { pinStore.clear() }
             statusHideJob?.cancel()
-            _state.value = initialState()
+            _state.value = initialState().copy(credentialStatusContext = loadingGeneration.value)
             refreshBiometricSigningAvailability()
             pinCleared.exceptionOrNull()?.let { error ->
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
@@ -1472,10 +1499,20 @@ class WalletDemoController(
         }
     }
 
-    fun submitPresentation(reviewedStatus: Map<String, String>? = null) {
+    fun submitPresentation(submission: WalletDemoPresentationSubmission) {
+        if (!applicationForeground.value) return
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm) return
+        val reviewed = submission.selection
+        if (submission.previewHandle != current.presentationPreview?.previewHandle || submission.walletKeyId != ready.keyId ||
+            submission.walletContext != current.credentialStatusContext ||
+            reviewed.credentials != current.selectedPresentationCredentialOptions ||
+            reviewed.disclosures != current.selectedPresentationDisclosureOptions.forSelectedCredentials(current.selectedPresentationCredentialOptions) ||
+            reviewed.paymentConsentRevision != current.paymentReview.consent?.revision) {
+            _state.update { it.copy(credentialStatusError = "The review changed. Check the updated information before continuing.") }
+            return
+        }
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
         val previewHandle = current.presentationPreview?.previewHandle ?: return
         val selectedCredentialOptions = current.selectedPresentationCredentialOptions.toList()
@@ -1507,7 +1544,7 @@ class WalletDemoController(
                     selectedDisclosureOptions,
                     did = ready.did,
                     paymentConsentRevision = current.paymentReview.consent?.revision,
-                    reviewedStatus = reviewedStatus ?: current.credentialStatuses.credentials.mapValues { it.value.advisoryRevision },
+                    reviewedStatus = reviewed.credentialStatusRevisions,
                 )
                 currentCoroutineContext().ensureActive()
                 updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
@@ -1521,9 +1558,19 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 if (error is WalletDemoStatusReviewChanged) {
-                    installCredentialStatuses(wallet.credentialStatusSnapshot())
+                    var unavailable = false
+                    try {
+                        val snapshot = wallet.credentialStatusSnapshot()
+                        currentCoroutineContext().ensureActive()
+                        if (_state.value.credentialStatusContext != submission.walletContext) return@launch
+                        installCredentialStatuses(snapshot)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { unavailable = true }
+                    currentCoroutineContext().ensureActive()
                     updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
-                        it.copy(operation = WalletOperationState.Idle, credentialStatusError = error.message)
+                        it.copy(operation = WalletOperationState.Idle, credentialStatusError = if (unavailable)
+                            "Status changed, but its latest details are unavailable. Try again." else error.message,
+                            credentialStatuses = if (unavailable) it.credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable) else it.credentialStatuses)
                     }
                     return@launch
                 }
@@ -1913,6 +1960,8 @@ class WalletDemoController(
     @OptIn(DelicateCoroutinesApi::class)
     private fun cancelLoading(): Job {
         loadingGeneration.update { it + 1 }
+        _state.update { it.copy(credentialStatusContext = loadingGeneration.value,
+            credentialStatuses = it.credentialStatuses.copy(readState = it.credentialStatuses.readState.awaitingRead), checkingCredentialStatuses = false) }
         val bootstrap = bootstrapJob
         val registration = registrationJob
         val previous = loadingCancellationJob

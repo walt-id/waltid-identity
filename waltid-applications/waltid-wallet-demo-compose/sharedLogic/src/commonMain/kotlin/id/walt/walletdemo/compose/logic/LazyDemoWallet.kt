@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.logic
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 internal open class LazyDemoWallet<Wallet : DemoWallet>(
     private val createWallet: suspend () -> Wallet,
@@ -30,7 +32,7 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     ): WalletDemoSigningProtectionAvailability =
         wallet().signingProtectionAvailability(signingProtection)
 
-    override fun credentialStatusSnapshots(): kotlinx.coroutines.flow.Flow<WalletDemoCredentialStatuses> = kotlinx.coroutines.flow.flow {
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = flow {
         wallet().credentialStatusSnapshots().collect { emit(it) }
     }
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet().credentialStatusSnapshot()

@@ -3326,7 +3326,7 @@ final class id.walt.wallet2.mobile/MobileWalletCredential { // id.walt.wallet2.m
 }
 
 final class id.walt.wallet2.mobile/MobileWalletCredentialRead { // id.walt.wallet2.mobile/MobileWalletCredentialRead|null[0]
-    constructor <init>(id.walt.wallet2.mobile/MobileWalletCredential, id.walt.credentials.status/CredentialStatusMetadata, id.walt.credentials.status/CredentialStatusPresentation, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCredentialRead.<init>|<init>(id.walt.wallet2.mobile.MobileWalletCredential;id.walt.credentials.status.CredentialStatusMetadata;id.walt.credentials.status.CredentialStatusPresentation;kotlin.String){}[0]
+    constructor <init>(id.walt.wallet2.mobile/MobileWalletCredential, id.walt.credentials.status/CredentialStatus, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCredentialRead.<init>|<init>(id.walt.wallet2.mobile.MobileWalletCredential;id.walt.credentials.status.CredentialStatus;kotlin.String){}[0]
 
     final val credential // id.walt.wallet2.mobile/MobileWalletCredentialRead.credential|{}credential[0]
         final fun <get-credential>(): id.walt.wallet2.mobile/MobileWalletCredential // id.walt.wallet2.mobile/MobileWalletCredentialRead.credential.<get-credential>|<get-credential>(){}[0]
@@ -3335,13 +3335,12 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialRead { // id.walt.walle
     final val presentation // id.walt.wallet2.mobile/MobileWalletCredentialRead.presentation|{}presentation[0]
         final fun <get-presentation>(): id.walt.credentials.status/CredentialStatusPresentation // id.walt.wallet2.mobile/MobileWalletCredentialRead.presentation.<get-presentation>|<get-presentation>(){}[0]
     final val status // id.walt.wallet2.mobile/MobileWalletCredentialRead.status|{}status[0]
-        final fun <get-status>(): id.walt.credentials.status/CredentialStatusMetadata // id.walt.wallet2.mobile/MobileWalletCredentialRead.status.<get-status>|<get-status>(){}[0]
+        final fun <get-status>(): id.walt.credentials.status/CredentialStatus // id.walt.wallet2.mobile/MobileWalletCredentialRead.status.<get-status>|<get-status>(){}[0]
 
     final fun component1(): id.walt.wallet2.mobile/MobileWalletCredential // id.walt.wallet2.mobile/MobileWalletCredentialRead.component1|component1(){}[0]
-    final fun component2(): id.walt.credentials.status/CredentialStatusMetadata // id.walt.wallet2.mobile/MobileWalletCredentialRead.component2|component2(){}[0]
-    final fun component3(): id.walt.credentials.status/CredentialStatusPresentation // id.walt.wallet2.mobile/MobileWalletCredentialRead.component3|component3(){}[0]
-    final fun component4(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRead.component4|component4(){}[0]
-    final fun copy(id.walt.wallet2.mobile/MobileWalletCredential = ..., id.walt.credentials.status/CredentialStatusMetadata = ..., id.walt.credentials.status/CredentialStatusPresentation = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletCredentialRead // id.walt.wallet2.mobile/MobileWalletCredentialRead.copy|copy(id.walt.wallet2.mobile.MobileWalletCredential;id.walt.credentials.status.CredentialStatusMetadata;id.walt.credentials.status.CredentialStatusPresentation;kotlin.String){}[0]
+    final fun component2(): id.walt.credentials.status/CredentialStatus // id.walt.wallet2.mobile/MobileWalletCredentialRead.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRead.component3|component3(){}[0]
+    final fun copy(id.walt.wallet2.mobile/MobileWalletCredential = ..., id.walt.credentials.status/CredentialStatus = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletCredentialRead // id.walt.wallet2.mobile/MobileWalletCredentialRead.copy|copy(id.walt.wallet2.mobile.MobileWalletCredential;id.walt.credentials.status.CredentialStatus;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletCredentialRead.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletCredentialRead.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialRead.toString|toString(){}[0]
@@ -3448,19 +3447,19 @@ final class id.walt.wallet2.mobile/MobileWalletCredentialSelection { // id.walt.
 }
 
 final class id.walt.wallet2.mobile/MobileWalletCredentialStatusValue { // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue|null[0]
-    constructor <init>(id.walt.credentials.status/CredentialStatusMetadata, id.walt.credentials.status/CredentialStatusPresentation, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.<init>|<init>(id.walt.credentials.status.CredentialStatusMetadata;id.walt.credentials.status.CredentialStatusPresentation;kotlin.String){}[0]
+    constructor <init>(id.walt.credentials.status/CredentialStatus, id.walt.credentials.status/CredentialStatusPresentationData, kotlin/String) // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.<init>|<init>(id.walt.credentials.status.CredentialStatus;id.walt.credentials.status.CredentialStatusPresentationData;kotlin.String){}[0]
 
     final val evaluatedAt // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.evaluatedAt|{}evaluatedAt[0]
         final fun <get-evaluatedAt>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.evaluatedAt.<get-evaluatedAt>|<get-evaluatedAt>(){}[0]
     final val presentation // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.presentation|{}presentation[0]
-        final fun <get-presentation>(): id.walt.credentials.status/CredentialStatusPresentation // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.presentation.<get-presentation>|<get-presentation>(){}[0]
+        final fun <get-presentation>(): id.walt.credentials.status/CredentialStatusPresentationData // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.presentation.<get-presentation>|<get-presentation>(){}[0]
     final val status // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.status|{}status[0]
-        final fun <get-status>(): id.walt.credentials.status/CredentialStatusMetadata // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.status.<get-status>|<get-status>(){}[0]
+        final fun <get-status>(): id.walt.credentials.status/CredentialStatus // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.status.<get-status>|<get-status>(){}[0]
 
-    final fun component1(): id.walt.credentials.status/CredentialStatusMetadata // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.component1|component1(){}[0]
-    final fun component2(): id.walt.credentials.status/CredentialStatusPresentation // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.component2|component2(){}[0]
+    final fun component1(): id.walt.credentials.status/CredentialStatus // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.component1|component1(){}[0]
+    final fun component2(): id.walt.credentials.status/CredentialStatusPresentationData // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.component2|component2(){}[0]
     final fun component3(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.component3|component3(){}[0]
-    final fun copy(id.walt.credentials.status/CredentialStatusMetadata = ..., id.walt.credentials.status/CredentialStatusPresentation = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletCredentialStatusValue // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.copy|copy(id.walt.credentials.status.CredentialStatusMetadata;id.walt.credentials.status.CredentialStatusPresentation;kotlin.String){}[0]
+    final fun copy(id.walt.credentials.status/CredentialStatus = ..., id.walt.credentials.status/CredentialStatusPresentationData = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletCredentialStatusValue // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.copy|copy(id.walt.credentials.status.CredentialStatus;id.walt.credentials.status.CredentialStatusPresentationData;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletCredentialStatusValue.toString|toString(){}[0]

@@ -20,6 +20,42 @@ class AuthorizationServerMetadataSerializationTest {
     private val json = Json
 
     @Test
+    fun `pre-authorized-only metadata may omit response types without inventing authorization support`() {
+        // OID4VCI 1.0 section 12.2.4 explicitly permits this RFC 8414 exception.
+        val payload = """{"issuer":"https://issuer.example","token_endpoint":"https://issuer.example/token",
+            "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"],
+            "token_endpoint_auth_methods_supported":["none"],"pre-authorized_grant_anonymous_access_supported":true}"""
+        val metadata = json.decodeFromString<AuthorizationServerMetadata>(payload)
+        assertTrue(metadata.responseTypesSupported.isEmpty())
+        assertEquals(null, metadata.authorizationEndpoint)
+        val output = json.parseToJsonElement(json.encodeToString(metadata)).jsonObject
+        assertFalse("response_types_supported" in output)
+        assertFalse("authorization_endpoint" in output)
+        assertEquals(JsonArray(listOf(JsonPrimitive("urn:ietf:params:oauth:grant-type:pre-authorized_code"))), output["grant_types_supported"])
+        assertFailsWith<IllegalArgumentException> {
+            metadata.copy(grantTypesSupported = setOf(GrantType.PreAuthorizedCode.value, GrantType.AuthorizationCode.value),
+                authorizationEndpoint = "https://issuer.example/authorize")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString<AuthorizationServerMetadata>(JsonObject(output +
+                ("response_types_supported" to JsonArray(emptyList()))).toString())
+        }
+    }
+
+    @Test
+    fun `omitted response types remain invalid for default mixed or other grants`() {
+        val base = json.parseToJsonElement("""{"issuer":"https://issuer.example",
+            "authorization_endpoint":"https://issuer.example/authorize","token_endpoint":"https://issuer.example/token"}""").jsonObject
+        val grantSets = listOf(null, listOf("authorization_code"), listOf("client_credentials"),
+            listOf("urn:ietf:params:oauth:grant-type:pre-authorized_code", "authorization_code"))
+        for (grants in grantSets) {
+            val payload = if (grants == null) base else JsonObject(base +
+                ("grant_types_supported" to JsonArray(grants.map(::JsonPrimitive))))
+            assertFailsWith<IllegalStateException> { json.decodeFromString<AuthorizationServerMetadata>(payload.toString()) }
+        }
+    }
+
+    @Test
     fun `signed metadata is an optional standard field and round trips`() {
         val unsigned = AuthorizationServerMetadata.fromBaseUrl("https://as.example")
         assertFalse("signed_metadata" in json.encodeToJsonElement(AuthorizationServerMetadata.serializer(), unsigned).jsonObject)

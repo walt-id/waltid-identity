@@ -77,7 +77,7 @@
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
       "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
-      "title": "Wallet \u2014 saved credential"
+      "title": "Wallet — saved credential"
     },
     {
       "id": "wallet.scan.empty",
@@ -91,7 +91,7 @@
     },
     {
       "id": "wallet.scan.fido",
-      "title": "Scanner \u2014 FIDO request",
+      "title": "Scanner — FIDO request",
       "requirements": [
         "Android system handoff action and iOS system scanner guidance"
       ],
@@ -142,7 +142,7 @@
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
-      "title": "Receiving \u2014 selected credentials"
+      "title": "Receiving — selected credentials"
     },
     {
       "id": "batch.offer.none_selected",
@@ -159,7 +159,7 @@
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
-      "title": "Receiving \u2014 saved and deferred"
+      "title": "Receiving — saved and deferred"
     },
     {
       "id": "payment.mixed_credentials.main",
@@ -209,7 +209,7 @@
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
-      "title": "Nearby sharing \u2014 hold near reader",
+      "title": "Nearby sharing — hold near reader",
       "note": "Synthetic engagement with the decorative animation paused (Compose reduced motion; native inactive scene); no radio session or system NFC prompt."
     },
     {
@@ -220,7 +220,7 @@
         "PIN setup guidance and input"
       ],
       "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
-      "title": "Onboarding \u2014 choose a PIN"
+      "title": "Onboarding — choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -283,7 +283,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "PIN \u2014 compact, dark, large text"
+      "title": "PIN — compact, dark, large text"
     },
     {
       "id": "onboarding.pin.unlock",
@@ -366,7 +366,7 @@
           "textSize": "accessibilityMedium"
         }
       },
-      "title": "Receiving \u2014 compact, dark, large text"
+      "title": "Receiving — compact, dark, large text"
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -438,7 +438,7 @@
       "composeTest": "missingSavedDetails",
       "swiftTest": "testMissingSavedDetails",
       "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
-      "title": "Receiving \u2014 saved details unavailable"
+      "title": "Receiving — saved details unavailable"
     },
     {
       "id": "onboarding.key.summary",
@@ -493,7 +493,7 @@
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
       "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
-      "title": "Sharing \u2014 selected information"
+      "title": "Sharing — selected information"
     },
     {
       "id": "sharing.information.dates",
@@ -1244,39 +1244,41 @@
     {
       "id": "status.home.issue",
       "requirements": [
-        "Issue-only home-card icon with title clearance and no positive badge"
+        "Issue-only icon on artwork with unchanged card geometry"
       ],
       "composeTest": "credentialStatusHome",
       "swiftTest": "testCredentialStatusHome",
-      "title": "Issue-only home-card icon with title clearance and no positive badge"
+      "title": "Issue-only icon on artwork with unchanged card geometry",
+      "note": "Wallet-rendered titles use an icon prefix; supplied artwork uses a bottom-start overlay. Covered icons need not remain visible. Quiet credentials have no positive Home badge."
     },
     {
       "id": "status.details.clear",
       "requirements": [
-        "Standalone clear-status section, checked time and manual action"
+        "Standalone status island with green check, check time and icon controls"
       ],
       "composeTest": "credentialStatusDetailsClear",
       "swiftTest": "testCredentialStatusDetailsClear",
-      "title": "Standalone clear-status section, checked time and manual action"
+      "title": "Standalone status island with green check, check time and icon controls"
     },
     {
       "id": "status.details.adverse",
       "requirements": [
-        "Adverse previous observation with stale and partial essentials visible"
+        "One last-known adverse headline with refresh and disclosure icons"
       ],
       "composeTest": "credentialStatusDetailsAdverse",
       "swiftTest": "testCredentialStatusDetailsAdverse",
-      "title": "Adverse previous observation with stale and partial essentials visible"
+      "title": "One last-known adverse headline with refresh and disclosure icons",
+      "note": "Staleness, incomplete coverage and latest-attempt facts appear in the expanded disclosure rather than the headline."
     },
     {
       "id": "status.details.expanded",
       "requirements": [
-        "Expanded explanation, previous attempt, failure and privacy wording"
+        "Grouped per-reference facts, original check times and latest-attempt outcomes"
       ],
       "composeTest": "credentialStatusDetailsExpanded",
       "swiftTest": "testCredentialStatusDetailsExpanded",
-      "title": "Expanded explanation, previous attempt, failure and privacy wording",
-      "note": "Expanded production status section. Compose opens the actual Details control and asserts its contents; native uses the same internal initial-disclosure fixture convention as payment details. App-host navigation is separate evidence."
+      "title": "Grouped per-reference facts, original check times and latest-attempt outcomes",
+      "note": "Compose opens the production disclosure and asserts its contents; native uses the established initial-disclosure fixture. App-host navigation remains separate evidence."
     },
     {
       "id": "status.states",
@@ -1290,30 +1292,59 @@
     {
       "id": "status.sharing.review",
       "requirements": [
-        "Cached row status and selected-only advisory with ordinary Share anyway action"
+        "Compact status row below an inset divider with ordinary Share action"
       ],
       "composeTest": "credentialStatusSharing",
       "swiftTest": "testCredentialStatusSharing",
-      "title": "Cached row status and selected-only advisory with ordinary Share anyway action",
-      "note": "Wallet-owned provider review content. It does not reproduce OS-owned credential-picker chrome; the same shared row/advisory is used in ordinary review."
+      "title": "Compact status row below an inset divider with ordinary Share action",
+      "note": "Wallet-owned provider review content uses the shared row and actions. It does not reproduce OS-owned picker chrome. Selected adverse status is confirmed after tapping Share."
+    },
+    {
+      "id": "status.sharing.confirmation",
+      "title": "Selected adverse credential warning with Share anyway and Back to review",
+      "requirements": [
+        "Selected adverse credential warning with Share anyway and Back to review"
+      ],
+      "composeTest": "credentialStatusConfirmation",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "kind": "deterministic",
+      "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
     },
     {
       "id": "status.payment.review",
       "requirements": [
-        "Cached status warnings preserve payment consent and payment action labels"
+        "Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions"
       ],
       "composeTest": "credentialStatusPayment",
       "swiftTest": "testCredentialStatusPayment",
-      "title": "Cached status warnings preserve payment consent and payment action labels"
+      "title": "Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions"
+    },
+    {
+      "id": "status.payment.confirmation",
+      "title": "One combined unsigned-payment and credential-status warning with the payment action",
+      "requirements": [
+        "One combined unsigned-payment and credential-status warning with the payment action"
+      ],
+      "composeTest": "credentialStatusPaymentConfirmation",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "kind": "deterministic",
+      "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
     },
     {
       "id": "status.settings.partial",
       "requirements": [
-        "Foreground preference, explicit batch check and partial/deferred result summary"
+        "Foreground preference and structured completed, unchanged, deferred and error counts"
       ],
       "composeTest": "credentialStatusSettingsPartial",
       "swiftTest": "testCredentialStatusSettingsPartial",
-      "title": "Foreground preference, explicit batch check and partial/deferred result summary"
+      "title": "Foreground preference and structured completed, unchanged, deferred and error counts",
+      "note": "Check-error counts overlap processed/unchanged outcomes; expanded help explains the categories. Background scheduling is deferred."
     },
     {
       "id": "status.settings.checking",

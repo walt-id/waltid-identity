@@ -374,18 +374,17 @@ public final class id/walt/wallet2/mobile/MobileWalletCredentialOffer$Uri : id/w
 }
 
 public final class id/walt/wallet2/mobile/MobileWalletCredentialRead {
-	public fun <init> (Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;)V
+	public fun <init> (Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatus;Ljava/lang/String;)V
 	public final fun component1 ()Lid/walt/wallet2/mobile/MobileWalletCredential;
-	public final fun component2 ()Lid/walt/credentials/status/CredentialStatusMetadata;
-	public final fun component3 ()Lid/walt/credentials/status/CredentialStatusPresentation;
-	public final fun component4 ()Ljava/lang/String;
-	public final fun copy (Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletCredentialRead;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletCredentialRead;Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletCredentialRead;
+	public final fun component2 ()Lid/walt/credentials/status/CredentialStatus;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatus;Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletCredentialRead;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletCredentialRead;Lid/walt/wallet2/mobile/MobileWalletCredential;Lid/walt/credentials/status/CredentialStatus;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletCredentialRead;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredential ()Lid/walt/wallet2/mobile/MobileWalletCredential;
 	public final fun getEvaluatedAt ()Ljava/lang/String;
 	public final fun getPresentation ()Lid/walt/credentials/status/CredentialStatusPresentation;
-	public final fun getStatus ()Lid/walt/credentials/status/CredentialStatusMetadata;
+	public final fun getStatus ()Lid/walt/credentials/status/CredentialStatus;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -481,16 +480,16 @@ public final class id/walt/wallet2/mobile/MobileWalletCredentialSelection {
 
 public final class id/walt/wallet2/mobile/MobileWalletCredentialStatusValue {
 	public static final field Companion Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue$Companion;
-	public fun <init> (Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;)V
-	public final fun component1 ()Lid/walt/credentials/status/CredentialStatusMetadata;
-	public final fun component2 ()Lid/walt/credentials/status/CredentialStatusPresentation;
+	public fun <init> (Lid/walt/credentials/status/CredentialStatus;Lid/walt/credentials/status/CredentialStatusPresentationData;Ljava/lang/String;)V
+	public final fun component1 ()Lid/walt/credentials/status/CredentialStatus;
+	public final fun component2 ()Lid/walt/credentials/status/CredentialStatusPresentationData;
 	public final fun component3 ()Ljava/lang/String;
-	public final fun copy (Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;Lid/walt/credentials/status/CredentialStatusMetadata;Lid/walt/credentials/status/CredentialStatusPresentation;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;
+	public final fun copy (Lid/walt/credentials/status/CredentialStatus;Lid/walt/credentials/status/CredentialStatusPresentationData;Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;Lid/walt/credentials/status/CredentialStatus;Lid/walt/credentials/status/CredentialStatusPresentationData;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletCredentialStatusValue;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getEvaluatedAt ()Ljava/lang/String;
-	public final fun getPresentation ()Lid/walt/credentials/status/CredentialStatusPresentation;
-	public final fun getStatus ()Lid/walt/credentials/status/CredentialStatusMetadata;
+	public final fun getPresentation ()Lid/walt/credentials/status/CredentialStatusPresentationData;
+	public final fun getStatus ()Lid/walt/credentials/status/CredentialStatus;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

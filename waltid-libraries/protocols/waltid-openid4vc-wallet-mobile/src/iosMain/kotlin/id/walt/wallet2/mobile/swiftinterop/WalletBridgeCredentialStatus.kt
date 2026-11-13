@@ -4,6 +4,8 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletCredentialRead
 import id.walt.wallet2.mobile.MobileWalletCredentialStatusValue
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import id.walt.wallet2.status.WalletCredentialStatusSnapshotResponse
+import id.walt.wallet2.status.toResponse
 import kotlinx.serialization.json.Json
 
 /** A typed credential plus the shared semantic status representation for the native facade. */
@@ -32,8 +34,8 @@ internal val credentialStatusJson: Json = Json { encodeDefaults = true }
 
 internal fun MobileWalletCredentialRead.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
     credential, credentialStatusJson.encodeToString(MobileWalletCredentialStatusValue.serializer(),
-        MobileWalletCredentialStatusValue(status, presentation, evaluatedAt)),
+        MobileWalletCredentialStatusValue(status, presentation.toData(), evaluatedAt)),
 )
 
 internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String =
-    credentialStatusJson.encodeToString(WalletCredentialStatusSnapshot.serializer(), this)
+    credentialStatusJson.encodeToString(WalletCredentialStatusSnapshotResponse.serializer(), toResponse())

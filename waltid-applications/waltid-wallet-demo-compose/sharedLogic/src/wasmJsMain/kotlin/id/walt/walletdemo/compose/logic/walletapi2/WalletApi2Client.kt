@@ -26,6 +26,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged
 
 internal class WalletApi2Exception(
     val status: HttpStatusCode,
@@ -40,6 +41,7 @@ internal class WalletApi2Client(
     private val onSessionExpired: () -> Unit = {},
 ) {
     private var expiryReported = false
+    private val statusCapableWallets = mutableSetOf<String>()
 
     private fun checkSession(response: HttpResponse) {
         if (response.status == HttpStatusCode.Unauthorized && !expiryReported) {
@@ -122,8 +124,14 @@ internal class WalletApi2Client(
     suspend fun credentialStatusSnapshot(walletId: String): CredentialStatusSnapshotDto? {
         val response = http.get(walletPath(walletId, "credential-status"))
         checkSession(response)
-        if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.MethodNotAllowed) return null
+        if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.MethodNotAllowed) {
+            if (walletId in statusCapableWallets) throw response.toApiException()
+            return null
+        }
         if (!response.status.isSuccess()) throw response.toApiException()
+        // A malformed successful response is still a status-aware integration failure, not
+        // permission to downgrade a later submission to the unguarded legacy endpoints.
+        statusCapableWallets += walletId
         return response.body()
     }
 
@@ -245,7 +253,7 @@ internal class WalletApi2Client(
         if (response.status == HttpStatusCode.Conflict) {
             val error = walletApi2Json.parseToJsonElement(response.bodyAsText()).jsonObject
             if (error["code"]?.jsonPrimitive?.content == "credential_status_review_changed")
-                throw id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged()
+                throw WalletDemoStatusReviewChanged()
         }
         if (!response.status.isSuccess()) throw response.toApiException()
         return response

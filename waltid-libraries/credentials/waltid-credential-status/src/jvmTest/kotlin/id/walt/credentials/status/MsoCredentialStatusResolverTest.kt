@@ -1,17 +1,30 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.credentials.status
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
-import id.walt.cose.*
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseContentType
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.createAndSign
+import id.walt.cose.toCoseKey
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
-import id.walt.crypto2.keys.*
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.issuance.MdocIssuer
@@ -35,9 +48,14 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class MsoCredentialStatusResolverTest {
     @Test
@@ -67,7 +85,7 @@ class MsoCredentialStatusResolverTest {
             issuerKey = issuerKey, signatureAlgorithm = Cose.Algorithm.ES256,
             issuerCertificate = listOf(issuer.cose(), ca.cose()), holderKey = holderKey, docType = docType,
             data = MdocIssuer.MdocUniversalIssuanceData(mapOf("org.iso.18013.5.1" to buildJsonObject { put("family_name", "Example") })),
-            validFrom = at, validUntil = at + 1.hours,
+            validFrom = at, validUntil = at + 1.hours, signedAt = at,
             status = Status(statusList = Status.StatusListInfo(0u, UniformResourceIdentifier(uri))),
         )
         val credential = MdocsCredential(
@@ -96,21 +114,22 @@ class MsoCredentialStatusResolverTest {
         }))
         val resolver = CredentialStatusResolver(client, backgroundScope, { at })
         try {
-            assertIs<CredentialStatusEntry.NotChecked>(resolver.discover(credential).entries.single())
+            assertIs<Check.NotChecked>(assertIs<CredentialStatusEntry.Mso>(resolver.discover(credential).entries.single()).check)
             assertEquals(0, requests)
-            val observed = assertIs<CredentialStatusEntry.Observed>(resolver.resolve(credential).metadata.entries.single()).observation
-            assertEquals(StatusProtocol.ISO_MSO_STATUS_LIST, observed.protocol)
-            assertEquals(StatusMeaning.REVOKED, observed.meaning)
+            val entry = assertIs<CredentialStatusEntry.Mso>(resolver.resolve(credential).metadata.entries.single())
+            val observed = assertNotNull(entry.lastObservation())
+            assertEquals(StatusProtocol.ISO_MSO_STATUS_LIST, entry.protocol)
+            assertEquals(StatusMeaning.REVOKED, entry.meaning)
             val deadline = assertNotNull(observed.validUntil)
             assertTrue(deadline <= statusSigner.data.validity.notAfter)
             for ((candidate, expected) in listOf(
-                token(protectedChain = false) to StatusFailure.INVALID_SIGNATURE,
-                token(exp = null) to StatusFailure.INVALID_VALIDITY,
-                token(bits = 2) to StatusFailure.INVALID_LIST,
+                token(protectedChain = false) to CheckFailure.Reason.INVALID_SIGNATURE,
+                token(exp = null) to CheckFailure.Reason.INVALID_VALIDITY,
+                token(bits = 2) to CheckFailure.Reason.INVALID_LIST,
             )) {
                 body = candidate
-                val failure = assertIs<CredentialStatusEntry.Unavailable>(resolver.resolve(credential, force = true).metadata.entries.single())
-                assertEquals(expected, failure.reason)
+                val failure = resolver.resolve(credential, force = true).metadata.entries.single().failure
+                assertEquals(expected, failure)
             }
             val foreignCaKey = key("foreign-ca")
             val foreignCa = X509CertificateUtil.createSelfSignedCertificate(foreignCaKey, algorithm) {
@@ -120,8 +139,8 @@ class MsoCredentialStatusResolverTest {
                 subjectDn = "CN=Foreign status signer"; subjectPublicKey(statusKey)
             }
             body = token(certificate = foreignStatus)
-            assertEquals(StatusFailure.UNAUTHORIZED_SIGNER,
-                assertIs<CredentialStatusEntry.Unavailable>(resolver.resolve(credential, force = true).metadata.entries.single()).reason)
+            assertEquals(CheckFailure.Reason.UNAUTHORIZED_SIGNER,
+                resolver.resolve(credential, force = true).metadata.entries.single().failure)
         } finally { resolver.close(); client.close() }
     }
 

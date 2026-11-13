@@ -10,6 +10,8 @@ import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationSubmission
+import id.walt.walletdemo.compose.logic.presentationSubmission
 import id.walt.walletdemo.compose.logic.presentationCredentialSelectionComplete
 import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
@@ -20,6 +22,7 @@ import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.selectedReviewStatuses
 import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 
 @Composable
@@ -28,7 +31,7 @@ internal fun PresentTab(
     onPreview: () -> Unit,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onSubmit: (Map<String, String>) -> Unit,
+    onSubmit: (WalletDemoPresentationSubmission) -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
     onDone: () -> Unit,
@@ -71,13 +74,15 @@ internal fun PresentTab(
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
-                    credentialStatuses = preview.credentialOptions.filter { it.selection in state.selectedPresentationCredentialOptions }
-                        .mapNotNull { option -> state.credentialStatuses.credentials[option.credentialId]?.let { option.label.ifBlank { option.credentialId } to it } },
+                    reviewKey = listOf(preview, state.presentationNavigationResetKey,
+                        state.selectedPresentationCredentialOptions, state.selectedPresentationDisclosureOptions),
+                    credentialStatuses = selectedReviewStatuses(information,
+                        state.selectedPresentationCredentialOptions, state.credentialStatuses),
                     paymentReview = state.paymentReview,
                     isPayment = preview.transactionData.any { it.isPaymentTransaction },
                     enabled = state.presentationReviewEnabled,
                     selectionComplete = information != null && state.presentationCredentialSelectionComplete(),
-                    onSubmit = { onSubmit(state.credentialStatuses.credentials.mapValues { it.value.advisoryRevision }) },
+                    onSubmit = { revisions -> state.presentationSubmission(revisions)?.let(onSubmit) },
                     onCancel = onCancel,
                     onReject = onReject,
                     showCancelWithReject = false,

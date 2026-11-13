@@ -19,7 +19,11 @@ import id.walt.did.dids.DidService
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.WalletCredentialReference
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import id.walt.wallet2.status.reviewGuard
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
@@ -91,6 +95,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import id.walt.wallet2.data.StoredCredential
+import kotlinx.coroutines.flow.flow
 
 internal object MobileDidSupport {
     private val initializationMutex = Mutex()
@@ -613,7 +619,7 @@ public class MobileWallet internal constructor(
         wallet.streamAllCredentials().map { it.toMobileWalletCredential() }.toList()
     }
 
-    private fun id.walt.wallet2.data.StoredCredential.toMobileWalletCredential(): MobileWalletCredential {
+    private fun StoredCredential.toMobileWalletCredential(): MobileWalletCredential {
         val meta = toMetadata()
         return MobileWalletCredential(id = meta.id, format = meta.format, issuer = meta.issuer,
             subject = meta.subject, label = meta.label, addedAt = meta.addedAt?.toString(),
@@ -624,13 +630,12 @@ public class MobileWallet internal constructor(
     /** Reads credentials with typed, local status metadata without rebuilding them for status updates. */
     public suspend fun credentialReads(): List<MobileWalletCredentialRead> = lifecycle.use {
         wallet.readCredentialsWithStatus().map { read ->
-            MobileWalletCredentialRead(read.credential.toMobileWalletCredential(), read.status,
-                read.presentation, read.evaluatedAt.toString())
+            MobileWalletCredentialRead(read.credential.toMobileWalletCredential(), read.status, read.evaluatedAt.toString())
         }
     }
 
     /** Initial and conflated status-only snapshots; observation does not retain network work. */
-    public val credentialStatuses: Flow<WalletCredentialStatusSnapshot> = kotlinx.coroutines.flow.flow {
+    public val credentialStatuses: Flow<WalletCredentialStatusSnapshot> = flow {
         val service = lifecycle.use { wallet.credentialStatuses() }
         emitAll(service.observe())
     }
@@ -854,7 +859,7 @@ public class MobileWallet internal constructor(
     ): MobileWalletDigitalCredentialResponse {
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
         guard.check()
-        return kotlinx.coroutines.withContext(guard) {
+        return withContext(guard) {
             submitDigitalCredentialPresentation(requestId, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
         }
     }
@@ -929,7 +934,7 @@ public class MobileWallet internal constructor(
     ): MobileWalletDigitalCredentialResponse {
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(submission.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
         guard.check()
-        return kotlinx.coroutines.withContext(guard) { submitAnnexCPresentation(submission) }
+        return withContext(guard) { submitAnnexCPresentation(submission) }
     }
 
     /** Verifies the raw post-consent request, builds device authentication in KMP, and HPKE-encrypts the response. */
@@ -1062,7 +1067,7 @@ public class MobileWallet internal constructor(
     ): MobileWalletPresentationResult {
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
         guard.check()
-        return kotlinx.coroutines.withContext(guard) {
+        return withContext(guard) {
             submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, runPolicies, paymentConsentRevision)
         }
     }

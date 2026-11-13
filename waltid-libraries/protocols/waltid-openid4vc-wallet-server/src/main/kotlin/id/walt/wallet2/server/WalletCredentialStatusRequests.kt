@@ -1,8 +1,18 @@
 package id.walt.wallet2.server
 
-import id.walt.credentials.status.CredentialStatusEntry
+import id.walt.credentials.status.entries
+import id.walt.credentials.status.isCheckable
+import id.walt.credentials.status.lastObservation
 import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.status.*
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshOutcome
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.RefreshCredentialStatusesRequest
+import id.walt.wallet2.status.WalletCredentialRead
+import id.walt.wallet2.status.WalletCredentialStatusService
+import id.walt.wallet2.status.WalletCredentialStatusSnapshotResponse
+import id.walt.wallet2.status.reviewGuard
+import id.walt.wallet2.status.toResponse
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -31,7 +41,7 @@ class WalletCredentialStatusRequests(
 
     suspend fun reads(wallet: Wallet): List<WalletCredentialRead> = serviceFactory(wallet).use { it.readCredentials() }
     suspend fun read(wallet: Wallet, id: String): WalletCredentialRead? = serviceFactory(wallet).use { it.readCredential(id) }
-    suspend fun snapshot(wallet: Wallet): WalletCredentialStatusSnapshot = serviceFactory(wallet).use { it.snapshot() }
+    suspend fun snapshot(wallet: Wallet): WalletCredentialStatusSnapshotResponse = serviceFactory(wallet).use { it.snapshot().toResponse() }
 
     suspend fun <T> withReviewedStatus(wallet: Wallet, ids: Set<String>, reviewed: Map<String, String>, operation: suspend () -> T): T =
         serviceFactory(wallet).use { service ->
@@ -51,7 +61,7 @@ class WalletCredentialStatusRequests(
             val selected = snapshot.credentials.filter { selection == null || it.reference in selection }
             // Local no-op checks must not consume admission for a later explicit revalidation.
             val localOnly = selected.all { record -> record.status.entries.all { entry ->
-                entry is CredentialStatusEntry.Unsupported ||
+                !entry.isCheckable(snapshot.evaluatedAt) ||
                     request.mode == CredentialStatusRefreshMode.IF_DUE && entry.lastObservation()?.isFresh(snapshot.evaluatedAt) == true
             } }
             if (localOnly) return@use selected.map {
