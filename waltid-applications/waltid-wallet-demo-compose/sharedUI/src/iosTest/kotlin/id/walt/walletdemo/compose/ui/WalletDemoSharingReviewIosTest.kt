@@ -6,6 +6,18 @@ class WalletDemoSharingReviewIosTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions() = scenarios.statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions()
+
+    @Test
+    fun statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges() = scenarios.statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges()
+
+    @Test
+    fun unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit() = scenarios.unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit()
+
+    @Test
+    fun unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions() = scenarios.unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions()
+
+    @Test
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =
         scenarios.choosingFromTheWholeRowUpdatesInformationAndSubmission()
 
@@ -24,6 +36,10 @@ class WalletDemoSharingReviewIosTest {
     @Test
     fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() =
         scenarios.unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState()
+
+    @Test
+    fun compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability() =
+        scenarios.compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability()
 
     @Test
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =

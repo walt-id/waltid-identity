@@ -41,6 +41,11 @@ public struct ProximitySharingReceipt: Sendable, Equatable {
 protocol ProximitySharingPlanBridge: Sendable {
     var isExpired: Bool { get }
     func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult
+    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult
+}
+
+extension ProximitySharingPlanBridge {
+    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult { try approve(submission) }
 }
 
 /// A recent authenticated request. Retaining this plan does not authorize any disclosure.
@@ -55,6 +60,14 @@ public struct ProximitySharingPlan: Sendable, Equatable {
 
     /// Whether the wallet considers the request too old to prepare for sharing.
     public var isExpired: Bool { bridge.isExpired }
+
+    /// Call after showing and deliberately approving these exact choices. No radio or key operation starts here.
+    /// - Parameter submission: Exact credential and field choices deliberately approved by the holder.
+    /// Captures the semantic status warnings shown for this one-use prepared selection.
+    /// - Parameter reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
+    public func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult {
+        try bridge.approveStatusReviewed(submission, reviewedStatus: reviewedStatus)
+    }
 
     /// Call after showing and deliberately approving these exact choices. No radio or key operation starts here.
     /// - Parameter submission: Exact credential and field choices deliberately approved by the holder.

@@ -130,6 +130,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import kotlin.io.encoding.Base64
 import kotlin.test.assertFalse
 import kotlin.test.assertEquals
@@ -2037,7 +2039,7 @@ class WalletDemoAppTestScenarios(
                 WalletDemoProximityScreen(proximity.value, emptyMap(),
                     WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
-                    onContinueAfterResponseChange = {}, onApprove = {}, onDecline = {}, onRetry = {},
+                    onContinueAfterResponseChange = {}, onApprove = { _, _ -> }, onDecline = {}, onRetry = {},
                     onRemediate = { _, _ -> }, onCancel = { cancelled = true }, onDismiss = {}, onRestart = {},
                     onApprovalModeChange = { proximity.value = proximity.value.copy(approvalMode = it) },
                     onShowEngagement = { proximity.value = proximity.value.copy(preferredEngagement = it) },
@@ -2372,6 +2374,11 @@ internal class WalletUiTestWallet(
     var signingProtectionAvailability: WalletDemoSigningProtectionAvailability =
         WalletDemoSigningProtectionAvailability.Available,
 ) : DemoWallet {
+    override fun credentialStatusSnapshots() = flow { emit(credentialStatusSnapshot()) }
+    override suspend fun credentialStatusSnapshot() = WalletDemoCredentialStatuses(
+        (credentials.map { it.id } + presentationPreview.credentialOptions.map { it.credentialId }).associateWith {
+            WalletVisualFixtures.credentialStatus("not_provided")
+        })
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
     var previewedRequestUrl: String? = null

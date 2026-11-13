@@ -1551,11 +1551,13 @@ protocol ProximitySessionBridge: Sendable {
     var states: AsyncStream<ProximityState> { get }
     func presentNfc() async
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult
     func close() async
 }
 
 @available(macOS 10.15, *)
 extension ProximitySessionBridge {
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult { try await dispatch(action) }
     var connectedRoute: ProximityConnectedRoute? { nil }
     var sharingPlan: ProximitySharingPlan? { nil }
 }
@@ -1599,6 +1601,16 @@ public actor ProximitySession {
     public func presentNfc() async {
         guard !closed else { return }
         await bridge.presentNfc()
+    }
+
+    /// Dispatches one host intent against the current session state.
+    /// - Parameter action: Action derived from the current state's ``ProximityState/legalActions``.
+    /// - Returns: Whether the session accepted the action.
+    /// Dispatches approval using the exact selected cached status warnings shown by the host.
+    /// - Parameter reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
+    public func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        guard !closed else { return try await dispatch(action) }
+        return try await bridge.dispatchStatusReviewed(action, reviewedStatus: reviewedStatus)
     }
 
     /// Dispatches one host intent against the current session state.

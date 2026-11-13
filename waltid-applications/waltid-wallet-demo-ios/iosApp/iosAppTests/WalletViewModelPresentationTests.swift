@@ -14,13 +14,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         XCTAssertEqual(viewModel.paymentReview, .loading)
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         var submitted = await client.submittedPaymentConsentRevisions
         XCTAssertTrue(submitted.isEmpty)
 
         await preparation.complete(0, with: .failure(WalletError.internalFailure("Missing issuer labels")))
         try await waitUntil { if case .blocked = viewModel.paymentReview { true } else { false } }
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         submitted = await client.submittedPaymentConsentRevisions
         XCTAssertTrue(submitted.isEmpty)
     }
@@ -49,7 +49,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         await fulfillment(of: [stale], timeout: 0.2)
         withExtendedLifetime(observation) {}
         XCTAssertEqual(viewModel.paymentReview.consent?.revision, "current")
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
         let submitted = await client.submittedPaymentConsentRevisions
         XCTAssertEqual(submitted, ["current"])

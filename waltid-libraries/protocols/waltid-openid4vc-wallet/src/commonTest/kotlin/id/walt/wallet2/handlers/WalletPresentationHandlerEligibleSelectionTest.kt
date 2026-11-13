@@ -18,6 +18,16 @@ import kotlin.test.assertEquals
 
 class WalletPresentationHandlerEligibleSelectionTest {
 
+    @Test
+    fun statusReviewConstructionAndMeteringShareLegacyFallbackAndOptionsPrecedence() {
+        val options = listOf(PresentationCredentialSelection("pid", "preferred"))
+        val legacy = mapOf("pid" to listOf("first", "second"), "licence" to listOf("third"))
+        assertEquals(options, resolveSelectedCredentialOptions(options, emptyMap()))
+        assertEquals(options, resolveSelectedCredentialOptions(options, legacy))
+        assertEquals(listOf(PresentationCredentialSelection("pid", "first"), PresentationCredentialSelection("pid", "second"),
+            PresentationCredentialSelection("licence", "third")), resolveSelectedCredentialOptions(emptyList(), legacy))
+    }
+
     /**
      * Credential Manager evaluates each registry entry independently, so two same-format
      * credentials both appear even when DCQL defaults to `multiple=false`. Rematching the

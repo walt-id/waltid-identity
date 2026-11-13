@@ -7,6 +7,8 @@ import WalletSDK
 /// The host owns the transport, the preview handle and the operating-system result; this view owns
 /// only the rendering of what the user is being asked and the reporting of what they chose.
 public struct SharingReviewView: View {
+    @Environment(\.credentialStatusUI) private var statusUI
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<SharingSubmissionKey?>>()
     private let review: SharingReviewModel
     private let selection: SharingSelection
     private let selectionComplete: Bool
@@ -14,7 +16,8 @@ public struct SharingReviewView: View {
     private let isReadOnly: Bool
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onSubmit: () -> Void
+    private let onSubmit: ([String: String]) -> Void
+    private let requestIdentity: AnyHashable?
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
     private let compact: Bool
@@ -45,12 +48,13 @@ public struct SharingReviewView: View {
         isReadOnly: Bool = false,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onSubmit: @escaping () -> Void,
+        onSubmit: @escaping ([String: String]) -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         compact: Bool = false,
         showActions: Bool = true,
-        paymentReview: PaymentReviewState = .notRequired
+        paymentReview: PaymentReviewState = .notRequired,
+        requestIdentity: AnyHashable? = nil
     ) {
         self.review = review
         self.selection = selection
@@ -65,10 +69,12 @@ public struct SharingReviewView: View {
         self.compact = compact
         self.showActions = showActions
         self.paymentReview = paymentReview
+        self.requestIdentity = requestIdentity
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if showActions { ReviewChangedNotice(submission) }
             SharingRequestSections(request: review.request, paymentReview: paymentReview)
 
             if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
@@ -122,8 +128,11 @@ public struct SharingReviewView: View {
 
             if !isReadOnly && showActions {
                 ReviewActions(
-                    selectionComplete: selectionComplete && isNormalized,
+                    gate: submission,
+                    selectionComplete: selectionComplete && isNormalized && requestIdentity != nil,
                     isLoading: isLoading,
+                    reviewKey: requestIdentity.map { SharingSubmissionKey(requestIdentity: $0, review: review, selection: selection) },
+                    credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
                     onSubmit: onSubmit,
                     onReject: onReject,
                     onCancel: onCancel,

@@ -32,7 +32,7 @@ public struct SigningKeySummary: View {
                 HStack(spacing: 12) {
                     label(title, value)
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary).accessibilityHidden(true)
+                    Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint).accessibilityHidden(true)
                 }.frame(minHeight: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("wallet.keySetupEdit.\(setting.rawValue)")
         } else {

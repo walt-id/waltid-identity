@@ -24,6 +24,7 @@ import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
+import id.walt.walletdemo.compose.ui.components.CredentialStatusSection
 
 @Composable
 internal fun ProximityReviewContent(
@@ -136,6 +137,7 @@ private fun CredentialOption(
             WalletInstantText(credential.validUntil)
         }
     }
+    CredentialStatusSection(credential.credentialId, compact = true)
 }
 
 internal fun CredentialDetails.mdocClaims(namespace: String, elementIdentifier: String): List<ClaimItem> =

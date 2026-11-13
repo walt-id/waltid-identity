@@ -1,19 +1,29 @@
 # Browser wallet visual checks
 
-This small [Playwright comparison lane](https://playwright.dev/docs/test-snapshots) runs the
-production Wasm host. It covers the browser-specific account form at compact/wide widths,
-busy submission, invalid credentials, registration conflict and expired sessions. Credential-details
-cases also exercise browser-local timestamp formatting at compact/wide widths, including the two
-02:30 instants in Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
-Other shared wallet content stays in the [mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md).
+This [Playwright comparison lane](https://playwright.dev/docs/test-snapshots) runs the production
+Wasm host. Account cases cover compact/wide forms, busy submission, invalid credentials,
+registration conflict and expired sessions. Credential dates retain the two 02:30 instants in
+Budapest's DST overlap, nanosecond precision and an unchanged calendar date.
+
+Status cases share producer assessments and unchanged public artwork with the
+[mobile catalogue](../../../waltid-wallet-demo-test-fixtures/visual/README.md). They cover mixed
+chip/no-chip Home cards, the centered bounded wide column, simple clear and expanded adverse details,
+inline sharing facts and manual refresh, selected-only confirmation, and signed-in settings with
+expanded help. Interaction cases check review-owned refresh, deliberate guarded submission and
+context loss with unchanged issuer facts, including the first deliberate consent to the recovered
+review. Generic transaction metadata has its own sharing reference; this does not imply native
+prepared-payment support in the browser. The older-server case retains explicit capability fallback
+without an unsupported refresh request. The browser never fetches an issuer status list directly.
 The [browser catalogue](catalogue.json) records exact states, requirements and environment.
 
-The tests intercept only synthetic local account/wallet HTTP requests. They exercise the actual
+The tests intercept synthetic account/wallet HTTP and serve the shared artwork bytes locally. Forced
+status overlays on public artwork are component fixtures, not issuer results for PID/EMVCo/KYC.
+They exercise the actual
 Compose form, validate submitted credentials and recovery messages, and check that empty/busy
 actions cannot send an extra request. Submitted responses are held until the working state
 has rendered; recovery cases release that gate after its image settles, so fast synthetic
 responses cannot skip the intermediate state. No application test route, separate gallery app or live
-account is needed. Real API2 authentication and protocol tests remain separate evidence.
+account is needed. Real API2 authentication, issuance and verifier journeys remain separate evidence.
 A separate immediate-response interaction case uses actual canvas pointer/backing-editor input to
 prove that registration failure restores editable fields and permits a retry with new credentials.
 Credential cases open the real stored card through the API2 mapper, shared normalizer and browser
@@ -69,5 +79,55 @@ Text entry waits for the actual backing editor's input mode and focus, fills tha
 then verifies its value. Keyboard navigation also targets that editor. Filling the contenteditable
 ARIA mirror can race canvas focus without entering text into Compose. ARIA focus and disabled attributes are not reliable
 proxies for Compose state in the pinned version; submitted request assertions remain required.
-This pilot does not prove screen-reader acceptance, every browser/viewport, browser authorization
+The sharing driver enters its URL through the scanner's actual keyboard path and asserts the exact
+preview request. It scrolls within the real sheet and checks that controls fit above the pinned
+actions; ARIA visibility alone does not prove canvas hit testing or reachability. Help exercises
+Space activation without changing preference or batch results. The pinned
+renderer can leave its ARIA mirror stale after closing a popup, so the Escape assertion compares
+the actual canvas backdrop. This does not establish screen-reader acceptance after popup dismissal.
+These fixtures do not prove screen-reader acceptance, every browser/viewport, browser authorization
 redirects or mobile system hosts.
+
+## Real server journey
+
+`live-status.cjs` is an explicit, separate journey through the production Wasm app and a real
+loopback Wallet API 2 service with auth disabled. It creates a new wallet, issues public-demo PID
+and controlled conference/workplace credentials, checks signed suspension/recovery/revocation,
+refreshes expanded sharing details and completes a real public-verifier presentation. It does not
+intercept wallet, issuer or verifier responses. This qualifies the supported browser host, not
+account authentication or native prepared payments.
+
+Start the built app and an immutable copy of the current wallet-service JAR on loopback, and run
+the [controlled issuer](../../../mobile-e2e-fixtures/status/README.md). Keep its control port private.
+Run serially with mobile controlled-status journeys: their outage control is shared. From this
+directory, on a clean committed checkout:
+
+```sh
+WALLET_API2_E2E_BASE_URL=http://127.0.0.1:7018 \
+WALLET_STATUS_CONTROL_URL=http://127.0.0.1:8090 \
+WALLET_BROWSER_APP_URL=http://127.0.0.1:8074 \
+WALLET_API2_E2E_PRODUCER=/private/evidence/backend-producer.json \
+WALLET_BROWSER_EVIDENCE_DIR=/private/evidence/unused-browser-run \
+node live-status.cjs
+```
+
+The producer receipt identifies the service source revision and immutable JAR digest. The runner
+retains its own source revision, browser/platform, eleven full-frame captures, producer projections,
+hash-only request bodies and the verifier's terminal verdict in `evidence.json`. The output must not
+already exist; diagnostics and request-derived data remain private. A page reload verifies server
+retention after issuance; the browser's runtime-owned manual preference is explicitly restored.
+Delivery is proved by the real verifier's terminal verdict and the actual return home, without
+manufacturing a persistent receipt screen or publishing a duplicate Home capture as a receipt.
+Refreshes respect the API's existing 30-second admission cooldown without automatic retries.
+
+For the pinned Linux Playwright container, use `host.docker.internal` instead of `127.0.0.1`
+to reach those same host-local services. Mount the checkout and its Git common directory read-only,
+with only the chosen evidence output writable. The runner also accepts this explicit local alias;
+it does not allow arbitrary remote wallet or control endpoints.
+
+Set `WALLET_BROWSER_EXECUTABLE` explicitly when using an installed Chromium instead of Playwright's
+bundled browser, and label that actual environment separately from Linux reference comparisons.
+For a free ngrok test tunnel, optional `WALLET_BROWSER_USER_AGENT=waltid-evidence/1` uses its
+[documented programmatic-access option](https://ngrok.com/docs/pricing-limits/free-plan-limits#using-a-custom-user-agent)
+to avoid an HTML interstitial replacing public artwork. Record that transport accommodation;
+it adds no application networking exception or simulated result.

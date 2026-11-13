@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
+import kotlinx.coroutines.currentCoroutineContext
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
@@ -180,7 +182,9 @@ internal class MobileWalletAnnexCEngine(
     suspend fun submit(submission: MobileWalletAnnexCSubmission): MobileWalletDigitalCredentialResponse =
         retainedRequests.useRetainingOnFailure(wallet.id, submission.requestId) { retained ->
             val confirmed = confirmRequestUnchangedAfterConsent(submission, retained)
+            currentCoroutineContext()[PresentationReviewGuard]?.check()
             val documents = buildSelectedDocuments(submission, retained, confirmed.transcript)
+            currentCoroutineContext()[PresentationReviewGuard]?.check()
             encryptDeviceResponse(documents, confirmed)
         }
 

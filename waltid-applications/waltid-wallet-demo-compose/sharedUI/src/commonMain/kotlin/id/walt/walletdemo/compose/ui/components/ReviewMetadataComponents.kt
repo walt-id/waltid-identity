@@ -89,7 +89,7 @@ internal fun ExpandableMetadataCard(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     modifier = Modifier.rotate(rotation),
                     contentDescription = if (expanded) "Hide $title details" else "Show $title details",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
             WalletExpandableContent(expanded) {

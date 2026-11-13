@@ -1,5 +1,14 @@
 package id.walt.walletdemo.compose.android
 
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReadState
+import id.walt.walletdemo.compose.logic.toDemoStatuses
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.retryWhen
+
 import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -28,8 +37,16 @@ import android.content.Context
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
 
 internal class DigitalCredentialProviderModel(context: Context) : DigitalCredentialActivityModel() {
+    var credentialStatuses by mutableStateOf(WalletDemoCredentialStatuses(readState = WalletDemoStatusReadState.Loading))
+        private set
+    var statusReviewNotice by mutableStateOf<String?>(null)
+        private set
+    private var statusWallet: MobileWallet? = null
+    private var statusObservation: Job? = null
+    private var statusReviewEnabled = false
     private val context = context.applicationContext
     private val resultIntent = Intent()
     private var discardReview: (suspend () -> Unit)? = null
@@ -49,8 +66,27 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         val config = demoWalletConfig()
         val created = createAndroidDemoMobileWallet(context, config, ::interactionActivity)
         val wallet = created.wallet
+        statusWallet = wallet
         created.bootstrap(config.selectedSigningProtection(context))
         val showPreview = createAndroidDemoSharingSettingsStore(context).showDcApiPresentationPreview()
+        statusReviewEnabled = showPreview
+        if (showPreview) {
+            try { credentialStatuses = wallet.credentialStatusSnapshot().toDemoStatuses() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { credentialStatuses = credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable) }
+            statusObservation = scope.launch {
+                wallet.credentialStatuses.retryWhen { cause, _ ->
+                    if (cause is CancellationException) throw cause
+                    credentialStatuses = credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable)
+                    statusReviewNotice = "Credential status is unavailable. Previous results are retained."
+                    delay(5_000)
+                    true
+                }.collect {
+                    if (!credentialStatuses.available) statusReviewNotice = null
+                    credentialStatuses = it.toDemoStatuses()
+                }
+            }
+        }
         if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
             val request = wallet.annexCRequest(input.request)
             val preview = wallet.previewAnnexCPresentation(request)
@@ -91,9 +127,10 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     fun submit(selection: WalletDemoSharingSelection) {
         val action = submitReview ?: return
         val current = reviewController?.selectionForSubmission() ?: return
-        if (submitting || result != null || current != selection) return
+        if (submitting || result != null || current != selection.copy(credentialStatusRevisions = current.credentialStatusRevisions)) return
         submitting = true
-        perform { action(current) }
+        statusReviewNotice = null
+        perform { action(selection) }
     }
 
     fun cancel() {
@@ -111,12 +148,14 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         selection: WalletDemoSharingSelection,
         providerRequest: ProviderGetCredentialRequest,
     ) {
-        val response = wallet.submitDigitalCredentialPresentation(
+        val response = if (statusReviewEnabled) wallet.submitStatusReviewedDigitalCredentialPresentation(
+            reviewedStatus = selection.credentialStatusRevisions,
             requestId = preview.requestId,
             selectedCredentialOptions = selection.toCredentialSelections(),
             selectedDisclosureOptions = selection.toDisclosureSelections(),
             paymentConsentRevision = selection.paymentConsentRevision,
         )
+        else wallet.submitDigitalCredentialPresentation(preview.requestId, selection.toCredentialSelections(), selection.toDisclosureSelections(), paymentConsentRevision = selection.paymentConsentRevision)
         currentCoroutineContext().ensureActive()
         AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
         finish(resultIntent)
@@ -129,15 +168,15 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         selection: WalletDemoSharingSelection,
         providerRequest: ProviderGetCredentialRequest,
     ) {
-        val response = wallet.submitAnnexCPresentation(
-            MobileWalletAnnexCSubmission(
+        val submission = MobileWalletAnnexCSubmission(
                 requestId = preview.requestId,
                 verifiedOrigin = preview.verifiedOrigin,
                 deviceRequestBase64Url = requireNotNull(request.deviceRequestBase64Url),
                 encryptionInfoBase64Url = requireNotNull(request.encryptionInfoBase64Url),
                 selectedCredentialOptions = selection.toCredentialSelections(),
             )
-        )
+        val response = if (statusReviewEnabled) wallet.submitStatusReviewedAnnexCPresentation(submission, selection.credentialStatusRevisions)
+            else wallet.submitAnnexCPresentation(submission)
         currentCoroutineContext().ensureActive()
         AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
         finish(resultIntent)
@@ -147,12 +186,15 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     override fun showFailure(cause: Exception) {
         Log.e("WaltDigitalCredentials", "Digital credential presentation failed (${cause::class.simpleName})", cause)
         submitting = false
+        if (cause is CredentialStatusReviewChangedException) { statusReviewNotice = cause.message; return }
         failure = cause.message ?: "The request could not be completed."
     }
 
     override suspend fun releaseRequest() {
+        statusObservation?.cancel()
         reviewController?.close()
         discardReview?.let { discard -> runCatching { discard() } }
+        statusWallet?.close()
     }
 }
 

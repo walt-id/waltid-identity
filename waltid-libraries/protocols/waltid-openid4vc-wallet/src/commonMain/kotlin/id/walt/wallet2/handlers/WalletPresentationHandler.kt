@@ -3,6 +3,10 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
+import id.walt.wallet2.status.WalletCredentialStatusService
+import id.walt.wallet2.status.reviewGuard
+import kotlinx.coroutines.withContext
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 import id.walt.wallet2.consent.*
 
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
@@ -65,6 +69,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.jvm.JvmInline
+import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
 
@@ -1105,6 +1110,23 @@ object WalletPresentationHandler {
         scaAuthorizer = null,
     )
 
+    suspend fun submitStatusReviewedPresentation(
+        wallet: Wallet, request: SubmitPresentationRequest,
+        reviewedStatus: Map<String, String>,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        scaAuthorizer: WalletScaPresentationAuthorizer? = null,
+        paymentConsentPolicy: PaymentConsentPolicy? = null,
+        statusService: WalletCredentialStatusService? = null,
+    ): WalletPresentResult {
+        val guard = (statusService ?: wallet.credentialStatuses()).reviewGuard(
+            request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus)
+        guard.check()
+        return withContext(guard) {
+            submitPresentation(wallet, request, onEvent, transactionDataTypeRegistry, scaAuthorizer, paymentConsentPolicy)
+        }
+    }
+
     suspend fun submitPresentation(
         wallet: Wallet,
         request: SubmitPresentationRequest,
@@ -1114,11 +1136,13 @@ object WalletPresentationHandler {
         paymentConsentPolicy: PaymentConsentPolicy? = null,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        return previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->
-            require(cached is PreviewedPresentation.Ready) {
-                "Cannot submit an invalid presentation request; reject it or dismiss it locally"
-            }
-        }) { preview ->
+        val statusReviewed = currentCoroutineContext()[PresentationReviewGuard] != null
+        suspend fun execute(block: suspend (PreviewedPresentation) -> WalletPresentResult): WalletPresentResult =
+            if (statusReviewed) previewedAuthorizationRequests.useStatusReviewedOnce(wallet.id, request.previewHandle.value, block)
+            else previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->
+                require(cached is PreviewedPresentation.Ready) { "Cannot submit an invalid presentation request; reject it or dismiss it locally" }
+            }, block = block)
+        return execute { preview ->
             val ready = preview as? PreviewedPresentation.Ready
                 ?: error("Unexpected presentation preview state")
             require(request.keyId == null || request.keyId == ready.keyId) { "The signing key must match the reviewed key" }
@@ -2487,7 +2511,14 @@ data class BuildVpTokenRequest(
     val did: String? = null,
 ) : VpRequestSource
 
-internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
+internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> =
+    resolveSelectedCredentialOptions(selectedCredentialOptions, selectedCredentialIds)
+
+/** Shared selection precedence for construction, status review and usage accounting. */
+fun resolveSelectedCredentialOptions(
+    selectedCredentialOptions: List<PresentationCredentialSelection>,
+    selectedCredentialIds: Map<String, List<String>>,
+): List<PresentationCredentialSelection> {
     if (selectedCredentialOptions.isNotEmpty()) return selectedCredentialOptions
     return selectedCredentialIds.flatMap { (queryId, credentialIds) ->
         credentialIds.map { credentialId ->

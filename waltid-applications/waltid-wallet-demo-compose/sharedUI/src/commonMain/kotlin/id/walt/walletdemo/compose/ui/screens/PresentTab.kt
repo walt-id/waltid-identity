@@ -4,12 +4,18 @@ import id.walt.walletdemo.compose.ui.LocalWalletSheet
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationSubmission
+import id.walt.walletdemo.compose.logic.WalletDemoReviewStatusRefresh
+import id.walt.walletdemo.compose.logic.presentationSubmission
 import id.walt.walletdemo.compose.logic.presentationCredentialSelectionComplete
 import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
@@ -19,7 +25,11 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
+import id.walt.walletdemo.compose.ui.components.ReviewChangedNotice
+import id.walt.walletdemo.compose.ui.components.rememberSharingSubmission
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.selectedReviewStatuses
 import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 
 @Composable
@@ -28,7 +38,7 @@ internal fun PresentTab(
     onPreview: () -> Unit,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (WalletDemoPresentationSubmission) -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
     onDone: () -> Unit,
@@ -66,16 +76,42 @@ internal fun PresentTab(
 
     if (preview != null) {
         val information by rememberSharingInformation(preview.credentialOptions)
+        val statuses = LocalCredentialStatusUi.current
+        val refresh = state.presentationStatusRefresh
+        val isPayment = preview.transactionData.any { it.isPaymentTransaction }
+        val submission = rememberSharingSubmission(
+            reviewKey = listOf(preview, state.presentationNavigationResetKey,
+                state.selectedPresentationCredentialOptions, state.selectedPresentationDisclosureOptions),
+            credentialStatuses = selectedReviewStatuses(information,
+                state.selectedPresentationCredentialOptions, state.credentialStatuses),
+            paymentReview = state.paymentReview, isPayment = isPayment,
+            enabled = state.presentationReviewEnabled && refresh == null,
+            selectionComplete = information != null && state.presentationCredentialSelectionComplete(),
+            onSubmit = { revisions -> state.presentationSubmission(revisions)?.let(onSubmit) },
+        )
+        val refreshActions = statuses.reviewRefresh
+        val navigationKey = state.presentationNavigationResetKey
+        DisposableEffect(preview.previewHandle, navigationKey, statuses.contextKey) {
+            onDispose { refreshActions?.release?.invoke(preview.previewHandle, navigationKey) }
+        }
+        CompositionLocalProvider(LocalCredentialStatusUi provides statuses.copy(
+            check = refreshActions?.let { actions -> { id ->
+                if (submission.canRefresh() && state.presentationReviewEnabled)
+                    actions.check(id, preview.previewHandle, navigationKey)
+            } },
+            checking = statuses.checking || refresh != null || !submission.refreshAllowed || !state.presentationReviewEnabled,
+            snapshot = statuses.snapshot.copy(refreshing = statuses.snapshot.refreshing +
+                listOfNotNull(refresh?.takeIf { it.phase == WalletDemoReviewStatusRefresh.Phase.Checking }?.credentialId)),
+        )) {
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
+                    submission = submission,
                     paymentReview = state.paymentReview,
-                    isPayment = preview.transactionData.any { it.isPaymentTransaction },
+                    isPayment = isPayment,
                     enabled = state.presentationReviewEnabled,
-                    selectionComplete = information != null && state.presentationCredentialSelectionComplete(),
-                    onSubmit = onSubmit,
                     onCancel = onCancel,
                     onReject = onReject,
                     showCancelWithReject = false,
@@ -83,6 +119,8 @@ internal fun PresentTab(
             },
         ) {
             feedback?.invoke()
+            ReviewChangedNotice(submission)
+            state.credentialStatusError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
@@ -95,6 +133,10 @@ internal fun PresentTab(
                 onToggleDisclosure = onToggleDisclosure,
                 compact = false,
             )
+        }
+        SideEffect {
+            if (refresh?.phase == WalletDemoReviewStatusRefresh.Phase.AwaitingRender) refreshActions?.rendered?.invoke(refresh.id)
+        }
         }
         return
     }

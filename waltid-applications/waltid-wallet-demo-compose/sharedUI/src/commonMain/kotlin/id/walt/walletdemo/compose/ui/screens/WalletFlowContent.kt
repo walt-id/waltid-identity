@@ -48,15 +48,7 @@ internal fun WalletFlowContent(
                 onPreview = controller::previewPresentation,
                 onToggleCredential = controller::togglePresentationCredential,
                 onToggleDisclosure = controller::togglePresentationDisclosure,
-                onSubmit = {
-                    val current = controller.state.value
-                    if (current.presentationReview == state.presentationReview &&
-                        current.paymentReview == state.paymentReview &&
-                        current.selectedPresentationCredentialOptions == state.selectedPresentationCredentialOptions &&
-                        current.selectedPresentationDisclosureOptions == state.selectedPresentationDisclosureOptions) {
-                        controller.submitPresentation()
-                    }
-                },
+                onSubmit = controller::submitPresentation,
                 onReject = controller::rejectPresentation,
                 onCancel = {
                     if (state.externalFlow != null) onDone()

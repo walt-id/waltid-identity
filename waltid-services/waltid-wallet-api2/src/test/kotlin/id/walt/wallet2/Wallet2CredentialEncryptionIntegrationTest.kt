@@ -27,7 +27,7 @@ import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
-import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.status.WalletCredentialResponse
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialResult
@@ -158,7 +158,7 @@ class Wallet2CredentialEncryptionIntegrationTest {
                     val credentialId = received.credentialIds.single()
                     val stored = http.get("/wallet/$walletId/credentials/$credentialId")
                         .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
-                        .body<StoredCredential>()
+                        .body<WalletCredentialResponse>()
 
                     assertEquals("Ada", stored.credential.credentialData.getValue("given_name").jsonPrimitive.content)
                     assertEquals(listOf("application/jwt"), wire.requestTypes.map { it.lowercase() }, "requests=$wire")

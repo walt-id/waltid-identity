@@ -2,6 +2,9 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.status.reviewGuard
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
@@ -110,6 +113,7 @@ internal class ProximityRequestProcessor(
         val submission: ProximitySubmission,
         val applicationProfiles: List<ApplicationProfileSnapshot>,
         val choiceDigest: ByteString,
+        val statusGuard: PresentationReviewGuard?,
     )
 
     private data class ReaderTrustKey(
@@ -181,9 +185,14 @@ internal class ProximityRequestProcessor(
         prompt: MdocConsentPrompt,
         reviewId: ProximityReviewId,
         submission: ProximitySubmission,
+        reviewedStatus: Map<String, String>? = null,
     ): ProximityError? {
         val owned = try { submission.snapshot() } catch (_: IllegalArgumentException) {
             return staleError("The proximity submission is invalid")
+        }
+        val statusGuard = reviewedStatus?.let { wallet.credentialStatuses().reviewGuard(owned.documents.mapTo(mutableSetOf()) { it.credentialId }, it) }
+        try { statusGuard?.check() } catch (_: CredentialStatusReviewChangedException) {
+            return approvalError("credential_status_review_changed", "Credential status changed. Review the updated information before sharing.")
         }
         return stateMutex.withLock {
             val snapshot = currentSnapshot
@@ -196,7 +205,7 @@ internal class ProximityRequestProcessor(
             if (approved != null) return@withLock staleError("The proximity review was already submitted")
             approved = Approved(
                 prompt.exchange, reviewId, owned, snapshot.applicationProfiles,
-                choiceDigest(reviewId, owned, snapshot.applicationProfiles),
+                choiceDigest(reviewId, owned, snapshot.applicationProfiles), statusGuard,
             )
             null
         }
@@ -250,7 +259,9 @@ internal class ProximityRequestProcessor(
             throw ProximityException(EngineProximityError.Security(error.code, error.message))
         }
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
+        retained.statusGuard?.check()
         val response = buildResponse(context, fresh, retained.submission, retained.applicationProfiles)
+        retained.statusGuard?.check()
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
         return MdocResponseResolution.Send(
             exactResponse = ByteString(

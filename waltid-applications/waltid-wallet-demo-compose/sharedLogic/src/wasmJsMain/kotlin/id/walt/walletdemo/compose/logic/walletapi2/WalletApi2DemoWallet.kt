@@ -1,5 +1,9 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.logic.WalletDemoStatusRefreshSummary
+import id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged
+import kotlinx.coroutines.isActive
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
@@ -26,6 +30,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 fun createWalletApi2DemoWallet(
     baseUrl: String,
@@ -53,6 +60,7 @@ internal class WalletApi2DemoWallet(
     private val issuanceSessions = mutableMapOf<String, Api2IssuanceSession>()
     private val processingIssuanceSessions = mutableSetOf<String>()
     private val presentationSessions = mutableMapOf<String, Api2PresentationSession>()
+    private var statuses = WalletApi2CredentialStatuses(client, walletId)
     private var activeOperations = 0
     private var resetStage: WalletResetStage? = null
     private var resetInProgress = false
@@ -75,6 +83,21 @@ internal class WalletApi2DemoWallet(
     override suspend fun signingProtectionAvailability(
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
+
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = flow {
+        while (currentCoroutineContext().isActive) {
+            emit(credentialStatusSnapshot())
+            delay(30_000)
+        }
+    }
+
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = useWallet {
+        statuses.snapshot()
+    }
+
+    override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = useWallet {
+        statuses.refresh(ids, force)
+    }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = useWallet {
         client.listCredentialMetadata(walletId).map { metadata ->
@@ -297,6 +320,51 @@ internal class WalletApi2DemoWallet(
         mapped
     }
 
+    override suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>,
+        did: String?,
+        paymentConsentRevision: String?,
+        statusReviewEpoch: Long?,
+    ): WalletDemoOperationResult = useWallet {
+        val statusSnapshot = statuses.submissionSnapshot(statusReviewEpoch)
+        val supported = statusSnapshot != null
+        if (supported && selectedCredentialOptions.any { reviewedStatus[it.credentialId].isNullOrBlank() }) throw WalletDemoStatusReviewChanged()
+        val review = reviewedStatus.takeIf { supported }
+        val session = presentationSessions[previewHandle.value]
+        val built = client.buildVpToken(
+            walletId,
+            BuildVpTokenRequestDto(
+                requestUrl = previewHandle.value,
+                selectedCredentialOptions = selectedCredentialOptions.map {
+                    CredentialSelectionDto(queryId = it.queryId, credentialId = it.credentialId)
+                },
+                selectedDisclosureOptions = selectedDisclosureOptions.toDisclosureSelectionDtos(),
+                keyId = session?.keyId ?: keyId,
+                did = did ?: this.did,
+            ),
+            reviewedStatus = review,
+            statusContext = statusSnapshot?.statusContext?.id,
+        )
+        val result = client.sendPresentationResponse(
+            walletId,
+            SendAuthorizationResponseRequestDto(
+                requestUrl = previewHandle.value,
+                vpToken = built.vpToken,
+                idToken = built.idToken,
+            ),
+            reviewedStatus = review, selectedIds = selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
+            statusContext = statusSnapshot?.statusContext?.id,
+        )
+        presentationSessions.remove(previewHandle.value)
+        result.toDemoOperationResult(
+            successMessage = WalletDisplayText.PresentationSent,
+            failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
+        )
+    }
+
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
@@ -382,6 +450,7 @@ internal class WalletApi2DemoWallet(
             }
             if (resetStage == WalletResetStage.CreateReplacement) {
                 walletId = client.createWallet()
+                statuses = WalletApi2CredentialStatuses(client, walletId)
                 resetStage = WalletResetStage.PublishReplacement
             }
             onWalletIdChanged(walletId)

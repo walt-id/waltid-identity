@@ -23,7 +23,7 @@ internal fun WalletAccessScaffold(
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .heightIn(min = maxHeight).wrapContentWidth(Alignment.CenterHorizontally)
-                .widthIn(max = 640.dp).padding(horizontal = 20.dp, vertical = 12.dp)) {
+                .widthIn(max = WalletContentMaxWidth).padding(horizontal = 20.dp, vertical = 12.dp)) {
                 header()
                 Column(Modifier.weight(1f).fillMaxWidth().heightIn(min = 168.dp),
                     verticalArrangement = Arrangement.Center) {

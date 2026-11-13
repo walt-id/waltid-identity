@@ -43,6 +43,7 @@ class WalletApi2SessionExpiryTest {
     fun unauthorizedResponsesExpireOnceAcrossAllRequestPaths() = runTest {
         val paths = listOf<suspend (WalletApi2Client) -> Unit>(
             { it.listWallets() },
+            { it.credentialStatusSnapshot("wallet") },
             { it.deleteCredential("wallet", "credential") },
             { it.receivePreAuthorized("wallet", "offer", null, null, "https://wallet.example", emptyList()) },
         )

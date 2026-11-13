@@ -1,81 +1,116 @@
 import SwiftUI
+import UIKit
+import WalletSDK
 
-/// Presentation actions, with transport-specific labels and accessibility identifiers when needed.
-public struct ReviewActions: View {
-    let selectionComplete: Bool
-    let isLoading: Bool
-    let onSubmit: () -> Void
-    let onReject: (() -> Void)?
-    let onCancel: () -> Void
-    let presentation: ReviewActionPresentation
-    let paymentReview: PaymentReviewState
-    let isPayment: Bool
-    let showCancelWithReject: Bool
-    @State private var pendingUnsignedRevision: String?
+/// Binding owned by the review host, including selection, payment, wallet and status revisions.
+public struct ReviewSubmissionBinding<Key: Equatable>: Equatable {
+    struct Revision: Equatable { let credentialID: String; let storeIndex: Int?; let revision: String? }
+    let review: Key
+    let context: AnyHashable?
+    let credentials: [Revision]
+    let paymentRevision: String?
+}
 
-    public init(
-        selectionComplete: Bool,
-        isLoading: Bool,
-        onSubmit: @escaping () -> Void,
-        onReject: (() -> Void)?,
-        onCancel: @escaping () -> Void,
-        presentation: ReviewActionPresentation = .sharing,
-        paymentReview: PaymentReviewState = .notRequired,
-        isPayment: Bool = false,
-        showCancelWithReject: Bool = true
-    ) {
-        self.selectionComplete = selectionComplete
-        self.isLoading = isLoading
-        self.onSubmit = onSubmit
-        self.onReject = onReject
-        self.onCancel = onCancel
-        self.presentation = presentation
-        self.paymentReview = paymentReview
-        self.isPayment = isPayment
-        self.showCancelWithReject = showCancelWithReject
+/// Actions shared by online, provider and nearby hosts, with one final warning gate.
+public struct ReviewActions<Key: Equatable>: View {
+    @Environment(\.credentialStatusUI) private var statusUI
+    @ObservedObject private var gate: ReviewSubmissionGate<ReviewSubmissionBinding<Key>>
+    private let reviewKey: Key
+    private let credentialStatuses: [ReviewCredentialStatus]
+    private let selectionComplete: Bool
+    private let isLoading: Bool
+    private let onSubmit: ([String: String]) -> Void
+    private let onReject: (() -> Void)?
+    private let onCancel: () -> Void
+    private let presentation: ReviewActionPresentation
+    private let paymentReview: PaymentReviewState
+    private let isPayment: Bool
+    private let showCancelWithReject: Bool
+    private let showCancel: Bool
+    private let submitTitleOverride: String?
+
+    public init(gate: ReviewSubmissionGate<ReviewSubmissionBinding<Key>>, selectionComplete: Bool, isLoading: Bool, reviewKey: Key,
+                credentialStatuses: [ReviewCredentialStatus], onSubmit: @escaping ([String: String]) -> Void,
+                onReject: (() -> Void)?, onCancel: @escaping () -> Void,
+                presentation: ReviewActionPresentation = .sharing, paymentReview: PaymentReviewState = .notRequired,
+                isPayment: Bool = false, showCancelWithReject: Bool = true, showCancel: Bool = true,
+                submitTitleOverride: String? = nil) {
+        self.gate = gate; self.selectionComplete = selectionComplete; self.isLoading = isLoading; self.reviewKey = reviewKey
+        self.credentialStatuses = credentialStatuses; self.onSubmit = onSubmit; self.onReject = onReject; self.onCancel = onCancel
+        self.presentation = presentation; self.paymentReview = paymentReview; self.isPayment = isPayment
+        self.showCancelWithReject = showCancelWithReject; self.showCancel = showCancel; self.submitTitleOverride = submitTitleOverride
     }
 
     public var body: some View {
-        let canSubmit = !isLoading && selectionComplete && paymentReview.canConfirm
-        let submitTitle = paymentReview.consent?.affirmativeAction
+        let revisions = statusUI.reviewedRevisions(for: credentialStatuses)
+        let canSubmit = !isLoading && selectionComplete && paymentReview.canConfirm && revisions != nil
+        let binding = ReviewSubmissionBinding(review: reviewKey, context: statusUI.contextKey,
+            credentials: credentialStatuses.map { ReviewSubmissionBinding<Key>.Revision(credentialID: $0.credentialID,
+                storeIndex: $0.storeIndex, revision: $0.presentation?.advisoryRevision) }.sorted { $0.credentialID < $1.credentialID },
+            paymentRevision: paymentReview.consent?.revision)
+        let ordinarySharing = presentation == .sharing && !isPayment && paymentReview.consent == nil
+        let submitTitle = submitTitleOverride ?? paymentReview.consent?.affirmativeAction
             ?? (isPayment ? String(localized: "Confirm payment", bundle: .module) : presentation.submitTitle)
+        let unsigned = paymentReview.consent?.requiresUnsignedRequestWarning == true
+        let adverse = credentialStatuses.filter { $0.presentation?.hasAdverseStatus == true }
+        let message = confirmationMessage(adverse: adverse, unsigned: unsigned)
         let cancel = WalletAction(
             (onReject == nil ? paymentReview.consent?.denialAction : nil) ?? presentation.cancelTitle
                 ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)),
-            enabled: !isLoading || presentation == .proximity, identifier: presentation.cancelAccessibilityIdentifier,
-            perform: onCancel
-        )
+            enabled: !isLoading || presentation == .proximity, identifier: presentation.cancelAccessibilityIdentifier, perform: onCancel)
         WalletActions(
-            primary: WalletAction(submitTitle,
-                enabled: canSubmit,
-                identifier: presentation.submitAccessibilityIdentifier, perform: {
-                    if let consent = paymentReview.consent, consent.requiresUnsignedRequestWarning {
-                        pendingUnsignedRevision = consent.revision
-                    } else { onSubmit() }
-                }),
-            secondary: onReject.map { reject in
-                WalletAction(paymentReview.consent?.denialAction
+                primary: WalletAction(submitTitle, enabled: canSubmit, identifier: presentation.submitAccessibilityIdentifier) {
+                    guard let revisions else { return }
+                    gate.begin(.init(key: binding, revisions: revisions, unsigned: unsigned, message: message,
+                        affirmative: ordinarySharing ? String(localized: "Share anyway", bundle: .module) : submitTitle, submit: onSubmit),
+                        needsConfirmation: unsigned || !adverse.isEmpty)
+                },
+                secondary: onReject.map { reject in WalletAction(paymentReview.consent?.denialAction
                     ?? (isPayment ? String(localized: "Decline payment", bundle: .module) : presentation.rejectTitle),
-                    enabled: !isLoading, identifier: presentation.rejectAccessibilityIdentifier, perform: reject)
-            } ?? cancel,
-            tertiary: onReject == nil || !showCancelWithReject ? nil : cancel
-        )
-        .alert(String(localized: "Unsigned payment request", bundle: .module), isPresented: Binding(
-            get: { pendingUnsignedRevision != nil },
-            set: { if !$0 { pendingUnsignedRevision = nil } }
-        ), presenting: pendingUnsignedRevision) { revision in
-            Button(submitTitle) {
-                guard canSubmit, revision == paymentReview.consent?.revision else { return }
-                pendingUnsignedRevision = nil
-                onSubmit()
-            }.accessibilityIdentifier("payment-unsigned-confirm")
-            Button(String(localized: "Back to review", bundle: .module), role: .cancel) {
-                pendingUnsignedRevision = nil
-            }.accessibilityIdentifier("payment-unsigned-back")
-        } message: { _ in
-            Text("This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?", bundle: .module)
+                    enabled: !isLoading, identifier: presentation.rejectAccessibilityIdentifier, perform: reject) }
+                    ?? (showCancel ? cancel : nil),
+                tertiary: onReject == nil || !showCancelWithReject || !showCancel ? nil : cancel)
+        .alert(gate.pending?.unsigned == true ? String(localized: "Unsigned payment request", bundle: .module)
+               : ordinarySharing ? String(localized: "Share with status issues?", bundle: .module)
+               : String(localized: "Credential status warning", bundle: .module),
+               isPresented: Binding(get: { gate.pending != nil }, set: { if !$0 { gate.dismiss() } }), presenting: gate.pending) { attempt in
+            Button(attempt.affirmative) { gate.confirm(attempt) }
+                .accessibilityIdentifier(attempt.unsigned ? "payment-unsigned-confirm" : "credential-status-confirm")
+            Button(String(localized: "Back to review", bundle: .module), role: .cancel) { gate.dismiss() }
+                .accessibilityIdentifier(attempt.unsigned ? "payment-unsigned-back" : "credential-status-back")
+        } message: { Text($0.message) }
+        .onAppear { gate.update(binding, enabled: canSubmit) }
+        .onChange(of: binding) { gate.update($0, enabled: canSubmit) }
+        .onChange(of: canSubmit) { gate.update(binding, enabled: $0) }
+        .onDisappear { gate.close() }
+    }
+
+    private func confirmationMessage(adverse: [ReviewCredentialStatus], unsigned: Bool) -> String {
+        var parts: [String] = []
+        if unsigned { parts.append(String(localized: "This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?", bundle: .module)) }
+        if adverse.count == 1, let value = adverse.first, let status = value.presentation {
+            let name = value.issuer.flatMap { $0.isEmpty ? nil : "\(value.title) (\($0))" } ?? value.title
+            parts.append(String(localized: "\(name): \(status.statusTitle.lowercased()). The recipient may reject it.", bundle: .module))
+        } else if adverse.count > 1 {
+            parts.append(String(localized: "\(adverse.count) selected credentials have adverse status. The recipient may reject them.", bundle: .module))
         }
-        .onChange(of: paymentReview.consent?.revision) { _ in pendingUnsignedRevision = nil }
-        .onChange(of: canSubmit) { if !$0 { pendingUnsignedRevision = nil } }
+        return parts.joined(separator: "\n\n")
+    }
+}
+
+/// Place in scrollable review content, independently of the pinned action bar.
+public struct ReviewChangedNotice<Key: Equatable>: View {
+    @ObservedObject private var gate: ReviewSubmissionGate<Key>
+    public init(_ gate: ReviewSubmissionGate<Key>) { self.gate = gate }
+    public var body: some View {
+        Group {
+            if gate.changed {
+                Text("The review changed. Check the updated information before continuing.", bundle: .module)
+                    .font(.footnote).accessibilityIdentifier("credential-status-review-changed")
+            }
+        }.onChange(of: gate.changed) { changed in
+            if changed { UIAccessibility.post(notification: .announcement,
+                argument: String(localized: "The review changed. Check the updated information before continuing.", bundle: .module)) }
+        }
     }
 }

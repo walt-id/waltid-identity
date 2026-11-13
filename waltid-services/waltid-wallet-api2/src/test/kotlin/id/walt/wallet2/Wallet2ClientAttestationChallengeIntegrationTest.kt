@@ -26,7 +26,7 @@ import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerif
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import id.walt.wallet2.server.handlers.CreateWalletRequest
@@ -201,7 +201,7 @@ class Wallet2ClientAttestationChallengeIntegrationTest {
                             assertEquals(1, received.credentialIds.size)
                             receivedIds.addAll(received.credentialIds)
                             assertEquals(receivedIds, http.get("$path/credentials")
-                                .body<List<StoredCredentialMetadata>>().map { it.id }.toSet())
+                                .body<List<WalletCredentialMetadataResponse>>().map { it.id }.toSet())
                             val exchanges = gateway.exchanges.drop(before)
                             val challengeCalls = exchanges.filter { it.path.endsWith("/challenge") }
                             assertEquals(if (responseOnly) 0 else 1, challengeCalls.size)

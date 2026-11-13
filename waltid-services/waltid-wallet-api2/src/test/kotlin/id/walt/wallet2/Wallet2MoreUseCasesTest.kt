@@ -53,7 +53,8 @@ import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierApi
 import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialResponse
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
@@ -342,17 +343,17 @@ class Wallet2MoreUseCasesTest {
 
                 // ── Both credentials are in the wallet ──
                 testAndReturn("Wallet contains 2 credentials of different formats") {
-                    val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                    val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(2, creds.size, "Expected 2 credentials, got ${creds.size}")
                 }
 
                 // ── GET /credentials/{id} returns full raw data ──
-                val credList = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                val credList = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                 val credId = credList.first().id
-                testAndReturn("GET /credentials/{id} returns full StoredCredential with raw data") {
+                testAndReturn("GET /credentials/{id} returns a status-aware credential response with raw data") {
                     val full = http.get("/wallet/$walletId/credentials/$credId")
                         .also { assertEquals(HttpStatusCode.OK, it.status) }
-                        .body<StoredCredential>()
+                        .body<WalletCredentialResponse>()
                     assertEquals(credId, full.id)
                     assertNotNull(full.credential, "Full credential data must be present")
                 }
@@ -522,7 +523,7 @@ class Wallet2MoreUseCasesTest {
                 // Step 4: credential now in wallet
                 testAndReturn("Deferred credential stored in wallet after polling") {
                     val creds = http.get("/wallet/$walletId/credentials")
-                        .body<List<id.walt.wallet2.data.StoredCredentialMetadata>>()
+                        .body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(1, creds.size, "Wallet must contain the deferred credential after poll")
                 }
             }
@@ -652,7 +653,7 @@ class Wallet2MoreUseCasesTest {
 
                 // Credential is in the wallet
                 testAndReturn("Credential stored after JWK-binding receive") {
-                    val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                    val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                     assertEquals(1, creds.size)
                 }
             }
@@ -706,12 +707,12 @@ class Wallet2MoreUseCasesTest {
                         CredentialOffer.withPreAuthorizedCodeGrant(issuerBase, listOf(credConfigId), preAuthCode)
                     ).jsonObject))
                 }
-                val storedCreds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                val storedCreds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                 assertEquals(1, storedCreds.size)
 
-                // Get full StoredCredential (includes raw credential data) for isolated VP
+                // Read the credential response, then supply only stored credential fields for isolated VP
                 val fullCred = http.get("/wallet/$walletId/credentials/${storedCreds.first().id}")
-                    .body<StoredCredential>()
+                    .body<WalletCredentialResponse>()
 
                 // Create verifier session
                 val verifierSession = http.post("/verification-session/create") {
@@ -730,7 +731,14 @@ class Wallet2MoreUseCasesTest {
                         contentType(ContentType.Application.Json)
                         setBody(PresentCredentialIsolatedRequest(
                             requestUrl = bootstrapUrl,
-                            credentials = listOf(fullCred),
+                            credentials = listOf(StoredCredential(
+                                id = fullCred.id,
+                                credential = fullCred.credential,
+                                label = fullCred.label,
+                                addedAt = fullCred.addedAt,
+                                metadata = fullCred.metadata,
+                                holderKeyBinding = fullCred.holderKeyBinding,
+                            )),
                             did = holderDid
                         ))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }

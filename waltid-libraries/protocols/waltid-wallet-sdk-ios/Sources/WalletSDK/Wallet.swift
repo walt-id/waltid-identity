@@ -44,6 +44,29 @@ public actor Wallet {
         bridge.events
     }
 
+    /// Initial and current credential-status snapshots, with a single buffered latest value.
+    ///
+    /// Observation performs no issuer requests. Cancelling iteration releases the native collector.
+    public var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { bridge.credentialStatuses }
+
+    /// Reads local status without rebuilding credential artwork or requesting issuer data.
+    public func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot { try await bridge.credentialStatusSnapshot() }
+
+    /// Explicitly checks wallet-owned credentials; omitted IDs select all stored credentials.
+    ///
+    /// Force requires network revalidation. Per-credential failures and deferred work are returned
+    /// without discarding other results; the status stream also updates as work completes.
+    /// - Parameters:
+    ///   - ids: Stored credential IDs to check, or nil to select all stored credentials.
+    ///   - force: Whether to require network revalidation instead of reusing fresh evidence.
+    /// - Returns: Independent per-credential outcomes, including deferred or failed checks.
+    public func refreshCredentialStatuses(ids: [String]? = nil, force: Bool = false) async throws -> [CredentialStatusRefreshResult] {
+        try await bridge.refreshCredentialStatuses(ids: ids, force: force)
+    }
+
+    /// Closes this instance and its status work while preserving persisted wallet data.
+    public func close() async throws { try await bridge.close() }
+
     /// Checks whether a key-use authorization request is supported without creating a key.
     ///
     /// - Parameters:
@@ -241,6 +264,43 @@ public actor Wallet {
     /// Submits a presentation with user-selected credential options.
     ///
     /// - Parameters:
+    ///   - reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
+    ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
+    ///   - selectedCredentialOptions: Credential options selected from
+    ///     ``previewPresentation(request:)``.
+    ///   - selectedDisclosureOptions: Optional selectively disclosable claims
+    ///     selected from ``previewPresentation(request:)``. Passing `nil`
+    ///     preserves the wallet core's default request-matched disclosure set.
+    ///   - did: Optional wallet DID to use for presentation.
+    ///   - runPolicies: Optional policy execution override for presentation.
+    ///   - paymentConsentRevision: Revision returned by payment preparation and explicitly reviewed by the user.
+    /// - Returns: Presentation outcome.
+    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
+    /// Submits the selected credentials using the exact semantic status warnings rendered by the host.
+    /// Throws `WalletError.credentialStatusReviewChanged` if those warnings change during authorization.
+    public func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        reviewedStatus: [String: String],
+        did: String? = nil,
+        runPolicies: Bool? = nil,
+        paymentConsentRevision: String? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.submitStatusReviewedPresentation(
+            previewHandle: previewHandle,
+            selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions,
+            reviewedStatus: reviewedStatus,
+            did: did,
+            runPolicies: runPolicies,
+            paymentConsentRevision: paymentConsentRevision
+        )
+    }
+
+    /// Submits a presentation with user-selected credential options.
+    ///
+    /// - Parameters:
     ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
     ///   - selectedCredentialOptions: Credential options selected from
     ///     ``previewPresentation(request:)``.
@@ -348,6 +408,34 @@ public actor Wallet {
             parsedRequest: parsedRequest,
             verifiedOrigin: verifiedOrigin,
             selectedRegistryEntryIDs: selectedRegistryEntryIDs
+        )
+    }
+
+    /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    ///
+    /// - Parameters:
+    ///   - reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
+    ///   - requestID: Handle returned by ``previewAnnexCPresentation(parsedRequest:verifiedOrigin:selectedRegistryEntryIDs:)``.
+    ///   - verifiedOrigin: Platform-verified origin bound to the preview.
+    ///   - deviceRequestBase64URL: Raw post-consent device request.
+    ///   - encryptionInfoBase64URL: Raw post-consent encryption information.
+    ///   - selectedCredentialOptions: User-approved credentials, one per requested document.
+    /// Submits an Annex C response only while the selected cached status warnings remain as reviewed.
+    public func submitStatusReviewedAnnexCPresentation(
+        reviewedStatus: [String: String],
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        try await bridge.submitStatusReviewedAnnexCPresentation(
+            reviewedStatus: reviewedStatus,
+            requestID: requestID,
+            verifiedOrigin: verifiedOrigin,
+            deviceRequestBase64URL: deviceRequestBase64URL,
+            encryptionInfoBase64URL: encryptionInfoBase64URL,
+            selectedCredentialOptions: selectedCredentialOptions
         )
     }
 

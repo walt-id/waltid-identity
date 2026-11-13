@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
+import id.walt.walletdemo.compose.logic.displayStatus
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +33,7 @@ internal fun CredentialCardStack(
     expandedId: String? = null,
 ) {
     if (cards.isEmpty()) return
+    val statuses = LocalCredentialStatusUi.current.snapshot
     val othersVisibility = remember { Animatable(1f) }
     val selectedProgress = remember { Animatable(0f) }
     var displayedExpandedId by remember { mutableStateOf(expandedId) }
@@ -89,6 +92,7 @@ internal fun CredentialCardStack(
                     CredentialCardArt(
                         art = remember(item) { item.toCardArt() },
                         modifier = Modifier.fillMaxWidth(),
+                        statusDecoration = statuses.displayStatus(id),
                         onClick = if (interactive) ({ onOpenDetails(id) }) else null,
                     )
                 }

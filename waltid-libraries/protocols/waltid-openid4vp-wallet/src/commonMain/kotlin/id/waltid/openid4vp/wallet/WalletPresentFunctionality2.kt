@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet
 
+import id.waltid.openid4vp.wallet.presentation.requireCurrentPresentationReview
 import id.walt.crypto2.keys.Signer
 import id.walt.verifier.openid.transactiondata.parseTs12PaymentEntries
 import kotlin.time.TimeSource
@@ -109,6 +110,7 @@ object WalletPresentFunctionality2 {
         credentialHolderKeyResolver: CredentialPresentationKeyResolver? = null,
         clock: Clock = Clock.System,
     ): String {
+        requireCurrentPresentationReview()
         val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
         // OID4VP 1.0 Appendix A: DC API holder binding is to the platform-asserted origin.
@@ -776,6 +778,7 @@ object WalletPresentFunctionality2 {
         scaAuthorizer: ScaPresentationAuthorizer?,
         credentialHolderKeyResolver: CredentialPresentationKeyResolver?,
     ): Result<DcApiCredentialResponse> = runCatching {
+        requireCurrentPresentationReview()
         val authorizationRequest = request.authorizationRequest
         validateRequestTransactionData(
             transactionData = authorizationRequest.transactionData,
@@ -803,7 +806,9 @@ object WalletPresentFunctionality2 {
             holderBindingAudience = request.holderBindingAudience,
         )
         if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
+        requireCurrentPresentationReview()
         DcApiWallet.buildResponse(request, vpToken, idToken).also {
+            requireCurrentPresentationReview()
             if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
         }
     }
@@ -906,6 +911,7 @@ object WalletPresentFunctionality2 {
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
                 requireCurrentPayment()
+                requireCurrentPresentationReview()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -930,6 +936,7 @@ object WalletPresentFunctionality2 {
                 )
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
                 requireCurrentPayment()
+                requireCurrentPresentationReview()
                 postFormResponse(responseUri, parameters)
             }
 
@@ -1418,6 +1425,7 @@ object WalletPresentFunctionality2 {
             }
         }
 
+        requireCurrentPresentationReview()
         val credentialCount = distinctCredentialCount(credentials)
         if (credentialCount > 0) beforeCredentialsUsed(credentialCount)
 
@@ -1450,6 +1458,8 @@ object WalletPresentFunctionality2 {
             buildIdToken(authorizationRequest, requireNotNull(holderKey), holderDid)
         }
 
+        // A native authorization prompt may have outlived the rendered status warning.
+        requireCurrentPresentationReview()
         // Step 4: Send response.
         if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
         val afterVpToken = walletPhaseStart.elapsedNow()
@@ -1605,6 +1615,7 @@ object WalletPresentFunctionality2 {
             )
         }
         suspend fun signProof(authentication: ScaAuthenticationMethods?, signer: Signer?): String {
+            requireCurrentPresentationReview()
             currentCoroutineContext().ensureActive()
             payments.forEach { it.requireCurrent(paymentClock.now()) }
             val kbJwtPayload = buildJsonObject {
@@ -1646,6 +1657,7 @@ object WalletPresentFunctionality2 {
             // A native signer may finish after cancellation without observing the coroutine's Job.
             if (scaContext != null) currentCoroutineContext().ensureActive()
             payments.forEach { it.requireCurrent(paymentClock.now()) }
+            requireCurrentPresentationReview()
             return proof
         }
         return if (presentation != null && crypto2Key != null) {

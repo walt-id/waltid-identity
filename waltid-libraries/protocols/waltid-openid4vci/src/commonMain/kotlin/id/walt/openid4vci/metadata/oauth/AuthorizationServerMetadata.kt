@@ -50,6 +50,7 @@ data class AuthorizationServerMetadata(
     val registrationEndpoint: String? = null,
     @SerialName("scopes_supported")
     val scopesSupported: Set<String>? = null,
+    /** Empty denotes omission by a pre-authorized-only issuer under OID4VCI 1.0 section 12.2.4. */
     @SerialName("response_types_supported")
     val responseTypesSupported: Set<String>,
     @SerialName("response_modes_supported")
@@ -116,8 +117,8 @@ data class AuthorizationServerMetadata(
         // RFC 8414 §2: issuer must be a valid URL without query/fragment.
         validateIssuerUrl(issuer)
 
-        // RFC 8414 §2: response_types_supported is REQUIRED.
-        require(responseTypesSupported.isNotEmpty()) {
+        // OID4VCI 1.0 §12.2.4 permits omission only for the sole pre-authorized grant.
+        require(responseTypesSupported.isNotEmpty() || grantTypesSupported == setOf(GrantType.PreAuthorizedCode.value)) {
             "Authorization server response_types_supported is required"
         }
         require(responseTypesSupported.none { it.isBlank() }) {
@@ -320,7 +321,8 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             value.authorizationEndpoint?.let { put("authorization_endpoint", JsonPrimitive(it)) }
             value.tokenEndpoint?.let { put("token_endpoint", JsonPrimitive(it)) }
             value.jwksUri?.let { put("jwks_uri", JsonPrimitive(it)) }
-            put("response_types_supported", value.responseTypesSupported.toJsonArray())
+            value.responseTypesSupported.takeIf { it.isNotEmpty() }
+                ?.let { put("response_types_supported", it.toJsonArray()) }
             value.responseModesSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("response_modes_supported", it.toJsonArray()) }
             value.tokenEndpointAuthMethodsSupported?.takeIf { it.isNotEmpty() }
@@ -391,8 +393,13 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
         val jsonDecoder = decoder as? JsonDecoder
             ?: error("AuthorizationServerMetadataSerializer only supports JSON")
         val element = jsonDecoder.decodeJsonElement().jsonObject
+        val grantTypes = element.stringSet("grant_types_supported")
         val responseTypes = element.stringSet("response_types_supported")
-            ?: error("Authorization server response_types_supported is required")
+            ?: if ("response_types_supported" !in element && grantTypes == setOf(GrantType.PreAuthorizedCode.value)) emptySet()
+            else error("Authorization server response_types_supported is required")
+        require("response_types_supported" !in element || responseTypes.isNotEmpty()) {
+            "Authorization server response_types_supported must not be empty"
+        }
         val customParameters = element.filterKeys { it !in knownKeys }.takeIf { it.isNotEmpty() }
         return AuthorizationServerMetadata(
             issuer = element.string("issuer") ?: error("Authorization server issuer is required"),
@@ -404,7 +411,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             scopesSupported = element.stringSet("scopes_supported"),
             responseTypesSupported = responseTypes,
             responseModesSupported = element.stringSet("response_modes_supported"),
-            grantTypesSupported = element.stringSet("grant_types_supported"),
+            grantTypesSupported = grantTypes,
             tokenEndpointAuthMethodsSupported = element.stringSet("token_endpoint_auth_methods_supported"),
             tokenEndpointAuthSigningAlgValuesSupported =
                 element.stringSet("token_endpoint_auth_signing_alg_values_supported"),

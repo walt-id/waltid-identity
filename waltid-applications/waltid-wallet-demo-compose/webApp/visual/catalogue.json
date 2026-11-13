@@ -1,14 +1,183 @@
 {
-  "requirements": ["Account form feedback and available actions", "Compact and wide layouts"],
+  "requirements": [
+    "Account form feedback and available actions",
+    "Compact and centered wide wallet layouts",
+    "Shared status facts, scoped refresh, reviewed consent and passive help"
+  ],
   "environment": "Playwright 1.62.0 / Chromium 151.0.7922.34 / Ubuntu 24.04 x86_64 / en-US / UTC / scale 1 / light",
   "states": [
-    { "id": "account.empty.compact", "state": "empty", "width": 393, "height": 852 },
-    { "id": "account.empty.wide", "state": "empty", "width": 1280, "height": 800 },
-    { "id": "account.busy.wide", "state": "busy", "width": 1280, "height": 800 },
-    { "id": "account.invalid.compact", "state": "invalid", "width": 393, "height": 852 },
-    { "id": "account.registered.wide", "state": "registered", "width": 1280, "height": 800 },
-    { "id": "account.expired.compact", "state": "expired", "width": 393, "height": 852 },
-    { "id": "credential.dates.compact", "state": "credential-dates", "width": 393, "height": 852, "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Localized credential timestamps, DST overlap, exact fractions and calendar dates"] },
-    { "id": "credential.dates.wide", "state": "credential-dates", "width": 1280, "height": 900, "locale": "en-GB", "timezoneId": "Europe/Budapest", "requirements": ["Localized credential timestamps, DST overlap, exact fractions and calendar dates"] }
+    {
+      "id": "account.empty.compact",
+      "state": "empty",
+      "width": 393,
+      "height": 852
+    },
+    {
+      "id": "account.empty.wide",
+      "state": "empty",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "id": "account.busy.wide",
+      "state": "busy",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "id": "account.invalid.compact",
+      "state": "invalid",
+      "width": 393,
+      "height": 852
+    },
+    {
+      "id": "account.registered.wide",
+      "state": "registered",
+      "width": 1280,
+      "height": 800
+    },
+    {
+      "id": "account.expired.compact",
+      "state": "expired",
+      "width": 393,
+      "height": 852
+    },
+    {
+      "id": "credential.dates.compact",
+      "state": "credential-dates",
+      "width": 393,
+      "height": 852,
+      "locale": "en-GB",
+      "timezoneId": "Europe/Budapest",
+      "requirements": [
+        "Localized credential timestamps, DST overlap, exact fractions and calendar dates"
+      ]
+    },
+    {
+      "id": "credential.dates.wide",
+      "state": "credential-dates",
+      "width": 1280,
+      "height": 900,
+      "locale": "en-GB",
+      "timezoneId": "Europe/Budapest",
+      "requirements": [
+        "Localized credential timestamps, DST overlap, exact fractions and calendar dates"
+      ]
+    },
+    {
+      "id": "credential.status.adverse.wide",
+      "state": "status-supported",
+      "width": 1280,
+      "height": 1000,
+      "locale": "en-GB",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Server-local status snapshot, explicit stored-record refresh and partial adverse details"
+      ]
+    },
+    {
+      "id": "credential.status.unsupported.compact",
+      "state": "status-unsupported",
+      "width": 393,
+      "height": 1000,
+      "locale": "en-GB",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Older-server fallback without unsupported refresh requests"
+      ]
+    },
+    {
+      "id": "wallet.status.home.compact",
+      "state": "home",
+      "width": 393,
+      "height": 852,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Mixed unchanged public artwork and constructed cards, with chip/no-chip and quiet/warning/revoked cases",
+        "Consistent physical-right badge anchor and optical triangle centering"
+      ]
+    },
+    {
+      "id": "wallet.status.home.wide",
+      "state": "home",
+      "width": 1280,
+      "height": 900,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Centered bounded credential column and unchanged stack peek",
+        "Same badge placement for both artwork modes"
+      ]
+    },
+    {
+      "id": "credential.status.clear.compact",
+      "state": "status-clear",
+      "width": 393,
+      "height": 852,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Status clear, checked scope and original check time without redundant expansion",
+        "Shared date formatting and secondary timestamp hierarchy"
+      ]
+    },
+    {
+      "id": "wallet.status.sharing.wide",
+      "state": "sharing",
+      "width": 1280,
+      "height": 900,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Two selected credentials with compact attached status rows and the ordinary action footer"
+      ]
+    },
+    {
+      "id": "wallet.status.sharing.expanded.compact",
+      "state": "sharing-expanded",
+      "width": 393,
+      "height": 1000,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Inline sharing facts and explicit refresh, preserving selection and performing no check on expansion"
+      ]
+    },
+    {
+      "id": "wallet.status.sharing.confirmation.compact",
+      "state": "sharing-confirmation",
+      "width": 393,
+      "height": 852,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Selected adverse credential requires deliberate confirmation with Back to review and Share anyway"
+      ]
+    },
+    {
+      "id": "wallet.status.settings.help.wide",
+      "state": "settings-help",
+      "width": 1280,
+      "height": 900,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Trailing manual-check accessory, structured counts and expanded four-point help",
+        "Signed-in wording, passive disclosure and keyboard activation"
+      ]
+    },
+    {
+      "id": "wallet.status.sharing.transaction.wide",
+      "state": "sharing-transaction",
+      "width": 1280,
+      "height": 1100,
+      "locale": "en-US",
+      "timezoneId": "UTC",
+      "requirements": [
+        "Supported generic transaction metadata remains readable alongside selected credential status",
+        "Ordinary sharing action and no implied native prepared-payment support"
+      ]
+    }
   ]
 }

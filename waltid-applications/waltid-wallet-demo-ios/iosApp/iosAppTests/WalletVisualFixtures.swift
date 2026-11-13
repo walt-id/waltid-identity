@@ -7,7 +7,7 @@ import XCTest
 /// Shared, non-personal input also consumed by Compose Android and Compose iOS.
 struct WalletVisualFixtures {
     private let root: [String: Any]
-    private let resourceDirectory: URL
+    let resourceDirectory: URL
 
     init() throws {
         let applications = URL(fileURLWithPath: #filePath)
@@ -17,6 +17,24 @@ struct WalletVisualFixtures {
         let url = resourceDirectory.appendingPathComponent("wallet-visual-data.json")
         root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         XCTAssertEqual(root["schemaVersion"] as? Int, 1)
+    }
+
+    func credentialStatus(_ name: String) throws -> CredentialStatus {
+        let data = try Data(contentsOf: resourceDirectory.appendingPathComponent("credential-status.json"))
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let values = try XCTUnwrap(root["values"] as? [String: Any])
+        let encoded = try JSONSerialization.data(withJSONObject: XCTUnwrap(values[name]))
+        return try decodeCredentialStatus(CredentialStatus.self, json: XCTUnwrap(String(data: encoded, encoding: .utf8)))
+    }
+
+    func noReferenceStatusContext() throws -> CredentialStatusUIContext {
+        var ids = [try text(object(root, "credential"), "id"), try nearbyCredential().id]
+        for group in ["sharing", "sharingInformation", "sharingDates"] {
+            ids += try array(object(root, group), "credentials").map { try text($0, "credentialId") }
+        }
+        let status = try credentialStatus("not_provided")
+        return CredentialStatusUIContext(values: Dictionary(uniqueKeysWithValues: Set(ids).map { ($0, status) }),
+            storeIndices: Dictionary(uniqueKeysWithValues: Set(ids).map { ($0, 0) }))
     }
 
     func readerTrustImport() throws -> ProximityReaderTrustImportPreview {

@@ -32,6 +32,15 @@ generated bridge symbols behind the package implementation.
 - Local binary dependency: `WalletCore.xcframework`
 - Current delivery mode: local package plus locally assembled XCFramework
 
+## Credential status
+
+Read `credentialStatusSnapshot()` or observe `credentialStatuses` without issuer networking.
+`refreshCredentialStatuses(ids:force:)` explicitly checks stored credentials; your app owns
+foreground/manual triggers and preferences. Cancel stream tasks with their UI owner and call
+`close()` to release the instance without deleting wallet data. See the
+[credential-status guide](Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md) for semantics,
+reviewed sharing, persistence and lifecycle examples.
+
 ## Local Build
 
 Generate the KMP core XCFramework before building an iOS consumer:

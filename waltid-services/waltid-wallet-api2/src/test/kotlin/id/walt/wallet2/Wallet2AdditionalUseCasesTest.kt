@@ -52,7 +52,7 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierApi
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.*
@@ -280,11 +280,11 @@ class Wallet2AdditionalUseCasesTest {
 
             // Both wallets should see the credential (shared store)
             testAndReturn("Wallet-1 sees the credential") {
-                val creds = http.get("/wallet/$wallet1Id/credentials").body<List<StoredCredentialMetadata>>()
+                val creds = http.get("/wallet/$wallet1Id/credentials").body<List<WalletCredentialMetadataResponse>>()
                 assertTrue(creds.isNotEmpty(), "Wallet-1 should see the imported credential")
             }
             testAndReturn("Wallet-2 sees the same credential (shared store)") {
-                val creds = http.get("/wallet/$wallet2Id/credentials").body<List<StoredCredentialMetadata>>()
+                val creds = http.get("/wallet/$wallet2Id/credentials").body<List<WalletCredentialMetadataResponse>>()
                 assertTrue(
                     creds.isNotEmpty(),
                     "Wallet-2 should see credential imported via wallet-1 (shared store)"
@@ -523,7 +523,7 @@ class Wallet2AdditionalUseCasesTest {
                     setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(offer).jsonObject))
                 }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
 
-                val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
+                val creds = http.get("/wallet/$walletId/credentials").body<List<WalletCredentialMetadataResponse>>()
                 assertEquals(1, creds.size, "Should have 1 credential after receive")
                 val credId = creds.first().id
 

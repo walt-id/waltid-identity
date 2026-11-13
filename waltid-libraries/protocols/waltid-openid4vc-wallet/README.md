@@ -239,6 +239,42 @@ data class StoredCredential(
 )
 ```
 
+## Credential status
+
+`readCredentialsWithStatus()` and `readCredentialWithStatus(id)` return composed reads without
+changing stored credential constructors. `credentialStatuses().snapshot()` and `.observe()` expose
+local, deadline-aware status-only state. Reads and observation perform no issuer requests.
+Explicit `.refresh(references, mode)` uses stored, store-scoped references and returns partial
+per-credential outcomes. Use `IF_DUE` for an app-owned foreground check and `FORCE` for manual
+revalidation. The service owns cancellation, coalescing and conditional snapshot commits, not scheduling.
+
+Managed stores persist minimal metadata under the signed-credential fingerprint and trust-policy
+identity. Custom stores can implement `CredentialStatusSnapshotStore` without changing the base store
+interface. Unknown or changed trust-policy identities restore historical evidence as stale.
+Configure `WalletCredentialStatusService` with explicit limits/reference/signer authorization and a
+stable `trustPolicyId`, then `attachCredentialStatusService` before first status access when embedding
+custom policy. Closing the service releases work; `closeCredentialStatusService()` does not initialize
+an unused service or delete wallet data.
+
+Long-lived services reconcile changed managed evidence on local reads and guard checks. Retained
+no-store observations keep their storage restriction after failed or conflicting refreshes; a new
+cacheable observation can replace that evidence. Request-scoped hosts can use `captureReviewState()`
+and `restoreReviewState()` with a stable, non-null `trustPolicyId` to retain detached evidence for an
+explicit bounded review. Bind that opaque, non-serializable state to the same authorized tenant,
+wallet lifecycle and store configuration. It contains no service, credential store or list body;
+restore checks signed-byte identity and reconciles current managed evidence without issuer I/O.
+This is transient host state, not a persistence format. The [HTTP adapter](../waltid-openid4vc-wallet-server/README.md#credential-status)
+provides bounded, expiring browser contexts instead of retaining an authorized service.
+
+Shared presentation semantics distinguish clear, adverse, stale, partial, unchecked, unsupported and
+unavailable. Domain reads derive presentation from evidence and evaluation time; HTTP responses use
+the separate presentation DTO and `WalletCredentialStatusSnapshotResponse`. Decoded transport values
+never override local service assessment. They do not replace verifier acceptance. Status-reviewed submission paths compare
+only the selected credentials' displayed semantic revisions before signing and delivery; existing
+public submission paths retain their behavior. Capture the request, selection and displayed revisions
+when starting a UI confirmation; do not rebuild an acknowledgement at its final button. See the [status module](../../credentials/waltid-credential-status/README.md)
+for supported profiles, trust, network bounds, no-store and batch-session rules.
+
 ## Session Events
 
 Both handlers emit events for progress tracking:

@@ -61,7 +61,7 @@ struct HomeView: View {
                 .walletSheetSizing()
         }
         .fullScreenCover(isPresented: $showingSettings, onDismiss: { dismissingSettings = false }) {
-            NavigationView {
+            WalletNavigationContainer {
                 SettingsView(viewModel: viewModel)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
@@ -71,7 +71,7 @@ struct HomeView: View {
                             .accessibilityIdentifier("wallet.settingsBack")
                         }
                     }
-            }.navigationViewStyle(.stack)
+            }
         }
         .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false; showingScanner = false } }
         .onChange(of: NearbySheetSessionState(active: proximity.active, entryReady: proximity.hasEntryContent,
@@ -87,6 +87,23 @@ struct HomeView: View {
             let cards = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
             guard !Task.isCancelled else { return }
             credentialCards = cards
+        }
+        .environment(\.credentialStatusUI, viewModel.credentialStatusUIContext)
+        .onReceive(viewModel.proximityPresentation.$active) { active in
+            if !active { Task { @MainActor in viewModel.presentDeferredCredentialStatusNotice() } }
+        }
+        .overlay(alignment: .bottom) {
+            if let notice = viewModel.credentialStatusNotice, viewModel.presentationReview == nil {
+                HStack {
+                    Text(notice).font(.footnote)
+                    Button(String(localized: "Dismiss")) { viewModel.credentialStatusNotice = nil }
+                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
+                    .accessibilityIdentifier("credential-status-notice")
+                    .task(id: notice) {
+                        do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return }
+                        if viewModel.credentialStatusNotice == notice { viewModel.credentialStatusNotice = nil }
+                    }
+            }
         }
     }
 

@@ -118,7 +118,7 @@ public struct OfferedCredentialRow: View {
             if showsLabel { toggle }
             else { toggle.labelsHidden().fixedSize() }
         } else {
-            Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint).accessibilityHidden(true)
         }
     }
 

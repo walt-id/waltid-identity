@@ -38,6 +38,7 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.*
+import kotlinx.coroutines.withContext
 
 /** Independent Nimbus signature/decryption checks. All authentication in these tests is simulated. */
 class ScaPresentationInteropTest {
@@ -55,6 +56,27 @@ class ScaPresentationInteropTest {
         "sca-user" to mapOf("masked_psu_id" to "user***"),
         "sca-card-dpc" to mapOf("credential_id" to "synthetic-card", "network" to "synthetic", "card_id" to "card***"),
     )
+
+    @Test
+    fun `changed host review after authorization prevents proof signing`() = runTest {
+        val fixture = fixture("sca-iban", OpenID4VPResponseMode.DIRECT_POST)
+        var current = true
+        var signatures = 0
+        val authorizer = object : ScaPresentationAuthorizer {
+            override suspend fun authorize(presentation: ScaPresentation) = factors
+            override suspend fun withAuthorizedSigner(
+                presentation: ScaPresentation, signer: Signer,
+                operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+            ): String {
+                current = false // Simulated native prompt completed after the warning changed.
+                return operation(factors, Signer { bytes, algorithm -> signatures++; signer.sign(bytes, algorithm) })
+            }
+        }
+        assertFailsWith<IllegalStateException> {
+            withContext(PresentationReviewGuard { check(current) { "Review changed" } }) { present(fixture, authorizer) }
+        }
+        assertEquals(0, signatures)
+    }
 
     @Test
     fun `three payment credentials bind all four response modes and decrypt independently`() = runTest {

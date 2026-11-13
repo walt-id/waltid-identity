@@ -3,12 +3,46 @@ import XCTest
 
 @MainActor
 final class MockWalletUITests: XCTestCase {
+    func testCredentialStatusSettingsToggleAndBatchReport() async {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        await runCredentialStatusSettingsReview(app, capturePrefix: "native-ios-mock")
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
     }
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
+
+    func testStatusWarningInTheOnlineHostReturnsToReviewAndConfirms() {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current", "E2E_MOCK_PAYMENT": "none"])
+        ui.openDeepLink("openid4vp://mock")
+        let share = app.buttons["wallet.presentationSubmitButton"]
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        XCTAssertEqual(share.label, "Share")
+        XCTAssertTrue(app.staticTexts["Revoked"].exists)
+        XCTAssertFalse(app.buttons["credential-status-confirm"].exists)
+        share.tap()
+        let alert = app.alerts["Share with status issues?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Example Credential")).firstMatch.exists)
+        alert.buttons["credential-status-back"].firstMatch.tap()
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["wallet.presentationResult"].exists)
+        share.tap()
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertEqual(alert.buttons["credential-status-confirm"].firstMatch.label, "Share anyway")
+        alert.buttons["credential-status-confirm"].firstMatch.tap()
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Presentation sent", "Present failed"], timeout: 10), "Presentation sent")
+    }
 
     func testDuplicateExternalOfferKeepsItsSheetAndTransactionCode() throws {
         guard #available(iOS 16.4, *) else { throw XCTSkip("Opening a URL through XCTest requires iOS 16.4") }
@@ -96,8 +130,9 @@ final class MockWalletUITests: XCTestCase {
     func testUnsignedPaymentShowsLocalizedFieldsAndRequiresSeparateConfirmation() {
         continueAfterFailure = false
         let app = XCUIApplication()
+        defer { app.terminate() }
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "unsigned"])
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "unsigned", "E2E_MOCK_STATUS": "revoked_current"])
         ui.openDeepLink("openid4vp://mock")
         ui.assertExists(identifier: "payment-unsigned-warning")
         XCTAssertTrue(app.staticTexts["Zahlung prüfen"].exists)
@@ -116,6 +151,8 @@ final class MockWalletUITests: XCTestCase {
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Zahlen")
         let alert = app.alerts["Unsigned payment request"]
         XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Example Credential")).firstMatch.waitForExistence(timeout: 5),
+                      app.debugDescription)
         let warning = XCTAttachment(screenshot: app.screenshot())
         warning.name = "payment-unsigned-confirmation"
         warning.lifetime = .keepAlways

@@ -56,7 +56,10 @@ struct ComposeWalletDemoApp: App {
                 // Reconciling requests authorization on a first run, and afterwards picks up a status
                 // the user changed in Settings - neither carries a notification, so becoming active
                 // is the first moment this app can act on it.
-                guard phase == .active else { return }
+                guard phase == .active else {
+                    if phase == .background { sharedUI.WalletDemoIosKt.handleWalletDemoApplicationBackgrounded() }
+                    return
+                }
                 sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
                 Task { await Self.reconcileRegistrations() }
             }

@@ -1240,9 +1240,229 @@
       ],
       "kind": "deterministic",
       "note": "Production Compose confirmation dialog opened through Settings; cancellation is asserted. SwiftUI uses a system alert covered by the existing recovery/reset host journey rather than a replica of OS chrome."
+    },
+    {
+      "id": "status.home.issue",
+      "requirements": [
+        "Issue-only Home decoration at a fixed physical-right artwork anchor"
+      ],
+      "composeTest": "credentialStatusHome",
+      "swiftTest": "testCredentialStatusHome",
+      "title": "Issue-only Home decoration at a fixed physical-right artwork anchor",
+      "note": "Supplied, constructed, pending and failed artwork use the same card-relative badge anchor. Quiet credentials have no Home badge. Aspect ratio, 56-unit stack peek and transitions are preserved."
+    },
+    {
+      "id": "status.home.mixed_artwork",
+      "requirements": [
+        "All six chip/no-chip and quiet/warning/revoked combinations",
+        "One physical-right anchor with visible clearance above the next card"
+      ],
+      "composeTest": "credentialStatusMixedArtwork",
+      "swiftTest": "testCredentialStatusMixedArtwork",
+      "title": "Mixed real artwork with quiet, warning and revoked component fixtures",
+      "note": "Production card stack with three unchanged public issuer artworks and three wallet-constructed cards. Synthetic producer-derived assessments are layout fixtures, not adverse claims about issued PID/EMVCo/KYC credentials. Input bytes and provenance are shared in credential-artwork.json."
+    },
+    {
+      "id": "status.home.mixed_artwork.dark_large_text_rtl",
+      "requirements": [
+        "All six chip/no-chip and quiet/warning/revoked combinations",
+        "One physical-right anchor with visible clearance above the next card"
+      ],
+      "composeTest": "credentialStatusMixedArtworkRtl",
+      "swiftTest": "testCredentialStatusMixedArtworkRtl",
+      "title": "Mixed artwork at compact width, dark theme, large text and RTL",
+      "note": "Production card stack with three unchanged public issuer artworks and three wallet-constructed cards. Synthetic producer-derived assessments are layout fixtures, not adverse claims about issued PID/EMVCo/KYC credentials. Input bytes and provenance are shared in credential-artwork.json.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "textSize": "accessibilityMedium"
+        }
+      }
+    },
+    {
+      "id": "status.details.clear",
+      "requirements": [
+        "Standalone status island with green check, check time and icon controls"
+      ],
+      "composeTest": "credentialStatusDetailsClear",
+      "swiftTest": "testCredentialStatusDetailsClear",
+      "title": "Standalone status island with green check, check time and icon controls"
+    },
+    {
+      "id": "status.details.adverse",
+      "requirements": [
+        "One last-known adverse headline with refresh and disclosure icons"
+      ],
+      "composeTest": "credentialStatusDetailsAdverse",
+      "swiftTest": "testCredentialStatusDetailsAdverse",
+      "title": "One last-known adverse headline with refresh and disclosure icons",
+      "note": "Staleness, incomplete coverage and latest-attempt facts appear in the expanded disclosure rather than the headline."
+    },
+    {
+      "id": "status.details.expanded",
+      "requirements": [
+        "Grouped per-reference facts, original check times and latest-attempt outcomes"
+      ],
+      "composeTest": "credentialStatusDetailsExpanded",
+      "swiftTest": "testCredentialStatusDetailsExpanded",
+      "title": "Grouped per-reference facts, original check times and latest-attempt outcomes",
+      "note": "Compose opens the production disclosure and asserts its contents; native uses the established initial-disclosure fixture. App-host navigation remains separate evidence."
+    },
+    {
+      "id": "status.states",
+      "requirements": [
+        "Distinct no-status, unchecked, clear, stale, unsupported, unverified and suspended meanings"
+      ],
+      "composeTest": "credentialStatusKinds",
+      "swiftTest": "testCredentialStatusKinds",
+      "title": "Distinct no-status, unchecked, clear, stale, unsupported, unverified and suspended meanings"
+    },
+    {
+      "id": "status.sharing.review",
+      "requirements": [
+        "Compact status row below an inset divider with ordinary Share action"
+      ],
+      "composeTest": "credentialStatusSharing",
+      "swiftTest": "testCredentialStatusSharing",
+      "title": "Compact status row below an inset divider with ordinary Share action",
+      "note": "Wallet-owned provider review content uses the shared row and actions. It does not reproduce OS-owned picker chrome. Selected adverse status is confirmed after tapping Share."
+    },
+    {
+      "id": "status.sharing.confirmation",
+      "title": "Selected adverse credential warning with Share anyway and Back to review",
+      "requirements": [
+        "Selected adverse credential warning with Share anyway and Back to review"
+      ],
+      "composeTest": "credentialStatusConfirmation",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "kind": "deterministic",
+      "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
+    },
+    {
+      "id": "status.payment.review",
+      "requirements": [
+        "Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions"
+      ],
+      "composeTest": "credentialStatusPayment",
+      "swiftTest": "testCredentialStatusPayment",
+      "title": "Visible per-credential status distinguishes the affected and quiet cards while preserving payment actions"
+    },
+    {
+      "id": "status.payment.confirmation",
+      "title": "One combined unsigned-payment and credential-status warning with the payment action",
+      "requirements": [
+        "One combined unsigned-payment and credential-status warning with the payment action"
+      ],
+      "composeTest": "credentialStatusPaymentConfirmation",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "kind": "deterministic",
+      "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
+    },
+    {
+      "id": "status.settings.partial",
+      "requirements": [
+        "Foreground preference and structured completed, unchanged, deferred and error counts"
+      ],
+      "composeTest": "credentialStatusSettingsPartial",
+      "swiftTest": "testCredentialStatusSettingsPartial",
+      "title": "Foreground preference and structured completed, unchanged, deferred and error counts",
+      "note": "Check-error counts overlap processed/unchanged outcomes; expanded help explains the categories. Background scheduling is deferred."
+    },
+    {
+      "id": "status.settings.help",
+      "requirements": [
+        "Expanded four-point help with compact typography and unchanged batch/preference state"
+      ],
+      "composeTest": "credentialStatusSettingsHelp",
+      "swiftTest": "testCredentialStatusSettingsHelp",
+      "title": "Expanded How checks work and structured batch results",
+      "note": "Production settings content. Compose opens and closes the actual disclosure without invoking refresh or changing the preference; native pins its expanded state. Actual app-host open/close behavior is separate journey evidence."
+    },
+    {
+      "id": "status.settings.checking",
+      "requirements": [
+        "Visible check progress and duplicate-action prevention"
+      ],
+      "composeTest": "credentialStatusSettingsChecking",
+      "swiftTest": "testCredentialStatusSettingsChecking",
+      "title": "Visible check progress and duplicate-action prevention"
+    },
+    {
+      "id": "status.compact.dark_large_text_rtl",
+      "requirements": [
+        "Compact status rows with large text, dark contrast and right-to-left reading order"
+      ],
+      "composeTest": "credentialStatusCompactRtl",
+      "swiftTest": "testCredentialStatusCompactRtl",
+      "title": "Compact status rows with large text, dark contrast and right-to-left reading order",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "layoutDirection": "rtl",
+          "textSize": "accessibilityMedium"
+        }
+      }
     }
   ],
   "galleryPreview": [
+    "status.home.mixed_artwork",
+    "status.details.clear",
+    "status.details.adverse",
+    "status.details.expanded",
+    "status.sharing.review",
+    "status.payment.review",
+    "status.settings.help",
     "payment.scheduled.main",
     "payment.scheduled.details",
     "payment.recurring.main",
@@ -1262,6 +1482,8 @@
     "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",
     "batch.offer.compact_dark_large_text",
-    "components.dates.compact_large_text_rtl"
+    "components.dates.compact_large_text_rtl",
+    "status.compact.dark_large_text_rtl",
+    "status.home.mixed_artwork.dark_large_text_rtl"
   ]
 }

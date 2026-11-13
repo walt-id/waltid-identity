@@ -12,6 +12,14 @@ actor MockWalletClient: WalletClient {
     }
 
     private var storedCredentials: [Credential]
+    private var statusSnapshot: CredentialStatusSnapshot?
+    private var statusCollectors: [UUID: AsyncThrowingStream<CredentialStatusSnapshot, Error>.Continuation] = [:]
+    var statusCollectorCount: Int { statusCollectors.count }
+    private(set) var statusRefreshCalls = 0
+    private var statusRefreshResults: [CredentialStatusRefreshResult] = []
+    private var statusRefreshFails = false
+    private var statusRefreshWait: (@Sendable () async -> Void)?
+    private(set) var statusSnapshotReads = 0
     private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
@@ -21,6 +29,7 @@ actor MockWalletClient: WalletClient {
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
+    private let paymentTransaction: Bool
     private(set) var submittedPaymentConsentRevisions: [String?] = []
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
@@ -43,14 +52,17 @@ actor MockWalletClient: WalletClient {
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
         paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
+        paymentTransaction: Bool = true,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
         mdocMetadata: Bool = false,
         sampleCredentialDataJSON: String? = nil,
         samplePortraitDisclosureValueJSON: String? = nil,
         deleteLocalDataDelayMilliseconds: UInt64 = 0,
-        deleteLocalDataError: Error? = nil
+        deleteLocalDataError: Error? = nil,
+        credentialStatusSnapshot: CredentialStatusSnapshot? = nil
     ) {
+        self.statusSnapshot = credentialStatusSnapshot
         self.storedCredentials = storedCredentials
         self.initialCredentialRead = initialCredentialRead
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -61,6 +73,7 @@ actor MockWalletClient: WalletClient {
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
         self.paymentConsent = paymentConsent
+        self.paymentTransaction = paymentTransaction
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
@@ -71,8 +84,13 @@ actor MockWalletClient: WalletClient {
     }
 
     #if DEBUG
+    nonisolated static func uiTestCredentialStatusSnapshot(_ json: String?) -> CredentialStatusSnapshot? {
+        guard let json else { return nil }
+        return try? decodeCredentialStatusSnapshot(json)
+    }
+
     nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
-        guard let scenario else { return nil }
+        guard let scenario, scenario != "none" else { return nil }
         if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
         if scenario == "recurring" {
             let fields: [PaymentConsentField] = [
@@ -257,6 +275,36 @@ actor MockWalletClient: WalletClient {
         storedCredentials = []
     }
 
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { statusSnapshotReads += 1; return statusSnapshot }
+    func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+        let id = UUID()
+        return AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            statusCollectors[id] = continuation
+            if let statusSnapshot { continuation.yield(statusSnapshot) }
+            continuation.onTermination = { [weak self] _ in Task { await self?.removeStatusCollector(id) } }
+        }
+    }
+    private func removeStatusCollector(_ id: UUID) { statusCollectors.removeValue(forKey: id) }
+    func setCredentialStatusSnapshot(_ snapshot: CredentialStatusSnapshot) {
+        statusSnapshot = snapshot
+        for continuation in statusCollectors.values { continuation.yield(snapshot) }
+    }
+    func failCredentialStatusObservation() {
+        for continuation in statusCollectors.values {
+            continuation.finish(throwing: NSError(domain: "MockWalletStatusRead", code: 1))
+        }
+    }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
+        statusRefreshCalls += 1
+        await statusRefreshWait?()
+        try await delayOperation()
+        if statusRefreshFails { throw NSError(domain: "MockWalletStatusTransport", code: 1) }
+        return statusRefreshResults
+    }
+    func setStatusRefreshResults(_ results: [CredentialStatusRefreshResult], fails: Bool = false, waitFor: (@Sendable () async -> Void)? = nil) {
+        statusRefreshResults = results; statusRefreshFails = fails; statusRefreshWait = waitFor
+    }
+
     private func delayOperation() async throws {
         guard operationDelayNanoseconds > 0 else { return }
         try await Task.sleep(nanoseconds: operationDelayNanoseconds)
@@ -283,7 +331,7 @@ actor MockWalletClient: WalletClient {
             state: "state-123",
             nonce: "nonce-456",
             responseEncryption: responseEncryption,
-            transactionData: [Self.paymentAuthorizationTransactionData]
+            transactionData: paymentTransaction ? [Self.paymentAuthorizationTransactionData] : []
         )
     }
 

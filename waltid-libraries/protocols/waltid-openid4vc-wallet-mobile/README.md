@@ -82,6 +82,46 @@ should use `engine { configureSession { URLCache = null } }`; a custom `URLSessi
 should set `configuration.urlCache = nil` before creating the session. A request
 policy that ignores cached responses does not prevent storing new response bodies.
 
+## Credential status
+
+Status reads are local. Use `credentialReads()` for composed credential/status data or
+`credentialStatuses` for status-only updates. Observe without rebuilding credential artwork:
+
+```kotlin
+val observation = scope.launch {
+    wallet.credentialStatuses.collect { snapshot -> renderStatus(snapshot) }
+}
+// App-owned foreground check: reuse authenticated evidence while it is fresh.
+val foreground = wallet.refreshCredentialStatuses()
+// A user-requested check requires revalidation.
+val manual = wallet.refreshCredentialStatuses(
+    credentialIds = listOf(credentialId),
+    mode = CredentialStatusRefreshMode.FORCE,
+)
+observation.cancel()
+wallet.close() // Cancels owned work; does not delete wallet data.
+```
+
+`scope`, `renderStatus` and `credentialId` belong to your app. Import
+`id.walt.wallet2.status.CredentialStatusRefreshMode`. Inspect per-credential outcomes and use the
+snapshot's shared `presentation` for wording, coverage, freshness and consent revisions.
+A previous result after a failed check, no status, unchecked and unsupported are not all-clear.
+Reads, matching, opening review facts and submitting never trigger issuer status checks. An app can
+offer explicit refresh inside an online review: keep its selection and prior evidence, wait only for
+that review's requested operation, render the result/error, then require a new deliberate submit
+with the displayed revisions. Cancel the old UI interest on lock, disposal or request/wallet replacement;
+do not apply its late result to a successor review. Provider/nearby hosts need no additional networking.
+The app owns preferences and
+foreground/manual scheduling; the SDK installs no background worker. The snapshot
+`nextRefreshAt` supports an app-owned timer while active. Cancel it during lock, background and consent,
+and use bounded retry spacing for a past due time.
+
+Managed persistence retains only minimal last-known metadata. Default mobile snapshots restore as
+historical/stale evidence after reopen; a refresh re-establishes current evidence. No-store results
+are not persisted. Custom stores need the optional shared snapshot-store capability for durability.
+See [credential-status profiles, trust hooks, cache rules and lifecycle](../../credentials/waltid-credential-status/README.md)
+and the Swift [credential-status guide](../waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md).
+
 ## Receiving credentials
 
 When an issuer advertises `key_attestations_required`, attach an application-supplied

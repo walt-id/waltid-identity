@@ -108,6 +108,7 @@ object Wallet2Tables {
         val addedAt = timestamp("added_at")
         val metadata = text("metadata").nullable()
         val holderKeyBinding = text("holder_key_binding").nullable()
+        val credentialStatus = text("credential_status").nullable()
         override val primaryKey = PrimaryKey(storeId, id)
     }
 

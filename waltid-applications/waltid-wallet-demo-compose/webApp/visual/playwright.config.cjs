@@ -24,7 +24,7 @@ if (!record) {
 const output = path.resolve(__dirname, '../build/reports/browser-visual');
 module.exports = defineConfig({
   testDir: __dirname,
-  testMatch: 'account.spec.cjs',
+  testMatch: '*.spec.cjs',
   workers: 1,
   retries: 0,
   timeout: 30000,

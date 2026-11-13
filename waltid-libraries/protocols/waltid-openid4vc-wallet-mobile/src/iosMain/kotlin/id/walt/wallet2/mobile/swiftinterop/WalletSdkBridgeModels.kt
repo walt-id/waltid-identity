@@ -50,6 +50,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Instant
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
 
 /**
  * Configuration used when creating an iOS [WalletSdkBridge].
@@ -606,6 +607,9 @@ public enum class WalletBridgeErrorCategory {
 
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
+
+    /** The local semantic status warning changed after host review. */
+    credentialStatusReviewChanged,
 }
 
 /**
@@ -658,6 +662,7 @@ public class WalletBridgeError internal constructor(
             val presentationFailure = throwable as? UnsafePresentationErrorResponseException
             val category = when {
                 presentationFailure != null -> WalletBridgeErrorCategory.presentationValidation
+                throwable is CredentialStatusReviewChangedException -> WalletBridgeErrorCategory.credentialStatusReviewChanged
                 paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
                 authorizationFailure != null -> WalletBridgeErrorCategory.authorization
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled

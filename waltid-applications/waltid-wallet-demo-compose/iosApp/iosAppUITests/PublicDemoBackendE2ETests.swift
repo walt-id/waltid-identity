@@ -7,9 +7,37 @@ import XCTest
 /// and keep received credentials across app restart.
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
+    func testCredentialStatusLifecycleWithPublicAndControlledIssuers() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runCredentialStatusLifecycle(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink,
+            returnToWallet: ui.returnToWallet, relaunch: {
+                ui.launch(initializeSigningIdentity: false)
+                XCTAssertEqual(ui.waitUntilWalletReady(timeout: self.walletReadyTimeout), "Wallet ready")
+            })
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+    }
+
+    func testControlledStatusIssuanceAndRevocation() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runControlledStatusIssuanceAndRevocation(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink)
     }
 
 

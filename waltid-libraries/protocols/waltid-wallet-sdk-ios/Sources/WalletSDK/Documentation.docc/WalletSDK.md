@@ -127,6 +127,7 @@ reset; plaintext-to-encrypted migration is not performed.
 - <doc:PresentingCredentials>
 - <doc:ProximityPresentation>
 - <doc:ObservingEventsAndErrors>
+- <doc:CheckingCredentialStatus>
 
 ### Wallet
 

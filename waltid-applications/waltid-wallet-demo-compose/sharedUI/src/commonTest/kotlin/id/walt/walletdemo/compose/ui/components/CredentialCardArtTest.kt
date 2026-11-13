@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.components
 
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,6 +10,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CredentialCardArtTest {
+
+    @Test
+    fun badgeClearsMeasuredIssuerChipsAndTheUnchangedStackPeek() {
+        // Pixel bounds from the unchanged public and controlled issuer assets (1280 px wide).
+        for (width in listOf(280, 320, 353, 360)) {
+            val top = credentialStatusBadgeTop(width.dp).value
+            for (chipBottom in listOf(97f, 109f)) {
+                assertTrue(top - chipBottom * width / 1280f > 1.5f, "Full badge needs visible clearance below the chip at $width")
+            }
+            assertTrue(56f - top - 20f > 2.5f, "Full badge must clear the next card at $width")
+        }
+    }
 
     @Test
     fun thumbnailUsesMetadataBackgroundAndLogoInsteadOfArtwork() {

@@ -20,6 +20,7 @@ struct PresentView: View {
     @State private var showingConnectionOptions = false
     @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
     @State private var renderedSharingOptions: [PresentationCredentialOption] = []
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<OnlineSubmissionKey>>()
 
     init(viewModel: WalletViewModel, onBack: (() -> Void)? = nil, nearbySheet: Bool = false) {
         self.onBack = onBack
@@ -157,14 +158,28 @@ struct PresentView: View {
         let informationReady = renderedSharingOptions == review.credentialOptions
         let reviewedSelection = viewModel.presentationSharingSelection
         let reviewedPayment = viewModel.paymentReview
-        let submit = {
+        let context = viewModel.credentialStatusUIContext
+        let handle = viewModel.presentationPreview?.previewHandle
+        let navigationKey = viewModel.presentationNavigationResetKey
+        let refresh = viewModel.presentationStatusRefresh
+        var reviewStatusUI = context
+        reviewStatusUI.check = handle.map { handle in { id in
+            guard submission.canRefresh, viewModel.presentationReviewEnabled else { return }
+            viewModel.checkPresentationCredentialStatus(id, handle: handle, navigationKey: navigationKey)
+        } }
+        reviewStatusUI.checking = context.checking || refresh != nil || !submission.canRefresh || !viewModel.presentationReviewEnabled
+        if let refresh, refresh.phase == .checking { reviewStatusUI.refreshing.insert(refresh.credentialID) }
+        let submit: ([String: String]) -> Void = { reviewedStatuses in
             guard informationReady, review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
-                  reviewedPayment == viewModel.paymentReview else { return }
-            viewModel.submitPresentation()
+                  reviewedPayment == viewModel.paymentReview,
+                  context.contextKey == viewModel.credentialStatusUIContext.contextKey else { return }
+            viewModel.submitPresentation(reviewedStatus: reviewedStatuses)
         }
         return WalletReviewScaffold(showsActions: true) {
+            ReviewChangedNotice(submission)
             WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+            if let statusError = viewModel.credentialStatusError { Text(statusError).font(.footnote).foregroundStyle(.red) }
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }
@@ -186,8 +201,12 @@ struct PresentView: View {
             )
         } actions: {
             ReviewActions(
-                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete,
+                gate: submission,
+                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete && refresh == nil,
                 isLoading: !viewModel.presentationReviewEnabled,
+                reviewKey: OnlineSubmissionKey(handle: viewModel.presentationPreview?.previewHandle,
+                    review: review, selection: reviewedSelection),
+                credentialStatuses: context.selectedStatuses(review: review, selection: reviewedSelection),
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
                 onCancel: closeReview,
@@ -195,7 +214,18 @@ struct PresentView: View {
                 isPayment: review.request.hasPaymentTransaction,
                 showCancelWithReject: false
             )
-        }.onPreferenceChange(SharingReviewReadinessKey.self) { renderedSharingOptions = $0 }
+        }
+        .environment(\.credentialStatusUI, reviewStatusUI)
+        .onPreferenceChange(SharingReviewReadinessKey.self) { renderedSharingOptions = $0 }
+        .onChange(of: refresh) { result in
+            if let result, result.phase == .awaitingRender { viewModel.presentationStatusRefreshRendered(result.id) }
+        }
+        .onAppear {
+            if let refresh, refresh.phase == .awaitingRender { viewModel.presentationStatusRefreshRendered(refresh.id) }
+        }
+        .onDisappear {
+            if let handle { viewModel.releasePresentationStatusRefresh(handle: handle, navigationKey: navigationKey) }
+        }
     }
 
     private var proximityContent: some View {
@@ -209,6 +239,12 @@ struct PresentView: View {
             .allowsHitTesting(proximityPresentation.active && !proximityPresentation.closing)
     }
 
+}
+
+private struct OnlineSubmissionKey: Equatable {
+    let handle: PresentationPreviewHandle?
+    let review: SharingReviewModel
+    let selection: SharingSelection
 }
 
 private struct PresentationFormPostWebView: UIViewRepresentable {

@@ -68,6 +68,13 @@ maintainers enforce the completion policy during review.
 | `crypto2-platform-tests` | crypto2/jose/cose paths, or `ci:crypto2` | Windows + macOS x64 + macOS arm64/iOS crypto2 tests | Unrelated library changes |
 | `macos-predicate-tests` | Code changes (skipped for docs/asset-only PRs and pushes) | Fixture coverage of the A3 path predicates and conformance eligibility, summary, and gate behavior | Runtime job success |
 
+`compose-demo` excludes the opt-in `CredentialStatusBackendE2ETest` class. Run its issuer lifecycle
+and process-retention drivers using the [controlled status fixture](../waltid-applications/mobile-e2e-fixtures/status/README.md),
+an isolated wallet and serialized fixture access. These require explicit instrumentation arguments
+and are recorded separately from the ordinary device lane.
+Both iOS demo commands likewise leave their two controlled issuer methods to explicit fixture runs.
+The ordinary Android and iOS evidence validators still reject unexpected skipped tests.
+
 Main and release keep a cacheless Gradle rebuild (`clean cleanAllTests --rerun-tasks --no-daemon`).
 PR Gradle runs `build allTests` with the setup-gradle daemon and cached outputs.
 The Linux Gradle job times out after 90 minutes. Library JVM tests default to a

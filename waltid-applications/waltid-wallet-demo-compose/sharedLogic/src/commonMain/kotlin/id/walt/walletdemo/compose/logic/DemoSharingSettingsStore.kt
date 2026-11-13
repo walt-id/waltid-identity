@@ -7,6 +7,9 @@ package id.walt.walletdemo.compose.logic
  * platform-picker-only Digital Credentials path across wallet recreations.
  */
 interface DemoSharingSettingsStore {
+    fun automaticCredentialStatusChecks(): Boolean = true
+    fun setAutomaticCredentialStatusChecks(enabled: Boolean) {}
+
     fun showDcApiPresentationPreview(): Boolean
     fun setShowDcApiPresentationPreview(enabled: Boolean)
     fun proximityTransportProfile(): WalletDemoProximityTransportProfile
@@ -21,6 +24,9 @@ class InMemoryDemoSharingSettingsStore(
         WalletDemoProximityTransportProfile.Default,
     initialProximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
 ) : DemoSharingSettingsStore {
+    private var statusChecks = true
+    override fun automaticCredentialStatusChecks(): Boolean = statusChecks
+    override fun setAutomaticCredentialStatusChecks(enabled: Boolean) { statusChecks = enabled }
     private var showDcApiPresentationPreview: Boolean = initialShowDcApiPresentationPreview
     private var proximityTransportProfile: WalletDemoProximityTransportProfile =
         initialProximityTransportProfile
@@ -44,6 +50,8 @@ class InMemoryDemoSharingSettingsStore(
 }
 
 internal class PersistentDemoSharingSettingsStore(
+    private val readStatusChecks: () -> Boolean? = { null },
+    private val writeStatusChecks: (Boolean) -> Unit = {},
     private val readEnabled: () -> Boolean?,
     private val writeEnabled: (Boolean) -> Unit,
     private val readProximityTransportProfile: () -> String?,
@@ -51,6 +59,9 @@ internal class PersistentDemoSharingSettingsStore(
     private val readProximityApprovalMode: () -> String?,
     private val writeProximityApprovalMode: (String) -> Unit,
 ) : DemoSharingSettingsStore {
+    override fun automaticCredentialStatusChecks(): Boolean = readStatusChecks() ?: true
+    override fun setAutomaticCredentialStatusChecks(enabled: Boolean) = writeStatusChecks(enabled)
+
     override fun proximityApprovalMode(): WalletDemoProximityApprovalMode =
         WalletDemoProximityApprovalMode.fromPersistedValue(readProximityApprovalMode())
 
@@ -78,3 +89,5 @@ internal const val PROXIMITY_TRANSPORT_PROFILE_KEY =
     "id.walt.walletdemo.sharing.proximityTransportProfile"
 internal const val PROXIMITY_APPROVAL_MODE_KEY =
     "id.walt.walletdemo.sharing.proximityApprovalMode"
+
+internal const val AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY = "id.walt.walletdemo.status.automatic"

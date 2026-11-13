@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,18 +28,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 internal const val Id1AspectRatio = 1.586f
 internal val CredentialCardPeek = 56.dp
+internal val CredentialCardMaxWidth = 360.dp
+internal val CredentialStatusBadgeSize = 20.dp
 internal val DefaultWaltCardBlue = Color(0xFF1B4FDB)
+
+/** Optical baseline calibrated against issuer artwork, never inferred from arbitrary image pixels. */
+internal fun credentialStatusBadgeTop(cardWidth: Dp): Dp =
+    (CredentialCardPeek + cardWidth * (104f / 1280f) - CredentialStatusBadgeSize) / 2
 
 internal data class CredentialCardArtModel(
     val id: String,
@@ -98,8 +110,11 @@ internal fun CredentialCardArt(
     art: CredentialCardArtModel,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    statusDecoration: WalletDemoCredentialStatus? = null,
     onClick: (() -> Unit)? = null,
 ) {
+    val status = statusDecoration?.takeIf { it.hasIssue && !compact }
+    val statusTitle = status?.title()
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
@@ -123,6 +138,7 @@ internal fun CredentialCardArt(
             .clip(shape)
             .then(if (onClick == null) Modifier else Modifier.clickable(
                 role = Role.Button, onClickLabel = "View credential details", onClick = onClick))
+            .semantics { contentDescription = statusTitle?.let { "${art.name}, $it" } ?: art.name }
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
         val logoSize = if (compact) minOf(28.dp, maxHeight - 8.dp) else 36.dp
@@ -186,19 +202,13 @@ internal fun CredentialCardArt(
                 )
                 CredentialCardLogoSource.BundledWalt -> if (!compact) DefaultWaltLogo(logoModifier)
             }
-            if (!compact) Text(
-                text = art.name,
-                color = labelColor,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(namePadding)
-                    .fillMaxWidth(0.72f),
-            )
+            if (!compact) Text(art.name,
+                Modifier.align(AbsoluteAlignment.TopLeft).padding(namePadding).fillMaxWidth(0.72f),
+                color = labelColor, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+        if (status != null) CredentialStatusIcon(status,
+            Modifier.align(AbsoluteAlignment.TopRight).absoluteOffset(x = (-16).dp, y = credentialStatusBadgeTop(maxWidth))
+                .testTag("credential-status-icon-${art.id}"), contrast = true, size = CredentialStatusBadgeSize)
     }
 }
 

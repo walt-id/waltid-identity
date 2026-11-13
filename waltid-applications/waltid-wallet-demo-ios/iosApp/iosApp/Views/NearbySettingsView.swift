@@ -3,35 +3,11 @@ import WalletDemoSharingUI
 import WalletSDK
 import WalletDemoIdentityDocumentSupport
 
-struct SettingsDestinationLabel: View {
-    let title: LocalizedStringKey
-    let systemImage: String
-    let summary: String
-
-    init(_ title: LocalizedStringKey, systemImage: String, summary: String) {
-        self.title = title
-        self.systemImage = systemImage
-        self.summary = summary
-    }
-
-    var body: some View {
-        Label {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                Text(summary).font(.footnote).foregroundStyle(.secondary)
-            }
-        } icon: {
-            Image(systemName: systemImage).accessibilityHidden(true)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(title))
-        .accessibilityValue(summary)
-    }
-}
-
 struct NearbySettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
     @ObservedObject private var readerTrust: DemoReaderTrustSettingsController
+    @State private var destination: Destination?
+    private enum Destination { case connection, readerTrust }
 
     init(viewModel: WalletViewModel) {
         self.viewModel = viewModel
@@ -44,15 +20,15 @@ struct NearbySettingsView: View {
                 ProximityApprovalModeChoice(mode: $viewModel.proximityApprovalMode, compact: false)
             }
             Section {
-                NavigationLink { ConnectionSettingsView(viewModel: viewModel) } label: {
-                    SettingsDestinationLabel("Connection method", systemImage: "network", summary: viewModel.proximityTransportProfile.title)
+                SettingsDestinationRow("Connection method", systemImage: "network", summary: viewModel.proximityTransportProfile.title,
+                    identifier: "wallet.settingsConnectionMethod") {
+                    destination = .connection
                 }
-                .accessibilityIdentifier("wallet.settingsConnectionMethod")
-                NavigationLink { ReaderTrustSettingsView(controller: readerTrust) } label: {
-                    SettingsDestinationLabel("Reader authentication", systemImage: "shield", summary: readerTrust.settings.readerPolicy == .requireTrusted
-                        ? String(localized: "Require trusted readers") : String(localized: "Allow anonymous or untrusted readers"))
+                SettingsDestinationRow("Reader authentication", systemImage: "shield", summary: readerTrust.settings.readerPolicy == .requireTrusted
+                    ? String(localized: "Require trusted readers") : String(localized: "Allow anonymous or untrusted readers"),
+                    identifier: WalletAccessibilityID.settingsReaderAuthentication) {
+                    destination = .readerTrust
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
             }
         }
         .frame(maxWidth: 640)
@@ -60,6 +36,13 @@ struct NearbySettingsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Nearby sharing")
         .navigationBarTitleDisplayMode(.inline)
+        .walletDetailDestination(isPresented: Binding(get: { destination != nil }, set: { if !$0 { destination = nil } })) {
+            switch destination {
+            case .connection: ConnectionSettingsView(viewModel: viewModel)
+            case .readerTrust: ReaderTrustSettingsView(controller: readerTrust)
+            case nil: EmptyView()
+            }
+        }
     }
 }
 

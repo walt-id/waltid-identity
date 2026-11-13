@@ -36,6 +36,7 @@ import org.jetbrains.compose.resources.stringResource
 
 internal enum class SettingsDestination(val title: StringResource) {
     Main(Res.string.settings_title),
+    CredentialStatus(Res.string.credential_status_title),
     WalletAccess(Res.string.settings_wallet_access),
     SigningKey(Res.string.settings_signing_key),
     Technical(Res.string.settings_technical),
@@ -129,7 +130,7 @@ internal fun SettingsScreen(
                         }
                         Column(
                             Modifier.weight(1f, fill = fillViewport).verticalScroll(rememberScrollState()).fillMaxWidth()
-                                .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
+                                .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletContentMaxWidth)
                                 .padding(horizontal = 20.dp, vertical = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
@@ -160,6 +161,11 @@ internal fun SettingsScreen(
                                                 icon = { SettingsSymbol(Res.drawable.settings_key) })
                                             SettingsDivider()
                                         }
+                                        WalletNavigationRow(stringResource(Res.string.credential_status_title),
+                                            { open(SettingsDestination.CredentialStatus) }, Modifier.testTag("settings-credential-status"),
+                                            summary = stringResource(Res.string.credential_status_settings_summary),
+                                            icon = { WalletIcon(WalletSymbol.StatusClear, null) })
+                                        SettingsDivider()
                                         WalletNavigationRow(stringResource(Res.string.settings_technical),
                                             { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_code) })
@@ -282,6 +288,7 @@ internal fun SettingsScreen(
                                 }
                                 SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
                                 SettingsDestination.Server -> serverSettingsContent?.invoke()
+                                SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = onSignOut != null)
                                 SettingsDestination.DigitalCredentialsApi -> {
                                     WalletSection(footer = stringResource(Res.string.settings_review_description)) {
                                     SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
