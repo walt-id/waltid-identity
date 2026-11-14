@@ -456,13 +456,19 @@ internal object WalletComposeE2EHelper {
         device: UiDevice,
         tag: String,
         timeoutMs: Long = UI_ELEMENT_TIMEOUT,
+    ): UiObject2? = waitForAnyResourceAfterScrolling(device, listOf(tag), timeoutMs)
+
+    fun waitForAnyResourceAfterScrolling(
+        device: UiDevice,
+        tags: List<String>,
+        timeoutMs: Long = UI_ELEMENT_TIMEOUT,
     ): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         var towardBottom = true
         var stepsInDirection = 0
         while (System.currentTimeMillis() < deadline) {
             try {
-                findVisibleResource(device, tag)?.let { return it }
+                tags.firstNotNullOfOrNull { findVisibleResource(device, it) }?.let { return it }
                 if (towardBottom) device.scrollDown() else device.scrollUp()
                 stepsInDirection++
                 if (stepsInDirection == 6) {

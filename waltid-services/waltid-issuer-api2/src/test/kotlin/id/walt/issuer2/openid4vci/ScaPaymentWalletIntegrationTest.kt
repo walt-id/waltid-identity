@@ -2,6 +2,7 @@
 
 package id.walt.issuer2.openid4vci
 
+import id.walt.mobile.test.backend.DemoPayment
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -16,6 +17,7 @@ import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.issuer2.testsupport.*
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
@@ -42,6 +44,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.sse.SSE
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
@@ -52,10 +55,15 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.*
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /** Real configured issuer, wallet and verifier; only authentication factors are simulated. */
 class ScaPaymentWalletIntegrationTest {
     private enum class MissingMetadata { ACTION_LABEL, OPTIONAL_CLAIM }
+    private enum class ExpiryBoundary { REVIEW, SIGNING }
 
     @AfterEach
     fun clearConfig() = clearIssuer2TestEnvironment()
@@ -71,16 +79,24 @@ class ScaPaymentWalletIntegrationTest {
         paymentFlow(MissingMetadata.OPTIONAL_CLAIM, recurringTerms())
 
     @Test
-    fun scheduledPaymentReachesWalletAndVerifier() = paymentFlow(extra = Json.parseToJsonElement(
-        """{"execution_date":"2099-01-01T12:00:00Z","sct_inst":false}""").jsonObject)
+    fun scheduledPaymentReachesWalletAndVerifier() = paymentFlow(extra = DemoPayment.SCHEDULED.payload())
 
     @Test
-    fun recurringPaymentReachesWalletAndVerifier() = paymentFlow(extra = recurringTerms())
+    fun recurringPaymentReachesWalletAndVerifier() = paymentFlow(extra = DemoPayment.RECURRING.payload())
+
+    @Test
+    fun paymentExpiryDuringReviewDoesNotReleaseAProof() =
+        paymentFlow(extra = DemoPayment.SCHEDULED.payload(), expiry = ExpiryBoundary.REVIEW)
+
+    @Test
+    fun paymentExpiryDuringSigningDoesNotReleaseAProof() =
+        paymentFlow(extra = DemoPayment.SCHEDULED.payload(), expiry = ExpiryBoundary.SIGNING)
 
     private fun recurringTerms() = Json.parseToJsonElement(
         """{"recurrence":{"frequency":"MNTH","number":12,"mit_options":{"amount_variable":false,"min_amount":1.23,"max_amount":9007199254740993.01,"apr":0.1234567890123456789}}}""").jsonObject
 
-    private fun paymentFlow(missingMetadata: MissingMetadata? = null, extra: JsonObject? = null) = testApplication {
+    private fun paymentFlow(missingMetadata: MissingMetadata? = null, extra: JsonObject? = null,
+        expiry: ExpiryBoundary? = null) = testApplication {
         val attester = Issuer2TestKeyAttester.create()
         installIssuer2WithConfigFiles(configureServiceConfig = {
             it.copy(baseUrl = "https://localhost", keyAttestationConfig = attester.issuerTrust)
@@ -127,12 +143,81 @@ class ScaPaymentWalletIntegrationTest {
         paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
             issuerKey.getPublicKey().exportJWK(),
             "Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.",
-            missingMetadata != null, attester, extra)
+            missingMetadata != null, attester, extra, expiry)
     }
 
-    @Test
-    @Tag("live-payment")
-    fun deployedPaymentCardReachesWalletAndVerifier() = runBlocking {
+    @Test @Tag("live-payment")
+    fun deployedPaymentCardReachesWalletAndVerifier() = deployedPayment(DemoPayment.MINIMAL)
+
+    @Test @Tag("live-payment")
+    fun deployedScheduledPaymentReachesWalletAndVerifier() = deployedPayment(DemoPayment.SCHEDULED)
+
+    @Test @Tag("live-payment")
+    fun deployedRecurringPaymentReachesWalletAndVerifier() = deployedPayment(DemoPayment.RECURRING)
+
+    @Test @Tag("live-payment")
+    fun deployedPaymentExpiresDuringReviewWithoutReleasingAProof() =
+        deployedPayment(DemoPayment.SCHEDULED, ExpiryBoundary.REVIEW)
+
+    @Test @Tag("live-payment")
+    fun deployedPaymentExpiresDuringSigningWithoutReleasingAProof() =
+        deployedPayment(DemoPayment.SCHEDULED, ExpiryBoundary.SIGNING)
+
+    @Test @Tag("live-payment")
+    fun deployedVerifierRejectsPastSchedulingBeforeCreatingSession() = withDeployedServices { http, _, verifierBase ->
+        val shipped = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
+        val openid = requireNotNull(shipped.openid)
+        val entries = requireNotNull(openid.transactionData).map { item ->
+            JsonObject(item + ("payload" to JsonObject(item.getValue("payload").jsonObject +
+                ("execution_date" to JsonPrimitive((Clock.System.now() - 1.days).toString())))))
+        }
+        val response = http.post("$verifierBase/verification-session/create") {
+            contentType(ContentType.Application.Json)
+            setBody<VerificationSessionSetup>(shipped.copy(core = shipped.core.copy(clientId = null, signedRequest = false, encryptedResponse = false),
+                openid = openid.copy(transactionData = entries)))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status,
+            "WAL-1665: deployed verifier must reject past execution_date at session creation")
+        val error = response.bodyAsText()
+        assertTrue("execution_date" in error && "must not lie in the past" in error,
+            "Expected the scheduling rule, not an unrelated HTTP 400")
+        assertFalse("sessionId" in error, "Invalid scheduling must not create a session")
+    }
+
+    private fun deployedPayment(payment: DemoPayment, expiry: ExpiryBoundary? = null) = withDeployedServices { http, issuerBase, verifierBase ->
+        val profiles = http.get("$verifierBase/transaction-data-profiles")
+        assertEquals(HttpStatusCode.OK, profiles.status, "WAL-1665: verifier profile discovery unavailable")
+        val descriptor = profiles.body<JsonArray>().single {
+            it.jsonObject["type"]?.jsonPrimitive?.content == "urn:eudi:sca:payment:1"
+        }.jsonObject["payloadSchema"]
+        assertTrue(descriptor is JsonObject, "WAL-1665: deploy TS12 payloadSchema before public payment acceptance")
+        val metadataResponse = http.get("$issuerBase/openid4vci/sca_payment_card_sd_jwt")
+        assertEquals(HttpStatusCode.OK, metadataResponse.status, "WAL-1665: payment type metadata unavailable")
+        val metadata = metadataResponse.body<JsonObject>().getValue("transaction_data_types").jsonObject
+            .getValue("urn:eudi:sca:payment:1").jsonObject
+        val paths = metadata.getValue("claims").jsonArray.associate { claim ->
+            val value = claim.jsonObject
+            value.getValue("path").jsonArray.joinToString(".") { it.jsonPrimitive.content } to value
+        }
+        val expectedPaths = setOf("transaction_id", "payee.name", "payee.id", "currency", "amount", "date_time",
+            "payee.logo", "payee.website", "pisp.legal_name", "pisp.brand_name", "pisp.domain_name", "amount_estimated",
+            "amount_earmarked", "sct_inst", "execution_date", "recurrence.start_date", "recurrence.end_date",
+            "recurrence.number", "recurrence.frequency", "recurrence.mit_options.amount_variable",
+            "recurrence.mit_options.min_amount", "recurrence.mit_options.max_amount", "recurrence.mit_options.total_amount",
+            "recurrence.mit_options.initial_amount", "recurrence.mit_options.initial_amount_number", "recurrence.mit_options.apr")
+        assertEquals(expectedPaths, paths.keys, "WAL-1665: issuer must deploy all 26 payment claim paths")
+        paths.forEach { (path, claim) ->
+            val labels = claim.getValue("display").jsonArray.associate {
+                it.jsonObject.getValue("locale").jsonPrimitive.content to it.jsonObject.getValue("label").jsonPrimitive.content
+            }
+            for (language in listOf("en", "de")) assertFalse(labels[language].isNullOrBlank(), "Missing $language label for $path")
+        }
+        val issuerPublicJwk = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
+        paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk,
+            "Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.", extra = payment.payload(), expiry = expiry)
+    }
+
+    private fun withDeployedServices(block: suspend (HttpClient, String, String) -> Unit) = runBlocking {
         val issuerBase = System.getProperty("payment.issuerUrl", "https://issuer2.demo.walt.id").trimEnd('/')
         val verifierBase = System.getProperty("payment.verifierUrl", "https://verifier2.demo.walt.id").trimEnd('/')
         HttpClient(Java) {
@@ -140,13 +225,7 @@ class ScaPaymentWalletIntegrationTest {
             defaultRequest { url(issuerBase) }
             install(ClientContentNegotiation) { json(issuer2TestJson) }
             install(HttpTimeout) { requestTimeoutMillis = 30_000 }
-        }.use { http ->
-            // Pin the same public verification key as the demos, independently of the received credential.
-            val issuerPublicJwk = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
-            // Keep the deployed metadata expectation until the rollout tracked by WAL-1665.
-            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk,
-                "Prüfen Sie Empfänger und Betrag vor der Bestätigung.") }
-        }
+        }.use { http -> withTimeout(120_000) { block(http, issuerBase, verifierBase) } }
     }
 
     private suspend fun paymentFlow(
@@ -154,6 +233,7 @@ class ScaPaymentWalletIntegrationTest {
         issuerPublicJwk: String, expectedSecurityHint: String, missingLabel: Boolean = false,
         attester: Issuer2TestKeyAttester? = null,
         extra: JsonObject? = null,
+        expiry: ExpiryBoundary? = null,
     ) {
         val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
         try {
@@ -161,9 +241,16 @@ class ScaPaymentWalletIntegrationTest {
                 KeyId("payment-holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             ))
             var signatures = 0
+            var submissionStarted = false
+            var deadline: Instant? = null
+            suspend fun crossDeadline() {
+                val remaining = requireNotNull(deadline) - Clock.System.now()
+                if (remaining.isPositive()) delay(remaining + 1.seconds)
+            }
             val holderKey = object : Key by generatedKey {
                 override val capabilities = generatedKey.capabilities.copy(signer = Signer { bytes, algorithm ->
                     signatures++
+                    if (submissionStarted && expiry == ExpiryBoundary.SIGNING) crossDeadline()
                     requireNotNull(generatedKey.capabilities.signer).sign(bytes, algorithm)
                 })
             }
@@ -190,9 +277,12 @@ class ScaPaymentWalletIntegrationTest {
             // Reuse the shipped demo request. Only transport protection and the issuer VCT differ;
             // signed/encrypted transport variants already have their own protocol/app coverage.
             val shipped = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
-            val example = if (extra == null) shipped else shipped.copy(openid = requireNotNull(shipped.openid).copy(
+            if (expiry != null) deadline = Clock.System.now() + 30.seconds
+            val requestExtra = if (expiry == null) extra else JsonObject(requireNotNull(extra) +
+                ("execution_date" to JsonPrimitive(requireNotNull(deadline).toString())))
+            val example = if (requestExtra == null) shipped else shipped.copy(openid = requireNotNull(shipped.openid).copy(
                 transactionData = requireNotNull(requireNotNull(shipped.openid).transactionData).map { item ->
-                    JsonObject(item + ("payload" to JsonObject(item.getValue("payload").jsonObject + extra)))
+                    JsonObject(item + ("payload" to JsonObject(item.getValue("payload").jsonObject + requestExtra)))
                 }))
             val setup = example.copy(core = example.core.copy(
                 clientId = null, signedRequest = false, encryptedResponse = false,
@@ -265,7 +355,7 @@ class ScaPaymentWalletIntegrationTest {
             assertEquals("Betrag", fields.getValue(listOf("amount")).label)
             assertEquals("11.56", fields.getValue(listOf("amount")).value)
             if (extra?.containsKey("execution_date") == true) {
-                assertEquals("2099-01-01T12:00:00Z", fields.getValue(listOf("execution_date")).value)
+                assertEquals(requireNotNull(requestExtra).getValue("execution_date").jsonPrimitive.content, fields.getValue(listOf("execution_date")).value)
             }
             if (extra?.containsKey("recurrence") == true) {
                 assertEquals("Monatlich", fields.getValue(listOf("recurrence", "frequency")).value)
@@ -274,6 +364,21 @@ class ScaPaymentWalletIntegrationTest {
             }
             assertEquals(0, authorizations)
             assertEquals(0, signatures)
+            submissionStarted = true
+            if (expiry != null) {
+                if (expiry == ExpiryBoundary.REVIEW) crossDeadline()
+                val failure = assertFailsWith<Ts12PaymentValidationException> {
+                    WalletPresentationHandler.submitDcApiPresentation(wallet,
+                        submission.copy(paymentConsentRevision = prepared.revision), transactionDataTypeRegistry = registry,
+                        scaAuthorizer = authorizer, paymentConsentPolicy = policy)
+                }
+                assertEquals("/execution_date", failure.path)
+                assertEquals(if (expiry == ExpiryBoundary.REVIEW) 0 else 1, signatures)
+                assertEquals(if (expiry == ExpiryBoundary.REVIEW) 0 else 1, authorizations)
+                val info = http.get("$verifierBase/verification-session/${created.sessionId}/info").body<JsonObject>()
+                assertFalse(info.getValue("attempted").jsonPrimitive.boolean, "Expired payment released a response")
+                return
+            }
             val response = WalletPresentationHandler.submitDcApiPresentation(wallet,
                 submission.copy(paymentConsentRevision = prepared.revision), transactionDataTypeRegistry = registry,
                 scaAuthorizer = authorizer, paymentConsentPolicy = policy)

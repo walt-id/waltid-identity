@@ -8,13 +8,13 @@ import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import id.walt.mobile.test.backend.DemoPayment
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -40,29 +40,27 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
     /** Select this physical class explicitly with -e wallet.sca approve. */
     @Test
     fun sharesScaSdJwtWithNativeAuthorization() = runBlocking {
+        for (payment in DemoPayment.entries) sharePayment(payment)
+    }
+
+    private suspend fun sharePayment(payment: DemoPayment) {
         val fixture = fixture()
         val scenario = DemoTestBackend.scaPaymentSdJwtScenario
         val session = DemoTestBackend.createDcApiVerifierSession(
             credentialQueries = listOf(scenario.verifierCredentialQuery),
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
             signedRequest = true,
-            transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment")),
+            transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment", payment)),
         )
         val wire = Json.parseToJsonElement(session.requestJson).jsonObject.getValue("requests").jsonArray.single().jsonObject
         assertEquals("openid4vp-v1-signed", wire.getValue("protocol").jsonPrimitive.content)
         val requestObject = wire.getValue("data").jsonObject.getValue("request").jsonPrimitive.content
         val requestClaims = Json.parseToJsonElement(Base64.decode(requestObject.split('.')[1], Base64.URL_SAFE).decodeToString()).jsonObject
         val encodedEntry = requestClaims.getValue("transaction_data").jsonArray.single().jsonPrimitive.content
+        WalletGalleryEvidence.request("presentation", session.requestJson)
         val request = fixture.startCredentialRequest(session.requestJson)
         fixture.enterProviderReview(request, scenario.credentialConfigurationId)
-        listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
-            assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
-        }
-        listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
-            "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
-            WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
-                "Payment review is missing issuer instruction '$label'")
-        }
+        WalletPaymentReviewE2E.review(fixture.device, payment, "physical-payment-${payment.name.lowercase()}")
         println("SCA_OPERATOR: approve the next biometric prompt after payment review")
         clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
         val result = withTimeout(OPERATOR_TIMEOUT) { request.await() }
@@ -82,7 +80,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
         assertEquals(Json.parseToJsonElement("""[{"possession":"other"},{"inherence":"other"}]"""), claims["amr"])
         assertVerifierAccepted(session.sessionId, credential.credentialJson, "sca_payment",
             SD_JWT_REQUIRED_POLICIES + "dc+sd-jwt/transaction-data-hash-check")
-        println("SCA_DEVICE_E2E nativeApproved=true walletReview=true exactEncodedHash=true verifier=SUCCESSFUL")
+        println("SCA_DEVICE_E2E shape=${payment.name.lowercase()} nativeApproved=true walletReview=true exactEncodedHash=true verifier=SUCCESSFUL")
     }
 
     companion object {
@@ -100,6 +98,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
                 "Select the physical payment test with -e wallet.sca approve"
             }
             val offer = DemoTestBackend.createOffer(DemoTestBackend.scaPaymentSdJwtScenario)
+            WalletGalleryEvidence.request("issuance", offer.offerUrl)
             val created = createAndroidDemoMobileWallet(context, demoWalletConfig())
             provisionedWallet = created.wallet
             check(provisionedWallet.credentials().isEmpty() && provisionedWallet.signingIdentity.state() == SigningIdentityState.Absent) {
