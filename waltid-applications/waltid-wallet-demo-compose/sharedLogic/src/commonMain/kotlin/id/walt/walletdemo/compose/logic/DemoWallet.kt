@@ -40,14 +40,6 @@ interface DemoWallet {
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
     ): WalletDemoPreparedClaimReview = error("Selection-aware claim review is unavailable on this wallet")
-    suspend fun submitReviewedPresentation(
-        previewHandle: WalletDemoPresentationPreviewHandle,
-        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
-        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
-        did: String?,
-        paymentConsentRevision: String?,
-        presentationReviewRevision: String,
-    ): WalletDemoOperationResult = error("Reviewed submission is unavailable on this wallet")
     /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */
     suspend fun preparePaymentConsent(
         previewHandle: WalletDemoPresentationPreviewHandle,

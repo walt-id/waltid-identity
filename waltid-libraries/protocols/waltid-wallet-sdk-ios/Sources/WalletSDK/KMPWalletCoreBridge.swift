@@ -239,29 +239,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             selectedDisclosureOptions: selectedDisclosureOptions?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) },
             did: did)
         let value = try Self.successValue(result, as: MobileWalletPreparedPresentationReview.self, operation: "review presentation")
-        return PreparedPresentationReview(revision: value.revision, credentials: value.credentials.map { claim in
+        return PreparedPresentationReview(credentials: value.credentials.map { claim in
             PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
                 claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
                     PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
                         sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried)
                 })
         })
-    }
-
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
-        did: String?,
-        runPolicies: Bool?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult {
-        let result = try await bridge.submitReviewedPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
-            selectedCredentialOptions: selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
-            selectedDisclosureOptions: selectedDisclosureOptions?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) },
-            did: did, runPolicies: runPolicies.map { KotlinBoolean(bool: $0) },
-            paymentConsentRevision: paymentConsentRevision, presentationReviewRevision: presentationReviewRevision)
-        return try Self.successValue(result, as: MobileWalletPresentationResult.self, operation: "submit reviewed presentation").toSwiftPresentationResult()
     }
 
     func preparePaymentConsent(

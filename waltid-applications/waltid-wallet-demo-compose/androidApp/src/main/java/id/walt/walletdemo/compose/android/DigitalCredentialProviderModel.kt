@@ -118,14 +118,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         selection: WalletDemoSharingSelection,
         providerRequest: ProviderGetCredentialRequest,
     ) {
-        val revision = selection.presentationReviewRevision
-        val response = if (revision != null) wallet.submitReviewedDigitalCredentialPresentation(
-            requestId = preview.requestId,
-            selectedCredentialOptions = selection.toCredentialSelections(),
-            selectedDisclosureOptions = selection.toDisclosureSelections(),
-            paymentConsentRevision = selection.paymentConsentRevision,
-            presentationReviewRevision = revision,
-        ) else wallet.submitDigitalCredentialPresentation(
+        val response = wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = selection.toCredentialSelections(),
             selectedDisclosureOptions = selection.toDisclosureSelections(),

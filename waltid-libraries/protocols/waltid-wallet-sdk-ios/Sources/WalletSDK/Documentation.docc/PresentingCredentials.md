@@ -80,19 +80,19 @@ let information = try await wallet.reviewPresentation(
 )
 // Display information.credentials; recompute whenever these choices change.
 // Prepare any payment consent sequentially on the same preview handle.
-let result = try await wallet.submitReviewedPresentation(
+let result = try await wallet.submitPresentation(
     previewHandle: preview.previewHandle,
     selectedCredentialOptions: selectedCredentials,
     selectedDisclosureOptions: selectedDisclosures,
     did: identity.did,
-    paymentConsentRevision: paymentConsent?.revision,
-    presentationReviewRevision: information.revision
+    paymentConsentRevision: paymentConsent?.revision
 )
 ```
 
-Disable confirmation while preparing or after an error. Submission rejects a stale review revision;
-reviewing does not sign, refetch the authorization request, or send a presentation. Existing clients
-that never prepare an effective review can continue using `submitPresentation`.
+Disable confirmation while preparing or after an error. Discard late results after selections change,
+and submit the same selection snapshot that was displayed. The SDK does not bind claim review to
+submission; apps own this consistency guard. Reviewing does not sign, refetch the authorization
+request, or send a presentation. Payment consent keeps its independent revision checks.
 
 ### Reject a Presentation Request
 

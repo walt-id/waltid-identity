@@ -1,10 +1,5 @@
 # Breaking changes since 0.3.1
 
-## Selection-bound presentation reviews
-
-- The core `SubmitPresentationRequest` and `SubmitDcApiPresentationRequest` gain an optional `presentationReviewRevision`. Kotlin source can omit it, but their constructor and `copy` JVM descriptors change; direct binary consumers must rebuild. Existing mobile submission method signatures remain available.
-- Once a retained request has prepared a claim review, submission must carry that current review's revision. Changing the selected credentials, disclosures or signed credential invalidates the old revision. Clients that never opt into claim review retain their existing flow. The stateless Wallet2 preview contract is unchanged.
-
 ## OpenID4VCI claim metadata paths
 
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.

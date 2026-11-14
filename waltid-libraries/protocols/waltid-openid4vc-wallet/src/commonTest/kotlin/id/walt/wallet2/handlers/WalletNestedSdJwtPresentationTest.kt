@@ -282,7 +282,7 @@ class WalletNestedSdJwtPresentationTest {
     // ---------------------------------------------------------------------------------------------------------
 
     @Test
-    fun retainedReviewIsReusableWalletBoundAndInvalidatedByAFailedSelectionChange() = runTest {
+    fun retainedReviewIsReusableWalletBoundAndRejectsInvalidSelections() = runTest {
         val request = request(
             """{"id":"name","path":["given_name"]}""",
             """{"id":"country","path":["nationalities",1,"country"]}""",
@@ -316,7 +316,6 @@ class WalletNestedSdJwtPresentationTest {
         assertTrue(on.credentials.single().locations.single {
             it.receivedPath == listOf(JsonPrimitive("given_name"))
         }.alwaysCarried)
-        assertFalse(off.revision == on.revision)
         // No request consumption or second URL resolution is needed to toggle back.
         assertEquals(off.credentials, WalletPresentationHandler.reviewPresentation(wallet, submit).credentials)
         assertFailsWith<PreviewSessionException> {
@@ -326,58 +325,8 @@ class WalletNestedSdJwtPresentationTest {
             WalletPresentationHandler.reviewPresentation(wallet, submit.copy(selectedDisclosureOptions = listOf(
                 PresentationDisclosureSelection(QUERY_ID, CREDENTIAL_ID, "unknown"))))
         }
-        val selected = WalletPresentationHandler.run {
-            selectFromStores(wallet, requireNotNull(request.dcqlQuery), useWalletCredentialIds = true)
-                .selectCredentialOptions(submit.selectedCredentialOptions, emptyList())
-        }
-        assertFailsWith<IllegalStateException> {
-            preview.presentationReview.confirm(off.revision, selected, submit.selectedCredentialOptions, emptyList(), keyId, null)
-        }
         WalletPresentationHandler.discardPreview(wallet, handle)
         assertFailsWith<PreviewSessionException> { WalletPresentationHandler.reviewPresentation(wallet, submit) }
-    }
-
-    @Test
-    fun submissionRejectsMissingReviewRevisionBeforePreparingAnyPresentation() = runTest {
-        val request = request(claim("nationalities", 1, "country"))
-        val wallet = wallet(sdJwt)
-        val keyId = requireNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))).keyId
-        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(wallet,
-            WalletPresentationHandler.PreviewedPresentation.Ready(REQUEST_URL, resolverFor(request)(REQUEST_URL), keyId))
-        val submit = SubmitPresentationRequest(handle,
-            listOf(PresentationCredentialSelection(QUERY_ID, CREDENTIAL_ID)), emptyList())
-        WalletPresentationHandler.reviewPresentation(wallet, submit)
-        val events = mutableListOf<id.walt.wallet2.data.WalletSessionEvent>()
-        val error = assertFailsWith<IllegalStateException> {
-            WalletPresentationHandler.submitPresentation(wallet, submit, onEvent = { events += it },
-                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()))
-        }
-        assertEquals("Information to share has changed; review the current selection before submitting.", error.message)
-        assertFalse(id.walt.wallet2.data.WalletSessionEvent.presentation_credentials_selected in events)
-    }
-
-    @Test
-    fun retainedReviewRejectsAChangedCredentialOrSelectionAndCannotBeBypassedByOmittingItsRevision() = runTest {
-        val wallet = wallet(sdJwt)
-        val query = requireNotNull(request(claim("nationalities", 1, "country")).dcqlQuery)
-        val credentials = listOf(PresentationCredentialSelection(QUERY_ID, CREDENTIAL_ID))
-        val selected = WalletPresentationHandler.run {
-            selectFromStores(wallet, query, useWalletCredentialIds = true).selectCredentialOptions(credentials, emptyList())
-        }
-        val retained = RetainedPresentationReview()
-        val prepared = retained.prepare(selected, credentials, emptyList(), "holder", null)
-        retained.confirm(prepared.revision, selected, credentials, emptyList(), "holder", null)
-        assertFailsWith<IllegalStateException> { retained.confirm(null, selected, credentials, emptyList(), "holder", null) }
-        assertFailsWith<IllegalStateException> { retained.confirm(prepared.revision, selected, credentials, emptyList(), "holder", null) }
-        val changedChoices = retained.prepare(selected, credentials, emptyList(), "holder", null)
-        assertFailsWith<IllegalStateException> { retained.confirm(changedChoices.revision, selected, credentials, null, "holder", null) }
-        val changedKey = retained.prepare(selected, credentials, emptyList(), "holder", null)
-        assertFailsWith<IllegalStateException> { retained.confirm(changedKey.revision, selected, credentials, emptyList(), "other-key", null) }
-        val changedCredential = retained.prepare(selected, credentials, emptyList(), "holder", null)
-        val raw = selected.getValue(QUERY_ID).single().credential as RawDcqlCredential
-        // Snapshot must retain an immutable fingerprint, not a reference to this mutable issuer property.
-        (raw.originalCredential as DigitalCredential).issuer = "https://changed.example"
-        assertFailsWith<IllegalStateException> { retained.confirm(changedCredential.revision, selected, credentials, emptyList(), "holder", null) }
     }
 
     @Test

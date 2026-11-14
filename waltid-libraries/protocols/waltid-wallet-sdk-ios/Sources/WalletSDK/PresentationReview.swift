@@ -2,10 +2,8 @@ import Foundation
 
 /// Effective credential claims for one selected query, prepared without signing or transport.
 public struct PreparedPresentationReview: Equatable, Sendable {
-    public let revision: String
     public let credentials: [PresentationCredentialClaims]
-    public init(revision: String, credentials: [PresentationCredentialClaims]) {
-        self.revision = revision
+    public init(credentials: [PresentationCredentialClaims]) {
         self.credentials = credentials
     }
 }

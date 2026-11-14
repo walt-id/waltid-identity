@@ -91,7 +91,7 @@ class WalletDemoSharingReviewControllerTest {
         assertNull(owner.selectionForSubmission())
         owner.close()
     }
-    private fun claimReview(revision: String) = WalletDemoPreparedClaimReview(revision, listOf(
+    private fun claimReview() = WalletDemoPreparedClaimReview(listOf(
         WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt", "{}", false,
             listOf(WalletDemoClaimLocation("[]", "[]", emptyList(), true)))))
 
@@ -99,7 +99,7 @@ class WalletDemoSharingReviewControllerTest {
         val release = CompletableDeferred<Unit>()
         val calls = mutableListOf<String>()
         val owner = WalletDemoSharingReviewController(review, backgroundScope,
-            project = { selection -> calls += "claims"; release.await(); claimReview(if (name in selection.disclosures) "on" else "off") },
+            project = { calls += "claims"; release.await(); claimReview() },
             prepare = { calls += "payment"; consent("payment") })
         runCurrent()
         assertEquals(listOf("claims"), calls)
@@ -107,26 +107,25 @@ class WalletDemoSharingReviewControllerTest {
         release.complete(Unit)
         val rendered = owner.state.first { it.information is WalletDemoClaimReview.Ready }
         assertEquals(listOf("claims", "payment"), calls)
-        assertEquals("off", owner.selectionForSubmission(rendered)?.presentationReviewRevision)
+        assertEquals(emptySet(), owner.selectionForSubmission(rendered)?.disclosures)
         owner.toggleDisclosure(name)
         assertNull(owner.selectionForSubmission(rendered))
         val current = owner.state.first { it.information is WalletDemoClaimReview.Ready }
-        assertEquals("on", owner.selectionForSubmission(current)?.presentationReviewRevision)
         assertEquals(setOf(name), owner.selectionForSubmission(current)?.disclosures)
         owner.close()
     }
 
-    @Test fun failedClaimReviewKeepsChoicesAndRetryCannotReuseAnOlderRevision() = runTest {
+    @Test fun failedClaimReviewKeepsChoicesAndRetryCannotReuseThePreviousState() = runTest {
         var attempts = 0
         val owner = WalletDemoSharingReviewController(review, backgroundScope,
-            project = { if (++attempts == 1) error("Request expired") else claimReview("retry") })
+            project = { if (++attempts == 1) error("Request expired") else claimReview() })
         val failed = owner.state.first { it.information is WalletDemoClaimReview.Failed }
         assertNull(owner.selectionForSubmission())
         owner.retry()
         assertNull(owner.selectionForSubmission(failed))
         val ready = owner.state.first { it.information is WalletDemoClaimReview.Ready }
         assertEquals(failed.selection.credentials, ready.selection.credentials)
-        assertEquals("retry", owner.selectionForSubmission(ready)?.presentationReviewRevision)
+        assertNotNull(owner.selectionForSubmission(ready))
         owner.close()
     }
 

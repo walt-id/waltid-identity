@@ -14,25 +14,25 @@ final class WalletViewModelPresentationTests: XCTestCase {
         try await waitUntilAsync { await preparation.count == 1 }
         XCTAssertFalse(viewModel.claimReview.canConfirm)
         viewModel.submitPresentation()
-        let firstSubmissions = await client.submittedClaimRevisions
+        let firstSubmissions = await client.submittedClaimSelections
         XCTAssertTrue(firstSubmissions.isEmpty)
         await preparation.fail(0)
         try await waitUntil { if case .failed = viewModel.claimReview { true } else { false } }
         viewModel.submitPresentation()
-        let failedSubmissions = await client.submittedClaimRevisions
+        let failedSubmissions = await client.submittedClaimSelections
         XCTAssertTrue(failedSubmissions.isEmpty)
         viewModel.retryPresentationClaimReview()
         try await waitUntilAsync { await preparation.count == 2 }
-        await preparation.complete(1, revision: "retried")
-        try await waitUntil { viewModel.claimReview.revision == "retried" }
+        await preparation.complete(1)
+        try await waitUntil { if case .ready = viewModel.claimReview { true } else { false } }
         viewModel.submitPresentation()
         try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
-        let revisions = await client.submittedClaimRevisions
-        XCTAssertEqual(revisions, ["retried"])
+        let submissions = await client.submittedClaimSelections
+        XCTAssertEqual(submissions.count, 1)
     }
 
     @MainActor
-    func testSelectionChangeDiscardsLateClaimReviewAndSubmitsTheNewRevision() async throws {
+    func testSelectionChangeDiscardsLateClaimReviewAndSubmitsTheCurrentSelection() async throws {
         let preparation = PendingClaimPreparation()
         let client = claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
@@ -40,19 +40,21 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let credential = try XCTUnwrap(viewModel.selectedPresentationCredentialOptions.first)
         viewModel.togglePresentationDisclosure(.init(queryID: credential.queryID, credentialID: credential.credentialID, path: "$.given_name"))
         try await waitUntilAsync { await preparation.count == 2 }
-        await preparation.complete(1, revision: "current")
-        try await waitUntil { viewModel.claimReview.revision == "current" }
+        await preparation.complete(1)
+        try await waitUntil { if case .ready = viewModel.claimReview { true } else { false } }
+        let currentReview = viewModel.claimReview
         let stale = expectation(description: "Old projection must not replace current review")
         stale.isInverted = true
-        let observation = viewModel.$claimReview.sink { if $0.revision == "stale" { stale.fulfill() } }
-        await preparation.complete(0, revision: "stale")
+        let observation = viewModel.$claimReview.sink { if $0 != currentReview { stale.fulfill() } }
+        await preparation.complete(0)
         await fulfillment(of: [stale], timeout: 0.2)
-        withExtendedLifetime(observation) {}
-        XCTAssertEqual(viewModel.claimReview.revision, "current")
+        observation.cancel()
+        XCTAssertEqual(viewModel.claimReview, currentReview)
+        let currentSelection = Array(viewModel.selectedPresentationDisclosureOptions)
         viewModel.submitPresentation()
         try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
-        let revisions = await client.submittedClaimRevisions
-        XCTAssertEqual(revisions, ["current"])
+        let submissions = await client.submittedClaimSelections
+        XCTAssertEqual(submissions, [currentSelection])
     }
 
     @MainActor
@@ -62,11 +64,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         viewModel.lock()
-        await preparation.complete(0, revision: "late")
+        await preparation.complete(0)
         try await waitUntil { viewModel.presentationReview == nil }
-        XCTAssertNil(viewModel.claimReview.revision)
-        let revisions = await client.submittedClaimRevisions
-        XCTAssertTrue(revisions.isEmpty)
+        XCTAssertEqual(viewModel.claimReview, .legacy)
+        let submissions = await client.submittedClaimSelections
+        XCTAssertTrue(submissions.isEmpty)
     }
 
 
@@ -673,7 +675,7 @@ private actor PendingClaimPreparation {
         try await withCheckedThrowingContinuation { pending.append((credentials, disclosures, $0)) }
     }
     func fail(_ index: Int) { pending[index].2.resume(throwing: WalletError.internalFailure("Projection unavailable")) }
-    func complete(_ index: Int, revision: String) {
+    func complete(_ index: Int) {
         let selected = !pending[index].1.isEmpty
         let claims = pending[index].0.map { credential in
             PresentationCredentialClaims(queryID: credential.queryID, credentialID: credential.credentialID, format: "dc+sd-jwt",
@@ -682,6 +684,6 @@ private actor PendingClaimPreparation {
                     .init(sourcePathJSON: #"["given_name"]"#, receivedPathJSON: #"["given_name"]"#,
                           sharedBy: ["$.given_name"], alwaysCarried: false)].prefix(selected ? 2 : 1).map { $0 })
         }
-        pending[index].2.resume(returning: .init(revision: revision, credentials: claims))
+        pending[index].2.resume(returning: .init(credentials: claims))
     }
 }

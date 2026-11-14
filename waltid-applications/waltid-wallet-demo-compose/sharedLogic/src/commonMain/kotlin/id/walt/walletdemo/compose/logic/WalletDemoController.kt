@@ -1408,11 +1408,7 @@ class WalletDemoController(
 
         presentationJob = scope.launch(dispatcher) {
             try {
-                val revision = current.claimReview.revision
-                val result = if (revision != null) wallet.submitReviewedPresentation(
-                    previewHandle, selectedCredentialOptions, selectedDisclosureOptions, ready.did,
-                    current.paymentReview.consent?.revision, revision,
-                ) else wallet.submitPresentation(
+                val result = wallet.submitPresentation(
                     previewHandle, selectedCredentialOptions, selectedDisclosureOptions, ready.did,
                     paymentConsentRevision = current.paymentReview.consent?.revision,
                 )

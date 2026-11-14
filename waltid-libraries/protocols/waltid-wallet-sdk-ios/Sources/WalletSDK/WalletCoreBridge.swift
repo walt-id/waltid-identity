@@ -28,13 +28,6 @@ protocol WalletCoreBridge: Sendable {
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?
     ) async throws -> PreparedPresentationReview
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
-        did: String?,
-        runPolicies: Bool?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -243,14 +236,5 @@ extension WalletCoreBridge {
         did: String?
     ) async throws -> PreparedPresentationReview {
         throw WalletError.invalidInput("Effective claim review is unavailable")
-    }
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
-        did: String?,
-        runPolicies: Bool?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult {
-        throw WalletError.invalidInput("Reviewed submission is unavailable")
     }
 }

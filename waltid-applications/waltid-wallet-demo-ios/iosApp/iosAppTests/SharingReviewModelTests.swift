@@ -67,7 +67,7 @@ final class SharingReviewModelTests: XCTestCase {
         let option = effectiveOption()
         for locations in [[], [.init(sourcePathJSON: "[null]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)],
                           [.init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)]] as [[PresentationClaimLocation]] {
-            let prepared = PreparedPresentationReview(revision: "review", credentials: [.init(queryID: "employee", credentialID: "one",
+            let prepared = PreparedPresentationReview(credentials: [.init(queryID: "employee", credentialID: "one",
                 format: option.format, claimsJSON: #"{"name":"Maya"}"#, wholeCredential: false, locations: locations)])
             XCTAssertThrowsError(try effectiveReview(prepared, option))
         }
@@ -121,7 +121,7 @@ final class SharingReviewModelTests: XCTestCase {
         for index in [1, 2] {
             let options = [option("first", index: 1), option("second", index: index)]
             let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: options)
-            let review = try EffectivePresentationReview(prepared: .init(revision: "review", credentials: [
+            let review = try EffectivePresentationReview(prepared: .init(credentials: [
                 contribution("first", index: 1), contribution("second", index: index)]), model: model,
                 details: options.map(CredentialDisplayNormalizer.details(for:)),
                 selection: .init(credentials: Set(options.map(\.selection))))
@@ -175,7 +175,7 @@ final class SharingReviewModelTests: XCTestCase {
             }
         }
         walk(CredentialDisplayJSONParser.parse(claims)!, received: [])
-        return .init(revision: "review", credentials: [.init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
+        return .init(credentials: [.init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
             claimsJSON: claims, wholeCredential: false, locations: locations)])
     }
 

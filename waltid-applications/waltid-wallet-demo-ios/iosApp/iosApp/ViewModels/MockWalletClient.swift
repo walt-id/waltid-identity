@@ -22,7 +22,7 @@ actor MockWalletClient: WalletClient {
     private let presentationPreviewResultOverride: PresentationPreviewResult?
     private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)?
     nonisolated var supportsClaimReview: Bool { claimPreparation != nil }
-    private(set) var submittedClaimRevisions: [String] = []
+    private(set) var submittedClaimSelections: [[PresentationDisclosureSelection]] = []
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
     private(set) var submittedPaymentConsentRevisions: [String?] = []
     private let rejectionResult: PresentationResult
@@ -223,15 +223,6 @@ actor MockWalletClient: WalletClient {
         return try await claimPreparation(selectedCredentialOptions, selectedDisclosureOptions)
     }
 
-    func submitReviewedPresentation(previewHandle: PresentationPreviewHandle,
-                                    selectedCredentialOptions: [PresentationCredentialSelection],
-                                    selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?,
-                                    paymentConsentRevision: String?, presentationReviewRevision: String) async throws -> PresentationResult {
-        submittedClaimRevisions.append(presentationReviewRevision)
-        return try await submitPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did, paymentConsentRevision: paymentConsentRevision)
-    }
-
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -246,6 +237,7 @@ actor MockWalletClient: WalletClient {
         did: String?,
         paymentConsentRevision: String?
     ) async throws -> PresentationResult {
+        submittedClaimSelections.append(selectedDisclosureOptions)
         submittedPaymentConsentRevisions.append(paymentConsentRevision)
         try await delayOperation()
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))

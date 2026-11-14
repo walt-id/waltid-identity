@@ -9,12 +9,6 @@ protocol WalletClient {
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PreparedPresentationReview
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult
     func signingIdentityManager() async throws -> SigningIdentityManager?
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult
     func signingProtectionAvailability(
@@ -58,14 +52,6 @@ extension WalletClient {
     ) async throws -> PreparedPresentationReview {
         throw WalletError.invalidInput("Effective review is unavailable")
     }
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult {
-        throw WalletError.invalidInput("Reviewed submission is unavailable")
-    }
     func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
 }
 
@@ -79,16 +65,6 @@ final class SDKWalletClient: WalletClient {
     ) async throws -> PreparedPresentationReview {
         try await wallet().reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions, did: did)
-    }
-    func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?, paymentConsentRevision: String?, presentationReviewRevision: String
-    ) async throws -> PresentationResult {
-        try await wallet().submitReviewedPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did, paymentConsentRevision: paymentConsentRevision,
-            presentationReviewRevision: presentationReviewRevision)
     }
     private let configuration: WalletConfiguration
     private var cachedWallet: Wallet?

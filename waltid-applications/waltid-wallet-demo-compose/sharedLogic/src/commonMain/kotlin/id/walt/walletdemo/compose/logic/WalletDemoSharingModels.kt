@@ -157,7 +157,6 @@ data class WalletDemoSharingSelection(
     val disclosures: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
     /** Acknowledgment supplied only when the corresponding resolved payment has been displayed. */
     val paymentConsentRevision: String? = null,
-    val presentationReviewRevision: String? = null,
 )
 
 /**

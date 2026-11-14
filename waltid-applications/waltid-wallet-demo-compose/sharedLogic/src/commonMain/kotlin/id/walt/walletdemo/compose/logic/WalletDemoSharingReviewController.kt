@@ -56,8 +56,7 @@ class WalletDemoSharingReviewController(
     fun selectionForSubmission(reviewedState: State = state.value): WalletDemoSharingSelection? {
         val current = state.value
         if (closed || current != reviewedState || !review.hasCompleteCredentialSelection(current.selection.credentials) || !current.payment.canConfirm || !current.information.canConfirm) return null
-        return current.selection.copy(paymentConsentRevision = current.payment.consent?.revision,
-            presentationReviewRevision = current.information.revision)
+        return current.selection.copy(paymentConsentRevision = current.payment.consent?.revision)
     }
 
     fun retry() {

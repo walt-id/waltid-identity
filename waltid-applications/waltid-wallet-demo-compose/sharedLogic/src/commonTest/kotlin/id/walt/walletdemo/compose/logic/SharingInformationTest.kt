@@ -96,7 +96,7 @@ class SharingInformationTest {
                 location("""["nationalities",1,"kind"]""", """["nationalities",0,"kind"]"""),
                 location("""["nationalities",1,"country"]""", """["nationalities",0,"country"]"""),
             ))
-        val projected = WalletDemoPreparedClaimReview("revision", listOf(contribution))
+        val projected = WalletDemoPreparedClaimReview(listOf(contribution))
         val array = projected.toEffectiveSharingInformation(listOf(base), emptySet()).single().contributions.single().nodes.single()
         assertEquals(SharingClaimNode.Kind.Array, array.kind)
         assertTrue(array.initiallyExpanded)
@@ -122,7 +122,7 @@ class SharingInformationTest {
                 WalletDemoClaimLocation("""["nationalities"]""", """["nationalities"]""", emptyList(), true),
                 WalletDemoClaimLocation("""["nationalities",$sourceIndex]""", """["nationalities",0]""", listOf("\"nationalities\".$sourceIndex"), false),
             ))
-        val review = WalletDemoPreparedClaimReview("revision", listOf(contribution("a", "IN", 0), contribution("b", "FR", 2)))
+        val review = WalletDemoPreparedClaimReview(listOf(contribution("a", "IN", 0), contribution("b", "FR", 2)))
         val group = review.toEffectiveSharingInformation(listOf(a, b), emptySet()).single()
         assertEquals(2, group.contributions.size)
         assertEquals(listOf(DisplayValue.Text("IN"), DisplayValue.Text("FR")),
@@ -149,7 +149,7 @@ class SharingInformationTest {
                 WalletDemoClaimLocation("""["name"]""", """["name"]""", listOf("name"), false)))
         val selected = setOf(WalletDemoPresentationDisclosureSelection("a", "one", "name"),
             WalletDemoPresentationDisclosureSelection("b", "one", "name"))
-        val review = WalletDemoPreparedClaimReview("revision", listOf(contribution("a"), contribution("b")))
+        val review = WalletDemoPreparedClaimReview(listOf(contribution("a"), contribution("b")))
         val group = review.toEffectiveSharingInformation(listOf(a, b), selected).single()
         assertTrue(group.choices.all { it.forcedReason == null })
         assertEquals(2, group.contributions.size)
@@ -167,7 +167,7 @@ class SharingInformationTest {
         val contribution = WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt",
             """{"iat":1700000000,"_sd_alg":"sha-256","employment":{"iat":"Business note"}}""", false,
             paths.map { WalletDemoClaimLocation(it, it, emptyList(), true) })
-        val nodes = WalletDemoPreparedClaimReview("revision", listOf(contribution))
+        val nodes = WalletDemoPreparedClaimReview(listOf(contribution))
             .toEffectiveSharingInformation(listOf(option), emptySet()).single().contributions.single().nodes
         assertTrue(nodes.single { it.path.id == "iat" }.technical)
         assertTrue(nodes.single { it.path.id == "_sd_alg" }.technical)
@@ -186,7 +186,7 @@ class SharingInformationTest {
             """{"address":{"country":"IN","city":"Bengaluru","verified":false,"extra":{}},"empty_object":{},"empty_array":[]}""", false,
             alwaysPaths.map { WalletDemoClaimLocation(it, it, emptyList(), true) } +
                 conditionalPaths.map { WalletDemoClaimLocation(it, it, listOf(city), false) })
-        val contribution = WalletDemoPreparedClaimReview("revision", listOf(projection))
+        val contribution = WalletDemoPreparedClaimReview(listOf(projection))
             .toEffectiveSharingInformation(listOf(option), emptySet()).single().contributions.single()
         assertTrue(contribution.separatesAlwaysShared)
         val always = contribution.nodes.sharingSection(alwaysShared = true)
@@ -235,7 +235,7 @@ class SharingInformationTest {
             val projection = WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt",
                 """{"certifications":[{"name":"Cloud security","issuer":"Example Training"}]}""", false,
                 paths.map { (source, received) -> WalletDemoClaimLocation(source, received, listOf(path), false) })
-            val certificate = WalletDemoPreparedClaimReview("r", listOf(projection))
+            val certificate = WalletDemoPreparedClaimReview(listOf(projection))
                 .toEffectiveSharingInformation(listOf(option), emptySet()).single().contributions.single().nodes.single().children.single()
             assertEquals("Required", certificate.reason)
             assertTrue(certificate.children.all { !it.additional }, path)
@@ -260,7 +260,7 @@ class SharingInformationTest {
             }
             val projection = WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt",
                 if (on) "{\"certifications\":[$value]}" else "{}", false, locations)
-            return WalletDemoPreparedClaimReview("r", listOf(projection)).toEffectiveSharingInformation(listOf(option),
+            return WalletDemoPreparedClaimReview(listOf(projection)).toEffectiveSharingInformation(listOf(option),
                 if (on) setOf(selection) else emptySet()).single().contributions.single().nodes
                 .sharingSection(alwaysShared = false).single().children.single()
         }

@@ -1,7 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 /** SDK-owned effective values. Received paths describe the payload; source paths own metadata/controls. */
-data class WalletDemoPreparedClaimReview(val revision: String, val credentials: List<WalletDemoCredentialClaims>)
+data class WalletDemoPreparedClaimReview(val credentials: List<WalletDemoCredentialClaims>)
 data class WalletDemoCredentialClaims(
     val queryId: String,
     val credentialId: String,
@@ -24,7 +24,6 @@ sealed interface WalletDemoClaimReview {
     data class Failed(val message: String) : WalletDemoClaimReview
 }
 val WalletDemoClaimReview.canConfirm: Boolean get() = this is WalletDemoClaimReview.Legacy || this is WalletDemoClaimReview.Ready
-val WalletDemoClaimReview.revision: String? get() = (this as? WalletDemoClaimReview.Ready)?.review?.revision
 
 internal val WalletDemoClaimReview.previousReady: WalletDemoClaimReview.Ready?
     get() = when (this) {

@@ -2451,9 +2451,9 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun regularPresentationWaitsForEffectiveClaimsAndSubmitsTheDisplayedReviewRevision() = runTest {
+    fun regularPresentationWaitsForEffectiveClaimsAndSubmitsTheDisplayedSelection() = runTest {
         val gate = CompletableDeferred<Unit>()
-        var reviewedRevision: String? = null
+        var submittedSelection: List<WalletDemoPresentationCredentialSelection>? = null
         val option = WalletDemoPresentationCredentialOption("pid", "card", label = "Identity", issuer = "Issuer",
             format = "dc+sd-jwt", credentialDataJson = "{}", disclosures = emptyList())
         val base = FakeDemoWallet(presentationPreview = WalletDemoPresentationPreview(
@@ -2467,16 +2467,16 @@ class WalletDemoControllerTest {
                 selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, did: String?,
             ): WalletDemoPreparedClaimReview {
                 gate.await()
-                return WalletDemoPreparedClaimReview("reviewed-claims", listOf(WalletDemoCredentialClaims("pid", "card",
+                return WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("pid", "card",
                     "dc+sd-jwt", "{}", false, listOf(WalletDemoClaimLocation("[]", "[]", emptyList(), true)))))
             }
-            override suspend fun submitReviewedPresentation(
+            override suspend fun submitPresentation(
                 previewHandle: WalletDemoPresentationPreviewHandle,
                 selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
                 selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, did: String?,
-                paymentConsentRevision: String?, presentationReviewRevision: String,
+                paymentConsentRevision: String?,
             ): WalletDemoOperationResult {
-                reviewedRevision = presentationReviewRevision
+                submittedSelection = selectedCredentialOptions
                 return WalletDemoOperationResult.Success("Shared")
             }
         }
@@ -2485,12 +2485,12 @@ class WalletDemoControllerTest {
         controller.previewPresentation(); runCurrent()
         assertIs<WalletDemoClaimReview.Loading>(controller.state.value.claimReview)
         controller.submitPresentation(); runCurrent()
-        assertNull(reviewedRevision)
+        assertNull(submittedSelection)
         assertEquals(0, base.submitPresentationCalls)
         gate.complete(Unit)
         controller.state.first { it.claimReview is WalletDemoClaimReview.Ready }
         controller.submitPresentation(); runCurrent()
-        assertEquals("reviewed-claims", reviewedRevision)
+        assertEquals(listOf(option.selection), submittedSelection)
         assertEquals(0, base.submitPresentationCalls)
         assertNull(controller.state.value.presentationPreview)
         assertIs<WalletDemoClaimReview.Legacy>(controller.state.value.claimReview)

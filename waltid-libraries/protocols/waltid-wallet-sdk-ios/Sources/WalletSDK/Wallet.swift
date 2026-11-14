@@ -220,7 +220,7 @@ public actor Wallet {
     }
 
     /// Prepares the effective claims for this selection without signing or sending credentials.
-    /// Display this review and use its revision with reviewed submission. Recompute after any selection change.
+    /// Recompute after selection changes and submit the same selection snapshot that was displayed.
     public func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -229,19 +229,6 @@ public actor Wallet {
     ) async throws -> PreparedPresentationReview {
         try await bridge.reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions, did: did)
-    }
-
-    /// Submits exactly the selection whose effective claims were reviewed. A stale revision is rejected by core.
-    public func submitReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
-        did: String? = nil,
-        runPolicies: Bool? = nil, paymentConsentRevision: String? = nil, presentationReviewRevision: String
-    ) async throws -> PresentationResult {
-        try await bridge.submitReviewedPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did, runPolicies: runPolicies,
-            paymentConsentRevision: paymentConsentRevision, presentationReviewRevision: presentationReviewRevision)
     }
 
     /// Resolves authenticated payment instructions for this selection without signing.

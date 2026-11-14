@@ -146,7 +146,7 @@ class WalletDemoSharingReviewTestScenarios {
             val selected = city in selection.disclosures
             fun location(path: String, carried: Boolean) = WalletDemoClaimLocation(path, path,
                 if (carried) emptyList() else listOf(cityPath), carried)
-            WalletDemoPreparedClaimReview(if (selected) "on" else "off", listOf(WalletDemoCredentialClaims(
+            WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims(
                 "employee", "employee-1", "dc+sd-jwt",
                 if (selected) """{"iat":1700000000,"_sd_alg":"sha-256","employee_id":"EMP-42","address":{"city":"Bengaluru","country":"IN"}}""" else """{"iat":1700000000,"_sd_alg":"sha-256","employee_id":"EMP-42"}""",
                 false, buildList {
@@ -196,7 +196,7 @@ class WalletDemoSharingReviewTestScenarios {
             onNodeWithText("IN").assertDoesNotExist()
             onNodeWithText("Not shared").performScrollToContent(this).assertIsDisplayed()
             onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
-            assertEquals("off", submitted?.presentationReviewRevision)
+            assertEquals(emptySet(), submitted?.disclosures)
         } finally { owner.close(); scope.cancel() }
     }
 

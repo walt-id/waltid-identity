@@ -326,7 +326,6 @@ data class SubmitPresentationRequest(
     val did: String? = null,
     val runPolicies: Boolean? = null,
     val paymentConsentRevision: String? = null,
-    val presentationReviewRevision: String? = null,
 )
 
 @Serializable
@@ -350,7 +349,6 @@ data class SubmitDcApiPresentationRequest(
     val selectedDisclosureOptions: List<PresentationDisclosureSelection>? = null,
     val did: String? = null,
     val paymentConsentRevision: String? = null,
-    val presentationReviewRevision: String? = null,
 )
 
 class MissingPresentationPreviewException :
@@ -387,7 +385,7 @@ object WalletPresentationHandler {
             val keyId: String,
         ) : PreviewedPresentation {
             internal val paymentConsent = RetainedPaymentConsent()
-            internal val presentationReview = RetainedPresentationReview()
+
         }
 
         data class Invalid(
@@ -407,7 +405,6 @@ object WalletPresentationHandler {
         val allowedCredentialIds: Set<String>,
     ) {
         val paymentConsent = RetainedPaymentConsent()
-        val presentationReview = RetainedPresentationReview()
     }
 
     /**
@@ -1040,14 +1037,12 @@ object WalletPresentationHandler {
         request: SubmitPresentationRequest,
     ): PreparedPresentationReview = previewedAuthorizationRequests.prepare(wallet.id, request.previewHandle.value) { preview ->
         require(preview is PreviewedPresentation.Ready) { "Cannot review an invalid presentation" }
-        preview.presentationReview.invalidate()
         require(request.keyId == null || request.keyId == preview.keyId) { "The signing key must match the reviewed key" }
         val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
         validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        preview.presentationReview.prepare(selected, request.selectedCredentialOptions, request.selectedDisclosureOptions,
-            preview.keyId, request.did ?: wallet.defaultDid())
+        preparePresentationReview(selected)
     }
 
     /** Selection review for a wallet-bound Digital Credentials API request; does not consume it. */
@@ -1055,7 +1050,6 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: SubmitDcApiPresentationRequest,
     ): PreparedPresentationReview = previewedDcApiRequests.prepare(wallet.id, request.requestId) { preview ->
-        preview.presentationReview.invalidate()
         require(request.selectedCredentialOptions.all { it.credentialId in preview.allowedCredentialIds }) {
             "A selected credential was not offered by the retained Digital Credentials preview"
         }
@@ -1063,9 +1057,7 @@ object WalletPresentationHandler {
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
         validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        val key = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)) ?: error("Signing key is unavailable")
-        preview.presentationReview.prepare(selected, request.selectedCredentialOptions, request.selectedDisclosureOptions,
-            key.keyId, request.did ?: wallet.defaultDid())
+        preparePresentationReview(selected)
     }
 
     /** Prepares metadata-driven consent under the retained URL preview's exclusive lease. */
@@ -1175,8 +1167,6 @@ object WalletPresentationHandler {
 
             val selected = selectReviewedCredentials(wallet, requireNotNull(resolvedAuthorizationRequest.authorizationRequest.dcqlQuery),
                 request.selectedCredentialOptions, request.selectedDisclosureOptions)
-            ready.presentationReview.confirm(request.presentationReviewRevision, selected,
-                request.selectedCredentialOptions, request.selectedDisclosureOptions, ready.keyId, did)
             paymentConsentPolicy?.let { policy ->
                 ready.paymentConsent.confirm(request.paymentConsentRevision, resolvedAuthorizationRequest.authorizationRequest,
                     selected, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)
@@ -1408,8 +1398,6 @@ object WalletPresentationHandler {
 
             val selected = selectReviewedCredentials(wallet, requireNotNull(authorizationRequest.dcqlQuery),
                 request.selectedCredentialOptions, request.selectedDisclosureOptions)
-            previewedRequest.presentationReview.confirm(request.presentationReviewRevision, selected,
-                request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial.keyId, did)
             paymentConsentPolicy?.let { policy ->
                 previewedRequest.paymentConsent.confirm(request.paymentConsentRevision, authorizationRequest,
                     selected, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)

@@ -323,12 +323,9 @@ public enum class MobileWalletPresentationErrorCode(
 /**
  * Effective claims for a selection, prepared without signing or consuming the retained request.
  *
- * @property revision Opaque acknowledgment of this review. Submit it only after displaying the
- * current review; changing the selection requires preparing and acknowledging a new review.
  * @property credentials Effective claim contributions, kept separate for each query and credential.
  */
 public data class MobileWalletPreparedPresentationReview(
-    val revision: String,
     val credentials: List<MobileWalletPresentationCredentialClaims>,
 )
 

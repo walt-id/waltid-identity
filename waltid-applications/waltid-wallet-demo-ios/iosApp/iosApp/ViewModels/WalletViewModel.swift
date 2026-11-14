@@ -1477,24 +1477,16 @@ class WalletViewModel: ObservableObject {
         let selectedDid = did.isEmpty ? nil : did
 
         let consentRevision = paymentReview.consent?.revision
-        let claimRevision = claimReview.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
-                let result: PresentationResult
-                if let claimRevision {
-                    result = try await walletClient.submitReviewedPresentation(previewHandle: previewHandle,
-                        selectedCredentialOptions: selectedCredentialOptions, selectedDisclosureOptions: Array(selectedDisclosureOptions),
-                        did: selectedDid, paymentConsentRevision: consentRevision, presentationReviewRevision: claimRevision)
-                } else {
-                result = try await walletClient.submitPresentation(
+                let result = try await walletClient.submitPresentation(
                     previewHandle: previewHandle,
                     selectedCredentialOptions: selectedCredentialOptions,
                     selectedDisclosureOptions: Array(selectedDisclosureOptions),
                     did: selectedDid,
                     paymentConsentRevision: consentRevision
                 )
-                }
                 try Task.checkCancellation()
                 resetPresentationToEntry()
                 handlePresentationResult(

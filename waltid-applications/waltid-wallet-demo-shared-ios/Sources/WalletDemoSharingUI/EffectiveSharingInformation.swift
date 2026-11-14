@@ -11,7 +11,6 @@ public enum ClaimReviewState: Equatable {
     public var canConfirm: Bool {
         switch self { case .legacy, .ready: return true; default: return false }
     }
-    public var revision: String? { if case .ready(let value) = self { return value.revision }; return nil }
     public var previous: EffectivePresentationReview? {
         switch self { case .ready(let value): return value; case .loading(let value): return value; default: return nil }
     }
@@ -59,17 +58,14 @@ struct EffectiveClaimContribution: Equatable, Identifiable {
 
 /// Layout is applied only to SDK-effective values. Off choices are explicitly holder-known candidates.
 public struct EffectivePresentationReview: Equatable {
-    public let revision: String
     let contributions: [EffectiveClaimContribution]
 
     public init(prepared: PreparedPresentationReview, model: SharingReviewModel,
                 details: [CredentialDetails], selection: SharingSelection) throws {
-        guard !prepared.revision.isEmpty,
-              prepared.credentials.count == selection.credentials.count,
+        guard prepared.credentials.count == selection.credentials.count,
               Set(prepared.credentials.map { PresentationCredentialSelection(queryID: $0.queryID, credentialID: $0.credentialID) }) == selection.credentials else {
             throw invalidReview("Effective review does not match selected credentials")
         }
-        revision = prepared.revision
         let options = Dictionary(uniqueKeysWithValues: model.credentialOptions.map { ($0.selection, $0) })
         func optionFor(_ contribution: PresentationCredentialClaims) throws -> PresentationCredentialOption {
             guard let option = options[.init(queryID: contribution.queryID, credentialID: contribution.credentialID)],

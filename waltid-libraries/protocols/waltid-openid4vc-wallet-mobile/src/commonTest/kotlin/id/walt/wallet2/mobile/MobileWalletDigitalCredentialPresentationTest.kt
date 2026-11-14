@@ -110,10 +110,9 @@ class MobileWalletDigitalCredentialPresentationTest {
             selectedCredentialOptions = preview.credentialOptions.selections(),
         )
         assertFalse(review.credentials.single().wholeCredential)
-        val response = fixture.wallet.submitReviewedDigitalCredentialPresentation(
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
-            presentationReviewRevision = review.revision,
         )
 
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, response.protocol)
@@ -151,10 +150,9 @@ class MobileWalletDigitalCredentialPresentationTest {
             selectedCredentialOptions = preview.credentialOptions.selections(),
         )
         assertFalse(review.credentials.single().wholeCredential)
-        val response = fixture.wallet.submitReviewedDigitalCredentialPresentation(
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
-            presentationReviewRevision = review.revision,
         )
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
