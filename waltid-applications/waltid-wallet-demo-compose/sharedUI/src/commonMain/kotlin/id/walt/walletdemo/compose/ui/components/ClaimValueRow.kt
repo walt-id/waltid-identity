@@ -24,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +50,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.ClaimRole
 import id.walt.walletdemo.compose.logic.ClaimItemPath
 import id.walt.walletdemo.compose.logic.DisplayValue
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -55,15 +59,55 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
-    CredentialDataRow(item.label, modifier.testTag(WalletUiTestTags.claim(item.path.id))) {
-        ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
+internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier, depth: Int = 0, ancestors: List<String> = emptyList()) {
+    key(item.path.id) {
+        val label = item.label
+        val objectValue = item.value as? DisplayValue.ObjectValue
+        if (objectValue != null) {
+            MetadataDisclosure(
+                title = label,
+                initiallyExpanded = false,
+                modifier = modifier.testTag(WalletUiTestTags.claim(item.path.id)),
+            ) { ClaimObjectEntries(objectValue, depth, ancestors + item.label) }
+        } else if ((item.value as? DisplayValue.ListValue)?.hasOnlyContainers() == true) {
+            MetadataDisclosure(
+                title = label,
+                initiallyExpanded = false,
+                modifier = modifier.testTag(WalletUiTestTags.claim(item.path.id)),
+            ) { ClaimValue(item.value, item.path, Modifier.fillMaxWidth(), depth = depth, ancestors = ancestors + item.label) }
+        } else {
+            CredentialDataRow(label, modifier.testTag(WalletUiTestTags.claim(item.path.id))) {
+                ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth(), depth = depth, ancestors = ancestors + item.label)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClaimObjectEntries(value: DisplayValue.ObjectValue, depth: Int, ancestors: List<String>) {
+    var visibleCount by rememberSaveable { mutableStateOf(MaxListPreviewItems) }
+    val readable = value.entries.filterNot { ClaimRole.Technical in it.roles }
+    val technical = value.entries.filter { ClaimRole.Technical in it.roles }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (value.entries.isEmpty()) Text(stringResource(Res.string.claim_empty_object))
+        readable.take(visibleCount).forEach { entry -> ClaimValueRow(entry, depth = depth + 1, ancestors = ancestors) }
+        if (readable.size > visibleCount) {
+            Text(stringResource(Res.string.claim_list_preview, visibleCount, readable.size), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { visibleCount = (visibleCount + MaxListPreviewItems).coerceAtMost(readable.size) }) {
+                Text(stringResource(Res.string.claim_list_more, (readable.size - visibleCount).coerceAtMost(MaxListPreviewItems)))
+            }
+        }
+        if (technical.isNotEmpty()) {
+            MetadataDisclosure(title = stringResource(Res.string.credential_technical_details), initiallyExpanded = false) {
+                technical.forEach { entry -> ClaimValueRow(entry, depth = depth + 1, ancestors = ancestors) }
+            }
+        }
     }
 }
 
 @Composable
 internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modifier = Modifier,
-                        textStyle: TextStyle = MaterialTheme.typography.bodyLarge) {
+                        textStyle: TextStyle = MaterialTheme.typography.bodyLarge, depth: Int = 0, ancestors: List<String> = emptyList()) {
     when (value) {
         is DisplayValue.InstantValue -> WalletInstantText(value.value, modifier = modifier)
         is DisplayValue.BooleanValue -> Text(
@@ -78,7 +122,7 @@ internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modi
         )
         is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
-        is DisplayValue.ListValue -> ClaimListValue(value, path, modifier)
+        is DisplayValue.ListValue -> ClaimListValue(value, path, modifier, depth, ancestors)
         DisplayValue.NullValue -> Text(
             stringResource(Res.string.claim_null_value),
             modifier = modifier,
@@ -95,9 +139,7 @@ internal fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modi
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (value.entries.isEmpty()) Text(stringResource(Res.string.claim_empty_object))
-            value.entries.forEach { entry ->
-                ClaimValueRow(entry)
-            }
+            if (value.entries.isNotEmpty()) ClaimObjectEntries(value, depth, ancestors)
         }
         is DisplayValue.Raw -> Text(
             value.value,
@@ -140,15 +182,43 @@ private fun DeferredImageValue(source: DisplayValue.DeferredImage, path: ClaimIt
 
 private const val MaxListPreviewItems = 25
 
+private fun DisplayValue.ListValue.hasOnlyContainers(): Boolean =
+    values.isNotEmpty() && values.all { it is DisplayValue.ObjectValue || it is DisplayValue.ListValue }
+
 @Composable
-private fun ClaimListValue(value: DisplayValue.ListValue, path: ClaimItemPath, modifier: Modifier) {
+private fun ClaimListValue(value: DisplayValue.ListValue, path: ClaimItemPath, modifier: Modifier, depth: Int, ancestors: List<String>) {
     var visibleCount by remember(value, path) { mutableStateOf(MaxListPreviewItems) }
+    val containerCount = value.values.count { it is DisplayValue.ObjectValue || it is DisplayValue.ListValue }
+    val mixed = containerCount > 0 && containerCount < value.values.size
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (value.values.isEmpty()) Text(stringResource(Res.string.claim_empty_list))
         value.values.take(visibleCount).forEachIndexed { index, child ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("${index + 1}.", style = MaterialTheme.typography.bodyLarge)
-                ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
+            key(path.indexedChild(index).id) {
+                val metadataLabel = value.labels[index]
+                if (mixed || child is DisplayValue.ObjectValue || child is DisplayValue.ListValue) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                            .padding(12.dp).testTag(WalletUiTestTags.claim(path.indexedChild(index).id)),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (metadataLabel != null) Text(metadataLabel, Modifier.semantics { heading() },
+                            style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        if (child is DisplayValue.ObjectValue) ClaimObjectEntries(child, depth + 1, ancestors)
+                        else ClaimValue(child, path.indexedChild(index), Modifier.fillMaxWidth(), depth = depth + 1, ancestors = ancestors)
+                    }
+                } else if (metadataLabel != null) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${index + 1}.", style = MaterialTheme.typography.bodyLarge)
+                        ClaimValueRow(ClaimItem(path = path.indexedChild(index), label = metadataLabel, value = child),
+                            Modifier.weight(1f), depth = depth + 1, ancestors = ancestors)
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("${index + 1}.", style = MaterialTheme.typography.bodyLarge)
+                        ClaimValue(child, path.indexedChild(index), Modifier.weight(1f), depth = depth, ancestors = ancestors)
+                    }
+                }
             }
         }
         if (value.values.size > visibleCount) {

@@ -157,10 +157,12 @@ struct PresentView: View {
         let informationReady = renderedSharingOptions == review.credentialOptions
         let reviewedSelection = viewModel.presentationSharingSelection
         let reviewedPayment = viewModel.paymentReview
+        let reviewedClaims = viewModel.claimReview
         let submit = {
             guard informationReady, review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
-                  reviewedPayment == viewModel.paymentReview else { return }
+                  reviewedPayment == viewModel.paymentReview,
+                  reviewedClaims == viewModel.claimReview else { return }
             viewModel.submitPresentation()
         }
         return WalletReviewScaffold(showsActions: true) {
@@ -172,7 +174,7 @@ struct PresentView: View {
             SharingReviewView(
                 review: review,
                 selection: viewModel.presentationSharingSelection,
-                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete,
+                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete && viewModel.claimReview.canConfirm,
                 isLoading: !viewModel.presentationReviewEnabled,
                 isReadOnly: false,
                 onToggleCredential: viewModel.togglePresentationCredential,
@@ -182,11 +184,13 @@ struct PresentView: View {
                 onCancel: closeReview,
                 compact: false,
                 showActions: false,
-                paymentReview: viewModel.paymentReview
+                paymentReview: viewModel.paymentReview,
+                claimReview: viewModel.claimReview,
+                onRetryClaimReview: viewModel.retryPresentationClaimReview
             )
         } actions: {
             ReviewActions(
-                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete,
+                selectionComplete: informationReady && viewModel.presentationCredentialSelectionComplete && viewModel.claimReview.canConfirm,
                 isLoading: !viewModel.presentationReviewEnabled,
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,

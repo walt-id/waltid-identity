@@ -53,24 +53,40 @@ extension CredentialClaimMetadata {
 extension ClaimItem {
     /// Metadata changes label/order only; disclosure policy and values remain SDK-owned.
     func applyingClaimMetadata(_ metadata: [CredentialClaimMetadata], format: String, expression: ClaimPathExpression? = nil) -> ClaimItem {
-        let paths = metadataPaths(expression ?? ClaimPathExpression.parse(path.id), format: format)
-        let match = metadata.enumerated().first { entry in
-            paths.contains { candidate in
-                entry.element.path.count == candidate.count && zip(entry.element.path, candidate).allSatisfy { $0.matches($1) }
-            }
-        }
+        let pathExpression = expression ?? ClaimPathExpression.parse(path.id)
+        let match = bestClaimMetadata(metadata, expression: pathExpression, format: format)
         return ClaimItem(path: path, pathComponents: pathComponents, label: match?.element.name ?? label,
-            value: value.applyingClaimMetadata(metadata, format: format), rawValue: rawValue, roles: roles,
+            value: value.applyingClaimMetadata(metadata, format: format, expression: pathExpression), rawValue: rawValue, roles: roles,
             labelSource: match?.element.name == nil ? labelSource : .issuerMetadata, displayOrder: match?.offset)
     }
 }
 
+func bestClaimMetadata(_ metadata: [CredentialClaimMetadata], expression: ClaimPathExpression, format: String)
+    -> (offset: Int, element: CredentialClaimMetadata)? {
+    guard !expression.segments.isEmpty else { return nil }
+    let paths = metadataPaths(expression, format: format)
+    let match = metadata.enumerated().first { entry in
+        paths.contains { candidate in
+            entry.element.path.count == candidate.count && zip(entry.element.path, candidate).allSatisfy { $0.matches($1) }
+        }
+    }
+    return match
+}
+
 private extension DisplayValue {
-    func applyingClaimMetadata(_ metadata: [CredentialClaimMetadata], format: String) -> DisplayValue {
+    func applyingClaimMetadata(_ metadata: [CredentialClaimMetadata], format: String, expression: ClaimPathExpression) -> DisplayValue {
+        guard !expression.segments.isEmpty else { return self }
         switch self {
         case .object(let items):
             return .object(items.map { $0.applyingClaimMetadata(metadata, format: format) }.sorted { ($0.displayOrder ?? .max) < ($1.displayOrder ?? .max) })
-        case .list(let values): return .list(values.map { $0.applyingClaimMetadata(metadata, format: format) })
+        case .list(let values, _):
+            let paths = values.indices.map { ClaimPathExpression(segments: expression.segments + [.index($0)]) }
+            var labels: [Int: String] = [:]
+            let mapped = values.enumerated().map { index, value in
+                if let name = bestClaimMetadata(metadata, expression: paths[index], format: format)?.element.name { labels[index] = name }
+                return value.applyingClaimMetadata(metadata, format: format, expression: paths[index])
+            }
+            return .list(mapped, labels: labels)
         default: return self // Deferred images remain unresolved.
         }
     }
@@ -86,22 +102,14 @@ private func metadataPaths(_ expression: ClaimPathExpression, format: String) ->
 
 func applyClaimMetadata(_ groups: [ClaimGroup], metadata: [CredentialClaimMetadata], format: String) -> [ClaimGroup] {
     guard !metadata.isEmpty else { return groups }
-    let mapped = groups.map { group in
+    // Order only siblings; preserve semantic sections and each nested parent.
+    return groups.map { group in
         if group.id == "requested" { return group }
+        let items = group.items.map { $0.applyingClaimMetadata(metadata, format: format) }
         return ClaimGroup(id: group.id, title: group.title,
-            items: group.items.map { $0.applyingClaimMetadata(metadata, format: format) },
+            items: items.sorted { ($0.displayOrder ?? .max) < ($1.displayOrder ?? .max) },
             initiallyExpanded: group.initiallyExpanded, transactionType: group.transactionType)
     }
-    let stored = mapped.filter { $0.id != "requested" }
-    guard stored.contains(where: { $0.items.contains { $0.displayOrder != nil } }) else { return mapped }
-    let readable = stored.flatMap { group in group.items.filter { group.id != "technical" || $0.displayOrder != nil } }
-        .sorted { ($0.displayOrder ?? .max) < ($1.displayOrder ?? .max) }
-    let technical = stored.filter { $0.id == "technical" }.compactMap { group -> ClaimGroup? in
-        let items = group.items.filter { $0.displayOrder == nil }
-        return items.isEmpty ? nil : ClaimGroup(id: group.id, title: group.title, items: items, initiallyExpanded: group.initiallyExpanded)
-    }
-    return mapped.filter { $0.id == "requested" }
-        + (readable.isEmpty ? [] : [ClaimGroup(id: "data", title: ClaimGroupKind.other.title, items: readable)]) + technical
 }
 
 func disclosurePathComponents(_ raw: String, format: String) -> [String] {

@@ -39,6 +39,7 @@ import id.walt.wallet2.handlers.PresentationCredentialRequirement
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PresentationPreviewHandle
+import id.walt.wallet2.handlers.PreparedPresentationReview
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
@@ -89,6 +90,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1043,6 +1045,34 @@ public class MobileWallet internal constructor(
         }
     }
 
+    /** Recomputes exactly what the selected credentials disclose, without signing or sending. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewPresentation(wallet,
+            SubmitPresentationRequest(PresentationPreviewHandle(previewHandle.value),
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
+    /** Same selection review for a retained Digital Credentials API request. */
+    public suspend fun reviewDigitalCredentialPresentation(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewDcApiPresentation(wallet,
+            SubmitDcApiPresentationRequest(requestId,
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
     /** Resolves authoritative payment instructions for the current credential/disclosure selection. */
     public suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -1478,3 +1508,11 @@ internal fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): Mo
 private fun String.includesWalletInstanceAttestation(): Boolean = this == "wia" || this == "wia_ka"
 
 private fun String.includesKeyAttestation(): Boolean = this == "ka" || this == "wia_ka"
+
+private fun PreparedPresentationReview.toMobileReview() =
+    MobileWalletPreparedPresentationReview(credentials.map {
+        MobileWalletPresentationCredentialClaims(it.queryId, it.credentialId, it.format, it.claims.toString(), it.wholeCredential,
+            it.locations.map { location -> MobileWalletPresentationClaimLocation(
+                JsonArray(location.sourcePath).toString(),
+                JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
+    })

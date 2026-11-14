@@ -4,6 +4,8 @@ import SwiftUI
 public struct MetadataDisclosure<Content: View>: View {
     public let title: String
     public let accessibilityIdentifier: String?
+    public let supportingText: String?
+    public let indicatorColor: Color
     public let content: Content
     @State private var isExpanded: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -13,8 +15,12 @@ public struct MetadataDisclosure<Content: View>: View {
         title: String,
         initiallyExpanded: Bool,
         accessibilityIdentifier: String? = nil,
+        supportingText: String? = nil,
+        indicatorColor: Color = .accentColor,
         @ViewBuilder content: () -> Content
     ) {
+        self.indicatorColor = indicatorColor
+        self.supportingText = supportingText
         self.title = title
         self.accessibilityIdentifier = accessibilityIdentifier
         self.content = content()
@@ -25,10 +31,12 @@ public struct MetadataDisclosure<Content: View>: View {
         VStack(alignment: .leading, spacing: 4) {
             Button { isExpanded.toggle() } label: {
                 HStack(spacing: 8) {
-                    Text(title).font(.body.weight(.semibold)).foregroundStyle(Color.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title).font(.body.weight(.semibold)).foregroundStyle(Color.primary)
+                        if let supportingText { Text(supportingText).font(.footnote).foregroundStyle(.secondary) }
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.forward")
-                        .font(.body.weight(.semibold)).foregroundStyle(.tint)
+                        .font(.body.weight(.semibold)).foregroundStyle(indicatorColor)
                         .rotationEffect(.degrees(isExpanded ? (layoutDirection == .rightToLeft ? -90 : 90) : 0))
                         .accessibilityHidden(true)
                 }

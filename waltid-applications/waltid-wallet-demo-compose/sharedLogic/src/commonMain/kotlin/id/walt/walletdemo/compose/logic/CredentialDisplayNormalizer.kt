@@ -45,18 +45,27 @@ object CredentialDisplayNormalizer {
                 issuerDisplay = issuerDisplay,
                 credentialDisplay = credentialDisplay,
             )
-        val displayData = if (summary.format == MdocFormat) parsed.withoutNullObjectMembers() else parsed
+        val displayData = parsed
+        val multipleNamespaces = summary.format == MdocFormat && displayData.values.count { it is JsonObject } > 1
 
         val groupedItems = displayData.entries
             .flatMap { (key, value) ->
                 val path = ClaimPath.topLevel(key)
-                value.toClaimRows(
+                value.toCredentialRows(
                     path = path,
                     label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
                     format = summary.format,
+                    preserveNamespaces = multipleNamespaces,
                 )
-                    .map { row -> row.withMdocDisplaySemantics(summary.format) }
-                    .map { row -> CredentialDisplayVocabulary.groupKind(row.path, summary.format) to row }
+                    .map { row ->
+                        val children = (row.item.value as? DisplayValue.ObjectValue)?.entries
+                        val group = if (summary.format == MdocFormat && row.path.components.size == 1 && children != null) {
+                            children.map { child -> CredentialDisplayVocabulary.groupKind(
+                                ClaimPath(itemPath = child.path, components = child.pathComponents), summary.format)
+                            }.minByOrNull { it.order } ?: CredentialDisplayVocabulary.groupKind(row.path, summary.format)
+                        } else CredentialDisplayVocabulary.groupKind(row.path, summary.format)
+                        group to row
+                    }
             }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
             .entries
@@ -76,7 +85,7 @@ object CredentialDisplayNormalizer {
 
         return CredentialDetails(
             summary = summary,
-            groups = applyClaimMetadata(groupedItems, StoredCredentialMetadataParser.claims(summary.metadataJson, preferredLocales), summary.format),
+            groups = applyClaimMetadata(groupedItems, StoredCredentialMetadataParser.claims(summary.metadataJson, preferredLocales, summary.format), summary.format),
             issuerDisplay = issuerDisplay,
             credentialDisplay = credentialDisplay,
         )
@@ -186,18 +195,27 @@ object CredentialDisplayNormalizer {
         }
     }
 
-    private fun JsonElement.toClaimItem(path: ClaimPath, label: String, format: String?): ClaimItem =
-        ClaimItem(
+    private fun JsonElement.toClaimItem(path: ClaimPath, label: String, format: String?): ClaimItem {
+        if (format == MdocFormat && path.components.size == 2 && this is JsonObject && keys == setOf(imageWrapperClaimName)) {
+            return getValue(imageWrapperClaimName).toClaimItem(ClaimPath.child(path, imageWrapperClaimName), label, format)
+        }
+        val item = ClaimItem(
             path = path.itemPath,
             pathComponents = path.components,
-            label = label,
-            value = toProtocolDisplayValue(path) ?: toDisplayValue(path, format),
+            label = label.ifBlank { "Claim" },
+            value = toProtocolDisplayValue(path, format) ?: toDisplayValue(path, format),
             rawValue = toString(),
-            roles = CredentialDisplayVocabulary.roles(path),
+            roles = CredentialDisplayVocabulary.roles(path) +
+                if (format in setOf("dc+sd-jwt", "vc+sd-jwt") && path.leaf in setOf("_sd", "_sd_alg")) setOf(ClaimRole.Technical) else emptySet(),
         )
+        return if (format == null) item else ClaimRow(path, item).withMdocDisplaySemantics(format).item
+    }
 
-    private fun JsonElement.toProtocolDisplayValue(path: ClaimPath): DisplayValue? =
-        when (path.leaf) {
+    private fun JsonElement.toProtocolDisplayValue(path: ClaimPath, format: String?): DisplayValue? {
+        if (format?.lowercase() !in dataUrlFallbackFormats) return null
+        val components = if (format in setOf("jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc") && path.topLevel == "vc") path.components.drop(1) else path.components
+        if (components.size != 1 && !(path.leaf == "_sd" && format in setOf("dc+sd-jwt", "vc+sd-jwt"))) return null
+        return when (path.leaf) {
             "_sd" -> (this as? JsonArray)?.let { digests ->
                 DisplayValue.Text(digests.hiddenClaimCommitmentsText())
             }
@@ -216,15 +234,54 @@ object CredentialDisplayNormalizer {
             else -> null
         }
 
+    }
+
     private fun JsonElement.toClaimRows(path: ClaimPath, label: String, format: String?): List<ClaimRow> {
         val item = toClaimItem(path = path, label = label, format = format)
         return flattenObjectForClaimRows(path = path, item = item)
     }
 
+    /** Only protocol envelopes are transparent. Claim objects retain their own display identity. */
+    private fun JsonElement.toCredentialRows(
+        path: ClaimPath,
+        label: String,
+        format: String,
+        preserveNamespaces: Boolean,
+    ): List<ClaimRow> {
+        if (this is JsonObject) {
+            val components = path.components
+            if (format == MdocFormat && keys == setOf(imageWrapperClaimName)) {
+                return getValue(imageWrapperClaimName).toCredentialRows(
+                    ClaimPath.child(path, imageWrapperClaimName), label, format, preserveNamespaces)
+            }
+            val w3cEnvelope = format in setOf("jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc") &&
+                components in listOf(listOf("vc"), listOf("credentialSubject"), listOf("credential_subject"),
+                    listOf("vc", "credentialSubject"), listOf("vc", "credential_subject"))
+            val mdocNamespace = format == MdocFormat && components.size == 1 && !preserveNamespaces
+            if ((w3cEnvelope || mdocNamespace) && isNotEmpty()) {
+                return entries.flatMap { (key, value) ->
+                    value.toCredentialRows(ClaimPath.child(path, key),
+                        CredentialDisplayVocabulary.humanizedClaimLabel(key), format, preserveNamespaces)
+                }
+            }
+        }
+        val item = toClaimItem(path, label, format)
+        val objectValue = item.value as? DisplayValue.ObjectValue
+        val wrappedImage = objectValue?.entries?.singleOrNull()?.takeIf { child ->
+            child.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName) &&
+                (child.value is DisplayValue.Image || child.value is DisplayValue.DeferredImage)
+        }
+        return if (wrappedImage != null) {
+            listOf(ClaimRow(ClaimPath.child(path, imageWrapperClaimName), wrappedImage.copy(label = label)))
+        } else {
+            listOf(ClaimRow(path, item))
+        }
+    }
+
     private fun ClaimRow.withMdocDisplaySemantics(format: String): ClaimRow {
         val semantics = MdocClaimDisplaySemantics.describe(format = format, path = path.components)
             ?: return this
-        val displayValue = when (semantics.valueKind) {
+        val displayValue = if (item.value == DisplayValue.NullValue) item.value else when (semantics.valueKind) {
             MdocClaimValueKind.Boolean -> if (item.value is DisplayValue.BooleanValue) {
                 item.value
             } else {
@@ -257,20 +314,6 @@ object CredentialDisplayNormalizer {
 
     private fun Int.toReadableByteCount(): String =
         if (this == 1) "1 byte" else "$this bytes"
-
-    private fun JsonObject.withoutNullObjectMembers(): JsonObject =
-        JsonObject(
-            entries.mapNotNull { (key, value) ->
-                if (value is JsonNull) null else key to value.withoutNullObjectMembers()
-            }.toMap()
-        )
-
-    private fun JsonElement.withoutNullObjectMembers(): JsonElement =
-        when (this) {
-            is JsonObject -> withoutNullObjectMembers()
-            is JsonArray -> JsonArray(map { element -> element.withoutNullObjectMembers() })
-            else -> this
-        }
 
     private fun JsonElement.flattenObjectForClaimRows(
         path: ClaimPath,
@@ -413,9 +456,9 @@ private data class ClaimRow(
 
 private fun JsonArray.hiddenClaimCommitmentsText(): String =
     when (size) {
-        0 -> "No undisclosed claim values"
-        1 -> "1 undisclosed claim value"
-        else -> "$size undisclosed claim values"
+        0 -> "No disclosure digests"
+        1 -> "1 disclosure digest"
+        else -> "$size disclosure digests"
     }
 
 private fun JsonObject.credentialStatusText(): String {

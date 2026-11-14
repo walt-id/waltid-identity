@@ -20,6 +20,9 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
+    private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)?
+    nonisolated var supportsClaimReview: Bool { claimPreparation != nil }
+    private(set) var submittedClaimSelections: [[PresentationDisclosureSelection]] = []
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
     private(set) var submittedPaymentConsentRevisions: [String?] = []
     private let rejectionResult: PresentationResult
@@ -42,6 +45,7 @@ actor MockWalletClient: WalletClient {
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
+        claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)? = nil,
         paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
@@ -60,6 +64,7 @@ actor MockWalletClient: WalletClient {
         self.transactionCodeRequired = transactionCodeRequired
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
+        self.claimPreparation = claimPreparation
         self.paymentConsent = paymentConsent
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
@@ -211,6 +216,13 @@ actor MockWalletClient: WalletClient {
         )
     }
 
+    func reviewPresentation(previewHandle: PresentationPreviewHandle,
+                            selectedCredentialOptions: [PresentationCredentialSelection],
+                            selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?) async throws -> PreparedPresentationReview {
+        guard let claimPreparation else { throw WalletError.invalidInput("Claim review unavailable") }
+        return try await claimPreparation(selectedCredentialOptions, selectedDisclosureOptions)
+    }
+
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -225,6 +237,7 @@ actor MockWalletClient: WalletClient {
         did: String?,
         paymentConsentRevision: String?
     ) async throws -> PresentationResult {
+        submittedClaimSelections.append(selectedDisclosureOptions)
         submittedPaymentConsentRevisions.append(paymentConsentRevision)
         try await delayOperation()
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))

@@ -17,6 +17,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.ProximityCapabilities
@@ -246,6 +247,16 @@ public class WalletSdkBridge private constructor(
             operations.previewPresentation(requestUrl = requestUrl)
         }
 
+    /** Prepares exact selection data through the same typed error/cancellation bridge as submission. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): WalletBridgeResult<MobileWalletPreparedPresentationReview> = walletBridgeCall {
+        operations.reviewPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+    }
+
     /** Resolves authenticated payment instructions without signing. */
     public suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -407,6 +418,13 @@ internal interface WalletSdkBridgeOperations {
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult
 
+    suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = error("Claim review is not implemented by this test bridge")
+
     suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
@@ -522,6 +540,14 @@ internal class MobileWalletSdkBridgeOperations(
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
+
+    override suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = wallet.reviewPresentation(
+        previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
 
     override suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
