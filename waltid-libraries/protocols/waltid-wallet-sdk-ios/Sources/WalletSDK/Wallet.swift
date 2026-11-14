@@ -221,6 +221,13 @@ public actor Wallet {
 
     /// Prepares the effective claims for this selection without signing or sending credentials.
     /// Recompute after selection changes and submit the same selection snapshot that was displayed.
+    /// - Parameters:
+    ///   - previewHandle: Handle identifying the retained, wallet-bound presentation request.
+    ///   - selectedCredentialOptions: Credentials selected for the requested queries.
+    ///   - selectedDisclosureOptions: Selected optional disclosures, or nil for request-matched defaults.
+    ///   - did: Optional holder DID to use consistently with the subsequent submission.
+    /// - Returns: Effective credential claims and source/received path mappings for this selection.
+    /// - Throws: A wallet error when the request, selection or credential format cannot be reviewed.
     public func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
