@@ -23,4 +23,14 @@ object DidUtils {
     }
 
     fun isDidUrl(did: String): Boolean = PATTERN.toRegex().matches(did)
+
+    /** Returns the base DID portion of a DID URL, excluding path, query, and fragment components. */
+    fun didFromDidUrl(didUrl: String): String? {
+        if (!isDidUrl(didUrl)) return null
+        val componentIndex = didUrl.indices
+            .filter { didUrl[it] == '/' || didUrl[it] == '?' || didUrl[it] == '#' }
+            .minOrNull()
+        val did = componentIndex?.let { didUrl.substring(0, it) } ?: didUrl
+        return did.takeIf(::isDidUrl)
+    }
 }
