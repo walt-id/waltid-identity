@@ -367,7 +367,7 @@ Failure events carry the protocol error directly on the event envelope:
 
 ### Ordering and delivery
 
-Events raised while handling a single request are delivered in order, on both transports. Concurrent requests on the same session may interleave. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
+Events raised while handling a single request are published to SSE and enqueued for webhook delivery in order. Concurrent requests on the same session may interleave. Webhook attempts can arrive out of order. Use the `Webhook-Sequence` header to recover enqueue order within a service process. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
 
 On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
 

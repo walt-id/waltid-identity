@@ -300,10 +300,11 @@ class IssuanceNotificationRouteTest {
             assertEquals(errorBody["error"]?.jsonPrimitive?.contentOrNull, failure.error)
             assertEquals(errorBody["error_description"]?.jsonPrimitive?.contentOrNull, failure.errorDescription)
 
-            notificationServer.awaitEvent(
-                createdOffer.offerId,
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
                 IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED,
-            )
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val events = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
                 .map { it.event }
@@ -648,6 +649,11 @@ class IssuanceNotificationRouteTest {
                 "invalid_request",
                 parResponse.body<JsonObject>()["error"]?.jsonPrimitive?.content,
             )
+
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
 
             assertEquals(
                 listOf(

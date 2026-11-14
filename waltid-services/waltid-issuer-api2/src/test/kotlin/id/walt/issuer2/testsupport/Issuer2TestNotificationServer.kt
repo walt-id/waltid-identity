@@ -3,6 +3,7 @@ package id.walt.issuer2.testsupport
 import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.apply
 import id.walt.issuer2.notifications.IssuanceSessionEvent
+import id.walt.ktornotifications.WEBHOOK_SEQUENCE_HEADER
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.HttpStatusCode
@@ -23,7 +24,7 @@ import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentLinkedQueue
 
 class Issuer2TestNotificationServer {
-    private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
+    private val receivedUpdates = ConcurrentLinkedQueue<ReceivedCallback>()
     private var testServer: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
     private var previousGuard: GuardSnapshot? = null
 
@@ -78,7 +79,8 @@ class Issuer2TestNotificationServer {
         "http://127.0.0.1:${connector.port}"
     }
 
-    fun getReceivedUpdates(): List<KtorSessionUpdate> = receivedUpdates.toList()
+    fun getReceivedUpdates(): List<KtorSessionUpdate> =
+        receivedUpdates.sortedBy { it.sequence }.map { it.update }
 
     fun awaitEvent(
         sessionId: String,
@@ -87,19 +89,27 @@ class Issuer2TestNotificationServer {
     ): KtorSessionUpdate {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
-            receivedUpdates.firstOrNull { it.target == sessionId && it.event == event.value }?.let { return it }
+            receivedUpdates.firstOrNull { it.update.target == sessionId && it.update.event == event.value }
+                ?.let { return it.update }
             Thread.sleep(50)
         }
         throw AssertionError(
             "Timed out waiting for event '$event' for session '$sessionId'. Received events: " +
-                receivedUpdates.joinToString { "${it.target}:${it.event}" },
+                receivedUpdates.joinToString { "${it.update.target}:${it.update.event}" },
         )
     }
 
     private suspend fun ApplicationCall.receiveUpdate() {
-        receivedUpdates += receive<KtorSessionUpdate>()
+        val sequence = request.headers[WEBHOOK_SEQUENCE_HEADER]?.toLongOrNull()
+            ?: throw IllegalArgumentException("Webhook callback is missing $WEBHOOK_SEQUENCE_HEADER")
+        receivedUpdates += ReceivedCallback(receive(), sequence)
         respond(HttpStatusCode.OK)
     }
+
+    private data class ReceivedCallback(
+        val update: KtorSessionUpdate,
+        val sequence: Long,
+    )
 
     private data class GuardSnapshot(
         val allowLoopback: Boolean,

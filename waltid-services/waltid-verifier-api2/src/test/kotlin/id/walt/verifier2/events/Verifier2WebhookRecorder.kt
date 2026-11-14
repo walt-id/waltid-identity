@@ -3,12 +3,14 @@ package id.walt.verifier2.events
 import com.sun.net.httpserver.HttpServer
 import id.walt.commons.config.NetworkFetchGuardConfig
 import id.walt.commons.config.apply
+import id.walt.ktornotifications.WEBHOOK_SEQUENCE_HEADER
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.verifier2.data.SessionEvent
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.Url
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.test.assertEquals
@@ -19,7 +21,7 @@ import kotlin.test.assertTrue
  * of SSE subscribers.
  */
 class Verifier2WebhookRecorder : AutoCloseable {
-    private val receivedUpdates = ConcurrentLinkedQueue<KtorSessionUpdate>()
+    private val receivedUpdates = ConcurrentLinkedQueue<ReceivedCallback>()
     private var server: HttpServer? = null
     private var previousGuard: GuardSnapshot? = null
 
@@ -33,8 +35,10 @@ class Verifier2WebhookRecorder : AutoCloseable {
         ).apply()
         val httpServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         httpServer.createContext("/webhook") { exchange ->
+            val sequence = exchange.requestHeaders.getFirst(WEBHOOK_SEQUENCE_HEADER)?.toLongOrNull()
+                ?: error("Webhook callback is missing $WEBHOOK_SEQUENCE_HEADER")
             val body = exchange.requestBody.readBytes().decodeToString()
-            receivedUpdates += json.decodeFromString<KtorSessionUpdate>(body)
+            receivedUpdates += ReceivedCallback(json.decodeFromString(body), sequence)
             val response = "ok".toByteArray()
             exchange.sendResponseHeaders(200, response.size.toLong())
             exchange.responseBody.use { it.write(response) }
@@ -54,18 +58,43 @@ class Verifier2WebhookRecorder : AutoCloseable {
             webhook = KtorSessionNotifications.VerificationSessionWebhookNotification(url = url())
         )
 
-    fun received(): List<KtorSessionUpdate> = receivedUpdates.toList()
+    fun received(): List<KtorSessionUpdate> = receivedInEnqueueOrder()
+
+    fun awaitPresentationEvents(
+        sessionId: String,
+        presentationId: String,
+        expected: List<SessionEvent>,
+        timeoutMillis: Long = 8_000,
+    ): List<KtorSessionUpdate> {
+        val expectedNames = expected.map { it.name }
+        val deadline = System.currentTimeMillis() + timeoutMillis
+        var updates = emptyList<KtorSessionUpdate>()
+        while (System.currentTimeMillis() < deadline) {
+            updates = receivedUpdates.filter {
+                it.update.target == sessionId &&
+                    it.update.session["presentationId"]?.jsonPrimitive?.content == presentationId &&
+                    it.update.event != SessionEvent.authorization_request_requested.name
+            }.sortedBy { it.sequence }.map { it.update }
+            if (updates.map { it.event } == expectedNames) return updates
+            if (updates.size > expectedNames.size) break
+            Thread.sleep(50)
+        }
+        throw AssertionError(
+            "Presentation '$presentationId' did not emit callback events $expectedNames. " +
+                "Received: ${updates.map { it.event }}"
+        )
+    }
 
     fun awaitEvents(sessionId: String, timeoutMillis: Long = 5_000): List<KtorSessionUpdate> {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
-            val events = receivedUpdates.filter { it.target == sessionId }
-            if (events.isNotEmpty()) return events
+            val events = receivedUpdates.filter { it.update.target == sessionId }
+            if (events.isNotEmpty()) return events.sortedBy { it.sequence }.map { it.update }
             Thread.sleep(50)
         }
         throw AssertionError(
             "Timed out waiting for webhook events for session '$sessionId'. Received: " +
-                receivedUpdates.joinToString { "${it.target}:${it.event}" }
+                receivedUpdates.joinToString { "${it.update.target}:${it.update.event}" }
         )
     }
 
@@ -74,21 +103,19 @@ class Verifier2WebhookRecorder : AutoCloseable {
         val deadline = System.currentTimeMillis() + timeoutMillis
         var events = emptyList<String>()
         while (System.currentTimeMillis() < deadline) {
-            events = receivedUpdates.filter { it.target == sessionId }.map { it.event }
-            when {
-                events == expectedNames -> return
-                events.size > expectedNames.size -> break
-                events != expectedNames.take(events.size) -> break
-            }
+            events = eventsInEnqueueOrder(sessionId)
+            if (events.size > expectedNames.size) break
+            if (events.size == expectedNames.size && events == expectedNames) return
             Thread.sleep(50)
         }
         throw AssertionError(
-            "Session '$sessionId' did not emit exact callback events $expectedNames. Received: $events"
+            "Session '$sessionId' did not emit exact callback events $expectedNames in Webhook-Sequence order. " +
+                "Received: $events"
         )
     }
 
     fun assertDoesNotContain(sessionId: String, unexpected: SessionEvent) {
-        val events = receivedUpdates.filter { it.target == sessionId }.map { it.event }
+        val events = eventsInEnqueueOrder(sessionId)
         assertTrue(
             unexpected.name !in events,
             "Session '$sessionId' unexpectedly emitted '${unexpected.name}'. Received: $events"
@@ -96,9 +123,9 @@ class Verifier2WebhookRecorder : AutoCloseable {
     }
 
     fun assertSessionStatus(sessionId: String, event: SessionEvent, expectedStatus: String) {
-        val update = receivedUpdates.firstOrNull { it.target == sessionId && it.event == event.name }
-            ?: error("Missing event '${event.name}' for session '$sessionId'. Received: ${receivedUpdates.map { it.event }}")
-        val status = update.session["status"]?.toString()?.trim('"')
+        val update = receivedUpdates.firstOrNull { it.update.target == sessionId && it.update.event == event.name }
+            ?: error("Missing event '${event.name}' for session '$sessionId'. Received: ${receivedUpdates.map { it.update.event }}")
+        val status = update.update.session["status"]?.toString()?.trim('"')
         assertEquals(expectedStatus, status, "Unexpected status on '${event.name}'")
     }
 
@@ -109,6 +136,19 @@ class Verifier2WebhookRecorder : AutoCloseable {
         previousGuard?.restore()
         previousGuard = null
     }
+
+    private fun eventsInEnqueueOrder(sessionId: String): List<String> =
+        receivedUpdates.filter { it.update.target == sessionId }
+            .sortedBy { it.sequence }
+            .map { it.update.event }
+
+    private fun receivedInEnqueueOrder(): List<KtorSessionUpdate> =
+        receivedUpdates.sortedBy { it.sequence }.map { it.update }
+
+    private data class ReceivedCallback(
+        val update: KtorSessionUpdate,
+        val sequence: Long,
+    )
 
     private data class GuardSnapshot(
         val allowLoopback: Boolean,

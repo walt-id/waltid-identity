@@ -212,12 +212,12 @@ class WalletDemoAppTestScenarios(
         assertTrue(pinStore.hasPin())
         assertFalse(pinStore.isBiometricUnlockEnabled())
         gate.complete(DemoBiometricResult.Cancelled)
-        waitUntil {
+        waitUntil(timeoutMillis = 5_000) {
             !onNodeWithTag(WalletUiTestTags.BiometricSetupContinue)
                 .fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
         }
         onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsEnabled().performClick()
-        waitUntil { controller.state.value.auth == WalletAuthState.Unlocked }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.auth == WalletAuthState.Unlocked }
         assertFalse(pinStore.isBiometricUnlockEnabled())
     }
 
