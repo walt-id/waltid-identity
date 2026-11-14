@@ -118,6 +118,8 @@ jobs:
         run: python3 -m unittest discover -s .github/scripts/mobile-ci -p 'test_*.py'
       - name: Test Swift facade parity gate
         run: scripts/test-mobile-swift-parity-gate.sh
+      - name: Test the vendored payment matcher
+        run: node waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/matcher-tests/payment.mjs
       - name: Test physical controller without hardware
         run: python3 -m unittest discover -s scripts/proximity-physical -p 'test_*.py'
       - uses: actions/setup-python@v6

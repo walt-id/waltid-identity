@@ -79,11 +79,12 @@ public final class id/walt/wallet2/mobile/AndroidDigitalCredentialProviderInput 
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class id/walt/wallet2/mobile/AndroidDigitalCredentialRegistry : id/walt/wallet2/mobile/MobileWalletCredentialRegistry {
+public final class id/walt/wallet2/mobile/AndroidDigitalCredentialRegistry : id/walt/wallet2/mobile/MobileWalletPaymentCredentialRegistry {
 	public fun <init> (Landroid/content/Context;)V
 	public fun getCapabilities ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialCapabilities;
 	public fun registerCreationOptions (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun replace (Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun replaceWithPaymentMetadata (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/mobile/AndroidMobileWalletNfcConfiguration {
@@ -766,6 +767,14 @@ public final class id/walt/wallet2/mobile/MobileWalletMetadataDisplay {
 	public final fun getTextColor ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/wallet2/mobile/MobileWalletPaymentCredentialRegistry : id/walt/wallet2/mobile/MobileWalletCredentialRegistry {
+	public abstract fun replaceWithPaymentMetadata (Ljava/lang/String;Ljava/util/List;Ljava/util/Map;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/mobile/MobileWalletPaymentCredentialRegistry$DefaultImpls {
+	public static fun registerCreationOptions (Lid/walt/wallet2/mobile/MobileWalletPaymentCredentialRegistry;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/mobile/MobileWalletPersistence {
