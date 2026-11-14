@@ -39,6 +39,7 @@ import id.walt.wallet2.handlers.PresentationCredentialRequirement
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PresentationPreviewHandle
+import id.walt.wallet2.handlers.PreparedPresentationReview
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
@@ -89,6 +90,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1507,10 +1509,10 @@ private fun String.includesWalletInstanceAttestation(): Boolean = this == "wia" 
 
 private fun String.includesKeyAttestation(): Boolean = this == "ka" || this == "wia_ka"
 
-private fun id.walt.wallet2.handlers.PreparedPresentationReview.toMobileReview() =
+private fun PreparedPresentationReview.toMobileReview() =
     MobileWalletPreparedPresentationReview(credentials.map {
         MobileWalletPresentationCredentialClaims(it.queryId, it.credentialId, it.format, it.claims.toString(), it.wholeCredential,
             it.locations.map { location -> MobileWalletPresentationClaimLocation(
-                kotlinx.serialization.json.JsonArray(location.sourcePath).toString(),
-                kotlinx.serialization.json.JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
+                JsonArray(location.sourcePath).toString(),
+                JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
     })

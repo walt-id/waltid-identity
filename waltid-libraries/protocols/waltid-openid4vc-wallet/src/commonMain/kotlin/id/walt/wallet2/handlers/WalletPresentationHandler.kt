@@ -385,7 +385,6 @@ object WalletPresentationHandler {
             val keyId: String,
         ) : PreviewedPresentation {
             internal val paymentConsent = RetainedPaymentConsent()
-
         }
 
         data class Invalid(
