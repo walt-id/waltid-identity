@@ -127,4 +127,43 @@ class TypeMetadataIssuanceTest {
             protected.validateIssuanceInput(buildJsonObject {}, SDMap.generateSDMap(listOf("cnf.jwk")), setOf("cnf"))
         }
     }
+
+    @Test fun pendingMandatoryPathsRetainValueIndependentDisclosureConstraints() = runTest {
+        for ((path, disclosure, root) in listOf(
+            Triple("[\"family_name\"]", "family_name", "family_name"),
+            Triple("[\"address\",\"city\"]", "address.city", "address"),
+            Triple("[\"names\",0]", "names.[0]", "names"),
+            Triple("[\"names\",1]", "names.[]", "names"),
+            Triple("[\"names\",\"0\"]", "names.0", "names"),
+        )) {
+            for (sd in listOf("always", "never")) {
+                val resolved = metadata("""[{"path":$path,"mandatory":true,"sd":"$sd"}]""")
+                val selected = SDMap.generateSDMap(listOf(disclosure))
+                val public = SDMap(emptyMap())
+                val valid = if (sd == "always") selected else public
+                val invalid = if (sd == "always") public else selected
+                resolved.validateIssuanceInput(buildJsonObject {}, valid, setOf(root))
+                assertFailsWith<TypeMetadataValidationException>("$path sd=$sd") {
+                    resolved.validateIssuanceInput(buildJsonObject {}, invalid, setOf(root))
+                }
+            }
+        }
+        // Hiding an ancestor does not selectively disclose the nested claim itself.
+        val city = metadata("""[{"path":["address","city"],"mandatory":true,"sd":"never"}]""")
+        city.validateIssuanceInput(buildJsonObject {}, SDMap.generateSDMap(listOf("address")), setOf("address"))
+    }
+
+    @Test fun pendingOptionalClaimsAndWildcardCardinalityRemainDeferred() = runTest {
+        for (sd in listOf("always", "never")) {
+            for (path in listOf("[\"members\"]", "[\"members\",0,\"name\"]")) {
+                val optional = metadata("""[{"path":$path,"sd":"$sd"}]""")
+                optional.validateIssuanceInput(buildJsonObject {}, SDMap.generateSDMap(listOf("members.[0].name")), setOf("members"))
+            }
+            val wildcard = metadata("""[{"path":["members",null,"name"],"mandatory":true,"sd":"$sd"}]""")
+            for (encoding in listOf(null, SDMap.generateSDMap(listOf("members.[].name")))) {
+                wildcard.validateIssuanceInput(buildJsonObject {}, encoding, setOf("members"))
+            }
+            wildcard.validateForIssuance(listOf(payload("""{"members":[]}"""))) { error("No schema") }
+        }
+    }
 }
