@@ -13,6 +13,7 @@ import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
+import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueResult
@@ -33,11 +34,12 @@ class TypeMetadataOfferPreflightTest {
         val metadata = Issuer2MetadataConfig(
             credentialConfigurations = mapOf("identity" to json("""{"format":"dc+sd-jwt","vct":"vctBaseUrl"}""")),
             sdJwtVcTypeMetadataConfiguration = mapOf("identity" to Json.decodeFromJsonElement<SdJwtVcTypeMetadataDraft04>(json("""
-                {"claims":[{"path":["family_name"],"mandatory":true,"sd":"always"}],
+                {"claims":[{"path":["family_name"],"mandatory":true,"sd":"always"},
+                           {"path":["given_name"],"mandatory":true,"sd":"never"}],
                  "schema":{"type":"object","required":["iss"]}}
             """))),
         )
-        val data = json("""{"family_name":"Doe"}""")
+        val data = json("""{"family_name":"Doe","given_name":"Jane"}""")
         val profiles = Issuer2ProfilesConfig(profiles = mapOf("person" to CredentialProfileConfig(
             name = "Person", credentialConfigurationId = "identity",
             issuerKey = json(KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1))),
@@ -69,6 +71,19 @@ class TypeMetadataOfferPreflightTest {
             assertEquals(0, codes)
             assertTrue(repository.list().isEmpty())
 
+            val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
+            val requestId = "rejected-mapped-never"
+            assertFailsWith<TypeMetadataValidationException> {
+                service.createCredentialOffer(CredentialOfferCreateRequest("person", AuthenticationMethod.PRE_AUTHORIZED,
+                    runtimeOverrides = CredentialOfferRuntimeOverrides(
+                        mapping = json("""{"given_name":"<must-not-execute>"}"""),
+                        selectiveDisclosure = SDMap.generateSDMap(listOf("family_name", "given_name")),
+                    )), requestId)
+            }
+            assertEquals(0, codes)
+            assertTrue(repository.list().isEmpty())
+            assertTrue(events.replayCache.none { it.requestId == requestId })
+
             // Generated schema requirements and dynamic mapping stay deferred to final preparation.
             val mapping = json("""{"family_name":"<timestamp>"}""")
             val receipt = service.createCredentialOffer(CredentialOfferCreateRequest("person", AuthenticationMethod.PRE_AUTHORIZED,
@@ -77,6 +92,7 @@ class TypeMetadataOfferPreflightTest {
             assertEquals(data, saved.credentialData)
             assertEquals(mapping, saved.mapping, "Preflight must not execute dynamic mapping")
             assertEquals(1, codes)
+            assertEquals(1, events.replayCache.count { it.requestId == "accepted" && it.event == "credential_offer_created" })
         }
     }
 

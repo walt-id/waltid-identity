@@ -59,18 +59,28 @@ fun ResolvedTypeMetadata.validateIssuanceInput(
         if (root.value in SDJwtVC.NON_SELECTIVELY_DISCLOSABLE_CLAIMS && claim.sd == ClaimSdMetadata.Always) {
             invalidClaim(claim, "requires selective disclosure of a protected format claim")
         }
-        if (root.value in pendingClaims && claim.mandatory == true && claim.path.size == 1 &&
-            claim.sd == ClaimSdMetadata.Always && effective[root.value]?.sd != true) {
-            invalidClaim(claim, "requires selective disclosure")
-        }
     }
 }
 
 private data class SelectedClaim(val value: JsonElement, val encoding: SDField?)
 
 private fun ResolvedTypeMetadata.validateClaims(payload: JsonObject, encoding: SDMap, pendingClaims: Set<String>) {
-    for (claim in claims) {
-        if ((claim.path.first() as? MetadataClaimPathComponent.Name)?.value in pendingClaims) continue
+    claims@ for (claim in claims) {
+        if ((claim.path.first() as? MetadataClaimPathComponent.Name)?.value in pendingClaims) {
+            if (claim.mandatory != true) continue
+            // Mandatory fixed paths must exist in any valid final payload, even when their values
+            // are pending. Wildcards can select no elements, so their disclosure checks must wait.
+            var field: SDField? = SDField(false, children = encoding)
+            for (component in claim.path) field = when (component) {
+                is MetadataClaimPathComponent.Name -> field?.children?.get(component.value)
+                is MetadataClaimPathComponent.Index -> field?.arrayChildren?.let {
+                    it.elements.getOrNull(component.value) ?: it.wildcard
+                }
+                MetadataClaimPathComponent.AnyIndex -> continue@claims
+            }
+            validateDisclosure(claim, field)
+            continue
+        }
         var selected = listOf(SelectedClaim(payload, SDField(false, children = encoding)))
         for (component in claim.path) selected = selected.flatMap { current ->
             fun missing(): List<SelectedClaim> {
@@ -97,11 +107,15 @@ private fun ResolvedTypeMetadata.validateClaims(payload: JsonObject, encoding: S
                 }
             }
         }
-        for (value in selected) when (claim.sd) {
-            ClaimSdMetadata.Always -> if (value.encoding?.sd != true) invalidClaim(claim, "requires selective disclosure")
-            ClaimSdMetadata.Never -> if (value.encoding?.sd == true) invalidClaim(claim, "forbids selective disclosure")
-            ClaimSdMetadata.Allowed, null -> Unit
-        }
+        for (value in selected) validateDisclosure(claim, value.encoding)
+    }
+}
+
+private fun validateDisclosure(claim: ResolvedMetadataClaim, encoding: SDField?) {
+    when (claim.sd) {
+        ClaimSdMetadata.Always -> if (encoding?.sd != true) invalidClaim(claim, "requires selective disclosure")
+        ClaimSdMetadata.Never -> if (encoding?.sd == true) invalidClaim(claim, "forbids selective disclosure")
+        ClaimSdMetadata.Allowed, null -> Unit
     }
 }
 

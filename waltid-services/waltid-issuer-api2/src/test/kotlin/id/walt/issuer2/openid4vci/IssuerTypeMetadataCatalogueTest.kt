@@ -50,7 +50,7 @@ class IssuerTypeMetadataCatalogueTest {
     }
 
     @Test
-    fun `restart retains original parent bytes and removed configurations remain published`() = runBlocking {
+    fun `catalogue reconstruction retains original parent bytes and removed configurations remain published`() = runBlocking {
         val store = InMemoryPersistence<String>("publications", Duration.INFINITE)
         val reads = AtomicInteger()
         val source = SdJwtVcTypeMetadataDraft04(name = "Identity", extends = parent)
