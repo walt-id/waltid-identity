@@ -484,10 +484,25 @@ extension XCTestCase {
         guard app.state == .runningForeground else {
             return XCTFail("Gallery app is not foreground")
         }
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
+        let started = ProcessInfo.processInfo.systemUptime
+        var unchangedSince = started
+        var previous: Data?
+        while ProcessInfo.processInfo.systemUptime - started < 10 {
+            let screenshot = XCUIScreen.main.screenshot()
+            let pixels = screenshot.pngRepresentation
+            let at = ProcessInfo.processInfo.systemUptime
+            if pixels == previous {
+                if at - unchangedSince >= 0.5 {
+                    let attachment = XCTAttachment(screenshot: screenshot)
+                    attachment.name = name
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                    return
+                }
+            } else { previous = pixels; unchangedSince = at }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        XCTFail("Gallery frame did not settle: \(name)")
     }
 
     func recordGalleryRequest(_ kind: String, value: String) {

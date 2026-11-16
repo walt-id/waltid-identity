@@ -64,6 +64,9 @@ async function run() {
   const observations = new Set();
   let requiredArtwork = [];
   let phase = 'bootstrap', admittedAt = Date.now(), verdict;
+  let documentEpoch = 0;
+  const requestEpochs = new WeakMap();
+  page.on('request', request => requestEpochs.set(request, documentEpoch));
   page.on('pageerror', error => errors.push(error.message));
   async function observeResponse(response) {
     const url = new URL(response.url());
@@ -74,6 +77,7 @@ async function run() {
     if (!url.pathname.startsWith('/wallet')) return;
     const body = response.request().postData();
     const item = { method: response.request().method(), path: url.pathname.replace(wallet.walletId, ':wallet'), status: response.status() };
+    const requestEpoch = requestEpochs.get(response.request());
     if (body) {
       item.requestDigest = digest(body);
       try { item.mode = JSON.parse(body).mode; } catch { /* Not every request body is JSON. */ }
@@ -85,7 +89,10 @@ async function run() {
           item.projection.some(result => result.outcome !== 'DEFERRED')) admittedAt = Date.now();
       }
     } catch (error) {
-      errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
+      if (item.method === 'GET' && url.pathname.endsWith('/credential-status') &&
+          requestEpoch < documentEpoch && error.message.includes('Network.getResponseBody')) {
+        item.observation = 'Read-only poll body unavailable after the intentional page reload';
+      } else errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
     } finally { requests.push(item); }
   }
   page.on('response', response => {
@@ -205,6 +212,7 @@ async function run() {
     // Browser demo preferences are runtime-owned, so explicitly restore manual mode afterwards.
     // Finish inspecting response bodies before navigation invalidates Chromium's body handles.
     await Promise.all([...observations]);
+    documentEpoch += 1;
     await page.reload(); await ready();
     await expect.poll(() => requiredArtwork.every(uri => artworks.has(uri))).toBe(true);
     phase = 'settings'; await settings(); await click(button('Automatic checks'));
