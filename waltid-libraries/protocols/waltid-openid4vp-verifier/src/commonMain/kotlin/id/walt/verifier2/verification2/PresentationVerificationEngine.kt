@@ -17,6 +17,7 @@ import id.walt.dcql.DcqlCredential
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.DcqlMatchingContext
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -389,8 +390,9 @@ object PresentationVerificationEngine {
                 disclosures = (credential as? SelectivelyDisclosableVerifiableCredential)?.disclosures
                     ?.map { DcqlDisclosure(it.name, it.value, it.location) },
                 originalCredential = credential,
-            ).withResolvedVctTypes(resolvedTypes[credential].orEmpty())
-            DcqlMatcher.matchCredential(query, dcqlCredential).onFailure { return "credential $index: ${it.message}" }
+            )
+            val matchingContext = DcqlMatchingContext(mapOf(dcqlCredential to resolvedTypes[credential].orEmpty()))
+            DcqlMatcher.matchCredential(query, dcqlCredential, matchingContext).onFailure { return "credential $index: ${it.message}" }
         }
         return null
     }

@@ -41,9 +41,10 @@ internal class RetainedPaymentConsent {
         policy: PaymentConsentPolicy,
         holderDid: String? = null,
         requiresUnsignedRequestWarning: Boolean = false,
+        typeMetadataSnapshots: Map<String, JsonObject>,
     ): PreparedPaymentConsent? {
         prepared = null // Failed re-preparation cannot leave an older acknowledgment available.
-        val payment = selectedPayment(request, selection) ?: return null
+        val payment = selectedPayment(request, selection, typeMetadataSnapshots) ?: return null
         val binding = binding(request, selection, credentials, disclosures, key, policy, holderDid)
         val consent = policy.resolver.resolve(payment.credential, payment.payload, policy.preferredLocales, payment.snapshot)
         return PreparedPaymentConsent(CryptographyRandom.nextBytes(32).encodeToBase64Url(), consent, requiresUnsignedRequestWarning).also {
@@ -76,6 +77,7 @@ private data class SelectedPayment(val credential: SdJwtCredential, val payload:
 private fun selectedPayment(
     request: AuthorizationRequest,
     selection: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    typeMetadataSnapshots: Map<String, JsonObject> = emptyMap(),
 ): SelectedPayment? {
     val payments = decodeList(request.transactionData.orEmpty()).filter { it.transactionData.type == TS12_PAYMENT_TYPE }
     val paymentEntries = payments.flatMap { payment -> payment.transactionData.credentialIds.flatMap { query ->
@@ -88,7 +90,7 @@ private fun selectedPayment(
     if (details.keys != setOf("payload")) consentFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT)
     return SelectedPayment(paymentCredentials.single() as SdJwtCredential,
         details["payload"] as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_PAYMENT),
-        paymentEntries.single().typeMetadataSnapshot)
+        typeMetadataSnapshots[paymentEntries.single().id])
 }
 
 private data class PaymentConsentBinding(

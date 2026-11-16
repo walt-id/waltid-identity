@@ -52,6 +52,15 @@ object DcqlMatcher {
         availableCredentials: List<DcqlCredential>,
         contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlMatchResult>>> =
+        findMatches(query, availableCredentials, DcqlMatchingContext.Empty, contextDocuments, trustedAuthoritiesChecker)
+
+    fun findMatches(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        matchingContext: DcqlMatchingContext,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
         log.debug { "Starting DCQL discovery. Query: $query, Available Credentials Count: ${availableCredentials.size}" }
 
@@ -72,7 +81,7 @@ object DcqlMatcher {
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
             for (credential in potentialMatchesByFormat) {
-                matchCredential(credentialQuery, credential, contextDocuments, trustedAuthoritiesChecker)
+                matchCredential(credentialQuery, credential, matchingContext, contextDocuments, trustedAuthoritiesChecker)
                     .onSuccess {
                         successfullyMatchedCredentialsForThisQuery.add(it)
                         log.trace { "Credential ${credential.id} matches query ${credentialQuery.id}. Selected: ${it.selectedDisclosures}" }
@@ -113,11 +122,20 @@ object DcqlMatcher {
         credential: DcqlCredential,
         contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<DcqlMatchResult> =
+        matchCredential(credentialQuery, credential, DcqlMatchingContext.Empty, contextDocuments, trustedAuthoritiesChecker)
+
+    fun matchCredential(
+        credentialQuery: CredentialQuery,
+        credential: DcqlCredential,
+        matchingContext: DcqlMatchingContext,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<DcqlMatchResult> {
         if (credential.format !in credentialQuery.format.id) {
             return Result.failure(DcqlMatchException("format '${credential.format}' is not '${credentialQuery.format.id.first()}'"))
         }
-        if (!matchesMeta(credential, credentialQuery.meta, credentialQuery.format, contextDocuments)) {
+        if (!matchesMeta(credential, credentialQuery.meta, credentialQuery.format, contextDocuments, matchingContext)) {
             return Result.failure(DcqlMatchException("meta ${credentialQuery.meta.constraintName()} is not satisfied"))
         }
         if (!matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities, trustedAuthoritiesChecker)) {
@@ -165,8 +183,17 @@ object DcqlMatcher {
         availableCredentials: List<DcqlCredential>,
         contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlMatchResult>>> =
+        match(query, availableCredentials, DcqlMatchingContext.Empty, contextDocuments, trustedAuthoritiesChecker)
+
+    fun match(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        matchingContext: DcqlMatchingContext,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
-        val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
+        val discovered = findMatches(query, availableCredentials, matchingContext, contextDocuments, trustedAuthoritiesChecker)
         if (discovered.isFailure) return discovered
         val finalIndividualMatches = discovered.getOrThrow()
         enforceSatisfaction(query, finalIndividualMatches.keys)?.let { return Result.failure(it) }
@@ -195,8 +222,17 @@ object DcqlMatcher {
         availableCredentials: List<DcqlCredential>,
         contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlCredential>>> =
+        matchWithoutClaims(query, availableCredentials, DcqlMatchingContext.Empty, contextDocuments, trustedAuthoritiesChecker)
+
+    fun matchWithoutClaims(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        matchingContext: DcqlMatchingContext,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlCredential>>> {
-        val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
+        val discovered = findMatches(query, availableCredentials, matchingContext, contextDocuments, trustedAuthoritiesChecker)
         val individualMatches = discovered.getOrElse { return Result.failure(it) }
             .mapValues { (_, results) -> results.map { it.credential } }
         enforceSatisfaction(query, individualMatches.keys)?.let { return Result.failure(it) }
@@ -469,6 +505,7 @@ object DcqlMatcher {
         metaQuery: CredentialQueryMeta?,
         expectedFormat: CredentialFormat,
         contextDocuments: JsonLdContextDocumentSource,
+        matchingContext: DcqlMatchingContext,
     ): Boolean {
         // If metaQuery is NoMeta, it means no specific constraints from the query side.
         if (metaQuery == null || metaQuery is NoMeta) {
@@ -538,7 +575,8 @@ object DcqlMatcher {
                 }
                 // Spec B.3.5: "vct_values: REQUIRED. A non-empty array of strings..."
                 // The init block in SdJwtVcMeta now enforces non-empty.
-                metaQuery.vctValues.any { it == vctClaim || it in (credential as? RawDcqlCredential)?.resolvedVctTypes.orEmpty() }
+                val resolvedTypes = matchingContext.vctTypes(credential)
+                metaQuery.vctValues.any { it == vctClaim || it in resolvedTypes }
             }
 
             is MsoMdocMeta -> {
