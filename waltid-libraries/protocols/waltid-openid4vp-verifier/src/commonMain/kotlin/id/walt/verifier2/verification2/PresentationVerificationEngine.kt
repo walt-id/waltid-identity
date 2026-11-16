@@ -26,6 +26,7 @@ import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.DcqlFulfillmentFailure
@@ -333,10 +334,15 @@ object PresentationVerificationEngine {
         dcqlQuery: DcqlQuery,
         credentialsByQuery: Map<String, List<DigitalCredential>>,
         matchClaims: Boolean,
+        transactionData: List<String> = emptyList(),
     ): Result<Set<String>> {
         val mismatches = credentialsByQuery.mapNotNull { (queryId, credentials) ->
             val credentialQuery = dcqlQuery.credentials.single { it.id == queryId }
-            credentialMismatch(credentialQuery, credentials, matchClaims)?.let { queryId to it }
+            val mismatch = credentialMismatch(credentialQuery, credentials, matchClaims)
+                ?: if (matchClaims) credentials.filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
+                    unrequestedMdocClaim(dcqlQuery, credentialsByQuery, it, transactionData)
+                } else null
+            mismatch?.let { queryId to it }
         }.toMap()
         val matched = credentialsByQuery.keys - mismatches.keys
         if (mismatches.isEmpty()) return Result.success(matched)
@@ -355,6 +361,43 @@ object PresentationVerificationEngine {
                 ),
             )
         )
+    }
+
+    /**
+     * ISO mdoc elements are selectively disclosable. OpenID4VP 1.0 section 6.4 permits additional
+     * claims when the same credential is selected by another query in this request. Compare the
+     * issuer authentication, not just docType: another credential cannot authorize this one's claims.
+     */
+    private fun unrequestedMdocClaim(
+        dcqlQuery: DcqlQuery,
+        credentialsByQuery: Map<String, List<DigitalCredential>>,
+        credential: MdocsCredential,
+        transactionData: List<String>,
+    ): String? {
+        val issuerAuth = credential.document.issuerSigned.issuerAuth
+        val selectedQueryIds = credentialsByQuery.filterValues { credentials ->
+            credentials.filterIsInstance<MdocsCredential>().any { it.document.issuerSigned.issuerAuth == issuerAuth }
+        }.keys
+        // Requested transaction binding is protocol data, not an extra credential claim.
+        // Permit only the two hash fields in transaction types requested for this credential.
+        val transactionPaths = decodeList(transactionData)
+            .filter { it.transactionData.credentialIds.any(selectedQueryIds::contains) }
+            .flatMap { decoded ->
+                listOf("transaction_data_hash", "transaction_data_hash_alg").map { name ->
+                    listOf(JsonPrimitive(decoded.transactionData.type), JsonPrimitive(name))
+                }
+            }
+        val allowedPaths = dcqlQuery.credentials.filter { it.id in selectedQueryIds }
+            .flatMap { it.claims.orEmpty() }.map { it.path }.toSet()
+        val issuerPaths = credential.document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, items) ->
+            items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.value.elementIdentifier)) }
+        }
+        val devicePaths = credential.document.deviceSigned?.namespaces?.value?.entries.orEmpty().flatMap { (namespace, items) ->
+            items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.key)) }
+        }
+        val unrequested = issuerPaths.firstOrNull { it !in allowedPaths }
+            ?: devicePaths.firstOrNull { it !in allowedPaths && it !in transactionPaths }
+        return unrequested?.let { "mdoc contains an unrequested selectively disclosable claim" }
     }
 
     private fun credentialMismatch(
@@ -610,6 +653,7 @@ object PresentationVerificationEngine {
                     dcqlQuery = dcqlQuery,
                     credentialsByQuery = allSuccessfullyValidatedAndProcessedData,
                     matchClaims = session.setup !is DcApiAnnexCFlowSetup,
+                    transactionData = session.authorizationRequest.transactionData.orEmpty(),
                 ).mapCatching { matchedQueryIds ->
                     DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matchedQueryIds).getOrThrow()
                 }
