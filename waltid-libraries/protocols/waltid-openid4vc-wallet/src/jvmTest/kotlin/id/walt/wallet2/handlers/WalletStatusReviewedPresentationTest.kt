@@ -31,20 +31,24 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
+import kotlin.test.fail
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class WalletStatusReviewedPresentationTest {
     @Test
+    @Timeout(30)
     fun callerCannotAdoptANewStatusWhileTheHolderSignatureIsPending() = runBlocking {
         val fixture = batchTestFixture(true)
         val holder = fixture.keys.first().requireCrypto2Key()
@@ -110,7 +114,13 @@ class WalletStatusReviewedPresentationTest {
                         reviewed, registry)
                 }
             }
-            signing.await()
+            select<Unit> {
+                signing.onAwait { }
+                result.onAwait {
+                    it.getOrThrow()
+                    fail("Presentation completed before reaching holder signing")
+                }
+            }
             at += 1.seconds; value = 1u
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
             val changed = service.snapshot().credentials.single().presentation
