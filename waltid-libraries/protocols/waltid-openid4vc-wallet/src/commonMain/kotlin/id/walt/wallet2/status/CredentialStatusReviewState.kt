@@ -21,5 +21,5 @@ internal data class CredentialStatusReviewEntry(
     val fingerprint: String,
     val metadata: CredentialStatus,
     val nonPersistentReferenceIds: Set<String>,
-    val persisted: PersistedCredentialStatus?,
+    val persisted: CredentialStatusStoredRecord?,
 )

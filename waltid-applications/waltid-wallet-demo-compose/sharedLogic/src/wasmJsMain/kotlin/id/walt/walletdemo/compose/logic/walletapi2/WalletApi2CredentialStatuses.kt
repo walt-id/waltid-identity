@@ -4,6 +4,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatus
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoStatusRefreshSummary
 import id.walt.walletdemo.compose.logic.WalletDemoStatusReviewChanged
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -16,8 +18,25 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
     private var review: ActiveReview? = null
     private var reviewInvalidated = false
     private var reviewEpoch = 0L
+    private var closed = false
+
+    suspend fun close() {
+        closed = true // Fence in-flight results before waiting for their serialization lock.
+        mutex.withLock {
+            val context = review?.context
+            review = null
+            reviewEpoch += 1
+            if (context != null) try {
+                withTimeoutOrNull(3_000) { client.closeCredentialStatusContext(walletId, context.id) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* Expiry bounds server retention if best-effort release fails. */ }
+        }
+    }
+
+    private fun requireOpen() = check(!closed) { "Credential status owner is closed" }
 
     suspend fun snapshot(): WalletDemoCredentialStatuses = mutex.withLock {
+        requireOpen()
         val snapshot = readSnapshot()?.toDemoStatuses() ?: WalletDemoCredentialStatuses(
             client.listCredentialMetadata(walletId).associate { it.id to WalletDemoCredentialStatus.ServerUnsupported },
             legacySubmission = true,
@@ -27,6 +46,7 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
 
     /** A local server read validates context lifetime; expiration always invalidates pending consent. */
     suspend fun submissionSnapshot(renderedEpoch: Long? = null): CredentialStatusSnapshotDto? = mutex.withLock {
+        requireOpen()
         if (renderedEpoch != null && renderedEpoch != reviewEpoch) throw WalletDemoStatusReviewChanged()
         // Polling may already have recovered cold, with the same semantic revision. That recovery
         // cannot silently revive an attempt bound to the lost context. A matching rendered epoch
@@ -43,6 +63,7 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
     }
 
     suspend fun refresh(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = mutex.withLock {
+        requireOpen()
         // Context creation and all snapshot reads are local; only this explicit action checks issuers.
         val before = if (review == null) openContext() else {
             val snapshot = readSnapshot(consumeImmediate = false)
@@ -54,6 +75,7 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
         val results = client.refreshCredentialStatuses(walletId, RefreshCredentialStatusesDto(
             selection, if (force) "FORCE" else "IF_DUE", context.id,
         ))
+        requireOpen()
         // Display the response itself before polling again, including no-store and failed attempts.
         review = ActiveReview(before.withRefreshResults(results), awaitingDisplay = true)
         if (force) reviewInvalidated = false // The explicit check starts a new review; its caller renders this result before enabling submission.
@@ -65,11 +87,13 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
 
     private suspend fun openContext(): CredentialStatusSnapshotDto = client.createCredentialStatusContext(walletId).also {
         review = ActiveReview(it)
+        requireOpen()
         reviewEpoch += 1
     }
 
     /** Called only under [mutex], so an earlier poll cannot overwrite an explicit refresh. */
     private suspend fun readSnapshot(consumeImmediate: Boolean = true, failOnExpired: Boolean = false): CredentialStatusSnapshotDto? {
+        requireOpen()
         val active = review
         if (consumeImmediate && active?.awaitingDisplay == true) {
             review = active.copy(awaitingDisplay = false)
@@ -85,6 +109,7 @@ internal class WalletApi2CredentialStatuses(private val client: WalletApi2Client
             // Recover once with a cold local read. No issuer work and no submission retry.
             client.credentialStatusSnapshot(walletId)
         }
+        requireOpen()
         if (review != null) {
             requireNotNull(snapshot)
             check(snapshot.statusContext?.id == active?.context?.id) { "Server changed the active status review" }

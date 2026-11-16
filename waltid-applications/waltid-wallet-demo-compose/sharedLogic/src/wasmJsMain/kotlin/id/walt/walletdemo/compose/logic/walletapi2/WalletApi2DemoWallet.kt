@@ -61,6 +61,7 @@ internal class WalletApi2DemoWallet(
     private val processingIssuanceSessions = mutableSetOf<String>()
     private val presentationSessions = mutableMapOf<String, Api2PresentationSession>()
     private var statuses = WalletApi2CredentialStatuses(client, walletId)
+    override suspend fun close() { statuses.close() }
     private var activeOperations = 0
     private var resetStage: WalletResetStage? = null
     private var resetInProgress = false

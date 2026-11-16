@@ -1,6 +1,7 @@
 package id.walt.credentials.status
 
 import id.walt.cose.CoseHeaders
+import id.walt.policies2.vc.policies.status.signature.IetfStatusListTokenClaims
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialParser
@@ -52,8 +53,9 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.cbor.CborMap
+import kotlinx.serialization.cbor.CborInteger
+import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -410,7 +412,7 @@ class CredentialStatusResolver(
                     jwtReader, cwtReader, signatureVerifier = signatureVerifier,
                 )
                 validator.evaluate(entry, IETFStatusPolicyAttribute(value = 0u), credential,
-                    signerAuthorizer, content, at.epochSeconds, reference.protocol).getOrThrow()
+                    signerAuthorizer, content, at.epochSeconds, reference.protocol, at).getOrThrow()
             }
             is W3CEntry -> createW3cValidator(resource.storageAllowed, entry).evaluate(entry, W3CStatusPolicyAttribute(value = 0u,
                 purpose = entry.purpose, type = if (reference.protocol == StatusProtocol.BITSTRING_STATUS_LIST) "BitstringStatusList" else "StatusList2021"),
@@ -457,24 +459,24 @@ class CredentialStatusResolver(
         val sign1 = CoseSign1.fromTagged(content.content)
         val headers = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(sign1.protected)
         if (headers.x5chain.isNullOrEmpty()) fail(CheckFailure.Reason.INVALID_SIGNATURE)
-        val claims = coseCompliantCbor.decodeFromByteArray<CwtLifetime>(requireNotNull(sign1.payload))
-        if (claims.exp == null) fail(CheckFailure.Reason.INVALID_VALIDITY)
+        val claims = coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), requireNotNull(sign1.payload)) as? CborMap
+            ?: fail(CheckFailure.Reason.INVALID_LIST)
+        if (claims[CborInteger(4)] == null) fail(CheckFailure.Reason.INVALID_VALIDITY)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun lifetime(content: StatusListContent, reference: Reference): Pair<Instant?, Duration?> = when (content) {
         is StatusListContent.Binary -> {
             val payload = requireNotNull(CoseSign1.fromTagged(content.content).payload)
-            val claims = coseCompliantCbor.decodeFromByteArray<CwtLifetime>(payload)
-            claims.exp?.let(Instant::fromEpochSeconds) to claims.ttl?.also { if (it < 0) fail(CheckFailure.Reason.INVALID_LIST) }?.seconds
+            val claims = IetfStatusListTokenClaims.cwtValidity(payload, reference.entry.uri)
+            claims.expiresAt?.toStatusInstant() to claims.ttl?.seconds
         }
         is StatusListContent.Text -> {
             val jwt = JwtParser().parse(content.content)
             if (reference.protocol == StatusProtocol.TOKEN_STATUS_LIST) {
-                val expiry = jwt.instantClaim("exp")
-                val beginning = jwt.instantClaim("nbf")
-                if (expiry != null && now() >= expiry || beginning != null && now() < beginning) fail(CheckFailure.Reason.INVALID_VALIDITY)
-                expiry to jwt.nonnegativeLongClaim("ttl")?.seconds
+                IetfStatusListTokenClaims.validate(jwt, reference.entry.uri, now())
+                val claims = IetfStatusListTokenClaims.jwtValidity(jwt, reference.entry.uri)
+                claims.expiresAt?.toStatusInstant() to claims.ttl?.seconds
             } else {
                 val vc = jwt["vc"] as? JsonObject ?: jwt
                 val from = listOfNotNull(jwt.instantClaim("nbf"), vc.dateClaim("validFrom"), vc.dateClaim("issuanceDate")).maxOrNull()
@@ -542,7 +544,8 @@ class CredentialStatusResolver(
         Instant.parse((it as? JsonPrimitive)?.contentOrNull ?: fail(CheckFailure.Reason.INVALID_VALIDITY))
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    @Serializable
-    private data class CwtLifetime(@CborLabel(4) val exp: Long? = null, @CborLabel(65534) val ttl: Long? = null)
+    private fun Double.toStatusInstant(): Instant {
+        val seconds = floor(this)
+        return Instant.fromEpochSeconds(seconds.toLong(), ((this - seconds) * 1_000_000_000).toLong())
+    }
 }

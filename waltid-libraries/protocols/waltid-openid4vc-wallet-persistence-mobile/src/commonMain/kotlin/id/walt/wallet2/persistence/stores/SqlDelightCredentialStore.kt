@@ -9,7 +9,7 @@ import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.status.CredentialStatusSnapshotStore
-import id.walt.wallet2.status.PersistedCredentialStatus
+import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.statusFingerprint
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
@@ -31,28 +31,22 @@ public class SqlDelightCredentialStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletCredentialStore, CredentialStatusSnapshotStore {
 
-    /** Reads minimal protected metadata for the current stored credential. */
-    override suspend fun readCredentialStatus(credentialId: String): PersistedCredentialStatus? =
-        queries.selectCredentialStatus(credentialId).executeAsOneOrNull()?.let {
-            runCatching { json.decodeFromString(PersistedCredentialStatus.serializer(), it) }.getOrNull()
-        }
+    override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? =
+        queries.selectCredentialStatus(credentialId).executeAsOneOrNull()?.let(::decodeStatusRecord)
 
-    /** Writes metadata only while the stored signed credential still matches. */
-    override suspend fun saveCredentialStatusIfCurrent(credential: StoredCredential, status: PersistedCredentialStatus): Boolean {
-        require(status.credentialFingerprint == credential.statusFingerprint())
-        return queries.transactionWithResult {
-            queries.saveCredentialStatusIfCurrent(snapshot = json.encodeToString(PersistedCredentialStatus.serializer(), status),
-                credential_id = credential.id, expected_credential = credential.credential.serializedForWalletPersistence())
-            queries.credentialStatusChanges().executeAsOne() == 1L
-        }
-    }
+    private fun decodeStatusRecord(raw: String): CredentialStatusStoredRecord? =
+        runCatching { json.decodeFromString(CredentialStatusStoredRecord.serializer(), raw) }.getOrNull()
 
-    /** Removes metadata only while the stored signed credential still matches. */
-    override suspend fun removeCredentialStatusIfCurrent(credential: StoredCredential): Boolean = queries.transactionWithResult {
-        val current = queries.selectCredentialById(credential.id).executeAsOneOrNull()
-        if (current?.serialized_credential != credential.credential.serializedForWalletPersistence()) return@transactionWithResult false
-        queries.deleteCredentialStatus(credential.id)
-        true
+    override suspend fun compareAndSetCredentialStatus(
+        credential: StoredCredential, expected: CredentialStatusStoredRecord?, updated: CredentialStatusStoredRecord,
+    ): Boolean = queries.transactionWithResult {
+        require(updated.revision != expected?.revision)
+        require(updated.snapshot?.credentialFingerprint?.let { it == credential.statusFingerprint() } != false)
+        val raw = queries.selectCredentialStatus(credential.id).executeAsOneOrNull()
+        if (raw?.let(::decodeStatusRecord) != expected) return@transactionWithResult false
+        queries.saveCredentialStatusIfCurrent(snapshot = json.encodeToString(CredentialStatusStoredRecord.serializer(), updated),
+            credential_id = credential.id, expected_credential = credential.credential.serializedForWalletPersistence(), expected_snapshot = raw)
+        queries.credentialStatusChanges().executeAsOne() == 1L
     }
 
     /**

@@ -60,7 +60,7 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
     var expanded by rememberSaveable(credentialId, context.contextKey) { mutableStateOf(false) }
     val refreshing = credentialId in context.snapshot.refreshing
     val refreshVisible = context.check != null && (status.action in setOf("CHECK", "RETRY") || refreshing || status.references.any { it.eligibleAt != null })
-    val disclosure = facts.extra.isNotEmpty() || compact && (facts.main.isNotEmpty() || refreshVisible)
+    val disclosure = facts.extra.isNotEmpty() || compact && facts.main.isNotEmpty()
     val disclosureEnabled = context.snapshot.readState != WalletDemoStatusReadState.Loading || retained != null
     val expandedVisible = expanded && disclosure
     val rotation by animateFloatAsState(
@@ -73,37 +73,29 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().then(if (compact) Modifier.testTag("credential-status-$credentialId") else Modifier)) {
             if (compact) SettingsDivider()
-            val header = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(
-                if (compact && disclosure) Modifier.testTag("credential-status-details-$credentialId")
-                    .semantics { stateDescription = disclosureState }
-                    .clickable(enabled = disclosureEnabled, role = Role.Button, onClickLabel = disclosureLabel) { expanded = !expanded }
-                else Modifier,
-            )
-            Row(header.padding(start = 16.dp, end = if (disclosure || !compact && refreshVisible) 4.dp else 16.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CredentialStatusIcon(status, size = glyphSize)
-                Text(status.title(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!compact && refreshVisible) StatusRefreshButton(credentialId)
-                    if (disclosure) {
-                        if (compact) Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
-                        } else IconButton(onClick = { expanded = !expanded }, enabled = disclosureEnabled,
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                            modifier = Modifier.testTag("credential-status-details-$credentialId").semantics { stateDescription = disclosureState }) {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, disclosureLabel, Modifier.rotate(rotation))
-                        }
+            Row(Modifier.fillMaxWidth().padding(end = if (refreshVisible) 4.dp else 0.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                val header = Modifier.weight(1f).heightIn(min = 48.dp).then(
+                    if (disclosure) Modifier.testTag("credential-status-details-$credentialId")
+                        .semantics { stateDescription = disclosureState }
+                        .clickable(enabled = disclosureEnabled, role = Role.Button, onClickLabel = disclosureLabel) { expanded = !expanded }
+                    else Modifier,
+                )
+                Row(header.padding(start = 16.dp, end = if (disclosure || refreshVisible) 4.dp else 16.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CredentialStatusIcon(status, size = glyphSize)
+                    Text(status.title(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    if (disclosure) Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
+                if (refreshVisible) StatusRefreshButton(credentialId)
             }
             if (!compact) CredentialStatusFactsContent(credentialId, main = facts.main)
             WalletExpandableContent(expandedVisible) {
                 Column {
                     if (compact && facts.main.isNotEmpty()) SettingsDivider()
                     CredentialStatusFactsContent(credentialId, main = if (compact) facts.main else emptyList(), extra = facts.extra)
-                    if (compact && refreshVisible) Row(Modifier.fillMaxWidth().padding(end = 4.dp), horizontalArrangement = Arrangement.End) {
-                        StatusRefreshButton(credentialId)
-                    }
                 }
             }
         }

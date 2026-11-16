@@ -291,12 +291,7 @@ extension WalletCoreBridge {
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         reviewedStatus: [String: String], did: String?, runPolicies: Bool?, paymentConsentRevision: String?
     ) async throws -> PresentationResult {
-        let snapshot = try await credentialStatusSnapshot()
-        guard selectedCredentialOptions.allSatisfy({ selection in
-            snapshot.credentials.first { $0.credentialID == selection.credentialID }?.value.presentation.advisoryRevision == reviewedStatus[selection.credentialID]
-        }) else { throw WalletError.credentialStatusReviewChanged }
-        return try await submitPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did, runPolicies: runPolicies, paymentConsentRevision: paymentConsentRevision)
+        throw WalletError.internalFailure("Status-reviewed presentation is unavailable")
     }
 }
 

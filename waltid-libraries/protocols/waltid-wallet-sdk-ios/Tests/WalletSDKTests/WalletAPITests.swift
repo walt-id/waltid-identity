@@ -1681,6 +1681,9 @@ private final class FakeProximityPresentationSessionBridge: ProximitySessionBrid
 
     func presentNfc() async { presentNfcCalls += 1 }
 
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        throw WalletError.internalFailure("Fixture does not support reviewed approval")
+    }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         dispatches.append(action)
         return .accepted
@@ -1712,6 +1715,9 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
         states = pair.stream
         continuation = pair.continuation
     }
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        throw WalletError.internalFailure("Fixture does not support reviewed approval")
+    }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
     func presentNfc() async {}
@@ -1719,6 +1725,9 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
 
 private struct DisplayOnlySharingPlanBridge: ProximitySharingPlanBridge {
     var isExpired: Bool { false }
+    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult {
+        throw WalletError.internalFailure("Display fixture does not support reviewed approval")
+    }
     func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
         .rejected(.init(category: .policy, code: "display_fixture", message: "Display fixture only", recovery: .none))
     }

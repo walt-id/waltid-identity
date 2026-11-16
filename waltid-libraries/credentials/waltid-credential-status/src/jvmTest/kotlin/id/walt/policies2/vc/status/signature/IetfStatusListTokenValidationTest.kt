@@ -128,7 +128,7 @@ class IetfStatusListTokenValidationTest {
         val payload = buildJsonObject {
             put("iss", did)
             put("sub", sub)
-            put("iat", 1_700_000_000)
+            put("iat", minOf(1_700_000_000, exp - 60))
             put("exp", exp)
             put("status_list", buildJsonObject {
                 put("bits", 1)
@@ -156,7 +156,7 @@ class IetfStatusListTokenValidationTest {
             CwtToken(
                 sub = sub,
                 exp = exp,
-                iat = 1_700_000_000,
+                iat = minOf(1_700_000_000, exp - 60),
                 statusList = IETFStatusContent(size = 1, list = validList()),
             )
         )

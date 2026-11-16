@@ -67,12 +67,13 @@ internal fun OfferedCredentialRow(
             if (showLargeArt) {
                 Box(Modifier.fillMaxWidth().testTag("issuance-large-art-${credential.configurationId}")) {
                     CredentialCardArt(art, Modifier.clearAndSetSemantics { contentDescription = title })
+                    CredentialCardAccessory {
                     IconButton(onClick = openInformation,
-                        // Align the 20dp icon with the card's 16dp inset: 2 + (48 - 20) / 2.
-                        modifier = Modifier.align(Alignment.BottomStart).padding(2.dp).size(48.dp)
+                        modifier = Modifier.size(48.dp)
                             .testTag("issuance-details-${credential.configurationId}"),
                         colors = IconButtonDefaults.iconButtonColors(contentColor = parseCssColor(art.textColor) ?: Color.White)) {
                         Icon(Icons.Outlined.Info, informationLabel, Modifier.size(20.dp))
+                    }
                     }
                 }
             } else if (onSelectionChange != null && needsSeparateSelection) {

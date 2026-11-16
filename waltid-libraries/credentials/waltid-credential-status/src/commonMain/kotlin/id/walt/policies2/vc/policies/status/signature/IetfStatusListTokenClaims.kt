@@ -3,30 +3,20 @@ package id.walt.policies2.vc.policies.status.signature
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto2.jose.CompactJws
+import id.walt.statuslist.token.IetfStatusListToken
+import kotlin.time.Instant
 import id.walt.policies2.vc.policies.status.model.StatusVerificationError
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.cbor.CborLabel
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.cbor.CborFloat
 import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborMap
-import kotlinx.serialization.cbor.CborNull
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.cbor.longOrNull
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.longOrNull
 
 /**
  * draft-ietf-oauth-status-list-21 §5 and §8.3: the protected type header and `iat` are required,
@@ -34,27 +24,47 @@ import kotlinx.serialization.json.longOrNull
  * RFC 7519 and RFC 8392. `ttl` is a cache lifetime, not a token expiry.
  */
 object IetfStatusListTokenClaims {
-    fun validate(payload: JsonObject, statusListUri: String, nowEpochSeconds: Long) {
-        val subject = (payload["sub"] as? JsonPrimitive)?.content
-        requireSubject(subject, statusListUri)
-        requireIssuedAt(payload.issuedAt())
-        requireCurrent(
-            exp = payload.epochSeconds("exp"),
-            nbf = payload.epochSeconds("nbf"),
-            nowEpochSeconds = nowEpochSeconds,
-        )
+    fun validate(payload: JsonObject, statusListUri: String, nowEpochSeconds: Long) =
+        validate(payload, statusListUri, Instant.fromEpochSeconds(nowEpochSeconds))
+
+    fun validate(payload: ByteArray, statusListUri: String, nowEpochSeconds: Long) =
+        validate(payload, statusListUri, Instant.fromEpochSeconds(nowEpochSeconds))
+
+    fun validate(payload: JsonObject, statusListUri: String, now: Instant) =
+        requireCurrent(jwtValidity(payload, statusListUri), now)
+
+    fun validate(payload: ByteArray, statusListUri: String, now: Instant) =
+        requireCurrent(cwtValidity(payload, statusListUri), now)
+
+    fun jwtValidity(payload: JsonObject, statusListUri: String): IetfStatusListToken.Validity = try {
+        IetfStatusListToken.Validity.fromJwt(payload, statusListUri)
+    } catch (cause: IllegalArgumentException) {
+        throw StatusVerificationError(cause.message ?: "Invalid status-list claims")
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun validate(payload: ByteArray, statusListUri: String, nowEpochSeconds: Long) {
-        val claims = try {
-            coseCompliantCbor.decodeFromByteArray<CwtStatusClaims>(payload)
-        } catch (cause: Exception) {
-            throw StatusVerificationError("IETF status-list CWT claims could not be read: ${cause.message}")
+    fun cwtValidity(payload: ByteArray, statusListUri: String): IetfStatusListToken.Validity = try {
+        val claims = coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), payload) as? CborMap
+            ?: throw IllegalArgumentException("CWT claims are not a map")
+        requireSubject((claims[CborInteger(2)] as? CborString)?.value, statusListUri)
+        fun date(label: Long, name: String): Double? = claims[CborInteger(label)]?.let {
+            val number = when (it) {
+                is CborInteger -> it.longOrNull?.toDouble()
+                is CborFloat -> it.value
+                else -> null
+            }
+            number?.takeIf(Double::isFinite) ?: throw IllegalArgumentException("IETF status-list token $name is not a number")
         }
-        requireSubject(claims.sub, statusListUri)
-        requireIssuedAt(claims.iat)
-        requireCurrent(claims.exp, claims.nbf, nowEpochSeconds)
+        val ttl = claims[CborInteger(65534)]?.let {
+            (it as? CborInteger)?.longOrNull?.takeIf { value -> value > 0 }
+                ?: throw IllegalArgumentException("CWT TTL must be a positive unsigned integer")
+        }
+        IetfStatusListToken.Validity(date(6, "iat") ?: throw IllegalArgumentException("IETF status-list token has no iat"),
+            date(4, "exp"), date(5, "nbf"), ttl?.toDouble())
+    } catch (cause: StatusVerificationError) {
+        throw cause
+    } catch (cause: Exception) {
+        throw StatusVerificationError(cause.message ?: "Invalid status-list CWT claims")
     }
 
     /**
@@ -110,48 +120,10 @@ object IetfStatusListTokenClaims {
         }
     }
 
-    private fun requireIssuedAt(iat: Double?) {
-        if (iat == null) {
-            throw StatusVerificationError("IETF status-list token has no iat")
-        }
-        if (!iat.isFinite()) {
-            throw StatusVerificationError("IETF status-list token iat is not a number")
-        }
-    }
-
-    private fun requireCurrent(exp: Long?, nbf: Long?, nowEpochSeconds: Long) {
-        if (nbf != null && nowEpochSeconds < nbf) {
-            throw StatusVerificationError("IETF status-list token is not yet valid")
-        }
-        if (exp != null && nowEpochSeconds >= exp) {
-            throw StatusVerificationError("IETF status-list token is expired")
-        }
-    }
-
-    /** RFC 7519 §4.1.6: `iat` is a NumericDate, a finite JSON number. */
-    private fun JsonObject.issuedAt(): Double? {
-        if ("iat" !in this) return null
-        val primitive = this["iat"] as? JsonPrimitive
-            ?: throw StatusVerificationError("IETF status-list token iat is not a number")
-        if (primitive.isString) {
-            throw StatusVerificationError("IETF status-list token iat is not a number")
-        }
-        val number = primitive.doubleOrNull
-            ?: throw StatusVerificationError("IETF status-list token iat is not a number")
-        if (!number.isFinite()) {
-            throw StatusVerificationError("IETF status-list token iat is not a number")
-        }
-        return number
-    }
-
-    private fun JsonObject.epochSeconds(name: String): Long? {
-        if (name !in this) return null
-        val primitive = this[name] as? JsonPrimitive
-            ?: throw StatusVerificationError("IETF status-list token $name is not an integer time")
-        return primitive.longOrNull
-            ?: primitive.content.toLongOrNull()
-            ?: primitive.doubleOrNull?.toLong()
-            ?: throw StatusVerificationError("IETF status-list token $name is not an integer time")
+    private fun requireCurrent(claims: IetfStatusListToken.Validity, at: Instant) {
+        val now = at.epochSeconds.toDouble() + at.nanosecondsOfSecond / 1_000_000_000.0
+        if (claims.notBefore?.let { now < it } == true) throw StatusVerificationError("IETF status-list token is not yet valid")
+        if (claims.expiresAt?.let { now >= it } == true) throw StatusVerificationError("IETF status-list token is expired")
     }
 
     private const val JWT_TYPE = "statuslist+jwt"
@@ -160,42 +132,4 @@ object IetfStatusListTokenClaims {
 
     /** IANA CoAP content-format for `application/statuslist+cwt`. */
     private const val CWT_CONTENT_FORMAT = 279L
-}
-
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
-private data class CwtStatusClaims(
-    @CborLabel(2) val sub: String? = null,
-    @CborLabel(4) val exp: Long? = null,
-    @CborLabel(5) val nbf: Long? = null,
-    @Serializable(with = CwtIssuedAtSerializer::class)
-    @CborLabel(6) val iat: Double? = null,
-)
-
-/**
- * RFC 8392 §4: a CWT NumericDate is an integer or a floating-point number of seconds.
- * Absent and null claims stay null so the caller can report a missing `iat`.
- */
-@OptIn(ExperimentalSerializationApi::class)
-private object CwtIssuedAtSerializer : KSerializer<Double?> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("CwtIssuedAt", PrimitiveKind.DOUBLE)
-
-    override fun serialize(encoder: Encoder, value: Double?) {
-        when {
-            value == null -> encoder.encodeNull()
-            value.isFinite() && value % 1.0 == 0.0 &&
-                value in Long.MIN_VALUE.toDouble()..Long.MAX_VALUE.toDouble() -> encoder.encodeLong(value.toLong())
-            else -> encoder.encodeDouble(value)
-        }
-    }
-
-    override fun deserialize(decoder: Decoder): Double? =
-        when (val element = decoder.decodeSerializableValue(CborElement.serializer())) {
-            is CborNull -> null
-            is CborInteger -> element.longOrNull?.toDouble()
-                ?: throw SerializationException("CWT iat is not a number")
-            is CborFloat -> element.value
-            else -> throw SerializationException("CWT iat is not a number")
-        }
 }

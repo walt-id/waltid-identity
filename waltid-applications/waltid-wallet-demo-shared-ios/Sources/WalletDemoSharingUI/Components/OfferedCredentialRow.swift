@@ -31,6 +31,7 @@ public struct OfferedCredentialRow: View {
         VStack(alignment: .leading, spacing: 0) {
             if largeArt || allowsSelection { identity.padding(16) }
             else {
+                CredentialCardAccessory {
                 Button { showDetails = true } label: { identity.padding(16).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityHint(String(localized: "View credential information", bundle: .module))
@@ -77,6 +78,7 @@ public struct OfferedCredentialRow: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(CredentialCardSummary.offered(from: credential).title)
                     .accessibilityIdentifier("issuance-large-art-\(credential.configurationID)")
+                CredentialCardAccessory {
                 Button { showDetails = true } label: {
                     Image(systemName: "info.circle")
                         .resizable().frame(width: 20, height: 20)
@@ -86,8 +88,7 @@ public struct OfferedCredentialRow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(String(localized: "Credential information", bundle: .module))
                 .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
-                // Align the 20pt icon with the card's 16pt inset: 2 + (48 - 20) / 2.
-                .padding(2)
+                }
             }
         } else if !allowsSelection {
             HStack(spacing: 12) { summary; selection(showsLabel: false) }

@@ -54,37 +54,27 @@ private struct CredentialStatusContent: View {
         let refreshVisible = statusUI.check != nil && (value?.action == .check || value?.action == .retry || refreshing || value?.references.contains {
             switch $0.failure { case .notYetValid: true; case .rateLimited(let date): date != nil; default: false }
         } == true)
-        let disclosure = !facts.extra.isEmpty || compact && (!facts.main.isEmpty || refreshVisible)
+        let disclosure = !facts.extra.isEmpty || compact && !facts.main.isEmpty
         let disclosureEnabled = !display.isLoading || value != nil
         let expandedVisible = expanded && disclosure
         return VStack(alignment: .leading, spacing: 0) {
             if compact { divider }
-            if compact && disclosure {
-                Button { expanded.toggle() } label: { header(display, disclosure: true, expanded: expandedVisible) }
-                    .buttonStyle(.plain).disabled(!disclosureEnabled)
-                    .accessibilityHint(String(localized: "Credential status details", bundle: .module))
-                    .accessibilityValue(expandedVisible ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
-                    .accessibilityIdentifier("credential-status-details-\(credentialID)")
-            } else {
-                HStack(spacing: 0) {
-                    header(display, disclosure: false, expanded: false, trailingInset: refreshVisible || disclosure ? 8 : 16)
-                    if !compact && refreshVisible { refreshButton(display) }
-                    if disclosure {
-                        Button { expanded.toggle() } label: { chevron(expanded: expandedVisible) }
-                            .buttonStyle(.plain).disabled(!disclosureEnabled)
-                            .accessibilityLabel(String(localized: "Credential status details", bundle: .module))
-                            .accessibilityValue(expandedVisible ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
-                            .accessibilityIdentifier("credential-status-details-\(credentialID)")
-                    }
-                }.padding(.trailing, !compact && (refreshVisible || disclosure) ? 4 : 0)
-            }
+            HStack(spacing: 0) {
+                if disclosure {
+                    Button { expanded.toggle() } label: { header(display, disclosure: true, expanded: expandedVisible) }
+                        .buttonStyle(.plain).disabled(!disclosureEnabled)
+                        .accessibilityHint(String(localized: "Credential status details", bundle: .module))
+                        .accessibilityValue(expandedVisible ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
+                        .accessibilityIdentifier("credential-status-details-\(credentialID)")
+                } else {
+                    header(display, disclosure: false, expanded: false, trailingInset: refreshVisible ? 8 : 16)
+                }
+                if refreshVisible { refreshButton(display) }
+            }.padding(.trailing, refreshVisible ? 4 : 0)
             if !compact { CredentialStatusFactsContent(credentialID: credentialID, main: facts.main) }
             if expandedVisible {
                 if compact && !facts.main.isEmpty { divider }
                 CredentialStatusFactsContent(credentialID: credentialID, main: compact ? facts.main : [], extra: facts.extra)
-                if compact && refreshVisible {
-                    HStack { Spacer(); refreshButton(display) }.padding(.trailing, 4)
-                }
             }
         }
     }

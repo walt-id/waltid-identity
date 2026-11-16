@@ -1244,18 +1244,18 @@
     {
       "id": "status.home.issue",
       "requirements": [
-        "Issue-only Home decoration at a fixed physical-right artwork anchor"
+        "Issue-only Home decoration at a fixed bottom-left artwork anchor"
       ],
       "composeTest": "credentialStatusHome",
       "swiftTest": "testCredentialStatusHome",
-      "title": "Issue-only Home decoration at a fixed physical-right artwork anchor",
+      "title": "Issue-only Home decoration at a fixed bottom-left artwork anchor",
       "note": "Supplied, constructed, pending and failed artwork use the same card-relative badge anchor. Quiet credentials have no Home badge. Aspect ratio, 56-unit stack peek and transitions are preserved."
     },
     {
       "id": "status.home.mixed_artwork",
       "requirements": [
         "All six chip/no-chip and quiet/warning/revoked combinations",
-        "One physical-right anchor with visible clearance above the next card"
+        "One bottom-left accessory slot; rear cards may obscure it"
       ],
       "composeTest": "credentialStatusMixedArtwork",
       "swiftTest": "testCredentialStatusMixedArtwork",
@@ -1266,7 +1266,7 @@
       "id": "status.home.mixed_artwork.dark_large_text_rtl",
       "requirements": [
         "All six chip/no-chip and quiet/warning/revoked combinations",
-        "One physical-right anchor with visible clearance above the next card"
+        "One bottom-left accessory slot; rear cards may obscure it"
       ],
       "composeTest": "credentialStatusMixedArtworkRtl",
       "swiftTest": "testCredentialStatusMixedArtworkRtl",

@@ -7,6 +7,7 @@ import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.status.CredentialStatus
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.PersistedCredentialStatus
 import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.test.runTest
@@ -34,11 +35,19 @@ class SqlDelightCredentialStatusStoreTest {
             val at = Instant.fromEpochSeconds(1_800_000_000)
             val snapshot = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
                 metadata = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"ref","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}"""))
-            assertTrue(store.saveCredentialStatusIfCurrent(credential, snapshot))
+            assertTrue(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("first", snapshot)))
+            val original = CredentialStatusStoredRecord("first", snapshot)
+            val cleared = CredentialStatusStoredRecord("cleared", null)
+            assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("stale", snapshot)))
+            assertTrue(store.compareAndSetCredentialStatus(credential, original, cleared))
+            assertNull(store.readCredentialStatus(credential.id))
+            assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("aba", snapshot)))
+            assertFalse(store.compareAndSetCredentialStatus(credential, original, CredentialStatusStoredRecord("old", snapshot)))
+            assertTrue(store.compareAndSetCredentialStatus(credential, cleared, CredentialStatusStoredRecord("restored", snapshot)))
             assertEquals(snapshot, SqlDelightCredentialStore(WalletPersistenceDatabase(driver).walletPersistenceQueries).readCredentialStatus("resident"))
             assertTrue(store.removeCredential("resident"))
             assertNull(store.readCredentialStatus("resident"))
-            assertFalse(store.saveCredentialStatusIfCurrent(credential, snapshot))
+            assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("first", snapshot)))
         } finally { driver.close() }
     }
 }

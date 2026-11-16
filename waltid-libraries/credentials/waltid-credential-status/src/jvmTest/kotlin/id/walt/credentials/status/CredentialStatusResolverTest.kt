@@ -1,5 +1,6 @@
 package id.walt.credentials.status
 
+import kotlin.time.Duration.Companion.milliseconds
 import id.walt.credentials.formats.W3C11
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngineConfig
@@ -31,6 +32,30 @@ import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 class CredentialStatusResolverTest {
+    @Test
+    fun authenticatedFractionalTokenTimesReachTheSharedParserWithoutTruncation() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val at = Instant.fromEpochSeconds(1_800_000_000, 500_000_000)
+        val list = issuer.sign(buildJsonObject {
+            put("iss", issuer.did); put("sub", issuer.uri); put("iat", 1_700_000_000)
+            put("nbf", 1_800_000_000.25); put("exp", 1_800_000_001.25); put("ttl", 0.5)
+            put("status_list", buildJsonObject { put("bits", 1); put("lst", "eNpjYAAAAAIAAQ") })
+        }, "statuslist+jwt")
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(list, headers = Headers.build {
+            append(HttpHeaders.ContentType, "application/statuslist+jwt"); append(HttpHeaders.CacheControl, "max-age=600")
+        }) }
+        }))
+        val resolver = CredentialStatusResolver(client, backgroundScope, now = { at })
+        try {
+            val entry = resolver.resolve(issuer.credential(), true).metadata.entries.single()
+            assertEquals(StatusMeaning.CLEAR, entry.meaning, entry.failure?.toString())
+            assertEquals(at + 500.milliseconds, entry.lastObservation()!!.freshUntil)
+            assertEquals(Instant.fromEpochSeconds(1_800_000_001, 250_000_000), entry.lastObservation()!!.validUntil)
+        } finally { resolver.close(); client.close() }
+    }
+
     @Test
     fun signedReferencesCannotBeHiddenOrReplacedByTheStoredProjection() = runTest {
         val issuer = StatusTestIssuer.create()

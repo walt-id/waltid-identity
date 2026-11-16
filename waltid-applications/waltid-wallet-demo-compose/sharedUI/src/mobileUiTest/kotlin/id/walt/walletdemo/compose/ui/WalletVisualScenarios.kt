@@ -178,15 +178,14 @@ internal class WalletVisualScenarios(
                 val badge = onNodeWithTag("credential-status-icon-${card.id}", useUnmergedTree = true)
                 if (!status.hasIssue) badge.assertDoesNotExist()
                 else {
-                    badge.assertIsDisplayed()
+                    badge.assertExists()
+                    if (index == WalletArtworkFixtures.cards.lastIndex) badge.assertIsDisplayed()
                     val bounds = badge.fetchSemanticsNode().boundsInRoot
                     val cardBounds = onNodeWithTag(WalletUiTestTags.credentialCard(card.id)).fetchSemanticsNode().boundsInRoot
-                    assertTrue(bounds.left > cardBounds.center.x, "Artwork decoration remains physically right in both reading directions")
-                    assertTrue(bounds.right < cardBounds.right)
-                    WalletArtworkFixtures.cards.getOrNull(index + 1)?.let { next ->
-                        val nextTop = onNodeWithTag(WalletUiTestTags.credentialCard(next.id)).fetchSemanticsNode().boundsInRoot.top
-                        assertTrue(bounds.bottom < nextTop, "The complete badge must clear the next stacked card")
-                    }
+                    assertTrue(bounds.right < cardBounds.center.x, "Artwork accessory remains physically left in both reading directions")
+                    assertTrue(bounds.left > cardBounds.left)
+                    assertTrue(bounds.center.y > cardBounds.center.y, "Artwork accessory belongs to the bottom of the card")
+                    assertTrue(bounds.bottom < cardBounds.bottom)
                 }
             }
             capture(if (rtl) "status.home.mixed_artwork.dark_large_text_rtl" else "status.home.mixed_artwork")

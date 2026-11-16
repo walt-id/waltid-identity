@@ -1,6 +1,7 @@
 package id.walt.wallet2.persistence
 
 import kotlinx.serialization.json.Json
+import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.PersistedCredentialStatus
 import id.walt.wallet2.status.statusFingerprint
 import id.walt.credentials.status.CredentialStatus
@@ -57,11 +58,19 @@ class Wallet2DatabaseMigrationTest {
             val at = Instant.fromEpochSeconds(1_800_000_000)
             val saved = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
                 metadata = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"ref","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}"""))
-            assertTrue(first.saveCredentialStatusIfCurrent(credential, saved))
+            assertTrue(first.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("first", saved)))
+            val original = CredentialStatusStoredRecord("first", saved)
+            val cleared = CredentialStatusStoredRecord("cleared", null)
+            assertFalse(first.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("stale", saved)))
+            assertTrue(first.compareAndSetCredentialStatus(credential, original, cleared))
+            assertNull(first.readCredentialStatus(credential.id))
+            assertFalse(first.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("aba", saved)))
+            assertFalse(first.compareAndSetCredentialStatus(credential, original, CredentialStatusStoredRecord("old", saved)))
+            assertTrue(first.compareAndSetCredentialStatus(credential, cleared, CredentialStatusStoredRecord("restored", saved)))
             assertEquals(saved, ExposedCredentialStore("first", initWallet2Database(config(url))).readCredentialStatus(credential.id))
             assertNull(second.readCredentialStatus(credential.id))
             first.removeCredential(credential.id)
-            assertFalse(first.saveCredentialStatusIfCurrent(credential, saved))
+            assertFalse(first.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("first", saved)))
             assertNull(first.readCredentialStatus(credential.id))
             assertNotNull(second.getCredential(credential.id))
         }

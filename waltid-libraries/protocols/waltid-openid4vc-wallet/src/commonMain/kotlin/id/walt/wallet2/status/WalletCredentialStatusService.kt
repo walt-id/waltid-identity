@@ -64,6 +64,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.uuid.Uuid
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -95,7 +96,7 @@ class WalletCredentialStatusService(
         val generation: Long,
         val metadata: CredentialStatus,
         val nonPersistentReferenceIds: Set<String> = emptySet(),
-        val persisted: PersistedCredentialStatus? = null,
+        val persisted: CredentialStatusStoredRecord? = null,
     )
     private class Flight(val fingerprint: String, val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
@@ -265,13 +266,13 @@ class WalletCredentialStatusService(
 
     private suspend fun local(record: Record): CredentialStatus {
         check(job.isActive) { "Credential status service is closed" }
-        val stored = (record.store as? CredentialStatusSnapshotStore)?.readCredentialStatus(record.credential.id)
+        val stored = (record.store as? CredentialStatusSnapshotStore)?.readCredentialStatusRecord(record.credential.id)
         mutex.withLock {
             states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint && it.persisted == stored }
                 ?.let { return it.metadata }
         }
         val discovered = resolver.discover(record.credential.credential)
-        val restored = stored?.takeIf { it.schemaVersion == 2 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
+        val restored = stored?.snapshot?.takeIf { it.schemaVersion == 2 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
             if (discovered !is CredentialStatus.References) return@let discovered
             val samePolicy = trustPolicyId != null && saved.trustPolicyId == trustPolicyId
             val known = saved.metadata.entries.associateBy(CredentialStatusEntry::referenceId)
@@ -357,7 +358,7 @@ class WalletCredentialStatusService(
         if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store || current?.statusFingerprint() != record.fingerprint) {
             return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
         }
-        val merged = mutex.withLock {
+        var merged = mutex.withLock {
             val previous = states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint && it.generation == version }
                 ?: return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
             val known = previous.metadata.entries.associateBy(CredentialStatusEntry::referenceId)
@@ -379,19 +380,38 @@ class WalletCredentialStatusService(
                 retainedRestrictions(metadata, previous.metadata, previous.nonPersistentReferenceIds))
         }
 
-        val persistent = CredentialStatus.references(merged.metadata.entries.mapNotNull { entry ->
-            entry.takeUnless { it.referenceId in merged.nonPersistentReferenceIds }
-        })
         val snapshotStore = record.store as? CredentialStatusSnapshotStore
-        val persisted = persistent.takeIf { it.entries.isNotEmpty() }?.let {
-            PersistedCredentialStatus(credentialFingerprint = record.fingerprint, trustPolicyId = trustPolicyId, metadata = it)
-        }
+        var expected = merged.persisted
+        var committed: CredentialStatusStoredRecord? = null
         if (snapshotStore != null) {
-            val stored = if (persisted == null) snapshotStore.removeCredentialStatusIfCurrent(current)
-            else snapshotStore.saveCredentialStatusIfCurrent(current, persisted)
-            if (!stored) {
-                return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
+            // Retry only the local atomic commit, never issuer work. A cleared record is a fence,
+            // not permission to resurrect an observation from before that clear.
+            for (attempt in 0 until 8) {
+                val persistent = CredentialStatus.references(merged.metadata.entries.filterNot {
+                    it.referenceId in merged.nonPersistentReferenceIds
+                })
+                val updated = CredentialStatusStoredRecord(Uuid.random().toString(),
+                    persistent.takeIf { it.entries.isNotEmpty() }?.let {
+                        PersistedCredentialStatus(credentialFingerprint = record.fingerprint, trustPolicyId = trustPolicyId, metadata = it)
+                    })
+                if (snapshotStore.compareAndSetCredentialStatus(current, expected, updated)) {
+                    committed = updated
+                    break
+                }
+                val latest = snapshotStore.readCredentialStatusRecord(record.credential.id)
+                if (latest == expected || latest?.snapshot == null) {
+                    return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.DEFERRED, local(record))
+                }
+                val saved = latest.snapshot
+                if (saved.schemaVersion != 2 || saved.credentialFingerprint != record.fingerprint || saved.trustPolicyId != trustPolicyId) {
+                    return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.DEFERRED, local(record))
+                }
+                val metadata = reconcile(merged.metadata, saved.metadata)
+                merged = merged.copy(metadata = metadata, nonPersistentReferenceIds =
+                    retainedRestrictions(metadata, merged.metadata, merged.nonPersistentReferenceIds))
+                expected = latest
             }
+            if (committed == null) return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.DEFERRED, local(record))
         }
         currentCoroutineContext().ensureActive()
         mutex.withLock {
@@ -401,7 +421,7 @@ class WalletCredentialStatusService(
                 state == null || state.store !== record.store || state.fingerprint != record.fingerprint || state.generation != version) {
                 return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
             }
-            states[record.reference] = merged.copy(persisted = if (snapshotStore != null) persisted else null)
+            states[record.reference] = merged.copy(persisted = committed)
             if (merged.metadata.hasCheckError) retryAfter[record.reference] = now() + 30.seconds
             else retryAfter.remove(record.reference)
         }

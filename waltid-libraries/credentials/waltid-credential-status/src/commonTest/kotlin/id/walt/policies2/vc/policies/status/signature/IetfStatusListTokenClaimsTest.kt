@@ -206,6 +206,31 @@ class IetfStatusListTokenClaimsTest {
         assertEquals("IETF status-list token iat is not a number", error.message)
     }
 
+    @Test
+    fun `fractional jwt expiry is not truncated and ttl must be positive`() {
+        val payload = buildJsonObject { put("sub", uri); put("iat", iat); put("exp", now + 0.5); put("ttl", 0.5) }
+        IetfStatusListTokenClaims.validate(payload, uri, now)
+        for (ttl in listOf(0.0, -1.0)) {
+            assertFailsWith<StatusVerificationError> {
+                IetfStatusListTokenClaims.validate(buildJsonObject { put("sub", uri); put("iat", iat); put("ttl", ttl) }, uri, now)
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun `cwt expiry and not before permit fractional dates but ttl is a positive unsigned integer`() {
+        fun claims(exp: CborElement, nbf: CborElement, ttl: CborElement) = coseCompliantCbor.encodeToByteArray(
+            CborElement.serializer(), CborMap(mapOf(CborInteger(2) to CborString(uri), CborInteger(6) to CborInteger(iat),
+                CborInteger(4) to exp, CborInteger(5) to nbf, CborInteger(65534) to ttl)))
+        IetfStatusListTokenClaims.validate(claims(CborFloat(now + 0.5), CborFloat(now - 0.5), CborInteger(1)), uri, now)
+        for (ttl in listOf(CborInteger(0), CborInteger(-1), CborFloat(0.5))) {
+            assertFailsWith<StatusVerificationError> {
+                IetfStatusListTokenClaims.validate(claims(CborFloat(now + 0.5), CborFloat(now - 0.5), ttl), uri, now)
+            }
+        }
+    }
+
     private fun jwtWithTyp(typ: String): String = jwtWithHeader("""{"alg":"EdDSA","typ":"$typ"}""")
 
     private fun jwtWithHeader(header: String): String {

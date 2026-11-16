@@ -56,13 +56,14 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         suppliedContent: StatusListContent? = null,
         nowEpochSeconds: Long = Clock.System.now().epochSeconds,
         profile: StatusProtocol? = null,
+        evaluatedAt: Instant = Instant.fromEpochSeconds(nowEpochSeconds),
     ): Result<EvaluatedCredentialStatus> = runStatusCheck {
         val statusListContent = suppliedContent ?: fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
 
         val verified = signatureVerifier?.let { verifier ->
             requireNotNull(referencedCredential) { "Referenced credential is required for status-list signer authorization" }
-            authenticateStatusList(verifier, statusListContent, referencedCredential, entry, signerAuthorizer, nowEpochSeconds, profile)
+            authenticateStatusList(verifier, statusListContent, referencedCredential, entry, signerAuthorizer, evaluatedAt, profile)
         }
 
         val matchingReader = reader.firstOrNull { it.canHandle(statusListContent) }
@@ -77,7 +78,7 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         if (bitValue.isEmpty()) throw StatusVerificationError("Null or empty bit value")
         if (bitValue.any { it != '0' && it != '1' }) throw StatusVerificationError("Invalid bit value: $bitValue")
         EvaluatedCredentialStatus(bitValue.joinToString("").toUInt(2),
-            verified?.let { certificateDeadline(it.signer.certificateChain, Instant.fromEpochSeconds(nowEpochSeconds)) })
+            verified?.let { certificateDeadline(it.signer.certificateChain, evaluatedAt) })
     }
 
     protected abstract suspend fun getBitValue(statusList: K, entry: M): List<Char>

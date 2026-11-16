@@ -95,7 +95,7 @@
       "timezoneId": "UTC",
       "requirements": [
         "Mixed unchanged public artwork and constructed cards, with chip/no-chip and quiet/warning/revoked cases",
-        "Consistent physical-right badge anchor and optical triangle centering"
+        "Consistent bottom-left badge anchor and optical triangle centering"
       ]
     },
     {

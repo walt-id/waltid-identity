@@ -9,6 +9,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockEngineConfig
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -32,6 +33,53 @@ import kotlin.test.assertIs
 
 class WalletApi2CredentialStatusTest {
     @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun closingTheOwnerReleasesItsContextAndFencesLateRefreshEvenIfCloseFails() = runTest {
+        for (closeStatus in listOf(HttpStatusCode.NoContent, HttpStatusCode.ServiceUnavailable, HttpStatusCode.Unauthorized)) {
+            val waiting = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            var hold = false
+            var closes = 0
+            var expired = 0
+            val http = HttpClient(MockEngine(MockEngineConfig().apply {
+                dispatcher = StandardTestDispatcher(testScheduler)
+                addHandler { request ->
+                    val path = request.url.encodedPath
+                    when {
+                        request.method == HttpMethod.Delete -> {
+                            closes++
+                            respond("", closeStatus)
+                        }
+                        path.endsWith("/context") -> respond(snapshot(presentation("CHECKED", "NONE", "clear"), """{"id":"review","expiresAt":"2026-11-16T12:00:00Z"}"""),
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                        path.endsWith("/refresh") -> {
+                            if (hold) { waiting.complete(Unit); resume.await() }
+                            respond("[]", headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                        }
+                        else -> respond(snapshot(presentation("CHECKED", "NONE", "clear"), """{"id":"review","expiresAt":"2026-11-16T12:00:00Z"}"""),
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                    }
+                }
+            })) { install(ContentNegotiation) { json(walletApi2Json) } }
+            val statuses = WalletApi2CredentialStatuses(WalletApi2Client("https://wallet.example", "token", http = http, onSessionExpired = { expired++ }), "wallet")
+            try {
+                statuses.refresh(null, true)
+                hold = true
+                val late = async { runCatching { statuses.refresh(null, true) } }
+                waiting.await()
+                val close = async { statuses.close() }
+                runCurrent()
+                resume.complete(Unit)
+                assertTrue(late.await().isFailure)
+                close.await()
+                statuses.close()
+                assertEquals(1, closes)
+                assertEquals(0, expired, "Retiring-owner cleanup must not expire a replacement session")
+                assertFailsWith<IllegalStateException> { statuses.snapshot() }
+            } finally { http.close() }
+        }
+    }
+
     @Test
     fun anEarlierPollCannotOverwriteTheResultOfAnExplicitRefresh() = runTest {
         val context = """{"id":"active-context","expiresAt":"2026-11-12T10:05:00Z"}"""

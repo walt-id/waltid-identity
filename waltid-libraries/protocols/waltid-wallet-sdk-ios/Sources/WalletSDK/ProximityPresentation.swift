@@ -1557,7 +1557,6 @@ protocol ProximitySessionBridge: Sendable {
 
 @available(macOS 10.15, *)
 extension ProximitySessionBridge {
-    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult { try await dispatch(action) }
     var connectedRoute: ProximityConnectedRoute? { nil }
     var sharingPlan: ProximitySharingPlan? { nil }
 }

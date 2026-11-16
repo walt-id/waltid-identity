@@ -45,8 +45,9 @@ Keep home-card decoration limited to an issue icon. Put the result, checked time
 a standalone Credential status section with a refresh icon. The demos use Status clear only for
 qualifying evidence, retain scope and original check time, and expand only additional facts.
 Sharing reviews use cached observations and selected-only warnings. Opening or expanding them and
-submitting do not contact issuer status services. A normal online review can offer explicit refresh
-inside expanded facts. Preserve selection and previous evidence; wait for that review's own operation
+submitting do not contact issuer status services. A normal online review can offer an independent
+refresh control in its summary, beside disclosure. Refresh does not expand the facts.
+Preserve selection and previous evidence; wait for that review's own operation
 and render its result/error before another deliberate submit. Cancel the old UI interest on lock,
 disposal or request/wallet replacement, fencing late completion. Provider and nearby reviews retain
 their existing read-only capability.

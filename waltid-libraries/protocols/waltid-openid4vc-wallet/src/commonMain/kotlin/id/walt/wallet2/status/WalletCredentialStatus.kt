@@ -87,14 +87,26 @@ data class PersistedCredentialStatus(
     val metadata: CredentialStatus,
 )
 
-/** Optional capability: implementing a custom credential store gains no new required methods. */
+/** A durable write fence. A null snapshot clears evidence without losing its revision (ABA). */
+@Serializable
+data class CredentialStatusStoredRecord(
+    val revision: String,
+    val snapshot: PersistedCredentialStatus?,
+)
+
+/** Optional store capability. Revisions must change on every successful write, including clears. */
 interface CredentialStatusSnapshotStore {
-    suspend fun readCredentialStatus(credentialId: String): PersistedCredentialStatus?
+    suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord?
 
-    /** Atomically check that the credential still exists with these signed bytes before writing. */
-    suspend fun saveCredentialStatusIfCurrent(credential: StoredCredential, status: PersistedCredentialStatus): Boolean
+    suspend fun readCredentialStatus(credentialId: String): PersistedCredentialStatus? =
+        readCredentialStatusRecord(credentialId)?.snapshot
 
-    suspend fun removeCredentialStatusIfCurrent(credential: StoredCredential): Boolean
+    /** Atomically fence signed bytes, lifecycle and the exact previous record before replacing it. */
+    suspend fun compareAndSetCredentialStatus(
+        credential: StoredCredential,
+        expected: CredentialStatusStoredRecord?,
+        updated: CredentialStatusStoredRecord,
+    ): Boolean
 }
 
 /** Metadata changes do not invalidate status; replacement of the signed credential does. */

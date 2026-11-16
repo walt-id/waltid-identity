@@ -44,9 +44,6 @@ protocol ProximitySharingPlanBridge: Sendable {
     func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult
 }
 
-extension ProximitySharingPlanBridge {
-    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult { try approve(submission) }
-}
 
 /// A recent authenticated request. Retaining this plan does not authorize any disclosure.
 public struct ProximitySharingPlan: Sendable, Equatable {

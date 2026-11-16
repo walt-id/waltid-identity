@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
 interface DemoWallet {
+    /** Releases host-owned resources when this wallet instance leaves its session. */
+    suspend fun close() {}
     fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = emptyFlow()
     suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses()
     suspend fun refreshCredentialStatuses(ids: Set<String>? = null, force: Boolean = false): WalletDemoStatusRefreshSummary =

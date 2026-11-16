@@ -58,7 +58,8 @@ SELECT snapshot FROM credential_status_snapshots WHERE credential_id = ?;
 saveCredentialStatusIfCurrent:
 INSERT OR REPLACE INTO credential_status_snapshots (credential_id, snapshot)
 SELECT id, :snapshot FROM credentials
-WHERE id = :credential_id AND serialized_credential = :expected_credential;
+WHERE id = :credential_id AND serialized_credential = :expected_credential
+AND (SELECT snapshot FROM credential_status_snapshots WHERE credential_id = :credential_id) IS :expected_snapshot;
 
 credentialStatusChanges:
 SELECT changes();

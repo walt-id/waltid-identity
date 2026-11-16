@@ -9,9 +9,15 @@ public let credentialCardMaxWidth: CGFloat = 360
 private let credentialStatusBadgeSize: CGFloat = 20
 public let defaultWaltCardBlue = Color(red: 27 / 255, green: 79 / 255, blue: 219 / 255)
 
-/// Optical baseline calibrated against issuer assets, without runtime artwork inspection.
-func credentialStatusBadgeTop(_ cardWidth: CGFloat) -> CGFloat {
-    (credentialCardPeek + cardWidth * (104.0 / 1280.0) - credentialStatusBadgeSize) / 2
+/// One physical bottom-left accessory slot, shared by status and issuance information.
+struct CredentialCardAccessory<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        content().frame(width: 48, height: 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(2)
+            .environment(\.layoutDirection, .leftToRight)
+    }
 }
 
 public struct CredentialCardView: View {
@@ -37,7 +43,6 @@ public struct CredentialCardView: View {
 }
 
 public struct CredentialCardArtView: View {
-    @Environment(\.layoutDirection) private var layoutDirection
     public let summary: CredentialCardSummary
     private let credentialID: String?
     public var compact: Bool = false
@@ -86,21 +91,20 @@ public struct CredentialCardArtView: View {
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(label)
                                 .lineLimit(2)
-                                .frame(width: max(0, proxy.size.width - 2 * padding) * 0.72, alignment: .leading)
                                 .padding(padding)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity,
-                                    alignment: layoutDirection == .rightToLeft ? .topTrailing : .topLeading)
+                                    alignment: .topLeading)
                     }
                     credentialLogo()
                         .frame(width: logoSize, height: logoSize)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .center : .bottomTrailing)
-                        .padding(padding)
+                        .position(x: compact ? proxy.size.width / 2 : proxy.size.width - padding - logoSize / 2,
+                                  y: compact ? proxy.size.height / 2 : proxy.size.height - padding - logoSize / 2)
                 }
             }
             .overlay {
-                statusMark.position(x: proxy.size.width - 16 - credentialStatusBadgeSize / 2,
-                    y: credentialStatusBadgeTop(proxy.size.width) + credentialStatusBadgeSize / 2)
-                    .environment(\.layoutDirection, .leftToRight)
+                if !compact, statusDecoration?.hasStatusIssue == true {
+                    CredentialCardAccessory { statusMark }
+                }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(summary.title)

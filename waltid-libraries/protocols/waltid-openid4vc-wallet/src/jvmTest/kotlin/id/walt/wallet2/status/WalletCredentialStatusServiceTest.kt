@@ -80,19 +80,25 @@ class WalletCredentialStatusServiceTest {
     private class Store : WalletCredentialStore, CredentialStatusSnapshotStore {
         val credentials = linkedMapOf<String, StoredCredential>()
         val snapshots = mutableMapOf<String, PersistedCredentialStatus>()
+        var beforeSave: (suspend (PersistedCredentialStatus) -> Unit)? = null
+        var beforeCommit: (suspend (CredentialStatusStoredRecord) -> Unit)? = null
         override suspend fun getCredential(id: String) = credentials[id]
         override suspend fun listCredentials() = credentials.values.toList().asFlow()
         override suspend fun addCredential(entry: StoredCredential) { credentials[entry.id] = entry }
         override suspend fun removeCredential(id: String): Boolean { snapshots.remove(id); return credentials.remove(id) != null }
-        override suspend fun readCredentialStatus(credentialId: String) = snapshots[credentialId]
-        override suspend fun removeCredentialStatusIfCurrent(credential: StoredCredential): Boolean {
-            if (credentials[credential.id]?.statusFingerprint() != credential.statusFingerprint()) return false
-            snapshots.remove(credential.id)
-            return true
+        private val records = mutableMapOf<String, CredentialStatusStoredRecord>()
+        override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? {
+            val saved = records[credentialId]
+            val snapshot = snapshots[credentialId]
+            if (saved?.snapshot == snapshot) return saved
+            return CredentialStatusStoredRecord("injected-${snapshot.hashCode()}", snapshot).also { records[credentialId] = it }
         }
-        override suspend fun saveCredentialStatusIfCurrent(credential: StoredCredential, status: PersistedCredentialStatus): Boolean {
-            if (credentials[credential.id]?.statusFingerprint() != status.credentialFingerprint) return false
-            snapshots[credential.id] = status
+        override suspend fun compareAndSetCredentialStatus(credential: StoredCredential, expected: CredentialStatusStoredRecord?, updated: CredentialStatusStoredRecord): Boolean {
+            beforeCommit?.invoke(updated)
+            updated.snapshot?.let { beforeSave?.invoke(it) }
+            if (credentials[credential.id]?.statusFingerprint() != credential.statusFingerprint() || readCredentialStatusRecord(credential.id) != expected) return false
+            records[credential.id] = updated
+            if (updated.snapshot == null) snapshots.remove(credential.id) else snapshots[credential.id] = updated.snapshot
             return true
         }
     }
@@ -155,6 +161,86 @@ class WalletCredentialStatusServiceTest {
             }
             assertEquals(3, requests)
         } finally { client.close() }
+    }
+
+    @Test
+    fun outOfOrderServicesCannotReplaceNewerDurableEvidence() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.list()
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(body, headers = Headers.build {
+            append(HttpHeaders.ContentType, "application/statuslist+jwt")
+            append(HttpHeaders.CacheControl, "max-age=600")
+        }) }
+        }))
+        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        val waiting = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        store.beforeSave = { snapshot ->
+            if (snapshot.metadata.entries.single().meaning == StatusMeaning.CLEAR) {
+                waiting.complete(Unit)
+                resume.await()
+            }
+        }
+        val first = service()
+        val second = service()
+        try {
+            val older = async { first.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+            waiting.await()
+            at += 1.seconds
+            body = issuer.list(value = 1u)
+            second.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            resume.complete(Unit)
+            older.await()
+            service().use { cold ->
+                assertEquals(CredentialStatusKind.INVALID, cold.snapshot().credentials.single().presentation.kind)
+            }
+        } finally { first.close(); second.close(); client.close() }
+    }
+
+    @Test
+    fun delayedNoStorePurgeCannotEraseANewerCacheableObservation() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var body = issuer.list()
+        var cache = "max-age=600"
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(body, headers = Headers.build {
+                append(HttpHeaders.ContentType, "application/statuslist+jwt"); append(HttpHeaders.CacheControl, cache)
+            }) }
+        }))
+        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        val first = service()
+        val second = service()
+        try {
+            first.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            at += 1.seconds
+            body = issuer.list(value = 1u)
+            cache = "no-store"
+            val waiting = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            store.beforeCommit = { if (it.snapshot == null) { waiting.complete(Unit); resume.await() } }
+            val purge = async { first.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+            waiting.await()
+            at += 1.seconds
+            body = issuer.list()
+            cache = "max-age=600"
+            second.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            resume.complete(Unit)
+            purge.await()
+            service().use { cold ->
+                val entry = cold.snapshot().credentials.single().status.entries.single()
+                assertEquals(StatusMeaning.CLEAR, entry.meaning)
+                assertEquals(at, entry.lastObservation()!!.checkedAt)
+            }
+        } finally { first.close(); second.close(); client.close() }
     }
 
     @Test
@@ -309,11 +395,11 @@ class WalletCredentialStatusServiceTest {
         val issuer = StatusTestIssuer.create()
         val store = Store()
         for (id in listOf("first", "second", "third")) store.addCredential(StoredCredential(id, issuer.credential()))
-        val body = issuer.list(ttl = 0)
+        val body = issuer.list(ttl = 1)
         val client = HttpClient(MockEngine(MockEngineConfig().apply {
             dispatcher = StandardTestDispatcher(testScheduler)
             addHandler { respond(body, headers = Headers.build {
-                append(HttpHeaders.ContentType, "application/statuslist+jwt"); append(HttpHeaders.CacheControl, "no-store")
+                append(HttpHeaders.ContentType, "application/statuslist+jwt"); append(HttpHeaders.CacheControl, "no-store, max-age=0")
             }) }
         }))
         val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,

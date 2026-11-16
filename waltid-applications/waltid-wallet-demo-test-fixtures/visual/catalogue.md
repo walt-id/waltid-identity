@@ -808,11 +808,11 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 ## status-home-issue
 
-**Issue-only Home decoration at a fixed physical-right artwork anchor**
+**Issue-only Home decoration at a fixed bottom-left artwork anchor**
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.issue.png" alt="Issue-only Home decoration at a fixed physical-right artwork anchor, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.issue.png" alt="Issue-only Home decoration at a fixed physical-right artwork anchor, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-issue.native-ios27_0-phone-en-light.png" alt="Issue-only Home decoration at a fixed physical-right artwork anchor, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.issue.png" alt="Issue-only Home decoration at a fixed bottom-left artwork anchor, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.issue.png" alt="Issue-only Home decoration at a fixed bottom-left artwork anchor, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-issue.native-ios27_0-phone-en-light.png" alt="Issue-only Home decoration at a fixed bottom-left artwork anchor, Native iOS" width="240"> |
 
 ## status-home-mixed_artwork
 

@@ -135,7 +135,9 @@ internal class WalletApi2Client(
         statusResponse(walletId, http.post(walletPath(walletId, "credential-status/context")) { jsonBody(Unit) }).body()
 
     suspend fun closeCredentialStatusContext(walletId: String, statusContext: String) {
-        request { delete(walletPath(walletId, "credential-status/context/${statusContext.encodeURLPathPart()}")) }
+        // Cleanup belongs to a retiring owner; its stale token must not expire a newer session.
+        val response = http.delete(walletPath(walletId, "credential-status/context/${statusContext.encodeURLPathPart()}"))
+        if (!response.status.isSuccess()) throw response.toApiException()
     }
 
     suspend fun refreshCredentialStatuses(walletId: String, request: RefreshCredentialStatusesDto): List<CredentialStatusRefreshResultDto> =

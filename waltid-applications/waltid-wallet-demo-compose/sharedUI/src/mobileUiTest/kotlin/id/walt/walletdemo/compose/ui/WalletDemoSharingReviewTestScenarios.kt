@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsSelected
@@ -419,14 +420,17 @@ class WalletDemoSharingReviewTestScenarios {
             }
         }
         onNodeWithText("Status clear").assertIsDisplayed()
-        onNodeWithTag("credential-status-check-$id").assertDoesNotExist()
+        onNodeWithTag("credential-status-check-$id").assertIsEnabled()
+        onNodeWithTag("credential-status-last-checked-$id").assertDoesNotExist()
+        assertEquals(0, checks, "Showing the summary must not check issuer status")
+        onNodeWithTag("credential-status-check-$id").performClick().assertIsNotEnabled()
+        onNodeWithTag("credential-status-last-checked-$id").assertDoesNotExist()
+        assertEquals(1, checks, "Refresh is independent of disclosure")
         onNodeWithTag("credential-status-details-$id").performClick()
         onNodeWithTag("credential-status-last-checked-$id").assertIsDisplayed()
-        assertEquals(0, checks, "Expansion must not check issuer status")
-        onNodeWithTag("credential-status-check-$id").performClick().assertIsNotEnabled()
-        assertEquals(1, checks)
+        assertEquals(1, checks, "Expansion must not check issuer status")
         onNodeWithTag("credential-status-details-$id").performClick()
-        onNodeWithTag("credential-status-check-$id").assertDoesNotExist()
+        onNodeWithTag("credential-status-check-$id").assertIsNotEnabled()
         onNodeWithTag("credential-status-details-$id").performClick()
         onNodeWithTag("credential-status-check-$id").assertIsNotEnabled()
         assertEquals(1, checks, "Collapsing/reopening does not restart the owned request")

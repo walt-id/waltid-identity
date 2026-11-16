@@ -51,7 +51,7 @@ internal suspend fun authenticateStatusList(
     credential: DigitalCredential,
     entry: StatusEntry,
     authorizer: StatusListSignerAuthorizer?,
-    nowEpochSeconds: Long,
+    now: Instant,
     profile: StatusProtocol? = null,
 ): VerifiedStatusList<*> {
     val verified = when (content) {
@@ -88,8 +88,8 @@ internal suspend fun authenticateStatusList(
                 is StatusListContent.Binary -> IetfStatusListTokenClaims.requireCwtType(content.content)
             }
             when (val payload = verified.payload) {
-                is JsonObject -> IetfStatusListTokenClaims.validate(payload, entry.uri, nowEpochSeconds)
-                is ByteArray -> IetfStatusListTokenClaims.validate(payload, entry.uri, nowEpochSeconds)
+                is JsonObject -> IetfStatusListTokenClaims.validate(payload, entry.uri, now)
+                is ByteArray -> IetfStatusListTokenClaims.validate(payload, entry.uri, now)
                 else -> throw StatusVerificationError("Unsupported verified status-list payload")
             }
         } catch (cause: CancellationException) {

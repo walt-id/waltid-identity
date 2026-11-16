@@ -7,13 +7,14 @@ import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.status.CredentialStatusSnapshotStore
-import id.walt.wallet2.status.PersistedCredentialStatus
+import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -45,40 +46,33 @@ class ExposedCredentialStore private constructor(
     internal fun forWallet(scope: ExposedWalletScope): ExposedCredentialStore =
         ExposedCredentialStore(storeId, db, json, scope)
 
-    override suspend fun readCredentialStatus(credentialId: String): PersistedCredentialStatus? = suspendTransaction(db) {
+    override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? = suspendTransaction(db) {
         Wallet2Tables.Credentials.selectAll().where {
             (Wallet2Tables.Credentials.storeId eq this@ExposedCredentialStore.storeId) and (Wallet2Tables.Credentials.id eq credentialId)
-        }.firstOrNull()?.get(Wallet2Tables.Credentials.credentialStatus)?.let {
-            runCatching { json.decodeFromString(PersistedCredentialStatus.serializer(), it) }.getOrNull()
-        }
+        }.firstOrNull()?.get(Wallet2Tables.Credentials.credentialStatus)?.let(::decodeStatusRecord)
     }
 
-    override suspend fun saveCredentialStatusIfCurrent(credential: StoredCredential, status: PersistedCredentialStatus): Boolean =
-        suspendTransaction(db) {
-            walletScope?.requireCurrentForWrite()
-            require(status.credentialFingerprint == credential.statusFingerprint())
-            val row = Wallet2Tables.Credentials.selectAll().where {
-                (Wallet2Tables.Credentials.storeId eq this@ExposedCredentialStore.storeId) and (Wallet2Tables.Credentials.id eq credential.id)
-            }.firstOrNull() ?: return@suspendTransaction false
-            if (rowToStoredCredential(row)?.statusFingerprint() != status.credentialFingerprint) return@suspendTransaction false
-            Wallet2Tables.Credentials.update({
-                (Wallet2Tables.Credentials.storeId eq this@ExposedCredentialStore.storeId) and (Wallet2Tables.Credentials.id eq credential.id) and
-                    (Wallet2Tables.Credentials.serializedCredential eq row[Wallet2Tables.Credentials.serializedCredential])
-            }) { it[credentialStatus] = json.encodeToString(PersistedCredentialStatus.serializer(), status) } == 1
-        }
+    private fun decodeStatusRecord(raw: String): CredentialStatusStoredRecord? =
+        runCatching { json.decodeFromString(CredentialStatusStoredRecord.serializer(), raw) }.getOrNull()
 
-    override suspend fun removeCredentialStatusIfCurrent(credential: StoredCredential): Boolean = suspendTransaction(db) {
+    override suspend fun compareAndSetCredentialStatus(
+        credential: StoredCredential, expected: CredentialStatusStoredRecord?, updated: CredentialStatusStoredRecord,
+    ): Boolean = suspendTransaction(db) {
         walletScope?.requireCurrentForWrite()
+        require(updated.revision != expected?.revision)
+        require(updated.snapshot?.credentialFingerprint?.let { it == credential.statusFingerprint() } != false)
         val row = Wallet2Tables.Credentials.selectAll().where {
             (Wallet2Tables.Credentials.storeId eq this@ExposedCredentialStore.storeId) and (Wallet2Tables.Credentials.id eq credential.id)
         }.firstOrNull() ?: return@suspendTransaction false
         if (rowToStoredCredential(row)?.statusFingerprint() != credential.statusFingerprint()) return@suspendTransaction false
+        val raw = row[Wallet2Tables.Credentials.credentialStatus]
+        if (raw?.let(::decodeStatusRecord) != expected) return@suspendTransaction false
         Wallet2Tables.Credentials.update({
             (Wallet2Tables.Credentials.storeId eq this@ExposedCredentialStore.storeId) and (Wallet2Tables.Credentials.id eq credential.id) and
-                (Wallet2Tables.Credentials.serializedCredential eq row[Wallet2Tables.Credentials.serializedCredential])
-        }) { it[credentialStatus] = null } == 1
+                (Wallet2Tables.Credentials.serializedCredential eq row[Wallet2Tables.Credentials.serializedCredential]) and
+                (if (raw == null) Wallet2Tables.Credentials.credentialStatus.isNull() else Wallet2Tables.Credentials.credentialStatus eq raw)
+        }) { it[credentialStatus] = json.encodeToString(CredentialStatusStoredRecord.serializer(), updated) } == 1
     }
-
 
     override suspend fun getCredential(id: String): StoredCredential? =
         suspendTransaction(db) {

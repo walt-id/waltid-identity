@@ -7,7 +7,7 @@ import korlibs.io.stream.SyncOutputStream
 import korlibs.io.stream.openSync
 
 internal fun CompressionMethod.uncompressBounded(data: ByteArray, maxOutputBytes: Int): ByteArray {
-    require(maxOutputBytes > 0)
+    require(maxOutputBytes >= 0)
     return MemorySyncStreamToByteArray(minOf(maxOutputBytes, 4096)) {
         val output = this
         var written = 0
