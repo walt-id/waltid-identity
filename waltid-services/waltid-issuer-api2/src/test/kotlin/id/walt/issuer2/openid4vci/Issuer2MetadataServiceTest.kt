@@ -91,6 +91,17 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
+    fun `contradictory claim descriptions are rejected with the configuration id`() {
+        val config = Issuer2MetadataConfig(credentialConfigurations = mapOf("pid" to Json.parseToJsonElement(
+            """{"format": "dc+sd-jwt", "vct": "urn:example:pid", "credential_metadata": {"claims": [
+                {"path": ["nationalities", null]}, {"path": ["nationalities", 1]}
+            ]}}"""
+        )))
+        val error = assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = config) }
+        assertTrue(error.message.orEmpty().contains("Credential configuration 'pid'"), error.message)
+    }
+
+    @Test
     fun `generated self-hosted VCTs cannot use protocol path names`() {
         RESERVED_VCT_NAMES.forEach { name ->
             val error = assertFailsWith<IllegalArgumentException> {

@@ -29,6 +29,8 @@ data class KeyAttestationRequest(
     val proofKey: EncodedKey.Jwk,
     val nonce: String?,
     val requirements: KeyAttestationsRequired,
+    /** Wallet OAuth client id. The provider stores it as the unit subject, not the issuer URL. */
+    val clientId: String? = null,
 )
 
 internal suspend fun keyAttestationForProof(
@@ -38,6 +40,7 @@ internal suspend fun keyAttestationForProof(
     credentialIssuer: String,
     nonce: String?,
     acceptedAlgorithms: Set<String>?,
+    clientId: String? = null,
 ): String? = requirements?.let { required ->
     val attester = requireNotNull(provider) {
         "Issuer requires key attestation but no wallet-provider service is configured"
@@ -46,7 +49,7 @@ internal suspend fun keyAttestationForProof(
         "Credential proof key cannot export public material for attestation"
     }.exportPublicKey().toPublicJwk(proofKey.spec)
     attester.validatedAttestation(
-        KeyAttestationRequest(credentialIssuer, publicKey, nonce, required), acceptedAlgorithms,
+        KeyAttestationRequest(credentialIssuer, publicKey, nonce, required, clientId), acceptedAlgorithms,
     )
 }
 

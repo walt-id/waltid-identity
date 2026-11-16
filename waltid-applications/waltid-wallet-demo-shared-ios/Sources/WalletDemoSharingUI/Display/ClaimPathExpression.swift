@@ -28,25 +28,19 @@ public struct ClaimPathExpression {
 
     private static func parseJSONArrayPath(_ rawValue: String) -> ClaimPathExpression? {
         guard rawValue.hasPrefix("["),
-              let data = rawValue.data(using: .utf8),
-              let values = try? JSONSerialization.jsonObject(with: data) as? [Any] else {
-            return nil
+              case .array(let values) = CredentialDisplayJSONParser.parse(rawValue) else { return nil }
+        var segments: [Segment] = []
+        for value in values {
+            switch CredentialClaimPathSegment(value) {
+            case .key(let key): segments.append(.key(key))
+            case .wildcard: segments.append(.wildcard)
+            case .integer(let literal):
+                guard let index = Int(literal) else { return ClaimPathExpression(segments: []) }
+                segments.append(.index(index))
+            case nil: return ClaimPathExpression(segments: [])
+            }
         }
-
-        return ClaimPathExpression(segments: values.compactMap(segment(from:)))
-    }
-
-    private static func segment(from value: Any) -> Segment? {
-        if value is NSNull {
-            return .wildcard
-        }
-        if let string = value as? String, !string.isEmpty {
-            return .key(string)
-        }
-        if let number = value as? NSNumber, !number.isBool {
-            return .index(number.intValue)
-        }
-        return nil
+        return ClaimPathExpression(segments: segments)
     }
 }
 
@@ -167,11 +161,5 @@ private struct ClaimPathExpressionParser {
 private extension Character {
     var isQuote: Bool {
         self == "'" || self == "\""
-    }
-}
-
-private extension NSNumber {
-    var isBool: Bool {
-        String(cString: objCType) == "c" || String(cString: objCType) == "B"
     }
 }

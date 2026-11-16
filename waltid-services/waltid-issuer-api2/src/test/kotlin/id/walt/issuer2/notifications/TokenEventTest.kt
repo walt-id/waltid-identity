@@ -40,10 +40,39 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
 class TokenEventTest {
+
+    @Test
+    fun `provider PKCE rejection publishes one correlated authorization code failure`() = runTest {
+        val session = issuanceSession("pkce-failed-session").copy(authenticationMethod = AuthenticationMethod.AUTHORIZED)
+        lateinit var provider: OAuth2Provider
+        val service = protocolService(session) { provider = it; it }
+        val request = assertIs<id.walt.openid4vci.requests.authorization.AuthorizationRequestResult.Success>(
+            provider.createAuthorizationRequest(mapOf(
+                "response_type" to listOf("code"), "client_id" to listOf("wallet-client"),
+                "redirect_uri" to listOf("https://wallet.example/callback"),
+                "code_challenge" to listOf("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"),
+                "code_challenge_method" to listOf("S256"),
+            ))
+        ).request
+        val code = assertIs<id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Success>(
+            provider.createAuthorizationResponse(request, DefaultSession(subject = session.sessionId))
+        ).response.code
+        val (response, events) = service.processTokenAndCaptureEvents(mapOf(
+            "grant_type" to listOf("authorization_code"), "client_id" to listOf("wallet-client"),
+            "redirect_uri" to listOf("https://wallet.example/callback"), "code" to listOf(code),
+            "code_verifier" to listOf("x".repeat(43)),
+        ), "pkce-correlated-failure")
+        assertEquals(400, response.status)
+        val event = events.single()
+        assertEquals(IssuanceSessionEvent.TOKEN_REQUEST_AUTHORIZATION_CODE_FAILED.value, event.event)
+        assertEquals(session.sessionId, event.target)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, event.error)
+    }
 
     @Test
     fun `missing grant type publishes one generic uncorrelated failure`() = runTest {
