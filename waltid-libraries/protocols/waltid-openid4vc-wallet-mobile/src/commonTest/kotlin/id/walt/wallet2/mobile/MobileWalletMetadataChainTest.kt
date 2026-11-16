@@ -9,6 +9,8 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.*
 import id.walt.sdjwt.metadata.type.TypeMetadataFixture
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
+import id.walt.sdjwt.metadata.type.validateForIssuance
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -47,7 +49,10 @@ class MobileWalletMetadataChainTest {
             })
             put("account_id", "account-1")
             put("accounts", buildJsonArray { add(buildJsonObject { put("iban", "DE123") }) })
-        }, SDMap(mapOf("accounts" to SDField(sd = true))))
+        }, SDMap.generateSDMap(listOf("accounts.[].iban")))
+        val metadata = TypeMetadataResolver({ TypeMetadataFixture.documents.getValue(it) })
+            .resolve(leaf, TypeMetadataFixture.LEAF_PIN, requireParentIntegrity = true)
+        metadata.validateForIssuance(listOf(payload)) { TypeMetadataFixture.documents.getValue(it) }
         val signer = Crypto2AsyncJWTCryptoProvider(mapOf("issuer" to Crypto2SdJwtKey(issuer, JwsAlgorithm.ES256)))
         val credential = SDJwt.createFromSignedJwt(signer.sign(payload.undisclosedPayload, "issuer", "dc+sd-jwt", emptyMap()), payload)
         val requested = mutableListOf<String>()
