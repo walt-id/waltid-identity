@@ -472,8 +472,9 @@ extension XCTestCase {
         XCTAssertTrue(refresh.waitForExistence(timeout: 10))
         XCTAssertEqual(details.exists, expectsDisclosure)
         for control in expectsDisclosure ? [refresh, details] : [refresh] {
-            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
-            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+            // Accessibility frame subtraction can report 43.99999999999994 for a 44-point target.
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44 - 0.001)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44 - 0.001)
         }
         if expectsDisclosure { XCTAssertFalse(refresh.frame.intersects(details.frame)) }
     }
