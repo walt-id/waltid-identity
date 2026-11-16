@@ -31,12 +31,14 @@ public class SqlDelightCredentialStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletCredentialStore, CredentialStatusSnapshotStore {
 
+    /** Loads the current evidence revision, including a cleared snapshot; unreadable metadata is unavailable. */
     override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? =
         queries.selectCredentialStatus(credentialId).executeAsOneOrNull()?.let(::decodeStatusRecord)
 
     private fun decodeStatusRecord(raw: String): CredentialStatusStoredRecord? =
         runCatching { json.decodeFromString(CredentialStatusStoredRecord.serializer(), raw) }.getOrNull()
 
+    /** Atomically replaces [expected] only while the signed credential and stored evidence are unchanged. */
     override suspend fun compareAndSetCredentialStatus(
         credential: StoredCredential, expected: CredentialStatusStoredRecord?, updated: CredentialStatusStoredRecord,
     ): Boolean = queries.transactionWithResult {

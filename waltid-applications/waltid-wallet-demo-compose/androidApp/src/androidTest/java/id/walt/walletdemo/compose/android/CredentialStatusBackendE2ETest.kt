@@ -93,7 +93,9 @@ class CredentialStatusBackendE2ETest {
                 device.wait(Until.hasObject(By.text(headline)), 30_000))
         }
         fun refresh(headline: String) {
-            val action = requireNotNull(device.findObject(By.res(Pattern.compile("credential-status-check-.*"))))
+            val action = requireNotNull(device.wait(Until.findObject(By.res(Pattern.compile("credential-status-check-.*"))), 30_000)) {
+                "The selected credential must expose its refresh control"
+            }
             val tag = action.resourceName
             assertTrue(device.wait(Until.hasObject(By.res(tag).enabled(true)), 30_000))
             clickByTag(device, tag)
