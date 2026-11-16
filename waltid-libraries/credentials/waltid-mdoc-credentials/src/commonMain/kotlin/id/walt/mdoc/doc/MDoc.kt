@@ -16,6 +16,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
 
+@OptIn(ExperimentalSerializationApi::class)
 private val msoCbor = Cbor { ignoreUnknownKeys = true }
 
 /**
@@ -24,6 +25,7 @@ private val msoCbor = Cbor { ignoreUnknownKeys = true }
  * To create/issue and sign an MDoc, use MDocBuilder
  * @see MDocBuilder
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable(with = MDocSerializer::class)
 data class MDoc(
     val docType: StringElement,

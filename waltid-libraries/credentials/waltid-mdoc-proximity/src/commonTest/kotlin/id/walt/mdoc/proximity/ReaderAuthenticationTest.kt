@@ -1,7 +1,8 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.proximity
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate

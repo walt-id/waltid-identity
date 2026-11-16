@@ -121,11 +121,6 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         } ?: throw Exception("Initialize job didn't return any jobId.")
     }
 
-    private fun updateDid(did: String) {
-        did
-        TODO()
-    }
-
     private suspend fun initiateDidJob(url: String, body: JsonElement): JobActionResponse =
         fetcher.rawFetch(url) {
             contentType(ContentType.Application.Json)

@@ -2,6 +2,8 @@ package id.walt.trust.service
 
 import id.walt.trust.model.AuthenticityState
 import id.walt.trust.model.SourceFamily
+import id.walt.trust.model.SourceAcceptancePolicy
+import id.walt.trust.model.SourceLoadOptions
 import id.walt.trust.store.InMemoryTrustStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -27,7 +29,7 @@ class LoadFromUrlIntegrationTest {
         val result = service.loadSourceFromUrl(
             sourceId = "at-tsl",
             url = "https://www.signatur.rtr.at/vertrauensliste.xml",
-            validateSignature = true
+            options = SourceLoadOptions(acceptancePolicy = SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE)
         )
 
         println("=== Austrian TSL Load Result ===")
@@ -70,7 +72,7 @@ class LoadFromUrlIntegrationTest {
         val result = service.loadSourceFromUrl(
             sourceId = "it-tsl",
             url = "https://eidas.agid.gov.it/TL/TSL-IT.xml",
-            validateSignature = true
+            options = SourceLoadOptions(acceptancePolicy = SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE)
         )
 
         println("=== Italian TSL Load Result ===")
@@ -93,7 +95,7 @@ class LoadFromUrlIntegrationTest {
         val result = service.loadSourceFromUrl(
             sourceId = "eu-lotl",
             url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
-            validateSignature = true
+            options = SourceLoadOptions(acceptancePolicy = SourceAcceptancePolicy.REQUIRE_VALID_SIGNATURE)
         )
 
         println("=== EU LoTL Load Result ===")
@@ -123,7 +125,7 @@ class LoadFromUrlIntegrationTest {
             val result = service.loadSourceFromUrl(
                 sourceId = "test",
                 url = "https://example.invalid", // intentionally invalid
-                validateSignature = false
+                options = SourceLoadOptions(acceptancePolicy = SourceAcceptancePolicy.ALLOW_UNVERIFIED)
             )
             // Expected to fail (can't connect), but proves the method works
             assertTrue(!result.success, "Should fail to connect to invalid URL")

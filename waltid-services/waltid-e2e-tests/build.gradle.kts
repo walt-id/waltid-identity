@@ -4,6 +4,12 @@ plugins {
 
 group = "id.walt"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     // Testing
     testImplementation(kotlin("test"))

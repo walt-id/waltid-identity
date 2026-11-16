@@ -5,6 +5,10 @@ plugins {
 group = "id.walt.examples"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     sourceSets {
         commonMain.dependencies {
             // Brings waltid-did and waltid-sdjwt along as api dependencies, so a single dependency covers every

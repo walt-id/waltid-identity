@@ -4,22 +4,26 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.deferred.DeferredIssuanceStore
+import id.walt.openid4vci.deferred.DeferredSessionSnapshot
+import id.walt.openid4vci.deferred.DeferredIssuanceState
+import id.walt.openid4vci.deferred.DeferredStatus
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
     private val repository: IssuanceSessionRepository,
 ) {
-    val deferredStore: id.walt.openid4vci.deferred.DeferredIssuanceStore = object : id.walt.openid4vci.deferred.DeferredIssuanceStore {
-        override suspend fun get(sessionId: String): id.walt.openid4vci.deferred.DeferredSessionSnapshot? =
-            repository.get(sessionId)?.let { id.walt.openid4vci.deferred.DeferredSessionSnapshot(it.sessionId, it.expiresAt, it.deferredState) }
+    val deferredStore: DeferredIssuanceStore = object : DeferredIssuanceStore {
+        override suspend fun get(id: String): DeferredSessionSnapshot? =
+            repository.get(id)?.let { DeferredSessionSnapshot(it.sessionId, it.expiresAt, it.deferredState) }
 
         override suspend fun compareAndSet(
-            expected: id.walt.openid4vci.deferred.DeferredSessionSnapshot,
-            replacement: id.walt.openid4vci.deferred.DeferredIssuanceState,
+            expected: DeferredSessionSnapshot,
+            replacement: DeferredIssuanceState,
         ): Boolean {
             val current = repository.get(expected.id) ?: return false
             if (current.deferredState != expected.state) return false
-            val denied = replacement.status == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            val denied = replacement.status == DeferredStatus.DENIED
             return repository.compareAndSet(current, current.copy(
                 deferredState = replacement, deferredStatus = replacement.status,
                 expiresAt = replacement.deadline ?: current.expiresAt,
@@ -37,7 +41,7 @@ class IssuanceSessionService(
             val results = current.issuanceResults + session.issuanceResults
             val selected = current.authorizedCredentialIdentifiers ?: session.authorizedCredentialIdentifiers
             val complete = !selected.isNullOrEmpty() && selected.all { it in results }
-            val denied = current.deferredStatus == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            val denied = current.deferredStatus == DeferredStatus.DENIED
             val updated = current.copy(
                 issuanceResults = results, authorizedCredentialIdentifiers = selected,
                 status = if (denied) IssuanceSessionStatus.UNSUCCESSFUL else if (complete) IssuanceSessionStatus.SUCCESSFUL else session.status,
@@ -55,7 +59,7 @@ class IssuanceSessionService(
         while (true) {
             val current = getSession(session.sessionId)
             val state = requireNotNull(current.deferredState)
-            val denied = state.status == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            val denied = state.status == DeferredStatus.DENIED
             val replacement = session.copy(
                 deferredState = state, deferredStatus = state.status, expiresAt = current.expiresAt,
                 issuanceResults = current.issuanceResults + session.issuanceResults,

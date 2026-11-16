@@ -41,6 +41,8 @@ import kotlin.test.*
 
 /** Independent Nimbus signature/decryption checks. All authentication in these tests is simulated. */
 class ScaPresentationInteropTest {
+    private val prettyJson = Json { prettyPrint = true }
+
     private val factors = ScaAuthenticationMethods.KnowledgeAndPossession(
         ScaAuthenticationMethods.Knowledge.PIN_6_OR_MORE_DIGITS,
         ScaAuthenticationMethods.Possession.KEY_IN_LOCAL_NATIVE_WSCD,
@@ -75,14 +77,14 @@ class ScaPresentationInteropTest {
             assertEquals("sha-256", payload["transaction_data_hashes_alg"]?.jsonPrimitive?.content)
             assertEquals(listOf(hash(fixture.transaction)), payload.getValue("transaction_data_hashes").jsonArray.map { it.jsonPrimitive.content })
             assertEquals(fixture.transaction, assertNotNull(observed).transactionData.single())
-            assertEquals(proofId, observed!!.proofId)
-            assertEquals("ES256", observed!!.signingAlgorithm)
-            assertEquals(payload["sd_hash"]?.jsonPrimitive?.content, observed!!.sdHash)
-            assertEquals("stored-$type", observed!!.credentialId)
-            assertEquals(fixture.keyId, observed!!.holderKeyId)
-            assertEquals(fixture.audience, observed!!.audience)
-            assertEquals(fixture.request.nonce, observed!!.nonce)
-            assertEquals(mode, observed!!.responseMode)
+            assertEquals(proofId, observed.proofId)
+            assertEquals("ES256", observed.signingAlgorithm)
+            assertEquals(payload["sd_hash"]?.jsonPrimitive?.content, observed.sdHash)
+            assertEquals("stored-$type", observed.credentialId)
+            assertEquals(fixture.keyId, observed.holderKeyId)
+            assertEquals(fixture.audience, observed.audience)
+            assertEquals(fixture.request.nonce, observed.nonce)
+            assertEquals(mode, observed.responseMode)
 
             val delivered = deliver(fixture, vp)
             assertEquals(Json.parseToJsonElement(vp), delivered["vp_token"])
@@ -108,7 +110,7 @@ class ScaPresentationInteropTest {
     fun `display-equivalent payment JSON keeps its original encoded hash input`() = runTest {
         val fixture = fixture(mode = OpenID4VPResponseMode.DC_API)
         val decoded = Json.parseToJsonElement(String(Base64.getUrlDecoder().decode(fixture.transaction)))
-        val pretty = Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), decoded)
+        val pretty = prettyJson.encodeToString(JsonElement.serializer(), decoded)
         val reencoded = encode(pretty.encodeToByteArray())
         assertEquals(decoded, Json.parseToJsonElement(pretty))
         assertNotEquals(fixture.transaction, reencoded)
