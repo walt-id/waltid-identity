@@ -30,6 +30,7 @@ import id.walt.verifier2.verification2.PresentationVerificationEngine
 import id.walt.verifier2.verification2.SelfIssuedIdTokenValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -311,6 +312,7 @@ object Verifier2VPDirectPostHandler {
             }
         }
 
+        var processingResponse = true
         try {
             // Phase timings: this call is 74% of the enterprise verification response handler (46.6ms of
             // 63ms), so attributing it is what makes optimisation here a measured decision. Logged as one
@@ -330,6 +332,7 @@ object Verifier2VPDirectPostHandler {
             )
             val afterHandle = started.elapsedNow()
 
+            processingResponse = false
             beforeRespond(false)
             call.respond(result)
             log.debug {
@@ -344,7 +347,7 @@ object Verifier2VPDirectPostHandler {
             log.debug { "Presentation rejected, responding 400: ${e.message}" }
             val errorBody = buildMap {
                 put("error", "invalid_request")
-                put("error_description", e.message ?: "Presentation rejected")
+                put("error_description", "Invalid presentation response")
                 verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
             beforeRespond(true)
@@ -358,11 +361,22 @@ object Verifier2VPDirectPostHandler {
             log.error(e) { "Verification unavailable, responding 503: ${e.message}" }
             val errorBody = buildMap {
                 put("error", "temporarily_unavailable")
-                put("error_description", e.message ?: "Verification temporarily unavailable")
+                put("error_description", "Verification temporarily unavailable")
                 verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
             beforeRespond(true)
             call.respond(HttpStatusCode.ServiceUnavailable, errorBody)
+        } catch (e: Exception) {
+            // Parsing failures are client errors. Keep parser classes and submitted values out of
+            // the public response while preserving claim cleanup through the normal callback.
+            if (!processingResponse || (e !is IllegalArgumentException && e !is BadRequestException)) throw e
+            log.debug(e) { "Invalid presentation response" }
+            beforeRespond(true)
+            call.respond(HttpStatusCode.BadRequest, buildMap {
+                put("error", "invalid_request")
+                put("error_description", "Invalid presentation response")
+                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
+            })
         }
     }
 
