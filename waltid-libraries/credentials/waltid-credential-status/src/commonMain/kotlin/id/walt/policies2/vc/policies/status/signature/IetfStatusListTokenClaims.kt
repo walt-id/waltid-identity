@@ -42,7 +42,7 @@ object IetfStatusListTokenClaims {
         throw StatusVerificationError(cause.message ?: "Invalid status-list claims")
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     fun cwtValidity(payload: ByteArray, statusListUri: String): IetfStatusListToken.Validity = try {
         val claims = coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), payload) as? CborMap
             ?: throw IllegalArgumentException("CWT claims are not a map")

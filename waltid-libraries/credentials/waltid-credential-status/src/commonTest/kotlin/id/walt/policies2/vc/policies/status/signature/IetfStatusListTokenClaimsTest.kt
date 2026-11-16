@@ -217,7 +217,7 @@ class IetfStatusListTokenClaimsTest {
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     @Test
     fun `cwt expiry and not before permit fractional dates but ttl is a positive unsigned integer`() {
         fun claims(exp: CborElement, nbf: CborElement, ttl: CborElement) = coseCompliantCbor.encodeToByteArray(

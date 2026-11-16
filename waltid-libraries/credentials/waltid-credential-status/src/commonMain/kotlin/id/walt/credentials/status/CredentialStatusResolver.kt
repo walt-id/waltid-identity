@@ -453,7 +453,7 @@ class CredentialStatusResolver(
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     private fun requireMsoProfile(content: StatusListContent) {
         if (content !is StatusListContent.Binary) fail(CheckFailure.Reason.UNSUPPORTED_PROOF)
         val sign1 = CoseSign1.fromTagged(content.content)
