@@ -45,7 +45,7 @@ class WalletManualAttestationTest {
         ClientAttestationHeaders.HEADER_ATTESTATION_POP.uppercase() to "manual-pop",
     )
     private val assembler = ClientAttestationAssembler(object : WalletAttestationProvider {
-        @Suppress("DEPRECATION")
+        @Deprecated("Use the EncodedKey.Jwk overload")
         override suspend fun getAttestationJwt(instanceKey: Key, clientId: String): String =
             error("Manual authentication must not contact the automatic WIA provider")
     })
