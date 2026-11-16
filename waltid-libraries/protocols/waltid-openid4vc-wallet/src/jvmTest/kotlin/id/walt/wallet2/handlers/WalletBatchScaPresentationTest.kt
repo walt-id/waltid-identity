@@ -57,6 +57,31 @@ class WalletBatchScaPresentationTest {
                 ))),
             )
             val registry = TransactionDataTypeRegistry("urn:eudi:sca:payment:1")
+            val isolatedRequest = BuildVpTokenRequest(
+                requestUrl = Url("https://verifier.example/request"),
+                selectedCredentialIds = mapOf("payment" to listOf(credentialId)),
+                keyId = fixture.keys.first().keyId,
+            )
+            suspend fun build(authorizer: WalletScaPresentationAuthorizer? = null) = WalletPresentationHandler.buildVpToken(
+                wallet = fixture.wallet, request = isolatedRequest, scaAuthorizer = authorizer,
+                transactionDataTypeRegistry = registry,
+                resolveAuthorizationRequest = { id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest.Plain(request) },
+            )
+            assertFailsWith<IllegalArgumentException> { build() }
+            val isolated = build(WalletScaPresentationAuthorizer { key, proof ->
+                assertSame(holder, key)
+                assertEquals(credentialId, proof.credentialId)
+                ScaAuthenticationMethods.KnowledgeAndPossession(
+                    ScaAuthenticationMethods.Knowledge.PIN_6_OR_MORE_DIGITS,
+                    ScaAuthenticationMethods.Possession.KEY_IN_LOCAL_NATIVE_WSCD,
+                )
+            })
+            assertTrue(isolated.vpToken.contains("payment"))
+            assertFailsWith<IllegalStateException> { build(WalletScaPresentationAuthorizer { _, _ -> error("denied") }) }
+            assertFailsWith<kotlinx.coroutines.CancellationException> {
+                build(WalletScaPresentationAuthorizer { _, _ -> throw kotlinx.coroutines.CancellationException("cancelled") })
+            }
+
             val preview = assertIs<PreviewPresentationResult.Ready>(WalletPresentationHandler.previewPresentation(
                 wallet = fixture.wallet,
                 request = PreviewPresentationRequest(Url("https://verifier.example/request")),
