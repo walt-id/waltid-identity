@@ -183,6 +183,35 @@ class IssuerSignedDataMdocVpPolicyTest {
     }
 
 
+    @Test
+    fun duplicateDisclosedDigestIdIsRejected() = runTest {
+        val item = IssuerSignedItem(1u, ByteArray(16), "given_name", CborString("Inga"))
+        assertFalse(verifyItems(listOf(item, item), listOf(item)))
+    }
+
+    @Test
+    fun duplicateDisclosedElementIdentifierIsRejected() = runTest {
+        val first = IssuerSignedItem(1u, ByteArray(16), "given_name", CborString("Inga"))
+        val second = first.copy(digestId = 2u, elementValue = CborString("Another"))
+        assertFalse(verifyItems(listOf(first, second), listOf(first, second)))
+    }
+
+    @Test
+    fun disclosureOrderDoesNotChangeDigestVerification() = runTest {
+        val first = IssuerSignedItem(1u, ByteArray(16), "given_name", CborString("Inga"))
+        val second = first.copy(digestId = 2u, elementIdentifier = "family_name")
+        assertTrue(verifyItems(listOf(second, first), listOf(first, second)))
+    }
+
+    private suspend fun verifyItems(disclosed: List<IssuerSignedItem>, issued: List<IssuerSignedItem>): Boolean {
+        val namespace = "example.namespace"
+        val mso = dummyMsoWithDigests("example.document", "SHA-256", mapOf(namespace to
+            issued.map { ValueDigest.fromIssuerSignedItem(it, namespace, "SHA-256") }))
+        val document = Document("example.document", IssuerSigned.fromIssuerSignedItems(
+            mapOf(namespace to disclosed), dummyIssuerAuth()))
+        return IssuerSignedDataMdocVpPolicy().runPolicy(document, mso, dummyVerificationContext()).success
+    }
+
     private fun dummyMsoWithDigests(
         docType: String,
         digestAlgorithm: String,
