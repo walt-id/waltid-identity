@@ -383,6 +383,33 @@ class ETSITrustListPolicyTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource("false, false, true", "true, true, true", "true, true, false")
+    fun `trust list requires an assertion key and matches its signing thumbprint`(
+        assertionAuthorized: Boolean,
+        embedded: Boolean,
+        listed: Boolean,
+    ) = runTest {
+        DidService.minimalInit()
+        val did = "did:web:assertion-issuer.example"
+        val signerKey = generateP256Key(KeyId("assertion-signer"))
+        val listedKey = if (listed) signerKey else generateP256Key(KeyId("other-listed-key"))
+        val credential = signedSdJwtVc(signerKey, did, "$did#key-1", null)
+        val policy = ETSITrustListPolicy(
+            trustLists = listOf(loteWithServiceIdentity("\"PublicKeyValues\": [${publicJwk(listedKey)}]"))
+        )
+        val previous = DidService.resolverMethods["web"]
+        DidService.registerResolverForMethod(
+            "web", SwitchableDidWebResolver(publicJwk(signerKey), assertionAuthorized, embedded)
+        )
+        try {
+            val result = policy.verify(credential, PolicyExecutionContext.Empty)
+            assertEquals(assertionAuthorized && listed, result.isSuccess, result.exceptionOrNull()?.message)
+        } finally {
+            previous?.let { DidService.registerResolverForMethod("web", it) }
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Test fixtures
     // ---------------------------------------------------------------------------
@@ -469,7 +496,11 @@ class ETSITrustListPolicyTest {
     }
 
     /** A `did:web` resolver serving one verification method, `#key-1`, whose key the test can swap. */
-    private class SwitchableDidWebResolver(var jwk: JsonObject) : DidResolver {
+    private class SwitchableDidWebResolver(
+        var jwk: JsonObject,
+        val assertionAuthorized: Boolean = true,
+        val embedded: Boolean = false,
+    ) : DidResolver {
         override val name: String = "switchable-did-web-resolver"
 
         override suspend fun getSupportedMethods(): Result<Set<String>> = Result.success(setOf("web"))
@@ -477,15 +508,20 @@ class ETSITrustListPolicyTest {
         override suspend fun resolve(did: String): Result<JsonObject> = Result.success(
             buildJsonObject {
                 put("id", did)
-                putJsonArray("assertionMethod") { add("$did#key-1") }
-                putJsonArray("verificationMethod") {
-                    add(buildJsonObject {
-                        put("id", "$did#key-1")
-                        put("type", "JsonWebKey2020")
-                        put("controller", did)
-                        put("publicKeyJwk", jwk)
-                    })
+                val method = buildJsonObject {
+                    put("id", "$did#key-1")
+                    put("type", "JsonWebKey2020")
+                    put("controller", did)
+                    put("publicKeyJwk", jwk)
                 }
+                if (assertionAuthorized) {
+                    putJsonArray("assertionMethod") {
+                        if (embedded) add(method) else add("$did#key-1")
+                    }
+                } else {
+                    putJsonArray("authentication") { add("$did#key-1") }
+                }
+                if (!embedded) putJsonArray("verificationMethod") { add(method) }
             }
         )
 
