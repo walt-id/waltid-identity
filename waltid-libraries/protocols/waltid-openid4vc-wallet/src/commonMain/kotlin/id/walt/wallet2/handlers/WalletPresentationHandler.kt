@@ -1579,6 +1579,31 @@ object WalletPresentationHandler {
                 unsignedRequestObjectPolicy,
             )
         },
+    ): BuildVpTokenResult = buildVpToken(
+        wallet, request, scaAuthorizer = null, transactionDataTypeRegistry,
+        clientIdTrustConfiguration, expectedRequestObjectAudience, unsignedRequestObjectPolicy,
+        resolveAuthorizationRequest,
+    )
+
+    /** Builds an isolated proof using trusted, application-owned SCA authorization. */
+    suspend fun buildVpToken(
+        wallet: Wallet,
+        request: BuildVpTokenRequest,
+        scaAuthorizer: WalletScaPresentationAuthorizer?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
+            this@WalletPresentationHandler.resolveAuthorizationRequest(
+                { WalletPresentationFormatRegistry.defaultCapabilities() },
+                requestUrl,
+                clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
+                unsignedRequestObjectPolicy,
+            )
+        },
     ): BuildVpTokenResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -1641,8 +1666,8 @@ object WalletPresentationHandler {
                 holderKey = crypto2Key,
                 holderDid = did,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
-                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
-                scaAuthorizer = null,
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
+                scaAuthorizer = scaAuthorizer?.forKey(crypto2Key),
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1655,7 +1680,7 @@ object WalletPresentationHandler {
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 holderCrypto2Key = null,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
-                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
                 scaAuthorizer = null,
             )
         }
