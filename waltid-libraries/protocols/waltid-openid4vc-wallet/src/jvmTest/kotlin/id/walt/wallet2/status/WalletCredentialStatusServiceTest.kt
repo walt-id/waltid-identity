@@ -52,6 +52,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -59,6 +60,35 @@ import kotlin.time.Duration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class WalletCredentialStatusServiceTest {
+    @Test
+    fun singleCredentialReadsUseDirectLookupAndKeepFirstStorePrecedence() = runTest {
+        val credential = StoredCredential("resident", StatusTestIssuer.create().credential(), label = "first")
+        val lookups = mutableListOf<Int>()
+        fun store(index: Int, entry: StoredCredential? = null): WalletCredentialStore {
+            val delegate = Store().apply { entry?.let { credentials[it.id] = it } }
+            return object : WalletCredentialStore by delegate {
+                override suspend fun getCredential(id: String): StoredCredential? {
+                    lookups += index
+                    return delegate.getCredential(id)
+                }
+                override suspend fun listCredentials() = error("A single-ID read must not enumerate unrelated credentials")
+            }
+        }
+        val wallet = Wallet("wallet", credentialStores = listOf(store(0), store(1, credential), store(2, credential.copy(label = "second"))))
+        val client = HttpClient(MockEngine { error("Local reads must not fetch issuer status") })
+        try {
+            WalletCredentialStatusService(wallet, client, parentScope = backgroundScope).use { service ->
+                val read = assertNotNull(service.readCredential("resident"))
+                assertEquals(WalletCredentialReference(1, "resident"), read.reference)
+                assertEquals("first", read.credential.label)
+                assertEquals(listOf(0, 1), lookups)
+                lookups.clear()
+                assertNull(service.readCredential("missing"))
+                assertEquals(listOf(0, 1, 2), lookups)
+            }
+        } finally { client.close() }
+    }
+
     @Test
     fun snapshotsDetachCollectionsValidateTheirTimeAndKeepStoreScopedIdentities() {
         val at = Instant.fromEpochSeconds(1_800_000_000)

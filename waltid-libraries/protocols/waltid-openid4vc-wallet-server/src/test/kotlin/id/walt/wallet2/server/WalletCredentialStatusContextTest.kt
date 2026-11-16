@@ -36,6 +36,30 @@ import kotlin.time.Instant
 
 class WalletCredentialStatusContextTest {
     @Test
+    fun subtreeCleanupWaitsForCommitAndRetiresOnlyCapturedOwners() = runTest {
+        val wallet = Wallet("wallet", credentialStores = listOf(InMemoryCredentialStore()))
+        val requests = WalletCredentialStatusRequests {
+            WalletCredentialStatusService(it, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        }
+        val backend = Any()
+        val removed = WalletCredentialStatusRequests.Scope(backend, "org.deleted.wallet", "old")
+        val sibling = WalletCredentialStatusRequests.Scope(backend, "org.deletedsibling.wallet")
+        val foreign = WalletCredentialStatusRequests.Scope(Any(), "org.deleted.wallet")
+        val scopes = listOf(removed, sibling, foreign)
+        val ids = scopes.map { assertNotNull(requests.createContext(wallet, it).statusContext).id }
+        var commit: (() -> Unit)? = null
+        requests.forget(WalletCredentialStatusRequests.Scope(backend, "org.deleted"), includeDescendants = true) { commit = it }
+        // No commit (including rollback) leaves active reviews usable.
+        assertNotNull(requests.snapshot(wallet, removed, ids.first()).statusContext)
+        val replacement = WalletCredentialStatusRequests.Scope(backend, "org.deleted.wallet", "new")
+        val replacementId = assertNotNull(requests.createContext(wallet, replacement).statusContext).id
+        assertNotNull(commit).invoke()
+        assertFailsWith<CredentialStatusReviewChangedException> { requests.snapshot(wallet, removed, ids.first()) }
+        assertNotNull(requests.snapshot(wallet, replacement, replacementId).statusContext)
+        scopes.drop(1).zip(ids.drop(1)).forEach { (scope, id) -> assertNotNull(requests.snapshot(wallet, scope, id).statusContext) }
+    }
+
+    @Test
     fun signedMixedBatchSurvivesPollingAndReviewWithoutPersistingRestrictedEvidence() = runTest {
         val persistent = StatusTestIssuer.create("https://status.example/cacheable")
         val transient = StatusTestIssuer.create("https://status.example/no-store")

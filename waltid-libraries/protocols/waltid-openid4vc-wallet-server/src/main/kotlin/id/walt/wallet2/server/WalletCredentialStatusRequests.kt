@@ -53,7 +53,8 @@ class WalletCredentialStatusRequests(
         storeConfiguration: List<String> = emptyList(),
     ) {
         private val storeConfiguration = storeConfiguration.toList()
-        internal fun sameWallet(other: Scope): Boolean = backend === other.backend && walletId == other.walletId
+        internal fun sameWallet(other: Scope, includeDescendants: Boolean = false): Boolean = backend === other.backend &&
+            (walletId == other.walletId || includeDescendants && walletId.startsWith("${other.walletId}."))
         override fun equals(other: Any?): Boolean = other is Scope && backend === other.backend &&
             walletId == other.walletId && generation == other.generation && storeConfiguration == other.storeConfiguration
         override fun hashCode(): Int = 31 * (31 * (31 * System.identityHashCode(backend) + walletId.hashCode()) +
@@ -144,9 +145,16 @@ class WalletCredentialStatusRequests(
         Unit
     }
 
-    fun forget(scope: Scope) {
-        admitted.keys.removeIf { it.sameWallet(scope) }
-        synchronized(contexts) { contexts.entries.removeIf { it.value.scope.sameWallet(scope) } }
+    fun forget(scope: Scope) = forget(scope, includeDescendants = false) { it() }
+
+    /** Capture retired owners now; remove them after commit without removing a recreated wallet's reviews. */
+    fun forget(scope: Scope, includeDescendants: Boolean, afterCommit: (() -> Unit) -> Unit) {
+        val admissions = admitted.filterKeys { it.sameWallet(scope, includeDescendants) }
+        val retired = synchronized(contexts) { contexts.filterValues { it.scope.sameWallet(scope, includeDescendants) } }
+        afterCommit {
+            admissions.forEach { (key, at) -> admitted.remove(key, at) }
+            synchronized(contexts) { retired.forEach { (id, owner) -> if (contexts[id] === owner) contexts.remove(id) } }
+        }
     }
 
     private fun admit(scope: Scope): Boolean {

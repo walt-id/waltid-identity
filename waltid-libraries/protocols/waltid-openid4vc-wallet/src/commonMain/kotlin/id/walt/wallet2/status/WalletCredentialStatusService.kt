@@ -192,7 +192,9 @@ class WalletCredentialStatusService(
     }
 
     suspend fun readCredential(id: String): WalletCredentialRead? {
-        val record = records().firstOrNull { it.credential.id == id } ?: return null
+        val record = wallet.credentialStores.withIndex().firstNotNullOfOrNull { (index, store) ->
+            store.getCredential(id)?.let { Record(WalletCredentialReference(index, it.id), store, it) }
+        } ?: return null
         return WalletCredentialRead(record.credential, record.reference, local(record), now())
     }
 

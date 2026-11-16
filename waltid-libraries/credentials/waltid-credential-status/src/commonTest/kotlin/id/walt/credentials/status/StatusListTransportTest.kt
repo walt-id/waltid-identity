@@ -13,6 +13,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.close
+import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -24,11 +27,73 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class StatusListTransportTest {
+    @Test
+    fun responseLimitsRejectOpenOversizedBodiesBeforeWaitingForEof() = runTest {
+        for (declared in listOf(true, false)) {
+            val body = ByteChannel(autoFlush = true)
+            if (!declared) body.writeFully("12345678901".encodeToByteArray())
+            val client = HttpClient(MockEngine(MockEngineConfig().apply {
+                dispatcher = StandardTestDispatcher(testScheduler)
+                addHandler { respond(body, headers = if (declared) headersOf(HttpHeaders.ContentLength, "1000000") else headersOf()) }
+            }))
+            val transport = StatusListTransport(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) },
+                CredentialStatusLimits(maxResponseBytes = 10, requestTimeout = 1.seconds))
+            try {
+                assertEquals(CheckFailure.Reason.RESOURCE_LIMIT,
+                    assertFailsWith<CredentialStatusException> { transport.fetch("https://status.example/large", true) }.reason)
+                assertTrue(body.isClosedForWrite, "Rejected response must release its open body")
+            } finally { body.cancel(null); transport.close(); client.close() }
+        }
+        val body = ByteChannel(autoFlush = true)
+        body.writeFully("1234567890".encodeToByteArray()); body.close()
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { respond(body) }
+        }))
+        val transport = StatusListTransport(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) },
+            CredentialStatusLimits(maxResponseBytes = 10))
+        try {
+            assertEquals(StatusListContent.Text("1234567890"), transport.fetch("https://status.example/exact", true).content)
+        } finally { transport.close(); client.close() }
+    }
+
+    @Test
+    fun backoffPrunesAbandonedUrlsAndPreservesOverflowDeadlinesWithoutGrowingTheTable() = runTest {
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler {
+                requests++
+                val wait = when (it.url.encodedPath) { "/a" -> 5; "/b" -> 20; else -> 30 }
+                respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, wait.toString()))
+            }
+        }))
+        val transport = StatusListTransport(client, backgroundScope, { at }, CredentialStatusLimits(maxCachedLists = 1))
+        suspend fun limited(path: String) = assertFailsWith<CredentialStatusException> {
+            transport.fetch("https://status.example/$path", true)
+        }.reason
+        try {
+            assertEquals(CheckFailure.RateLimited(at + 5.seconds), limited("a"))
+            at += 6.seconds // Abandoned a expires before b needs the sole slot.
+            assertEquals(CheckFailure.RateLimited(at + 20.seconds), limited("b"))
+            assertEquals(CheckFailure.RateLimited(at + 30.seconds), limited("c"))
+            assertEquals(3, requests)
+            at += 21.seconds // b expired; c's overflow deadline must still apply to new work.
+            assertEquals(CheckFailure.RateLimited(at + 9.seconds), limited("d"))
+            assertEquals(3, requests)
+            at += 10.seconds
+            assertEquals(CheckFailure.RateLimited(at + 30.seconds), limited("d"))
+            assertEquals(4, requests)
+        } finally { transport.close(); client.close() }
+    }
+
     @Test
     fun conditionalForceRevalidatesAndDerivedClientCannotInheritWalletCredentials() = runTest {
         var at = Instant.fromEpochSeconds(1_800_000_000)

@@ -54,7 +54,8 @@ public actor Wallet {
 
     /// Explicitly checks wallet-owned credentials; omitted IDs select all stored credentials.
     ///
-    /// Force requires network revalidation. Per-credential failures and deferred work are returned
+    /// Force bypasses freshness reuse for eligible checks; validity, backoff and execution limits still apply.
+    /// Per-credential failures and deferred work are returned
     /// without discarding other results; the status stream also updates as work completes.
     /// - Parameters:
     ///   - ids: Stored credential IDs to check, or nil to select all stored credentials.

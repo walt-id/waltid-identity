@@ -6,7 +6,7 @@ import id.walt.policies2.vc.policies.status.runStatusCheck
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.api.SendingRequest
 import io.ktor.client.plugins.api.createClientPlugin
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -16,7 +16,8 @@ import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.fromHttpToGmtDate
 import io.ktor.util.AttributeKey
-import io.ktor.utils.io.readAvailable
+import io.ktor.utils.io.readBuffer
+import kotlinx.io.readByteArray
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -95,6 +96,7 @@ internal class StatusListTransport(
     private val cache = linkedMapOf<String, Cached>()
     private val flights = mutableMapOf<String, Flight>()
     private val rateLimits = mutableMapOf<String, Instant>()
+    private var overflowRetryAt: Instant? = null
     private val permits = Semaphore(limits.concurrency)
 
     suspend fun fetch(uri: String, force: Boolean, session: CredentialStatusRefreshSession? = null): StatusListResource {
@@ -103,12 +105,14 @@ internal class StatusListTransport(
             require(session == null || session.owner === this) { "Refresh session belongs to another resolver" }
             session?.cached(uri)?.let { return it.getOrThrow() }
             val at = now()
-            if (rateLimits[uri]?.let { it > at } == true) fail(CheckFailure.RateLimited(rateLimits[uri]))
-            rateLimits.remove(uri)
+            rateLimits.entries.removeAll { it.value <= at }
+            rateLimits[uri]?.let { fail(CheckFailure.RateLimited(it)) }
             val stored = cache[uri]
             if (!force && stored != null && !stored.revalidate &&
                 at >= stored.resource.retrievedAt && at < stored.resource.freshUntil
             ) return stored.resource
+            overflowRetryAt?.takeIf { it > at }?.let { fail(CheckFailure.RateLimited(it)) }
+            overflowRetryAt = null
             flights.getOrPut(uri) {
                 Flight(scope.async(start = CoroutineStart.LAZY) {
                     runStatusCheck {
@@ -156,6 +160,7 @@ internal class StatusListTransport(
         flights.clear()
         cache.clear()
         rateLimits.clear()
+        overflowRetryAt = null
     }
 
     private suspend fun download(uri: String): StatusListResource {
@@ -163,7 +168,7 @@ internal class StatusListTransport(
         var conditional = previous != null
         repeat(2) {
             val startedAt = now()
-            val response = client.get(uri) {
+            val resource = client.prepareGet(uri) {
                 attributes.put(StatusOriginalUrl, Url(uri))
                 header(HttpHeaders.Accept, "application/statuslist+jwt, application/statuslist+cwt, application/vc+jwt")
                 header(HttpHeaders.CacheControl, "no-cache")
@@ -174,99 +179,84 @@ internal class StatusListTransport(
                     previous?.etag?.let { header(HttpHeaders.IfNoneMatch, it) }
                     previous?.modified?.let { header(HttpHeaders.IfModifiedSince, it) }
                 }
-            }
-            val receivedAt = now()
-            if (response.status == HttpStatusCode.TooManyRequests) {
-                val wait = response.headers[HttpHeaders.RetryAfter]?.toLongOrNull()?.coerceIn(1, 3600) ?: 30
-                mutex.withLock { rateLimits[uri] = receivedAt + wait.seconds }
-                response.bodyAsChannel().cancel(null)
-                fail(CheckFailure.RateLimited(receivedAt + wait.seconds))
-            }
-            val notModified = response.status == HttpStatusCode.NotModified
-            if (notModified && (!conditional || previous == null)) {
-                response.bodyAsChannel().cancel(null)
-                conditional = false
-                return@repeat
-            }
-            if (!notModified && response.status.value !in 200..299) {
-                response.bodyAsChannel().cancel(null)
-                fail(CheckFailure.Reason.TRANSPORT)
-            }
-            val bytes = if (notModified) {
-                response.bodyAsChannel().cancel(null)
-                requireNotNull(previous).bytes
-            } else {
-                val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-                if (declared != null && declared > limits.maxResponseBytes) {
-                    response.bodyAsChannel().cancel(null)
-                    fail(CheckFailure.Reason.RESOURCE_LIMIT)
-                }
-                val channel = response.bodyAsChannel()
-                val chunks = mutableListOf<ByteArray>()
-                var size = 0
-                val buffer = ByteArray(4096)
-                try {
-                    while (true) {
-                        val count = channel.readAvailable(buffer)
-                        if (count < 0) break
-                        if (count == 0) continue
-                        if (count > limits.maxResponseBytes - size) fail(CheckFailure.Reason.RESOURCE_LIMIT)
-                        chunks += buffer.copyOf(count)
-                        size += count
+            }.execute { response ->
+                val receivedAt = now()
+                if (response.status == HttpStatusCode.TooManyRequests) {
+                    val wait = response.headers[HttpHeaders.RetryAfter]?.toLongOrNull()?.coerceIn(1, 3600) ?: 30
+                    val retryAt = receivedAt + wait.seconds
+                    mutex.withLock {
+                        rateLimits.entries.removeAll { it.value <= receivedAt }
+                        if (uri in rateLimits || rateLimits.size < limits.maxCachedLists) rateLimits[uri] = retryAt
+                        // Concurrent responses can fill the table. Preserve their deadlines with bounded, conservative backoff.
+                        else overflowRetryAt = maxOf(overflowRetryAt ?: retryAt, retryAt)
                     }
-                } finally { channel.cancel(null) }
-                ByteArray(size).also { result ->
-                    var offset = 0
-                    chunks.forEach { chunk -> chunk.copyInto(result, offset); offset += chunk.size }
+                    fail(CheckFailure.RateLimited(retryAt))
                 }
-            }
-            val controls = response.headers.getAll(HttpHeaders.CacheControl)?.joinToString(",")
-                ?: if (notModified) previous?.cacheControl else null
-            val directives = controls.orEmpty().lowercase().split(',').map(String::trim)
-            val vary = response.headers.getAll(HttpHeaders.Vary).orEmpty()
-                .flatMap { it.lowercase().split(',').map(String::trim) }
-            val storageAllowed = directives.none { it.substringBefore('=') == "no-store" } &&
-                vary.all { it in setOf("accept", "accept-encoding") }
-            val revalidate = directives.any { it.substringBefore('=') == "no-cache" }
-            val ages = directives.filter { it.startsWith("max-age=") }
-            val maxAge = if (ages.isEmpty()) null else if (ages.size != 1) 0L else
-                ages.single().substringAfter('=').trim('"').toLongOrNull()?.coerceAtLeast(0) ?: 0L
-            val date = response.headers[HttpHeaders.Date]?.let {
-                runCatching { Instant.fromEpochMilliseconds(it.fromHttpToGmtDate().timestamp) }.getOrNull()
-            }
-            val apparentAge = date?.let { (receivedAt - it).coerceAtLeast(Duration.ZERO) } ?: Duration.ZERO
-            val correctedAge = maxOf(apparentAge,
-                (response.headers[HttpHeaders.Age]?.toLongOrNull()?.coerceAtLeast(0) ?: 0).seconds +
-                    (receivedAt - startedAt).coerceAtLeast(Duration.ZERO))
-            val expires = response.headers[HttpHeaders.Expires]?.let {
-                runCatching { Instant.fromEpochMilliseconds(it.fromHttpToGmtDate().timestamp) }.getOrNull()
-            }
-            val lifetime = minOf(maxAge?.seconds ?: expires?.let { (it - (date ?: receivedAt)).coerceAtLeast(Duration.ZERO) }
-                ?: limits.fallbackFreshness, limits.maximumFreshness)
-            val freshUntil = if (revalidate || !storageAllowed) receivedAt else
-                receivedAt + (lifetime - correctedAge).coerceAtLeast(Duration.ZERO)
-            val content = if (notModified) requireNotNull(previous).resource.content else {
-                if (response.contentType()?.contentSubtype == "statuslist+cwt") StatusListContent.Binary(bytes)
-                else StatusListContent.Text(bytes.decodeToString())
-            }
-            val resource = StatusListResource(content, receivedAt, freshUntil, storageAllowed, fingerprint(bytes))
-            mutex.withLock {
-                cache.remove(uri)
-                if (storageAllowed) {
-                    cache[uri] = Cached(resource, bytes,
-                        response.headers[HttpHeaders.ETag] ?: if (notModified) previous?.etag else null,
-                        response.headers[HttpHeaders.LastModified] ?: if (notModified) previous?.modified else null,
-                        revalidate, controls)
-                    while (cache.size > limits.maxCachedLists || cache.values.sumOf { it.bytes.size.toLong() } > limits.maxCachedBytes) {
-                        cache.remove(cache.keys.first())
+                val notModified = response.status == HttpStatusCode.NotModified
+                if (notModified && (!conditional || previous == null)) {
+                    conditional = false
+                    return@execute null
+                }
+                if (!notModified && response.status.value !in 200..299) {
+                    fail(CheckFailure.Reason.TRANSPORT)
+                }
+                val bytes = if (notModified) {
+                    requireNotNull(previous).bytes
+                } else {
+                    val declared = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+                    if (declared != null && declared > limits.maxResponseBytes) fail(CheckFailure.Reason.RESOURCE_LIMIT)
+                    val data = response.bodyAsChannel().readBuffer(limits.maxResponseBytes + 1L).readByteArray()
+                    if (data.size > limits.maxResponseBytes) fail(CheckFailure.Reason.RESOURCE_LIMIT)
+                    data
+                }
+                val controls = response.headers.getAll(HttpHeaders.CacheControl)?.joinToString(",")
+                    ?: if (notModified) previous?.cacheControl else null
+                val directives = controls.orEmpty().lowercase().split(',').map(String::trim)
+                val vary = response.headers.getAll(HttpHeaders.Vary).orEmpty()
+                    .flatMap { it.lowercase().split(',').map(String::trim) }
+                val storageAllowed = directives.none { it.substringBefore('=') == "no-store" } &&
+                    vary.all { it in setOf("accept", "accept-encoding") }
+                val revalidate = directives.any { it.substringBefore('=') == "no-cache" }
+                val ages = directives.filter { it.startsWith("max-age=") }
+                val maxAge = if (ages.isEmpty()) null else if (ages.size != 1) 0L else
+                    ages.single().substringAfter('=').trim('"').toLongOrNull()?.coerceAtLeast(0) ?: 0L
+                val date = response.headers[HttpHeaders.Date]?.let {
+                    runCatching { Instant.fromEpochMilliseconds(it.fromHttpToGmtDate().timestamp) }.getOrNull()
+                }
+                val apparentAge = date?.let { (receivedAt - it).coerceAtLeast(Duration.ZERO) } ?: Duration.ZERO
+                val correctedAge = maxOf(apparentAge,
+                    (response.headers[HttpHeaders.Age]?.toLongOrNull()?.coerceAtLeast(0) ?: 0).seconds +
+                        (receivedAt - startedAt).coerceAtLeast(Duration.ZERO))
+                val expires = response.headers[HttpHeaders.Expires]?.let {
+                    runCatching { Instant.fromEpochMilliseconds(it.fromHttpToGmtDate().timestamp) }.getOrNull()
+                }
+                val lifetime = minOf(maxAge?.seconds ?: expires?.let { (it - (date ?: receivedAt)).coerceAtLeast(Duration.ZERO) }
+                    ?: limits.fallbackFreshness, limits.maximumFreshness)
+                val freshUntil = if (revalidate || !storageAllowed) receivedAt else
+                    receivedAt + (lifetime - correctedAge).coerceAtLeast(Duration.ZERO)
+                val content = if (notModified) requireNotNull(previous).resource.content else {
+                    if (response.contentType()?.contentSubtype == "statuslist+cwt") StatusListContent.Binary(bytes)
+                    else StatusListContent.Text(bytes.decodeToString())
+                }
+                val resource = StatusListResource(content, receivedAt, freshUntil, storageAllowed, fingerprint(bytes))
+                mutex.withLock {
+                    cache.remove(uri)
+                    if (storageAllowed) {
+                        cache[uri] = Cached(resource, bytes,
+                            response.headers[HttpHeaders.ETag] ?: if (notModified) previous?.etag else null,
+                            response.headers[HttpHeaders.LastModified] ?: if (notModified) previous?.modified else null,
+                            revalidate, controls)
+                        while (cache.size > limits.maxCachedLists || cache.values.sumOf { it.bytes.size.toLong() } > limits.maxCachedBytes) {
+                            cache.remove(cache.keys.first())
+                        }
                     }
                 }
+                resource
             }
-            return resource
+            if (resource != null) return resource
         }
         fail(CheckFailure.Reason.TRANSPORT)
     }
-
 
 
     fun close() { client.close() }

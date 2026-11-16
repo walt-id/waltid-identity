@@ -61,12 +61,16 @@ The wallet service's default client uses the shared `WebDataFetcher` private-net
 Default limits are 10 seconds per list request, 30 seconds per credential resolution, four concurrent
 resolutions/requests, 2 MiB per response, 8 MiB expanded data, 16 MiB/64 lists in each bounded cache,
 and 64 references per credential. `CredentialStatusLimits` permits bounded host overrides.
+Response limits apply while streaming, including with a caller-supplied client. Issuer backoff
+retains at most `maxCachedLists` URL deadlines; overflow conservatively pauses network work until
+its latest deadline rather than dropping an active limit. Expired entries are pruned.
 HTTPS endpoints cannot contain user information or fragments. Cancellation releases only the
 caller's ownership of coalesced work; the last owner cancels it.
 
 Freshness is capped by signed validity, list TTL, HTTP freshness and the local maximum (one hour).
 The local fallback is 15 minutes. W3C TTL is milliseconds; Token Status List TTL is seconds.
-Force requires network revalidation and supports conditional requests. A 304 cannot extend signed
+Force bypasses freshness reuse for eligible work and supports conditional requests; validity,
+backoff and host execution limits still apply. A 304 cannot extend signed
 validity; a 304 without a reusable body causes an unconditional retry. `no-cache` requires
 revalidation; `no-store` forbids body reuse after the active batch and persisted observations from
 that response. Rate limiting and resource limits return typed failures.
