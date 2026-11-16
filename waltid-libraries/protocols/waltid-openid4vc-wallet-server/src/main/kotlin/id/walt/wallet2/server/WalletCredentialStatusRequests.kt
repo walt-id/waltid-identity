@@ -97,16 +97,20 @@ class WalletCredentialStatusRequests(
     suspend fun <T> withReviewedStatus(
         wallet: Wallet, scope: Scope, ids: Set<String>, reviewed: Map<String, String>, statusContext: String? = null,
         operation: suspend () -> T,
-    ): T = serviceFactory(wallet).use { service ->
-        require(ids.isNotEmpty() && ids.size <= 100)
-        val localGuard = service.reviewGuard(ids, reviewed)
-        val guard = PresentationReviewGuard {
-            // Another refresh can update this active review while signing/authorization is pending.
-            statusContext?.let { service.restoreReviewState(loadContext(scope, it).state) }
-            localGuard.check()
+    ): T {
+        val selection = ids.toSet()
+        val revisions = reviewed.toMap()
+        require(selection.isNotEmpty() && selection.size <= 100)
+        return serviceFactory(wallet).use { service ->
+            val localGuard = service.reviewGuard(selection, revisions)
+            val guard = PresentationReviewGuard {
+                // Another refresh can update this active review while signing/authorization is pending.
+                statusContext?.let { service.restoreReviewState(loadContext(scope, it).state) }
+                localGuard.check()
+            }
+            guard.check()
+            withContext(guard) { operation() }
         }
-        guard.check()
-        withContext(guard) { operation() }
     }
 
     suspend fun refresh(wallet: Wallet, scope: Scope, request: RefreshCredentialStatusesRequest): List<WalletCredentialStatusRefreshResponse> =

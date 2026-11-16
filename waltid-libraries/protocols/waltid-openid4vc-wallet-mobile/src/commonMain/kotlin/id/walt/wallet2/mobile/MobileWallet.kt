@@ -961,10 +961,13 @@ public class MobileWallet internal constructor(
         reviewedStatus: Map<String, String>,
         did: String? = null, paymentConsentRevision: String? = null,
     ): MobileWalletDigitalCredentialResponse {
-        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
+        val credentials = selectedCredentialOptions.toList()
+        val disclosures = selectedDisclosureOptions?.toList()
+        val revisions = reviewedStatus.toMap()
+        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(credentials.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
         guard.check()
         return withContext(guard) {
-            submitDigitalCredentialPresentation(requestId, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
+            submitDigitalCredentialPresentation(requestId, credentials, disclosures, did, paymentConsentRevision)
         }
     }
 
@@ -1036,9 +1039,11 @@ public class MobileWallet internal constructor(
     public suspend fun submitStatusReviewedAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission, reviewedStatus: Map<String, String>,
     ): MobileWalletDigitalCredentialResponse {
-        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(submission.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
+        val captured = submission.copy(selectedCredentialOptions = submission.selectedCredentialOptions.toList())
+        val revisions = reviewedStatus.toMap()
+        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(captured.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
         guard.check()
-        return withContext(guard) { submitAnnexCPresentation(submission) }
+        return withContext(guard) { submitAnnexCPresentation(captured) }
     }
 
     /** Verifies the raw post-consent request, builds device authentication in KMP, and HPKE-encrypts the response. */
@@ -1197,10 +1202,13 @@ public class MobileWallet internal constructor(
         reviewedStatus: Map<String, String>,
         did: String? = null, runPolicies: Boolean? = null, paymentConsentRevision: String? = null,
     ): MobileWalletPresentationResult {
-        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus) }
+        val credentials = selectedCredentialOptions.toList()
+        val disclosures = selectedDisclosureOptions?.toList()
+        val revisions = reviewedStatus.toMap()
+        val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(credentials.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
         guard.check()
         return withContext(guard) {
-            submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, runPolicies, paymentConsentRevision)
+            submitPresentation(previewHandle, credentials, disclosures, did, runPolicies, paymentConsentRevision)
         }
     }
 

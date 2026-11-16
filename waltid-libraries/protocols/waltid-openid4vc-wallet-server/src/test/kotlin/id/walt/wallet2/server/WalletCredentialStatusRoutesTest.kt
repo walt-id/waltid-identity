@@ -12,6 +12,7 @@ import id.walt.wallet2.status.CredentialStatusRefreshOutcome
 import id.walt.wallet2.status.RefreshCredentialStatusesRequest
 import id.walt.wallet2.status.StatusReviewedBuildVpTokenRequest
 import id.walt.wallet2.status.WalletCredentialStatusService
+import id.walt.wallet2.status.WalletCredentialStatusSnapshotResponse
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.client.HttpClient
@@ -88,7 +89,7 @@ class WalletCredentialStatusRoutesTest {
         val opened = client.post("$base/credential-status/context") { header("X-Test-Account", "owner") }
         assertEquals(HttpStatusCode.Created, opened.status, opened.bodyAsText())
         assertEquals("no-store", opened.headers[HttpHeaders.CacheControl])
-        val contextId = Json.parseToJsonElement(opened.bodyAsText()).jsonObject.getValue("statusContext").jsonObject.getValue("id").jsonPrimitive.content
+        val contextId = requireNotNull(Json.decodeFromString<WalletCredentialStatusSnapshotResponse>(opened.bodyAsText()).statusContext).id
         assertEquals(HttpStatusCode.Forbidden, client.get("$base/credential-status?statusContext=$contextId") { header("X-Test-Account", "other") }.status)
         assertEquals(HttpStatusCode.Forbidden, client.delete("$base/credential-status/context/$contextId") { header("X-Test-Account", "other") }.status)
         assertEquals(HttpStatusCode.OK, client.get("$base/credential-status?statusContext=$contextId") { header("X-Test-Account", "owner") }.status)

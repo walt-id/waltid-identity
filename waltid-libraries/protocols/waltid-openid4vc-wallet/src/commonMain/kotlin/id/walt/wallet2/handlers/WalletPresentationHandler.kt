@@ -5,7 +5,6 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.dcql.models.meta.SdJwtVcMeta
-import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.status.reviewGuard
 import kotlinx.coroutines.withContext
 import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
@@ -1153,13 +1152,17 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         scaAuthorizer: WalletScaPresentationAuthorizer? = null,
         paymentConsentPolicy: PaymentConsentPolicy? = null,
-        statusService: WalletCredentialStatusService? = null,
     ): WalletPresentResult {
-        val guard = (statusService ?: wallet.credentialStatuses()).reviewGuard(
-            request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, reviewedStatus)
+        val submission = request.copy(
+            selectedCredentialOptions = request.selectedCredentialOptions.toList(),
+            selectedDisclosureOptions = request.selectedDisclosureOptions?.toList(),
+        )
+        val revisions = reviewedStatus.toMap()
+        val guard = wallet.credentialStatuses().reviewGuard(
+            submission.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, revisions)
         guard.check()
         return withContext(guard) {
-            submitPresentation(wallet, request, onEvent, transactionDataTypeRegistry, scaAuthorizer, paymentConsentPolicy)
+            submitPresentation(wallet, submission, onEvent, transactionDataTypeRegistry, scaAuthorizer, paymentConsentPolicy)
         }
     }
 

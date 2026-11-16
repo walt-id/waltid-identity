@@ -21,6 +21,8 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -35,6 +37,39 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class WalletCredentialStatusContextTest {
+    @Test
+    fun reviewedInputsAreCapturedBeforeTheAuthorizedServiceFactorySuspends() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val store = InMemoryCredentialStore().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        val wallet = Wallet("wallet", credentialStores = listOf(store))
+        val creating = CompletableDeferred<Unit>()
+        val resumeCreating = CompletableDeferred<Unit>()
+        var suspendCreation = false
+        val client = HttpClient(MockEngine { error("Review must not fetch issuer status") })
+        val requests = WalletCredentialStatusRequests {
+            if (suspendCreation) { creating.complete(Unit); resumeCreating.await() }
+            WalletCredentialStatusService(it, client, parentScope = backgroundScope)
+        }
+        val scope = WalletCredentialStatusRequests.Scope(Any(), wallet.id)
+        try {
+            val reviewed = requests.snapshot(wallet, scope).credentials.associate {
+                it.reference.credentialId to it.presentation.advisoryRevision
+            }.toMutableMap()
+            val ids = mutableSetOf("resident")
+            suspendCreation = true
+            val operation = async {
+                requests.withReviewedStatus(wallet, scope, ids, reviewed) {
+                    assertNotNull(currentCoroutineContext()[PresentationReviewGuard]).check()
+                    "submitted"
+                }
+            }
+            creating.await()
+            ids.clear(); reviewed.clear()
+            resumeCreating.complete(Unit)
+            assertEquals("submitted", operation.await())
+        } finally { resumeCreating.complete(Unit); client.close() }
+    }
+
     @Test
     fun subtreeCleanupWaitsForCommitAndRetiresOnlyCapturedOwners() = runTest {
         val wallet = Wallet("wallet", credentialStores = listOf(InMemoryCredentialStore()))
