@@ -80,6 +80,45 @@ class SharingInformationTest {
         assertFalse(field.alwaysIncluded)
         assertTrue(option.toSharingInformation().additionalInformationLabels.isEmpty())
     }
+    @Test fun effectiveConsentUsesDetailsLocaleForTreeChoicesAndInclusionReasons() {
+        val city = "\"address\".\"city\""
+        val base = option(disclosures = listOf(
+            disclosure(city, "Vienna"),
+            disclosure("\"address\".\"country\"", "AT", required = false),
+            disclosure("\"address\".\"postal_code\"", "1010", required = false),
+        )).copy(
+            credentialDataJson = """{"address":{"city":"Vienna","country":"AT","postal_code":"1010"}}""",
+            metadataJson = """{"credentialClaims":[
+                {"path":["address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},
+                {"path":["address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},
+                {"path":["address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},
+                {"path":["address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}""",
+        )
+        val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("pid", "one", "dc+sd-jwt",
+            """{"address":{"city":"Vienna","country":"AT"}}""", false,
+            listOf("[]", """["address"]""", """["address","city"]""", """["address","country"]""").map {
+                WalletDemoClaimLocation(it, it, listOf(city), false)
+            })))
+        // English is first in the issuer metadata; a regional German preference must override it.
+        for ((locale, labels) in listOf(
+            "de-AT" to listOf("Anschrift", "Wohnort", "Land", "Postleitzahl"),
+            "en-US" to listOf("Address", "City", "Country", "Postal code"),
+            "fr" to listOf("Address", "City", "Country", "Postal code"),
+        )) {
+            val details = base.toCredentialDetails(listOf(locale))
+            assertEquals(labels.drop(1), details.groups.first { it.id == "requested" }.items.map { it.label })
+            val group = review.toEffectiveSharingInformation(listOf(base), emptySet(), listOf(locale)).single()
+            val address = group.contributions.single().nodes.single()
+            assertEquals(labels[0], address.label)
+            assertEquals(labels.drop(1), address.children.map { it.label })
+            assertEquals("Shared with ${labels[1]}", address.children[1].reason)
+            assertEquals(labels.drop(2), group.choices.map { it.item.label })
+            assertEquals("Included with ${labels[1]}", group.choices[0].forcedReason)
+            assertEquals(labels[3], address.children[2].choice?.item?.label)
+            assertTrue(address.children[2].contextOnly)
+        }
+    }
+
     @Test fun effectiveTreeUsesOriginalMetadataIndexesAndNeverFillsWithheldSiblings() {
         val country = "\"nationalities\".1.\"country\""
         val base = option(disclosures = listOf(disclosure(country, "DE"))).copy(

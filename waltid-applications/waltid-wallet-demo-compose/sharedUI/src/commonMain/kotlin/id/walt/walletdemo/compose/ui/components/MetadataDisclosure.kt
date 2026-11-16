@@ -36,7 +36,7 @@ import id.walt.walletdemo.compose.ui.resources.*
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import org.jetbrains.compose.resources.stringResource
 
-/** One accessible expansion target; animation never changes the underlying claim state. */
+/** The leading control and accessible expansion target act independently. */
 @Composable
 internal fun MetadataDisclosure(
     title: String,
@@ -44,6 +44,7 @@ internal fun MetadataDisclosure(
     modifier: Modifier = Modifier,
     indicatorColor: Color = MaterialTheme.colorScheme.primary,
     supportingText: String? = null,
+    leadingContent: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
@@ -54,26 +55,29 @@ internal fun MetadataDisclosure(
         WalletMotion.disclosure(reduceMotion), label = "disclosure-chevron")
 
     Column {
-        Row(
-            modifier = modifier.fillMaxWidth()
-                .clickable(role = Role.Button) { expanded = !expanded }
-                .semantics(mergeDescendants = true) {
-                    heading()
-                    text = AnnotatedString(title)
-                    stateDescription = listOfNotNull(stateLabel, supportingText).joinToString(", ")
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            leadingContent?.invoke()
+            Row(
+                modifier = modifier.weight(1f)
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics(mergeDescendants = true) {
+                        heading()
+                        text = AnnotatedString(title)
+                        stateDescription = listOfNotNull(stateLabel, supportingText).joinToString(", ")
+                    }
+                    .heightIn(min = 48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    supportingText?.let { Text(it, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                .heightIn(min = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(title, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                supportingText?.let { Text(it, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                    modifier = Modifier.rotate(rotation), tint = indicatorColor)
             }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
-                modifier = Modifier.rotate(rotation), tint = indicatorColor)
         }
         WalletExpandableContent(expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }

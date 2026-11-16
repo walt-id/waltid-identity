@@ -61,12 +61,16 @@ public struct EffectivePresentationReview: Equatable {
     let contributions: [EffectiveClaimContribution]
 
     public init(prepared: PreparedPresentationReview, model: SharingReviewModel,
-                details: [CredentialDetails], selection: SharingSelection) throws {
+                details: [CredentialDetails], selection: SharingSelection,
+                preferredLocales: [String] = Locale.preferredLanguages) throws {
         guard prepared.credentials.count == selection.credentials.count,
               Set(prepared.credentials.map { PresentationCredentialSelection(queryID: $0.queryID, credentialID: $0.credentialID) }) == selection.credentials else {
             throw invalidReview("Effective review does not match selected credentials")
         }
         let options = Dictionary(uniqueKeysWithValues: model.credentialOptions.map { ($0.selection, $0) })
+        let metadataByOption = options.mapValues {
+            StoredCredentialMetadataParser.claims(from: $0.metadataJSON, preferredLocales: preferredLocales, format: $0.format)
+        }
         func optionFor(_ contribution: PresentationCredentialClaims) throws -> PresentationCredentialOption {
             guard let option = options[.init(queryID: contribution.queryID, credentialID: contribution.credentialID)],
                   selection.credentials.contains(option.selection), option.format == contribution.format else { throw invalidReview("Unavailable credential option") }
@@ -77,7 +81,7 @@ public struct EffectivePresentationReview: Equatable {
         }
         func label(_ raw: String, option: PresentationCredentialOption) -> String {
             let expression = ClaimPathExpression(segments: path(raw, option.format))
-            let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, format: option.format)
+            let metadata = metadataByOption[option.selection, default: []]
             return bestClaimMetadata(metadata, expression: expression, format: option.format)?.element.name
                 ?? option.disclosures.first { $0.path == raw }?.name
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -91,7 +95,7 @@ public struct EffectivePresentationReview: Equatable {
                   case .object(let members) = CredentialDisplayJSONParser.parse(contribution.claimsJSON) else {
                 throw invalidReview("Missing effective credential data")
             }
-            let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, format: option.format)
+            let metadata = metadataByOption[option.selection, default: []]
             var locations: [[ClaimPathExpression.Segment]: PresentationClaimLocation] = [:]
             for location in contribution.locations {
                 let received = try concreteReviewPath(location.receivedPathJSON)

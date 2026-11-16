@@ -82,8 +82,8 @@ internal fun EffectiveSharingInformationSection(
 
 @Composable
 private fun SharingCategory(title: String, tag: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().testTag(tag)) {
-        MetadataDisclosure(title, initiallyExpanded = true,
+    Column(Modifier.fillMaxWidth()) {
+        MetadataDisclosure(title, initiallyExpanded = true, modifier = Modifier.testTag(tag),
             indicatorColor = MaterialTheme.colorScheme.onSurfaceVariant) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
@@ -102,23 +102,27 @@ private fun SharingClaimChoice.statusText(): String = forcedReason ?: when {
 }
 
 @Composable
-private fun ClaimChoice(choice: SharingClaimChoice, interaction: ClaimInteraction, showValue: Boolean = false,
-                        showLabel: Boolean = true, showStatus: Boolean = true) {
+private fun ClaimChoice(choice: SharingClaimChoice, interaction: ClaimInteraction, showValue: Boolean = false) {
     val status = choice.statusText()
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.testTag(WalletUiTestTags.presentationDisclosure(choice.selection.id))) {
-        if (choice.forcedReason == null && !interaction.readOnly) Checkbox(choice.selected,
-            enabled = interaction.enabled, onCheckedChange = { interaction.toggle(choice.selection) },
-            modifier = Modifier.testTag(WalletUiTestTags.presentationDisclosureToggle(choice.selection.id)).semantics {
-                contentDescription = choice.item.label
-                stateDescription = status
-            })
+        ClaimChoiceToggle(choice, interaction)
         Column(Modifier.weight(1f)) {
-            Text(if (showLabel) choice.item.label else "Include this information", style = MaterialTheme.typography.titleSmall)
-            if (showStatus) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(choice.item.label, style = MaterialTheme.typography.titleSmall)
+            if (status != "Included") Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (showValue && !choice.selected) ClaimValue(choice.item.value, choice.item.path)
         }
     }
+}
+
+@Composable
+private fun ClaimChoiceToggle(choice: SharingClaimChoice, interaction: ClaimInteraction) {
+    if (choice.forcedReason == null && !interaction.readOnly) Checkbox(choice.selected,
+        enabled = interaction.enabled, onCheckedChange = { interaction.toggle(choice.selection) },
+        modifier = Modifier.testTag(WalletUiTestTags.presentationDisclosureToggle(choice.selection.id)).semantics {
+            contentDescription = choice.item.label
+            stateDescription = choice.statusText()
+        })
 }
 
 @Composable
@@ -148,21 +152,22 @@ private fun EffectiveClaim(node: SharingClaimNode, interaction: ClaimInteraction
             }
             SharingClaimNode.Kind.Object -> {
                 val body: @Composable () -> Unit = {
-                    node.choice?.let { ClaimChoice(it, interaction, showLabel = false, showStatus = false) }
                     if (node.children.isEmpty() && !node.contextOnly) Text("No fields")
                     else EffectiveClaimChildren(node.children, interaction, technicalContext)
                 }
-                val status = choice?.statusText() ?: node.reason
+                val status = (choice?.statusText() ?: node.reason)?.takeUnless { it == "Included" }
                 if (showLabel && node.label.isNotBlank()) MetadataDisclosure(node.label, initiallyExpanded = node.initiallyExpanded,
-                    supportingText = status, content = body)
+                    supportingText = status,
+                    modifier = choice?.let { Modifier.testTag(WalletUiTestTags.presentationDisclosure(it.selection.id)) } ?: Modifier,
+                    leadingContent = choice?.let { { ClaimChoiceToggle(it, interaction) } }, content = body)
                 else {
-                    status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    choice?.let { ClaimChoice(it, interaction) }
+                    if (choice == null) status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     body()
                 }
             }
             SharingClaimNode.Kind.Array -> {
                 val body: @Composable () -> Unit = {
-                    node.choice?.let { ClaimChoice(it, interaction, showLabel = false, showStatus = false) }
                     if (node.children.isEmpty() && !node.contextOnly) Text("No items")
                     val scalarOnly = !node.arrayUsesCards && node.children.all { it.kind == SharingClaimNode.Kind.Scalar }
                     var count by rememberSaveable(node.path.id) { mutableStateOf(25) }
@@ -176,15 +181,18 @@ private fun EffectiveClaim(node: SharingClaimNode, interaction: ClaimInteraction
                     } }
                     if (node.children.size > count) TextButton(onClick = { count += 25 }) { Text("Show more") }
                 }
-                val status = choice?.statusText() ?: node.reason
+                val status = (choice?.statusText() ?: node.reason)?.takeUnless { it == "Included" }
                 if (showLabel && node.label.isNotBlank()) MetadataDisclosure(node.label, initiallyExpanded = node.initiallyExpanded,
-                    supportingText = status, content = body)
+                    supportingText = status,
+                    modifier = choice?.let { Modifier.testTag(WalletUiTestTags.presentationDisclosure(it.selection.id)) } ?: Modifier,
+                    leadingContent = choice?.let { { ClaimChoiceToggle(it, interaction) } }, content = body)
                 else {
-                    status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    choice?.let { ClaimChoice(it, interaction) }
+                    if (choice == null) status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     body()
                 }
             }
         }
-        if (node.kind == SharingClaimNode.Kind.Scalar && choice == null) node.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (node.kind == SharingClaimNode.Kind.Scalar && choice == null) node.reason?.takeUnless { it == "Included" }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

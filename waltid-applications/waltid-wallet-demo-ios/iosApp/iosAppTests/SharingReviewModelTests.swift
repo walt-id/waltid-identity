@@ -9,6 +9,40 @@ import XCTest
 /// claim and which actions are offered, so it is where a transport could start describing a request as
 /// something it is not.
 final class SharingReviewModelTests: XCTestCase {
+    func testEffectiveConsentUsesDetailsLocaleForTreeChoicesAndInclusionReasons() throws {
+        let city = #""home_address"."city""#
+        let option = PresentationCredentialOption(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
+            issuer: nil, subject: nil, label: "Identity",
+            credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#,
+            disclosures: [
+                .init(path: city, name: "City", valueJSON: #""Vienna""#, displayValue: nil, selectivelyDisclosable: true, required: true),
+                .init(path: #""home_address"."country""#, name: "Country", valueJSON: #""AT""#, displayValue: nil, selectivelyDisclosable: true),
+                .init(path: #""home_address"."postal_code""#, name: "Postal code", valueJSON: #""1010""#, displayValue: nil, selectivelyDisclosable: true),
+            ],
+            metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#)
+        let prepared = effectivePrepared(#"{"home_address":{"city":"Vienna","country":"AT"}}"#)
+        // English is first in the issuer metadata; a regional German preference must override it.
+        for (locale, labels) in [
+            ("de-AT", ["Anschrift", "Wohnort", "Land", "Postleitzahl"]),
+            ("en-US", ["Address", "City", "Country", "Postal code"]),
+            ("fr", ["Address", "City", "Country", "Postal code"]),
+        ] {
+            let details = CredentialDisplayNormalizer.details(for: option, preferredLocales: [locale])
+            XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.map(\.label), Array(labels.dropFirst()))
+            let review = try EffectivePresentationReview(prepared: prepared,
+                model: .init(request: .init(requester: nil), credentialOptions: [option]), details: [details],
+                selection: .init(credentials: [option.selection]), preferredLocales: [locale])
+            let address = try XCTUnwrap(review.contributions.first?.nodes.first)
+            XCTAssertEqual(address.label, labels[0])
+            XCTAssertEqual(address.children.map(\.label), Array(labels.dropFirst()))
+            XCTAssertEqual(address.children[1].reason, "Shared with \(labels[1])")
+            XCTAssertEqual(address.children[1].choice?.item.label, labels[2])
+            XCTAssertEqual(address.children[1].choice?.forcedReason, "Included with \(labels[1])")
+            XCTAssertEqual(address.children[2].choice?.item.label, labels[3])
+            XCTAssertTrue(address.children[2].contextOnly)
+        }
+    }
+
     func testEffectiveReviewKeepsSourceIndexesParentsAndOptionalObjectTypes() throws {
         let option = effectiveOption()
         let prepared = effectivePrepared(#"{"employment":{"department":"Engineering","job_title":"Engineer"},"certifications":[{"name":"Cloud security"}]}"#)

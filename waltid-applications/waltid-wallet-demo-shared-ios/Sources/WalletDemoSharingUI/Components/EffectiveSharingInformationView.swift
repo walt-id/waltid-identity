@@ -104,7 +104,14 @@ private struct EffectiveClaimNodeView: View {
     let onToggle: (PresentationDisclosureSelection) -> Void
     var technicalContext = false
     @State private var count = 25
-    private var status: String? { node.choice?.status ?? (technicalContext ? nil : node.reason) }
+    private var status: String? {
+        let value = node.choice?.status ?? (technicalContext ? nil : node.reason)
+        return value == "Included" ? nil : value
+    }
+    private var selectionControl: AnyView? {
+        guard let choice = node.choice, choice.forcedReason == nil, !readOnly else { return nil }
+        return AnyView(EffectiveClaimToggle(choice: choice, enabled: enabled, onToggle: onToggle, label: EmptyView()))
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if node.kind == .scalar {
@@ -115,19 +122,18 @@ private struct EffectiveClaimNodeView: View {
                 if node.choice == nil, let status { Text(status).font(.footnote).foregroundStyle(.secondary) }
             } else if !node.label.isEmpty {
                 MetadataDisclosure(title: node.label, initiallyExpanded: node.initiallyExpanded,
-                    accessibilityIdentifier: WalletAccessibilityID.claim(node.id.id), supportingText: status) { containerBody }
+                    accessibilityIdentifier: WalletAccessibilityID.claim(node.id.id), supportingText: status,
+                    leadingContent: selectionControl) { containerBody }
             } else {
-                if let status { Text(status).font(.footnote).foregroundStyle(.secondary) }
+                if let choice = node.choice {
+                    EffectiveClaimChoiceView(choice: choice, enabled: enabled, readOnly: readOnly, onToggle: onToggle)
+                } else if let status { Text(status).font(.footnote).foregroundStyle(.secondary) }
                 containerBody
             }
         }.accessibilityElement(children: .contain)
             .accessibilityIdentifier("review-claim-" + node.id.id)
     }
     @ViewBuilder private var containerBody: some View {
-        if let choice = node.choice {
-            EffectiveClaimChoiceView(choice: choice, enabled: enabled, readOnly: readOnly,
-                showLabel: false, showStatus: false, onToggle: onToggle)
-        }
         if node.children.isEmpty { Text(node.kind == .object ? "No fields" : "No items").font(.footnote) }
         if node.kind == .object {
             EffectiveClaimChildren(nodes: node.children, enabled: enabled, readOnly: readOnly, onToggle: onToggle, technicalContext: technicalContext)
@@ -153,24 +159,35 @@ private struct EffectiveClaimChoiceView: View {
     let enabled: Bool
     let readOnly: Bool
     var showValue = false
-    var showLabel = true
-    var showStatus = true
     let onToggle: (PresentationDisclosureSelection) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if choice.forcedReason == nil && !readOnly {
-                Toggle(isOn: Binding(get: { choice.selected }, set: { _ in onToggle(choice.selection) })) { label }
-                    .toggleStyle(ReviewCheckboxToggleStyle()).disabled(!enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(choice.id))
-                    .accessibilityValue(choice.status)
+                EffectiveClaimToggle(choice: choice, enabled: enabled, onToggle: onToggle, label: label)
             } else { label }
             if showValue && !choice.selected { ClaimValueView(value: choice.item.value, path: choice.item.path) }
         }
     }
     private var label: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(showLabel ? choice.item.label : "Include this information").font(.subheadline.weight(.semibold))
-            if showStatus { Text(choice.status).font(.footnote).foregroundStyle(.secondary) }
+            Text(choice.item.label).font(.subheadline.weight(.semibold))
+            if choice.status != "Included" { Text(choice.status).font(.footnote).foregroundStyle(.secondary) }
         }
+    }
+}
+
+/// Selection is a sibling of the disclosure button, so expanding never changes the SDK choice.
+private struct EffectiveClaimToggle<Label: View>: View {
+    let choice: EffectiveClaimChoice
+    let enabled: Bool
+    let onToggle: (PresentationDisclosureSelection) -> Void
+    let label: Label
+
+    var body: some View {
+        Toggle(isOn: Binding(get: { choice.selected }, set: { _ in onToggle(choice.selection) })) { label }
+            .toggleStyle(ReviewCheckboxToggleStyle()).disabled(!enabled)
+            .accessibilityLabel(choice.item.label)
+            .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(choice.id))
+            .accessibilityValue(choice.status)
     }
 }

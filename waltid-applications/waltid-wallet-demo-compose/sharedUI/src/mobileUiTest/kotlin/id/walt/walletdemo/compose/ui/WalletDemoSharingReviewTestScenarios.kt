@@ -2,7 +2,10 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -16,6 +19,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -33,6 +37,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.components.EffectiveSharingInformationSection
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialRow
 import id.walt.walletdemo.compose.ui.components.PaymentConsentSection
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
@@ -130,6 +135,86 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(1, copies.value)
     }
 
+    fun compactClaimChoicesKeepSelectionAndExpansionIndependent() = runComposeUiTest {
+        val selected = mutableStateOf(setOf("salary", "languages", "overtime"))
+        val readOnly = mutableStateOf(false)
+        val enabled = mutableStateOf(true)
+        fun selection(id: String) = WalletDemoPresentationDisclosureSelection("employee", "credential", id)
+        fun scalar(id: String, label: String, value: DisplayValue, reason: String? = null) = SharingClaimNode(
+            ClaimItemPath.topLevel(id), label, SharingClaimNode.Kind.Scalar, value, emptyList(), reason,
+            additional = false, technical = false, initiallyExpanded = true)
+        fun choice(id: String, label: String) = SharingClaimChoice(selection(id),
+            ClaimItem(ClaimItemPath.topLevel(id), label = label, value = DisplayValue.Text(label)),
+            selected = id in selected.value, included = id in selected.value, forcedReason = null)
+        setContent {
+            val salary = choice("salary", "Salary")
+            val languages = choice("languages", "Languages")
+            val overtime = choice("overtime", "Eligible for overtime")
+            val nodes = listOf(
+                SharingClaimNode(ClaimItemPath.topLevel("salary"), "Salary", SharingClaimNode.Kind.Object,
+                    null, listOf(scalar("amount", "Annual amount", DisplayValue.NumberValue("1320000"))),
+                    null, false, false, true, choice = salary),
+                SharingClaimNode(ClaimItemPath.topLevel("languages"), "Languages", SharingClaimNode.Kind.Array,
+                    null, listOf(scalar("language", "", DisplayValue.Text("English"))),
+                    null, false, false, true, choice = languages),
+                scalar("overtime", "Eligible for overtime", DisplayValue.BooleanValue(false)).copy(choice = overtime),
+                scalar("job", "Job title", DisplayValue.Text("Engineer"), "Required"),
+                scalar("country", "Country", DisplayValue.Text("IN")).copy(
+                    choice = choice("country", "Country").copy(included = true, forcedReason = "Included with Address")),
+                scalar("partial", "Other information", DisplayValue.Text("Already carried")).copy(
+                    choice = choice("partial", "Other information").copy(included = true)),
+            )
+            val group = EffectiveSharingGroup("credential", CredentialCardDisplayData("credential", "Employee", "Issuer"),
+                listOf(SharingClaimContribution("employee", nodes, false)), listOf(salary, languages, overtime))
+            WalletDemoTheme {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    EffectiveSharingInformationSection(
+                        WalletDemoClaimReview.Ready(WalletDemoPreparedClaimReview(emptyList()), listOf(group)),
+                        enabled = enabled.value, readOnly = readOnly.value,
+                        onToggleDisclosure = { key -> selected.value = if (key.path in selected.value) selected.value - key.path else selected.value + key.path },
+                        onRetry = {})
+                }
+            }
+        }
+        onNodeWithText("Included").assertDoesNotExist()
+        onNodeWithText("Include this information").assertDoesNotExist()
+        onNodeWithText("Required").assertExists()
+        onNodeWithText("Included with Address").assertExists()
+        onNodeWithText("Not selected; some information is already shared").assertExists()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(selection("country").id)).assertDoesNotExist()
+        for ((id, label, value) in listOf(Triple("salary", "Salary", "1320000"), Triple("languages", "Languages", "English"))) {
+            val toggle = onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(selection(id).id))
+            toggle.performScrollToContent(this).assertIsOn()
+            onNodeWithText(label).assertExists()
+            val heading = onNodeWithTag(WalletUiTestTags.presentationDisclosure(selection(id).id)).assertHasClickAction()
+            val toggleBounds = toggle.fetchSemanticsNode().boundsInRoot
+            val headingBounds = heading.fetchSemanticsNode().boundsInRoot
+            assertTrue(kotlin.math.abs(toggleBounds.center.y - headingBounds.center.y) < toggleBounds.height / 2,
+                "The selection belongs beside the named heading")
+            heading.performClick()
+            onNodeWithText(value).assertDoesNotExist()
+            toggle.assertIsOn()
+            assertTrue(id in selected.value)
+            runOnIdle { enabled.value = false }
+            toggle.assertIsNotEnabled().performClick().assertIsOn()
+            runOnIdle { enabled.value = true }
+            toggle.performClick().assertIsOff()
+            onNodeWithText(value).assertDoesNotExist()
+            heading.performClick()
+            onNodeWithText(value).performScrollToContent(this).assertIsDisplayed()
+            toggle.assertIsOff()
+        }
+        onNodeWithText("No").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(selection("overtime").id)).assertIsOn()
+        runOnIdle { readOnly.value = true }
+        for (id in listOf("salary", "languages", "overtime")) {
+            onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(selection(id).id)).assertDoesNotExist()
+        }
+        onNodeWithText("Included").assertDoesNotExist()
+        onNodeWithText("Included with Address").assertExists()
+        onNodeWithText("Not selected; some information is already shared").assertExists()
+    }
+
     fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() = runComposeUiTest {
         val cityPath = "\"address\".\"city\""
         val option = WalletDemoPresentationCredentialOption("employee", "employee-1", label = "Employee credential",
@@ -166,10 +251,10 @@ class WalletDemoSharingReviewTestScenarios {
                     onCancel = {}, controller = owner)
             } }
             waitUntil(timeoutMillis = 10_000) { onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).fetchSemanticsNodes().isNotEmpty() }
-            onNodeWithText("Always shared").performScrollToContent(this).performClick()
+            onNodeWithTag("review-always-shared").assertHasClickAction().performScrollToContent(this).performClick()
             onNodeWithText("EMP-42").assertDoesNotExist()
             onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).assertExists()
-            onNodeWithText("Always shared").performScrollToContent(this).performClick()
+            onNodeWithTag("review-always-shared").assertHasClickAction().performScrollToContent(this).performClick()
             onNodeWithText("EMP-42").performScrollToContent(this).assertIsDisplayed()
             onNodeWithText("Always included by this credential").assertDoesNotExist()
             onNodeWithText("Requested information").performScrollToContent(this).assertIsDisplayed()

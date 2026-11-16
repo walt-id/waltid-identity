@@ -62,9 +62,13 @@ data class EffectiveSharingGroup(
 fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
     options: List<WalletDemoPresentationCredentialOption>,
     selectedDisclosures: Set<WalletDemoPresentationDisclosureSelection>,
+    preferredLocales: List<String> = platformPreferredLocales(),
 ): List<EffectiveSharingGroup> {
     val optionById = options.associateBy { it.selection }
-    val information = options.associate { it.selection to it.toSharingInformation() }
+    val information = options.associate { it.selection to it.toSharingInformation(preferredLocales) }
+    val metadataByOption = options.associate { option ->
+        option.selection to StoredCredentialMetadataParser.claims(option.metadataJson, preferredLocales, option.format)
+    }
     return credentials.groupBy { it.credentialId }.map { (credentialId, contributions) ->
         val selectedOptions = contributions.map { contribution ->
             requireNotNull(optionById[WalletDemoPresentationCredentialSelection(contribution.queryId, credentialId)]) {
@@ -77,7 +81,7 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
         fun label(selection: WalletDemoPresentationDisclosureSelection): String {
             val optionId = WalletDemoPresentationCredentialSelection(selection.queryId, selection.credentialId)
             val option = requireNotNull(optionById[optionId])
-            return bestClaimMetadata(StoredCredentialMetadataParser.claims(option.metadataJson, format = option.format),
+            return bestClaimMetadata(metadataByOption.getValue(option.selection),
                 reviewedDisclosurePathExpression(selection.path, option.format), option.format)?.value?.displayName
                 ?: information[optionId]?.fields?.firstOrNull { selection in it.selections }?.item?.label ?: "selected information"
         }
@@ -109,7 +113,7 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
         }
         val rendered = contributions.map { contribution ->
             val option = optionById.getValue(WalletDemoPresentationCredentialSelection(contribution.queryId, credentialId))
-            val metadata = StoredCredentialMetadataParser.claims(option.metadataJson, format = option.format)
+            val metadata = metadataByOption.getValue(option.selection)
             val locations = contribution.locations.associateBy { concreteClaimPath(it.receivedPathJson) }
             require(locations.size == contribution.locations.size) { "Claim review contains duplicate received paths" }
             require(ClaimPathExpression(emptyList()) in locations) { "Claim review has no root identity" }
@@ -191,7 +195,7 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
                     // A choice forced only by another query stays beside that query's contribution.
                     if (choice.forcedReason == null || nodes.hasClaimPath(expression.claimPath().itemPath)) {
                         nodes = nodes.withChoice(expression, choice,
-                            StoredCredentialMetadataParser.claims(option.metadataJson, format = option.format), option.format)
+                            metadataByOption.getValue(option.selection), option.format)
                     }
                 }
             }
