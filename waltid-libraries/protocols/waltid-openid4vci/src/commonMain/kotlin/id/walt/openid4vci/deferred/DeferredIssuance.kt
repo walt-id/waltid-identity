@@ -1,7 +1,10 @@
 package id.walt.openid4vci.deferred
 
+import id.walt.openid4vci.attestation.*
+
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
 import id.walt.openid4vci.requests.generateRequestId
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -46,7 +49,7 @@ interface DeferredIssuanceStore {
 }
 
 class DeferredDecisionException(val httpStatus: Int, message: String) : IllegalStateException(message)
-class DeferredProtocolException(val error: CredentialError) : IllegalStateException(error.description)
+class DeferredProtocolException(error: CredentialError) : CredentialProtocolException(error)
 
 /** Operates only on an already resolved and authorized issuance session. Knows nothing about grants. */
 class DeferredIssuance(
@@ -131,15 +134,32 @@ class DeferredIssuance(
         sessionId: String,
         claim: DeferredTransaction,
         clientAttestationRequired: Boolean = false,
+        statusValidator: AttestationStatusValidator? = null,
     ) {
+        // Validate lifetime first, then do HTTP outside the CAS retry transformation.
+        val initial = validateClaimState(sessionId, claim, clientAttestationRequired)
+        val accepted = initial.transactions.getValue(claim.id).accepted
+        val status = statusValidator?.validate(accepted.statusEvidence())
+        // Re-read the fence and lifetime after every asynchronous status lookup.
+        validateClaimState(sessionId, claim, clientAttestationRequired, status?.permanentlyDenied == true)
+        status?.error()?.let { throw DeferredProtocolException(it) }
+    }
+
+    private suspend fun validateClaimState(
+        sessionId: String,
+        claim: DeferredTransaction,
+        clientAttestationRequired: Boolean,
+        statusDenied: Boolean = false,
+    ): DeferredIssuanceState {
         val state = update(sessionId) { _, state ->
             val current = state.transactions[claim.id] ?: invalidTransaction()
             if (current.denied || state.status == DeferredStatus.DENIED) denied()
             check(!current.consumed && current.claimId == claim.claimId && claim.claimId != null) { "Deferred transaction claim was lost" }
-            if (attestationLifetimeValidator.isValid(current.accepted, now(), clientAttestationRequired)) state
+            if (!statusDenied && attestationLifetimeValidator.isValid(current.accepted, now(), clientAttestationRequired)) state
             else state.copy(transactions = state.transactions + (claim.id to current.copy(denied = true)))
         }
         if (state.transactions.getValue(claim.id).denied) denied()
+        return state
     }
 
     /** Renew only the processing lease, never the offer's absolute deadline. */

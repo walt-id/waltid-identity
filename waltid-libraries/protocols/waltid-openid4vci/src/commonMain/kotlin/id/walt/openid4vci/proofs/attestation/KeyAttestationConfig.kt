@@ -1,5 +1,8 @@
 package id.walt.openid4vci.proofs.attestation
 
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.CredentialProofCapabilities
 import id.walt.openid4vci.proofs.CredentialProofHandlers
@@ -13,6 +16,7 @@ data class KeyAttestationConfig(
     val verificationMethod: KeyAttestationVerificationMethod,
     /** Maximum entries in each attested_keys array; defaults to 20. Explicit null disables the limit. */
     val maxAttestedKeys: Int? = 20,
+    val statusPolicy: AttestationStatusPolicy = AttestationStatusPolicy(),
 ) {
     init {
         require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" }
@@ -65,7 +69,10 @@ fun validateKeyAttestationConfiguration(
 
 suspend fun KeyAttestationConfig.toVerificationOptions(
     keyReferenceResolver: KeyAttestationKeyReferenceResolver? = null,
+    statusResolver: AttestationStatusResolver? = null,
 ): KeyAttestationVerificationOptions = KeyAttestationVerificationOptions(
     createKeyAttestationTrustResolver(verificationMethod, keyReferenceResolver),
     maxAttestedKeys = maxAttestedKeys,
+    statusPolicy = statusPolicy,
+    statusResolver = statusResolver,
 )

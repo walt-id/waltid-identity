@@ -23,7 +23,10 @@ actual object ZlibCompressor {
         }
     }
 
-    actual fun decompress(data: ByteArray): ByteArray {
+    actual fun decompress(data: ByteArray): ByteArray = decompress(data, Int.MAX_VALUE)
+
+    actual fun decompress(data: ByteArray, maximumOutputBytes: Int): ByteArray {
+        require(maximumOutputBytes >= 0) { "Maximum decompressed size must be non-negative" }
         val inflater = Inflater()
         try {
             inflater.setInput(data)
@@ -39,6 +42,7 @@ actual object ZlibCompressor {
                     throw IllegalArgumentException("Zlib dictionary streams are not supported")
                 }
                 if (count > 0) {
+                    require(count <= maximumOutputBytes - result.size()) { "Decompressed status list exceeds the size limit" }
                     result.write(buffer, 0, count)
                     continue
                 }

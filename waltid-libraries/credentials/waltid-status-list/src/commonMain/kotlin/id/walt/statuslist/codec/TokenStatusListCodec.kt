@@ -6,8 +6,12 @@ import id.walt.statuslist.bit.BitOrder
 import id.walt.statuslist.bit.StatusBitLayout
 import id.walt.statuslist.compression.ZlibCompressor
 import id.walt.statuslist.encoding.StatusListStringEncoding
+import id.walt.statuslist.encoding.StatusListEncoding
 
 object TokenStatusListCodec : AbstractStatusListCodec() {
+    fun decode(encoded: String, maximumOutputBytes: Int): ByteArray =
+        ZlibCompressor.decompress(StatusListEncoding.decode(encoded, stringEncoding), maximumOutputBytes)
+
     override val format: StatusListFormat = StatusListFormat.TokenStatusList
     override val bitOrder: BitOrder = BitOrder.LeastSignificantFirst
     override val layout: StatusBitLayout = StatusBitLayout.IetfLittleEndianValue
