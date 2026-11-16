@@ -13,6 +13,7 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
+import id.walt.openid4vci.pkce.PkceService
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -57,8 +58,10 @@ fun buildOAuth2Provider(
     includeClientAttestationDefaultMethod: Boolean = true,
 ): OAuth2Provider {
     val resolvedConfig = applyIssuerStateValidator(config)
+    val pkceService = PkceService(resolvedConfig.pkceServiceConfig)
     registerDefaultGrantTypeHandlers(
         config = resolvedConfig,
+        pkceService = pkceService,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
         includeRefreshTokenDefaultHandlers = includeRefreshTokenDefaultHandlers,
@@ -75,7 +78,7 @@ fun buildOAuth2Provider(
         config = resolvedConfig,
         includeClientAttestationDefaultMethod = includeClientAttestationDefaultMethod,
     )
-    return DefaultOAuth2Provider(clientAuthConfig)
+    return DefaultOAuth2Provider(clientAuthConfig, pkceService)
 }
 
 private fun applyIssuerStateValidator(config: OAuth2ProviderConfig): OAuth2ProviderConfig =
@@ -94,6 +97,7 @@ private fun applyIssuerStateValidator(config: OAuth2ProviderConfig): OAuth2Provi
 
 private fun registerDefaultGrantTypeHandlers(
     config: OAuth2ProviderConfig,
+    pkceService: PkceService,
     includeAuthorizationCodeDefaultHandlers: Boolean,
     includePreAuthorizedCodeDefaultHandlers: Boolean,
     includeRefreshTokenDefaultHandlers: Boolean,
@@ -101,11 +105,13 @@ private fun registerDefaultGrantTypeHandlers(
     if (includeAuthorizationCodeDefaultHandlers) {
         val authorizationCodeAuthorizationEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
             codeRepository = config.authorizationCodeRepository,
+            pkceService = pkceService,
         )
         config.authorizationEndpointHandlers.append(authorizationCodeAuthorizationEndpointHandler)
 
         val authorizationCodeTokenEndpointHandler = AuthorizationCodeTokenEndpoint(
             codeRepository = config.authorizationCodeRepository,
+            pkceService = pkceService,
             accessTokenIssuer = config.accessTokenIssuer,
             refreshTokenRepository = config.refreshTokenRepository,
             refreshTokenIssuer = config.refreshTokenIssuer,

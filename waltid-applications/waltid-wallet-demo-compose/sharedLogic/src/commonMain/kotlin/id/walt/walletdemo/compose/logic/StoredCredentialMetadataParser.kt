@@ -39,8 +39,8 @@ object StoredCredentialMetadataParser {
         val entries = root["credentialClaims"] as? JsonArray ?: return emptyList()
         val claims = entries.map { entry ->
             val claim = entry as? JsonObject ?: return emptyList()
-            val path = (claim["path"] as? JsonArray)?.map { part -> (part as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() } ?: return emptyList() }
-                ?.takeIf { it.isNotEmpty() } ?: return emptyList()
+            val path = (claim["path"] as? JsonArray)?.toList()
+                ?.takeIf { it.isValidClaimMetadataPath() } ?: return emptyList()
             val displays = (claim["display"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
             WalletDemoCredentialClaimMetadata(path = path,
                 mandatory = (claim["mandatory"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull,

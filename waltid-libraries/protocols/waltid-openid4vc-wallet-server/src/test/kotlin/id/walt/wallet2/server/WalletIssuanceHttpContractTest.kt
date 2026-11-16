@@ -3,6 +3,7 @@ package id.walt.wallet2.server
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.models.OfferIssuerMetadata
+import id.walt.wallet2.server.models.OfferClaimMetadata
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import io.ktor.http.Url
 import io.ktor.http.HttpStatusCode
@@ -21,6 +22,14 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletIssuanceHttpContractTest {
+    @Test
+    fun claimMetadataPreservesTypedPathSegments() {
+        val path = listOf(JsonPrimitive("namespace"), JsonPrimitive("items"), JsonNull, JsonPrimitive(0), Json.parseToJsonElement("18446744073709551615"))
+        val encoded = Json.parseToJsonElement(Json.encodeToString(OfferClaimMetadata(path)))
+        assertEquals(Json.parseToJsonElement("""["namespace","items",null,0,18446744073709551615]"""), encoded.jsonObject["path"])
+        assertEquals(path, Json.decodeFromString<OfferClaimMetadata>(encoded.toString()).path)
+    }
+
     @Test
     fun isolatedResponsesPreserveStrictLegacySuccessAndAllDetailedProgress() = testApplication {
         val endpoint = Url("https://issuer.example/credential")

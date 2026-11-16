@@ -1,6 +1,7 @@
 package id.walt.issuer2.repository.openid4vci
 
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.pkce.PkceBinding
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,17 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
 class ConfiguredAuthorizationCodeRepositoryTest {
+
+    @Test
+    fun pkceBindingSurvivesStorageRoundTrip() = runTest {
+        val repository = ConfiguredAuthorizationCodeRepository()
+        for (binding in listOf(PkceBinding.NotUsed,
+            PkceBinding.Challenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "S256"))) {
+            val record = testRecord().copy(pkceBinding = binding)
+            repository.save(record)
+            assertEquals(binding, repository.consume(record.code)?.pkceBinding)
+        }
+    }
 
     @Test
     fun saveRejectsDuplicateAndConsumeIsOneTime() = runTest {
@@ -47,6 +59,7 @@ class ConfiguredAuthorizationCodeRepositoryTest {
     }
 
     private fun testRecord() = DefaultAuthorizationCodeRecord(
+        pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
         code = "auth-code-${Clock.System.now().toEpochMilliseconds()}",
         clientId = "wallet-client",
         redirectUri = "https://wallet.example/callback",

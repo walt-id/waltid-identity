@@ -58,14 +58,15 @@ object HashUtils {
      * Computes the SHA-256 fingerprint of a certificate in PEM or base64-encoded DER format.
      */
     fun computeCertificateSha256(pemOrDer: String): String? = try {
-        val certBytes = decodeCertificate(pemOrDer)
-
-        SHA256().digest(certBytes)
-            .joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+        sha256Hex(decodeCertificate(pemOrDer))
     } catch (e: Exception) {
         log.warn(e) { "Failed to compute certificate SHA-256" }
         null
     }
+
+    /** Lowercase hex SHA-256 of [bytes]. */
+    internal fun sha256Hex(bytes: ByteArray): String =
+        SHA256().digest(bytes).joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
 
     /** Normalizes a PEM or Base64-DER certificate to unpadded Base64 DER. */
     fun normalizeCertificateDerBase64(pemOrDer: String): String? = try {
@@ -75,7 +76,7 @@ object HashUtils {
         null
     }
 
-    private fun decodeCertificate(pemOrDer: String): ByteArray {
+    internal fun decodeCertificate(pemOrDer: String): ByteArray {
         val base64Content = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
             pemOrDer
                 .replace("-----BEGIN CERTIFICATE-----", "")
