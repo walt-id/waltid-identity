@@ -142,7 +142,10 @@ class SdJwtVcCredentialHandler(
     } catch (cause: CredentialProofValidationException) {
         CredentialResponseResult.Failure(CredentialError(cause.errorCode, cause.message))
     } catch (cause: TypeMetadataValidationException) {
-        CredentialResponseResult.Failure(CredentialError(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, cause.message))
+        logger.debug { "Credential type validation failed: ${cause.message}" }
+        CredentialResponseResult.Failure(CredentialError(
+            CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential does not satisfy its type metadata",
+        ))
     } catch (cause: SDJwtVerificationException) {
         CredentialResponseResult.Failure(CredentialError(
             CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, "Credential data breaks SD-JWT processing: ${cause.message}",
