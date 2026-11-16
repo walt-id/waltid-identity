@@ -112,11 +112,13 @@ class CredentialStatusBackendE2ETest {
         }
         fun refreshReview(card: String, actionLabel: String) {
             val id = card.removePrefix("wallet.credentialCard.")
-            val details = "credential-status-details-$id"
-            assertNotNull(waitForResourceAfterScrolling(device, details, 10_000))
-            clickByTag(device, details)
+            expandStatusDetails(device, card)
             val checked = "credential-status-last-checked-$id"
-            val before = requireNotNull(waitForResourceAfterScrolling(device, checked, 10_000)).text
+            // Let inline expansion expose its content before scrolling the review away from it.
+            val before = requireNotNull(device.wait(Until.findObject(By.res(checked)), 5_000)
+                ?: waitForResourceAfterScrolling(device, checked, 10_000)) {
+                "Expanded status must expose its original check time: $checked"
+            }.text
             assertNotNull(waitForResourceAfterScrolling(device, "credential-status-check-$id", 10_000))
             refresh("Revoked")
             assertNotEquals("An explicit review refresh must display its new authenticated result", before,
