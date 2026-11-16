@@ -20,7 +20,6 @@ import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.openapi.Verifier2OpenApiExamples
-import id.walt.verifier2.verifierApi
 import id.walt.verifier2.Verifier2Service
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vc.policies.PolicyServiceKey
