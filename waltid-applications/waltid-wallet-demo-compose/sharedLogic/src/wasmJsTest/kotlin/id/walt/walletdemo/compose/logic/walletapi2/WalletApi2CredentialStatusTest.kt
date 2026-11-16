@@ -80,6 +80,7 @@ class WalletApi2CredentialStatusTest {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun anEarlierPollCannotOverwriteTheResultOfAnExplicitRefresh() = runTest {
         val context = """{"id":"active-context","expiresAt":"2026-11-12T10:05:00Z"}"""
