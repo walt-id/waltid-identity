@@ -96,6 +96,7 @@ async function run() {
   const button = name => page.getByRole('button', { name, exact: true });
   const headline = name => page.getByText(name, { exact: true }).first();
   const refreshes = () => requests.filter(request => request.method === 'POST' && request.path.endsWith('/credential-status/refresh'));
+  const forcedRefreshes = () => refreshes().filter(request => request.mode === 'FORCE');
   const click = async locator => {
     await expect(locator).toBeVisible({ timeout: 30000 });
     await waitForSettledImage(page, await locator.boundingBox());
@@ -171,10 +172,10 @@ async function run() {
   }
   async function refresh(title) {
     await cooldown();
-    const before = refreshes().length;
+    const before = forcedRefreshes().length;
     await click(button('Refresh status'));
-    await expect.poll(() => refreshes().length, { timeout: 30000 }).toBe(before + 1);
-    const projection = refreshes().at(-1).projection;
+    await expect.poll(() => forcedRefreshes().length, { timeout: 30000 }).toBe(before + 1);
+    const projection = forcedRefreshes().at(-1).projection;
     expect(Array.isArray(projection), 'Refresh response must contain producer results').toBe(true);
     expect(projection.some(result => result.outcome !== 'DEFERRED')).toBe(true);
     await expect(headline(title)).toBeVisible({ timeout: 30000 });
@@ -209,9 +210,9 @@ async function run() {
     phase = 'settings'; await settings(); await click(button('Automatic checks'));
     await capture('automatic-disabled', button('Automatic checks'));
     await cooldown();
-    const batch = refreshes().length;
+    const batch = forcedRefreshes().length;
     await click(button('Check statuses'));
-    await expect.poll(() => refreshes().length).toBe(batch + 1);
+    await expect.poll(() => forcedRefreshes().length, { timeout: 30000 }).toBe(batch + 1);
     await capture('settings-manual', headline('Processed'));
     await click(button('How checks work'));
     await capture('settings-help', headline('Recipients verify credential status independently.'));
