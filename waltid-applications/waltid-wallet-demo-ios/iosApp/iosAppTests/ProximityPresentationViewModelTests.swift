@@ -1585,6 +1585,9 @@ private final class FakePresentmentState: @unchecked Sendable {
 private struct FakeSharingPlanBridge: ProximitySharingPlanBridge {
     let sharing: WalletSDK.ProximityPreparedSharing
     var isExpired: Bool { false }
+    func approveStatusReviewed(_ submission: WalletSDK.ProximitySubmission, reviewedStatus: [String: String]) throws -> WalletSDK.ProximityPreparationResult {
+        throw WalletError.internalFailure("Preparation fixture does not support reviewed approval")
+    }
     func approve(_ submission: WalletSDK.ProximitySubmission) throws -> WalletSDK.ProximityPreparationResult {
         .prepared(sharing)
     }

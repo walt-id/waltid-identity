@@ -66,7 +66,7 @@ for (const scenario of catalogue.states.filter(state => state.id.includes('.stat
           await expect(page.getByText('This server does not expose credential status checks. The credential can still be shared, and the recipient performs its own checks.', { exact: true })).toBeVisible();
           expect(fixture.refreshes).toEqual([]);
         } else {
-          await expect(page.getByRole('button', { name: 'Details', exact: true })).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Status clear', exact: true })).toHaveCount(0);
           if (scenario.state === 'status-supported') {
             await clickControl(page, page.getByRole('button', { name: 'Refresh status', exact: true }));
             await expect(page.getByText('Last known: revoked', { exact: true })).toBeVisible();
@@ -74,7 +74,7 @@ for (const scenario of catalogue.states.filter(state => state.id.includes('.stat
             const notice = page.getByText('Status changed: Status review credential. Open the marked cards for details.', { exact: true });
             await expect(notice).toBeVisible();
             await expect(notice).toHaveCount(0);
-            const disclosure = page.getByRole('button', { name: 'Details', exact: true });
+            const disclosure = page.getByRole('button', { name: 'Last known: revoked', exact: true });
             await clickControl(page, disclosure);
             await reveal(page, page.getByText('Latest attempt', { exact: true }));
             const force = fixture.refreshes.filter(request => request.mode === 'FORCE');
@@ -125,7 +125,7 @@ for (const scenario of catalogue.states.filter(state => state.id.includes('.stat
       await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
       await testInfo.attach(scenario.id, { body: await page.screenshot(), contentType: 'image/png' });
       if (scenario.state === 'status-supported') {
-        const disclosure = page.getByRole('button', { name: 'Details', exact: true });
+        const disclosure = page.getByRole('button', { name: 'Last known: revoked', exact: true });
         await reveal(page, disclosure);
         await clickControl(page, disclosure);
         await expect(page.getByText('Latest attempt', { exact: true })).toHaveCount(0);

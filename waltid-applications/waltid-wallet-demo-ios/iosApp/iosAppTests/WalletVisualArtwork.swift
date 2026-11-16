@@ -35,8 +35,8 @@ struct WalletVisualArtwork: Decodable {
         try Dictionary(uniqueKeysWithValues: artwork.map { (Self.origin + $0.file, try Data(contentsOf: directory.appendingPathComponent($0.file))) })
     }
 
-    /// Require decoded artworks and physical-right issue marks in the actual rendered stack.
-    static func hasRenderedArtworksAndRightBadges(_ image: UIImage) -> Bool {
+    /// Require decoded artworks and the front card's physical-left issue mark; rear marks may be covered.
+    static func hasRenderedArtworksAndLeftBadge(_ image: UIImage) -> Bool {
         guard let cg = image.cgImage else { return false }
         let width = cg.width, height = cg.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -58,7 +58,7 @@ struct WalletVisualArtwork: Decodable {
                     }
                 }
             }
-            return blue > 1_500 && orange > 500 && navy > 500 && redLeft == 0 && redRight > 30
+            return blue > 1_500 && orange > 500 && navy > 500 && redLeft > 30 && redRight == 0
         }
     }
 }

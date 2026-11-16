@@ -67,8 +67,8 @@ final class WalletVisualTests: XCTestCase {
             config: rtl ? .iPhoneSe : .iPhone13, colorScheme: rtl ? .dark : .light,
             sizeCategory: rtl ? .accessibilityMedium : .large,
             layoutDirection: rtl ? .rightToLeft : .leftToRight,
-            isReady: { WalletVisualArtworkProtocol.ready }, isImageReady: WalletVisualArtwork.hasRenderedArtworksAndRightBadges,
-            failure: "All three issuer artworks must render with issue badges on the physical right")
+            isReady: { WalletVisualArtworkProtocol.ready }, isImageReady: WalletVisualArtwork.hasRenderedArtworksAndLeftBadge,
+            failure: "All three issuer artworks and the front card's physical-left issue badge must render")
     }
 
     func testCredentialStatusDetailsClear() throws { try credentialStatusDetails(adverse: false) }

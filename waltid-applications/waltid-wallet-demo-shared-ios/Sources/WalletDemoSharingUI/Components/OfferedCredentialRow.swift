@@ -31,7 +31,6 @@ public struct OfferedCredentialRow: View {
         VStack(alignment: .leading, spacing: 0) {
             if largeArt || allowsSelection { identity.padding(16) }
             else {
-                CredentialCardAccessory {
                 Button { showDetails = true } label: { identity.padding(16).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityHint(String(localized: "View credential information", bundle: .module))
@@ -79,15 +78,15 @@ public struct OfferedCredentialRow: View {
                     .accessibilityLabel(CredentialCardSummary.offered(from: credential).title)
                     .accessibilityIdentifier("issuance-large-art-\(credential.configurationID)")
                 CredentialCardAccessory {
-                Button { showDetails = true } label: {
-                    Image(systemName: "info.circle")
-                        .resizable().frame(width: 20, height: 20)
-                        .foregroundStyle(Color(css: CredentialCardSummary.offered(from: credential).textColor) ?? .white)
-                        .frame(width: 48, height: 48).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Credential information", bundle: .module))
-                .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
+                    Button { showDetails = true } label: {
+                        Image(systemName: "info.circle")
+                            .resizable().frame(width: 20, height: 20)
+                            .foregroundStyle(Color(css: CredentialCardSummary.offered(from: credential).textColor) ?? .white)
+                            .frame(width: 48, height: 48).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "Credential information", bundle: .module))
+                    .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
                 }
             }
         } else if !allowsSelection {
