@@ -1,0 +1,46 @@
+# Wallet2 API v2: optional OIDC authentication (e.g. Keycloak)
+#
+# 1. Enable the 'auth' feature in config/_features.conf:
+#    enabledFeatures = [auth]
+#    (Preserve any other features your deployment needs.)
+# 2. Copy this example to config/auth.conf and replace ALL placeholders.
+# 3. Never commit production keys or client secrets to Git.
+#
+# File layout: auth.conf properties live at the ROOT (no outer auth {} block).
+#
+# The JWT signing key must be a valid Crypto2 StoredKey encoded using
+# StoredKeyCodec.encodeToString. It must have SIGN and VERIFY usages.
+# Use the same signing key on every Wallet2 replica.
+signingStoredKey = "REPLACE_WITH_ENCODED_CRYPTO2_STORED_KEY"
+tokenExpiry = "PT24H"
+
+oidc {
+  # Keycloak realm OpenID Connect discovery endpoint
+  openIdConfigurationUrl = "https://keycloak.example.com/realms/wallet/.well-known/openid-configuration"
+
+  # Configure a confidential OIDC client in Keycloak
+  clientId = "wallet2"
+  clientSecret = "REPLACE_WITH_KEYCLOAK_CLIENT_SECRET"
+
+  # Add this exact URI to Keycloak's Valid Redirect URIs for the client
+  callbackUri = "https://wallet.example.com/auth/oidc/callback"
+
+  # Recommended for Authorization Code flow
+  pkceEnabled = true
+}
+
+# Login entry point: GET https://wallet.example.com/auth/oidc/auth
+# This returns JSON containing an OIDC authorization URL in nextStep.url.
+# The client must open that URL in a browser; the endpoint is not itself a
+# direct HTTP 302 redirect to Keycloak.
+#
+# Keycloak redirects back to callbackUri upon successful login.
+# Wallet2 then issues its own authentication JWT.
+#
+# Existing email/password endpoints remain available even with OIDC enabled:
+#   POST /auth/register
+#   POST /auth/emailpass
+#   POST /auth/logout
+#
+# If the entire 'oidc' block is omitted, email/password authentication
+# still works, provided the 'auth' feature and a valid signing key are set.
