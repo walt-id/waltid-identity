@@ -91,7 +91,7 @@ private struct CredentialStatusContent: View {
             CredentialStatusIcon(display, size: compact ? compactGlyphSize : detailGlyphSize)
             Text(display.statusTitle).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier(compact ? "credential-status-\(credentialID)" : "")
-        }.padding(.leading, 16).padding(.trailing, trailingInset).frame(minHeight: 44)
+        }.padding(.leading, 16).padding(.trailing, trailingInset).frame(minHeight: 44).contentShape(Rectangle())
     }
 
     private func chevron(expanded: Bool) -> some View {
