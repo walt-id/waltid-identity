@@ -66,6 +66,9 @@ async function run() {
   let phase = 'bootstrap', admittedAt = Date.now(), verdict;
   let documentEpoch = 0;
   const requestEpochs = new WeakMap();
+  page.on('framenavigated', frame => {
+    if (frame === page.mainFrame()) documentEpoch += 1;
+  });
   page.on('request', request => requestEpochs.set(request, documentEpoch));
   page.on('pageerror', error => errors.push(error.message));
   async function observeResponse(response) {
@@ -90,8 +93,10 @@ async function run() {
       }
     } catch (error) {
       if (item.method === 'GET' && url.pathname.endsWith('/credential-status') &&
-          requestEpoch < documentEpoch && error.message.includes('Network.getResponseBody')) {
-        item.observation = 'Read-only poll body unavailable after the intentional page reload';
+          error.message.includes('Network.getResponseBody')) {
+        // Chromium may invalidate the old body before the navigation commit event arrives.
+        item.unreadablePoll = { requestDocumentEpoch: requestEpoch, observedDocumentEpoch: documentEpoch,
+          networkFailure: response.request().failure(), error: error.message };
       } else errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
     } finally { requests.push(item); }
   }
@@ -212,7 +217,6 @@ async function run() {
     // Browser demo preferences are runtime-owned, so explicitly restore manual mode afterwards.
     // Finish inspecting response bodies before navigation invalidates Chromium's body handles.
     await Promise.all([...observations]);
-    documentEpoch += 1;
     await page.reload(); await ready();
     await expect.poll(() => requiredArtwork.every(uri => artworks.has(uri))).toBe(true);
     phase = 'settings'; await settings(); await click(button('Automatic checks'));
@@ -269,6 +273,11 @@ async function run() {
     // renderer can retain their ARIA mirror, so verify the actual undimmed Home control.
     await expectRemembered('scan', 15000);
     await Promise.all([...observations]);
+    for (const item of requests.filter(request => request.unreadablePoll)) {
+      if (Number.isInteger(item.unreadablePoll.requestDocumentEpoch) && item.unreadablePoll.requestDocumentEpoch < documentEpoch) {
+        item.observation = 'Completed main-frame navigation interrupted a previous document read-only poll';
+      } else errors.push(`Unreadable status response at ${item.path}: ${item.unreadablePoll.error}`);
+    }
     expect(errors).toEqual([]);
     expect(frames).toHaveLength(11);
     clean();
@@ -278,7 +287,7 @@ async function run() {
     throw Error(`${phase}: ${error.message}`);
   } finally {
     fs.writeFileSync(path.join(output, 'evidence.json'), JSON.stringify({
-      sourceRevision: source, backend, phase, browser: browser.version(), platform: process.platform,
+      sourceRevision: source, backend, phase, browser: browser.version(), platform: process.platform, documentEpoch,
       userAgent: process.env.WALLET_BROWSER_USER_AGENT || 'Playwright default',
       auth: 'isolated loopback service with auth disabled', frames, requests, errors,
       artworkDigests: requiredArtwork.map(uri => ({ uriDigest: digest(uri), pngDigest: artworks.get(uri) })),
