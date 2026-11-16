@@ -456,6 +456,33 @@ class ProviderCredentialIssuanceTest {
     }
 
     @Test
+    fun `type validation errors use permitted protocol descriptions without claim names`() = runBlocking {
+        val provider = buildOAuth2Provider(createTestConfig())
+        for (claim in listOf("family_name", "quoted\"name", "back\\slash", "caf\u00e9")) {
+            val metadata = PublishedTypeMetadata.create(buildJsonObject {
+                put("vct", "https://issuer.example/identity")
+                putJsonArray("claims") { add(buildJsonObject {
+                    putJsonArray("path") { add(claim) }
+                    put("mandatory", true)
+                }) }
+            })
+            val signatures = mutableListOf<Unit>()
+            val failure = assertIs<CredentialResponseResult.Failure>(issueTimeMappedSdJwt(
+                null, "2026-09-10T17:43:28Z", metadata = metadata, signatures = signatures,
+            ))
+            val response = provider.writeCredentialError(failure.error)
+            val wire = Json.parseToJsonElement(JsonObject(response.payload).toString()).jsonObject
+            assertEquals(400, response.status)
+            assertEquals(CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED, wire.getValue("error").jsonPrimitive.content)
+            val description = wire.getValue("error_description").jsonPrimitive.content
+            assertEquals("Credential does not satisfy its type metadata", description)
+            assertTrue(description.all { it.code in 0x20..0x21 || it.code in 0x23..0x5b || it.code in 0x5d..0x7e })
+            assertFalse(claim in description)
+            assertTrue(signatures.isEmpty())
+        }
+    }
+
+    @Test
     fun `metadata validation and signing reuse each dynamically mapped payload`() = runBlocking {
         var mappings = 0
         val clock = object : Clock {

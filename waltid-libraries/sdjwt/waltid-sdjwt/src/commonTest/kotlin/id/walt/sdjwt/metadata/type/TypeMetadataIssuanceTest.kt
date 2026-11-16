@@ -31,7 +31,10 @@ class TypeMetadataIssuanceTest {
         }.toString().encodeToByteArray()
         val resolved = TypeMetadataResolver({ if (it == vct) leaf else base }).resolve(vct)
         val noSchema: suspend (String) -> ByteArray = { error("No schema may be fetched") }
-        assertFailsWith<TypeMetadataValidationException> { resolved.validateForIssuance(listOf(payload("{}")), noSchema) }
+        val missing = assertFailsWith<TypeMetadataValidationException> {
+            resolved.validateForIssuance(listOf(payload("{}")), noSchema)
+        }
+        assertEquals("Claim [\"family_name\"] is mandatory but absent", missing.message)
         assertFailsWith<TypeMetadataValidationException> { resolved.validateForIssuance(listOf(payload("""{"family_name":"Lovelace"}""")), noSchema) }
         resolved.validateForIssuance(listOf(payload("""{"family_name":"Lovelace"}""", "family_name")), noSchema)
     }
