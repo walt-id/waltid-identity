@@ -192,6 +192,7 @@ Failed refreshes do not replace the active source snapshot. `RefreshResult` prov
 - Persisted sources created before the assurance model must be refreshed or migrated; missing assurance is treated as not admitted.
 - Compact JWS support validates embedded payloads and pinned X.509 signers; it is not full JAdES support.
 - `InMemoryTrustStore` is thread-safe but not persistent. Production deployments should provide a persistent `TrustStore` implementation.
+- Certificate-chain resolution reads its candidate anchors through `TrustStore.findCertificateIdentitiesByCanonicalSubject`, keyed by `ServiceIdentity.canonicalSubjectSha256Hex` (SHA-256 of the certificate subject's RFC 2253 canonical name, set when a source loads). A persistent store should index that field and also return identities without one; the default implementation lists every certificate identity.
 
 Useful public test sources:
 

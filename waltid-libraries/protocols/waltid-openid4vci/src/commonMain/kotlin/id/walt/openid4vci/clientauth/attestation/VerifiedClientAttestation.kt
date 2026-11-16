@@ -1,5 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.attestation.VerifiedAttestationStatus
+
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
 import id.walt.openid4vci.clientauth.AuthenticatedClient
@@ -11,6 +13,7 @@ data class VerifiedClientAttestation(
     val subject: String,
     val confirmationJwk: JsonObject,
     val lifetime: VerifiedAttestationLifetime,
+    val status: VerifiedAttestationStatus? = null,
 )
 
 @Serializable

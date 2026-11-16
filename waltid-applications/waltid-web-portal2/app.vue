@@ -121,17 +121,31 @@ const hasResult = computed(() =>
         <h1 class="text-2xl sm:text-3xl font-bold m-0 truncate">Demo Portal</h1>
       </div>
 
-      <div class="flex items-center gap-2">
-        <label class="sr-only" for="wallet-select">Wallet</label>
-        <select
-          id="wallet-select"
-          v-model="walletId"
-          class="form-select w-auto min-w-56 text-sm"
-        >
-          <option v-for="wallet in wallets" :key="wallet.id" :value="wallet.id">
-            {{ wallet.label }}
-          </option>
-        </select>
+      <div class="flex w-full items-center gap-3 sm:w-auto sm:gap-4">
+        <div class="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-none">
+          <label class="text-sm font-semibold" for="wallet-select">
+            Select a Wallet:
+          </label>
+          <select
+            id="wallet-select"
+            v-model="walletId"
+            class="form-select w-full sm:w-auto sm:min-w-56 text-sm"
+          >
+            <option v-for="wallet in wallets" :key="wallet.id" :value="wallet.id">
+              {{ wallet.label }}
+            </option>
+          </select>
+          <a
+            :href="wallet.learnMoreUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sm text-[--color-text-muted] underline underline-offset-2 hover:text-[--color-text]"
+          >
+            Find out more<span class="sr-only">
+              about {{ wallet.label }} (opens in a new tab)</span
+            >
+          </a>
+        </div>
       <div
         v-if="!isMobile"
         class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"

@@ -36,7 +36,7 @@ interface VerificationSessionRepository {
     suspend fun claimForProcessingWithOriginal(sessionId: String): VerificationSessionProcessingClaim {
         val current = get(sessionId) ?: throw VerificationSessionNotFoundException(sessionId)
         val status = current.session.status
-        if ((!current.session.reattemptable && status == Verification2Session.VerificationSessionStatus.SUCCESSFUL) || status in setOf(
+        if (current.session.isConsumed || status in setOf(
                 Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST,
                 Verification2Session.VerificationSessionStatus.PROCESSING_FLOW,
             )) {
