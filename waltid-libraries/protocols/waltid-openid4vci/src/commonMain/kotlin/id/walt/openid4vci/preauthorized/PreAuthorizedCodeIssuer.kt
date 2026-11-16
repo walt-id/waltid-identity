@@ -2,7 +2,6 @@ package id.walt.openid4vci.preauthorized
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.Session
-import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
@@ -16,18 +15,9 @@ import kotlin.time.Instant
 /**
  * Service API for issuing OpenID4VCI pre-authorized codes.
  *
- * This is intentionally not a handler?: issuance happens before any OAuth endpoint is invoked, so
- * callers trigger it out-of-band when preparing a credential offer. We keep handlers for inbound
- * HTTP flows.
- * This service covers the issuer’s own step, storing the grant so the token handler can redeem it later.
- *
- * The implementation must generate a one-time code, persists it via [PreAuthorizedCodeRepository], and
- * returns the data the wallet needs to redeem the grant at the token endpoint.
- *
- * The token endpoint half still lives as a handler (`PreAuthorizedCodeTokenEndpoint`) because it
- * responds to an OAuth request. The issuing step is backend orchestration the caller triggers
- * explicitly. Splitting the responsibilities keeps handler registries focused on inbound traffic
- * while services cover issuer-facing workflows.
+ * Call this service when preparing a credential offer. Implementations generate a one-time code,
+ * save it via [PreAuthorizedCodeRepository], and return the information the wallet needs for
+ * redemption. The token endpoint handler redeems the stored grant.
  */
 interface PreAuthorizedCodeIssuer {
     /**
@@ -51,8 +41,6 @@ data class PreAuthorizedCodeIssueRequest(
     val issuanceSessionId: String? = null,
     /** Code validity from issuance. Omit to use the issuer's configured default. */
     val lifetimeSeconds: Long? = null,
-    /** Cap the initial access token at the code deadline for offers sharing one expiry. */
-    val accessTokenExpiresWithCode: Boolean = false,
 )
 
 data class PreAuthorizedCodeIssueResult(
@@ -81,11 +69,7 @@ class DefaultPreAuthorizedCodeIssuer(
         val resolvedTxCodeValue = resolveTxCodeValue(request.txCode, request.txCodeValue)
 
         val expiresAt = Clock.System.now() + lifetime.seconds
-        val session = request.session.copy().withSubject(subject)
-        val sessionSnapshot = if (request.accessTokenExpiresWithCode) {
-            val tokenExpiry = session.expiresAt[TokenType.ACCESS_TOKEN]?.let { minOf(it, expiresAt) } ?: expiresAt
-            session.withExpiresAt(TokenType.ACCESS_TOKEN, tokenExpiry)
-        } else session
+        val sessionSnapshot = request.session.copy().withSubject(subject)
 
         val hashedTxCode = resolvedTxCodeValue?.let { hashTxCode(it) }
         val (code, _) = generateAndSaveUnique { generatedCode ->

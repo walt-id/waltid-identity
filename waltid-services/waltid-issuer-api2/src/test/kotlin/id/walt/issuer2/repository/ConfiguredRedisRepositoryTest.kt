@@ -128,6 +128,8 @@ class ConfiguredRedisRepositoryTest {
             assertTrue(didLock xor didConsume)
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
             assertNull(ConfiguredPreAuthorizedCodeRepository().consume(preAuthorizedCode.code))
+            val terminal = restartedPreAuthorizedCodeRepository.getForRedemption(preAuthorizedCode.code)
+            assertEquals(if (didLock) preAuthorizedCode.copy(redemptionState = locked) else null, terminal)
 
             parRepository.save(pushedAuthorizationRequest)
             assertEquals(

@@ -6,6 +6,7 @@ import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecor
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeStatus
 import id.walt.openid4vci.repository.preauthorized.isRedeemableAt
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
@@ -25,7 +26,10 @@ class ConfiguredPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
     }
 
     override suspend fun get(code: String): PreAuthorizedCodeRecord? =
-        records[code]?.takeIf { it.isRedeemableAt(Clock.System.now()) }
+        getForRedemption(code)?.takeIf { it.isRedeemableAt(Clock.System.now()) }
+
+    override suspend fun getForRedemption(code: String): PreAuthorizedCodeRecord? =
+        records[code]?.takeIf { Clock.System.now() < it.expiresAt && it.redemptionState?.status != PreAuthorizedCodeStatus.REDEEMED }
 
     override suspend fun compareAndSetRedemptionState(
         expected: PreAuthorizedCodeRecord,

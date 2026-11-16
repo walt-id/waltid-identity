@@ -10,8 +10,10 @@ import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeFailure
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
@@ -26,6 +28,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -231,6 +234,43 @@ class PreAuthorizedCodeGrantHandlerTest {
     }
 
     @Test
+    fun `in-memory state snapshots retain the custom grant payload`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                txCode = TxCode(length = 4),
+                txCodeValue = "4321",
+                session = DefaultSession(subject = "pin-subject"),
+            ),
+        )
+        val saved = assertNotNull(repository.get(issued.code))
+        val record = CustomGrant(saved, "application-data")
+        val customRepository = InMemoryPreAuthorizedCodeRepository()
+        customRepository.save(record)
+        val customHandler = PreAuthorizedCodeTokenEndpoint(
+            codeRepository = customRepository,
+            accessTokenIssuer = StubTokenIssuer(),
+            refreshTokenRepository = refreshTokenRepository,
+            refreshTokenIssuer = refreshTokenIssuer,
+        )
+
+        repeat(2) {
+            val request = createAccessRequestWithGrant(issued.code, txCode = "0000")
+            val result = assertIs<AccessTokenResponseResult.Failure>(customHandler.handleTokenEndpointRequest(request))
+            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, result.preAuthorizedCodeFailure)
+        }
+        val current = assertNotNull(customRepository.get(issued.code))
+        assertEquals(2, current.redemptionState?.failedAttempts)
+        assertSame(record, current.originalRecord)
+        assertEquals("application-data", assertIs<CustomGrant>(current.originalRecord).applicationData)
+        assertSame(record, assertNotNull(customRepository.consume(issued.code)).originalRecord)
+    }
+
+    private class CustomGrant(
+        grant: PreAuthorizedCodeRecord,
+        val applicationData: String,
+    ) : PreAuthorizedCodeRecord by grant
+
+    @Test
     fun `parallel wrong values cannot exceed the failed attempt limit`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
@@ -242,12 +282,36 @@ class PreAuthorizedCodeGrantHandlerTest {
         val failures = List(20) {
             async(Dispatchers.Default) {
                 val request = createAccessRequestWithGrant(issued.code, txCode = "0000")
-                assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(request)).error
+                assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(request))
             }
         }.awaitAll()
 
-        assertTrue(failures.all { it.error == "invalid_grant" })
-        assertEquals(4, failures.count { it.description == "tx_code is invalid" })
+        assertTrue(failures.all { it.error.error == "invalid_grant" })
+        assertEquals(4, failures.count { it.preAuthorizedCodeFailure == PreAuthorizedCodeFailure.WrongTxCode })
+        assertNull(repository.get(issued.code))
+    }
+
+    @Test
+    fun `last wrong PIN and trusted consume compete for the same active grant`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                txCode = TxCode(length = 4),
+                txCodeValue = "4321",
+                session = DefaultSession(subject = "pin-subject"),
+                issuanceSessionId = "issuance-session",
+            ),
+        )
+        val wrongPin = createAccessRequestWithGrant(issued.code, txCode = "0000")
+        repeat(4) {
+            val failure = assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(wrongPin))
+            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, failure.preAuthorizedCodeFailure)
+        }
+
+        val tokenRequest = async(Dispatchers.Default) { handler.handleTokenEndpointRequest(wrongPin) }
+        val trustedConsume = async(Dispatchers.Default) { repository.consume(issued.code) }
+        val failure = assertIs<AccessTokenResponseResult.Failure>(tokenRequest.await())
+        val locked = failure.preAuthorizedCodeFailure == PreAuthorizedCodeFailure.Locked("issuance-session")
+        assertTrue(locked xor (trustedConsume.await() != null))
         assertNull(repository.get(issued.code))
     }
 

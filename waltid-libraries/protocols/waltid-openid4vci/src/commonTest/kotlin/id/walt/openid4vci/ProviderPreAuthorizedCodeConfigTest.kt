@@ -2,9 +2,12 @@ package id.walt.openid4vci
 
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.InvalidPreAuthorizedCodeLifetimeException
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeFailure
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import kotlinx.coroutines.test.runTest
@@ -12,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -55,6 +59,43 @@ class ProviderPreAuthorizedCodeConfigTest {
         val success = assertIs<AccessTokenResponseResult.Success>(exchange(redeemable.code, "123456"))
         assertEquals(tokenDeadline, success.request.session?.expiresAt?.get(TokenType.ACCESS_TOKEN))
         assertTrue((success.response.expiresIn ?: 0) > 50)
+    }
+
+    @Test
+    fun `custom issuer factory receives the provider repository and runtime settings`() = runTest {
+        val config = createTestConfig()
+        val settings = PreAuthorizedCodeConfig(40, 50, 1)
+        var issuerInvocations = 0
+        val provider = buildOAuth2Provider(config.copy(
+            preAuthorizedCodeConfigResolver = { settings },
+            preAuthorizedCodeIssuerFactory = { repository, resolveConfig ->
+                assertSame(config.preAuthorizedCodeRepository, repository)
+                val delegate = DefaultPreAuthorizedCodeIssuer(repository, resolveConfig = resolveConfig)
+                object : PreAuthorizedCodeIssuer by delegate {
+                    override suspend fun issue(request: PreAuthorizedCodeIssueRequest) =
+                        delegate.issue(request).also { issuerInvocations++ }
+                }
+            },
+        ))
+        val request = PreAuthorizedCodeIssueRequest(
+            session = DefaultSession(subject = "holder"),
+            issuanceSessionId = "issuance-session",
+            txCode = TxCode(length = 6),
+            txCodeValue = "123456",
+        )
+        val before = Clock.System.now()
+        val issued = provider.preAuthorizedCodeIssuer.issue(request)
+        assertEquals(1, issuerInvocations)
+        assertTrue(issued.expiresAt in (before + 40.seconds)..(Clock.System.now() + 40.seconds))
+
+        val parsed = assertIs<AccessTokenRequestResult.Success>(provider.createAccessTokenRequest(mapOf(
+            "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+            "pre-authorized_code" to listOf(issued.code),
+            "tx_code" to listOf("000000"),
+        )))
+        val failure = assertIs<AccessTokenResponseResult.Failure>(provider.createAccessTokenResponse(parsed.request))
+        assertEquals(PreAuthorizedCodeFailure.Locked("issuance-session"), failure.preAuthorizedCodeFailure)
+        assertEquals("invalid_grant", failure.error.error)
     }
 
     @Test

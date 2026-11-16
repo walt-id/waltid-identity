@@ -30,6 +30,11 @@ class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
             records[code]?.takeIf { it.isRedeemableAt(Clock.System.now()) }
         }
 
+    override suspend fun getForRedemption(code: String): PreAuthorizedCodeRecord? =
+        synchronized(lock) {
+            records[code]?.takeIf { Clock.System.now() < it.expiresAt && it.redemptionState?.status != PreAuthorizedCodeStatus.REDEEMED }
+        }
+
     override suspend fun compareAndSetRedemptionState(
         expected: PreAuthorizedCodeRecord,
         replacement: PreAuthorizedCodeRedemptionState,
@@ -37,7 +42,7 @@ class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
         synchronized(lock) {
             val record = records[expected.code]
             if (record !== expected || !expected.isRedeemableAt(Clock.System.now())) return@synchronized false
-            val grant = (expected as? RecordWithRedemptionState)?.grant ?: expected
+            val grant = (expected as? RecordWithRedemptionState)?.originalRecord ?: expected
             records[expected.code] = RecordWithRedemptionState(grant, replacement)
             true
         }
@@ -45,5 +50,8 @@ class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
     private class RecordWithRedemptionState(
         val grant: PreAuthorizedCodeRecord,
         override val redemptionState: PreAuthorizedCodeRedemptionState,
-    ) : PreAuthorizedCodeRecord by grant
+    ) : PreAuthorizedCodeRecord by grant {
+        override val originalRecord: PreAuthorizedCodeRecord
+            get() = grant
+    }
 }

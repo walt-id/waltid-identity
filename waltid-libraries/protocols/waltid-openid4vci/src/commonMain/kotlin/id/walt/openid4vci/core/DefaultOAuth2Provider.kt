@@ -107,11 +107,13 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
     private val pkceService: PkceService = PkceService(config.pkceServiceConfig),
 ) : OAuth2Provider {
-    override val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
-        repository = config.preAuthorizedCodeRepository,
-        anonymousAccessSupported = config.preAuthorizedCodeAnonymousAccessSupported,
-        resolveConfig = config::resolvePreAuthorizedCodeConfig,
-    )
+    override val preAuthorizedCodeIssuer = config.preAuthorizedCodeIssuerFactory
+        ?.invoke(config.preAuthorizedCodeRepository, config::resolvePreAuthorizedCodeConfig)
+        ?: DefaultPreAuthorizedCodeIssuer(
+            repository = config.preAuthorizedCodeRepository,
+            anonymousAccessSupported = config.preAuthorizedCodeAnonymousAccessSupported,
+            resolveConfig = config::resolvePreAuthorizedCodeConfig,
+        )
     private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
 
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =

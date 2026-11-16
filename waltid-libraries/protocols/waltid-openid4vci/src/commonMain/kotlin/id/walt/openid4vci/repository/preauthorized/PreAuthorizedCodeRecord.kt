@@ -20,6 +20,13 @@ interface PreAuthorizedCodeRecord {
     val redemptionState: PreAuthorizedCodeRedemptionState?
         get() = null
 
+    /**
+     * The immutable grant payload, including any application-defined interfaces. Read [redemptionState]
+     * from the repository snapshot itself. Adapters that wrap records must expose the original payload here.
+     */
+    val originalRecord: PreAuthorizedCodeRecord
+        get() = this
+
     /** Optional issuance session ID for O(1) lookup on credential endpoint */
     val issuanceSessionId: String?
         get() = null

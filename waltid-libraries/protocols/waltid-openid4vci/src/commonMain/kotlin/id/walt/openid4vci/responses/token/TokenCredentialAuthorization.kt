@@ -17,6 +17,8 @@ data class TokenCredentialAuthorization(
     val includeInResponse: Boolean,
     /** Fixed deferred authorization deadline, supplied only by the resolved issuance session. */
     val issuanceDeadline: kotlin.time.Instant? = null,
+    /** Optional access-token ceiling for an immediate pre-authorized issuance session. */
+    val accessTokenDeadline: kotlin.time.Instant? = null,
 ) {
     val credentialIdentifiers: List<String>
         get() = authorizationDetails.flatMap { it.credentialIdentifiers.orEmpty() }

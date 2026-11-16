@@ -188,8 +188,11 @@ class RefreshTokenTokenEndpoint(
                 )
             }
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
-            val accessTokenExpiresAt = credentialAuthorization?.issuanceDeadline?.let { minOf(it, now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds) }
-                ?: (sessionExpiresAt ?: (now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds))
+            val defaultAccessTokenExpiry = now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds
+            val configuredAccessTokenExpiry = sessionExpiresAt ?: defaultAccessTokenExpiry
+            val accessTokenExpiresAt = credentialAuthorization?.issuanceDeadline?.let { minOf(it, defaultAccessTokenExpiry) }
+                ?: credentialAuthorization?.accessTokenDeadline?.let { minOf(it, configuredAccessTokenExpiry) }
+                ?: configuredAccessTokenExpiry
             val issuer = updatedRequest.issClaim ?: verifiedRefreshToken.issuer
             val accessToken = accessTokenIssuer.issue(
                 defaultAccessTokenClaims(

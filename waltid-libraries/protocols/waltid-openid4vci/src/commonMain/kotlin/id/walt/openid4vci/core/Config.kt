@@ -10,6 +10,7 @@ import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHand
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -78,9 +79,12 @@ data class OAuth2ProviderConfig(
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
     val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
     val preAuthorizedCodeConfig: PreAuthorizedCodeConfig = PreAuthorizedCodeConfig(),
+    /** Anonymous access setting for the default issuer. A custom issuer supplies its own setting. */
     val preAuthorizedCodeAnonymousAccessSupported: Boolean = true,
     /** Resolve issuer-specific settings in the current request context, if supplied. */
     val preAuthorizedCodeConfigResolver: (suspend () -> PreAuthorizedCodeConfig)? = null,
+    /** Optional issuer factory. Use the supplied repository and resolver to share redemption configuration. */
+    val preAuthorizedCodeIssuerFactory: ((PreAuthorizedCodeRepository, suspend () -> PreAuthorizedCodeConfig) -> PreAuthorizedCodeIssuer)? = null,
 ) {
     internal suspend fun resolvePreAuthorizedCodeConfig(): PreAuthorizedCodeConfig =
         preAuthorizedCodeConfigResolver?.invoke() ?: preAuthorizedCodeConfig

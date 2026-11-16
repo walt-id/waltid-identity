@@ -113,14 +113,13 @@ class CredentialOfferService(
                         session = DefaultSession(subject = sessionId),
                         issuanceSessionId = sessionId,
                         lifetimeSeconds = request.expiresInSeconds,
-                        accessTokenExpiresWithCode = true,
                     )
                 )
             } catch (e: InvalidPreAuthorizedCodeLifetimeException) {
                 throw BadRequestException(e.message.orEmpty(), e)
             }
         } else null
-        val expiresAt = preAuthorizedCode?.expiresAt ?: expirationTimestamp(request.expiresInSeconds)
+        val expiresAt = preAuthorizedCode?.expiresAt ?: authorizedOfferExpiresAt(request.expiresInSeconds)
         val credentialConfigurationIds = resolvedCredentials
             .map { it.second.credentialConfigurationId }
             .distinct()
@@ -194,7 +193,7 @@ class CredentialOfferService(
 
     private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 
-    private fun expirationTimestamp(expiresInSeconds: Long?): Instant =
+    private fun authorizedOfferExpiresAt(expiresInSeconds: Long?): Instant =
         when (expiresInSeconds) {
             -1L -> Instant.DISTANT_FUTURE
             else -> Clock.System.now().plus((expiresInSeconds ?: 300L).seconds)

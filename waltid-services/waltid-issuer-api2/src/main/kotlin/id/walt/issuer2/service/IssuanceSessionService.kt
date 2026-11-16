@@ -81,6 +81,30 @@ class IssuanceSessionService(
     suspend fun findByExternalAuthorizationState(state: String): IssuanceSession? =
         repository.list().firstOrNull { it.externalAuthorizationState == state }
 
+    suspend fun closeForPreAuthorizedCodeLockout(
+        sessionId: String,
+        code: String,
+        failure: IssuanceSessionFailure,
+    ): IssuanceSession? {
+        while (true) {
+            val current = repository.get(sessionId) ?: return null
+            if (current.isClosed || current.status != IssuanceSessionStatus.ACTIVE ||
+                current.credentialOffer?.grants?.preAuthorizedCode?.preAuthorizedCode != code
+            ) return null
+
+            val closed = current.copy(
+                status = IssuanceSessionStatus.UNSUCCESSFUL,
+                statusReason = "Transaction code attempt limit reached",
+                isClosed = true,
+                failure = failure,
+                credentialOffer = null,
+                deferredState = null,
+                deferredStatus = null,
+            )
+            if (repository.compareAndSet(current, closed)) return closed
+        }
+    }
+
     suspend fun updateStatus(
         sessionId: String,
         status: IssuanceSessionStatus,

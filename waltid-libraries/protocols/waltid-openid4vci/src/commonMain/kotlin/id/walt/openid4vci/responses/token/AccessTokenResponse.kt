@@ -3,6 +3,7 @@ package id.walt.openid4vci.responses.token
 import id.walt.openid4vci.responses.OpenId4VciResponseHeaders
 import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeFailure
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import kotlinx.serialization.json.add
@@ -90,6 +91,8 @@ sealed class AccessTokenResponseResult {
     data class Failure(
         val request: AccessTokenRequest,
         val error: OAuthError,
+        /** Library outcome for the embedding issuer. HTTP responses serialize [error]. */
+        val preAuthorizedCodeFailure: PreAuthorizedCodeFailure? = null,
     ) : AccessTokenResponseResult()
 
     fun isSuccess(): Boolean = this is Success
