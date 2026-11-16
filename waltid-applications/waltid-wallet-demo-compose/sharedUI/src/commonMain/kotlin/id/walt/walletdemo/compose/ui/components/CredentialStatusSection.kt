@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -63,6 +63,7 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
     val disclosure = facts.extra.isNotEmpty() || compact && facts.main.isNotEmpty()
     val disclosureEnabled = context.snapshot.readState != WalletDemoStatusReadState.Loading || retained != null
     val expandedVisible = expanded && disclosure
+    val toggleDisclosure = { expanded = !expanded }
     val rotation by animateFloatAsState(
         if (expandedVisible) { if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f } else 0f,
         WalletMotion.disclosure(LocalWalletVisualPreferences.current.reduceMotion), label = "credential-status-chevron",
@@ -73,23 +74,25 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().then(if (compact) Modifier.testTag("credential-status-$credentialId") else Modifier)) {
             if (compact) SettingsDivider()
-            Row(Modifier.fillMaxWidth().padding(end = if (refreshVisible) 4.dp else 0.dp),
+            Row(Modifier.fillMaxWidth().padding(end = if (disclosure || refreshVisible) 4.dp else 0.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 val header = Modifier.weight(1f).heightIn(min = 48.dp).then(
                     if (disclosure) Modifier.testTag("credential-status-details-$credentialId")
                         .semantics { stateDescription = disclosureState }
-                        .clickable(enabled = disclosureEnabled, role = Role.Button, onClickLabel = disclosureLabel) { expanded = !expanded }
+                        .clickable(enabled = disclosureEnabled, role = Role.Button, onClickLabel = disclosureLabel, onClick = toggleDisclosure)
                     else Modifier,
                 )
                 Row(header.padding(start = 16.dp, end = if (disclosure || refreshVisible) 4.dp else 16.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CredentialStatusIcon(status, size = glyphSize)
                     Text(status.title(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    if (disclosure) Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
-                    }
                 }
                 if (refreshVisible) StatusRefreshButton(credentialId)
+                if (disclosure) IconButton(onClick = toggleDisclosure, enabled = disclosureEnabled,
+                    // The title exposes this same disclosure action to accessibility services.
+                    modifier = Modifier.clearAndSetSemantics {}) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
+                }
             }
             if (!compact) CredentialStatusFactsContent(credentialId, main = facts.main)
             WalletExpandableContent(expandedVisible) {

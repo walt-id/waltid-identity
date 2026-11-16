@@ -57,20 +57,27 @@ private struct CredentialStatusContent: View {
         let disclosure = !facts.extra.isEmpty || compact && !facts.main.isEmpty
         let disclosureEnabled = !display.isLoading || value != nil
         let expandedVisible = expanded && disclosure
+        let toggleDisclosure = { expanded.toggle() }
         return VStack(alignment: .leading, spacing: 0) {
             if compact { divider }
             HStack(spacing: 0) {
                 if disclosure {
-                    Button { expanded.toggle() } label: { header(display, disclosure: true, expanded: expandedVisible) }
+                    Button(action: toggleDisclosure) { header(display, trailingInset: 4) }
                         .buttonStyle(.plain).disabled(!disclosureEnabled)
                         .accessibilityHint(String(localized: "Credential status details", bundle: .module))
                         .accessibilityValue(expandedVisible ? String(localized: "Expanded", bundle: .module) : String(localized: "Collapsed", bundle: .module))
                         .accessibilityIdentifier("credential-status-details-\(credentialID)")
                 } else {
-                    header(display, disclosure: false, expanded: false, trailingInset: refreshVisible ? 8 : 16)
+                    header(display, trailingInset: refreshVisible ? 8 : 16)
                 }
                 if refreshVisible { refreshButton(display) }
-            }.padding(.trailing, refreshVisible ? 4 : 0)
+                if disclosure {
+                    Button(action: toggleDisclosure) { chevron(expanded: expandedVisible) }
+                        .buttonStyle(.plain).disabled(!disclosureEnabled)
+                        // The title exposes this same disclosure action to accessibility services.
+                        .accessibilityHidden(true)
+                }
+            }.padding(.trailing, disclosure || refreshVisible ? 4 : 0)
             if !compact { CredentialStatusFactsContent(credentialID: credentialID, main: facts.main) }
             if expandedVisible {
                 if compact && !facts.main.isEmpty { divider }
@@ -79,13 +86,12 @@ private struct CredentialStatusContent: View {
         }
     }
 
-    private func header(_ display: CredentialStatusDisplay, disclosure: Bool, expanded: Bool, trailingInset: CGFloat = 16) -> some View {
+    private func header(_ display: CredentialStatusDisplay, trailingInset: CGFloat = 16) -> some View {
         HStack(alignment: .center, spacing: 8) {
             CredentialStatusIcon(display, size: compact ? compactGlyphSize : detailGlyphSize)
             Text(display.statusTitle).font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier(compact ? "credential-status-\(credentialID)" : "")
-            if disclosure { chevron(expanded: expanded).accessibilityHidden(true) }
-        }.padding(.leading, 16).padding(.trailing, disclosure ? 4 : trailingInset).frame(minHeight: 44)
+        }.padding(.leading, 16).padding(.trailing, trailingInset).frame(minHeight: 44)
     }
 
     private func chevron(expanded: Bool) -> some View {
