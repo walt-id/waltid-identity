@@ -1,9 +1,12 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class StoredCredentialMetadataParserTest {
     @Test
@@ -158,5 +161,26 @@ class StoredCredentialMetadataParserTest {
         assertEquals("https://issuer.example/pid.png", details.toCardDisplayData().logoUri)
         assertEquals("Personal ID", details.toCardDisplayData().title)
         assertEquals(details.toCardDisplayData(), details.summary.toCardDisplayData())
+    }
+
+    @Test
+    fun storedPathsKeepTypesLabelsAndInclusionHints() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":["nationalities",null],"mandatory":true,"display":[{"name":"Nationality"}]},
+          {"path":["addresses",0,"city"],"mandatory":false,"display":[{"name":"Primary city"}]},
+          {"path":["object_addresses","0","city"],"display":[{"name":"Key zero city"}]},
+          {"path":["namespace","element",18446744073709551615],"display":[{"name":"Large map key"}]}
+        ]}""")
+        assertEquals(listOf("Nationality", "Primary city", "Key zero city", "Large map key"), metadata.map { it.displayName })
+        assertEquals(listOf(true, false, null, null), metadata.map { it.mandatory })
+        assertEquals<Any>(Json.parseToJsonElement("""["nationalities",null]""").jsonArray.toList(), metadata.first().path)
+        assertEquals("18446744073709551615", metadata.last().path.last().toString())
+    }
+
+    @Test
+    fun malformedClaimPathsFallBackToNoMetadata() {
+        for (path in listOf("[]", "[true]", "[1.5]", "[{}]", "[[]]")) {
+            assertTrue(StoredCredentialMetadataParser.claims("""{"credentialClaims":[{"path":$path}]}""").isEmpty(), path)
+        }
     }
 }

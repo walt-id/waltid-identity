@@ -3,11 +3,13 @@ package id.walt.openid4vci.metadata.issuer
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.proofs.ProofType
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonUnquotedLiteral
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -25,6 +27,53 @@ class CredentialIssuerMetadataSerializationTest {
     private val json = Json {
         encodeDefaults = false
         explicitNulls = false
+    }
+
+    @Test
+    fun `claim paths preserve wildcards array indexes and mdoc integer keys`() {
+        for (path in listOf(
+            """["org.iso.18013.5.1","driving_privileges",null,"vehicle_category_code"]""",
+            """["nationalities",0]""",
+            """["nationalities","0"]""",
+            """["", " "]""",
+            """["namespace","element",-7]""",
+            """["namespace","element",9223372036854775807]""",
+            """["namespace","element",18446744073709551615]""",
+            """["namespace","element",-18446744073709551616]""",
+        )) {
+            val claim = json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            val encoded = json.parseToJsonElement(json.encodeToString(claim)).jsonObject
+            assertEquals(json.parseToJsonElement(path), encoded["path"])
+            assertEquals(claim.path.map { it.toString() }, encoded.getValue("path").jsonArray.map { it.toString() })
+        }
+    }
+
+    @Test
+    fun `claim path strings that look numeric stay object keys`() {
+        for (path in listOf("""["map","1E+19"]""", """["map","1e2"]""", """["by_code","0"]""", """["map","2.0"]""")) {
+            val claim = json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            assertEquals(json.parseToJsonElement(path), json.parseToJsonElement(json.encodeToString(claim)).jsonObject.getValue("path"), path)
+            assertTrue(claim.path.last().jsonPrimitive.isString, path)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun `claim description constructor requires canonical integers`() {
+        assertFailsWith<IllegalArgumentException> {
+            ClaimDescription(listOf(JsonPrimitive("namespace"), JsonPrimitive("map"), JsonUnquotedLiteral("1E+19")))
+        }
+        val claim = ClaimDescription(listOf(JsonPrimitive("namespace"), JsonPrimitive("map"), JsonPrimitive(7)))
+        assertEquals(JsonPrimitive(7), claim.path.last())
+    }
+
+    @Test
+    fun `claim paths reject invalid components`() {
+        for (path in listOf("[]", "[true]", "[1.5]", "[1e2]", "[1E+19]", "[2.0]", "[{}]", "[[]]")) {
+            assertFailsWith<IllegalArgumentException>(path) {
+                json.decodeFromString<ClaimDescription>("""{"path":$path}""")
+            }
+        }
     }
 
     // 1) Required fields: credential_issuer, credential_endpoint, credential_configurations_supported

@@ -613,8 +613,12 @@ must also restart. Unaffected pre-authorized sessions remain usable.
 
 ## Client attestation challenges
 
+The shipped `issuer-service.conf` comments out `client-attestation`, so the public demo
+accepts authorization-code wallets without a client attestation. Uncomment that block to
+require `attest_jwt_client_auth`. Anonymous pre-authorized access stays enabled.
+
 Challenges are disabled in the shipped configurations. To enable them, add the following
-inside the `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
+inside the uncommented `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
 in `issuer-service.conf`, alongside `config`, and restart the issuer:
 
 ```hocon
@@ -740,8 +744,9 @@ Refreshing an access token preserves its original WIA evidence and never replace
 transaction's accepted evidence. Resubmitting a Credential Request also keeps the
 original acceptance. Transactions stored before evidence capture fail closed when
 their required profile cannot be enforced. Standalone KAs without `exp` retain the
-existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
-replacement and attestation status-list enforcement are separate work (status: F6).
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh attestation
+replacement remains separate work. See [attestation status enforcement](docs/deferred-attestations.md)
+for status-policy configuration and retry behavior.
 
 Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
 in the issuer service configuration):
@@ -763,3 +768,8 @@ Use Redis for persistence across OSS restarts. Atomic claims serialize collectio
 verified public holder bindings, allocated progress, and prepared credential responses
 are retained for recovery. A live worker renews its processing lease; an abandoned
 claim becomes recoverable after five minutes, without extending the offer deadline.
+
+### Deferred attestation status
+
+See [deferred attestation enforcement](docs/deferred-attestations.md) for WIA/KA status
+configuration, signer trust, checkpoint freshness, retries and legacy handling.
