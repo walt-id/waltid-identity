@@ -243,7 +243,28 @@ This library implements **OpenID for Verifiable Credential Issuance 1.0** (final
 
 ### Basic Usage
 
-Build an OAuth2 provider with default handlers:
+Build an OAuth2 provider with default handlers. Use `provider.preAuthorizedCodeIssuer`
+for offer creation. An optional `preAuthorizedCodeIssuerFactory` receives the provider's
+repository and settings resolver so custom issuance can use the same configuration as redemption.
+Set `PreAuthorizedCodeIssueRequest.lifetimeSeconds` to select a code lifetime within the
+issuer's configured bounds. At token exchange, applications may provide an immediate session's
+`TokenCredentialAuthorization.accessTokenDeadline` or the separate deferred `issuanceDeadline`.
+The code deadline controls redemption.
+
+Pass the unchanged record instance returned by `get` or `getForRedemption` as the
+`expected` argument to `compareAndSetRedemptionState`. The in-memory repository
+checks object identity. Persistent repositories compare stored values or a storage version.
+Read a fresh record before retrying a failed update.
+
+Custom repositories must implement `compareAndSetRedemptionState` using a storage-side
+conditional update. Match the same grant (including the original expiry, or a stronger
+storage version) and the previous redemption state. Apply the state change only while
+the grant is active and unexpired. Keep the record through its original expiry. The default
+`consume` uses the same operation for trusted, already authenticated callers.
+The in-memory repository exposes application-specific payloads as `originalRecord`
+on snapshots after a state update. A token handler's structured lockout result can be used
+to close the issuer's business session. Repositories may return locked grants from
+`getForRedemption` to allow the issuer to reconcile an interrupted lockout.
 
 ```kotlin
 import id.walt.openid4vci.core.*
@@ -259,7 +280,6 @@ val config = OAuth2ProviderConfig(
     tokenEndpointHandlers = TokenEndpointHandlers(),
     authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
     preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
-    preAuthorizedCodeIssuer = PreAuthorizedCodeIssuer(),
     accessTokenIssuer = JwtAccessTokenIssuer(signingKey, issuer)
 )
 

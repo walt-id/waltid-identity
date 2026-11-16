@@ -4,12 +4,13 @@ import id.walt.commons.config.ConfigManager
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.config.AuthenticationServiceConfig
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.credentialRequestByIdentifier
@@ -31,6 +32,7 @@ import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.Issuer2TestKeyAttester
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
+import id.walt.ktornotifications.SseNotifier
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -43,6 +45,7 @@ import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION
 import io.ktor.client.call.body
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -97,7 +100,8 @@ class Issuer2PreAuthorizedWalletFlowTest {
         val resolved = wallet.resolve(offer)
         val code = assertNotNull(resolved.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
 
-        for (pin in listOf("000000", "000000", "123456")) {
+        val events = SseNotifier.getSseFlow(offer.offerId)
+        suspend fun rejectPin(pin: String) {
             val response = client.submitForm("/openid4vci/token", parameters {
                 append("grant_type", GrantType.PreAuthorizedCode.value)
                 append("pre-authorized_code", code)
@@ -106,6 +110,31 @@ class Issuer2PreAuthorizedWalletFlowTest {
             assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
             assertEquals(OAuthErrorCodes.INVALID_GRANT, response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
         }
+
+        rejectPin("000000")
+        val active = client.getSession(offer.offerId)
+        assertEquals(IssuanceSessionStatus.ACTIVE, active.status)
+        assertFalse(active.isClosed)
+        assertNotNull(active.credentialOffer)
+
+        rejectPin("000000")
+        rejectPin("123456")
+        val closed = client.getSession(offer.offerId)
+        assertEquals(IssuanceSessionStatus.UNSUCCESSFUL, closed.status)
+        assertTrue(closed.isClosed)
+        assertEquals("Transaction code attempt limit reached", closed.statusReason)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, closed.failure?.error)
+        assertEquals(HttpStatusCode.NotFound, client.get(offer.referencedOfferUri()).status)
+
+        assertEquals(listOf(
+            IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_FAILED,
+            IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_FAILED,
+            IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED,
+            IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_FAILED,
+        ).map { it.value }, events.replayCache.map { it.event })
+        val statusEvent = events.replayCache.single { it.event == IssuanceSessionEvent.ISSUANCE_STATUS_CHANGED.value }
+        assertEquals(closed.statusReason, statusEvent.session["statusReason"]?.jsonPrimitive?.content)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, statusEvent.error)
     }
 
     @Test
@@ -120,6 +149,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         val token = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
 
         assertBearerAccessToken(token)
+        assertTrue(assertNotNull(token.expires_in) in 1..300)
         assertJwtVcJsonCredentialPayload(walletFlow.requestCredential(resolvedOffer, token.access_token))
         assertSessionStatus(client, offer.offerId, "SUCCESSFUL")
     }
@@ -983,6 +1013,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         )
 
         assertBearerAccessToken(refreshedTokenResponse)
+        assertTrue(assertNotNull(refreshedTokenResponse.expires_in) in 1..300)
         val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
         assertNotEquals(refreshToken, rotatedRefreshToken)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")

@@ -748,7 +748,7 @@ class Wallet2ExtendedIntegrationTest {
                 }
                 assertTrue(receiveResult.credentialIds.isNotEmpty(), "Full receive must store credential")
 
-                testAndReturn("Full receive explains transaction code lockout") {
+                testAndReturn("Full receive preserves the OAuth error code through transaction code lockout") {
                     val txCode = TxCode(length = 6)
                     val grant = provider.preAuthorizedCodeIssuer.issue(
                         PreAuthorizedCodeIssueRequest(txCode = txCode, txCodeValue = "123456", session = session),
@@ -759,12 +759,7 @@ class Wallet2ExtendedIntegrationTest {
                         preAuthorizedCode = grant.code,
                         txCode = txCode,
                     )
-                    val attempts = listOf(
-                        "000000" to "Incorrect transaction code. Check the code and try again.",
-                        "000000" to "Too many incorrect transaction code attempts. Request a new credential offer from the issuer.",
-                        "123456" to "This credential offer is no longer usable. Request a new credential offer from the issuer.",
-                    )
-                    for ((pin, expectedMessage) in attempts) {
+                    for (pin in listOf("000000", "000000", "123456")) {
                         val response = http.post("/wallet/$walletId/credentials/receive") {
                             contentType(ContentType.Application.Json)
                             setBody(ReceiveCredentialRequest(
@@ -774,7 +769,7 @@ class Wallet2ExtendedIntegrationTest {
                             ))
                         }
                         assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
-                        assertEquals(expectedMessage, response.body<JsonObject>()["message"]?.jsonPrimitive?.content)
+                        assertEquals("invalid_grant", response.body<JsonObject>()["message"]?.jsonPrimitive?.content)
                     }
                 }
 
