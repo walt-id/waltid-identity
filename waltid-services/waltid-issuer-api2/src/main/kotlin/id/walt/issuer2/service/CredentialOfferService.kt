@@ -37,7 +37,7 @@ class CredentialOfferService(
     private val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
     private val config: Issuer2ServiceConfig,
     private val notificationService: IssuanceNotificationService,
-    private val typeMetadata: IssuerTypeMetadataCatalogue? = null,
+    private val typeMetadata: IssuerTypeMetadataCatalogue,
 ) {
     suspend fun createCredentialOffer(
         request: CredentialOfferCreateRequest,
@@ -97,7 +97,7 @@ class CredentialOfferService(
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }
         for ((_, issuance, _) in resolvedCredentials) {
-            val configuration = typeMetadata?.credentialConfigurations?.get(issuance.credentialConfigurationId) ?: continue
+            val configuration = typeMetadata.credentialConfigurations[issuance.credentialConfigurationId] ?: continue
             typeMetadata.resolve(configuration)?.use { context ->
                 context.resolved.validateIssuanceInput(
                     issuance.credentialData, issuance.selectiveDisclosure,

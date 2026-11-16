@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.sdjwt.metadata.type.MetadataIntegrity
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -35,6 +36,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class Issuer2MetadataServiceTest {
     private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
@@ -411,7 +413,9 @@ class Issuer2MetadataServiceTest {
         return MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
-            typeMetadata = IssuerTypeMetadataCatalogue(serviceConfig, metadataConfig).also(catalogues::add),
+            typeMetadata = IssuerTypeMetadataCatalogue(
+                serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+            ).also(catalogues::add),
             profileService = CredentialProfileService(
                 profilesConfig = Issuer2ProfilesConfig(),
                 metadataConfig = metadataConfig,

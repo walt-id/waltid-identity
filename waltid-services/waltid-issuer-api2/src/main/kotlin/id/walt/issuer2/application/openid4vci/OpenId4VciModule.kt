@@ -88,6 +88,7 @@ data class OpenId4VciModule(
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
             parRepository: PARRepository,
             refreshTokenRepository: RefreshTokenRepository,
+            metadataResolver: SdJwtVcMetadataResolver,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
         ): OpenId4VciModule = create(
             config = config,
@@ -97,6 +98,7 @@ data class OpenId4VciModule(
             refreshTokenRepository = refreshTokenRepository,
             keyAttestationKeyResolver = keyAttestationKeyResolver,
             credentialProofVerifier = DefaultCredentialProofVerifier(),
+            metadataResolver = metadataResolver,
         )
 
         internal fun create(
@@ -107,7 +109,7 @@ data class OpenId4VciModule(
             refreshTokenRepository: RefreshTokenRepository,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver?,
             credentialProofVerifier: CredentialProofVerifier,
-            metadataResolver: SdJwtVcMetadataResolver? = null,
+            metadataResolver: SdJwtVcMetadataResolver,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {

@@ -350,7 +350,7 @@ class ProviderCredentialIssuanceTest {
             for (time in times) {
                 for (count in 1..2) {
                     val now = Instant.parse(time)
-                    val payloads = timeMappedPayloads(issueTimeMappedSdJwt(mapping, time, count, legacy))
+                    val payloads = timeMappedPayloads(issueTimeMappedSdJwt(mapping, time, ordinaryInputs(count), legacy))
                     assertEquals(count, payloads.size)
                     payloads.forEach { payload ->
                         assertEquals(now.epochSeconds.floorDiv(86_400L) * 86_400L, payload["iat"]!!.jsonPrimitive.long)
@@ -423,7 +423,7 @@ class ProviderCredentialIssuanceTest {
         for (legacy in listOf(false, true)) {
             val signatures = mutableListOf<Unit>()
             val payloads = timeMappedPayloads(issueTimeMappedSdJwt(
-                mapping, "2026-09-10T17:43:28Z", count = 2, legacy = legacy,
+                mapping, "2026-09-10T17:43:28Z", inputs = ordinaryInputs(2), legacy = legacy,
                 metadata = publication, signatures = signatures,
             ))
             assertEquals(2, signatures.size)
@@ -446,7 +446,7 @@ class ProviderCredentialIssuanceTest {
         for (legacy in listOf(false, true)) {
             val signatures = mutableListOf<Unit>()
             val result = issueTimeMappedSdJwt(
-                null, "2026-09-10T17:43:28Z", count = 2, legacy = legacy, metadata = metadata,
+                null, "2026-09-10T17:43:28Z", legacy = legacy, metadata = metadata,
                 inputs = listOf(CredentialIssuanceInput(buildJsonObject { put("family_name", "Lovelace") }), CredentialIssuanceInput(buildJsonObject {})),
                 selectiveDisclosure = SDMap.generateSDMap(listOf("family_name")), signatures = signatures,
             )
@@ -494,7 +494,7 @@ class ProviderCredentialIssuanceTest {
         })
         val result = withContext(IssuanceClock(clock)) {
             issueTimeMappedSdJwt(buildJsonObject { put("issued_marker", "<timestamp-seconds>") },
-                "2026-09-10T17:43:28Z", count = 2, metadata = publication)
+                "2026-09-10T17:43:28Z", inputs = ordinaryInputs(2), metadata = publication)
         }
         val payloads = timeMappedPayloads(result)
         assertEquals(2, mappings)
@@ -535,19 +535,22 @@ class ProviderCredentialIssuanceTest {
         }
     }
 
+    private fun ordinaryInputs(count: Int = 1) = List(count) {
+        CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") })
+    }
+
     private suspend fun issueTimeMappedSdJwt(
         mapping: JsonObject?,
         time: String,
-        count: Int = 1,
+        inputs: List<CredentialIssuanceInput> = ordinaryInputs(),
         legacy: Boolean = false,
         round: Boolean = true,
-        input: CredentialIssuanceInput = CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }),
         metadata: PublishedTypeMetadata? = null,
-        inputs: List<CredentialIssuanceInput>? = null,
         selectiveDisclosure: SDMap? = null,
         signatures: MutableList<Unit> = mutableListOf(),
         loadDocument: suspend (String) -> ByteArray = { error("Inline schemas need no transport") },
     ): CredentialResponseResult {
+        require(inputs.isNotEmpty())
         suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
         )
@@ -558,8 +561,8 @@ class ProviderCredentialIssuanceTest {
             credentialResponseEncryption = null,
         )
         val batch = CredentialIssuanceBatch(
-            inputs = inputs ?: List(count) { input },
-            bindings = List(count) { index ->
+            inputs = inputs,
+            bindings = List(inputs.size) { index ->
                 VerifiedJwtProof("", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null).binding(index)
             },
         )

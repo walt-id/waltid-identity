@@ -7,6 +7,7 @@ import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.wallet2.consent.*
 
+import id.waltid.openid4vp.wallet.DcApiRequestProtocol
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
@@ -1071,7 +1072,7 @@ object WalletPresentationHandler {
         preview.paymentConsent.prepare(authorization, selected.matches, request.selectedCredentialOptions,
             request.selectedDisclosureOptions, key, policy,
             holderDid = request.did ?: wallet.defaultDid(),
-            requiresUnsignedRequestWarning = preview.request.protocol == id.waltid.openid4vp.wallet.DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+            requiresUnsignedRequestWarning = preview.request.protocol == DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
             typeMetadataSnapshots = selected.typeMetadataSnapshots)
     }
 

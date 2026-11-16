@@ -20,7 +20,6 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
-import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.*
@@ -38,13 +37,13 @@ class MetadataService @JvmOverloads constructor(
     metadataConfig: Issuer2MetadataConfig,
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
+    private val typeMetadata: IssuerTypeMetadataCatalogue,
     private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
     /** Metadata signing key when no dedicated signing strategy is configured. */
     private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
     metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
     private val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
-    private val typeMetadata: IssuerTypeMetadataCatalogue = IssuerTypeMetadataCatalogue(serviceConfig, metadataConfig),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
