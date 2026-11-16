@@ -17,6 +17,7 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.w3c.schemes.JwsSignatureScheme
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -306,7 +307,8 @@ data class ETSITrustListPolicy(
      * with — otherwise an attacker could sign with a self-asserted key while trust is established for
      * a different, trust-listed key or certificate. The key is resolved as the base `signature` policy
      * resolves it: `JwsSignatureScheme.getIssuerCrypto2KeyInfo` on the signed JWT, with
-     * `Crypto2JwtKeyResolver`'s `allowInlineJwk = false` default, not on the parsed credential data,
+     * `Crypto2JwtKeyResolver` with `allowInlineJwk = false` and DID `assertionMethod` authorization,
+     * not on the parsed credential data,
      * whose SD-JWT disclosures can add claims (such as `iss`) that the signed payload lacks. Resolving
      * twice does not guarantee the same key, as a `did:web` document or HTTPS issuer metadata is
      * fetched again, so the signed JWT is verified with the resolved key before its trust is checked.
@@ -648,9 +650,15 @@ data class ETSITrustListPolicy(
         /**
          * Resolves the key a JWT credential was signed with, as the base signature policy does
          * (DID, x5c, HTTPS well-known JWT VC issuer metadata). Inline `jwk` headers are not
-         * trusted for trust-list matching, as they are self-asserted.
+         * trusted for trust-list matching, as they are self-asserted. DID keys must be authorized
+         * for assertionMethod, including methods embedded directly in that relationship.
          */
-        private val keyResolver: Crypto2JwtKeyResolver by lazy { Crypto2JwtKeyResolver(allowInlineJwk = false) }
+        private val keyResolver: Crypto2JwtKeyResolver by lazy {
+            Crypto2JwtKeyResolver(
+                allowInlineJwk = false,
+                verificationRelationship = VerificationRelationshipType.AssertionMethod,
+            )
+        }
 
         /** Restores the x5c leaf certificate's key, to compare it with the resolved issuer key. */
         private val runtime: CryptoRuntime by lazy { CryptoRuntime(defaultSoftwareKeyProviders()) }
