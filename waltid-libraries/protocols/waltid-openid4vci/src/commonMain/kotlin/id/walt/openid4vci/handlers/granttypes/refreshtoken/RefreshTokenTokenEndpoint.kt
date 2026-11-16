@@ -187,6 +187,14 @@ class RefreshTokenTokenEndpoint(
                     resolvedRequest, OAuthError(OAuthErrorCodes.INVALID_GRANT, "Issuance deadline has expired"),
                 )
             }
+            // Reject before rotation: a ceiling in the past would yield an already expired access token.
+            if (credentialAuthorization?.issuanceDeadline == null &&
+                credentialAuthorization?.accessTokenDeadline?.let { it <= now } == true
+            ) {
+                return AccessTokenResponseResult.Failure(
+                    resolvedRequest, OAuthError(OAuthErrorCodes.INVALID_GRANT, "Access token deadline has expired"),
+                )
+            }
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
             val defaultAccessTokenExpiry = now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds
             val configuredAccessTokenExpiry = sessionExpiresAt ?: defaultAccessTokenExpiry
