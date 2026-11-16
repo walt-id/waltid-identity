@@ -78,6 +78,7 @@ class Issuer2LegacySessionContinuationTest {
                 // have the unchanged pre-batch shape, so this does not require a new login.
                 val code = java.util.UUID.randomUUID().toString()
                 authorizationCodes.save(DefaultAuthorizationCodeRecord(
+                    pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
                     code = code, clientId = "issuer2-wallet-test", redirectUri = "https://wallet.example/callback",
                     grantedScopes = setOf(baseline.credentialConfigurationId), grantedAudience = emptySet(),
                     session = DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to current.expiresAt)),

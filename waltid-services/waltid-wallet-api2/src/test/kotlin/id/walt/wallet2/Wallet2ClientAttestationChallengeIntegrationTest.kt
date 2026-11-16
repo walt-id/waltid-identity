@@ -47,11 +47,75 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Real OSS wallet/issuer routes, with only the wallet provider replaced by a local test attester. */
 class Wallet2ClientAttestationChallengeIntegrationTest {
     @Test fun `both grants with challenge endpoint`() = runFlow(responseOnly = false)
     @Test fun `both grants recover from issuer challenge errors`() = runFlow(responseOnly = true)
+
+    @Test
+    fun `malformed manual pairs return local HTTP 400 through OSS status pages`() {
+        val port = freePort()
+        val baseUrl = "http://127.0.0.1:$port"
+        val issuerCalls = AtomicInteger()
+        E2ETest("127.0.0.1", port, failEarly = true).testBlock(
+            features = listOf(OSSWallet2FeatureCatalog),
+            preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(baseUrl))) },
+            init = {},
+            module = {
+                install(io.ktor.server.sse.SSE)
+                wallet2Module(withPlugins = false)
+                routing {
+                    get("/.well-known/{path...}") {
+                        issuerCalls.incrementAndGet()
+                        call.respond(HttpStatusCode.InternalServerError)
+                    }
+                    post("/test-issuer/token") {
+                        issuerCalls.incrementAndGet()
+                        call.respond(HttpStatusCode.InternalServerError)
+                    }
+                }
+            },
+        ) {
+            testAndReturn("OSS manual attestation validation") {
+                testHttpClient().use { http ->
+                    val wallet = http.post("/wallet") { setBody(CreateWalletRequest()) }
+                        .body<WalletCreatedResponse>().walletId
+                    try {
+                        val malformed = listOf(
+                            mapOf("OAuth-Client-Attestation" to "wia"),
+                            mapOf("OAuth-Client-Attestation-PoP" to "pop"),
+                            mapOf("OAuth-Client-Attestation" to "", "OAuth-Client-Attestation-PoP" to "pop"),
+                            mapOf("OAuth-Client-Attestation" to "wia", "OAuth-Client-Attestation-PoP" to " "),
+                            mapOf("OAuth-Client-Attestation" to "wia", "oauth-client-attestation" to "duplicate",
+                                "OAuth-Client-Attestation-PoP" to "pop"),
+                        )
+                        for (authorized in listOf(false, true)) for (batch in listOf(false, true)) {
+                            val route = if (authorized) "exchange-code" else "request-token"
+                            for (headers in malformed) {
+                                val response = http.post("/wallet/$wallet/credentials/receive/$route" + if (batch) "/batch" else "") {
+                                    setBody(buildJsonObject {
+                                        put("tokenRequestHeaders", Json.encodeToJsonElement(headers))
+                                        if (authorized) {
+                                            put("code", "code"); put("credentialIssuerBaseUrl", "$baseUrl/test-issuer")
+                                        } else {
+                                            put("preAuthorizedCode", "code"); put("tokenEndpoint", "$baseUrl/test-issuer/token")
+                                            put("credentialIssuer", "$baseUrl/test-issuer")
+                                        }
+                                    })
+                                }
+                                assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+                                assertEquals(0, issuerCalls.get())
+                            }
+                        }
+                    } finally {
+                        http.delete("/wallet/$wallet")
+                    }
+                }
+            }
+        }
+    }
 
     private fun runFlow(responseOnly: Boolean) {
         val port = freePort()

@@ -9,6 +9,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Trust vocabulary (id.walt.trust.model) and the evaluator port
+            api(project(":waltid-libraries:credentials:waltid-trust-decision"))
+
             // Serialization
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)

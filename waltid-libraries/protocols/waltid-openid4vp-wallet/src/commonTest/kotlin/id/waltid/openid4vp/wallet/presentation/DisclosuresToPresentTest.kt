@@ -27,7 +27,13 @@ class DisclosuresToPresentTest {
             givenName.copy(location = location("given_name")),
         )
         override val signedWithDisclosures: String? = null
-        override val originalCredentialData: JsonObject? = null
+        override val originalCredentialData = buildJsonObject {
+            putJsonArray("_sd") { add(givenName.asHashedFromEncoded()) }
+            putJsonArray("nationalities") {
+                addJsonObject { put("...", india.asHashedFromEncoded()) }
+                addJsonObject { put("...", france.asHashedFromEncoded()) }
+            }
+        }
     }
 
     private val query = DcqlParser.parse(

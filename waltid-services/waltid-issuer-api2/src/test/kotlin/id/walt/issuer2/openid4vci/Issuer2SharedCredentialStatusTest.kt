@@ -154,6 +154,7 @@ class Issuer2SharedCredentialStatusTest {
             // Start at the authorization-code storage boundary; no external login is required.
             val code = UUID.randomUUID().toString()
             fixture.authorizationCodes.save(DefaultAuthorizationCodeRecord(
+                pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
                 code = code, clientId = "issuer2-wallet-test", redirectUri = "https://wallet.example/callback",
                 grantedScopes = setOf(configurationId), grantedAudience = emptySet(),
                 session = DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to saved.expiresAt)),

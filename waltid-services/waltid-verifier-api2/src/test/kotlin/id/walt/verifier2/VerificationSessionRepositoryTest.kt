@@ -3,6 +3,7 @@ package id.walt.verifier2
 import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.VerificationSessionUsage
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import io.ktor.client.request.delete
@@ -159,6 +160,26 @@ class VerificationSessionRepositoryTest {
             repository.update("retry") { status = Verification2Session.VerificationSessionStatus.SUCCESSFUL }
             if (reattemptable) repository.claimForProcessing("retry")
             else assertFailsWith<VerificationSessionAlreadyUsedException> { repository.claimForProcessing("retry") }
+        }
+    }
+
+    @Test
+    fun `explicit session usage controls processing claims after failure and success`() = runTest {
+        for (mode in VerificationSessionUsage.entries) {
+            val repository = InMemoryVerificationSessionRepository()
+            repository.create(session("mode").copy(
+                setup = CrossDeviceFlowSetup(core = GeneralFlowConfig(sessionUsage = mode)),
+                reattemptable = mode != VerificationSessionUsage.REUSABLE,
+            ))
+            repository.update("mode") { attempted = true; status = Verification2Session.VerificationSessionStatus.FAILED }
+            if (mode == VerificationSessionUsage.SINGLE_ATTEMPT) {
+                assertFailsWith<VerificationSessionAlreadyUsedException> { repository.claimForProcessing("mode") }
+            } else {
+                repository.claimForProcessing("mode")
+                repository.update("mode") { status = Verification2Session.VerificationSessionStatus.SUCCESSFUL }
+                if (mode == VerificationSessionUsage.REUSABLE) repository.claimForProcessing("mode")
+                else assertFailsWith<VerificationSessionAlreadyUsedException> { repository.claimForProcessing("mode") }
+            }
         }
     }
 

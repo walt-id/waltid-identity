@@ -30,10 +30,12 @@ import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -61,7 +63,9 @@ class AuthorizationEventTest {
         )
 
         assertEquals(400, response.status)
-        assertEquals("Missing response_type", response.body)
+        val payload = Json.parseToJsonElement(requireNotNull(response.body)).jsonObject
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, payload["error"]?.jsonPrimitive?.content)
+        assertEquals("Missing response_type", payload["error_description"]?.jsonPrimitive?.content)
         val event = events.single()
         assertEquals(IssuanceSessionEvent.AUTHORIZATION_REQUEST_FAILED.value, event.event)
         assertEquals(requestId, event.target)
