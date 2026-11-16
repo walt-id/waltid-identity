@@ -83,7 +83,7 @@ Web3 login application. Nuxt.js application demonstrating Web3 wallet-based auth
 ### Mobile Applications
 
 ### [🟢 waltid-wallet-demo-compose](./waltid-wallet-demo-compose)
-Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates credential issuance, presentation, platform-backed keys, and persistence on Android and iOS. The Web/Wasm module is currently a mock UI preview only.
+Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates credential issuance, presentation, platform-backed keys, and persistence on Android and iOS. The Web/Wasm host is a separate custodial demo backed by Wallet API2.
 
 **Use when:** You need the current cross-platform mobile wallet demo, Android or iOS integration tests, or a reference for wallet SDK integration in a mobile app.
 
@@ -91,11 +91,6 @@ Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates creden
 Native iOS wallet demo app. SwiftUI application using the `WalletSDK` Swift package backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and XCTest coverage for public EUDI, public demo, and Enterprise mobile flows.
 
 **Use when:** You need a native iOS wallet SDK reference implementation, iOS-specific integration patterns, or iOS wallet E2E coverage.
-
-### [🟠 waltid-android](./waltid-android)
-Android sample project for key generation, DID creation, signing, and verification. This app is planned for deprecation; use `waltid-wallet-demo-compose` for the current Android wallet issuance/presentation demo.
-
-**Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
 
 <br />
 <br />

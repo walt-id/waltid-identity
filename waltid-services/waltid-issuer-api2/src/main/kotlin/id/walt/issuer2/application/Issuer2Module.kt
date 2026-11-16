@@ -65,6 +65,7 @@ class Issuer2Module @JvmOverloads constructor(
     )
 
     private val metadataService = MetadataService(
+        pkceServiceConfig = openId4VciModule.pkceServiceConfig,
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
         profileService = credentialProfileService,

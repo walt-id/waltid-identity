@@ -1,5 +1,6 @@
 package id.waltid.openid4vp.wallet.presentation
 
+import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.dcql.DcqlDisclosure
@@ -15,7 +16,7 @@ import id.walt.dcql.DcqlMatcher
 internal fun SelectivelyDisclosableVerifiableCredential.disclosuresToPresent(
     matchResult: DcqlMatcher.DcqlMatchResult,
 ): List<SdJwtSelectiveDisclosure> {
-    val storedDisclosures = disclosures.orEmpty()
+    val storedDisclosures = locatedDisclosures()
 
     val requestedDisclosures = matchResult.disclosuresByPath.values.flatten()
         .ifEmpty { matchResult.selectedDisclosures?.values.orEmpty() }

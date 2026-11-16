@@ -7,6 +7,7 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.jose.JwsAlgorithm
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
@@ -59,7 +60,7 @@ class X509ChainClientAttestationVerifier(
             return ClientAttestationVerificationResult.Rejected("Client attestation signature is invalid")
         }
 
-        return ClientAttestationVerificationResult.Verified
+        return ClientAttestationVerificationResult.VerifiedWithSigner(leafKey.exportPublicJwkObject())
     }
 
     private fun JsonObject.x5cCertificates(): List<X509Certificate>? {

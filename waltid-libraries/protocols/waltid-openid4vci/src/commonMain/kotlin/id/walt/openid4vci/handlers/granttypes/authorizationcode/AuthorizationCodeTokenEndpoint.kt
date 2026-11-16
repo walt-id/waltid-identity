@@ -9,6 +9,8 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.pkce.PkceService
+import id.walt.openid4vci.pkce.PkceVerificationResult
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
@@ -41,6 +43,7 @@ class AuthorizationCodeTokenEndpoint(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val refreshTokenIssuer: RefreshTokenIssuer,
     private val refreshTokenLifetimeSeconds: Long = DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS,
+    private val pkceService: PkceService = PkceService(),
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -70,7 +73,7 @@ class AuthorizationCodeTokenEndpoint(
         } catch (e: SerializationException) {
             return AccessTokenResponseResult.Failure(
                 unresolvedRequest,
-                OAuthError(OAuthErrorCodes.INVALID_REQUEST, e.message)
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, "Authorization code record is invalid")
             )
         } catch (e: DuplicateCodeException) {
             return AccessTokenResponseResult.Failure(
@@ -103,6 +106,11 @@ class AuthorizationCodeTokenEndpoint(
                         OAuthError(OAuthErrorCodes.INVALID_GRANT, "redirect_uri does not match authorization request"),
                     )
                 }
+            }
+
+            when (val pkce = pkceService.verifyTokenRequest(request.requestForm, record.pkceBinding)) {
+                is PkceVerificationResult.Failure -> return AccessTokenResponseResult.Failure(resolvedRequest, pkce.error)
+                PkceVerificationResult.Success -> Unit
             }
 
             val updatedRequest = resolvedRequest.withSession(session)
