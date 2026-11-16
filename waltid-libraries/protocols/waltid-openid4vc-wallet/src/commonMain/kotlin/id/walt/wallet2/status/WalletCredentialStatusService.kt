@@ -398,12 +398,17 @@ class WalletCredentialStatusService(
                     committed = updated
                     break
                 }
+                if (wallet.credentialStores.getOrNull(record.reference.storeIndex) !== record.store ||
+                    record.store.getCredential(record.credential.id)?.statusFingerprint() != record.fingerprint) {
+                    return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.REMOVED, CredentialStatus.references())
+                }
                 val latest = snapshotStore.readCredentialStatusRecord(record.credential.id)
                 if (latest == expected || latest?.snapshot == null) {
                     return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.DEFERRED, local(record))
                 }
                 val saved = latest.snapshot
-                if (saved.schemaVersion != 2 || saved.credentialFingerprint != record.fingerprint || saved.trustPolicyId != trustPolicyId) {
+                if (saved.schemaVersion != 2 || saved.credentialFingerprint != record.fingerprint ||
+                    trustPolicyId == null || saved.trustPolicyId != trustPolicyId) {
                     return CredentialStatusRefreshResult(record.reference, CredentialStatusRefreshOutcome.DEFERRED, local(record))
                 }
                 val metadata = reconcile(merged.metadata, saved.metadata)

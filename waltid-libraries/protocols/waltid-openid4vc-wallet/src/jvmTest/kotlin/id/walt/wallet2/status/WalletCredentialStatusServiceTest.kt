@@ -30,6 +30,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -165,41 +166,65 @@ class WalletCredentialStatusServiceTest {
 
     @Test
     fun outOfOrderServicesCannotReplaceNewerDurableEvidence() = runTest {
-        val issuer = StatusTestIssuer.create()
-        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
-        var at = Instant.fromEpochSeconds(1_800_000_000)
-        var body = issuer.list()
-        val client = HttpClient(MockEngine(MockEngineConfig().apply {
-            dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { respond(body, headers = Headers.build {
-            append(HttpHeaders.ContentType, "application/statuslist+jwt")
-            append(HttpHeaders.CacheControl, "max-age=600")
-        }) }
-        }))
-        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
-            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
-        val waiting = CompletableDeferred<Unit>()
-        val resume = CompletableDeferred<Unit>()
-        store.beforeSave = { snapshot ->
-            if (snapshot.metadata.entries.single().meaning == StatusMeaning.CLEAR) {
-                waiting.complete(Unit)
-                resume.await()
+        for (policy in listOf("test-v1", null)) {
+            val issuer = StatusTestIssuer.create()
+            val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+            var at = Instant.fromEpochSeconds(1_800_000_000)
+            var body = issuer.list()
+            val client = HttpClient(MockEngine(MockEngineConfig().apply {
+                dispatcher = StandardTestDispatcher(testScheduler)
+                addHandler {
+                    respond(body, headers = Headers.build {
+                        append(HttpHeaders.ContentType, "application/statuslist+jwt")
+                        append(HttpHeaders.CacheControl, "max-age=600")
+                    })
+                }
+            }))
+            fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+                now = { at }, trustPolicyId = policy, parentScope = backgroundScope)
+            val waiting = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            store.beforeSave = { snapshot ->
+                if (snapshot.metadata.entries.single().meaning == StatusMeaning.CLEAR) {
+                    waiting.complete(Unit)
+                    resume.await()
+                }
             }
+            val first = service()
+            val second = service()
+            try {
+                val older = async { first.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+                waiting.await()
+                at += 1.seconds
+                body = issuer.list(value = 1u)
+                second.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                resume.complete(Unit)
+                val result = older.await().single()
+                assertEquals(if (policy == null) CredentialStatusRefreshOutcome.DEFERRED else CredentialStatusRefreshOutcome.COMPLETED,
+                    result.outcome, "A stable policy is required to merge another service's current evidence")
+                if (policy == null) assertTrue(result.status.presentation(at).lastKnown,
+                    "Evidence from an unknown policy remains historical after contention")
+                service().use { cold ->
+                    assertEquals(CredentialStatusKind.INVALID, cold.snapshot().credentials.single().presentation.kind)
+                }
+            } finally { first.close(); second.close(); client.close() }
         }
-        val first = service()
-        val second = service()
+    }
+
+    @Test
+    fun deletionAtTheAtomicCommitReportsRemovedRatherThanDeferred() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val at = Instant.fromEpochSeconds(1_800_000_000)
+        val store = Store().apply { addCredential(StoredCredential("resident", issuer.credential())) }
+        val client = HttpClient(MockEngine { respond(issuer.list(), headers = headersOf(HttpHeaders.ContentType, "application/statuslist+jwt")) })
+        val service = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, trustPolicyId = "test-v1", parentScope = backgroundScope)
+        store.beforeSave = { store.removeCredential("resident") }
         try {
-            val older = async { first.refresh(mode = CredentialStatusRefreshMode.FORCE) }
-            waiting.await()
-            at += 1.seconds
-            body = issuer.list(value = 1u)
-            second.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            resume.complete(Unit)
-            older.await()
-            service().use { cold ->
-                assertEquals(CredentialStatusKind.INVALID, cold.snapshot().credentials.single().presentation.kind)
-            }
-        } finally { first.close(); second.close(); client.close() }
+            assertEquals(CredentialStatusRefreshOutcome.REMOVED, service.refresh(mode = CredentialStatusRefreshMode.FORCE).single().outcome)
+            assertTrue(service.snapshot().credentials.isEmpty())
+            assertTrue(store.snapshots.isEmpty())
+        } finally { service.close(); client.close() }
     }
 
     @Test
