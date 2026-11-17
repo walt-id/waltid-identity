@@ -13,8 +13,10 @@ import kotlin.test.*
 import kotlin.time.Instant
 
 class PublicIssuanceSessionTest {
+    private val redactedIssuerKey = buildJsonObject { put("type", "redacted") }
+
     @Test
-    fun `single session JSON equals the baseline serializer with every optional-field mode`() {
+    fun `single session keeps the historical JSON shape with the key redacted`() {
         for (defaults in listOf(false, true)) for (nulls in listOf(false, true)) for (completed in listOf(false, true)) {
             val json = Json { encodeDefaults = defaults; explicitNulls = nulls }
             val baseline = baseline().copy(
@@ -23,8 +25,10 @@ class PublicIssuanceSessionTest {
             )
             val original = json.encodeToJsonElement(baseline)
             val session = IssuanceSessionStorageCodec.decode(original.toString())
-            assertEquals(original, session.toPublicJson(json))
-            assertEquals(original, json.encodeToJsonElement(PublicIssuanceSession(session)))
+            val expected = json.encodeToJsonElement(baseline.copy(issuerKey = redactedIssuerKey))
+            assertEquals(expected, session.toPublicJson(json))
+            assertEquals(expected, json.encodeToJsonElement(PublicIssuanceSession(session)))
+            assertEquals(baseline.issuerKey, session.issuanceRequests.single().issuerKey)
         }
     }
 
@@ -43,10 +47,20 @@ class PublicIssuanceSessionTest {
                 assertEquals(JsonArray(keys), view["expectedCredentialProofKeyJwks"])
             }
         }
-        val requests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B")
+        val managedKey = buildJsonObject {
+            put("type", "tse")
+            put("accessToken", "synthetic-token")
+        }
+        val requests = session.issuanceRequests + session.issuanceRequests.single().copy(
+            credentialIdentifier = "B",
+            issuerKey = managedKey,
+        )
         val narrowed = session.copy(issuanceRequests = requests, authorizedCredentialIdentifiers = listOf("configuration"))
         val view = narrowed.toPublicJson()
-        assertEquals(2, assertNotNull(view["issuanceRequests"]).jsonArray.size)
+        val publicRequests = assertNotNull(view["issuanceRequests"]).jsonArray
+        assertEquals(2, publicRequests.size)
+        publicRequests.forEach { assertEquals(redactedIssuerKey, it.jsonObject["issuerKey"]) }
+        assertEquals(managedKey, narrowed.issuanceRequests.last().issuerKey)
         assertFalse(view.containsKey("profileId"))
         assertEquals(JsonArray(listOf(JsonPrimitive("configuration"))), view["authorizedCredentialIdentifiers"])
     }

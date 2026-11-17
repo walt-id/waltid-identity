@@ -22,6 +22,7 @@ import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.mdoc.dataelement.json.JsonElementToCborMappingConfig
@@ -403,12 +404,13 @@ class Issuer2CredentialOfferEndpointTest {
             )
         )
 
-        // Runtime overrides are offer-scoped; they must be copied into the stored session
-        // without changing the configured profile.
         val session = client.getSession(response.offerId)
         val issuanceRequest = session.issuanceRequests.single()
+        val redactedKey = buildJsonObject { put("type", "redacted") }
+        assertTrue(issuanceRequest.issuerKey == redactedKey, "Session detail should mask the override key")
+        val listedRequest = client.listSessions().single { it.sessionId == response.offerId }.issuanceRequests.single()
+        assertTrue(listedRequest.issuerKey == redactedKey, "Session list should mask the override key")
         assertEquals("did:example:issuer-override", issuanceRequest.issuerDid)
-        assertEquals(issuerKeyOverride, issuanceRequest.issuerKey)
         assertEquals("Jane", issuanceRequest.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("<timestamp>", issuanceRequest.mapping?.get("iat")?.jsonPrimitive?.content)
         val sessionSelectiveDisclosure = assertNotNull(issuanceRequest.selectiveDisclosure)

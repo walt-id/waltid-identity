@@ -188,6 +188,20 @@ class Wallet2AuthIntegrationTest {
                     setBody(mapOf("email" to email2, "password" to password2))
                 }.body<AuthSessionInformation>().token!!
             }
+            testAndReturn("Wallet listing is scoped to the authenticated account") {
+                val ownedWallets = http.get("/wallet") { bearerAuth(token) }
+                    .also { assertEquals(HttpStatusCode.OK, it.status) }
+                    .body<List<String>>()
+                assertEquals(listOf(walletId), ownedWallets)
+
+                val emptyAccountWallets = http.get("/wallet") { bearerAuth(token2) }
+                    .also { assertEquals(HttpStatusCode.OK, it.status) }
+                    .body<List<String>>()
+                assertEquals(emptyList(), emptyAccountWallets)
+            }
+            testAndReturn("Wallet listing without a token returns 401") {
+                assertEquals(HttpStatusCode.Unauthorized, http.get("/wallet").status)
+            }
             testAndReturn("Second account cannot access first account's wallet → 403") {
                 http.get("/wallet/$walletId") {
                     bearerAuth(token2)

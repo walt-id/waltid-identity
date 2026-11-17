@@ -80,12 +80,13 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 }
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
-    val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
+    val publicRequests = issuanceRequests.map { it.copy(issuerKey = REDACTED_ISSUER_KEY) }
+    val encoded = JsonObject(json.encodeToJsonElement(copy(issuanceRequests = publicRequests)).jsonObject - buildSet {
         add("deferredState")
         add("issuanceClaimId")
         if (deferredStatus == null) add("deferredStatus")
     })
-    if (issuanceRequests.size != 1) {
+    if (publicRequests.size != 1) {
         val results = encoded["issuanceResults"] as? JsonObject ?: return encoded
         return JsonObject(encoded + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
             val fields = (value.jsonObject - "walletNotification").toMutableMap()
@@ -100,7 +101,7 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
             JsonObject(fields)
         })))
     }
-    val request = issuanceRequests.single()
+    val request = publicRequests.single()
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
     fields.putAll(
