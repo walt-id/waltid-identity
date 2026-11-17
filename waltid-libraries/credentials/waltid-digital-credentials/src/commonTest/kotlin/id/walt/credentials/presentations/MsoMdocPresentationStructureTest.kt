@@ -63,6 +63,15 @@ class MsoMdocPresentationStructureTest {
     }
 
     @Test
+    fun `tagged duplicate response keys cannot shadow model fields`() = runTest {
+        val encoded = coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", arrayOf(document), status = 0u))
+        val end = if (encoded[0] == 0xbf.toByte()) encoded.lastIndex else encoded.size
+        val duplicated = byteArrayOf(0xbf.toByte()) + "d9d9f76776657273696f6e63392e30".hexToByteArray() +
+            encoded.copyOfRange(1, end) + byteArrayOf(0xff.toByte())
+        assertTrue(MsoMdocPresentation.parse(Base64.UrlSafe.encode(duplicated)).isFailure)
+    }
+
+    @Test
     fun `malformed CBOR fails without exposing the submitted value`() = runTest {
         val input = "PRIVATE-CREDENTIAL-CONTENT!"
         val failure = MsoMdocPresentation.parse(input).exceptionOrNull()
