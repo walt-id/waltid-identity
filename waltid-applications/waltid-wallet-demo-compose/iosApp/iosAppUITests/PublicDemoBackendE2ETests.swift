@@ -155,23 +155,32 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         captureHost("Nearby compact choices")
         ui.tapButton(identifier: "proximity-connection-options", fallbackLabel: "Connection options")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsProximityDefault"].waitForExistence(timeout: 10))
+        var expandedTops: [CGFloat] = []
         let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            sheet.frame.minY < compactTop - 40
+            let top = sheet.frame.minY
+            expandedTops.append(top)
+            return top < compactTop - 40
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed,
+            "Nearby options did not expand: initial title y=\(compactTop), observed y=\(expandedTops)")
         captureHost("Nearby connection options")
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        var collapsedTops: [CGFloat] = []
         let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            abs(sheet.frame.minY - compactTop) <= 2
+            let top = sheet.frame.minY
+            collapsedTops.append(top)
+            return abs(top - compactTop) <= 2
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed,
+            "Nearby choices did not restore compact geometry: initial title y=\(compactTop), observed y=\(collapsedTops)")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Nearby options return")
         ui.tapButton(identifier: "wallet.proximityCancelButton", fallbackLabel: "Close nearby sharing")
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
             object: app.descendants(matching: .any)["wallet.proximityScreen"])
-        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 10), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 10), .completed,
+            "Nearby sharing did not close after its Close action")
         assertHome(app)
     }
 
@@ -382,8 +391,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
         XCTAssertTrue(changed)
         XCTAssertEqual(notice.label, "PIN changed")
-        app.terminate()
-        app.launch()
+        XCTContext.runActivity(named: "Terminate after changing PIN") { _ in app.terminate() }
+        XCTContext.runActivity(named: "Relaunch with the saved PIN") { _ in app.launch() }
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
         input.typeText("1234")
@@ -531,6 +540,11 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertFalse(submitStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(submitStatus)")
         XCTAssertFalse(submitStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(submitStatus)")
 
+        let presentationDone = app.buttons["wallet.presentationDone"]
+        XCTAssertTrue(presentationDone.waitForExistence(timeout: credentialOperationTimeout))
+        // Retain the receipt before remote verification can consume its idle-dismissal window.
+        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
         try await backend.waitForVerifierSuccess(
             sessionID: session.sessionID,
             timeoutSeconds: presentationOperationTimeout
@@ -544,9 +558,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             XCTAssertFalse(presentStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(presentStatus)")
             XCTAssertFalse(presentStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus)")
         }
-        XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: credentialOperationTimeout))
-        // Touching the blank receipt content keeps it open for explicit completion.
-        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(presentationDone.exists, "The touched sharing result must remain open until Done")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Sharing result")
         ui.tapButton(identifier: "wallet.presentationDone", fallbackLabel: "Done")
