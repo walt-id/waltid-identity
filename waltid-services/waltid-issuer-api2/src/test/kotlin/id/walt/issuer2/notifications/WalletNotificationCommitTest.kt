@@ -35,6 +35,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -46,6 +47,8 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 
 class WalletNotificationCommitTest {
+    private val singleCredentialGrant = Json.parseToJsonElement("""{"sub":"session","authorization_details":[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["credential"]}]}""").jsonObject
+
     @Test
     fun `cancellation as committed save returns never restores the old snapshot`() = runTest {
         val repository = RecordingRepository()
@@ -108,9 +111,13 @@ class WalletNotificationCommitTest {
             if (reportSaving.complete(Unit)) resumeReport.await()
         }
 
-        val service = protocolService(repository)
+        val service = protocolService(repository, singleCredentialGrant)
         val report = async {
-            service.processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "deferred-notification")
+            val response = service.processNotificationRequest(
+                listOf("Bearer token"), emptyList(), "{}", "deferred-notification",
+            )
+            assertTrue(reportSaving.isCompleted, "Notification returned ${response.status} before saving")
+            response
         }
         reportSaving.await()
         val progress = buildJsonObject { put("checkpoint", "saved") }
@@ -131,11 +138,10 @@ class WalletNotificationCommitTest {
 
     @Test
     fun `batch notifications respect narrowed tokens and established selection`() = runTest {
-        val grant = Json.parseToJsonElement("""{"sub":"session","authorization_details":[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["credential"]}]}""").jsonObject
         for ((claims, selected, expectedStatus) in listOf(
             Triple(buildJsonObject { put("sub", "session") }, listOf("credential"), 400),
-            Triple(grant, listOf("other"), 400),
-            Triple(grant, listOf("credential", "other"), 204),
+            Triple(singleCredentialGrant, listOf("other"), 400),
+            Triple(singleCredentialGrant, listOf("credential", "other"), 204),
         )) {
             val repository = RecordingRepository()
             val original = assertNotNull(repository.current)
