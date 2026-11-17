@@ -221,19 +221,26 @@ class CredentialStatusResolver(
         val results = discovery.metadata.entries.associateByTo(linkedMapOf(), CredentialStatusEntry::referenceId)
         val notPersistent = mutableSetOf<String>()
         for (reference in discovery.references) {
+            val representation = when (reference.protocol) {
+                StatusProtocol.TOKEN_STATUS_LIST -> if (authenticated is SdJwtCredential) StatusListRepresentation.TOKEN_JWT
+                    else StatusListRepresentation.TOKEN_JWT_OR_CWT
+                StatusProtocol.ISO_MSO_STATUS_LIST -> StatusListRepresentation.TOKEN_CWT
+                StatusProtocol.BITSTRING_STATUS_LIST, StatusProtocol.STATUS_LIST_2021 -> StatusListRepresentation.VC_JWT
+            }
+            val request = StatusListRequest(reference.entry.uri, representation)
             var resource: StatusListResource? = null
             results[reference.id] = try {
-                resource = transport.fetch(reference.entry.uri, force, session)
+                resource = transport.fetch(request, force, session)
                 if (!resource.storageAllowed) notPersistent += reference.id
                 val entry = evaluate(authenticated, reference, resource)
-                transport.constrain(reference.entry.uri, resource.bodyId, requireNotNull(entry.lastObservation()).freshUntil)
+                transport.constrain(request, resource.bodyId, requireNotNull(entry.lastObservation()).freshUntil)
                 entry
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Throwable) {
                 val reason = failure(cause, if (resource == null) CheckFailure.Reason.TRANSPORT else CheckFailure.Reason.INVALID_LIST)
                 if (reason != CheckFailure.Reason.TRANSPORT && reason != CheckFailure.Reason.TIMEOUT && reason !is CheckFailure.RateLimited) {
-                    resource?.let { transport.invalidate(reference.entry.uri, it.bodyId) }
+                    resource?.let { transport.invalidate(request, it.bodyId) }
                 }
                 reference.status.withFailure(reason, now())
             }
@@ -241,7 +248,7 @@ class CredentialStatusResolver(
         return CredentialStatusResolution(CredentialStatus.references(results.values.toList()), notPersistent)
     }
 
-    /** A bounded batch revalidates each unique list once, even with an immediate response. */
+    /** A bounded batch revalidates each list/representation once, even with an immediate response. */
     fun newRefreshSession(): CredentialStatusRefreshSession = transport.refreshSession()
 
     suspend fun clear() {

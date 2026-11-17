@@ -67,6 +67,16 @@ internal data class StatusListResource(
     val bodyId: String,
 )
 
+internal enum class StatusListRepresentation(val accept: String) {
+    TOKEN_JWT("application/statuslist+jwt"),
+    TOKEN_CWT("application/statuslist+cwt"),
+    TOKEN_JWT_OR_CWT("application/statuslist+jwt, application/statuslist+cwt"),
+    VC_JWT("application/vc+jwt"),
+}
+
+/** Negotiated bytes and their validators belong to both the endpoint and the requested representation. */
+internal data class StatusListRequest(val uri: String, val representation: StatusListRepresentation)
+
 /**
  * One instance belongs to one wallet/trust partition. Byte reuse never implies signer authorization.
  * The caller owns the scope and dedicated, unauthenticated HTTP client. Redirects are rejected.
@@ -93,31 +103,31 @@ internal class StatusListTransport(
     private class Flight(val result: Deferred<Result<StatusListResource>>, var owners: Int = 0)
 
     private val mutex = Mutex()
-    private val cache = linkedMapOf<String, Cached>()
-    private val flights = mutableMapOf<String, Flight>()
+    private val cache = linkedMapOf<StatusListRequest, Cached>()
+    private val flights = mutableMapOf<StatusListRequest, Flight>()
     private val rateLimits = mutableMapOf<String, Instant>()
     private var overflowRetryAt: Instant? = null
     private val permits = Semaphore(limits.concurrency)
 
-    suspend fun fetch(uri: String, force: Boolean, session: CredentialStatusRefreshSession? = null): StatusListResource {
-        requireStatusEndpoint(uri)
+    suspend fun fetch(request: StatusListRequest, force: Boolean, session: CredentialStatusRefreshSession? = null): StatusListResource {
+        requireStatusEndpoint(request.uri)
         val flight = mutex.withLock {
             require(session == null || session.owner === this) { "Refresh session belongs to another resolver" }
-            session?.cached(uri)?.let { return it.getOrThrow() }
+            session?.cached(request)?.let { return it.getOrThrow() }
             val at = now()
             rateLimits.entries.removeAll { it.value <= at }
-            rateLimits[uri]?.let { fail(CheckFailure.RateLimited(it)) }
-            val stored = cache[uri]
+            rateLimits[request.uri]?.let { fail(CheckFailure.RateLimited(it)) }
+            val stored = cache[request]
             if (!force && stored != null && !stored.revalidate &&
                 at >= stored.resource.retrievedAt && at < stored.resource.freshUntil
             ) return stored.resource
             overflowRetryAt?.takeIf { it > at }?.let { fail(CheckFailure.RateLimited(it)) }
             overflowRetryAt = null
-            flights.getOrPut(uri) {
+            flights.getOrPut(request) {
                 Flight(scope.async(start = CoroutineStart.LAZY) {
                     runStatusCheck {
                     permits.withPermit {
-                        withTimeoutOrNull(limits.requestTimeout) { download(uri) }
+                        withTimeoutOrNull(limits.requestTimeout) { download(request) }
                             ?: fail(CheckFailure.Reason.TIMEOUT)
                     }
                     }
@@ -126,17 +136,17 @@ internal class StatusListTransport(
         }
         flight.result.start()
         return try {
-            flight.result.await().getOrThrow().also { resource -> mutex.withLock { session?.remember(uri, Result.success(resource)) } }
+            flight.result.await().getOrThrow().also { resource -> mutex.withLock { session?.remember(request, Result.success(resource)) } }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            mutex.withLock { session?.remember(uri, Result.failure(failure)) }
+            mutex.withLock { session?.remember(request, Result.failure(failure)) }
             throw failure
         } finally {
             withContext(NonCancellable) { mutex.withLock {
                 flight.owners--
-                if (flight.owners == 0 && flights[uri] === flight) {
-                    flights.remove(uri)
+                if (flight.owners == 0 && flights[request] === flight) {
+                    flights.remove(request)
                     if (!flight.result.isCompleted) flight.result.cancel()
                 }
             } }
@@ -145,14 +155,14 @@ internal class StatusListTransport(
 
     fun refreshSession(): CredentialStatusRefreshSession = CredentialStatusRefreshSession(this, now, limits)
 
-    suspend fun constrain(uri: String, bodyId: String, deadline: Instant) = mutex.withLock {
-        cache[uri]?.takeIf { it.resource.bodyId == bodyId }?.let {
-            if (deadline < it.resource.freshUntil) cache[uri] = it.copy(resource = it.resource.copy(freshUntil = deadline))
+    suspend fun constrain(request: StatusListRequest, bodyId: String, deadline: Instant) = mutex.withLock {
+        cache[request]?.takeIf { it.resource.bodyId == bodyId }?.let {
+            if (deadline < it.resource.freshUntil) cache[request] = it.copy(resource = it.resource.copy(freshUntil = deadline))
         }
     }
 
-    suspend fun invalidate(uri: String, bodyId: String) = mutex.withLock {
-        if (cache[uri]?.resource?.bodyId == bodyId) cache.remove(uri)
+    suspend fun invalidate(request: StatusListRequest, bodyId: String) = mutex.withLock {
+        if (cache[request]?.resource?.bodyId == bodyId) cache.remove(request)
     }
 
     suspend fun clear() = mutex.withLock {
@@ -163,14 +173,15 @@ internal class StatusListTransport(
         overflowRetryAt = null
     }
 
-    private suspend fun download(uri: String): StatusListResource {
-        val previous = mutex.withLock { cache[uri] }
+    private suspend fun download(request: StatusListRequest): StatusListResource {
+        val uri = request.uri
+        val previous = mutex.withLock { cache[request] }
         var conditional = previous != null
         repeat(2) {
             val startedAt = now()
             val resource = client.prepareGet(uri) {
                 attributes.put(StatusOriginalUrl, Url(uri))
-                header(HttpHeaders.Accept, "application/statuslist+jwt, application/statuslist+cwt, application/vc+jwt")
+                header(HttpHeaders.Accept, request.representation.accept)
                 header(HttpHeaders.CacheControl, "no-cache")
                 // A status-list request must never inherit the wallet API's credentials.
                 headers.remove(HttpHeaders.Authorization)
@@ -232,7 +243,8 @@ internal class StatusListTransport(
                 }
                 val lifetime = minOf(maxAge?.seconds ?: expires?.let { (it - (date ?: receivedAt)).coerceAtLeast(Duration.ZERO) }
                     ?: limits.fallbackFreshness, limits.maximumFreshness)
-                val freshUntil = if (revalidate || !storageAllowed) receivedAt else
+                // no-cache requires another HTTP validation, not immediate expiry of the observation.
+                val freshUntil = if (!storageAllowed) receivedAt else
                     receivedAt + (lifetime - correctedAge).coerceAtLeast(Duration.ZERO)
                 val content = if (notModified) requireNotNull(previous).resource.content else {
                     if (response.contentType()?.contentSubtype == "statuslist+cwt") StatusListContent.Binary(bytes)
@@ -240,9 +252,9 @@ internal class StatusListTransport(
                 }
                 val resource = StatusListResource(content, receivedAt, freshUntil, storageAllowed, fingerprint(bytes))
                 mutex.withLock {
-                    cache.remove(uri)
+                    cache.remove(request)
                     if (storageAllowed) {
-                        cache[uri] = Cached(resource, bytes,
+                        cache[request] = Cached(resource, bytes,
                             response.headers[HttpHeaders.ETag] ?: if (notModified) previous?.etag else null,
                             response.headers[HttpHeaders.LastModified] ?: if (notModified) previous?.modified else null,
                             revalidate, controls)

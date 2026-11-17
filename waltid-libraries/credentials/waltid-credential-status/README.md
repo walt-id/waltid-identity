@@ -18,6 +18,9 @@ The W3C wallet profile requires at least 131,072 entries, so its minimum expande
 `statusSize`. A supplied list credential ID must match the referenced URL; the ID may be omitted.
 Signed one-or-more purposes are matched exactly, and declared list/entry sizes must agree.
 Other methods and unsupported proof forms are explicit results. They are never treated as clear.
+SD-JWT VC requests only JWT status-list tokens; the ISO MSO profile requests only CWT.
+Generic Token Status List references accept JWT or CWT, while W3C profiles request VC JWT.
+Negotiation does not replace signature, authority or profile validation of the returned list.
 Standards references: [Token Status List draft 21](https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-21.html)
 and [Bitstring Status List v1.0](https://www.w3.org/TR/2025/REC-vc-bitstring-status-list-20250515/).
 This is a profile list, not a claim of full ISO, EUDI or W3C proof-suite conformance.
@@ -69,10 +72,12 @@ caller's ownership of coalesced work; the last owner cancels it.
 
 Freshness is capped by signed validity, list TTL, HTTP freshness and the local maximum (one hour).
 The local fallback is 15 minutes. W3C TTL is milliseconds; Token Status List TTL is seconds.
+Body caches, conditional validators, coalesced requests and batch reuse are scoped to the URL and
+accepted representation. Endpoint backoff remains shared across representations.
 Force bypasses freshness reuse for eligible work and supports conditional requests; validity,
 backoff and host execution limits still apply. A 304 cannot extend signed
-validity; a 304 without a reusable body causes an unconditional retry. `no-cache` requires
-revalidation; `no-store` forbids body reuse after the active batch and persisted observations from
+validity; a 304 without a reusable body causes an unconditional retry. `no-cache` requires HTTP
+revalidation without itself expiring a newly checked observation; `no-store` forbids body reuse after the active batch and persisted observations from
 that response. Rate limiting and resource limits return typed failures.
 
 An explicit `CredentialStatusRefreshSession` can share authenticated response bytes within one

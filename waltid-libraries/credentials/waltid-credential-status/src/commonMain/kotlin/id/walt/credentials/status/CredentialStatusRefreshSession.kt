@@ -17,7 +17,7 @@ class CredentialStatusRefreshSession internal constructor(
 ) {
     private val deadline = now() + limits.resolutionTimeout
     private val mutex = Mutex()
-    private val resources = linkedMapOf<String, Result<StatusListResource>>()
+    private val resources = linkedMapOf<StatusListRequest, Result<StatusListResource>>()
     private var closing = false
     private var active = 0
     private var bytes = 0L
@@ -38,15 +38,15 @@ class CredentialStatusRefreshSession internal constructor(
         if (closing && active == 0) clear()
     }
 
-    internal suspend fun cached(uri: String): Result<StatusListResource>? = mutex.withLock { resources[uri] }
+    internal suspend fun cached(request: StatusListRequest): Result<StatusListResource>? = mutex.withLock { resources[request] }
 
-    internal suspend fun remember(uri: String, result: Result<StatusListResource>) = mutex.withLock {
+    internal suspend fun remember(request: StatusListRequest, result: Result<StatusListResource>) = mutex.withLock {
         val size = result.getOrNull()?.content?.let { when (it) {
             is StatusListContent.Text -> it.content.length.toLong() * 2
             is StatusListContent.Binary -> it.content.size.toLong()
         } } ?: 0L
-        if (uri !in resources && resources.size < limits.maxCachedLists && size <= limits.maxCachedBytes - bytes) {
-            resources[uri] = result
+        if (request !in resources && resources.size < limits.maxCachedLists && size <= limits.maxCachedBytes - bytes) {
+            resources[request] = result
             bytes += size
         }
     }

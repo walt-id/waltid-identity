@@ -1,6 +1,8 @@
 package id.walt.credentials.status
 
 import kotlin.time.Duration.Companion.milliseconds
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.formats.W3C11
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngineConfig
@@ -32,6 +34,43 @@ import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 class CredentialStatusResolverTest {
+    @Test
+    fun sdJwtRequestsOnlyJwtAndStillRejectsAnUnrequestedCwtResponse() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val credential = assertIs<SdJwtCredential>(CredentialParser.detectAndParse(issuer.sign(buildJsonObject {
+            put("iss", issuer.did); put("vct", "urn:example:pid"); put("exp", 4_000_000_000)
+            putJsonObject("status") { putJsonObject("status_list") { put("idx", 0); put("uri", issuer.uri) } }
+        }, "dc+sd-jwt") + "~").second)
+        val jwt = issuer.list()
+        var ignoreAccept = false
+        val accepts = mutableListOf<String?>()
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { request ->
+                val accept = request.headers[HttpHeaders.Accept]
+                accepts += accept
+                // Match the EUDI endpoint: advertising CWT selects it, regardless of JWT's order.
+                val cwt = ignoreAccept || accept.orEmpty().contains("application/statuslist+cwt")
+                respond(if (cwt) byteArrayOf(0xd2.toByte(), 0x80.toByte()) else jwt.encodeToByteArray(), headers = Headers.build {
+                    append(HttpHeaders.ContentType, if (cwt) "application/statuslist+cwt" else "application/statuslist+jwt")
+                    append(HttpHeaders.Vary, "Accept")
+                    append(HttpHeaders.CacheControl, "no-cache")
+                })
+            }
+        }))
+        val resolver = CredentialStatusResolver(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) })
+        try {
+            val entry = resolver.resolve(credential).metadata.entries.single()
+            assertEquals(StatusMeaning.CLEAR, entry.meaning, entry.failure?.toString())
+            assertEquals(CredentialStatusKind.CHECKED,
+                CredentialStatus.references(listOf(entry)).presentation(Instant.fromEpochSeconds(1_800_000_000)).kind)
+            assertEquals(listOf<String?>("application/statuslist+jwt"), accepts)
+            ignoreAccept = true
+            assertEquals(CheckFailure.Reason.UNSUPPORTED_PROOF,
+                resolver.resolve(credential, force = true).metadata.entries.single().failure)
+        } finally { resolver.close(); client.close() }
+    }
+
     @Test
     fun authenticatedFractionalTokenTimesReachTheSharedParserWithoutTruncation() = runTest {
         val issuer = StatusTestIssuer.create()
@@ -234,7 +273,10 @@ class CredentialStatusResolverTest {
         var body = issuer.w3cList()
         val client = HttpClient(MockEngine(MockEngineConfig().apply {
             dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { respond(body, headers = Headers.build { append(HttpHeaders.ContentType, "application/vc+jwt") }) }
+            addHandler { request ->
+                assertEquals("application/vc+jwt", request.headers[HttpHeaders.Accept])
+                respond(body, headers = Headers.build { append(HttpHeaders.ContentType, "application/vc+jwt") })
+            }
         }))
         val resolver = CredentialStatusResolver(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) })
         try {
@@ -323,7 +365,9 @@ class CredentialStatusResolverTest {
         var requests = 0
         val client = HttpClient(MockEngine(MockEngineConfig().apply {
             dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { requests++; respond(issuer.w3cList(legacy = true, purpose = "refresh", value = 1u),
+            addHandler { request ->
+                assertEquals("application/vc+jwt", request.headers[HttpHeaders.Accept])
+                requests++; respond(issuer.w3cList(legacy = true, purpose = "refresh", value = 1u),
                 headers = Headers.build { append(HttpHeaders.ContentType, "application/vc+jwt") }) }
         }))
         val resolver = CredentialStatusResolver(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) })
@@ -343,7 +387,10 @@ class CredentialStatusResolverTest {
         val issuer = StatusTestIssuer.create()
         val client = HttpClient(MockEngine(MockEngineConfig().apply {
             dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { respond(issuer.list(value = 4u, bits = 4), headers = Headers.build { append(HttpHeaders.ContentType, "application/statuslist+jwt") }) }
+            addHandler { request ->
+                assertEquals("application/statuslist+jwt, application/statuslist+cwt", request.headers[HttpHeaders.Accept])
+                respond(issuer.list(value = 4u, bits = 4), headers = Headers.build { append(HttpHeaders.ContentType, "application/statuslist+jwt") })
+            }
         }))
         val resolver = CredentialStatusResolver(client, backgroundScope, { Instant.fromEpochSeconds(1_800_000_000) })
         try {

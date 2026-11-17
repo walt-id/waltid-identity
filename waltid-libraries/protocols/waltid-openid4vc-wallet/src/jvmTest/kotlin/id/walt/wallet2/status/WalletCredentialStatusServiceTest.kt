@@ -19,6 +19,7 @@ import id.walt.credentials.status.hasConflict
 import id.walt.credentials.status.lastObservation
 import id.walt.credentials.status.meaning
 import id.walt.credentials.status.presentation
+import id.walt.credentials.status.withFailure
 import id.walt.credentials.formats.W3C11
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -60,6 +61,48 @@ import kotlin.time.Duration
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class WalletCredentialStatusServiceTest {
+    @Test
+    fun defaultWalletReopensUnsupportedProofFailuresAndCanRefreshWithoutReissuing() = runTest {
+        val issuer = StatusTestIssuer.create()
+        val credential = StoredCredential("resident", issuer.credential())
+        val store = Store().apply { addCredential(credential) }
+        var at = Instant.fromEpochSeconds(1_800_000_000)
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { requests++; respond(issuer.list(), headers = headersOf(HttpHeaders.ContentType, "application/statuslist+jwt")) }
+        }))
+        fun service() = WalletCredentialStatusService(Wallet("wallet", credentialStores = listOf(store)), client,
+            now = { at }, parentScope = backgroundScope)
+        try {
+            val unchecked = service().use {
+                val entry = it.snapshot().credentials.single().status.entries.single()
+                it.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                entry
+            }
+            val saved = assertNotNull(store.snapshots[credential.id])
+            val observed = assertIs<CredentialStatusEntry.Token>(saved.metadata.entries.single())
+            for (prior in listOf(observed, unchecked)) {
+                store.snapshots[credential.id] = saved.copy(metadata = CredentialStatus.references(listOf(
+                    prior.withFailure(CheckFailure.Reason.UNSUPPORTED_PROOF, at),
+                )))
+                at += 1.seconds
+                service().use { reopened ->
+                    val before = requests
+                    val restored = reopened.snapshot().credentials.single()
+                    assertEquals(CredentialStatusRefreshAction.CHECK, restored.presentation.action)
+                    assertNull(restored.status.entries.single().failure)
+                    assertEquals(prior.lastObservation()?.checkedAt, restored.status.entries.single().lastObservation()?.checkedAt)
+                    assertEquals(before, requests, "Restore must remain local")
+                    reopened.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                    assertEquals(before + 1, requests)
+                    assertEquals(StatusMeaning.CLEAR, reopened.snapshot().credentials.single().status.entries.single().meaning)
+                    assertEquals(credential, store.getCredential(credential.id), "Recovery must preserve the issued credential")
+                }
+            }
+        } finally { client.close() }
+    }
+
     @Test
     fun singleCredentialReadsUseDirectLookupAndKeepFirstStorePrecedence() = runTest {
         val credential = StoredCredential("resident", StatusTestIssuer.create().credential(), label = "first")

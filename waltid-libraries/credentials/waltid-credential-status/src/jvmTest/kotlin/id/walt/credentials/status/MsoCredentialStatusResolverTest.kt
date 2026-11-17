@@ -108,7 +108,9 @@ class MsoCredentialStatusResolverTest {
         var requests = 0
         val client = HttpClient(MockEngine(MockEngineConfig().apply {
             dispatcher = StandardTestDispatcher(testScheduler)
-            addHandler { requests++; respond(body, headers = Headers.build {
+            addHandler { request ->
+                assertEquals("application/statuslist+cwt", request.headers[HttpHeaders.Accept])
+                requests++; respond(body, headers = Headers.build {
                 append(HttpHeaders.ContentType, "application/statuslist+cwt")
             }) }
         }))
