@@ -107,8 +107,8 @@ internal object DataElementSerializer : KSerializer<DataElement> {
         when (value.type) {
             DEType.number -> when (value.internalValue) {
                 is Int, is Long, is Short, is UInt -> encoder.encodeLong((value.internalValue as Number).toLong())
-                is Float -> encoder.encodeFloat(value.internalValue.toFloat())
-                is Double -> encoder.encodeDouble(value.internalValue.toDouble())
+                is Float -> encoder.encodeFloat(value.internalValue)
+                is Double -> encoder.encodeDouble(value.internalValue)
             }
 
             DEType.boolean -> encoder.encodeBoolean(value.internalValue as Boolean)
@@ -155,8 +155,6 @@ internal object DataElementSerializer : KSerializer<DataElement> {
                     DEDateTimeMode.time_double -> encoder.encodeDouble(
                         dateTime.value.toEpochMilliseconds().toDouble() / 1000.0
                     )
-
-                    else -> {} // not possible
                 }
             }
         }

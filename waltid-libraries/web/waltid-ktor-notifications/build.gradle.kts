@@ -6,6 +6,10 @@ plugins {
 group = "id.walt.web"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     sourceSets {
         commonMain.dependencies {
             // Coroutines

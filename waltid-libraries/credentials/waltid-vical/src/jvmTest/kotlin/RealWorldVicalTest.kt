@@ -35,7 +35,7 @@ class RealWorldVicalTest {
             val certKey = certKeyResult.getOrNull()
             println("Key: $certKeyResult (${certKey?.getKeyId() ?: "Error"})")
         }
-        assertTrue { allowedIssuers.all { (certInfo, certKey) -> certKey.isSuccess } }
+        assertTrue(allowedIssuers.all { (certInfo, certKey) -> certKey.isSuccess })
         println("All keys successful. Allowed issuers per this VICAL: ${allowedIssuers.size}")
     }
 

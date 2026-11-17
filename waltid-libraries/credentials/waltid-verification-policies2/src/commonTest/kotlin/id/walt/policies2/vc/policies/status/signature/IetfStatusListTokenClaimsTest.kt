@@ -134,6 +134,7 @@ class IetfStatusListTokenClaimsTest {
         }.also { assertEquals("IETF status-list JWT typ must be statuslist+jwt", it.message) }
     }
 
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     @Test
     fun `cwt type must be protected header 16 as text or content format 279`() {
         IetfStatusListTokenClaims.requireCwtType(
@@ -194,6 +195,7 @@ class IetfStatusListTokenClaimsTest {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     @Test
     fun `cwt iat may be a fractional numeric date`() {
         IetfStatusListTokenClaims.validate(cwtIssuedAt(CborFloat(1_700_000_000.5)), uri, now)
@@ -229,7 +231,7 @@ class IetfStatusListTokenClaimsTest {
             signature = byteArrayOf(0),
         ).toTagged()
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     private fun cwtIssuedAt(iat: CborFloat): ByteArray =
         coseCompliantCbor.encodeToByteArray(
             CborElement.serializer(),

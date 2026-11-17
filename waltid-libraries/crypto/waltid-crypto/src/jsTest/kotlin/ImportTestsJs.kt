@@ -58,16 +58,17 @@ class ImportTestsJs {
         val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
 
         assertTrue(
-            "Error importing private JWK: ${
+            actual = privateKeyResult.isSuccess,
+            message = "Error importing private JWK: ${
                 privateKeyResult.exceptionOrNull()?.stackTraceToString()
-            }"
-        ) { privateKeyResult.isSuccess }
+            }",
+        )
 
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
 
         println("  Checking for private key...")
-        assertTrue { privateKey.hasPrivateKey }
+        assertTrue(privateKey.hasPrivateKey)
         println("  Checking for correct key type...")
         assertEquals(KeyType.RSA, privateKey.keyType)
 
@@ -84,13 +85,13 @@ class ImportTestsJs {
         val publicKeyResult = JWKKey.importJWK(publicKeyJwkString)
         println("  Checking import success...")
 
-        assertTrue("Error importing public JWK: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+        assertTrue(publicKeyResult.isSuccess, "Error importing public JWK: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}")
 
         println("  Getting public key...")
         val publicKey = publicKeyResult.getOrThrow()
 
         println("  Checking for private key...")
-        assertFalse { publicKey.hasPrivateKey }
+        assertFalse(publicKey.hasPrivateKey)
         println("  Checking for correct key type...")
         assertEquals(KeyType.RSA, publicKey.keyType)
 
@@ -114,15 +115,16 @@ class ImportTestsJs {
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
 
         assertTrue(
-            "Error importing private PEM: ${
+            actual = privateKeyResult.isSuccess,
+            message = "Error importing private PEM: ${
                 privateKeyResult.exceptionOrNull()?.stackTraceToString()
-            }"
-        ) { privateKeyResult.isSuccess }
+            }",
+        )
 
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
         println("  Checking for private key...")
-        assertTrue { privateKey.hasPrivateKey }
+        assertTrue(privateKey.hasPrivateKey)
         println("  Checking for correct key type...")
         assertEquals(KeyType.secp256r1, privateKey.keyType)
 
@@ -135,13 +137,13 @@ class ImportTestsJs {
         // Public
         println("Importing public PEM...")
         val publicKeyResult = JWKKey.importPEM(publicKeyPem)
-        println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
-        assertTrue("Error importing public PEM: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+        println("  Checking import success...${publicKeyResult.exceptionOrNull() ?: ""}")
+        assertTrue(publicKeyResult.isSuccess, "Error importing public PEM: ${publicKeyResult.exceptionOrNull()?.stackTraceToString()}")
 
         println("  Getting public key...")
         val publicKey = publicKeyResult.getOrThrow()
         println("  Checking for private key...")
-        assertFalse { publicKey.hasPrivateKey }
+        assertFalse(publicKey.hasPrivateKey)
         println("  Checking for correct key type...")
         assertEquals(KeyType.secp256r1, publicKey.keyType)
 

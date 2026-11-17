@@ -144,7 +144,10 @@ private suspend fun didProofKeys(jwt: String, kid: String): Set<PublicKeyThumbpr
             null
         }
     }.toSet()
-    return DidService.resolveToKeys(kid.substringBefore('#')).getOrThrow().filter { it.verifyJws(jwt).isSuccess }
+    // Custom legacy resolvers remain a fallback when no crypto2 resolver is available.
+    @Suppress("DEPRECATION")
+    val legacyKeys = DidService.resolveToKeys(kid.substringBefore('#'))
+    return legacyKeys.getOrThrow().filter { it.verifyJws(jwt).isSuccess }
         .map { it.getPublicKey().exportJWKObject().expectedThumbprint() }.toSet()
 }
 

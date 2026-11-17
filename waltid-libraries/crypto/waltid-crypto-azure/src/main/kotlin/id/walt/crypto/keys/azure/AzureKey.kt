@@ -26,7 +26,6 @@ class AzureKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
-    @Transient
     override var keyType: KeyType
         get() = _keyType!!
         set(value) {
