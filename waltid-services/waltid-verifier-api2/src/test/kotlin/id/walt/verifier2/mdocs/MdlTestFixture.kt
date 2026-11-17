@@ -40,7 +40,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Shared mDL test fixture, so the DC API round trip and the cross-device mdoc test verify the same
