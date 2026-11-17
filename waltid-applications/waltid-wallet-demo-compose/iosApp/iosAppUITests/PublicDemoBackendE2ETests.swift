@@ -148,8 +148,29 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         completePinOnlySetup(app, ui: ui)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Share nearby")
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        let nearby = app.descendants(matching: .any)["wallet.proximityScreen"]
+        let progress = app.descendants(matching: .any)["wallet.proximityStatus"]
+        let options = app.buttons["proximity-connection-options"]
         let sheet = app.descendants(matching: .any)["wallet.screen.title"]
+        var previousTop: CGFloat?
+        var stableSince = Date()
+        // Capability loading can replace the initial progress content with choices or
+        // prerequisites. Record the compact baseline after that content and resize settle.
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard nearby.exists && options.exists && options.isHittable && !progress.exists else {
+                previousTop = nil
+                return false
+            }
+            let top = sheet.frame.minY
+            if let previousTop, abs(top - previousTop) <= 2 {
+                return Date().timeIntervalSince(stableSince) >= 0.5
+            }
+            previousTop = top
+            stableSince = Date()
+            return false
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+            "Nearby capability content and compact geometry did not settle")
         let compactTop = sheet.frame.minY
         XCTAssertGreaterThan(compactTop, app.frame.height / 5, "Nearby choices must start compact")
         captureHost("Nearby compact choices")

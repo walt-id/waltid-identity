@@ -460,7 +460,11 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.proximityStartButton"].isHittable)
         ui.openScanner()
         XCTAssertFalse(app.buttons["wallet.scanContinue"].isEnabled)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         ui.returnToWallet()
+        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5),
+            "Closing the scanner must dismiss its keyboard before continuing on Home")
         XCTAssertTrue(app.buttons["wallet.proximityStartButton"].isHittable)
 
         ui.openWalletLink("openid4vp://mock")
