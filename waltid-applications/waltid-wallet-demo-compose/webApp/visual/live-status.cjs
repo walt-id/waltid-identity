@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { chromium, expect } = require('@playwright/test');
 const { clickControl, waitForSettledImage, revealReviewControl } = require('./browser-controls.cjs');
+const { readStatusResponse } = require('./status-response.cjs');
 
 const required = name => {
   const value = process.env[name];
@@ -65,11 +66,9 @@ async function run() {
   let requiredArtwork = [];
   let phase = 'bootstrap', admittedAt = Date.now(), verdict;
   let documentEpoch = 0;
-  const requestEpochs = new WeakMap();
   page.on('framenavigated', frame => {
     if (frame === page.mainFrame()) documentEpoch += 1;
   });
-  page.on('request', request => requestEpochs.set(request, documentEpoch));
   page.on('pageerror', error => errors.push(error.message));
   async function observeResponse(response) {
     const url = new URL(response.url());
@@ -80,24 +79,18 @@ async function run() {
     if (!url.pathname.startsWith('/wallet')) return;
     const body = response.request().postData();
     const item = { method: response.request().method(), path: url.pathname.replace(wallet.walletId, ':wallet'), status: response.status() };
-    const requestEpoch = requestEpochs.get(response.request());
     if (body) {
       item.requestDigest = digest(body);
       try { item.mode = JSON.parse(body).mode; } catch { /* Not every request body is JSON. */ }
     }
     try {
       if (url.pathname.includes('/credential-status')) {
-        item.projection = await response.json();
+        Object.assign(item, await readStatusResponse(response, item));
         if (url.pathname.endsWith('/refresh') && Array.isArray(item.projection) &&
           item.projection.some(result => result.outcome !== 'DEFERRED')) admittedAt = Date.now();
       }
     } catch (error) {
-      if (item.method === 'GET' && url.pathname.endsWith('/credential-status') &&
-          error.message.includes('Network.getResponseBody')) {
-        // Chromium may invalidate the old body before the navigation commit event arrives.
-        item.unreadablePoll = { requestDocumentEpoch: requestEpoch, observedDocumentEpoch: documentEpoch,
-          networkFailure: response.request().failure(), error: error.message };
-      } else errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
+      errors.push(`Unreadable status response at ${item.path}: ${error.message}`);
     } finally { requests.push(item); }
   }
   page.on('response', response => {
@@ -273,11 +266,6 @@ async function run() {
     // renderer can retain their ARIA mirror, so verify the actual undimmed Home control.
     await expectRemembered('scan', 15000);
     await Promise.all([...observations]);
-    for (const item of requests.filter(request => request.unreadablePoll)) {
-      if (Number.isInteger(item.unreadablePoll.requestDocumentEpoch) && item.unreadablePoll.requestDocumentEpoch < documentEpoch) {
-        item.observation = 'Completed main-frame navigation interrupted a previous document read-only poll';
-      } else errors.push(`Unreadable status response at ${item.path}: ${item.unreadablePoll.error}`);
-    }
     expect(errors).toEqual([]);
     expect(frames).toHaveLength(11);
     clean();
