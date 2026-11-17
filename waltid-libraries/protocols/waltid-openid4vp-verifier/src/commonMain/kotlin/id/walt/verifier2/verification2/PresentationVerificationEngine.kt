@@ -329,17 +329,19 @@ object PresentationVerificationEngine {
      * jwt_vc_json presentation can carry several. `trusted_authorities` is left to the caller's own check.
      * With [matchClaims] false only format and `meta` are matched, for ISO/IEC 18013-7 Annex C, whose query is
      * built from the requested elements and where a holder may withhold some of them.
+     * [enforceMdocDisclosure] applies OpenID4VP disclosure rules; external readers own their DeviceRequest.
      */
     internal fun matchCredentialsToQueries(
         dcqlQuery: DcqlQuery,
         credentialsByQuery: Map<String, List<DigitalCredential>>,
         matchClaims: Boolean,
         transactionData: List<String> = emptyList(),
+        enforceMdocDisclosure: Boolean = true,
     ): Result<Set<String>> {
         val mismatches = credentialsByQuery.mapNotNull { (queryId, credentials) ->
             val credentialQuery = dcqlQuery.credentials.single { it.id == queryId }
             val mismatch = credentialMismatch(credentialQuery, credentials, matchClaims)
-                ?: if (matchClaims) credentials.filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
+                ?: if (matchClaims && enforceMdocDisclosure) credentials.filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
                     unrequestedMdocClaim(dcqlQuery, credentialsByQuery, it, transactionData)
                 } else null
             mismatch?.let { queryId to it }
