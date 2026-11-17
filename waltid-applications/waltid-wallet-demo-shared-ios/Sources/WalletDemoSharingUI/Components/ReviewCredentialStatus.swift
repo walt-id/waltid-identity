@@ -21,8 +21,10 @@ public struct SharingSubmissionKey: Equatable {
     private let requestIdentity: AnyHashable
     private let review: SharingReviewModel
     private let selection: SharingSelection
-    public init(requestIdentity: AnyHashable, review: SharingReviewModel, selection: SharingSelection) {
+    private let claimReview: ClaimReviewState
+    public init(requestIdentity: AnyHashable, review: SharingReviewModel, selection: SharingSelection, claimReview: ClaimReviewState = .legacy) {
         self.requestIdentity = requestIdentity; self.review = review; self.selection = selection
+        self.claimReview = claimReview
     }
 }
 

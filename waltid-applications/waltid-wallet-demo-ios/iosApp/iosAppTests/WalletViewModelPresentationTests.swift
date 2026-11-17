@@ -13,19 +13,19 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         XCTAssertFalse(viewModel.claimReview.canConfirm)
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         let firstSubmissions = await client.submittedClaimSelections
         XCTAssertTrue(firstSubmissions.isEmpty)
         await preparation.fail(0)
         try await waitUntil { if case .failed = viewModel.claimReview { true } else { false } }
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         let failedSubmissions = await client.submittedClaimSelections
         XCTAssertTrue(failedSubmissions.isEmpty)
         viewModel.retryPresentationClaimReview()
         try await waitUntilAsync { await preparation.count == 2 }
         await preparation.complete(1)
         try await waitUntil { if case .ready = viewModel.claimReview { true } else { false } }
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
         let submissions = await client.submittedClaimSelections
         XCTAssertEqual(submissions.count, 1)
@@ -51,7 +51,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         observation.cancel()
         XCTAssertEqual(viewModel.claimReview, currentReview)
         let currentSelection = Array(viewModel.selectedPresentationDisclosureOptions)
-        viewModel.submitPresentation()
+        viewModel.submitPresentation(reviewedStatus: viewModel.credentialStatuses.mapValues { $0.presentation.advisoryRevision })
         try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
         let submissions = await client.submittedClaimSelections
         XCTAssertEqual(submissions, [currentSelection])

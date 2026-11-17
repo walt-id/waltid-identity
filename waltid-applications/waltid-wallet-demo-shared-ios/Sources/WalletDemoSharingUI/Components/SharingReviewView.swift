@@ -151,7 +151,7 @@ public struct SharingReviewView: View {
                     gate: submission,
                     selectionComplete: selectionComplete && isNormalized && claimReview.canConfirm && requestIdentity != nil,
                     isLoading: isLoading,
-                    reviewKey: requestIdentity.map { SharingSubmissionKey(requestIdentity: $0, review: review, selection: selection) },
+                    reviewKey: requestIdentity.map { SharingSubmissionKey(requestIdentity: $0, review: review, selection: selection, claimReview: claimReview) },
                     credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
                     onSubmit: onSubmit,
                     onReject: onReject,

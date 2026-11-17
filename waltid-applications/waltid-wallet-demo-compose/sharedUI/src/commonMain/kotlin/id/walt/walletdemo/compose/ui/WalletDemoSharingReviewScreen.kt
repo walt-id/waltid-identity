@@ -72,7 +72,7 @@ fun WalletDemoSharingReviewScreen(
     CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses,
         contextKey = LocalCredentialStatusUi.current.contextKey ?: owner)) {
     val submission = rememberSharingSubmission(
-        reviewKey = listOf(owner, review, selection.credentials, selection.disclosures),
+        reviewKey = listOf(owner, review, state.information, selection.credentials, selection.disclosures),
         credentialStatuses = selectedReviewStatuses(information, selection.credentials, statuses),
         paymentReview = paymentReview,
         isPayment = review.request.transactionData.any { it.isPaymentTransaction },

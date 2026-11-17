@@ -1,8 +1,39 @@
 import XCTest
+import WalletSDK
 @testable import WalletDemoSharingUI
 
 @MainActor
 final class ReviewSubmissionGateTests: XCTestCase {
+    func testChangedClaimReviewInvalidatesStatusConfirmationWithTheSameSelection() throws {
+        let option = PresentationCredentialOption(queryID: "identity", credentialID: "card", format: "dc+sd-jwt",
+            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: #"{"name":"Ada"}"#, disclosures: [])
+        let review = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
+        let selection = SharingSelection(credentials: [option.selection], disclosures: [])
+        func key(_ claimsJSON: String) throws -> SharingSubmissionKey {
+            let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID,
+                credentialID: option.credentialID, format: option.format, claimsJSON: claimsJSON, wholeCredential: false,
+                locations: ["[]", #"["name"]"#].map {
+                    .init(sourcePathJSON: $0, receivedPathJSON: $0, sharedBy: [], alwaysCarried: true)
+                })])
+            let claims = try EffectivePresentationReview(prepared: prepared, model: review,
+                details: [CredentialDisplayNormalizer.details(for: option)], selection: selection)
+            return SharingSubmissionKey(requestIdentity: "request", review: review, selection: selection,
+                claimReview: .ready(claims))
+        }
+        let old = try key(#"{"name":"Ada"}"#), updated = try key(#"{"name":"Grace"}"#)
+        let gate = ReviewSubmissionGate<SharingSubmissionKey>()
+        var delivered = 0
+        let attempt = ReviewSubmissionGate<SharingSubmissionKey>.Attempt(key: old, revisions: ["card": "revoked"],
+            unsigned: false, message: "Revoked", affirmative: "Share anyway", submit: { _ in delivered += 1 })
+        gate.update(old, enabled: true)
+        gate.begin(attempt, needsConfirmation: true)
+        gate.update(updated, enabled: true)
+        XCTAssertNil(gate.pending)
+        XCTAssertTrue(gate.changed)
+        gate.confirm(attempt)
+        XCTAssertEqual(delivered, 0)
+    }
+
     func testOrdinaryAttemptDeliversCapturedRevisionsOnce() {
         let gate = ReviewSubmissionGate<String>()
         var delivered: [[String: String]] = []

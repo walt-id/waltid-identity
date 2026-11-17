@@ -369,7 +369,7 @@ class WalletDemoSharingReviewTestScenarios {
         var submitted: WalletDemoSharingSelection? = null
         try {
             setContent { WalletDemoTheme {
-                WalletDemoSharingReviewScreen(review, "Share employee credential?", onSubmit = { submitted = it },
+                TestSharingReviewScreen(review, "Share employee credential?", onSubmit = { submitted = it },
                     onCancel = {}, controller = owner)
             } }
             waitUntil(timeoutMillis = 10_000) { onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(city.id)).fetchSemanticsNodes().isNotEmpty() }

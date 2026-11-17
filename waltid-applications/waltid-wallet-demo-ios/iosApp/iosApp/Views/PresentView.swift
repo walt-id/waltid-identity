@@ -209,7 +209,7 @@ struct PresentView: View {
                 selectionComplete: informationReady && viewModel.claimReview.canConfirm && viewModel.presentationCredentialSelectionComplete && refresh == nil,
                 isLoading: !viewModel.presentationReviewEnabled,
                 reviewKey: OnlineSubmissionKey(handle: viewModel.presentationPreview?.previewHandle,
-                    review: review, selection: reviewedSelection),
+                    review: review, selection: reviewedSelection, claimReview: reviewedClaims),
                 credentialStatuses: context.selectedStatuses(review: review, selection: reviewedSelection),
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
@@ -249,6 +249,7 @@ private struct OnlineSubmissionKey: Equatable {
     let handle: PresentationPreviewHandle?
     let review: SharingReviewModel
     let selection: SharingSelection
+    let claimReview: ClaimReviewState
 }
 
 private struct PresentationFormPostWebView: UIViewRepresentable {

@@ -2781,12 +2781,13 @@ class WalletDemoControllerTest {
                 return WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("pid", "card",
                     "dc+sd-jwt", "{}", false, listOf(WalletDemoClaimLocation("[]", "[]", emptyList(), true)))))
             }
-            override suspend fun submitPresentation(
+            override suspend fun submitStatusReviewedPresentation(
                 previewHandle: WalletDemoPresentationPreviewHandle,
                 selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
-                selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, did: String?,
-                paymentConsentRevision: String?,
+                selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>, reviewedStatus: Map<String, String>, did: String?,
+                paymentConsentRevision: String?, statusReviewEpoch: Long?,
             ): WalletDemoOperationResult {
+                assertEquals(setOf("card"), reviewedStatus.keys)
                 submittedSelection = selectedCredentialOptions
                 return WalletDemoOperationResult.Success("Shared")
             }
@@ -2795,12 +2796,12 @@ class WalletDemoControllerTest {
         controller.updatePresentationRequestUrl("openid4vp://example")
         controller.previewPresentation(); runCurrent()
         assertIs<WalletDemoClaimReview.Loading>(controller.state.value.claimReview)
-        controller.submitPresentation(); runCurrent()
+        controller.submitReviewedPresentation(); runCurrent()
         assertNull(submittedSelection)
         assertEquals(0, base.submitPresentationCalls)
         gate.complete(Unit)
         controller.state.first { it.claimReview is WalletDemoClaimReview.Ready }
-        controller.submitPresentation(); runCurrent()
+        controller.submitReviewedPresentation(); runCurrent()
         assertEquals(listOf(option.selection), submittedSelection)
         assertEquals(0, base.submitPresentationCalls)
         assertNull(controller.state.value.presentationPreview)

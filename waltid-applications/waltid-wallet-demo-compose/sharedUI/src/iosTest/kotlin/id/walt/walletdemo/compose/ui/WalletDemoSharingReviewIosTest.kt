@@ -12,6 +12,7 @@ class WalletDemoSharingReviewIosTest {
     @Test
     fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() =
         scenarios.selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff()
+
     @Test
     fun statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions() = scenarios.statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions()
 
