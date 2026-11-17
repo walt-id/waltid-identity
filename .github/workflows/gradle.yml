@@ -38,9 +38,12 @@ jobs:
           sudo swapon /swapfile
 
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d0f545651709e5135dc61a7c50d0c5b06a7fec2b
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@26468d53dea8c194fe8a03ff9818945c08d3d9d2
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Test checkout ref selection
+        run: python3 -m unittest discover -s waltid-identity/.github/actions/checkout-repos/tests -v
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
