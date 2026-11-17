@@ -19,9 +19,9 @@ extension XCTestCase {
         XCTAssertTrue(app.staticTexts["Status clear"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
         let checked = app.staticTexts["credential-status-last-checked-" + id].firstMatch
         XCTAssertTrue(checked.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(refresh.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         let before = checked.label
         XCTAssertFalse(before.isEmpty)
-        XCTAssertTrue(refresh.wait(for: \.isEnabled, toEqual: true, timeout: 30))
         refresh.tap()
         let updated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             checked.exists && !checked.label.isEmpty && checked.label != before

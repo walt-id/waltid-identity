@@ -77,9 +77,9 @@ class PublicDemoBackendE2ETest {
         assertTrue("EUDI PID must have an authenticated fresh result",
             device.wait(Until.hasObject(By.text("Status clear")), UI_ELEMENT_TIMEOUT))
         val checked = "credential-status-last-checked-$credentialId"
+        assertTrue(device.wait(Until.hasObject(By.res(refresh).enabled(true)), UI_ELEMENT_TIMEOUT))
         val before = requireNotNull(waitForResourceAfterScrolling(device, checked, UI_ELEMENT_TIMEOUT)).text
         assertNotNull(before)
-        assertTrue(device.wait(Until.hasObject(By.res(refresh).enabled(true)), UI_ELEMENT_TIMEOUT))
         clickByTag(device, refresh)
         assertTrue("Manual refresh must advance the successful check time",
             device.wait(Until.hasObject(By.res(checked).text(Pattern.compile("(?s)(?!${Pattern.quote(before)}$).+"))), UI_ELEMENT_TIMEOUT))
