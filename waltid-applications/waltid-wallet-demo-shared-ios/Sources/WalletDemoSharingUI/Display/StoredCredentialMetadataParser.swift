@@ -21,17 +21,16 @@ public enum StoredCredentialMetadataParser {
     }
 
     /// These are definitions advertised by the issuer, never values not yet received.
-    public static func claims(from metadataJSON: String?, preferredLocales: [String] = []) -> [CredentialClaimMetadata] {
+    public static func claims(from metadataJSON: String?, preferredLocales: [String] = [], format: String? = nil) -> [CredentialClaimMetadata] {
         guard case .object(let root) = CredentialDisplayJSONParser.parse(metadataJSON ?? ""),
               case .array(let entries)? = root.first(where: { $0.key == "credentialClaims" })?.value else { return [] }
-        var seen = Set<[CredentialClaimPathSegment]>()
         var result: [CredentialClaimMetadata] = []
         for entry in entries {
             guard case .object(let fields) = entry,
                   case .array(let values)? = fields.first(where: { $0.key == "path" })?.value,
                   !values.isEmpty else { return [] }
             let path = values.compactMap(CredentialClaimPathSegment.init)
-            guard path.count == values.count, seen.insert(path).inserted else { return [] }
+            guard path.count == values.count else { return [] }
             let displaysJSON = fields.first(where: { $0.key == "display" })?.value.rawJSON ?? "[]"
             let displays = (try? JSONSerialization.jsonObject(with: Data(displaysJSON.utf8)) as? [[String: Any]]) ?? []
             let display = DisplayLocales.select(displays, preferredLocales: preferredLocales) { stringValue($0["locale"]) }
@@ -43,7 +42,7 @@ public enum StoredCredentialMetadataParser {
             }
             result.append(CredentialClaimMetadata(path: path, mandatory: mandatory, name: stringValue(display?["name"])))
         }
-        return result
+        return consistentClaimPaths(result.map(\.path), format: format) ? result : []
     }
 
     private static func parseDisplay(
@@ -112,4 +111,44 @@ public enum StoredCredentialMetadataParser {
         let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+}
+
+/// OpenID4VCI B.3; numeric and string map keys may coexist in an mdoc CBOR map.
+private func consistentClaimPaths(_ paths: [[CredentialClaimPathSegment]], format: String?) -> Bool {
+    let jsonFormat = ["dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format ?? "")
+    let root = StoredClaimPathNode()
+    for path in paths {
+        var node = root
+        for original in path {
+            let segment: CredentialClaimPathSegment = original == .integer("-0") ? .integer("0") : original
+            var key = false
+            var integer = false
+            var wildcard = false
+            switch segment {
+            case .key: key = true
+            case .integer(let literal):
+                if jsonFormat && literal.hasPrefix("-") { return false }
+                integer = true
+            case .wildcard: wildcard = true
+            }
+            if node.hasWildcard && !wildcard || wildcard && (node.hasKey || node.hasInteger) { return false }
+            if jsonFormat && (key && node.hasInteger || integer && node.hasKey) { return false }
+            node.hasKey = node.hasKey || key
+            node.hasInteger = node.hasInteger || integer
+            node.hasWildcard = node.hasWildcard || wildcard
+            if let child = node.children[segment] { node = child }
+            else { let child = StoredClaimPathNode(); node.children[segment] = child; node = child }
+        }
+        if node.terminal { return false }
+        node.terminal = true
+    }
+    return true
+}
+
+private final class StoredClaimPathNode {
+    var terminal = false
+    var hasKey = false
+    var hasInteger = false
+    var hasWildcard = false
+    var children: [CredentialClaimPathSegment: StoredClaimPathNode] = [:]
 }

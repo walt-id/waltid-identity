@@ -26,6 +26,14 @@ public struct ClaimPathExpression {
         return parser.parse()
     }
 
+    /// SDK disclosure paths use quoted object keys and bare numeric array positions.
+    static func sdkDisclosure(_ raw: String, format: String) -> ClaimPathExpression {
+        if format == "mso_mdoc" { return disclosurePathExpression(raw, format: format) }
+        if let array = parseJSONArrayPath(raw.trimmingCharacters(in: .whitespacesAndNewlines)) { return array }
+        var parser = ClaimPathExpressionParser(rawValue: raw, sdkDisclosure: true)
+        return parser.parse()
+    }
+
     private static func parseJSONArrayPath(_ rawValue: String) -> ClaimPathExpression? {
         guard rawValue.hasPrefix("["),
               case .array(let values) = CredentialDisplayJSONParser.parse(rawValue) else { return nil }
@@ -48,8 +56,10 @@ private struct ClaimPathExpressionParser {
     private let characters: [Character]
     private var index = 0
     private var segments: [ClaimPathExpression.Segment] = []
+    private let sdkDisclosure: Bool
 
-    init(rawValue: String) {
+    init(rawValue: String, sdkDisclosure: Bool = false) {
+        self.sdkDisclosure = sdkDisclosure
         self.characters = Array(rawValue.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
@@ -61,9 +71,11 @@ private struct ClaimPathExpressionParser {
             case "[":
                 addBracketSegment()
             case "'", "\"":
-                addKey(readQuotedSegment(quote: characters[index]))
+                let key = readQuotedSegment(quote: characters[index])
+                if sdkDisclosure { segments.append(.key(key)) } else { addKey(key) }
             default:
-                addKey(readDotSegment())
+                let token = readDotSegment()
+                if sdkDisclosure { addToken(token) } else { addKey(token) }
             }
         }
         return ClaimPathExpression(segments: segments)
@@ -85,7 +97,7 @@ private struct ClaimPathExpressionParser {
         if segment.isEmpty {
             return
         }
-        if segment == "*" {
+        if segment == "*" || (sdkDisclosure && segment == "null") {
             segments.append(.wildcard)
         } else if let intValue = Int(segment) {
             segments.append(.index(intValue))

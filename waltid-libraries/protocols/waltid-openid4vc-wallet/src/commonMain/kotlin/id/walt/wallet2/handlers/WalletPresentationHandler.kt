@@ -1030,6 +1030,35 @@ object WalletPresentationHandler {
         )
     }
 
+    /** Recomputes effective claims under the existing preview lease without signing or consuming it. */
+    suspend fun reviewPresentation(
+        wallet: Wallet,
+        request: SubmitPresentationRequest,
+    ): PreparedPresentationReview = previewedAuthorizationRequests.prepare(wallet.id, request.previewHandle.value) { preview ->
+        require(preview is PreviewedPresentation.Ready) { "Cannot review an invalid presentation" }
+        require(request.keyId == null || request.keyId == preview.keyId) { "The signing key must match the reviewed key" }
+        val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
+        val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
+            request.selectedCredentialOptions, request.selectedDisclosureOptions)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
+        preparePresentationReview(selected)
+    }
+
+    /** Selection review for a wallet-bound Digital Credentials API request; does not consume it. */
+    suspend fun reviewDcApiPresentation(
+        wallet: Wallet,
+        request: SubmitDcApiPresentationRequest,
+    ): PreparedPresentationReview = previewedDcApiRequests.prepare(wallet.id, request.requestId) { preview ->
+        require(request.selectedCredentialOptions.all { it.credentialId in preview.allowedCredentialIds }) {
+            "A selected credential was not offered by the retained Digital Credentials preview"
+        }
+        val authorization = preview.request.authorizationRequest
+        val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
+            request.selectedCredentialOptions, request.selectedDisclosureOptions)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
+        preparePresentationReview(selected)
+    }
+
     /** Prepares metadata-driven consent under the retained URL preview's exclusive lease. */
     suspend fun preparePaymentConsent(
         wallet: Wallet,
