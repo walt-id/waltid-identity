@@ -797,7 +797,7 @@ internal const val STORE_DOCUMENT_LIMIT_BYTES = 16_793_600
  * against the whole cause chain, because the driver's timeout arrives wrapped by the store layer.
  */
 private val INFRASTRUCTURE_FAILURE_MARKERS = listOf(
-    "Timeout", "TimedOut", "Socket", "Connect", "IOException", "Unreachable", "PoolClear",
+    "Timeout", "TimedOut", "Socket", "Connect", "Unreachable", "PoolClear",
     "NotPrimary", "NodeIsRecovering", "ShutdownInProgress", "Interrupted",
 )
 
@@ -815,7 +815,8 @@ internal fun Throwable.isInfrastructureFailure(): Boolean {
     val seen = mutableSetOf<Throwable>()
     while (current != null && seen.add(current)) {
         val name = current::class.simpleName ?: ""
-        if (INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
+        // Certificate decoders use CertIOException for malformed bytes, not a dependency outage.
+        if (name == "IOException" || INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
         current = current.cause
     }
     return false
