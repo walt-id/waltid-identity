@@ -24,6 +24,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 
 /**
@@ -50,21 +52,35 @@ object MdocVerifier {
      * OID4VP-specific verification entry point.
      * This is a convenient overload that constructs the SessionTranscript from OID4VP context.
      */
-    suspend fun verify(mdocString: String, context: MdocVerificationContext): VerificationResult {
+    suspend fun verify(mdocString: String, context: MdocVerificationContext): VerificationResult =
+        verifyAt(mdocString, context, Clock.System.now())
+
+    internal suspend fun verifyAt(
+        mdocString: String,
+        context: MdocVerificationContext,
+        validationTime: Instant,
+    ): VerificationResult {
         val document = MdocParser.parseToDocument(mdocString)
 
         val sessionTranscript = buildSessionTranscriptForContext(context)
 
         log.trace { "SessionTranscript: $sessionTranscript" }
         log.trace { "SessionTranscript (hex): ${coseCompliantCbor.encodeToHexString(sessionTranscript)}" }
-        return verify(document, sessionTranscript)
+        return verifyAt(document, sessionTranscript, validationTime)
     }
 
     /**
      * Generic verification entry point. Verifies a credential with a pre-constructed SessionTranscript.
      * This makes the verifier reusable in contexts other than OID4VP.
      */
-    suspend fun verify(document: Document, sessionTranscript: SessionTranscript): VerificationResult {
+    suspend fun verify(document: Document, sessionTranscript: SessionTranscript): VerificationResult =
+        verifyAt(document, sessionTranscript, Clock.System.now())
+
+    private suspend fun verifyAt(
+        document: Document,
+        sessionTranscript: SessionTranscript,
+        validationTime: Instant,
+    ): VerificationResult {
         val errors = mutableListOf<String>()
 
         // Step 1: Parse Document from credential payload
@@ -75,7 +91,7 @@ object MdocVerifier {
         val issuerAuthResult = runCatching { verifyIssuerAuthentication(document) }
         log.trace { "Issuer auth result: $issuerAuthResult" }
 
-        val msoTimestampsResult = runCatching { verifyMso(mso) }
+        val msoTimestampsResult = runCatching { verifyMsoAt(mso, validationTime) }
         log.trace { "MSO Timestamp result: $msoTimestampsResult" }
 
         val deviceAuthResult = runCatching { verifyDeviceAuthentication(document, mso, sessionTranscript) }
@@ -161,10 +177,12 @@ object MdocVerifier {
         return x5c to issuerKey
     }
 
-    fun verifyMso(mso: MobileSecurityObject) {
+    fun verifyMso(mso: MobileSecurityObject) = verifyMsoAt(mso, Clock.System.now())
+
+    private fun verifyMsoAt(mso: MobileSecurityObject, validationTime: Instant) {
         log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo
-        timestamps.validate()
+        timestamps.validateAt(validationTime)
 
         require(MdocCrypto.isSupportedDigest(mso.digestAlgorithm)) {
             "MSO digest algorithm is not supported: ${mso.digestAlgorithm}"

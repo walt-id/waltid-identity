@@ -63,9 +63,15 @@ object MdocIssuer {
          */
         protectedHeaderX5t: CoseCertHash? = null
     ): IssuerSigned {
+        // Each included namespace must contain at least one issuer-signed item.
+        val nonEmptyNamespaceItems = namespaceIssuerSignedItems.filterValues { it.isNotEmpty() }
+        require(nonEmptyNamespaceItems.isNotEmpty()) {
+            "Cannot issue mdoc: at least one issuer-signed item is required"
+        }
+
         val coseSigner = issuerKey.toCoseSigner()
 
-        val valueDigests = namespaceIssuerSignedItems.mapValues { (namespace, issuerSignedItems) ->
+        val valueDigests = nonEmptyNamespaceItems.mapValues { (namespace, issuerSignedItems) ->
             ValueDigestList(issuerSignedItems.map { issuerSignedItem ->
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
@@ -123,7 +129,7 @@ object MdocIssuer {
         )
 
         val issuerSigned = IssuerSigned.fromIssuerSignedItems(
-            namespacedItems = namespaceIssuerSignedItems,
+            namespacedItems = nonEmptyNamespaceItems,
             issuerAuth = issuerAuth
         )
 

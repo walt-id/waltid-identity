@@ -54,8 +54,9 @@ data class ValidityInfo(
     @Serializable(with = MdocTDateInstantSerializer::class)
     val expectedUpdate: Instant? = null
 ) {
-    fun validate() {
-        val now = Clock.System.now()
+    fun validate() = validateAt(Clock.System.now())
+
+    internal fun validateAt(now: Instant) {
         require(validFrom <= now) { "MSO is not yet valid (becomes valid in ${validFrom - now})" }
         require(validUntil >= now) { "MSO is no longer valid (expired ${now - validFrom} ago)" }
     }

@@ -6,7 +6,10 @@ import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class VerifyConformanceMdoc {
 
@@ -62,10 +65,28 @@ class VerifyConformanceMdoc {
     @Test
     fun verifyConformanceMdoc() = runTest {
         println("==== VERIFICATION: MdocVerifier ====")
-        val verificationResult = MdocVerifier.verify(vpTokenMdocBase64, verificationContext)
+        // This historical wire fixture is valid from 2025-10-15 until 2026-10-15.
+        val verificationResult = MdocVerifier.verifyAt(
+            vpTokenMdocBase64,
+            verificationContext,
+            Instant.parse("2025-11-01T00:00:00Z"),
+        )
         println("Verification result: $verificationResult")
 
         assertTrue("Verification result is not valid") { verificationResult.valid }
+    }
+
+    @Test
+    fun expiredConformanceMdocIsRejected() = runTest {
+        val verificationResult = MdocVerifier.verifyAt(
+            vpTokenMdocBase64,
+            verificationContext,
+            Instant.parse("2026-10-15T03:42:43Z"),
+        )
+
+        assertFalse(verificationResult.valid)
+        assertEquals(false, verificationResult.msoValidityValid)
+        assertTrue(verificationResult.errors.any { it.startsWith("MSO Validation failed: MSO is no longer valid") })
     }
 
 }
