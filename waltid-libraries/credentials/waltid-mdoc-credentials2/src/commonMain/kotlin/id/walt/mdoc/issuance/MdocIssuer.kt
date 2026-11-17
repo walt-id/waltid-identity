@@ -147,8 +147,12 @@ object MdocIssuer {
         signedAt: Instant?,
         requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned {
+        val nonEmptyNamespaceItems = namespaceIssuerSignedItems.filterValues { it.isNotEmpty() }
+        require(nonEmptyNamespaceItems.isNotEmpty()) {
+            "Cannot issue mdoc: at least one issuer-signed item is required"
+        }
 
-        val valueDigests = namespaceIssuerSignedItems.mapValues { (namespace, issuerSignedItems) ->
+        val valueDigests = nonEmptyNamespaceItems.mapValues { (namespace, issuerSignedItems) ->
             ValueDigestList(issuerSignedItems.map { issuerSignedItem ->
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
@@ -165,7 +169,7 @@ object MdocIssuer {
             if (requireExpectedUpdateWithinWindow) {
                 validityInfo.requireExpectedUpdateWithinWindow()
             }
-            requireMdlIssueDateNotAfterValidFrom(namespaceIssuerSignedItems, validityInfo.validFrom)
+            requireMdlIssueDateNotAfterValidFrom(nonEmptyNamespaceItems, validityInfo.validFrom)
         } catch (cause: IllegalArgumentException) {
             throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${cause.message}", cause)
         }
@@ -203,7 +207,7 @@ object MdocIssuer {
         )
 
         val issuerSigned = IssuerSigned.fromIssuerSignedItems(
-            namespacedItems = namespaceIssuerSignedItems,
+            namespacedItems = nonEmptyNamespaceItems,
             issuerAuth = issuerAuth
         )
 
