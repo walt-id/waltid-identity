@@ -11,8 +11,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertIs
 
 class MsoMdocPresentationStructureTest {
     private val document = MdocParser.parseToDocument(MdocsExamples.mdocsExampleBase64Url)
@@ -69,6 +71,23 @@ class MsoMdocPresentationStructureTest {
         val duplicated = byteArrayOf(0xbf.toByte()) + "d9d9f76776657273696f6e63392e30".hexToByteArray() +
             encoded.copyOfRange(1, end) + byteArrayOf(0xff.toByte())
         assertTrue(MsoMdocPresentation.parse(Base64.UrlSafe.encode(duplicated)).isFailure)
+    }
+
+    @Test
+    fun `deterministic response mutations never escape as parser errors`() = runTest {
+        val original = coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", arrayOf(document), status = 0u))
+        val random = Random(1608)
+        repeat(3_000) { sample ->
+            val mutated = original.copyOf()
+            repeat(random.nextInt(1, 5)) {
+                val index = random.nextInt(mutated.size)
+                mutated[index] = (mutated[index].toInt() xor (1 shl random.nextInt(8))).toByte()
+            }
+            val bytes = if (sample % 3 == 0) mutated.copyOf(random.nextInt(mutated.size)) else mutated
+            MsoMdocPresentation.parse(Base64.UrlSafe.encode(bytes)).exceptionOrNull()?.let {
+                assertIs<Exception>(it, "mutation $sample must not produce a runtime Error")
+            }
+        }
     }
 
     @Test
