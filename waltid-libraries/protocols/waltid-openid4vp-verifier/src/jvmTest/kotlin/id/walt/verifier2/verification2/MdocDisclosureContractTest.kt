@@ -11,6 +11,7 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.mdoc.objects.DeviceSigned
@@ -98,6 +99,41 @@ class MdocDisclosureContractTest {
             DcqlQuery(listOf(query("name", "family_name"), query("photo", "portrait"))),
             mapOf("name" to listOf(credential("family_name", "portrait")),
                 "photo" to listOf(credential("portrait", signature = 2))), true).isFailure)
+    }
+
+    @Test
+    fun `claim alternatives accept either requested element without requiring both`() {
+        val alternatives = query("q", "family_name", "portrait").let { query ->
+            query.copy(
+                claims = query.claims!!.mapIndexed { index, claim -> claim.copy(id = "claim$index") },
+                claimSets = listOf(listOf("claim0"), listOf("claim1")),
+            )
+        }
+        for (name in listOf("family_name", "portrait")) {
+            assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+                DcqlQuery(listOf(alternatives)), mapOf("q" to listOf(credential(name))), true).isSuccess)
+        }
+    }
+
+    @Test
+    fun `unselected credential alternative cannot authorize an extra disclosure`() {
+        val dcql = DcqlQuery(
+            credentials = listOf(query("name", "family_name"), query("photo", "portrait")),
+            credentialSets = listOf(CredentialSetQuery(listOf(listOf("name"), listOf("photo")))),
+        )
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("photo" to listOf(credential("portrait"))), true).isSuccess)
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("name" to listOf(credential("family_name", "portrait"))), true).isFailure)
+    }
+
+    @Test
+    fun `multiple credentials must each respect the query disclosure boundary`() {
+        val dcql = DcqlQuery(listOf(query("q", "family_name").copy(multiple = true)))
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("q" to listOf(credential("family_name"), credential("family_name", signature = 2))), true).isSuccess)
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("q" to listOf(credential("family_name"), credential("family_name", "portrait", signature = 2))), true).isFailure)
     }
 
     private val transactionData = listOf(Base64.UrlSafe.encode(
