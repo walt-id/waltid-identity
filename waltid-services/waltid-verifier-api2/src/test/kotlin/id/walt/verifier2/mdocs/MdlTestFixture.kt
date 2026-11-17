@@ -1,6 +1,9 @@
 package id.walt.verifier2.mdocs
 
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.createAndSign
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.defaultCoseSignatureAlgorithm
@@ -22,7 +25,13 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.objects.wrapInCborTag
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -102,6 +111,20 @@ internal fun mdlFixtureCredential(credentialData: String): MdocsCredential = run
             signerKey = DirectSerializedKey(KeyManager.resolveSerializedKey(MDL_FIXTURE_SIGNER_JWK)),
         ),
     )
+}
+
+/** Re-sign controlled MSO mutations so negative tests do not merely fail an unrelated signature check. */
+@OptIn(ExperimentalSerializationApi::class)
+internal suspend fun resignMdlFixtureMso(document: Document, mso: MobileSecurityObject): Document {
+    val key = restoreCrypto2Key(MdlFixtureResources.read("private.jwk.json"), "mdl-fixture-ds-mutation")
+    val payload = coseCompliantCbor.encodeToByteArray(ByteArraySerializer(), coseCompliantCbor.encodeToByteArray(mso)).wrapInCborTag(24)
+    val auth = CoseSign1.createAndSign(
+        protectedHeaders = CoseHeaders(algorithm = key.spec.defaultCoseSignatureAlgorithm()),
+        unprotectedHeaders = CoseHeaders(x5chain = listOf(CoseCertificate(MDL_FIXTURE_X5C.decodeFromBase64()))),
+        payload = payload,
+        key = key,
+    )
+    return document.copy(issuerSigned = IssuerSigned.fromIssuerSignedLists(requireNotNull(document.issuerSigned.namespaces), auth))
 }
 
 private suspend fun restoreCrypto2Key(jwk: String, keyId: String): Key =
