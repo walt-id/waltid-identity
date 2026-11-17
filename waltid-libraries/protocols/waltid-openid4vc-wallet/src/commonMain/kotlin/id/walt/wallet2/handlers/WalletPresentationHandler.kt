@@ -1045,8 +1045,8 @@ object WalletPresentationHandler {
         val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
-        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        preparePresentationReview(selected)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preparePresentationReview(selected.matches)
     }
 
     /** Selection review for a wallet-bound Digital Credentials API request; does not consume it. */
@@ -1060,8 +1060,8 @@ object WalletPresentationHandler {
         val authorization = preview.request.authorizationRequest
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
-        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        preparePresentationReview(selected)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preparePresentationReview(selected.matches)
     }
 
     /** Prepares metadata-driven consent under the retained URL preview's exclusive lease. */

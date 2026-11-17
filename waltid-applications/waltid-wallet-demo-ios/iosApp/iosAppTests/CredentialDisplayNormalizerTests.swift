@@ -9,24 +9,40 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let metadata = String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayClaims"])), as: UTF8.self)
         let claims = StoredCredentialMetadataParser.claims(from: metadata, preferredLocales: ["en"])
         XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
-        XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("0"), .key("iban")], [.key("name")]])
+        XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("1"), .key("iban")], [.key("name")]])
         XCTAssertEqual(claims.first?.mandatory, true)
         let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
             credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayCredentialData"])), as: UTF8.self), metadataJSON: metadata)
         let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: ["en"]).groups.flatMap(\.items)
-        guard case .list(let accounts) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
+        guard case .list(let accounts, _) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
               accounts.count == 2, case .object(let first) = accounts[0], case .object(let second) = accounts[1] else {
             return XCTFail("Expected two structured accounts")
         }
-        XCTAssertEqual(first.first?.label, "First IBAN")
-        XCTAssertEqual(first.first?.labelSource, .issuerMetadata)
-        XCTAssertEqual(second.first?.label, "Iban")
-        XCTAssertNotEqual(second.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(first.first?.label, "Iban")
+        XCTAssertNotEqual(first.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(second.first?.label, "Second IBAN")
+        XCTAssertEqual(second.first?.labelSource, .issuerMetadata)
         XCTAssertEqual(rows.first { $0.path.id == "name" }?.label, "Full name")
         let option = PresentationCredentialOption(queryID: "account", credentialID: credential.id, format: credential.format,
             issuer: nil, subject: nil, label: "Account", credentialDataJSON: credential.credentialDataJSON,
-            disclosures: [PresentationDisclosure(path: #"["accounts",0,"iban"]"#, name: "Iban", valueJSON: #""DE123""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
-        XCTAssertEqual(CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"]).groups.first { $0.id == "requested" }?.items.first?.label, "First IBAN")
+            disclosures: [PresentationDisclosure(path: #"["accounts",1,"iban"]"#, name: "Iban", valueJSON: #""DE456""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
+        XCTAssertEqual(CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"]).groups.first { $0.id == "requested" }?.items.first?.label, "Second IBAN")
+        let path = try XCTUnwrap(option.disclosures.first).path
+        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+            format: option.format, claimsJSON: #"{"accounts":[{"iban":"DE456"}]}"#, wholeCredential: false, locations: [
+                .init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: #"["accounts"]"#, receivedPathJSON: #"["accounts"]"#, sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: #"["accounts",1]"#, receivedPathJSON: #"["accounts",0]"#, sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: path, receivedPathJSON: #"["accounts",0,"iban"]"#, sharedBy: [path], alwaysCarried: false),
+            ])])
+        let review = try EffectivePresentationReview(prepared: prepared,
+            model: .init(request: .init(requester: nil), credentialOptions: [option]),
+            details: [CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"])],
+            selection: .init(credentials: [option.selection], disclosures: []), preferredLocales: ["en"])
+        let account = try XCTUnwrap(review.contributions.first?.nodes.first?.children.first)
+        XCTAssertEqual(account.path, [.key("accounts"), .index(1)])
+        XCTAssertEqual(account.children.first?.label, "Second IBAN")
+        XCTAssertEqual(account.children.first?.value, .text("DE456"))
     }
 
     func testTimestampOffsetsAndUninterpretedCalendarValues() {

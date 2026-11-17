@@ -7,6 +7,7 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.*
 import id.walt.sdjwt.metadata.type.TypeMetadataFixture
 import id.walt.sdjwt.metadata.type.TypeMetadataResolver
@@ -120,10 +121,14 @@ class MobileWalletMetadataChainTest {
                 MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request, "https://verifier.example",
             ))
             val selected = preview.credentialOptions.single()
-            val response = reopened.submitDigitalCredentialPresentation(preview.requestId,
-                listOf(MobileWalletPresentationCredentialSelection(selected.queryId, selected.credentialId)))
+            val selections = listOf(MobileWalletPresentationCredentialSelection(selected.queryId, selected.credentialId))
+            val review = reopened.reviewDigitalCredentialPresentation(preview.requestId, selections)
+            val reviewed = review.credentials.single()
+            assertEquals(selected.credentialId, reviewed.credentialId)
+            val response = reopened.submitDigitalCredentialPresentation(preview.requestId, selections)
             val presentation = Json.parseToJsonElement(response.dataJson).jsonObject.getValue("vp_token")
                 .jsonObject.getValue("account").jsonArray.single().jsonPrimitive.content
+            assertEquals(SDJwt.parse(presentation).fullPayload, Json.parseToJsonElement(reviewed.claimsJson))
             val proof = CompactJws.verify(presentation.substringAfterLast('~'), holder, JwsAlgorithm.ES256)
             assertEquals("chain-nonce", Json.parseToJsonElement(proof.payload.decodeToString()).jsonObject.getValue("nonce").jsonPrimitive.content)
             assertEquals(3, metadataRequests, "Reopen, registry, selection and submission must reuse the fully pinned snapshot")

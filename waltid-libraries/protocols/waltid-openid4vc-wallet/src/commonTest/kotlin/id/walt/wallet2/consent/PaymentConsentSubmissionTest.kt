@@ -127,9 +127,15 @@ class PaymentConsentSubmissionTest {
             },
         )) }
         val dc = dcRequest(request)
+        val dcReview = WalletPresentationHandler.reviewDcApiPresentation(wallet, dc)
+        assertEquals(selections.map { it.credentialId }, dcReview.credentials.map { it.credentialId })
+        val url = urlRequest(request)
+        val urlReview = WalletPresentationHandler.reviewPresentation(wallet, url)
+        assertEquals(dcReview.credentials, urlReview.credentials)
+        assertEquals(0, signatures, "Claim review must not sign or consume either request")
         val dcConsent = prepare(dc)
         assertEquals("Pay", dcConsent.payment.affirmativeAction)
-        val urlConsent = assertNotNull(WalletPresentationHandler.preparePaymentConsent(wallet, urlRequest(request), policy))
+        val urlConsent = assertNotNull(WalletPresentationHandler.preparePaymentConsent(wallet, url, policy))
         assertEquals("Pay", urlConsent.payment.affirmativeAction)
         assertNotNull(submit(dc.copy(paymentConsentRevision = dcConsent.revision)))
         assertEquals(2, signatures)
