@@ -6,6 +6,8 @@ import id.walt.openid4vci.attestation.AttestationStatusResolver
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.CredentialProofCapabilities
 import id.walt.openid4vci.proofs.CredentialProofHandlers
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.model.TrustedEntityType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -46,6 +48,24 @@ sealed class KeyAttestationVerificationMethod {
             require(trustedRootCertificatesPem.isNotEmpty()) { "Key attestation trust roots must not be empty" }
         }
     }
+
+    /**
+     * Trusts the attester when a trust registry lists its x5c chain, leaf first, for one of
+     * [expectedEntityTypes], from an accepted source that is fresh. The deployment supplies the registry
+     * as a `TrustDecisionEvaluator` to [toVerificationOptions].
+     *
+     * @property requireAuthenticatedSource also require the trust list's signature to be authenticated.
+     */
+    @Serializable
+    @SerialName("x509-trust-registry")
+    data class X509TrustRegistry(
+        val expectedEntityTypes: Set<TrustedEntityType>,
+        val requireAuthenticatedSource: Boolean = false,
+    ) : KeyAttestationVerificationMethod() {
+        init {
+            require(expectedEntityTypes.isNotEmpty()) { "Key attestation expected entity types must not be empty" }
+        }
+    }
 }
 
 fun validateKeyAttestationConfiguration(
@@ -63,8 +83,10 @@ fun validateKeyAttestationConfiguration(
 suspend fun KeyAttestationConfig.toVerificationOptions(
     keyReferenceResolver: KeyAttestationKeyReferenceResolver? = null,
     statusResolver: AttestationStatusResolver? = null,
+    /** Required by [KeyAttestationVerificationMethod.X509TrustRegistry]; checked when an attestation is verified. */
+    trustEvaluator: TrustDecisionEvaluator? = null,
 ): KeyAttestationVerificationOptions = KeyAttestationVerificationOptions(
-    createKeyAttestationTrustResolver(verificationMethod, keyReferenceResolver),
+    createKeyAttestationTrustResolver(verificationMethod, keyReferenceResolver, trustEvaluator),
     maxAttestedKeys = maxAttestedKeys,
     statusPolicy = statusPolicy,
     statusResolver = statusResolver,
