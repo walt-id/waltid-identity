@@ -97,6 +97,13 @@ refreshes expanded sharing details and completes a real public-verifier presenta
 intercept wallet, issuer or verifier responses. This qualifies the supported browser host, not
 account authentication or native prepared payments.
 
+The `wallet-visual-browser` CI job also runs this journey, using the existing pinned Playwright
+container and `run-browser-live-status-e2e.sh`. It builds Wallet API 2 from the same revision,
+starts isolated persistence and a controlled HTTPS issuer with a generated test CA, and stops
+the owned processes on exit. Real journey evidence is retained separately from visual comparisons.
+The public verifier uses its default acceptance policy; independent status-policy rejection is
+covered by the Enterprise issuer2/status-service/wallet2/verifier2 integration journey.
+
 Start the built app and an immutable copy of the current wallet-service JAR on loopback, and run
 the [controlled issuer](../../../mobile-e2e-fixtures/status/README.md). Keep its control port private.
 Run serially with mobile controlled-status journeys: their outage control is shared. From this

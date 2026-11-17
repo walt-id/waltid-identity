@@ -24,6 +24,12 @@ The authorization metadata advertises only the pre-authorized grant and intentio
 Status entries explicitly include `statusSize: 1`, interoperating with verifier parsers which
 require the field while retaining the standard's one-bit semantics.
 
+For same-host browser E2E, the public listener can serve TLS directly with `--tls-cert` and
+`--tls-key`; both options are required together. Use an HTTPS origin such as
+`https://localhost:8089` and trust the test certificate in the wallet service and browser. The
+control listener remains plain HTTP on loopback and must never be exposed or tunneled. This mode
+keeps the wallet's normal HTTPS issuer handling without a public tunnel.
+
 GET the control listener's `/state` to identify the issued reference index. POST `/status` with
 `{"purpose":"revocation","index":0,"value":1}` to revoke the corresponding access credential.
 Revocation cannot be undone. Suspension uses purpose `suspension` and permits 1 → 0. POST `/outage`

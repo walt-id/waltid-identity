@@ -4,9 +4,34 @@ import TestHelpers
 #endif
 import XCTest
 
-/// Opt-in wallet-gallery/v1 attachments shared by the two public-demo UI test targets.
+/// Production-UI status assertions and opt-in gallery attachments shared by both demo UI test targets.
 @MainActor
 extension XCTestCase {
+    /// Shared by the native and Compose public EUDI journeys; reads only production UI state.
+    func assertEudiStatusRefresh(_ app: XCUIApplication, card: String) async {
+        let id = String(card.dropFirst("wallet.credentialCard.".count))
+        let refresh = app.buttons["credential-status-check-" + id].firstMatch
+        XCTAssertTrue(refresh.waitForExistence(timeout: 30), "EUDI PID must expose a supported status check")
+        for _ in 0..<6 where !refresh.isHittable { app.swipeUp() }
+        XCTAssertTrue(refresh.isHittable, app.debugDescription)
+        XCTAssertTrue(refresh.wait(for: \.isEnabled, toEqual: true, timeout: 30))
+        refresh.tap()
+        XCTAssertTrue(app.staticTexts["Status clear"].firstMatch.waitForExistence(timeout: 30), app.debugDescription)
+        let checked = app.staticTexts["credential-status-last-checked-" + id].firstMatch
+        XCTAssertTrue(checked.waitForExistence(timeout: 10), app.debugDescription)
+        let before = checked.label
+        XCTAssertFalse(before.isEmpty)
+        XCTAssertTrue(refresh.wait(for: \.isEnabled, toEqual: true, timeout: 30))
+        refresh.tap()
+        let updated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            checked.exists && !checked.label.isEmpty && checked.label != before
+        }, object: nil)
+        let result = await XCTWaiter.fulfillment(of: [updated], timeout: 30)
+        XCTAssertEqual(result, .completed, "Manual refresh must advance the successful check time")
+        XCTAssertTrue(app.staticTexts["Status clear"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Status outdated"].exists)
+    }
+
     /// The two iOS hosts share the production accessibility contract for this real issuer journey.
     func runControlledStatusIssuanceAndRevocation(_ app: XCUIApplication, capturePrefix: String,
                                                  openWalletLink: @escaping @MainActor (String) -> Void) async throws {

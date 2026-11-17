@@ -2,7 +2,7 @@
 """Bounded, ephemeral issuer for real wallet status journeys, never a production issuer.
 
 OID4VCI 1.0 pre-authorized JWT proofs; JWT VC + Bitstring Status List 2025.
-The public listener has no mutation controls. Tunnel only that listener over HTTPS.
+The public listener has no mutation controls. Expose only that listener over HTTPS.
 """
 
 import argparse
@@ -12,6 +12,7 @@ import hashlib
 import io
 import json
 import secrets
+import ssl
 import threading
 import time
 import uuid
@@ -335,14 +336,23 @@ def main():
     parser.add_argument("--port", type=int, default=8089)
     parser.add_argument("--control-port", type=int, default=8090)
     parser.add_argument("--ttl", type=int, default=20)
+    parser.add_argument("--tls-cert", help="Serve the public issuer listener over TLS with this certificate")
+    parser.add_argument("--tls-key", help="Private key matching --tls-cert")
     args = parser.parse_args()
     url = urlsplit(args.issuer_url)
     if url.scheme != "https" or not url.netloc or url.username or url.password or url.path not in ("", "/") or url.query or url.fragment:
         parser.error("issuer-url must be an HTTPS origin")
     if not 1 <= args.ttl <= 300 or args.port == args.control_port:
         parser.error("use distinct listener ports and a TTL from 1 to 300 seconds")
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error("--tls-cert and --tls-key must be supplied together")
     fixture = Issuer(args.issuer_url.rstrip("/"), args.ttl)
     public, control = Server(args.port, fixture), Server(args.control_port, fixture, control=True)
+    if args.tls_cert:
+        tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        tls.minimum_version = ssl.TLSVersion.TLSv1_2
+        tls.load_cert_chain(args.tls_cert, args.tls_key)
+        public.socket = tls.wrap_socket(public.socket, server_side=True)
     threading.Thread(target=control.serve_forever, daemon=True).start()
     print(json.dumps({"issuer": fixture.url, "publicPort": args.port, "controlPort": args.control_port}), flush=True)
     try:

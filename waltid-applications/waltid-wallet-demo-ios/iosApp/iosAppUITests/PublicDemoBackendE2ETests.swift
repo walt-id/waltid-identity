@@ -55,6 +55,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             ["E2E_WALLET_ID": "native-ka-\(UUID().uuidString)"]
         ) { _, new in new }
         ui.launch(environment: environment)
+        var previousCards = Set<String>()
         for index in 0..<2 {
             if index == 1 {
                 app.terminate()
@@ -74,7 +75,17 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
-            XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)).count, index + 1)
+            let currentCards = Set(cards.allElementsBoundByIndex.map(\.identifier))
+            XCTAssertEqual(currentCards.count, index + 1)
+            let added = currentCards.subtracting(previousCards)
+            XCTAssertEqual(added.count, 1, "EUDI issuance must add exactly one stored credential")
+            let card = try XCTUnwrap(added.first)
+            let element = app.descendants(matching: .any).matching(identifier: card).firstMatch
+            XCTAssertTrue(element.isHittable, app.debugDescription)
+            element.tap()
+            await assertEudiStatusRefresh(app, card: card)
+            ui.returnToWallet()
+            previousCards = currentCards
         }
     }
 

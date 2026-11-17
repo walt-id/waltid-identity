@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import androidx.test.uiautomator.activeWindow
 import androidx.test.uiautomator.waitForStable
 import id.walt.mobile.test.backend.DemoTestBackend
@@ -14,6 +15,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLIN
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.dismissKeyboard
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
@@ -44,6 +46,7 @@ class PublicDemoBackendE2ETest {
         launchAndUnlock(context, device)
         repeat(2) { index ->
             if (index == 1) relaunchAndUnlock(context, device)
+            val previousCards = device.credentialCardTags()
             val offer = EudiTestBackend.generateOffer()
             sendDeepLink(context, offer.offerUrl)
             assertReview(device, "wallet.offerAcceptButton")
@@ -54,7 +57,34 @@ class PublicDemoBackendE2ETest {
             assertTextVisibleAfterScrolling(device, listOf("Saved · 1"), "EUDI credential was not saved")
             clickByTag(device, "issuance-done")
             assertHome(device)
+            val added = device.credentialCardTags() - previousCards
+            assertEquals("EUDI issuance must add exactly one stored credential", 1, added.size)
+            val card = added.single()
+            assertNotNull(waitForResourceAfterScrolling(device, card, UI_ELEMENT_TIMEOUT))
+            clickByTag(device, card)
+            assertEudiStatusRefresh(device, card.removePrefix("wallet.credentialCard."))
+            device.pressBack()
+            assertHome(device)
         }
+    }
+
+    private fun assertEudiStatusRefresh(device: UiDevice, credentialId: String) {
+        val refresh = "credential-status-check-$credentialId"
+        assertNotNull("EUDI PID must expose a supported status check",
+            waitForResourceAfterScrolling(device, refresh, UI_ELEMENT_TIMEOUT))
+        assertTrue(device.wait(Until.hasObject(By.res(refresh).enabled(true)), UI_ELEMENT_TIMEOUT))
+        clickByTag(device, refresh)
+        assertTrue("EUDI PID must have an authenticated fresh result",
+            device.wait(Until.hasObject(By.text("Status clear")), UI_ELEMENT_TIMEOUT))
+        val checked = "credential-status-last-checked-$credentialId"
+        val before = requireNotNull(waitForResourceAfterScrolling(device, checked, UI_ELEMENT_TIMEOUT)).text
+        assertNotNull(before)
+        assertTrue(device.wait(Until.hasObject(By.res(refresh).enabled(true)), UI_ELEMENT_TIMEOUT))
+        clickByTag(device, refresh)
+        assertTrue("Manual refresh must advance the successful check time",
+            device.wait(Until.hasObject(By.res(checked).text(Pattern.compile("(?s)(?!${Pattern.quote(before)}$).+"))), UI_ELEMENT_TIMEOUT))
+        assertTrue(device.hasObject(By.text("Status clear")))
+        assertFalse(device.hasObject(By.text("Status outdated")))
     }
 
     @Test
