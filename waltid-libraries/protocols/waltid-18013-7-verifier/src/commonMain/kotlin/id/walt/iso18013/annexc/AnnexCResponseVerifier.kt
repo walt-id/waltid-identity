@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.iso18013.annexc
 
 import id.walt.cose.coseCompliantCbor
@@ -18,6 +20,7 @@ import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.jsonObject
 import id.walt.crypto2.keys.Key as Crypto2Key
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * The verifier must:

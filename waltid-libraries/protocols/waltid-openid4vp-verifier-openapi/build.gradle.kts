@@ -5,6 +5,12 @@ plugins {
 
 group = "id.walt.protocols"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 dependencies {
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))

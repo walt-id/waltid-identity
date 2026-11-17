@@ -208,7 +208,7 @@ class PreviewSessionStoreTest {
         val release = CompletableDeferred<Unit>()
         val signing = async { store.useOnce(WALLET_A, id) { started.complete(Unit); release.await(); "signed" } }
         started.await()
-        assertFailure(PreviewSessionFailureReason.IN_USE) { store.prepare(WALLET_A, id) { "must not run" } }
+        assertFailure(PreviewSessionFailureReason.IN_USE) { store.prepare<String>(WALLET_A, id) { "must not run" } }
         assertFailure(PreviewSessionFailureReason.IN_USE) { store.consume(WALLET_A, id) }
         assertTrue(signing.isActive)
         release.complete(Unit)
@@ -231,7 +231,7 @@ class PreviewSessionStoreTest {
         val store = store(now = { currentTime }, idGenerator = { "expired-in-use" })
         val id = store.create(WALLET_A, "resolution")
         assertFailure(PreviewSessionFailureReason.EXPIRED) {
-            store.useOnce(WALLET_A, id) { currentTime += 2.minutes; "late result" }
+            store.useOnce<String>(WALLET_A, id) { currentTime += 2.minutes; "late result" }
         }
         val timed = PreviewSessionStore<String>("Timed", timeToLive = kotlin.time.Duration.parse("1s"))
         val timedId = timed.create(WALLET_A, "resolution")
