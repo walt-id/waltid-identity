@@ -5,6 +5,7 @@ package id.walt.verifier2.mdocs
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.cose.coseCompliantCbor
+import id.walt.cose.CoseCertificate
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -202,6 +203,17 @@ class MdocSecurityMatrixHttpTest {
                     requireNotNull(document.issuerSigned.namespaces), auth.copy(signature = corrupt(auth.signature)),
                 ))))
             }, false, "mso_mdoc/issuer_auth")
+        }
+        test("malformed issuer certificate returns a client error") {
+            submit(http, prepare(http, credential) { response ->
+                val document = response.documents!!.single()
+                val auth = document.issuerSigned.issuerAuth
+                val certificate = auth.unprotected.x5chain!!.first()
+                response.copy(documents = arrayOf(document.copy(issuerSigned = IssuerSigned.fromIssuerSignedLists(
+                    requireNotNull(document.issuerSigned.namespaces),
+                    auth.copy(unprotected = auth.unprotected.copy(x5chain = listOf(CoseCertificate(corrupt(certificate.rawBytes))))),
+                ))))
+            }, false)
         }
         test("device signature corruption is rejected") {
             submit(http, prepare(http, credential) { response ->
