@@ -80,6 +80,17 @@ class MdocDisclosureContractTest {
     }
 
     @Test
+    fun `external readers retain required claim matching without OpenID4VP disclosure rules`() {
+        val dcql = DcqlQuery(listOf(query("q", "family_name")))
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("q" to listOf(credential("family_name", "portrait"))), true,
+            enforceMdocDisclosure = false).isSuccess)
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            dcql, mapOf("q" to listOf(credential("portrait"))), true,
+            enforceMdocDisclosure = false).isFailure)
+    }
+
+    @Test
     fun `no requested claims does not authorize every claim`() {
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
             DcqlQuery(listOf(query("q"))), mapOf("q" to listOf(credential("portrait"))), true).isFailure)
