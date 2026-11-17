@@ -10,9 +10,12 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import io.ktor.http.toHttpDate
+import io.ktor.util.date.GMTDate
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.close
 import io.ktor.utils.io.writeFully
@@ -31,10 +34,63 @@ import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 class StatusListTransportTest {
+    @Test
+    fun conditionalRevalidationRetainsExpiresUntilExplicitlyReplaced() = runTest {
+        val start = Instant.parse("2026-11-17T12:00:00Z")
+        var at = start
+        var expires: Instant? = start + 60.seconds
+        var cacheControl: String? = null
+        var notModified = false
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { request ->
+                requests++
+                if (requests > 1) assertEquals("\"v1\"", request.headers[HttpHeaders.IfNoneMatch])
+                respond(if (notModified) "" else "list", if (notModified) HttpStatusCode.NotModified else HttpStatusCode.OK,
+                    Headers.build {
+                        append(HttpHeaders.ETag, "\"v1\"")
+                        append(HttpHeaders.Date, GMTDate(at.toEpochMilliseconds()).toHttpDate())
+                        expires?.let { append(HttpHeaders.Expires, GMTDate(it.toEpochMilliseconds()).toHttpDate()) }
+                        cacheControl?.let { append(HttpHeaders.CacheControl, it) }
+                    })
+            }
+        }))
+        val transport = StatusListTransport(client, backgroundScope, { at }, CredentialStatusLimits())
+        val request = StatusListRequest("https://status.example/list", StatusListRepresentation.TOKEN_JWT)
+        try {
+            val initial = transport.fetch(request, false)
+            assertEquals(start + 60.seconds, initial.freshUntil)
+            notModified = true
+            expires = null
+            at += 30.seconds
+            val revalidated = transport.fetch(request, true)
+            assertEquals(initial.content, revalidated.content)
+            assertEquals(start + 60.seconds, revalidated.freshUntil, "Omitting Expires on 304 must retain the stored expiry")
+            transport.fetch(request, false)
+            assertEquals(2, requests, "The revalidated body remains reusable until its original deadline")
+            at += 30.seconds
+            assertEquals(at, transport.fetch(request, false).freshUntil)
+            assertEquals(3, requests, "The original deadline must trigger another validation")
+            expires = start + 120.seconds
+            assertEquals(expires, transport.fetch(request, true).freshUntil, "A new Expires must replace the stored value")
+            expires = null
+            cacheControl = "max-age=10"
+            at += 30.seconds
+            assertEquals(at + 10.seconds, transport.fetch(request, true).freshUntil, "Max-age takes precedence over retained Expires")
+            notModified = false
+            cacheControl = null
+            at += 10.seconds
+            assertEquals(at + 15.minutes, transport.fetch(request, false).freshUntil, "A full response must not inherit old freshness headers")
+            assertEquals(6, requests)
+        } finally { transport.close(); client.close() }
+    }
+
     @Test
     fun noCacheRevalidatesFreshObservationsAndStillHonorsExplicitZeroMaxAge() = runTest {
         var at = Instant.fromEpochSeconds(1_800_000_000)

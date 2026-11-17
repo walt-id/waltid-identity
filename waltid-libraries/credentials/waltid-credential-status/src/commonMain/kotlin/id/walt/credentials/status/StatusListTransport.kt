@@ -99,6 +99,7 @@ internal class StatusListTransport(
         val modified: String?,
         val revalidate: Boolean,
         val cacheControl: String?,
+        val expires: String?,
     )
     private class Flight(val result: Deferred<Result<StatusListResource>>, var owners: Int = 0)
 
@@ -238,7 +239,9 @@ internal class StatusListTransport(
                 val correctedAge = maxOf(apparentAge,
                     (response.headers[HttpHeaders.Age]?.toLongOrNull()?.coerceAtLeast(0) ?: 0).seconds +
                         (receivedAt - startedAt).coerceAtLeast(Duration.ZERO))
-                val expires = response.headers[HttpHeaders.Expires]?.let {
+                val expiresHeader = response.headers[HttpHeaders.Expires]
+                    ?: if (notModified) previous?.expires else null
+                val expires = expiresHeader?.let {
                     runCatching { Instant.fromEpochMilliseconds(it.fromHttpToGmtDate().timestamp) }.getOrNull()
                 }
                 val lifetime = minOf(maxAge?.seconds ?: expires?.let { (it - (date ?: receivedAt)).coerceAtLeast(Duration.ZERO) }
@@ -257,7 +260,7 @@ internal class StatusListTransport(
                         cache[request] = Cached(resource, bytes,
                             response.headers[HttpHeaders.ETag] ?: if (notModified) previous?.etag else null,
                             response.headers[HttpHeaders.LastModified] ?: if (notModified) previous?.modified else null,
-                            revalidate, controls)
+                            revalidate, controls, expiresHeader)
                         while (cache.size > limits.maxCachedLists || cache.values.sumOf { it.bytes.size.toLong() } > limits.maxCachedBytes) {
                             cache.remove(cache.keys.first())
                         }

@@ -98,7 +98,7 @@ class WalletCredentialStatusService(
         val nonPersistentReferenceIds: Set<String> = emptySet(),
         val persisted: CredentialStatusStoredRecord? = null,
     )
-    private class Flight(val fingerprint: String, val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
+    private class Flight(val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
     private val job = SupervisorJob(parentScope?.coroutineContext?.get(Job))
     private val scope = CoroutineScope((parentScope?.coroutineContext ?: Dispatchers.Default) + job)
@@ -336,7 +336,7 @@ class WalletCredentialStatusService(
         val flight = mutex.withLock {
             val state = requireNotNull(states[record.reference])
             flights.getOrPut(record.reference) {
-                Flight(record.fingerprint, scope.async(start = CoroutineStart.LAZY) { evaluateAndCommit(record, state.generation, mode, refreshSession) })
+                Flight(scope.async(start = CoroutineStart.LAZY) { evaluateAndCommit(record, state.generation, mode, refreshSession) })
             }.also { it.owners++ }
         }
         changes.tryEmit(Unit)

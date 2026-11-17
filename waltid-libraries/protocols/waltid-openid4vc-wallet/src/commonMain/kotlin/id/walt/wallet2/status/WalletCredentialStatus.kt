@@ -4,7 +4,6 @@ import id.walt.credentials.status.CredentialStatus
 import id.walt.credentials.status.CredentialStatusPresentation
 import id.walt.credentials.status.assess
 import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.StoredCredentialMetadata
 import kotlinx.serialization.Serializable
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.time.Instant
@@ -18,16 +17,6 @@ data class WalletCredentialReference(val storeIndex: Int, val credentialId: Stri
 /** New composed read APIs preserve the published low-level storage model and constructors. */
 data class WalletCredentialRead(
     val credential: StoredCredential,
-    val reference: WalletCredentialReference,
-    val status: CredentialStatus,
-    val evaluatedAt: Instant,
-) {
-    private val assessment = status.assess(evaluatedAt)
-    val presentation: CredentialStatusPresentation get() = assessment.presentation
-}
-
-data class WalletCredentialMetadataRead(
-    val credential: StoredCredentialMetadata,
     val reference: WalletCredentialReference,
     val status: CredentialStatus,
     val evaluatedAt: Instant,
