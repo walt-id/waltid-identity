@@ -20,6 +20,7 @@ async function openSharing(page, fixture) {
   await page.keyboard.insertText(requestUrl);
   await page.keyboard.press('Tab');
   const proceed = page.getByRole('button', { name: 'Continue', exact: true });
+  await expect(proceed).toBeInViewport({ ratio: 1 });
   await waitForSettledImage(page, await proceed.boundingBox());
   await clickControl(page, proceed);
   await expect.poll(() => fixture.requests.find(request => request.path.endsWith('/present/preview'))?.body?.requestUrl).toBe(requestUrl);
