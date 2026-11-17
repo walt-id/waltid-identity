@@ -55,11 +55,22 @@ class IssuanceSessionService(
 
     suspend fun createSession(session: IssuanceSession): IssuanceSession = repository.save(session)
 
-    /**
-     * Writes a session already removed by [claimSession].
-     * The snapshot keeps the deferred checkpoint it held at the claim; the stored row is gone until this write.
-     */
-    suspend fun saveClaimedSession(session: IssuanceSession): IssuanceSession = repository.save(session)
+    internal suspend fun trySaveWalletNotification(
+        current: IssuanceSession,
+        change: IssuedCredentialNotificationChange,
+    ): IssuanceSession? {
+        val result = requireNotNull(current.issuanceResults[change.credentialIdentifier])
+        val updatedResult = result.copy(
+            walletNotification = requireNotNull(result.walletNotification).copy(
+                event = change.event,
+                eventDescription = change.eventDescription,
+            ),
+        )
+        val updated = current.copy(
+            issuanceResults = current.issuanceResults + (change.credentialIdentifier to updatedResult),
+        )
+        return if (repository.compareAndSet(current, updated)) updated else null
+    }
 
     suspend fun saveSession(session: IssuanceSession): IssuanceSession {
         if (session.deferredState == null) return repository.save(session)
@@ -108,15 +119,4 @@ class IssuanceSessionService(
         )
         return saveSession(updated)
     }
-}
-
-/** Applies the library's resolved change to the stored record. */
-internal fun IssuanceSession.applyWalletNotification(update: IssuedCredentialNotificationChange): IssuanceSession {
-    val result = requireNotNull(issuanceResults[update.credentialIdentifier])
-    return copy(issuanceResults = issuanceResults + (update.credentialIdentifier to result.copy(
-        walletNotification = requireNotNull(result.walletNotification).copy(
-            event = update.event,
-            eventDescription = update.eventDescription,
-        ),
-    )))
 }

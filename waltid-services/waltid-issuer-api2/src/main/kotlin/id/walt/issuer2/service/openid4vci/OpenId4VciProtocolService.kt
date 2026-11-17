@@ -59,7 +59,6 @@ import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
 import id.walt.openid4vci.requests.notification.notificationRequestParameters
 import id.walt.openid4vci.responses.notification.NotificationResponseResult
-import id.walt.issuer2.service.applyWalletNotification
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -1732,57 +1731,47 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
                         authorization.scheme,
                     )
-                sessionService.getSessionOrNull(sessionId)
+                var current = sessionService.getSessionOrNull(sessionId)
                     ?: return oauth2Provider.writeNotificationError(
                         NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
                     )
-                val claimed = sessionService.claimSession(sessionId)
-                    ?: return oauth2Provider.writeNotificationError(
-                        OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, "Issuance session is being processed"),
-                        authorization.scheme,
-                    )
-                var claimFinalized = false
-                try {
-                    val authorizedIdentifiers = claimed.issuanceRequests
+                val scopeConfigurationIds = metadataService.credentialConfigurationIdsForScopes(
+                    result.tokenClaims.stringClaim("scope").orEmpty()
+                        .split(' ')
+                        .filter(String::isNotBlank)
+                        .toSet(),
+                )
+                while (true) {
+                    val authorizedIdentifiers = current.issuanceRequests
                         .map { it.toCredentialAuthorization() }
                         .authorizedByVerifiedToken(
                             result.tokenClaims,
-                            claimed.authorizedCredentialIdentifiers,
-                            metadataService.credentialConfigurationIdsForScopes(
-                                result.tokenClaims.stringClaim("scope").orEmpty()
-                                    .split(' ')
-                                    .filter(String::isNotBlank)
-                                    .toSet(),
-                            ),
+                            current.authorizedCredentialIdentifiers,
+                            scopeConfigurationIds,
                         )
                         .map { it.credentialIdentifier }
                         .toSet()
                     val response = oauth2Provider.createNotificationResponse(
                         request = result.request,
-                        storedNotifications = claimed.issuanceResults.values.mapNotNull { it.walletNotification },
+                        storedNotifications = current.issuanceResults.values.mapNotNull { it.walletNotification },
                         authorizedCredentialIdentifiers = authorizedIdentifiers,
                     )
                     val change = (response as? NotificationResponseResult.Success)?.change
-                    val saved = withContext(NonCancellable) {
-                        val saved = sessionService.saveClaimedSession(
-                            change?.let { claimed.applyWalletNotification(it) } ?: claimed,
-                        )
-                        // Save releases the claim. Record that fact before cancellation can resume.
-                        claimFinalized = true
-                        saved
-                    }
-                    if (change != null) {
+                        ?: return oauth2Provider.writeNotificationResponse(response)
+                    val saved = sessionService.trySaveWalletNotification(current, change)
+                    if (saved != null) {
                         notificationService.notify(
                             requestId = requestId,
                             session = saved,
                             event = change.event.toIssuanceSessionEvent(),
                         )
+                        return oauth2Provider.writeNotificationResponse(response)
                     }
-                    return oauth2Provider.writeNotificationResponse(response)
-                } finally {
-                    if (!claimFinalized) {
-                        withContext(NonCancellable) { sessionService.saveClaimedSession(claimed) }
-                    }
+                    current = sessionService.getSessionOrNull(sessionId)
+                        ?: return oauth2Provider.writeNotificationError(
+                            OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, "Issuance session is being processed"),
+                            authorization.scheme,
+                        )
                 }
             }
         }

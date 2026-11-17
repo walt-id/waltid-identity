@@ -14,18 +14,25 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.ktornotifications.SseNotifier
+import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.deferred.DeferredIssuance
 import id.walt.openid4vci.deferred.DeferredIssuanceState
 import id.walt.openid4vci.deferred.DeferredStatus
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
+import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
+import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.requests.notification.*
 import id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Instant
@@ -69,24 +76,57 @@ class WalletNotificationCommitTest {
     }
 
     @Test
-    fun `deferred session notification keeps the claimed checkpoint`() = runTest {
+    fun `deferred collection can checkpoint while another credential report is being saved`() = runTest {
         val repository = RecordingRepository()
-        val checkpoint = DeferredIssuanceState(status = DeferredStatus.READY)
-        repository.current = assertNotNull(repository.current).copy(
-            deferredState = checkpoint,
+        val session = assertNotNull(repository.current)
+        repository.current = session.copy(
+            issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "other"),
+            deferredState = DeferredIssuanceState(status = DeferredStatus.READY),
             deferredStatus = DeferredStatus.READY,
         )
-        val response = protocolService(repository).processNotificationRequest(
-            listOf("Bearer token"), emptyList(), "{}", "deferred-notification",
+        val deferred = DeferredIssuance(IssuanceSessionService(repository).deferredStore)
+        val transaction = deferred.accept(
+            session.sessionId,
+            AcceptedCredentialRequest(
+                request = DefaultCredentialRequest(
+                    client = DefaultClient("wallet", emptyList(), emptySet(), emptySet()),
+                    credentialIdentifier = "other",
+                    credentialConfigurationId = null,
+                    proofs = null,
+                    credentialResponseEncryption = null,
+                    accessTokenClientId = "wallet",
+                ),
+                credentialIdentifier = "other",
+                credentialConfigurationId = "configuration",
+                configuration = CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "https://example.com/credential"),
+                bindings = emptyList(),
+            ),
         )
-        assertEquals(204, response.status)
+        val reportSaving = CompletableDeferred<Unit>()
+        val resumeReport = CompletableDeferred<Unit>()
+        repository.beforeSave = {
+            if (reportSaving.complete(Unit)) resumeReport.await()
+        }
+
+        val service = protocolService(repository)
+        val report = async {
+            service.processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "deferred-notification")
+        }
+        reportSaving.await()
+        val progress = buildJsonObject { put("checkpoint", "saved") }
+        try {
+            val claim = assertIs<DeferredIssuance.Collection.Claimed>(
+                deferred.collect(session.sessionId, transaction.id, setOf("other"), "wallet"),
+            ).transaction
+            deferred.checkpointProgress(session.sessionId, claim, progress)
+        } finally {
+            resumeReport.complete(Unit)
+        }
+
+        assertEquals(204, report.await().status)
         val saved = assertNotNull(repository.current)
-        assertEquals(checkpoint, saved.deferredState)
-        assertEquals(DeferredStatus.READY, saved.deferredStatus)
-        assertEquals(
-            NotificationEvent.CREDENTIAL_ACCEPTED,
-            saved.issuanceResults.getValue("credential").walletNotification?.event,
-        )
+        assertEquals(progress, saved.deferredState?.transactions?.get(transaction.id)?.progress)
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, saved.issuanceResults.getValue("credential").walletNotification?.event)
     }
 
     @Test
@@ -177,8 +217,22 @@ class WalletNotificationCommitTest {
             status = IssuanceSessionStatus.SUCCESSFUL,
         )
         val saves = mutableListOf<IssuanceSession>()
+        var beforeSave: suspend () -> Unit = {}
         var afterSave: () -> Unit = {}
+
+        override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean {
+            if (replacement.issuanceResults != expected.issuanceResults) beforeSave()
+            if (current != expected) return false
+            write(replacement)
+            return true
+        }
+
         override suspend fun save(session: IssuanceSession): IssuanceSession {
+            beforeSave()
+            return write(session)
+        }
+
+        private fun write(session: IssuanceSession): IssuanceSession {
             current = session
             saves += session
             afterSave()
