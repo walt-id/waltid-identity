@@ -1,8 +1,8 @@
 name: Checkout all repos with ref fallback
 description: |
   Checks out waltid-unified-build, waltid-identity, and waltid-identity-enterprise.
-  The requested ref is used when it exists. Otherwise, all repositories use
-  the same fallback ref, defaulting to release/v0.23.x.
+  The requested ref is used when it exists. Unified build otherwise stays on
+  release/v0.23.x. Identity and Enterprise otherwise fall back to main.
 
 inputs:
   token:
@@ -10,13 +10,9 @@ inputs:
     required: false
     default: ${{ github.token }}
   ref:
-    description: 'Ref to try in each repository before using fallback-ref'
+    description: 'Ref to try in each repository before falling back to main'
     required: false
     default: ${{ github.head_ref || github.ref_name }}
-  fallback-ref:
-    description: 'Fallback ref shared by the unified, Identity, and Enterprise repositories'
-    required: false
-    default: 'release/v0.23.x'
   checkoutUnifiedToRepoDir:
     description: 'If set to "yes", checkout waltid-unified-build to its repo name instead of "."'
     required: false
@@ -29,11 +25,15 @@ runs:
       id: ref_unified
       shell: bash
       env:
-        CHECKOUT_REPOSITORY: walt-id/waltid-unified-build
-        REQUESTED_REF: ${{ inputs.ref }}
-        FALLBACK_REF: ${{ inputs.fallback-ref }}
-        CHECKOUT_TOKEN: ${{ inputs.token }}
-      run: bash "$GITHUB_ACTION_PATH/resolve-ref.sh"
+        REF: ${{ inputs.ref }}
+        TOKEN: ${{ inputs.token }}
+      run: |
+        REPO="walt-id/waltid-unified-build"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=release/v0.23.x" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Checkout waltid-unified-build
       uses: actions/checkout@v4
@@ -47,11 +47,14 @@ runs:
       id: ref_identity
       shell: bash
       env:
-        CHECKOUT_REPOSITORY: walt-id/waltid-identity
-        REQUESTED_REF: ${{ inputs.ref }}
-        FALLBACK_REF: ${{ inputs.fallback-ref }}
-        CHECKOUT_TOKEN: ${{ inputs.token }}
-      run: bash "$GITHUB_ACTION_PATH/resolve-ref.sh"
+        REF: ${{ inputs.ref }}
+      run: |
+        REPO="walt-id/waltid-identity"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Checkout waltid-identity
       uses: actions/checkout@v4
@@ -65,11 +68,14 @@ runs:
       id: ref_enterprise
       shell: bash
       env:
-        CHECKOUT_REPOSITORY: walt-id/waltid-identity-enterprise
-        REQUESTED_REF: ${{ inputs.ref }}
-        FALLBACK_REF: ${{ inputs.fallback-ref }}
-        CHECKOUT_TOKEN: ${{ inputs.token }}
-      run: bash "$GITHUB_ACTION_PATH/resolve-ref.sh"
+        REF: ${{ inputs.ref }}
+      run: |
+        REPO="walt-id/waltid-identity-enterprise"
+        if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+        else
+          echo "ref=main" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Checkout waltid-identity-enterprise
       uses: actions/checkout@v4
