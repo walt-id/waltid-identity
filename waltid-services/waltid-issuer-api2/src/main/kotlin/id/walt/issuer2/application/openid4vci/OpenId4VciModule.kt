@@ -27,6 +27,7 @@ import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallengeService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.PushedAuthorizationConfig
@@ -54,6 +55,8 @@ import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.pkce.PkceServiceConfig
+import id.walt.trust.decision.HttpTrustDecisionEvaluator
+import id.walt.trust.decision.TrustDecisionEvaluator
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -166,6 +169,7 @@ data class OpenId4VciModule(
                     }
                 )
             } ?: JwtRefreshTokenVerifier(verificationKeyResolver)
+            val attestationTrustEvaluator = createAttestationTrustEvaluator(config)
             val pkceServiceConfig = PkceServiceConfig(requirePkce = { config.requirePkce })
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
@@ -193,7 +197,9 @@ data class OpenId4VciModule(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = { config.enforcePushedAuthorizationRequests },
                     ),
-                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config, attestationChallengeService),
+                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(
+                        config, attestationChallengeService, attestationTrustEvaluator,
+                    ),
                     credentialRequestDecryptor = config.credentialEncryptionKey
                         ?.let(CredentialEncryptionKeyConfig::requestDecryptor),
 
@@ -217,7 +223,9 @@ data class OpenId4VciModule(
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,
                 keyAttestation = runBlocking {
-                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver, statusResolver).also {
+                    config.keyAttestationConfig?.toVerificationOptions(
+                        keyAttestationKeyResolver, statusResolver, attestationTrustEvaluator,
+                    ).also {
                         (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
                             require(requireNotNull(keyAttestationKeyResolver).resolve(method.reference).isNotEmpty()) {
                                 "Configured key attestation verification key is unavailable"
@@ -231,12 +239,37 @@ data class OpenId4VciModule(
         private fun createClientAuthenticationServiceConfig(
             config: Issuer2ServiceConfig,
             challengeService: AttestationChallengeService?,
+            trustEvaluator: TrustDecisionEvaluator?,
         ): ClientAuthenticationServiceConfig {
             val clientAuthenticationConfig = config.clientAuthenticationConfig
                 ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService, statusResolver = statusResolver)
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig(
+                    challengeService = challengeService,
+                    statusResolver = statusResolver,
+                    trustEvaluator = trustEvaluator,
+                )
             }
+        }
+
+        /**
+         * The evaluator for the `x509-trust-registry` attestation methods, from `attestationTrustResolver`.
+         * Fails startup when such a method is configured without a resolver.
+         */
+        internal fun createAttestationTrustEvaluator(config: Issuer2ServiceConfig): TrustDecisionEvaluator? {
+            val resolver = config.attestationTrustResolver
+            val registryMethods = listOfNotNull(
+                "client attestation".takeIf {
+                    config.clientAttestationConfig()?.verificationMethod is ClientAttestationVerificationMethod.X509TrustRegistry
+                },
+                "key attestation".takeIf {
+                    config.keyAttestationConfig?.verificationMethod is KeyAttestationVerificationMethod.X509TrustRegistry
+                },
+            )
+            require(resolver != null || registryMethods.isEmpty()) {
+                "${registryMethods.joinToString(" and ")} uses x509-trust-registry, which requires attestationTrustResolver"
+            }
+            return resolver?.let { HttpTrustDecisionEvaluator(it.resolveCertificateChainUrl) { it.headers } }
         }
 
         internal fun resolveCrypto2TokenKey(config: Issuer2ServiceConfig): Crypto2JwtSigningKey? = runBlocking {
