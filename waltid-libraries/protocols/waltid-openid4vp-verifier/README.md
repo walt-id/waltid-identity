@@ -247,6 +247,10 @@ claims and unrequested selectively disclosable mdoc elements are rejected. The s
 carry claims requested under another selected query, as allowed by OpenID4VP 1.0 section 6.4.
 Device-key authorizations restrict `DeviceSigned` elements, not the issuer's own signed elements.
 
+External-reader proximity submissions enforce configured DCQL claim constraints, but the kiosk owns
+the DeviceRequest; OpenID4VP extra-disclosure restrictions do not apply to that flow. Both flows
+reject duplicate CBOR map keys before decoding.
+
 ## Related Libraries
 
 - **[waltid-openid4vp](../waltid-openid4vp/README.md)** - Core OpenID4VP models and types
