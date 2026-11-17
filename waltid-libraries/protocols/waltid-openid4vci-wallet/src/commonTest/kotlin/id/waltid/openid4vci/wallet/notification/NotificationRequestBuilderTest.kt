@@ -3,6 +3,7 @@ package id.waltid.openid4vci.wallet.notification
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 
 import id.walt.openid4vci.errors.NotificationErrorCodes
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.DefaultNotificationRequest
 import id.walt.openid4vci.requests.notification.NotificationRequest
@@ -33,8 +34,10 @@ import kotlin.test.assertSame
 
 class NotificationRequestBuilderTest {
     private fun client(
+        validateStatus: Boolean = false,
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
     ): HttpClient = HttpClient(MockEngine) {
+        expectSuccess = validateStatus
         engine { addHandler(handler) }
     }
 
@@ -163,7 +166,7 @@ class NotificationRequestBuilderTest {
     fun retriesDpopNotificationOnceWithServerNonceAndFreshProof() = runTest {
         var callCount = 0
         val proofInputs = mutableListOf<Pair<String, String?>>()
-        val client = client { request ->
+        val client = client(validateStatus = true) { request ->
             callCount += 1
             assertEquals("DPoP access-token", request.headers[HttpHeaders.Authorization])
             assertEquals("proof-$callCount", request.headers[DPOP_HEADER])
@@ -207,7 +210,7 @@ class NotificationRequestBuilderTest {
 
     @Test
     fun parsesInvalidNotificationIdResponse() = runTest {
-        val client = client {
+        val client = client(validateStatus = true) {
             respond(
                 content = """{"error":"invalid_notification_id"}""",
                 status = HttpStatusCode.BadRequest,
@@ -228,6 +231,28 @@ class NotificationRequestBuilderTest {
         val failure = assertIs<NotificationDeliveryResult.Failure>(result)
         assertEquals(HttpStatusCode.BadRequest.value, failure.statusCode)
         assertEquals(NotificationErrorCodes.INVALID_NOTIFICATION_ID, failure.error?.error)
+    }
+
+    @Test
+    fun parsesInvalidAccessTokenResponse() = runTest {
+        val client = client(validateStatus = true) {
+            respond(
+                content = """{"error":"invalid_token"}""",
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = "https://issuer.example/notification",
+            accessToken = "expired-token",
+            accessTokenType = AccessTokenAuthorizationScheme.BEARER,
+            request = DefaultNotificationRequest("notification-id", NotificationEvent.CREDENTIAL_ACCEPTED),
+        )
+
+        val failure = assertIs<NotificationDeliveryResult.OAuthFailure>(result)
+        assertEquals(HttpStatusCode.Unauthorized.value, failure.statusCode)
+        assertEquals(OAuthErrorCodes.INVALID_TOKEN, failure.error?.error)
     }
 
     private fun HttpRequestData.bodyText(): String =

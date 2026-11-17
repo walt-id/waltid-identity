@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.dpop
 
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -25,6 +26,7 @@ suspend fun HttpClient.postWithDpopNonceRetry(
             header(HttpHeaders.Authorization, "$authorizationScheme $accessToken")
             dpopProof?.let { header(DPOP_HEADER, it) }
             configure()
+            expectSuccess = false
         }
         val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
         val retryWithNonce = attempt == 0 &&
