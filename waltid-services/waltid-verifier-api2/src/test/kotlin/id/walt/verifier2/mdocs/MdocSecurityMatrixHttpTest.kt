@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.verifier2.mdocs
 
@@ -46,6 +46,7 @@ import io.ktor.http.contentType
 import io.ktor.http.formUrlEncode
 import io.ktor.server.application.Application
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.coroutines.delay
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -67,6 +68,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.hours
 
 /** Real issuer and device signatures, actual session creation and direct-post/info HTTP routes. */
@@ -98,6 +100,7 @@ class MdocSecurityMatrixHttpTest {
         request: AuthorizationRequest,
         credential: MdocsCredential,
         disclosed: List<String>,
+        queryIds: List<String> = listOf("mdoc"),
         mutate: suspend (DeviceResponse) -> DeviceResponse = { it },
     ): String {
         val match = DcqlMatcher.matchCredential(query(disclosed), RawDcqlCredential(
@@ -109,7 +112,8 @@ class MdocSecurityMatrixHttpTest {
         ).content
         val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(presented))
         val token = buildJsonObject {
-            put("mdoc", JsonArray(listOf(JsonPrimitive(Base64.UrlSafe.encode(coseCompliantCbor.encodeToByteArray(mutate(response)))))))
+            val encoded = Base64.UrlSafe.encode(coseCompliantCbor.encodeToByteArray(mutate(response)))
+            queryIds.forEach { put(it, JsonArray(listOf(JsonPrimitive(encoded)))) }
         }
         return listOf("state" to requireNotNull(request.state), "vp_token" to token.toString()).formUrlEncode()
     }
@@ -119,16 +123,18 @@ class MdocSecurityMatrixHttpTest {
         credential: MdocsCredential,
         disclosed: List<String> = listOf("age_over_18"),
         usage: VerificationSessionUsage = VerificationSessionUsage.REUSABLE,
+        dcql: DcqlQuery = DcqlQuery(listOf(query(listOf("age_over_18")))),
+        queryIds: List<String> = listOf("mdoc"),
         mutate: suspend (DeviceResponse) -> DeviceResponse = { it },
     ): Presentation {
         val setup: VerificationSessionSetup = CrossDeviceFlowSetup(core = GeneralFlowConfig(
-            dcqlQuery = DcqlQuery(listOf(query(listOf("age_over_18")))),
+            dcqlQuery = dcql,
             sessionUsage = usage,
             policies = Verification2Session.DefinedVerificationPolicies(vc_policies = VCPolicyList(listOf(schema))),
         ))
         val created = http.post("/verification-session/create") { setBody(setup) }.body<VerificationSessionCreationResponse>()
         val request = http.get("/verification-session/${created.sessionId}/request").body<AuthorizationRequest>()
-        return Presentation(created.sessionId, request, form(request, credential, disclosed, mutate))
+        return Presentation(created.sessionId, request, form(request, credential, disclosed, queryIds, mutate))
     }
 
     private suspend fun submit(http: HttpClient, presentation: Presentation, success: Boolean, vpPolicy: String? = null): Verification2Session {
@@ -241,8 +247,13 @@ class MdocSecurityMatrixHttpTest {
                 false, "mso_mdoc/issuer_signed_integrity")
         }
         test("validly signed expired MSO is rejected") {
-            submit(http, prepare(http, credential) { mso(it) { m -> m.copy(validityInfo = m.validityInfo.copy(validUntil = m.validityInfo.validFrom)) } },
-                false, "mso_mdoc/mso")
+            // Keep signed <= validFrom < validUntil inside the DSC validity window, then let it expire.
+            delay(2.seconds)
+            val expired = submit(http, prepare(http, credential) { mso(it) { m -> m.copy(
+                validityInfo = m.validityInfo.copy(validUntil = m.validityInfo.validFrom + 1.seconds),
+            ) } }, false, "mso_mdoc/mso")
+            assertEquals(setOf("mso_mdoc/mso"),
+                assertIs<SessionFailure.PresentationValidation>(expired.failure).failedPolicies.getValue("mdoc").keys)
         }
         test("validly signed future MSO is rejected") {
             submit(http, prepare(http, credential) { mso(it) { m -> m.copy(validityInfo = m.validityInfo.copy(
@@ -260,6 +271,19 @@ class MdocSecurityMatrixHttpTest {
         }
         test("extra document cannot be silently trimmed") {
             submit(http, prepare(http, credential) { it.copy(documents = arrayOf(it.documents!!.single(), it.documents!!.single())) }, false)
+        }
+    }
+
+    @Test
+    fun sameSignedCredentialCanSatisfyTwoQueriesWithTheirCombinedDisclosures() = withVerifier {
+        test("same signed credential under two query ids") {
+            val http = testHttpClient()
+            val credential = mdlFixtureCredential(data().toString())
+            val queries = DcqlQuery(listOf(query(listOf("age_over_18")), query(listOf("portrait")).copy(id = "photo")))
+            val presentation = prepare(http, credential, disclosed = listOf("age_over_18", "portrait"),
+                dcql = queries, queryIds = listOf("mdoc", "photo"))
+            val result = submit(http, presentation, true)
+            assertEquals(setOf("mdoc", "photo"), result.presentedCredentials!!.keys)
         }
     }
 
