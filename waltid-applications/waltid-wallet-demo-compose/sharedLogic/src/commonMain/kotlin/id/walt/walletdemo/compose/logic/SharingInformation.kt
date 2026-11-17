@@ -45,8 +45,10 @@ fun List<SharingCredentialInformation>.informationToShare(
             }.sortedBy { it.item.displayOrder ?: Int.MAX_VALUE })
     }
 
-fun WalletDemoPresentationCredentialOption.toSharingInformation(): SharingCredentialInformation {
-    val details = toCredentialDetails()
+fun WalletDemoPresentationCredentialOption.toSharingInformation(
+    preferredLocales: List<String> = platformPreferredLocales(),
+): SharingCredentialInformation {
+    val details = toCredentialDetails(preferredLocales)
     val items = details.groups.firstOrNull { it.id == "requested" }?.items.orEmpty()
     val fields = disclosures.mapIndexedNotNull { index, disclosure ->
         val item = items.getOrNull(index) ?: return@mapIndexedNotNull null

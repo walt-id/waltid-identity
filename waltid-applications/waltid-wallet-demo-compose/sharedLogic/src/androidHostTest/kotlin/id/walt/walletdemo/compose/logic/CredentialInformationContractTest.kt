@@ -33,11 +33,20 @@ class CredentialInformationContractTest {
         val summary = CredentialSummary(id = "metadata-contract", format = format, label = "Identity", issuer = null,
             credentialDataJson = fixture.getValue("credentialData").toString(), metadataJson = metadata)
         val rows = CredentialDisplayNormalizer.toDetails(summary, locales).groups.flatMap { it.items }
-        assertEquals(strings("expectedLabels"), rows.take(4).map { it.label })
-        assertEquals(strings("expectedValues"), rows.take(4).map { assertIs<DisplayValue.Text>(it.value).value })
-        assertTrue(rows.take(4).all { it.labelSource == ClaimLabelSource.IssuerMetadata })
-        assertEquals(rows.size, rows.map { it.path.id }.distinct().size)
-        assertEquals(DisplayValue.BooleanValue(false), rows.last().value)
+        assertEquals(strings("expectedStoredRootPaths"), rows.map { it.path.id })
+        assertEquals(strings("expectedLabels").take(2), rows.take(2).map { it.label })
+        fun allItems(items: List<ClaimItem>): List<ClaimItem> = items.flatMap { item ->
+            listOf(item) + ((item.value as? DisplayValue.ObjectValue)?.entries?.let(::allItems) ?: emptyList())
+        }
+        val all = allItems(rows)
+        val paths = listOf("family_name", "given_name", "[\"ns.with.dots\"].given_name", "address.line_1")
+        val labelled = paths.map { path -> all.single { it.path.id == path } }
+        assertEquals(strings("expectedLabels"), labelled.map { it.label })
+        assertEquals(strings("expectedValues"), labelled.map { assertIs<DisplayValue.Text>(it.value).value })
+        assertTrue(labelled.all { it.labelSource == ClaimLabelSource.IssuerMetadata })
+        assertEquals(all.size, all.map { it.path.id }.distinct().size)
+        assertEquals(DisplayValue.BooleanValue(false), all.single { it.path.id == "extra" }.value)
+        for (path in listOf("address", "[\"ns.with.dots\"]")) assertIs<DisplayValue.ObjectValue>(rows.single { it.path.id == path }.value)
         val option = WalletDemoPresentationCredentialOption(queryId = "identity", credentialId = summary.id,
             format = format, label = "Identity", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = strings("requestedPaths").map { WalletDemoPresentationDisclosure(label = "Unhelpful fallback", path = it, valueJson = "\"Ada\"", selectivelyDisclosable = false) })

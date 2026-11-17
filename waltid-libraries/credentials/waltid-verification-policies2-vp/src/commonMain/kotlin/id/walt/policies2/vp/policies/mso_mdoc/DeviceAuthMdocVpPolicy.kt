@@ -40,7 +40,8 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
         val devicePublicKeyJwk = mso.deviceKeyInfo.deviceKey.toJWK()
         addResult("device_public_jwk", devicePublicKeyJwk)
 
-        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext.toMdocVerificationContext())
+        val sessionTranscript = verificationContext.mdocSessionTranscript
+            ?: MdocVerifier.buildSessionTranscriptForContext(verificationContext.toMdocVerificationContext())
         val verification = verifyDeviceAuthentication(document, mso, sessionTranscript)
         log.trace { "Device public key: ${verification.deviceKey}" }
         log.trace { "Device auth bytes (hex): ${verification.deviceAuthenticationBytes.toHexString()}" }

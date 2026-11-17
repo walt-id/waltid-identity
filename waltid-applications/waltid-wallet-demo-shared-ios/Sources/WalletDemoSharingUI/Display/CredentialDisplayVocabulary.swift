@@ -161,7 +161,7 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("valid_to", aliases: ["Valid to"], roles: [.temporal, .expiryDate], displayOrder: 216),
         ClaimDescriptor("status", label: "Credential status", group: .technical, displayOrder: 220),
         ClaimDescriptor("credential_status", aliases: ["credentialStatus"], label: "Credential status", displayOrder: 221),
-        ClaimDescriptor("_sd", label: "Undisclosed claims", group: .technical, displayOrder: 230),
+        ClaimDescriptor("_sd", label: "Disclosure digests", group: .technical, displayOrder: 230),
         ClaimDescriptor("_sd_alg", label: "Selective disclosure algorithm", group: .technical, displayOrder: 231),
         ClaimDescriptor("cnf", label: "Confirmation key", group: .technical, displayOrder: 240),
         ClaimDescriptor("credential_type", aliases: ["Credential type", "credentialType"], roles: [.credentialType], displayOrder: 250)
@@ -285,8 +285,10 @@ public enum CredentialDisplayVocabulary {
         if lhsSegments.count < rhsSegments.count { return .orderedAscending }
         if lhsSegments.count > rhsSegments.count { return .orderedDescending }
 
-        let lhsPath = lhs.joined(separator: ".")
-        let rhsPath = rhs.joined(separator: ".")
+        // Compare canonical literal-key paths, matching Compose. Joining with a dot
+        // would erase the distinction between a dotted key and nested members.
+        let lhsPath = lhs.dropFirst().reduce(ClaimItemPath.topLevel(lhs.first ?? "")) { $0.child($1) }.id
+        let rhsPath = rhs.dropFirst().reduce(ClaimItemPath.topLevel(rhs.first ?? "")) { $0.child($1) }.id
         let caseInsensitiveComparison = lhsPath.compare(rhsPath, options: [.caseInsensitive])
         if caseInsensitiveComparison != .orderedSame {
             return caseInsensitiveComparison
