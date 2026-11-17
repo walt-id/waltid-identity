@@ -964,7 +964,7 @@ object Wallet2RouteHandler {
                     "Posts OpenID4VCI credential_deleted for a credential fetched with " +
                             "storeInWallet=false. Pass notificationId and accessToken from fetch-credential " +
                             "plus either notificationEndpoint or credentialIssuerBaseUrl to resolve it. " +
-                            "Bearer-only, like isolated fetch. Delivery is best-effort: a missing issuer " +
+                            "Use a Bearer access token. Delivery is best-effort: a missing issuer " +
                             "notification_endpoint is a no-op and still returns 204."
                 request { pathParameter<String>("walletId"); body<RejectIssuedCredentialRequest>() }
                 response { HttpStatusCode.NoContent to {} }

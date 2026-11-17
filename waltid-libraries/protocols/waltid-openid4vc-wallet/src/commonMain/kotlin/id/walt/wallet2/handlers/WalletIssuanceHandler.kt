@@ -771,7 +771,7 @@ private fun FetchCredentialsResult.releasedRawCredentials(): List<String> {
  *
  * Pass [notificationId] and [accessToken] from [FetchCredentialResult] / the token response. Supply
  * either [notificationEndpoint] or [credentialIssuerBaseUrl] so the wallet can resolve the issuer's
- * OpenID4VCI notification endpoint. This isolated step is Bearer-only, matching isolated fetch.
+ * OpenID4VCI notification endpoint. The isolated rejection request accepts a Bearer token.
  */
 @Serializable
 data class RejectIssuedCredentialRequest(
@@ -2137,7 +2137,7 @@ object WalletIssuanceHandler {
      * Posts [NotificationEvent.CREDENTIAL_DELETED] for a credential fetched with
      * [FetchCredentialRequest.storeInWallet] left false. Resolves [RejectIssuedCredentialRequest.notificationEndpoint]
      * from issuer metadata when only [RejectIssuedCredentialRequest.credentialIssuerBaseUrl] is supplied.
-     * Bearer-only, like isolated fetch. Missing advertised `notification_endpoint` is a best-effort no-op.
+     * Use a Bearer token. A missing advertised `notification_endpoint` is a best-effort no-op.
      */
     suspend fun rejectIssuedCredential(
         request: RejectIssuedCredentialRequest,
