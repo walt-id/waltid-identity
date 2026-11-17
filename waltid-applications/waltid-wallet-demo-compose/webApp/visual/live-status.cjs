@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { chromium, expect } = require('@playwright/test');
 const { clickControl, waitForSettledImage, revealReviewControl } = require('./browser-controls.cjs');
-const { readStatusResponse } = require('./status-response.cjs');
+const { readStatusResponse, retainResponseBodies } = require('./status-response.cjs');
 
 const required = name => {
   const value = process.env[name];
@@ -61,11 +61,16 @@ async function run() {
     localStorage.setItem('waltid.wallet2.walletTargets', JSON.stringify([walletId]));
   }, { walletId: wallet.walletId, server });
   const page = await context.newPage();
+  await retainResponseBodies(page);
   const requests = [], errors = [], frames = [], controls = new Map(), artworks = new Map();
   const observations = new Set();
   let requiredArtwork = [];
   let phase = 'bootstrap', admittedAt = Date.now(), verdict;
   let documentEpoch = 0;
+  // Freeze the operation owner before headers; mode changes must not retag old requests.
+  let statusCheckOwner = 'automatic';
+  const requestOwners = new WeakMap();
+  page.on('request', request => requestOwners.set(request, statusCheckOwner));
   page.on('framenavigated', frame => {
     if (frame === page.mainFrame()) documentEpoch += 1;
   });
@@ -78,7 +83,8 @@ async function run() {
     }
     if (!url.pathname.startsWith('/wallet')) return;
     const body = response.request().postData();
-    const item = { method: response.request().method(), path: url.pathname.replace(wallet.walletId, ':wallet'), status: response.status() };
+    const item = { method: response.request().method(), path: url.pathname.replace(wallet.walletId, ':wallet'), status: response.status(),
+      statusCheckOwner: requestOwners.get(response.request()) };
     if (body) {
       item.requestDigest = digest(body);
       try { item.mode = JSON.parse(body).mode; } catch { /* Not every request body is JSON. */ }
@@ -178,6 +184,7 @@ async function run() {
   async function refresh(title) {
     await cooldown();
     const before = forcedRefreshes().length;
+    statusCheckOwner = 'manual';
     await click(button('Refresh status'));
     await expect.poll(() => forcedRefreshes().length, { timeout: 30000 }).toBe(before + 1);
     const projection = forcedRefreshes().at(-1).projection;
@@ -210,12 +217,14 @@ async function run() {
     // Browser demo preferences are runtime-owned, so explicitly restore manual mode afterwards.
     // Finish inspecting response bodies before navigation invalidates Chromium's body handles.
     await Promise.all([...observations]);
+    statusCheckOwner = 'automatic'; // Reload creates a new controller with its automatic default.
     await page.reload(); await ready();
     await expect.poll(() => requiredArtwork.every(uri => artworks.has(uri))).toBe(true);
     phase = 'settings'; await settings(); await click(button('Automatic checks'));
     await capture('automatic-disabled', button('Automatic checks'));
     await cooldown();
     const batch = forcedRefreshes().length;
+    statusCheckOwner = 'manual';
     await click(button('Check statuses'));
     await expect.poll(() => forcedRefreshes().length, { timeout: 30000 }).toBe(batch + 1);
     await capture('settings-manual', headline('Processed'));
