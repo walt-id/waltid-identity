@@ -14,7 +14,7 @@ import kotlin.io.encoding.Base64
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import kotlin.test.assertIs
+import kotlin.test.assertFalse
 
 class MsoMdocPresentationStructureTest {
     private val document = MdocParser.parseToDocument(MdocsExamples.mdocsExampleBase64Url)
@@ -74,7 +74,7 @@ class MsoMdocPresentationStructureTest {
     }
 
     @Test
-    fun `deterministic response mutations never escape as parser errors`() = runTest {
+    fun `mutated responses do not cause runtime errors`() = runTest {
         val original = coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", arrayOf(document), status = 0u))
         val random = Random(1608)
         repeat(3_000) { sample ->
@@ -85,7 +85,7 @@ class MsoMdocPresentationStructureTest {
             }
             val bytes = if (sample % 3 == 0) mutated.copyOf(random.nextInt(mutated.size)) else mutated
             MsoMdocPresentation.parse(Base64.UrlSafe.encode(bytes)).exceptionOrNull()?.let {
-                assertIs<Exception>(it, "mutation $sample must not produce a runtime Error")
+                assertFalse(it is Error, "mutation $sample must not produce a runtime Error")
             }
         }
     }
