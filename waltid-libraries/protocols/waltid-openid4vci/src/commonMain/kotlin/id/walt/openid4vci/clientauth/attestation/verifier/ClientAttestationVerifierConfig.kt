@@ -7,6 +7,8 @@ import id.walt.openid4vci.attestation.AttestationStatusResolver
 
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.model.TrustedEntityType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -38,6 +40,26 @@ sealed class ClientAttestationVerificationMethod {
         }
     }
 
+    /**
+     * Trusts the attestation signer when a trust registry lists its x5c chain for one of
+     * [expectedEntityTypes], from an accepted source that is fresh. The deployment supplies the
+     * registry as a `TrustDecisionEvaluator`; see [X509TrustRegistryClientAttestationVerifier].
+     *
+     * @property requireAuthenticatedSource also require the trust list's signature to be authenticated.
+     */
+    @Serializable
+    @SerialName("x509-trust-registry")
+    data class X509TrustRegistry(
+        val expectedEntityTypes: Set<TrustedEntityType>,
+        val requireAuthenticatedSource: Boolean = false,
+    ) : ClientAttestationVerificationMethod() {
+        init {
+            require(expectedEntityTypes.isNotEmpty()) {
+                "x509-trust-registry verification requires at least one expected entity type"
+            }
+        }
+    }
+
     @Serializable
     @SerialName("key-reference")
     data class KeyReference(
@@ -53,6 +75,8 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
     keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
     crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
     statusResolver: AttestationStatusResolver? = null,
+    /** Required by [ClientAttestationVerificationMethod.X509TrustRegistry]; checked when an attestation is verified. */
+    trustEvaluator: TrustDecisionEvaluator? = null,
 ): ClientAttestationConfig =
     when (val source = verificationMethod) {
         is ClientAttestationVerificationMethod.StaticJwk -> {
@@ -71,6 +95,16 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
         is ClientAttestationVerificationMethod.X509Chain ->
             ClientAttestationConfig(
                 attestationVerifier = X509ChainClientAttestationVerifier(source.trustedRootCertificatesPem),
+                statusPolicy = statusPolicy, statusResolver = statusResolver,
+            )
+
+        is ClientAttestationVerificationMethod.X509TrustRegistry ->
+            ClientAttestationConfig(
+                attestationVerifier = X509TrustRegistryClientAttestationVerifier(
+                    evaluator = trustEvaluator,
+                    expectedEntityTypes = source.expectedEntityTypes,
+                    requireAuthenticatedSource = source.requireAuthenticatedSource,
+                ),
                 statusPolicy = statusPolicy, statusResolver = statusResolver,
             )
 
