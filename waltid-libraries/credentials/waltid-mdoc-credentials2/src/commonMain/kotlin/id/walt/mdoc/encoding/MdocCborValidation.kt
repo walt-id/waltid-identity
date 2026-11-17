@@ -29,15 +29,40 @@ private class MdocCborValidator(private val bytes: ByteArray, private val depth:
         return bytes[position++].toInt() and 0xff
     }
 
-    private fun argument(info: Int): ULong? = when (info) {
-        in 0..23 -> info.toULong()
-        in 24..27 -> {
-            var value = 0uL
-            repeat(1 shl (info - 24)) { value = (value shl 8) or byte().toULong() }
-            value
+    private fun argument(info: Int): ULong? {
+        require(info in 0..27 || info == 31) { "Invalid mdoc CBOR argument" }
+        return when {
+            info < 24 -> info.toULong()
+            info == 31 -> null
+            else -> {
+                var value = 0uL
+                repeat(1 shl (info - 24)) { value = (value shl 8) or byte().toULong() }
+                value
+            }
         }
-        31 -> null
-        else -> error("Invalid mdoc CBOR argument")
+    }
+
+    private sealed interface MapKey
+    private data class IntegerKey(val negative: Boolean, val argument: ULong) : MapKey
+    private data class ElementKey(val value: CborElement) : MapKey
+
+    /** Typed map decoders ignore outer key tags; integer widths must not distinguish the same label. */
+    private fun mapKey(start: Int, end: Int): MapKey {
+        position = start
+        var initial = byte()
+        while (initial shr 5 == 6) {
+            argument(initial and 31)
+            initial = byte()
+        }
+        val major = initial shr 5
+        val key = if (major == 0 || major == 1) {
+            // Keep the CBOR argument, not its signed magnitude: -(2^64) is a valid key.
+            IntegerKey(major == 1, requireNotNull(argument(initial and 31)))
+        } else {
+            ElementKey(coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), bytes.copyOfRange(position - 1, end)))
+        }
+        position = end
+        return key
     }
 
     private fun item(level: Int) {
@@ -59,13 +84,12 @@ private class MdocCborValidator(private val bytes: ByteArray, private val depth:
                 position++
             }
             4, 5 -> {
-                val keys = mutableSetOf<CborElement>()
+                val keys = mutableSetOf<MapKey>()
                 fun entry() {
                     val start = position
                     item(level + 1)
                     if (major == 5) {
-                        val key = coseCompliantCbor.decodeFromByteArray(CborElement.serializer(), bytes.copyOfRange(start, position))
-                        require(keys.add(key)) { "Duplicate mdoc CBOR map key" }
+                        require(keys.add(mapKey(start, position))) { "Duplicate mdoc CBOR map key" }
                         item(level + 1)
                     }
                 }
