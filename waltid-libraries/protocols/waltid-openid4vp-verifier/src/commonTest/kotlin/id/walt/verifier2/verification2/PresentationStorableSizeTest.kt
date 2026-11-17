@@ -26,7 +26,7 @@ class PresentationStorableSizeTest {
         val oversized = maxStorablePresentationBytes + 1
 
         val failure = assertFailsWith<IllegalStateException> {
-            checkPresentationIsStorable(mapOf("mdl" to listOf("a".repeat(oversized.toInt()))))
+            checkPresentationIsStorable(mapOf("mdl" to listOf("a".repeat(oversized))))
         }
 
         assertContains(failure.message!!, "$oversized bytes is too large to store")
@@ -37,7 +37,7 @@ class PresentationStorableSizeTest {
     /** The budget covers a whole vp_token, not one presentation: several credentials share the same document. */
     @Test
     fun `presentations are measured together`() {
-        val half = (maxStorablePresentationBytes / 2 + 1).toInt()
+        val half = maxStorablePresentationBytes / 2 + 1
 
         assertFailsWith<IllegalStateException> {
             checkPresentationIsStorable(

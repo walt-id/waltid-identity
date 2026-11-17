@@ -1,5 +1,7 @@
 package id.walt.openid4vci.deferred
 
+import id.walt.openid4vci.attestation.VerifiedAttestationStatus
+
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
@@ -13,6 +15,7 @@ import kotlin.time.Instant
 data class AcceptedKeyAttestation(
     val lifetime: VerifiedAttestationLifetime,
     val attestedKeyThumbprints: Set<String>,
+    val status: VerifiedAttestationStatus? = null,
 )
 
 @Serializable

@@ -434,7 +434,7 @@ object OpenID4VCI {
                         put("scope", "openid")
                         when (responseType) {
                             ResponseType.VpToken -> put("presentation_definition", presentationDefinition!!.toJSON())
-                            else -> null
+                            else -> {}
                         }
                     }
                 )

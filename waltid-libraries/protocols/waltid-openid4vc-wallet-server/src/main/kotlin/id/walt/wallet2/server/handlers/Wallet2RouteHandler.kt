@@ -43,6 +43,14 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
+private const val MANUAL_TOKEN_ATTESTATION_DESCRIPTION =
+    "Supply both OAuth-Client-Attestation and OAuth-Client-Attestation-PoP in tokenRequestHeaders " +
+        "to use manual client authentication instead of automatic client authentication. " +
+        "Header names are case-insensitive; incomplete, blank or duplicate pairs return HTTP 400. " +
+        "Issuer rejections do not switch authentication methods. Static manual proofs cannot be " +
+        "regenerated for challenge or DPoP nonce retries; supply a fresh PoP in a new request. " +
+        "Token headers do not authenticate PAR."
+
 internal fun WalletInstanceAttestationRequiredException.toStatusException(): StatusException =
     StatusException(
         HttpStatusCode.BadRequest.value,
@@ -851,11 +859,15 @@ object Wallet2RouteHandler {
             for (batch in listOf(false, true)) {
                 post("/request-token${if (batch) "/batch" else ""}", {
                     summary = if (batch) "Batch: token and granted authorization details" else "Isolated: exchange pre-authorized code for access token"
-                    description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata."
+                    description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata. " +
+                        MANUAL_TOKEN_ATTESTATION_DESCRIPTION
                     request { pathParameter<String>("walletId"); body<RequestTokenRequest> {
                         example("Automatic authorization for selected configurations") { value = Wallet2RequestExamples.REQUEST_TOKEN_AUTOMATIC }
                     } }
-                    response { HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() } }
+                    response {
+                        HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() }
+                        HttpStatusCode.BadRequest to { description = "Malformed manual attestation headers or token request rejected" }
+                    }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<RequestTokenRequest>()
@@ -1001,9 +1013,12 @@ object Wallet2RouteHandler {
                         "Exchanges the authorization code for an access token. " +
                                 "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
                                 "If attestation is configured and supported by the issuer, the wallet key is used " +
-                                "to create token endpoint client authentication headers."
+                                "to create token endpoint client authentication headers. " + MANUAL_TOKEN_ATTESTATION_DESCRIPTION
                     request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
-                    response { HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() } }
+                    response {
+                        HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() }
+                        HttpStatusCode.BadRequest to { description = "Malformed manual attestation headers or token request rejected" }
+                    }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<ExchangeCodeRequest>()

@@ -20,17 +20,17 @@ class TestJs {
         val key = JWKKey.generate(keyType)
 
         println("  Checking for private key...")
-        assertTrue { key.hasPrivateKey }
+        assertTrue(key.hasPrivateKey)
 
         println("  Key id: " + key.getKeyId())
 
         println("  Exporting JWK...")
         val exportedJwk = key.exportJWK()
         println("  JWK: $exportedJwk")
-        assertTrue { exportedJwk.startsWith("{") }
+        assertTrue(exportedJwk.startsWith("{"))
 
         println("  Checking for private key on a public key...")
-        assertFalse { key.getPublicKey().hasPrivateKey }
+        assertFalse(key.getPublicKey().hasPrivateKey)
 
         println("  Checking for changes...")
         assertEquals(exportedJwk, key.exportJWK())

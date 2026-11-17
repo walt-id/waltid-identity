@@ -80,6 +80,7 @@ android {
 
     kotlin {
         compilerOptions {
+            allWarningsAsErrors.set(true)
             jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
         }
     }

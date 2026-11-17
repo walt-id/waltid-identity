@@ -1,5 +1,8 @@
 package id.walt.openid4vci.proofs.attestation
 
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChain
@@ -47,6 +50,8 @@ data class KeyAttestationVerificationOptions(
     val policy: KeyAttestationPolicy? = null,
     /** Maximum entries per attestation, checked before key import; defaults to 20. Explicit null disables the limit. */
     val maxAttestedKeys: Int? = 20,
+    val statusPolicy: AttestationStatusPolicy = AttestationStatusPolicy(),
+    val statusResolver: AttestationStatusResolver? = null,
 ) {
     init {
         require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" }
