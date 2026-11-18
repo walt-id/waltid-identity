@@ -1,5 +1,10 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.attestation.*
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestEngineConfiguration
 import id.walt.openid4vci.proofs.attestation.*
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
@@ -19,6 +24,7 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataResolver
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallengeService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
@@ -66,12 +72,22 @@ data class OpenId4VciModule(
 ) {
 
     companion object {
+        private val statusResolver = HttpAttestationStatusResolver(
+            WebDataFetcher(
+                WebDataFetcherId.OPENID4VCI_ATTESTATION_STATUS,
+                WebDataFetchingConfiguration(
+                    maxResponseBytes = HttpAttestationStatusResolver.MAXIMUM_RESPONSE_BYTES,
+                    engine = RequestEngineConfiguration(followRedirects = false),
+                ),
+            ),
+        )
         fun create(
             config: Issuer2ServiceConfig,
             authorizationCodeRepository: AuthorizationCodeRepository,
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
             parRepository: PARRepository,
             refreshTokenRepository: RefreshTokenRepository,
+            metadataResolver: SdJwtVcMetadataResolver,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
         ): OpenId4VciModule = create(
             config = config,
@@ -81,6 +97,7 @@ data class OpenId4VciModule(
             refreshTokenRepository = refreshTokenRepository,
             keyAttestationKeyResolver = keyAttestationKeyResolver,
             credentialProofVerifier = DefaultCredentialProofVerifier(),
+            metadataResolver = metadataResolver,
         )
 
         internal fun create(
@@ -91,6 +108,7 @@ data class OpenId4VciModule(
             refreshTokenRepository: RefreshTokenRepository,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver?,
             credentialProofVerifier: CredentialProofVerifier,
+            metadataResolver: SdJwtVcMetadataResolver,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {
@@ -151,6 +169,7 @@ data class OpenId4VciModule(
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
+                    attestationStatusResolver = statusResolver,
                     authorizationServerIssuer = config.openId4VciBaseUrl(),
                     pkceServiceConfig = pkceServiceConfig,
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
@@ -158,7 +177,7 @@ data class OpenId4VciModule(
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers().apply {
                         register(CredentialFormat.MSO_MDOC, MdocCredentialHandler(roundValidityToTwelveHours = true))
-                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true))
+                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true, metadataResolver = metadataResolver))
                     },
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
@@ -198,7 +217,7 @@ data class OpenId4VciModule(
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,
                 keyAttestation = runBlocking {
-                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver).also {
+                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver, statusResolver).also {
                         (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
                             require(requireNotNull(keyAttestationKeyResolver).resolve(method.reference).isNotEmpty()) {
                                 "Configured key attestation verification key is unavailable"
@@ -216,7 +235,7 @@ data class OpenId4VciModule(
             val clientAuthenticationConfig = config.clientAuthenticationConfig
                 ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService)
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService, statusResolver = statusResolver)
             }
         }
 

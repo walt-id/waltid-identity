@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.schema
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.mdoc.schema.MdocsSchema.MdocsDatatype
 import id.walt.mdoc.schema.MdocsSchema.MdocsSchemaType
 import kotlinx.serialization.cbor.CborArray
@@ -15,6 +18,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * How a `BYTES` element crosses the CBOR/JSON boundary.

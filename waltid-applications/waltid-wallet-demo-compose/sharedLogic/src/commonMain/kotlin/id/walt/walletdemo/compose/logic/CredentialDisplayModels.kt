@@ -110,7 +110,11 @@ sealed interface DisplayValue {
     data class NumberValue(val value: String) : DisplayValue
     data class BooleanValue(val value: Boolean) : DisplayValue
     data class ObjectValue(val entries: List<ClaimItem>) : DisplayValue
-    data class ListValue(val values: List<DisplayValue>) : DisplayValue
+    data class ListValue(
+        val values: List<DisplayValue>,
+        /** Display-only metadata for concrete source indexes; never reorders the values. */
+        val labels: Map<Int, String> = emptyMap(),
+    ) : DisplayValue
     /** Encoded media stays unresolved until a visible claim requests it. */
     class DeferredImage internal constructor(val byteCount: Int? = null, private val decode: () -> DisplayValue) : DisplayValue {
         fun resolve(): DisplayValue = decode()

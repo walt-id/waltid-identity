@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.mdocs
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.objects.digest.ValueDigest
@@ -9,7 +10,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.parser.MdocParser
-import id.walt.mdoc.verification.MdocVerifier
+import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import id.walt.policies2.vp.policies.IssuerSignedDataMdocVpPolicy
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -98,7 +99,7 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
 
         assertTrue(result.success)
         assertTrue(result.errors.isEmpty())
-        MdocVerifier.verifyIssuerSignedDataIntegrity(presentedDocument, mso)
+        verifyIssuerSignedItemDigests(presentedDocument, mso)
     }
 
     private fun loadResource(path: String): String {

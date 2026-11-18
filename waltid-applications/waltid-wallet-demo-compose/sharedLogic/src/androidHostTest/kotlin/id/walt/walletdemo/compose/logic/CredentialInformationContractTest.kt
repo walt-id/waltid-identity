@@ -5,8 +5,45 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
-    @Test fun sharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() {
-        val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
+    @Test
+    fun projectedArraySelectorsRetainUniqueLabelsAndRestrictions() {
+        val fixture = credentialInformationFixture()
+        val metadata = fixture.getValue("projectedArrayClaims").toString()
+        val claims = StoredCredentialMetadataParser.claims(metadata, listOf("en"))
+        assertEquals(fixture.getValue("projectedArrayLabels").jsonArray.map { it.jsonPrimitive.content }, claims.map { it.displayName })
+        assertEquals(listOf(listOf(JsonPrimitive("accounts"), JsonPrimitive(1), JsonPrimitive("iban")), listOf(JsonPrimitive("name"))), claims.map { it.path })
+        assertEquals(true, claims.first().mandatory)
+        val summary = CredentialSummary(id = "array-contract", format = "dc+sd-jwt", label = "Account", issuer = null,
+            credentialDataJson = fixture.getValue("projectedArrayCredentialData").toString(), metadataJson = metadata)
+        val rows = CredentialDisplayNormalizer.toDetails(summary, listOf("en")).groups.flatMap { it.items }
+        val accounts = assertIs<DisplayValue.ListValue>(rows.single { it.path.id == "accounts" }.value).values
+        val entries = accounts.map { assertIs<DisplayValue.ObjectValue>(it).entries.single() }
+        assertEquals(listOf("Iban", "Second IBAN"), entries.map { it.label })
+        assertEquals(listOf(ClaimLabelSource.Wallet, ClaimLabelSource.IssuerMetadata), entries.map { it.labelSource })
+        assertEquals("Full name", rows.single { it.path.id == "name" }.label)
+        val option = WalletDemoPresentationCredentialOption(queryId = "account", credentialId = summary.id,
+            format = summary.format, label = "Account", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
+            disclosures = listOf(WalletDemoPresentationDisclosure(label = "Iban", path = "[\"accounts\",1,\"iban\"]",
+                valueJson = "\"DE456\"", selectivelyDisclosable = true)))
+        assertEquals("Second IBAN", option.toRequestedDisclosureGroup(listOf("en"))!!.items.single().label)
+        val path = option.disclosures.single().path
+        val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("account", summary.id, summary.format,
+            """{"accounts":[{"iban":"DE456"}]}""", false, listOf(
+                WalletDemoClaimLocation("[]", "[]", emptyList(), true),
+                WalletDemoClaimLocation("""["accounts"]""", """["accounts"]""", emptyList(), true),
+                WalletDemoClaimLocation("""["accounts",1]""", """["accounts",0]""", emptyList(), true),
+                WalletDemoClaimLocation(path, """["accounts",0,"iban"]""", listOf(path), false),
+            ))))
+        val account = review.toEffectiveSharingInformation(listOf(option), emptySet(), listOf("en"))
+            .single().contributions.single().nodes.single().children.single()
+        assertEquals("accounts[1]", account.path.id)
+        assertEquals("Second IBAN", account.children.single().label)
+        assertEquals(DisplayValue.Text("DE456"), account.children.single().value)
+    }
+
+    @Test
+    fun sharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() {
+        val fixture = credentialInformationFixture()
         fixture.getValue("sharingVisibility").jsonArray.forEach { row ->
             val case = row.jsonObject
             val path = case.getValue("path").jsonPrimitive.content
@@ -24,8 +61,9 @@ class CredentialInformationContractTest {
         }
     }
 
-    @Test fun issuerLabelsAndOrderAreConsistentAcrossStoredAndRequestedInformation() {
-        val fixture = Json.parseToJsonElement(File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "credential-information.json").readText()).jsonObject
+    @Test
+    fun issuerLabelsAndOrderAreConsistentAcrossStoredAndRequestedInformation() {
+        val fixture = credentialInformationFixture()
         fun strings(key: String) = fixture.getValue(key).jsonArray.map { it.jsonPrimitive.content }
         val metadata = fixture.getValue("metadata").toString()
         val format = fixture.getValue("format").jsonPrimitive.content
@@ -33,11 +71,20 @@ class CredentialInformationContractTest {
         val summary = CredentialSummary(id = "metadata-contract", format = format, label = "Identity", issuer = null,
             credentialDataJson = fixture.getValue("credentialData").toString(), metadataJson = metadata)
         val rows = CredentialDisplayNormalizer.toDetails(summary, locales).groups.flatMap { it.items }
-        assertEquals(strings("expectedLabels"), rows.take(4).map { it.label })
-        assertEquals(strings("expectedValues"), rows.take(4).map { assertIs<DisplayValue.Text>(it.value).value })
-        assertTrue(rows.take(4).all { it.labelSource == ClaimLabelSource.IssuerMetadata })
-        assertEquals(rows.size, rows.map { it.path.id }.distinct().size)
-        assertEquals(DisplayValue.BooleanValue(false), rows.last().value)
+        assertEquals(strings("expectedStoredRootPaths"), rows.map { it.path.id })
+        assertEquals(strings("expectedLabels").take(2), rows.take(2).map { it.label })
+        fun allItems(items: List<ClaimItem>): List<ClaimItem> = items.flatMap { item ->
+            listOf(item) + ((item.value as? DisplayValue.ObjectValue)?.entries?.let(::allItems) ?: emptyList())
+        }
+        val all = allItems(rows)
+        val paths = listOf("family_name", "given_name", "[\"ns.with.dots\"].given_name", "address.line_1")
+        val labelled = paths.map { path -> all.single { it.path.id == path } }
+        assertEquals(strings("expectedLabels"), labelled.map { it.label })
+        assertEquals(strings("expectedValues"), labelled.map { assertIs<DisplayValue.Text>(it.value).value })
+        assertTrue(labelled.all { it.labelSource == ClaimLabelSource.IssuerMetadata })
+        assertEquals(all.size, all.map { it.path.id }.distinct().size)
+        assertEquals(DisplayValue.BooleanValue(false), all.single { it.path.id == "extra" }.value)
+        for (path in listOf("address", "[\"ns.with.dots\"]")) assertIs<DisplayValue.ObjectValue>(rows.single { it.path.id == path }.value)
         val option = WalletDemoPresentationCredentialOption(queryId = "identity", credentialId = summary.id,
             format = format, label = "Identity", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = strings("requestedPaths").map { WalletDemoPresentationDisclosure(label = "Unhelpful fallback", path = it, valueJson = "\"Ada\"", selectivelyDisclosable = false) })
@@ -47,13 +94,15 @@ class CredentialInformationContractTest {
         assertEquals(listOf(1, 2), requested.map { it.displayOrder })
     }
 
-    @Test fun contradictoryOrMalformedStoredClaimMetadataDoesNotInventLabels() {
+    @Test
+    fun contradictoryOrMalformedStoredClaimMetadataDoesNotInventLabels() {
         for (claims in listOf("[{\"path\":[\"name\"]},{\"path\":[\"name\"]}]", "[{\"path\":[false]}]", "[null]")) {
             assertTrue(StoredCredentialMetadataParser.claims("{\"credentialClaims\":$claims}").isEmpty())
         }
     }
 
-    @Test fun arrayIndicesCannotAccidentallyMatchAPropertyPath() {
+    @Test
+    fun arrayIndicesCannotAccidentallyMatchAPropertyPath() {
         val metadata = listOf(WalletDemoCredentialClaimMetadata(listOf("jobs", "name"), null, "Company name"))
         val item = ClaimItem(path = ClaimItemPath.topLevel("jobs").indexedChild(0).child("name"),
             pathComponents = listOf("jobs", "name"), label = "Name", value = DisplayValue.Text("Engineer"))
@@ -64,5 +113,10 @@ class CredentialInformationContractTest {
         val path = ClaimItemPath.topLevel("object").child(specialKey)
         assertEquals(listOf(ClaimPathExpression.Segment.Key("object"), ClaimPathExpression.Segment.Key(specialKey)),
             ClaimPathExpression.parse(path.id).segments)
+    }
+
+    private fun credentialInformationFixture(): JsonObject {
+        val directory = requireNotNull(System.getProperty("walletDemoImageFixturesDir"))
+        return Json.parseToJsonElement(File(directory, "credential-information.json").readText()).jsonObject
     }
 }

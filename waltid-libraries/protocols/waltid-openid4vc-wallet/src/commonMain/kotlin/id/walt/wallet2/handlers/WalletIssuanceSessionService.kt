@@ -197,6 +197,11 @@ data class WalletIssuanceSessionRequest(
     val did: String? = null,
     val clientId: String = "eudiw-abca",
     val redirectUri: Url = Url("openid://"),
+    /**
+     * Manual token authentication; see [ReceiveCredentialRequest.tokenRequestHeaders]. Validated
+     * before session creation. PAR authenticates independently; issuer refusals retain the session
+     * outcome contract. A static manual PoP cannot be regenerated for automatic recovery.
+     */
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val credentialIssuer: String? = null,
     val credentialConfigurationIds: List<String>? = null,
@@ -470,6 +475,7 @@ class WalletIssuanceSessionService(
         request: WalletIssuanceSessionRequest,
         preferredLocales: List<String>,
     ): ActiveSession {
+        parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         ensureOpen()
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request, preferredLocales, keyMaterial)
@@ -992,7 +998,7 @@ class WalletIssuanceSessionService(
                     val value = it.credential
                     if (value is JsonPrimitive) value.content else value.toString()
                 }, bindings, request.label, request.metadata, configured?.proofRequired ?: false,
-                    expectedConfiguration = configured?.configuration)
+                    expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient)
                 record = record.copy(content = DeferredContent.Received(prepared), claimed = false,
                     public = record.public.copy(intervalSeconds = null))
             }
@@ -1172,7 +1178,9 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationJwt = obtainAttestationJwt(active)
+        val attestationJwt = if (parseManualClientAttestationHeaders(active.request.tokenRequestHeaders) == null) {
+            obtainAttestationJwt(active)
+        } else null
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
         active.tokenRequestAnonymous = anonymous
@@ -1208,7 +1216,9 @@ class WalletIssuanceSessionService(
     ): TokenRequestBuilder.TokenResponse {
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
-        val attestationJwt = obtainAttestationJwt(active)
+        val attestationJwt = if (parseManualClientAttestationHeaders(active.request.tokenRequestHeaders) == null) {
+            obtainAttestationJwt(active)
+        } else null
         active.tokenRequestAnonymous = false
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
@@ -1412,8 +1422,8 @@ class WalletIssuanceSessionService(
             "Credential issuer metadata identifier does not match the offer"
         }
         val grantAuthorizationServer = when (offer?.getGrantType()) {
-            is GrantType.AuthorizationCode -> offer?.grants?.authorizationCode?.authorizationServer
-            is GrantType.PreAuthorizedCode -> offer?.grants?.preAuthorizedCode?.authorizationServer
+            is GrantType.AuthorizationCode -> offer.grants?.authorizationCode?.authorizationServer
+            is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
             else -> null
         }
         val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)

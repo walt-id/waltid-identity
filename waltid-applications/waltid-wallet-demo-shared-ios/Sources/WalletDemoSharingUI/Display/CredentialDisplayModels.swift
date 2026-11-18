@@ -34,7 +34,7 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.subject = subject
         self.format = format
         self.addedAt = addedAt
-        self.groups = applyClaimMetadata(groups, metadata: StoredCredentialMetadataParser.claims(from: metadataJSON, preferredLocales: preferredLocales), format: format)
+        self.groups = applyClaimMetadata(groups, metadata: StoredCredentialMetadataParser.claims(from: metadataJSON, preferredLocales: preferredLocales, format: format), format: format)
         self.issuerDisplay = issuerDisplay
             ?? StoredCredentialMetadataParser.issuerDisplay(
                 from: metadataJSON,
@@ -114,7 +114,8 @@ public enum DisplayValue: Equatable {
     case number(String)
     case bool(Bool)
     case object([ClaimItem])
-    case list([DisplayValue])
+    /// Per-index issuer labels are display annotations, not credential values.
+    case list([DisplayValue], labels: [Int: String] = [:])
     case deferredImage(DeferredCredentialImage)
     case image(encoded: String, data: Data, mimeType: String, byteCount: Int)
     case decodedText(String)
@@ -252,6 +253,8 @@ public enum ClaimRole: Hashable {
     case expiryDate
     case image
     case credentialType
+    /// Display category only; disclosure and inclusion policy remain SDK-owned.
+    case technical
 }
 
 public enum CredentialDisplayText {

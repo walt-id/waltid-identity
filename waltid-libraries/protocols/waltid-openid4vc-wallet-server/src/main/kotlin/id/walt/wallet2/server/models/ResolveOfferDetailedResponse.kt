@@ -1,11 +1,17 @@
 package id.walt.wallet2.server.models
 
+import id.walt.openid4vci.metadata.issuer.ClaimDescriptionPathSerializer
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
+import id.walt.openid4vci.metadata.issuer.claimDescriptionsToProcess
 import id.walt.openid4vci.offers.TxCode
 import id.walt.wallet2.handlers.WalletOfferResolution
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+
+private val log = KotlinLogging.logger {}
 
 /**
  * Enriched, UI-facing response for the isolated `credentials/receive/resolve-offer` endpoint.
@@ -71,7 +77,8 @@ data class OfferedCredentialMetadata(
 /** Display metadata for one claim declared by an offered credential configuration. */
 @Serializable
 data class OfferClaimMetadata(
-    val path: List<String>,
+    @Serializable(with = ClaimDescriptionPathSerializer::class)
+    val path: List<JsonElement>,
     val mandatory: Boolean? = null,
     val displayName: String? = null,
 )
@@ -117,7 +124,12 @@ fun WalletOfferResolution.toDetailedResponse(
             vct = configuration.vct,
             doctype = configuration.doctype,
             display = metadata?.display.selectPreferredByLocale(preferredLocales) { it.locale }?.toOfferDisplay(),
-            claims = metadata?.claims.orEmpty().map { claim ->
+            claims = configuration.claimDescriptionsToProcess { conflicts ->
+                log.warn {
+                    "Ignoring claim descriptions of credential configuration '${offered.credentialConfigurationId}' from " +
+                        "${summary.credentialIssuer}: ${conflicts.joinToString("; ") { it.message }} (OpenID4VCI Appendix B.3)"
+                }
+            }.map { claim ->
                 OfferClaimMetadata(
                     path = claim.path,
                     mandatory = claim.mandatory,

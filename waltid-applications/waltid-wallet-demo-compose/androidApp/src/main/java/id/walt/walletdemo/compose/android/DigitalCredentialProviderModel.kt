@@ -23,6 +23,8 @@ import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.toDemoPaymentConsent
+import id.walt.walletdemo.compose.logic.toDemoClaimReview
+import id.walt.walletdemo.compose.logic.WalletDemoPreparedClaimReview
 
 import android.content.Context
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
@@ -63,6 +65,10 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
             discardReview = { wallet.discardDigitalCredentialPreview(preview.requestId) }
             currentCoroutineContext().ensureActive()
             install(preview.toSharingReview(), "Share digital credential?", showPreview,
+                prepareClaimReview = { selection ->
+                    wallet.reviewDigitalCredentialPresentation(preview.requestId,
+                        selection.toCredentialSelections(), selection.toDisclosureSelections()).toDemoClaimReview()
+                },
                 preparePaymentConsent = { selection ->
                     wallet.prepareDigitalCredentialPaymentConsent(preview.requestId,
                         selection.toCredentialSelections(), selection.toDisclosureSelections())?.toDemoPaymentConsent()
@@ -74,13 +80,14 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         review: WalletDemoSharingReview,
         title: String,
         showPreview: Boolean,
+        prepareClaimReview: (suspend (WalletDemoSharingSelection) -> WalletDemoPreparedClaimReview?)? = null,
         preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
         submit: suspend (WalletDemoSharingSelection) -> Unit,
     ) {
         if (result != null || released) return
         this.title = title
         submitReview = submit
-        if (showPreview) reviewController = WalletDemoSharingReviewController(review, scope, preparePaymentConsent)
+        if (showPreview) reviewController = WalletDemoSharingReviewController(review, scope, project = prepareClaimReview, prepare = preparePaymentConsent)
         else {
             // Preserve the user's existing preview preference and the SDK's consent guard.
             submitting = true

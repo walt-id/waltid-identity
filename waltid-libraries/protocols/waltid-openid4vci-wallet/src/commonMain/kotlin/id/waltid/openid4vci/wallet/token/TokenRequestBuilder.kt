@@ -86,6 +86,11 @@ class TokenRequestException(
  * Builds OAuth 2.0 token requests for OpenID4VCI.
  * Implements §6 of OpenID4VCI 1.0 specification (Token Endpoint).
  *
+ * Static client-attestation headers, supplied through additional headers or [ClientAttestationHeaders],
+ * cannot be regenerated after an attestation challenge or DPoP nonce response, so these requests are
+ * not retried automatically. Callers must supply a fresh PoP on their next attempt. A fresh-PoP
+ * factory enables the existing bounded recovery, including for refresh-token requests.
+ *
  * @property clientConfig The OAuth 2.0 client configuration
  * @property httpClient The HTTP client for token requests
  */
@@ -437,6 +442,11 @@ class TokenRequestBuilder(
         require(attestationHeaders == null || attestationHeadersFactory == null) {
             "Client attestation must be configured with either attestationHeaders or attestationHeadersFactory, not both"
         }
+        // A static signed PoP cannot be refreshed after either kind of challenge. This also applies
+        // to refresh-token requests; only a factory can provide fresh attestation on recovery.
+        val staticAttestation = attestationHeaders != null || additionalHeaders.keys.any {
+            it.equals(ClientAttestationHeaders.HEADER_ATTESTATION_POP, ignoreCase = true)
+        }
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
 
@@ -469,12 +479,12 @@ class TokenRequestBuilder(
             if (!response.status.isSuccess()) {
                 val errorResponse = response.oauthError()
                 val oauthError = errorResponse?.error
-                if (!dpopRetried && dpopProofFactory != null && oauthError == USE_DPOP_NONCE && suppliedNonce != null) {
+                if (!staticAttestation && !dpopRetried && dpopProofFactory != null && oauthError == USE_DPOP_NONCE && suppliedNonce != null) {
                     dpopRetried = true
                     return@repeat
                 }
                 if (attestationRecovery.shouldRetry(
-                        response.status, oauthError, response.headers, attestationHeadersFactory != null,
+                        response.status, oauthError, response.headers, !staticAttestation && attestationHeadersFactory != null,
                     )) return@repeat
                 throw TokenRequestException(
                     statusCode = response.status.value,

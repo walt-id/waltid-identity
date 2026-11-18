@@ -2,6 +2,7 @@
 
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -22,6 +23,7 @@ import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.issuer2.testsupport.*
@@ -74,12 +76,21 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 class Issuer2AttestationChallengeTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
     @AfterEach
-    fun clear() = clearIssuer2TestEnvironment()
+    fun clear() {
+        try {
+            catalogues.forEach { it.close() }
+        } finally {
+            clearIssuer2TestEnvironment()
+        }
+    }
 
     @Test
     fun `PKCE token exchange is enforced by the provider through HTTP`() = testApplication {
@@ -473,7 +484,7 @@ class Issuer2AttestationChallengeTest {
         return apiClient()
     }
 
-    private class Fixture(
+    private inner class Fixture(
         val config: Issuer2ServiceConfig,
         val tokenKey: JWKKey,
         val material: Issuer2ClientAttestationTestMaterial,
@@ -489,11 +500,18 @@ class Issuer2AttestationChallengeTest {
             }
         }
         val preAuthorizedCodes = InMemoryPreAuthorizedCodeRepository()
-        val module = OpenId4VciModule.create(config, codes, preAuthorizedCodes, InMemoryPARRepository(), InMemoryRefreshTokenRepository())
-        val challenges get() = assertNotNull(module.attestationChallengeService)
         val metadataConfig = Issuer2MetadataConfig(credentialConfigurations = mapOf("identity" to buildJsonObject {
             put("format", "dc+sd-jwt"); put("vct", "https://example.com/identity"); put("scope", "identity")
         }))
+        private val typeMetadata = IssuerTypeMetadataCatalogue(
+            config, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
+        val module = OpenId4VciModule.create(
+            config, codes, preAuthorizedCodes, InMemoryPARRepository(), InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
+        )
+        val challenges get() = assertNotNull(module.attestationChallengeService)
+
         val profiles = CredentialProfileService(Issuer2ProfilesConfig(), metadataConfig)
         val sessions = IssuanceSessionService(object : IssuanceSessionRepository {
             val records = mutableMapOf<String, IssuanceSession>()
@@ -503,7 +521,7 @@ class Issuer2AttestationChallengeTest {
             override suspend fun remove(sessionId: String) { records.remove(sessionId) }
             override suspend fun take(sessionId: String) = records.remove(sessionId)
         })
-        val metadata = MetadataService(config, metadataConfig, profiles, sessions,
+        val metadata = MetadataService(config, metadataConfig, profiles, sessions, typeMetadata,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
             pkceServiceConfig = module.pkceServiceConfig)
         val notifications = IssuanceNotificationService()
@@ -515,7 +533,7 @@ class Issuer2AttestationChallengeTest {
         )
 
         fun controller(service: AttestationChallengeService?) = OpenId4VciController(
-            metadata, protocol(service), CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, config, notifications), notifications,
+            metadata, protocol(service), CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, config, notifications, typeMetadata), notifications,
         )
 
         suspend fun headers(challenge: String?) = material.attestationAssembler.buildAttestationHeaders(

@@ -18,7 +18,7 @@ import kotlinx.serialization.json.*
  * Supports RFC 7591 language-tagged metadata fields (e.g., `client_name#fr-FR`, `logo_uri#en`).
  * Language tags follow BCP 47 format and are case-insensitive.
  */
-@ExperimentalSerializationApi
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable(with = ClientMetadataSerializer::class)
 @JsonIgnoreUnknownKeys
 data class ClientMetadata(
