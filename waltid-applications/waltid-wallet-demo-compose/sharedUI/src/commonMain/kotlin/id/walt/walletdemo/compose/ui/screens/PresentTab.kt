@@ -15,6 +15,7 @@ import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
 import id.walt.walletdemo.compose.logic.isPaymentTransaction
+import id.walt.walletdemo.compose.logic.canConfirm
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
@@ -35,6 +36,7 @@ internal fun PresentTab(
     modifier: Modifier = Modifier,
     fillViewport: Boolean = !LocalWalletSheet.current,
     feedback: (@Composable () -> Unit)? = null,
+    onRetryClaimReview: () -> Unit = {},
 ) {
     val preview = state.presentationPreview
     val error = state.presentationError
@@ -74,7 +76,7 @@ internal fun PresentTab(
                     paymentReview = state.paymentReview,
                     isPayment = preview.transactionData.any { it.isPaymentTransaction },
                     enabled = state.presentationReviewEnabled,
-                    selectionComplete = information != null && state.presentationCredentialSelectionComplete(),
+                    selectionComplete = information != null && state.claimReview.canConfirm && state.presentationCredentialSelectionComplete(),
                     onSubmit = onSubmit,
                     onCancel = onCancel,
                     onReject = onReject,
@@ -85,6 +87,8 @@ internal fun PresentTab(
             feedback?.invoke()
             SharingReviewSection(
                 paymentReview = state.paymentReview,
+                claimReview = state.claimReview,
+                onRetryClaimReview = onRetryClaimReview,
                 review = preview.toSharingReview(),
                 information = information,
                 selectedCredentialOptions = state.selectedPresentationCredentialOptions,

@@ -1,5 +1,6 @@
 package id.walt.issuer2.notifications
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
@@ -12,6 +13,7 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.encodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.service.openid4vci.MetadataService
@@ -37,12 +39,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
@@ -52,6 +56,12 @@ import kotlin.time.Instant
  * exercised directly.
  */
 class AuthorizationEventTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
 
     @Test
     fun `malformed authorization request publishes an uncorrelated failure`() = runTest {
@@ -562,16 +572,21 @@ class AuthorizationEventTest {
             metadataConfig = metadataConfig,
         )
         val sessionService = IssuanceSessionService(InMemorySessionRepository(sessions.toList()))
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
         val module = OpenId4VciModule.create(
             config = serviceConfig,
             authorizationCodeRepository = authorizationCodeRepository,
             preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
+            typeMetadata = typeMetadata,
             profileService = profileService,
             sessionService = sessionService,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,

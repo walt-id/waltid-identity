@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -13,13 +14,16 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.dcql.DcqlParser
+import id.walt.dcql.RawDcqlCredential
 import id.walt.sdjwt.SDJwt
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
@@ -27,6 +31,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -153,7 +158,7 @@ class WalletNestedSdJwtPresentationTest {
     // ---------------------------------------------------------------------------------------------------------
 
     /** What the verifier rebuilds from the presentation, and the consent rows the wallet showed for it. */
-    private class Presented(val verifierView: JsonObject, val preview: List<PresentationDisclosure>) {
+    private class Presented(val verifierView: JsonObject, val preview: List<PresentationDisclosure>, val selectedClaims: JsonObject) {
         fun previewValue(path: String): JsonElement? = preview.single { it.path == path }.value
         fun previewName(path: String): String? = preview.single { it.path == path }.name
     }
@@ -228,6 +233,17 @@ class WalletNestedSdJwtPresentationTest {
         )
         val ready = assertIs<StatelessPreviewPresentationResult.Ready>(preview)
 
+        val chosen = listOf(PresentationCredentialSelection(QUERY_ID, CREDENTIAL_ID))
+        val optional = selectedOptionalPaths?.map { PresentationDisclosureSelection(QUERY_ID, CREDENTIAL_ID, it) }
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(wallet,
+            WalletPresentationHandler.PreviewedPresentation.Ready(REQUEST_URL, resolverFor(request)(REQUEST_URL), ready.keyId))
+        val selectedClaims = try {
+            WalletPresentationHandler.reviewPresentation(wallet,
+                SubmitPresentationRequest(handle, chosen, optional, did = did)).credentials.single().claims
+        } finally {
+            WalletPresentationHandler.discardPreview(wallet, handle)
+        }
+
         val vpToken = WalletPresentationHandler.buildVpToken(
             wallet = wallet,
             request = BuildVpTokenRequest(
@@ -242,7 +258,9 @@ class WalletNestedSdJwtPresentationTest {
         val presentation = Json.parseToJsonElement(vpToken).jsonObject.getValue(QUERY_ID).jsonArray.single().jsonPrimitive.content
 
         // Rebuilt by the SD-JWT library, which also rejects disclosures not reachable from the payload
-        return Presented(SDJwt.parse(presentation).fullPayload, ready.credentialOptions.single().disclosures)
+        val verifierView = SDJwt.parse(presentation).fullPayload
+        assertEquals(verifierView, selectedClaims, "Selection projection must equal the actual presented claims")
+        return Presented(verifierView, ready.credentialOptions.single().disclosures, selectedClaims)
     }
 
     private suspend fun isRejected(request: AuthorizationRequest): Boolean =
@@ -262,6 +280,108 @@ class WalletNestedSdJwtPresentationTest {
     // ---------------------------------------------------------------------------------------------------------
     // Cases
     // ---------------------------------------------------------------------------------------------------------
+
+    @Test
+    fun retainedReviewIsReusableWalletBoundAndRejectsInvalidSelections() = runTest {
+        val request = request(
+            """{"id":"name","path":["given_name"]}""",
+            """{"id":"country","path":["nationalities",1,"country"]}""",
+            claimSets = """[["name"],["name","country"]]""",
+        )
+        val wallet = wallet(sdJwt)
+        val keyId = requireNotNull(wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))).keyId
+        val preview = WalletPresentationHandler.PreviewedPresentation.Ready(REQUEST_URL,
+            resolverFor(request)(REQUEST_URL), keyId)
+        val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(wallet, preview)
+        val submit = SubmitPresentationRequest(handle,
+            listOf(PresentationCredentialSelection(QUERY_ID, CREDENTIAL_ID)), emptyList())
+        val off = WalletPresentationHandler.reviewPresentation(wallet, submit)
+        assertFalse("nationalities" in off.credentials.single().claims)
+        val included = submit.copy(selectedDisclosureOptions = listOf(
+            PresentationDisclosureSelection(QUERY_ID, CREDENTIAL_ID, "\"nationalities\".1.\"country\"")))
+        val on = WalletPresentationHandler.reviewPresentation(wallet, included)
+        assertEquals(json("""[{"kind":"residency","country":"DE"}]"""), on.credentials.single().claims["nationalities"])
+        assertFalse(on.credentials.single().wholeCredential)
+        val countryLocation = on.credentials.single().locations.single {
+            it.receivedPath == listOf(JsonPrimitive("nationalities"), JsonPrimitive(0), JsonPrimitive("country"))
+        }
+        assertEquals(listOf(JsonPrimitive("nationalities"), JsonPrimitive(1), JsonPrimitive("country")), countryLocation.sourcePath)
+        assertFalse(countryLocation.alwaysCarried)
+        assertEquals(listOf("\"nationalities\".1.\"country\""), countryLocation.sharedBy)
+        val kindLocation = on.credentials.single().locations.single {
+            it.receivedPath == listOf(JsonPrimitive("nationalities"), JsonPrimitive(0), JsonPrimitive("kind"))
+        }
+        assertFalse(kindLocation.alwaysCarried) // Clear sibling, but released only with its disclosed ancestors.
+        assertEquals(countryLocation.sharedBy, kindLocation.sharedBy)
+        assertTrue(on.credentials.single().locations.single {
+            it.receivedPath == listOf(JsonPrimitive("given_name"))
+        }.alwaysCarried)
+        // No request consumption or second URL resolution is needed to toggle back.
+        assertEquals(off.credentials, WalletPresentationHandler.reviewPresentation(wallet, submit).credentials)
+        assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.reviewPresentation(wallet.copy(id = "another-wallet"), submit)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentationHandler.reviewPresentation(wallet, submit.copy(selectedDisclosureOptions = listOf(
+                PresentationDisclosureSelection(QUERY_ID, CREDENTIAL_ID, "unknown"))))
+        }
+        WalletPresentationHandler.discardPreview(wallet, handle)
+        assertFailsWith<PreviewSessionException> { WalletPresentationHandler.reviewPresentation(wallet, submit) }
+    }
+
+    @Test
+    fun projectionDropsDecoysAndWithheldArraySlotsWithoutChangingControlPaths() = runTest {
+        val credential = sdJwt {
+            payload {
+                putJsonArray("nationalities") {
+                    addJsonObject { put("...", "decoy-before") }
+                    add(element("IN"))
+                    addJsonObject { put("...", "decoy-between") }
+                    add(element("FR"))
+                    addJsonObject { put("...", "decoy-after") }
+                }
+            }
+        }
+        val result = present(request(claim("nationalities", 1)), credential = credential)
+        assertEquals(json("""["FR"]"""), result.selectedClaims["nationalities"])
+        assertEquals(JsonPrimitive("FR"), result.previewValue("\"nationalities\".1"))
+    }
+
+    @Test
+    fun projectionPreservesClearValuesInsideAnAtomicDisclosure() = runTest {
+        val values = json("""{"":null,"0":false,"a.b":0,"a/b":"","quoted\"key":{},"array":[]}""")
+        val credential = sdJwt {
+            payload { putJsonArray("_sd") { add(property("details", values)) } }
+        }
+        assertEquals(values, present(request(claim("details")), credential = credential).selectedClaims["details"])
+    }
+
+    @Test
+    fun optionalCityProjectionIncludesOnlyItsEffectiveParentClaims() = runTest {
+        val employee = sdJwt {
+            payload {
+                putJsonArray("_sd") {
+                    add(property("address", buildJsonObject {
+                        put("country", "IN")
+                        put("city", "Bengaluru")
+                        putJsonArray("_sd") { add(property("postal_code", JsonPrimitive("560038"))) }
+                    }))
+                }
+            }
+        }
+        val query = request(
+            """{"id":"name","path":["given_name"]}""",
+            """{"id":"city","path":["address","city"]}""",
+            claimSets = """[["name"],["name","city"]]""",
+        )
+        val off = present(query, selectedOptionalPaths = emptyList(), credential = employee)
+        assertFalse("address" in off.selectedClaims)
+        val on = present(query, selectedOptionalPaths = listOf("\"address\".\"city\""), credential = employee)
+        assertEquals(json("""{"country":"IN","city":"Bengaluru"}"""), on.selectedClaims["address"])
+        assertFalse("postal_code" in on.selectedClaims.getValue("address").jsonObject)
+        val offAgain = present(query, selectedOptionalPaths = emptyList(), credential = employee)
+        assertEquals(off.selectedClaims, offAgain.selectedClaims)
+    }
 
     @Test
     fun w3cWrapperPathDoesNotPresentAnUnrequestedNestedVcDisclosure() = runTest {
@@ -388,6 +508,7 @@ class WalletNestedSdJwtPresentationTest {
         assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), country.verifierView["nationalities"])
         assertEquals(json(""""DE""""), country.previewValue(""""nationalities".1."country""""))
         assertEquals("country", country.previewName(""""nationalities".1."country""""))
+        assertEquals(json("""[{"kind":"residency","country":"DE"}]"""), country.selectedClaims["nationalities"])
 
         // request: ["nationalities", 1, "documents", null]
         // sent:    nationalities, element 1, documents, both documents
@@ -634,6 +755,16 @@ class WalletNestedSdJwtPresentationTest {
         fun verifierView(queryId: String) = SDJwt.parse(vpToken.getValue(queryId).jsonArray.single().jsonPrimitive.content).fullPayload
         assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), verifierView("A")["nationalities"])
         assertFalse("nationalities" in verifierView("B"))
+
+        val selected = WalletPresentationHandler.run {
+            selectFromStores(wallet, requireNotNull(request.dcqlQuery), useWalletCredentialIds = true)
+                .selectCredentialOptions(listOf("A", "B").map { PresentationCredentialSelection(it, CREDENTIAL_ID) }, emptyList())
+        }
+        selected.forEach { (queryId, matches) ->
+            val match = matches.single()
+            val credential = (match.credential as RawDcqlCredential).originalCredential as DigitalCredential
+            assertEquals(verifierView(queryId), SdJwtVcPresenter.previewClaims(credential, match))
+        }
     }
 
     private fun String.withId(id: String) = Json.parseToJsonElement(this).jsonObject.let { JsonObject(it + ("id" to JsonPrimitive(id))) }.toString()

@@ -4,6 +4,8 @@ package id.walt.wallet2.consent
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.keys.*
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.dcql.models.*
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -17,6 +19,7 @@ import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -33,6 +36,7 @@ class PaymentConsentSubmissionTest {
         var authorizations = 0
         var cancelAuthorization = false
         lateinit var wallet: Wallet
+        val store = InMemoryCredentialStore()
         val policy = PaymentConsentPolicy(fixture.resolver, listOf("en"))
         val registry = TransactionDataTypeRegistry(setOf(TS12_PAYMENT_TYPE))
         val selections = listOf(PresentationCredentialSelection("ordinary", "ordinary"), PresentationCredentialSelection("payment", "payment"))
@@ -59,7 +63,7 @@ class PaymentConsentSubmissionTest {
             })
             wallet = Wallet(id = "consent-${kotlin.random.Random.nextLong()}",
                 keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(countingKey) }),
-                credentialStores = listOf(InMemoryCredentialStore().also { store ->
+                credentialStores = listOf(store.also { store ->
                     store.addCredential(StoredCredential("ordinary", ordinary))
                     store.addCredential(StoredCredential("payment", credential))
                     store.addCredential(StoredCredential("other-payment", fixture.credential(buildJsonObject {
@@ -77,9 +81,9 @@ class PaymentConsentSubmissionTest {
                 put("payload", fixture.payload)
             }.toString().encodeToByteArray().encodeToBase64Url()),
         )
-        suspend fun dcRequest(): SubmitDcApiPresentationRequest {
+        suspend fun dcRequest(authorization: AuthorizationRequest = authorization()): SubmitDcApiPresentationRequest {
             val preview = WalletPresentationHandler.previewDcApiPresentation(wallet,
-                PreviewDcApiPresentationRequest("openid4vp-v1-unsigned", Json.encodeToJsonElement(authorization()).jsonObject,
+                PreviewDcApiPresentationRequest("openid4vp-v1-unsigned", Json.encodeToJsonElement(authorization).jsonObject,
                     "https://verifier.example"), transactionDataTypeRegistry = registry)
             assertEquals(setOf("ordinary", "payment"), preview.credentialOptions.map { it.queryId }.toSet())
             return SubmitDcApiPresentationRequest(preview.requestId, selections)
@@ -88,8 +92,8 @@ class PaymentConsentSubmissionTest {
             wallet, request, transactionDataTypeRegistry = registry, scaAuthorizer = authorizer, paymentConsentPolicy = policy)
         suspend fun prepare(request: SubmitDcApiPresentationRequest) = assertNotNull(
             WalletPresentationHandler.prepareDcApiPaymentConsent(wallet, request, policy))
-        suspend fun urlRequest(): SubmitPresentationRequest {
-            val request = authorization().copy(clientId = "redirect_uri:https://verifier.example/callback",
+        suspend fun urlRequest(authorization: AuthorizationRequest = authorization()): SubmitPresentationRequest {
+            val request = authorization.copy(clientId = "redirect_uri:https://verifier.example/callback",
                 responseUri = "https://verifier.example/callback", responseMode = OpenID4VPResponseMode.DIRECT_POST)
             val handle = WalletPresentationHandler.rememberPreviewedAuthorizationRequest(wallet,
                 WalletPresentationHandler.PreviewedPresentation.Ready(Url("openid4vp://request"),
@@ -98,6 +102,45 @@ class PaymentConsentSubmissionTest {
         }
         suspend fun submit(request: SubmitPresentationRequest) = WalletPresentationHandler.submitPresentation(
             wallet, request, transactionDataTypeRegistry = registry, scaAuthorizer = authorizer, paymentConsentPolicy = policy)
+    }
+
+    @Test fun bothConsentTransportsReuseTheSelectionSnapshotForAnAncestorRequest() = test {
+        val parentVct = "https://types.example/payment"
+        val parent = JsonObject(fixture.metadata + ("vct" to JsonPrimitive(parentVct))).toString().encodeToByteArray()
+        val parentPin = MetadataIntegrity.sha256(parent)
+        for (stored in store.listCredentials().toList()) {
+            val vct = stored.credential.credentialData.getValue("vct").jsonPrimitive.content
+            val leaf = buildJsonObject {
+                put("vct", vct); put("extends", parentVct); put("extends#integrity", parentPin)
+            }.toString().encodeToByteArray()
+            val pin = MetadataIntegrity.sha256(leaf)
+            val snapshot = TypeMetadataResolver({ if (it == vct) leaf else parent }).resolve(vct, pin).snapshot()
+            val credential = fixture.credential(JsonObject(stored.credential.credentialData + ("vct#integrity" to JsonPrimitive(pin))))
+            store.addCredential(stored.copy(credential = credential, metadata = buildJsonObject {
+                put(TYPE_METADATA_SNAPSHOT, snapshot)
+            }))
+        }
+        fixture.onMetadataRequest = { error("Pinned selection metadata must reach consent without retrieval") }
+        val request = authorization().let { authorization -> authorization.copy(dcqlQuery = authorization.dcqlQuery!!.copy(
+            credentials = authorization.dcqlQuery!!.credentials.map {
+                if (it.id == "payment") it.copy(meta = SdJwtVcMeta(listOf(parentVct))) else it
+            },
+        )) }
+        val dc = dcRequest(request)
+        val dcReview = WalletPresentationHandler.reviewDcApiPresentation(wallet, dc)
+        assertEquals(selections.map { it.credentialId }, dcReview.credentials.map { it.credentialId })
+        val url = urlRequest(request)
+        val urlReview = WalletPresentationHandler.reviewPresentation(wallet, url)
+        assertEquals(dcReview.credentials, urlReview.credentials)
+        assertEquals(0, signatures, "Claim review must not sign or consume either request")
+        val dcConsent = prepare(dc)
+        assertEquals("Pay", dcConsent.payment.affirmativeAction)
+        val urlConsent = assertNotNull(WalletPresentationHandler.preparePaymentConsent(wallet, url, policy))
+        assertEquals("Pay", urlConsent.payment.affirmativeAction)
+        assertNotNull(submit(dc.copy(paymentConsentRevision = dcConsent.revision)))
+        assertEquals(2, signatures)
+        assertEquals(1, authorizations)
+        assertTrue(fixture.requests.isEmpty())
     }
 
     @Test fun rejectionInterruptsMetadataPreparationBeforeEnteringTheDenialTransport() = test {

@@ -58,5 +58,5 @@ data class SdJwtVcTypeMetadataDraft04(
     }
 }
 
-private object SDJWTVCTypeMetadataDraft04Serializer :
+internal object SDJWTVCTypeMetadataDraft04Serializer :
     JsonDataObjectSerializer<SdJwtVcTypeMetadataDraft04>(SdJwtVcTypeMetadataDraft04.generatedSerializer())
