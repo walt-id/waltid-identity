@@ -56,6 +56,21 @@ class PublicIssuanceSessionTest {
     }
 
     @Test
+    fun `strict holder key policy survives flat and multi-item session views`() {
+        val session = IssuanceSessionStorageCodec.decode(Json.encodeToString(baseline()))
+        val request = session.issuanceRequests.single()
+        val strict = request.copy(requireDistinctBatchHolderKeys = true)
+        for (items in listOf(listOf(strict), listOf(request, strict.copy(credentialIdentifier = "B")))) {
+            val view = session.copy(issuanceRequests = items).toPublicJson()
+            val decoded = IssuanceSessionStorageCodec.decode(view.toString())
+            assertEquals(
+                items.map { it.requireDistinctBatchHolderKeys },
+                decoded.issuanceRequests.map { it.requireDistinctBatchHolderKeys },
+            )
+        }
+    }
+
+    @Test
     fun `proof copies preserve order and duplicates and original multiple selections stay plural after narrowing`() {
         val session = IssuanceSessionStorageCodec.decode(Json.encodeToString(baseline()))
         val keyA = buildJsonObject { put("kid", "A") }

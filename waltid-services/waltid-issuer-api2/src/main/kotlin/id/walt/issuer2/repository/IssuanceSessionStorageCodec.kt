@@ -56,5 +56,6 @@ object IssuanceSessionStorageCodec {
         "issuerDid",
         "credentialStatus",
         "expectedCredentialProofKeyJwks",
+        "requireDistinctBatchHolderKeys",
     )
 }
