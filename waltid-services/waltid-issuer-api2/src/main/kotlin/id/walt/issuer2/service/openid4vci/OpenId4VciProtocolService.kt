@@ -1130,6 +1130,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
 
         val nonceBinding = credentialNonceBinding()
+        val usesPreallocatedStatus = CredentialStatusConfiguration.isPreallocated(observedIssuanceRequest.credentialStatus)
 
         if (observedSession.deferredState != null && deferredClaim == null) {
             try {
@@ -1181,9 +1182,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         // pinned to an expected holder key, and deployments hooking into proof-key acceptance, need that
         // key before the session is claimed, so resolve it up front for those cases only. Nonces stay
         // valid until they expire, so validating them here as well never consumes anything.
-        val proofPublicKeyJwks = if (deferredClaim != null) deferredClaim.accepted.bindings.map { it.publicJwk } else if (requiresCredentialProofKeys(observedIssuanceRequest)) {
+        val verifiedProofKeys = if (deferredClaim != null) CredentialProofKeys(
+            deferredClaim.accepted.bindings.map { it.publicJwk },
+            if (usesPreallocatedStatus) deferredClaim.accepted.bindings.map {
+                credentialStatusBinding(it.publicJwk, it.holderKid, it.holderDid, it.proofIndexes)
+            } else emptyList(),
+        ) else if (usesPreallocatedStatus || requiresCredentialProofKeys(observedIssuanceRequest)) {
             try {
-                resolveCredentialProofPublicKeyJwks(requestWithSession, configuration, nonceBinding)
+                resolveCredentialProofKeys(requestWithSession, configuration, nonceBinding, usesPreallocatedStatus)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: CredentialProofServiceException) {
@@ -1217,6 +1223,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } else {
             null
         }
+        val proofPublicKeyJwks = verifiedProofKeys?.publicJwks
 
         validateExpectedCredentialProofKeys(proofPublicKeyJwks, observedIssuanceRequest)?.let { error ->
             return rejectCredentialRequest(
@@ -1883,11 +1890,29 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
      * holder keys to session pinning and to the proof-key hooks before the session is claimed, so that
      * neither runs for a request that cannot be issued.
      */
-    private suspend fun resolveCredentialProofPublicKeyJwks(
+    private data class CredentialProofKeys(
+        val publicJwks: List<JsonObject>,
+        val statusBindings: List<String>,
+    )
+
+    private suspend fun credentialStatusBinding(
+        publicJwk: JsonObject,
+        holderKid: String?,
+        holderDid: String?,
+        proofIndexes: Set<Int>,
+    ): String = buildJsonObject {
+        put("key", JWKKey.importJWK(publicJwk.toString()).getOrThrow().getThumbprint())
+        holderKid?.let { put("kid", it) }
+        holderDid?.let { put("did", it) }
+        put("proofIndexes", JsonArray(proofIndexes.sorted().map(::JsonPrimitive)))
+    }.toString()
+
+    private suspend fun resolveCredentialProofKeys(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         nonceBinding: CredentialNonceBinding,
-    ): List<JsonObject> {
+        includeStatusBindings: Boolean,
+    ): CredentialProofKeys {
         val verifiedProofs = credentialProofVerifier.verify(
             credentialRequest = request,
             credentialConfiguration = configuration,
@@ -1906,13 +1931,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         require(verifiedProofs.bindings.isNotEmpty()) { "Credential request has no credential proof" }
         // The verified holder key is a crypto2 key since the crypto updates, so the public JWK comes
         // from its public key exporter rather than the legacy getPublicKey().exportJWKObject().
-        return verifiedProofs.bindings.map { verifiedProof ->
+        val publicJwks = verifiedProofs.bindings.map { verifiedProof ->
             val holderKey = verifiedProof.holderKey
             val holderPublicJwk = requireNotNull(holderKey.capabilities.publicKeyExporter) {
                 "Credential proof holder key does not export public material"
             }.exportPublicKey().toPublicJwk(holderKey.spec)
             Json.parseToJsonElement(holderPublicJwk.data.toByteArray().decodeToString()).jsonObject
         }
+        return CredentialProofKeys(publicJwks, if (includeStatusBindings) verifiedProofs.bindings.mapIndexed { index, binding ->
+            credentialStatusBinding(publicJwks[index], binding.holderKid, binding.holderDid, binding.proofIndexes)
+        } else emptyList())
     }
 
     private suspend fun validateExpectedCredentialProofKeys(
