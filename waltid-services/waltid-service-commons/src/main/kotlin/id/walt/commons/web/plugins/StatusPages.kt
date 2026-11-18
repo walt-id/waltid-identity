@@ -12,6 +12,7 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.*
 import redis.clients.jedis.exceptions.JedisException
+import java.util.UUID
 import kotlin.reflect.jvm.jvmName
 
 
@@ -20,9 +21,11 @@ private val logger = logger("Web exception")
 fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
-            logger.error(cause)
+            val errorId = UUID.randomUUID().toString()
+            logger.error(cause) { "Unhandled exception, errorId=$errorId" }
             val status = statusCodeForException(cause)
-            call.respond(status, exceptionMap(cause, status))
+            call.response.header("X-Error-Id", errorId)
+            call.respond(status, exceptionMap(cause, status , errorId))
         }
     }
 }
@@ -44,38 +47,34 @@ internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (ca
     else -> HttpStatusCode.InternalServerError
 }
 
-fun exceptionMap(cause: Throwable, status: HttpStatusCode): JsonObject =
+fun exceptionMap(
+    cause: Throwable,
+    status: HttpStatusCode,
+    errorId: String = UUID.randomUUID().toString(),
+): JsonObject =
     if (cause is SerializableWebException) {
         Json.encodeToJsonElement(cause).jsonObject
+    } else if (status.value >= 500) {
+        // Server-side failure: the message is internal by definition. Details are only in the log, under errorId.
+        buildJsonObject {
+            put("exception", true)
+            put("status", status.description)
+            put("code", status.value.toString())
+            put("message", "Internal server error")
+            put("errorId", errorId)
+        }
     } else {
+        // Client error: the message describes the caller's input, so it is safe to return. The cause chain is not.
         val bodyError = humanizeRequestBodyError(cause)
-        JsonObject(
-            mutableMapOf<String, JsonElement>(
-                "exception" to JsonPrimitive(true),
-                "id" to JsonPrimitive(cause::class.simpleName ?: cause::class.jvmName),
-                "status" to JsonPrimitive(status.description),
-                "code" to JsonPrimitive(status.value.toString()),
-                "message" to JsonPrimitive(bodyError?.message ?: cause.message)
-            ).apply {
-                if (bodyError != null) {
-                    if (bodyError.details.isNotEmpty()) {
-                        put("details", bodyError.detailsJsonObject())
-                    }
-                } else {
-                    var underlyingCause = cause.cause
-                    var errorCounter = 1
-
-                    while (underlyingCause != null) {
-                        put(
-                            "cause${errorCounter}_exception",
-                            JsonPrimitive(underlyingCause::class.simpleName ?: underlyingCause::class.jvmName)
-                        )
-                        if (logger.isTraceEnabled()) {
-                            put("cause${errorCounter}_message", JsonPrimitive(underlyingCause.message))
-                        }
-                        underlyingCause = underlyingCause.cause
-                        errorCounter++
-                    }
-                }
-            })
+        buildJsonObject {
+            put("exception", true)
+            put("id", cause::class.simpleName ?: cause::class.jvmName)
+            put("status", status.description)
+            put("code", status.value.toString())
+            put("message", bodyError?.message ?: cause.message)
+            put("errorId", errorId)
+            if (bodyError != null && bodyError.details.isNotEmpty()) {
+                put("details", bodyError.detailsJsonObject())
+            }
+        }
     }
