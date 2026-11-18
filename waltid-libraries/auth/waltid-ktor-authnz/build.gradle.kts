@@ -6,6 +6,15 @@ plugins {
 group = "id.walt"
 
 dependencies {
+    constraints {
+        implementation(identityLibs.vertx.core) {
+            because("Web3j's transitive Vert.x dependency is affected by CVE-2026-1002 and CVE-2026-6860")
+        }
+        implementation(identityLibs.rhino) {
+            because("Swagger Parser's transitive Rhino dependency is affected by CVE-2025-66453")
+        }
+    }
+
     // Authentication exceptions carry their HTTP status
     api(project(":waltid-libraries:waltid-library-commons"))
 
@@ -113,7 +122,6 @@ dependencies {
 //   catalog version as well; users of this library get it through the published BOM (see the dependencies).
 //
 // ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
-// web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
 configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
@@ -125,8 +133,6 @@ configurations.all {
         identityLibs.netty.codec.compression,
         identityLibs.netty.codec.http.v2,
         identityLibs.netty.transport.classes.epoll,
-        identityLibs.vertx.core,
-        identityLibs.rhino,
     )
 }
 
