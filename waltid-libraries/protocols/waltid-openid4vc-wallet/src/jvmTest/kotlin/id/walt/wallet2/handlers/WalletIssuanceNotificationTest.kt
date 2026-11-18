@@ -27,6 +27,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class WalletIssuanceNotificationTest {
@@ -45,6 +47,47 @@ class WalletIssuanceNotificationTest {
 
         assertEquals(1, result.credentialIds.size)
         assertEquals("credential_accepted", notifications.single())
+    }
+
+    @Test
+    fun observerFailureAfterStorageStillPostsCredentialAccepted() = runTest {
+        val notifications = mutableListOf<String>()
+        val store = RecordingCredentialStore()
+        val client = issuanceClient(notifications)
+
+        val result = WalletIssuanceHandler.receiveCredentials(
+            wallet = wallet(store),
+            request = ReceiveCredentialRequest(offerJson = Json.parseToJsonElement(CREDENTIAL_OFFER).jsonObject),
+            httpClient = client,
+            onCredentialStored = { error("Accounting observer unavailable") },
+        )
+
+        assertEquals(CredentialIssuanceStage.OBSERVER, assertNotNull(result.failure).stage)
+        assertEquals(listOf(store.listCredentials().toList().single().id), result.credentialIds)
+        assertEquals(listOf("credential_accepted"), notifications)
+    }
+
+    @Test
+    fun observerFailureMidBatchWaitsForResumedStorageBeforeReporting() = runTest {
+        val notifications = mutableListOf<String>()
+        val store = RecordingCredentialStore()
+        val client = issuanceClient(notifications, credentialCount = 2)
+        val wallet = wallet(store)
+        val result = WalletIssuanceHandler.receiveCredentials(
+            wallet = wallet,
+            request = ReceiveCredentialRequest(offerJson = Json.parseToJsonElement(CREDENTIAL_OFFER).jsonObject),
+            httpClient = client,
+            onCredentialStored = { error("Accounting observer unavailable") },
+        )
+        assertEquals(CredentialIssuanceStage.OBSERVER, assertNotNull(result.failure).stage)
+        assertEquals(1, store.listCredentials().toList().size)
+        assertTrue(notifications.isEmpty())
+
+        val handle = assertNotNull(result.storageOutcome).deferredCredentials.single()
+        val resumed = assertIs<WalletIssuanceOutcome.Stored>(wallet.issuanceSessions(client).resumeDeferred(handle.id))
+        assertEquals(store.listCredentials().toList().map { it.id }.toSet(), resumed.credentialIds.toSet())
+        assertEquals(2, resumed.credentialIds.size)
+        assertEquals(listOf("credential_accepted"), notifications)
     }
 
     @Test

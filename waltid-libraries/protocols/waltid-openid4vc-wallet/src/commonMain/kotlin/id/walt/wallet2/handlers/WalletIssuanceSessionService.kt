@@ -1024,10 +1024,9 @@ class WalletIssuanceSessionService(
                 if (wallet.findCredential(credential.id) == null) pendingWrites += credential
                 else storedIds += credential.id
             }
-            storeAndNotify(
-                httpClient = httpClient,
-                target = record.notificationTarget(),
-            ) {
+            val notificationTarget = record.notificationTarget()
+            var runningStorageObserver = false
+            try {
                 if (pendingWrites.isNotEmpty()) {
                     ensureContinuationOwned(record.persistedSnapshot)
                     beforeCredentialsStored(pendingWrites.size)
@@ -1039,9 +1038,23 @@ class WalletIssuanceSessionService(
                     storedIds += credential.id
                     ensureContinuationOwned(record.persistedSnapshot)
                     emitEvent(WalletSessionEvent.issuance_credential_stored)
+                    runningStorageObserver = true
                     onCredentialStored(credential)
+                    runningStorageObserver = false
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                val event = when {
+                    !runningStorageObserver -> NotificationEvent.CREDENTIAL_FAILURE
+                    storedIds.size == received.credentials.size -> NotificationEvent.CREDENTIAL_ACCEPTED
+                    // A partially stored batch interrupted by a callback can still finish on resume.
+                    else -> null
+                }
+                if (event != null) deliverCredentialNotification(httpClient, notificationTarget, event)
+                throw error
             }
+            deliverCredentialNotification(httpClient, notificationTarget, NotificationEvent.CREDENTIAL_ACCEPTED)
             removeDeferred(record)
             WalletIssuanceOutcome.Stored(record.sessionId, storedIds)
         } catch (error: CancellationException) {

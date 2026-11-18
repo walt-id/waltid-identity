@@ -27,32 +27,6 @@ internal data class IssuerNotificationTarget(
     val dpopProofFactory: DPoPProofFactory? = null,
 )
 
-internal suspend inline fun <T> storeAndNotify(
-    httpClient: HttpClient,
-    target: IssuerNotificationTarget,
-    eventDescription: String? = null,
-    block: suspend () -> T,
-): T = try {
-    val stored = block()
-    deliverCredentialNotification(
-        httpClient = httpClient,
-        target = target,
-        event = NotificationEvent.CREDENTIAL_ACCEPTED,
-        eventDescription = eventDescription,
-    )
-    stored
-} catch (error: CancellationException) {
-    throw error
-} catch (error: Exception) {
-    deliverCredentialNotification(
-        httpClient = httpClient,
-        target = target,
-        event = NotificationEvent.CREDENTIAL_FAILURE,
-        eventDescription = eventDescription,
-    )
-    throw error
-}
-
 internal suspend fun deliverCredentialNotification(
     httpClient: HttpClient,
     target: IssuerNotificationTarget,
