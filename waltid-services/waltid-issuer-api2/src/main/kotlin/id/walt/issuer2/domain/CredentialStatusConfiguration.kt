@@ -101,12 +101,10 @@ sealed interface CredentialStatusConfiguration {
 
         private fun validateMapping(format: CredentialFormat, mapping: JsonObject?) {
             if (format == CredentialFormat.MSO_MDOC) return
-            val protected = if (format == CredentialFormat.SD_JWT_VC) "status" else "credentialStatus"
-            require(mapping.orEmpty().keys.none { key ->
-                val parts = key.removePrefix("jwt:").split(Regex("[^A-Za-z0-9_]+")).filter(String::isNotEmpty)
-                parts.isEmpty() || parts.first() == protected ||
-                    (parts.first() == "vc" && (parts.size == 1 || parts[1] == protected))
-            }) { "Mappings must not overwrite preallocated credential status" }
+            // Mapping keys are literal. A jwt: key writes to the signed payload; jwt:vc replaces the W3C wrapper.
+            val protected = if (format == CredentialFormat.SD_JWT_VC) setOf("status", "jwt:status")
+                else setOf("credentialStatus", "jwt:credentialStatus", "jwt:vc")
+            require(mapping.orEmpty().keys.none { it in protected }) { "Mappings must not overwrite preallocated credential status" }
         }
     }
 }

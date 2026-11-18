@@ -103,18 +103,30 @@ class CredentialStatusConfigurationTest {
 
     @Test
     fun statusMappingsCannotReplaceReservationsButBusinessStatusClaimsAreAllowed() {
-        for (path in listOf("status", "$.status", "jwt:status", "status.status_list.idx")) {
+        for (key in listOf("status", "jwt:status")) {
             assertFailsWith<IllegalArgumentException> {
                 CredentialStatusConfiguration.parse(tokenGroups(1), CredentialFormat.SD_JWT_VC,
-                    buildJsonObject { put(path, "overwrite") })
+                    buildJsonObject { put(key, "overwrite") })
             }
         }
         CredentialStatusConfiguration.parse(tokenGroups(1), CredentialFormat.SD_JWT_VC,
-            buildJsonObject { put("credentialSubject.status", "active") })
-        assertFailsWith<IllegalArgumentException> {
-            CredentialStatusConfiguration.parse(JsonArray(listOf(JsonArray(listOf(w3cStatus(1))))),
-                CredentialFormat.JWT_VC_JSON, buildJsonObject { put("vc.credentialStatus", "overwrite") })
+            buildJsonObject {
+                put("status-label", "active")
+                put("status.label", "active")
+                putJsonObject("credentialSubject") { put("status", "active") }
+            })
+        val w3cGroups = JsonArray(listOf(JsonArray(listOf(w3cStatus(1)))))
+        for (key in listOf("credentialStatus", "jwt:credentialStatus", "jwt:vc")) {
+            assertFailsWith<IllegalArgumentException> {
+                CredentialStatusConfiguration.parse(w3cGroups, CredentialFormat.JWT_VC_JSON,
+                    buildJsonObject { put(key, "overwrite") })
+            }
         }
+        CredentialStatusConfiguration.parse(w3cGroups, CredentialFormat.JWT_VC_JSON,
+            buildJsonObject {
+                put("credentialStatus-label", "active")
+                put("vc.credentialStatus", "active")
+            })
     }
 
     companion object {
