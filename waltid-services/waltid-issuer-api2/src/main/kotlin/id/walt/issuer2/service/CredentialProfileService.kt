@@ -8,17 +8,21 @@ import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.mdoc.MsoData
 import io.ktor.server.plugins.NotFoundException
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class CredentialProfileService(
     private val profilesConfig: Issuer2ProfilesConfig,
     private val metadataConfig: Issuer2MetadataConfig,
     private val preallocatedStatusEnabled: Boolean = true,
 ) {
+    private val preparedStatusByProfile = profilesConfig.profiles.mapValues { (_, profile) ->
+        prepareCredentialStatus(profile.credentialConfigurationId, profile.credentialStatus, profile.mapping)
+    }
+
     fun listProfiles(): List<CredentialProfile> =
         profilesConfig.profiles.map { (profileId, config) -> config.toDomain(profileId) }
             .map(::validateProfile)
@@ -33,12 +37,12 @@ class CredentialProfileService(
         getProfile(profileId)
 
     fun resolveProfileByCredentialConfigurationId(credentialConfigurationId: String): CredentialProfile {
-        val profiles = listProfiles().filter { it.credentialConfigurationId == credentialConfigurationId }
+        val profiles = profilesConfig.profiles.filterValues { it.credentialConfigurationId == credentialConfigurationId }
         require(profiles.size == 1) {
             "Expected exactly one credential profile for credentialConfigurationId '$credentialConfigurationId', " +
                     "found ${profiles.size}"
         }
-        return profiles.single()
+        return getProfile(profiles.keys.single())
     }
 
     private fun validateProfile(profile: CredentialProfile): CredentialProfile {
@@ -58,15 +62,28 @@ class CredentialProfileService(
                     profile.credentialConfigurationId
         }
         requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, profile.msoData)
-        prepareCredentialStatus(profile.credentialConfigurationId, profile.credentialStatus, profile.mapping)
         return profile
     }
 
-    /** Validate format-specific configuration and normalize per-copy values for stored sessions. */
-    fun prepareCredentialStatus(configurationId: String, value: JsonElement?, mapping: JsonObject?): JsonElement? {
+    internal fun statusForIssuance(
+        profile: CredentialProfile,
+        statusOverride: JsonElement? = null,
+        mappingOverride: JsonObject? = null,
+    ): JsonElement? {
+        if (statusOverride != null) {
+            return prepareCredentialStatus(profile.credentialConfigurationId, statusOverride, mappingOverride ?: profile.mapping)
+        }
+        val status = preparedStatusByProfile.getValue(profile.profileId)
+        if (mappingOverride != null && CredentialStatusConfiguration.isPreallocated(status)) {
+            val format = requireNotNull(credentialFormat(profile.credentialConfigurationId))
+            CredentialStatusConfiguration.validateMapping(format, mappingOverride)
+        }
+        return status
+    }
+
+    private fun prepareCredentialStatus(configurationId: String, value: JsonElement?, mapping: JsonObject?): JsonElement? {
         if (value !is JsonArray) return value
-        val format = metadataConfig.credentialConfigurations[configurationId]
-            ?.jsonObject?.get("format")?.jsonPrimitive?.content?.let(CredentialFormat::fromValue)
+        val format = credentialFormat(configurationId)
         if (format == null) {
             require(!CredentialStatusConfiguration.isPreallocated(value)) { "Unknown credential format for preallocated status" }
             return value
@@ -80,12 +97,14 @@ class CredentialProfileService(
         }
     }
 
+    private fun credentialFormat(configurationId: String): CredentialFormat? =
+        metadataConfig.credentialConfigurations[configurationId]
+            ?.jsonObject?.get("format")?.jsonPrimitive?.content?.let(CredentialFormat::fromValue)
+
     fun requireMsoDataOnlyForMdoc(credentialConfigurationId: String, msoData: MsoData?) {
         if (msoData == null || msoData.isEmpty()) return
         msoData.requireNonBlankFields()
-        val format = metadataConfig.credentialConfigurations[credentialConfigurationId]
-            ?.jsonObject?.get("format")?.jsonPrimitive?.content
-        require(format == CredentialFormat.MSO_MDOC.value) {
+        require(credentialFormat(credentialConfigurationId) == CredentialFormat.MSO_MDOC) {
             "msoData is only supported for mso_mdoc credential profiles"
         }
     }

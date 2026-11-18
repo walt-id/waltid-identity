@@ -73,11 +73,7 @@ class Issuer2Module @JvmOverloads constructor(
                 profilesConfig = profilesConfig,
                 metadataConfig = metadataConfig,
                 preallocatedStatusEnabled = statusConsumption.durable,
-            ).also { service ->
-                profilesConfig.profiles.values.forEach { profile ->
-                    service.prepareCredentialStatus(profile.credentialConfigurationId, profile.credentialStatus, profile.mapping)
-                }
-            }
+            )
 
             val issuanceSessionService = IssuanceSessionService(
                 repository = issuanceSessionRepository,

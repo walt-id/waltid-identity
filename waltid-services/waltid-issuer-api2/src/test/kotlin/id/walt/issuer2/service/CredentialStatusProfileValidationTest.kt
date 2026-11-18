@@ -4,10 +4,14 @@ import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.config.*
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.tokenStatus
 import id.walt.issuer2.testsupport.*
 import io.ktor.server.plugins.BadRequestException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.nio.file.Files
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -43,6 +47,36 @@ class CredentialStatusProfileValidationTest {
                 ).getProfile(example.profileId).credentialStatus)
             }
         } finally { Files.deleteIfExists(file) }
+    }
+
+    @Test
+    fun invalidMdocStatusUrlIsRejectedWhenTheProfileLoads() {
+        loadIssuer2ConfigFiles()
+        val profiles = ConfigManager.getConfig<Issuer2ProfilesConfig>()
+        val id = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS.profileId
+        val invalid = profiles.profiles.getValue(id).copy(
+            credentialStatus = JsonArray(listOf(tokenStatus(7, "https://status.example.com:70000/list"))),
+        )
+        val error = assertFailsWith<IllegalArgumentException> {
+            CredentialProfileService(profiles.copy(profiles = mapOf(id to invalid)), ConfigManager.getConfig())
+        }
+        assertContains(error.message.orEmpty(), "status_list.uri")
+    }
+
+    @Test
+    fun mappingOverrideIsCheckedAgainstTheEffectiveStatusConfiguration() {
+        loadIssuer2ConfigFiles()
+        val profiles = ConfigManager.getConfig<Issuer2ProfilesConfig>()
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val inventory = requireNotNull(example.runtimeOverrides?.credentialStatus)
+        val config = profiles.profiles.getValue(example.profileId).copy(credentialStatus = inventory)
+        val service = CredentialProfileService(profiles.copy(profiles = mapOf(example.profileId to config)), ConfigManager.getConfig())
+        val profile = service.resolveProfileByCredentialConfigurationId(config.credentialConfigurationId)
+        val mapping = buildJsonObject { put("jwt:status", "overwrite") }
+        assertFailsWith<IllegalArgumentException> { service.statusForIssuance(profile, mappingOverride = mapping) }
+        val fixed = tokenStatus(14)
+        assertEquals(fixed, service.statusForIssuance(profile, statusOverride = fixed, mappingOverride = mapping))
+        assertEquals(inventory, service.getProfile(profile.profileId).credentialStatus)
     }
 
     @Test

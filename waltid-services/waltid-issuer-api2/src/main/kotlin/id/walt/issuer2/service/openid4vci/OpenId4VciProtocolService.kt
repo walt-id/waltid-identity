@@ -1762,7 +1762,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             msoData = msoData,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
-            credentialStatus = profileService.prepareCredentialStatus(credentialConfigurationId, credentialStatus, mapping),
+            credentialStatus = profileService.statusForIssuance(profile),
         )
     }
 

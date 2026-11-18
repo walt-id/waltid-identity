@@ -70,11 +70,7 @@ class CredentialOfferService(
             val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
             val credentialStatus = try {
-                profileService.prepareCredentialStatus(
-                    profile.credentialConfigurationId,
-                    overrides?.credentialStatus ?: profile.credentialStatus,
-                    overrides?.mapping ?: profile.mapping,
-                )
+                profileService.statusForIssuance(profile, overrides?.credentialStatus, overrides?.mapping)
             } catch (e: IllegalArgumentException) {
                 throw BadRequestException(e.message ?: "Invalid credentialStatus configuration", e)
             }
