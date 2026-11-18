@@ -139,6 +139,32 @@ class Issuer2SharedCredentialStatusTest {
     )
 
     @Test
+    fun sdJwtKeepsLiteralBusinessClaimsAlongsideDistinctSignedStatuses() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val overrides = requireNotNull(example.runtimeOverrides)
+        val fixture = installStatusIssuer()
+        val offer = fixture.client.createCredentialOffer(example.copy(runtimeOverrides = overrides.copy(
+            mapping = buildJsonObject {
+                put("status-label", "active")
+                put("status.label", "verified")
+            },
+        )))
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        val response = fixture.issue(resolved, token.access_token,
+            credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId)))
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        val body = response.body<JsonObject>()
+        assertPreallocatedStatuses(body, "dc+sd-jwt", overrides.credentialStatus!!.jsonArray.take(2))
+        for (copy in body.getValue("credentials").jsonArray) {
+            val claims = SDJwt.parse(copy.jsonObject.getValue("credential").jsonPrimitive.content).fullPayload
+            assertEquals(JsonPrimitive("active"), claims["status-label"])
+            assertEquals(JsonPrimitive("verified"), claims["status.label"])
+        }
+    }
+
+    @Test
     fun overlappingProfilesConsumeDistinctStatusesAcrossOffers() = testApplication {
         val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
         val statuses = example.runtimeOverrides!!.credentialStatus!!.jsonArray
