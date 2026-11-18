@@ -3,7 +3,7 @@
 ### Issuer 2 and Wallet 2 API responses
 
 - Issuer 2 profile and session responses now report the issuer signing key as `{"type":"redacted"}`. The generated OpenAPI profile examples use the same value.
-- When Wallet 2 authentication is enabled, `GET /wallet` returns only wallets owned by the authenticated account. Accounts without wallets receive an empty list.
+- With Wallet 2 authentication enabled, `GET /wallet` returns only the caller's wallet IDs with `Cache-Control: no-store`. Accounts without wallets receive an empty list.
 
 ### Issuer trust for keys from `x5c`
 

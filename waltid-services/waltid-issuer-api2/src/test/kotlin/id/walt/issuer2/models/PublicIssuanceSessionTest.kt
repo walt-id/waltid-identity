@@ -79,7 +79,7 @@ class PublicIssuanceSessionTest {
                 ),
             ),
         ))
-        assertEquals(JsonObject(legacy + report), session.toPublicJson())
+        assertEquals(JsonObject(legacy + report + ("issuerKey" to redactedIssuerKey)), session.toPublicJson())
         assertEquals(session, IssuanceSessionStorageCodec.decode(Json.encodeToString(session)))
         val batch = session.copy(
             issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B"),
@@ -94,7 +94,12 @@ class PublicIssuanceSessionTest {
                 add("deferredState")
                 add("issuanceClaimId")
                 if (batch.deferredStatus == null) add("deferredStatus")
-            }) + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
+            }) + mapOf(
+                "issuanceResults" to buildJsonObject { put("configuration", publicResult) },
+                "issuanceRequests" to JsonArray(internal.getValue("issuanceRequests").jsonArray.map {
+                    JsonObject(it.jsonObject + ("issuerKey" to redactedIssuerKey))
+                }),
+            ))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))
             assertEquals(publicBatch, batch.toPublicJson(json))
             assertEquals(publicBatch, json.encodeToJsonElement(PublicIssuanceSession(batch)))

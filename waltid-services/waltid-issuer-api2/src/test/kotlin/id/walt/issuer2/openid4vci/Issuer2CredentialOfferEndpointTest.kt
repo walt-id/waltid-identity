@@ -8,17 +8,20 @@ import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.domain.CredentialProfile
+import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.issuer2Module
@@ -48,8 +51,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
@@ -364,9 +370,24 @@ class Issuer2CredentialOfferEndpointTest {
 
     @Test
     fun shouldApplyRuntimeOverridesToConfiguredCredentialOfferSessions() = testApplication {
-        installIssuer2WithConfigFiles()
+        val sessions = ConfiguredIssuanceSessionRepository()
+        installIssuer2WithConfigFiles {
+            configurePlugins()
+            val module = Issuer2Module(
+                serviceConfig = ConfigManager.getConfig(),
+                metadataConfig = ConfigManager.getConfig(),
+                profilesConfig = ConfigManager.getConfig(),
+                issuanceSessionRepository = sessions,
+            )
+            monitor.subscribe(ApplicationStopped) { module.close() }
+            routing {
+                module.managementController.register(this)
+                module.openId4VciController.register(this)
+            }
+        }
         val client = apiClient()
         val profile = client.getProfile(IDENTITY_SD_JWT_PROFILE_ID)
+        val configuredKey = ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles.getValue(profile.profileId).issuerKey
         val selectiveDisclosure = SDMap.generateSDMap(listOf("given_name", "family_name"))
         val issuerKeyOverride = buildJsonObject {
             put("type", "jwk")
@@ -422,8 +443,21 @@ class Issuer2CredentialOfferEndpointTest {
 
         val unchangedProfile = client.getProfile(profile.profileId)
         assertEquals(profile.issuerDid, unchangedProfile.issuerDid)
-        assertEquals(profile.issuerKey, unchangedProfile.issuerKey)
+        assertTrue(unchangedProfile.issuerKey == redactedKey, "Profile should mask the configured key")
         assertEquals(profile.credentialData, unchangedProfile.credentialData)
+
+        val storedOverride = assertNotNull(sessions.get(response.offerId)).issuanceRequests.single()
+        assertTrue(storedOverride.issuerKey == issuerKeyOverride, "The first offer should store its override key")
+
+        val defaultOffer = client.createCredentialOffer(
+            CredentialOfferCreateRequest(
+                profileId = profile.profileId,
+                authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
+            )
+        )
+        val storedDefault = assertNotNull(sessions.get(defaultOffer.offerId)).issuanceRequests.single()
+        assertTrue(storedDefault.issuerKey == configuredKey, "A subsequent offer should store the configured key")
 
         val overrideKeyId = KeyManager.resolveSerializedKey(issuerKeyOverride).getKeyId()
         val jwks = client.get("/openid4vci/jwks").body<JsonObject>()
@@ -941,7 +975,9 @@ class Issuer2CredentialOfferEndpointTest {
         }.body()
     }
 
-    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
+    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
+        startIssuer: Application.() -> Unit = { issuer2Module(withPlugins = true) },
+    ) {
         loadIssuer2ConfigFiles()
         application {
             install(ServerContentNegotiation) {
@@ -949,7 +985,7 @@ class Issuer2CredentialOfferEndpointTest {
             }
             issuer2AuthenticationPluginAmendment()
             AuthenticationServiceModule.run { enable() }
-            issuer2Module(withPlugins = true)
+            startIssuer()
         }
     }
 

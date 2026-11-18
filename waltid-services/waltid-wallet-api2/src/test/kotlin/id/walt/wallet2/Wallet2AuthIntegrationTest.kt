@@ -190,12 +190,18 @@ class Wallet2AuthIntegrationTest {
             }
             testAndReturn("Wallet listing is scoped to the authenticated account") {
                 val ownedWallets = http.get("/wallet") { bearerAuth(token) }
-                    .also { assertEquals(HttpStatusCode.OK, it.status) }
+                    .also {
+                        assertEquals(HttpStatusCode.OK, it.status)
+                        assertEquals("no-store", it.headers[HttpHeaders.CacheControl])
+                    }
                     .body<List<String>>()
                 assertEquals(listOf(walletId), ownedWallets)
 
                 val emptyAccountWallets = http.get("/wallet") { bearerAuth(token2) }
-                    .also { assertEquals(HttpStatusCode.OK, it.status) }
+                    .also {
+                        assertEquals(HttpStatusCode.OK, it.status)
+                        assertEquals("no-store", it.headers[HttpHeaders.CacheControl])
+                    }
                     .body<List<String>>()
                 assertEquals(emptyList(), emptyAccountWallets)
             }
