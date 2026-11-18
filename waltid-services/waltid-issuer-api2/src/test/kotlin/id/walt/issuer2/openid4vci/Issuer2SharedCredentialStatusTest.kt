@@ -66,6 +66,16 @@ class Issuer2SharedCredentialStatusTest {
     fun w3cCopiesShareStatusWithCrypto2() = verifySharedStatus(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS)
 
     @Test
+    fun flatW3cArrayRemainsOneSharedMultiPurposeStatus() = verifySharedStatus(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS.copy(
+            runtimeOverrides = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS
+                .runtimeOverrides!!.copy(credentialStatus =
+                    Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_W3C_STATUS
+                        .runtimeOverrides!!.credentialStatus!!.jsonArray.first()),
+        ),
+    )
+
+    @Test
     fun sdJwtCopiesShareStatusWithCrypto2() = verifySharedStatus(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS)
 
     @Test
