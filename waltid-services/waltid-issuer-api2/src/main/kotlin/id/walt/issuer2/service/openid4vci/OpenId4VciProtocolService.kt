@@ -1887,7 +1887,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return try {
             val presentedThumbprints = publicKeys.map { it.thumbprint() }
             if (requireDistinct && presentedThumbprints.toSet().size != presentedThumbprints.size) {
-                return CredentialError(CredentialErrorCodes.INVALID_PROOF, "Each credential copy in this batch requires a distinct holder key")
+                return CredentialError(
+                    CredentialErrorCodes.INVALID_PROOF,
+                    "Each credential copy in this batch requires a distinct holder key",
+                )
             }
             if (expectedJwks == null) return null
             val expectedThumbprints = expectedJwks.map { it.thumbprint() }
@@ -1896,17 +1899,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             } else {
                 presentedThumbprints == expectedThumbprints
             }
-            require(matches) {
-                "Credential proof keys do not match the issuance session"
-            }
-            null
+            if (matches) null else CredentialError(
+                CredentialErrorCodes.INVALID_PROOF, "Credential proof key does not match the issuance session",
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            CredentialError(
-                CredentialErrorCodes.INVALID_PROOF,
-                "Credential proof key does not match the issuance session",
-            )
+            CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof key could not be compared")
         }
     }
 
