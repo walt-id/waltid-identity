@@ -152,6 +152,86 @@ class ConfiguredRedisRepositoryTest {
         }
     }
 
+    @Test
+    fun legacyStatusHistoryMigratesOnceAndPendingBatchesRecoverAfterRestart() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            var now = Clock.System.now()
+            val oldGroups = statusGroups(1, 2)
+            val pending = CredentialStatusReservation(CredentialStatusReservation.bindingFor("pending", listOf("A")),
+                oldGroups.map { it.statuses }, now + 1.days)
+            storage["legacy-A"] = CredentialStatusConsumption(oldGroups.flatMap { it.references }.toSet(), mapOf("pending" to pending))
+            storage["legacy-B"] = CredentialStatusConsumption(statusGroups(3).single().references)
+            // Simulate an interrupted import whose worker's lease expired before recording completion.
+            redis.hset(keys.records, "entry:" + oldGroups.first().references.single(), Json.encodeToString(CredentialStatusOwner("legacy-A")))
+            redis.psetex(keys.migrationLock, 1, "dead-worker")
+            fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage, now = { now })
+            assertEquals(pending.groups, repository().reserve("legacy-A", "pending", listOf("A"), statusGroups(2, 4, 1), 2, now + 1.days))
+            assertEquals(CredentialStatusOwner("legacy-A", "pending"), Json.decodeFromString<CredentialStatusOwner>(
+                redis.hget(keys.records, "entry:" + oldGroups.first().references.single()),
+            ))
+            assertFailsWith<CredentialStatusCapacityException> {
+                repository().reserve("C", "next", listOf("C"), statusGroups(1, 2, 3, 4), 2, now + 1.days)
+            }
+            assertEquals(listOf(statusGroups(4).single().statuses),
+                repository().reserve("C", "next", listOf("C"), statusGroups(1, 2, 3, 4), 1, now + 1.days))
+            assertEquals(pending, storage["legacy-A"]!!.reservations.getValue("pending"))
+            assertEquals("2", redis.get(keys.migrationComplete))
+            now += 2.days
+            repository().reserve("D", "later", listOf("D"), statusGroups(5), 1, now + 1.days)
+            assertNull(redis.hget(keys.records, "operation:pending"))
+            assertNotNull(redis.hget(keys.records, "entry:" + oldGroups.first().references.single()))
+            assertFailsWith<CredentialStatusCapacityException> {
+                repository().reserve("E", "spent", listOf("E"), statusGroups(1, 2, 3, 4), 1, now + 1.days)
+            }
+        }
+    }
+
+    @Test
+    fun legacyProfilesWithOverlappingPendingStatusesFailClosed() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            val groups = statusGroups(1)
+            val deadline = Clock.System.now() + 1.days
+            for (profile in listOf("A", "B")) storage[profile] = CredentialStatusConsumption(groups.single().references,
+                mapOf(profile to CredentialStatusReservation(CredentialStatusReservation.bindingFor(profile, listOf("key")),
+                    groups.map { it.statuses }, deadline)))
+            assertFailsWith<CredentialStatusOperationException> {
+                ConfiguredCredentialStatusConsumptionRepository(storage).reserve("B", "B", listOf("key"), statusGroups(1, 2), 1, deadline)
+            }
+            assertNull(redis.hget(keys.records, "entry:" + statusGroups(2).single().references.single()))
+            assertEquals(listOf(statusGroups(2).single().statuses), ConfiguredCredentialStatusConsumptionRepository(storage)
+                .reserve("C", "fresh", listOf("key"), statusGroups(1, 2), 1, deadline))
+        }
+    }
+
+    @Test
+    fun w3cStatusPurposesMigrateAndRemainAtomicAcrossProfiles() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            fun groups(revocation: Int, suspension: Int) = (CredentialStatusConfiguration.parse(
+                JsonArray(listOf(JsonArray(listOf(w3cStatus(revocation), w3cStatus(suspension, "suspension"))))),
+                CredentialFormat.JWT_VC_JSON,
+            ) as CredentialStatusConfiguration.Preallocated).groups
+            val first = groups(1, 7).single()
+            val second = groups(2, 8).single()
+            val deadline = Clock.System.now() + 1.days
+            val pending = CredentialStatusReservation(CredentialStatusReservation.bindingFor("pending", listOf("key")),
+                listOf(first.statuses), deadline)
+            storage["legacy-W3C"] = CredentialStatusConsumption(first.references, mapOf("pending" to pending))
+            fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage)
+            assertEquals(listOf(first.statuses), repository().reserve("legacy-W3C", "pending", listOf("key"),
+                listOf(second, first), 1, deadline))
+            assertEquals(listOf(second.statuses), repository().reserve("other-W3C", "next", listOf("key"),
+                listOf(first, second), 1, deadline))
+            assertEquals(8, redis.hkeys(keys.records).count { it.startsWith("entry:") })
+            for (reference in second.references) assertEquals(CredentialStatusOwner("other-W3C", "next"),
+                Json.decodeFromString<CredentialStatusOwner>(redis.hget(keys.records, "entry:" + reference)))
+            val overlapping = groups(1, 99).single()
+            assertFailsWith<CredentialStatusCapacityException> {
+                repository().reserve("third-W3C", "third", listOf("key"), listOf(overlapping), 1, deadline)
+            }
+            for (unused in overlapping.references - first.references) assertNull(redis.hget(keys.records, "entry:" + unused))
+        }
+    }
+
     private fun statusGroups(vararg indexes: Int) = (CredentialStatusConfiguration.parse(
         tokenGroups(*indexes), CredentialFormat.SD_JWT_VC,
     ) as CredentialStatusConfiguration.Preallocated).groups
