@@ -17,6 +17,11 @@ import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceResult
+import id.walt.issuer2.domain.CredentialStatusConfiguration
+import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.CredentialStatusCapacityException
+import id.walt.issuer2.repository.CredentialStatusOperationException
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
@@ -139,6 +144,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val keyAttestation: KeyAttestationVerificationOptions? = null,
     private val attestationChallengeService: AttestationChallengeService? = null,
     private val deferredConfig: DeferredIssuanceConfig = DeferredIssuanceConfig(),
+    private val credentialStatusConsumption: CredentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -1273,6 +1279,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuerKey = KeyManager.resolveSerializedKey(issuanceRequest.issuerKey)
             val crypto2IssuerKey = restoreSessionIssuerCrypto2Key(issuanceRequest, crypto2Runtime)
             val x5Chain = issuanceRequest.x5Chain?.map { X509CertificateUtil.parseCertificatePem(it) }
+            val statusConfiguration = CredentialStatusConfiguration.parse(
+                issuanceRequest.credentialStatus, configuration.format, issuanceRequest.mapping,
+            )
+            val preallocatedStatus = statusConfiguration as? CredentialStatusConfiguration.Preallocated
+            val statusHolderKeys = if (preallocatedStatus != null) {
+                requireNotNull(verifiedProofKeys).statusBindings
+            } else emptyList()
+            val statusOperation = if (preallocatedStatus != null && deferredClaim == null) {
+                sessionService.prepareCredentialStatusOperation(
+                    session, issuanceRequest.credentialIdentifier, statusHolderKeys, statusHolderKeys.size,
+                )
+            } else null
 
             credentialProofKeyAcceptance?.let { acceptance ->
                 val accepted = try {
@@ -1326,34 +1344,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
 
-            // Prepare credential data with status injection for W3C/IETF formats
-            val credentialDataWithStatus = issuanceRequest.credentialStatus?.let { status ->
-                when (configuration.format) {
-                    CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON_LD -> {
-                        // Inject credentialStatus into credential data for W3C VCs
-                        JsonObject(issuanceRequest.credentialData.toMutableMap().apply {
-                            put("credentialStatus", status)
-                        })
-                    }
-
-                    CredentialFormat.SD_JWT_VC -> {
-                        // For SD-JWT VC, inject status at root level (as "status" claim)
-                        JsonObject(issuanceRequest.credentialData.toMutableMap().apply {
-                            put("status", status)
-                        })
-                    }
-
-                    else -> issuanceRequest.credentialData
-                }
-            } ?: issuanceRequest.credentialData
-
-            // Convert credentialStatus to Status object for mDoc
-            val mDocStatus = issuanceRequest.credentialStatus?.let { status ->
-                when (configuration.format) {
-                    CredentialFormat.MSO_MDOC -> parseStatusFromJsonElement(status)
-                    else -> null
-                }
-            }
             val issuedAt = Clock.System.now()
             val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
                 MsoValidityResolver.resolve(
@@ -1380,16 +1370,33 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
             )
             val issuanceInputData = CredentialIssuanceInputProvider { issuanceCount ->
-                // OSS embeds caller-supplied status: every copy of this selected item shares it.
-                // Status allocation and updates remain the caller's responsibility.
-                List(issuanceCount) {
-                    CredentialIssuanceInput(
-                        credentialData = credentialDataWithStatus,
-                        credentialStatus = mDocStatus,
-                    )
+                when (statusConfiguration) {
+                    is CredentialStatusConfiguration.Fixed -> List(issuanceCount) {
+                        createCredentialIssuanceInput(issuanceRequest, configuration.format, statusConfiguration.value)
+                    }
+                    is CredentialStatusConfiguration.Preallocated -> {
+                        if (issuanceCount != statusHolderKeys.size) {
+                            throw CredentialStatusOperationException("Verified status issuance count changed")
+                        }
+                        val groups = credentialStatusConsumption.reserve(
+                            profileId = issuanceRequest.profileId,
+                            operationId = deferredClaim?.id ?: requireNotNull(statusOperation).id,
+                            holderKeys = statusHolderKeys,
+                            groups = statusConfiguration.groups,
+                            count = issuanceCount,
+                            expiresAt = session.deferredState?.deadline ?: session.expiresAt,
+                        )
+                        if (deferredClaim != null) deferredIssuance.checkpointProgress(sessionId, deferredClaim,
+                            buildJsonObject { put("credentialStatusOperationId", deferredClaim.id) })
+                        groups.map { group ->
+                            val value = CredentialStatusConfiguration.credentialValue(group, configuration.format)
+                            createCredentialIssuanceInput(issuanceRequest, configuration.format, value)
+                        }
+                    }
                 }
             }
-            val credentialResponseResult = deferredClaim?.response?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {
+            val credentialResponseResult = (deferredClaim?.response ?: statusOperation?.response)
+                ?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {
                 if (crypto2IssuerKey != null) {
                     oauth2Provider.createCredentialResponse(
                         request = requestWithSession,
@@ -2074,8 +2081,24 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private suspend fun restoreClaimedSession(session: IssuanceSession) {
         withContext(NonCancellable) {
             if (session.deferredState != null) sessionService.saveDeferredProgress(session)
+            else if (session.credentialStatusIssuance?.leaseId != null) sessionService.releaseCredentialStatusSession(session)
             else sessionService.saveSession(session)
         }
+    }
+
+    private fun createCredentialIssuanceInput(
+        request: IssuanceRequest,
+        format: CredentialFormat,
+        status: JsonElement?,
+    ): CredentialIssuanceInput {
+        val data = if (status == null) request.credentialData else when (format) {
+            CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON_LD ->
+                JsonObject(request.credentialData + ("credentialStatus" to status))
+            CredentialFormat.SD_JWT_VC -> JsonObject(request.credentialData + ("status" to status))
+            else -> request.credentialData
+        }
+        return CredentialIssuanceInput(data,
+            if (format == CredentialFormat.MSO_MDOC && status != null) parseStatusFromJsonElement(status) else null)
     }
 
     private fun CredentialError.isRetryableProofFailure(): Boolean =
