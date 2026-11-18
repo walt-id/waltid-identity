@@ -123,10 +123,22 @@ object Issuer2ManagementRoutesDocs {
 
             - Redeem different offer items through separate Credential Requests. Multiple proofs request
               copies of one selected item, subject to the advertised `batch_credential_issuance.batch_size` limit.
-            - Copies and repeated issuance of an item share its configured `credentialStatus` entry.
-              Revoking that entry revokes every credential referencing it; shared references also make copies linkable.
+            - A status object or flat W3C status array retains fixed, shared behavior: copies and repeated
+              issuance share the configured value. Shared status references make those copies linkable.
+            - For SD-JWT VC/mdoc, a flat `credentialStatus` array supplies one complete IETF status value
+              per copy. For W3C, nested arrays supply one group per copy, containing one or more status
+              entries such as revocation and suspension. No `mode` or additional field is needed.
+            - Preallocated groups require Redis persistence. Consumption is atomic and shared across
+              profiles and sessions using the same Redis consumption ledger. Each reference retains
+              its owning profile and issuance operation; another operation cannot reuse it.
+              Insufficient remaining groups return
+              `invalid_credential_request` before signing, without partially consuming a batch.
+              Retries retain pending assignments; successful subsequent requests consume fresh groups.
+            - Profile-configured groups work with offered and offerless authorization sessions.
+              Sessions snapshot their configuration. Replenish profiles with fresh groups and restart
+              the service without clearing Redis. Changing profile IDs does not reset consumption.
             - Override status with `runtimeOverrides.credentialStatus` on the single-profile request or each
-              `credentials[]` entry. The caller allocates and manages status entries; OSS only embeds them.
+              `credentials[]` entry. The caller allocates and manages status entries; OSS embeds the selected values.
 
             See [credential status and batch issuance](https://docs.walt.id/community-stack/issuer2/credential-offers/credential-status#batch-issuance).
         """.trimIndent()
