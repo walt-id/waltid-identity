@@ -1150,6 +1150,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 binding = nonceBinding,
             ),
             batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
+            requireDistinctBatchHolderKeys = observedIssuanceRequest.requireDistinctBatchHolderKeys,
         )
 
         if (observedSession.deferredState != null && deferredClaim == null) {
@@ -1168,7 +1169,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     throw e
                 }
                 val publicKeys = accepted.bindings.map { it.publicJwk }
-                validateCredentialProofKeys(publicKeys, observedIssuanceRequest)?.let {
+                validateExpectedCredentialProofKeys(publicKeys, observedIssuanceRequest)?.let {
                     return oauth2Provider.writeCredentialError(it)
                 }
                 credentialProofKeyAcceptance?.let {
@@ -1256,17 +1257,20 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuanceInputData = object : CredentialIssuanceInputProvider {
                 override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult? {
                     val retainProofKeys = usesPreallocatedStatus || requiresCredentialProofKeys(issuanceRequest)
-                    if (retainProofKeys || (issuanceRequest.requireDistinctBatchHolderKeys && bindings.size > 1)) {
+                    val additionalVerifier = credentialProofVerifier.takeIf { deferredClaim == null }
+                    val verifyBatchWithHost = additionalVerifier != null &&
+                            proofValidationContext.requireDistinctBatchHolderKeys && bindings.size > 1
+                    if (retainProofKeys || verifyBatchWithHost) {
                         if (bindings.isEmpty()) return CredentialResponseResult.Failure(
                             CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential request has no credential proof"),
                         )
                         val publicKeys = bindings.map { it.holderKey.exportPublicJwkObject() }
-                        if (credentialProofVerifier != null && deferredClaim == null) {
-                            validateAdditionalProofKeys(credentialProofVerifier, requestWithSession, configuration,
+                        if (additionalVerifier != null) {
+                            validateAdditionalProofKeys(additionalVerifier, requestWithSession, configuration,
                                 proofValidationContext, publicKeys)?.let { return CredentialResponseResult.Failure(it) }
                         }
                         if (retainProofKeys) proofPublicKeyJwks = publicKeys
-                        validateCredentialProofKeys(publicKeys, issuanceRequest)?.let {
+                        validateExpectedCredentialProofKeys(publicKeys, issuanceRequest)?.let {
                             return CredentialResponseResult.Failure(it)
                         }
                         checkCredentialProofKeyAcceptance(session, publicKeys)?.let { return CredentialResponseResult.Failure(it) }
@@ -1877,22 +1881,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
     }
 
-    private suspend fun validateCredentialProofKeys(
+    private suspend fun validateExpectedCredentialProofKeys(
         publicKeys: List<JsonObject>,
         issuanceRequest: IssuanceRequest,
     ): CredentialError? {
-        val expectedJwks = issuanceRequest.expectedCredentialProofKeyJwks
-        val requireDistinct = issuanceRequest.requireDistinctBatchHolderKeys && publicKeys.size > 1
-        if (expectedJwks == null && !requireDistinct) return null
+        val expectedJwks = issuanceRequest.expectedCredentialProofKeyJwks ?: return null
         return try {
             val presentedThumbprints = publicKeys.map { it.thumbprint() }
-            if (requireDistinct && presentedThumbprints.toSet().size != presentedThumbprints.size) {
-                return CredentialError(
-                    CredentialErrorCodes.INVALID_PROOF,
-                    "Each credential copy in this batch requires a distinct holder key",
-                )
-            }
-            if (expectedJwks == null) return null
             val expectedThumbprints = expectedJwks.map { it.thumbprint() }
             val matches = if (expectedThumbprints.size == 1) {
                 presentedThumbprints.isNotEmpty() && presentedThumbprints.all { it == expectedThumbprints.single() }
