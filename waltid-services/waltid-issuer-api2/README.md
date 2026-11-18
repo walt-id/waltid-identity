@@ -323,8 +323,11 @@ Invalid proofs consume no groups.
 Consumption is internal allocation bookkeeping: issuer2 does not modify the profile
 configuration or the published status list, and marking an entry used does not revoke it.
 
-Issuer2 tracks actual list URI/index references globally across per-copy inventories
-sharing the same Redis store. Each ownership record retains the profile ID and issuance
+Issuer2 identifies a used entry by its normalized HTTP(S) list URI and index across
+per-copy inventories sharing the same Redis store. For example, `https://status.example.com:443/list`
+and `https://status.example.com/list` identify the same list. Invalid list URLs and
+duplicate references within an inventory are rejected at profile load or offer creation.
+Each ownership record retains the profile ID and issuance
 operation. An entry consumed through one profile is unavailable through another profile;
 the same operation can recover its reservation, but another operation cannot claim it.
 Changing profile IDs, reordering, removing, reintroducing, or appending configured entries
