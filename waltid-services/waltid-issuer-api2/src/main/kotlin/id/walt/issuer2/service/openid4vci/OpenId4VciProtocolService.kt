@@ -1763,6 +1763,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             credentialStatus = profileService.statusForIssuance(profile),
+            requireDistinctBatchHolderKeys = requireDistinctBatchHolderKeys,
         )
     }
 

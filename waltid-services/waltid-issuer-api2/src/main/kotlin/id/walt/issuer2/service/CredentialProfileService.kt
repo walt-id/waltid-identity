@@ -126,5 +126,6 @@ class CredentialProfileService(
             x5Chain = x5Chain,
             notifications = notifications,
             credentialStatus = credentialStatus,
+            requireDistinctBatchHolderKeys = requireDistinctBatchHolderKeys,
         )
 }

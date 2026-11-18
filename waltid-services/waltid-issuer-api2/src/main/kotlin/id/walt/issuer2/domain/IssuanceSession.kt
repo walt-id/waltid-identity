@@ -42,6 +42,7 @@ data class IssuanceRequest(
     val credentialStatus: JsonElement? = null,
     @Transient
     val crypto2IssuerStoredKey: String? = null,
+    val requireDistinctBatchHolderKeys: Boolean = false,
 )
 
 @Serializable

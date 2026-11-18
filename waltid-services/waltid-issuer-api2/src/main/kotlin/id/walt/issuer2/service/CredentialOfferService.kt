@@ -99,6 +99,7 @@ class CredentialOfferService(
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
                 credentialStatus = credentialStatus,
+                requireDistinctBatchHolderKeys = profile.requireDistinctBatchHolderKeys,
             )
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }

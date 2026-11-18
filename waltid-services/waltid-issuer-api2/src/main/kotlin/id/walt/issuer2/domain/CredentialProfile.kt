@@ -26,4 +26,5 @@ data class CredentialProfile(
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
     val credentialStatus: JsonElement? = null,
+    val requireDistinctBatchHolderKeys: Boolean = false,
 )
