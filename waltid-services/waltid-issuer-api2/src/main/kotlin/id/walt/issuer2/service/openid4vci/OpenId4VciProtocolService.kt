@@ -776,6 +776,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             "Token request has no issuance session"
         }
         val session = sessionService.getSession(sessionId)
+        if (GrantType.PreAuthorizedCode.value in accessTokenRequest.grantTypes) {
+            val currentCode = session.credentialOffer?.grants?.preAuthorizedCode?.preAuthorizedCode
+            if (currentCode == null || currentCode != accessTokenRequest.requestForm["pre-authorized_code"]?.singleOrNull()) {
+                throw InvalidTokenCredentialAuthorization(
+                    accessTokenRequest, "Pre-authorized code is invalid", OAuthErrorCodes.INVALID_GRANT,
+                )
+            }
+        }
         if (session.isClosed && !(session.deferredStatus == DeferredStatus.DENIED && refreshGrant != null)) {
             throw InvalidTokenCredentialAuthorization(
                 accessTokenRequest,

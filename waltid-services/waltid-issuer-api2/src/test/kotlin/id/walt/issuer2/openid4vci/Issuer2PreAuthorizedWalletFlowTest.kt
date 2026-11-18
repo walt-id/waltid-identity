@@ -72,6 +72,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import id.waltid.openid4vci.wallet.token.TokenRequestException
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -80,6 +82,31 @@ class Issuer2PreAuthorizedWalletFlowTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun onlyTheCurrentOfferCanAuthorizeItsSession() = testApplication {
+        val attestation = createIssuer2ClientAttestationTestMaterial()
+        installIssuer2WithConfigFiles(configureServiceConfig = {
+            it.copy(clientAuthenticationConfig = attestation.clientAuthenticationConfig)
+        })
+        val client = apiClient()
+        val wallet = Issuer2WalletFlowDriver(client, attestationAssembler = attestation.attestationAssembler)
+        val request = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
+        val first = client.createCredentialOffer(request)
+        val previous = wallet.resolve(first)
+        val replacement = client.createCredentialOffer(request.copy(
+            sessionId = first.offerId, txCode = TxCode(length = 6), txCodeValue = "123456",
+        ))
+        val current = wallet.resolve(replacement)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, assertFailsWith<TokenRequestException> {
+            wallet.exchangePreAuthorizedCode(previous, txCode = null)
+        }.oauthError)
+        val currentCode = assertNotNull(current.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, assertFailsWith<TokenRequestException> {
+            wallet.exchangeAuthorizationCode(current, currentCode)
+        }.oauthError)
+        assertBearerAccessToken(wallet.exchangePreAuthorizedCode(current, replacement.txCodeValue))
     }
 
     @Test
