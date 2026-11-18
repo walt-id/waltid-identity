@@ -9,6 +9,12 @@ the current Swift facade remains correct.
 
 ## Decisions
 
+- 2026-11-09 (WAL-1513): Added `MobileWalletPaymentCredentialRegistry`, an optional
+  registry capability carrying authenticated issuer instructions before Android
+  Credential Manager confirmation. The Swift facade does not expose Android
+  credential registries or implement this capability; its existing payment
+  review continues through the shared consent resolver. No Swift facade API or
+  UI change is required. Existing registry record constructors remain unchanged.
 - 2026-07-07: Added initial Kotlin ABI baselines and explicit API mode for the
   mobile wallet KMP modules. No Swift facade shape change is needed because this
   commit is a contract gate for the existing `WalletSDK` boundary, not a new

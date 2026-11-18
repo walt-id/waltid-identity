@@ -40,7 +40,12 @@ internal data class ScaWalletFixture(val wallet: MobileWallet, val request: Json
     }
 }
 
-internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProvider): ScaWalletFixture {
+internal suspend fun scaWalletFixture(
+    key: Key,
+    provider: PlatformManagedKeyProvider,
+    registry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    transformMetadata: (JsonObject) -> JsonObject = { it },
+): ScaWalletFixture {
     val issuer = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
         GenerateSoftwareKeyRequest(KeyId("synthetic-issuer"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
     )
@@ -81,13 +86,14 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         walletId = "synthetic-sca-wallet", keyStore = keys, didStore = InMemoryDidStore(), credentialStore = credentials,
         transactionDataProfiles = listOf(MobileWalletTransactionDataProfile("urn:eudi:sca:payment:1")),
         scaAuthorizer = NativeScaPresentationAuthorizer(provider),
+        credentialRegistry = registry,
         preferredLocales = listOf("en"),
         paymentCredentialIssuers = listOf(PaymentCredentialIssuer("https://issuer.example",
             requireNotNull(issuer.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(issuer.spec)
                 .data.toByteArray().decodeToString())),
         paymentMetadataHttpClient = HttpClient(MockEngine { request ->
             check(request.url.toString() == vct) { "Unexpected metadata request: ${request.url}" }
-            respond(buildJsonObject {
+            respond(transformMetadata(buildJsonObject {
                 put("vct", vct)
                 put("category", "urn:eu:europa:ec:eudi:sua:sca")
                 put("transaction_data_types", buildJsonObject {
@@ -111,7 +117,7 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
                         })
                     })
                 })
-            }.toString(), headers = headersOf(HttpHeaders.ContentType, "application/json"))
+            }).toString(), headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }),
     )
     return ScaWalletFixture(wallet, request)

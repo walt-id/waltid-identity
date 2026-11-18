@@ -126,7 +126,6 @@ class ScaPaymentWalletIntegrationTest {
             .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
         paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
             issuerKey.getPublicKey().exportJWK(),
-            "Prüfen Sie Empfänger, Beträge, Termine und wiederkehrende Bedingungen.",
             missingMetadata != null, attester, extra)
     }
 
@@ -143,15 +142,13 @@ class ScaPaymentWalletIntegrationTest {
         }.use { http ->
             // Pin the same public verification key as the demos, independently of the received credential.
             val issuerPublicJwk = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
-            // Keep the deployed metadata expectation until the rollout tracked by WAL-1665.
-            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk,
-                "Prüfen Sie Empfänger und Betrag vor der Bestätigung.") }
+            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk) }
         }
     }
 
     private suspend fun paymentFlow(
         http: HttpClient, issuerBase: String, verifierBase: String,
-        issuerPublicJwk: String, expectedSecurityHint: String, missingLabel: Boolean = false,
+        issuerPublicJwk: String, missingLabel: Boolean = false,
         attester: Issuer2TestKeyAttester? = null,
         extra: JsonObject? = null,
     ) {
@@ -186,6 +183,12 @@ class ScaPaymentWalletIntegrationTest {
             ).toList().single()
             val vct = credential.credential.credentialData.getValue("vct").jsonPrimitive.content
             assertEquals("$issuerBase/openid4vci/sca_payment_card_sd_jwt", vct)
+            val issuerUiLabels = http.get(vct).body<JsonObject>().getValue("transaction_data_types").jsonObject
+                .getValue("urn:eudi:sca:payment:1").jsonObject.getValue("ui_labels").jsonObject
+            // Optional copy follows the served catalogue before and after demo deployments.
+            fun germanUiLabel(name: String): String? = issuerUiLabels[name]?.jsonArray
+                ?.single { it.jsonObject.getValue("lang").jsonPrimitive.content == "de" }
+                ?.jsonObject?.getValue("value")?.jsonPrimitive?.content
 
             // Reuse the shipped demo request. Only transport protection and the issuer VCT differ;
             // signed/encrypted transport variants already have their own protocol/app coverage.
@@ -253,8 +256,8 @@ class ScaPaymentWalletIntegrationTest {
             val prepared = assertNotNull(WalletPresentationHandler.prepareDcApiPaymentConsent(wallet, submission, policy))
             val payment = prepared.payment
             assertEquals("de", payment.locale)
-            assertEquals("Diese Zahlung bestätigen", payment.title)
-            assertEquals(expectedSecurityHint, payment.securityHint)
+            assertEquals(germanUiLabel("transaction_title"), payment.title)
+            assertEquals(germanUiLabel("security_hint"), payment.securityHint)
             assertEquals("Zahlung bestätigen", payment.affirmativeAction)
             assertEquals("Zahlung abbrechen", payment.denialAction)
             val fields = payment.fields.associateBy { it.path }

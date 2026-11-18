@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 
 /** The wire alternatives are validated before any reference is retrieved. */
 internal sealed interface PaymentMetadataSource {
@@ -48,52 +49,12 @@ internal fun localizePaymentConsent(
     values: Map<List<String>, String>,
     preferredLocales: List<String>,
 ): PaymentConsent {
-    val claims = claimsDocument as? JsonArray ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-    val catalogue = catalogueDocument as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-    if ("affirmative_action_label" !in catalogue) {
-        consentFailure(PaymentConsentFailure.INVALID_METADATA)
+    val labels = paymentCatalogue(catalogueDocument)
+    val fields = paymentClaims(claimsDocument)
+    fields.forEach { field ->
+        if (field.mandatory && payload.claimAt(field.path) == null) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        if (field.path in values && field.labels.isEmpty()) consentFailure(PaymentConsentFailure.INVALID_METADATA)
     }
-    val labels = catalogue.filterKeys { it in CATALOGUE_LIMITS }.mapValues { (name, entries) -> translations(entries, "lang") { entry ->
-        val label = entry.string("value", PaymentConsentFailure.INVALID_METADATA)
-        if (label.codePointLength() > CATALOGUE_LIMITS.getValue(name)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        label
-    } }
-    val fields = claims.map { raw ->
-        val claim = raw as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        val path = (claim["path"] as? JsonArray)?.map { element ->
-            val part = element as? JsonPrimitive ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            if (!part.isString || part.content.isBlank()) consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            part.content
-        }?.takeIf { it.isNotEmpty() } ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        // TS-12 section 3.3.2 applies Claim Metadata to the transaction payload.
-        // Resolve against that object; never guess another root from provider data.
-        val present = payload.claimAt(path) != null
-        if ("mandatory" in claim) {
-            val mandatory = (claim["mandatory"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
-                ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            if (mandatory && !present) consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        }
-        val level = if ("visualisation" in claim) {
-            val value = claim["visualisation"] as? JsonPrimitive ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            if (value.isString) consentFailure(PaymentConsentFailure.INVALID_METADATA)
-            value.intOrNull ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        } else 3
-        val placement = when (level) {
-            1 -> PaymentFieldPlacement.PROMINENT
-            2 -> PaymentFieldPlacement.MAIN
-            3 -> PaymentFieldPlacement.DETAILS
-            4 -> PaymentFieldPlacement.OMITTED
-            else -> consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        }
-        // SD-JWT VC draft 16 section 4.6.2 requires locale. Unrecognized metadata
-        // properties are ignored per section 4.2, not used as aliases for required ones.
-        val display = if ("display" in claim) translations(claim["display"], "locale") { entry ->
-            ClaimLabel(entry.string("label", PaymentConsentFailure.INVALID_METADATA), entry.optionalString("description"))
-        } else emptyMap()
-        if (path in values && display.isEmpty()) consentFailure(PaymentConsentFailure.INVALID_METADATA)
-        LocalizedClaim(path, placement, display)
-    }
-    if (fields.map { it.path }.distinct().size != fields.size) consentFailure(PaymentConsentFailure.INVALID_METADATA)
     val fieldsByPath = fields.associateBy { it.path }
     if (!fieldsByPath.keys.containsAll(values.keys)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
     val presentFields = fields.filter { it.path in values }
@@ -140,7 +101,7 @@ private fun Set<String>.matchingTag(range: String): String? =
     range.takeIf { it in this } ?: firstOrNull { it.startsWith("$range-") }
 
 private class ClaimLabel(val label: String, val description: String?)
-private class LocalizedClaim(val path: List<String>, val placement: PaymentFieldPlacement, val labels: Map<String, ClaimLabel>)
+private class LocalizedClaim(val path: List<String>, val placement: PaymentFieldPlacement, val labels: Map<String, ClaimLabel>, val mandatory: Boolean)
 
 private fun <T> translations(raw: JsonElement?, languageKey: String, parse: (JsonObject) -> T): Map<String, T> {
     val entries = raw as? JsonArray ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
@@ -183,3 +144,80 @@ private val PAYMENT_FREQUENCY_LABELS = mapOf(
         "TWMN" to "Zweimal im Monat", "MNTH" to "Monatlich", "TOMN" to "Alle zwei Monate", "QUTR" to "Vierteljährlich",
         "FOMN" to "Alle vier Monate", "SEMI" to "Zweimal im Jahr", "YEAR" to "Jährlich", "TYEA" to "Alle zwei Jahre"),
 )
+
+private fun paymentCatalogue(catalogueDocument: JsonElement): Map<String, Map<String, String>> {
+    val catalogue = catalogueDocument as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+    if ("affirmative_action_label" !in catalogue) {
+        consentFailure(PaymentConsentFailure.INVALID_METADATA)
+    }
+    return catalogue.filterKeys { it in CATALOGUE_LIMITS }.mapValues { (name, entries) -> translations(entries, "lang") { entry ->
+        val label = entry.string("value", PaymentConsentFailure.INVALID_METADATA)
+        if (label.codePointLength() > CATALOGUE_LIMITS.getValue(name)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        label
+    } }
+}
+
+private fun paymentClaims(claimsDocument: JsonElement): List<LocalizedClaim> {
+    val claims = claimsDocument as? JsonArray ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+    val fields = claims.map { raw ->
+        val claim = raw as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        val path = (claim["path"] as? JsonArray)?.map { element ->
+            val part = element as? JsonPrimitive ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+            if (!part.isString || part.content.isBlank()) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+            part.content
+        }?.takeIf { it.isNotEmpty() } ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        val mandatory = if ("mandatory" in claim) {
+            (claim["mandatory"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
+                ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        } else false
+        val level = if ("visualisation" in claim) {
+            val value = claim["visualisation"] as? JsonPrimitive ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+            if (value.isString) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+            value.intOrNull ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        } else 3
+        val placement = when (level) {
+            1 -> PaymentFieldPlacement.PROMINENT
+            2 -> PaymentFieldPlacement.MAIN
+            3 -> PaymentFieldPlacement.DETAILS
+            4 -> PaymentFieldPlacement.OMITTED
+            else -> consentFailure(PaymentConsentFailure.INVALID_METADATA)
+        }
+        // SD-JWT VC draft 16 section 4.6.2 requires locale. Unrecognized metadata
+        // properties are ignored per section 4.2, not used as aliases for required ones.
+        val display = if ("display" in claim) translations(claim["display"], "locale") { entry ->
+            ClaimLabel(entry.string("label", PaymentConsentFailure.INVALID_METADATA), entry.optionalString("description"))
+        } else emptyMap()
+        LocalizedClaim(path, placement, display, mandatory)
+    }
+    if (fields.map { it.path }.distinct().size != fields.size) consentFailure(PaymentConsentFailure.INVALID_METADATA)
+    return fields
+}
+
+/** Validated language-indexed instructions for a sandboxed platform matcher with no network access. */
+internal fun platformPaymentInstructions(claims: JsonElement, catalogue: JsonElement, credentialClaims: JsonElement): JsonObject {
+    fun rules(raw: JsonElement): JsonArray = JsonArray(paymentClaims(raw).map { field ->
+        buildJsonObject {
+            put("path", JsonArray(field.path.map(::JsonPrimitive)))
+            put("mandatory", JsonPrimitive(field.mandatory))
+            put("visualisation", JsonPrimitive(when (field.placement) {
+                PaymentFieldPlacement.PROMINENT -> 1
+                PaymentFieldPlacement.MAIN -> 2
+                PaymentFieldPlacement.DETAILS -> 3
+                PaymentFieldPlacement.OMITTED -> 4
+            }))
+            put("labels", JsonObject(field.labels.mapValues { (_, label) ->
+                buildJsonObject {
+                    put("label", JsonPrimitive(label.label))
+                    label.description?.let { put("description", JsonPrimitive(it)) }
+                }
+            }))
+        }
+    })
+    return buildJsonObject {
+        put("claims", rules(claims))
+        put("credential_claims", rules(credentialClaims))
+        put("ui_labels", JsonObject(paymentCatalogue(catalogue).mapValues { (_, translations) ->
+            JsonObject(translations.mapValues { JsonPrimitive(it.value) })
+        }))
+    }
+}

@@ -111,6 +111,10 @@ class Issuer2MetadataEndpointTest {
         loadIssuer2ConfigFiles()
         val servicePayment = ConfigManager.getConfig<Issuer2MetadataConfig>()
             .sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+        val paymentUiLabels = servicePayment.customParameters!!.getValue("transaction_data_types").jsonObject
+            .getValue("urn:eudi:sca:payment:1").jsonObject.getValue("ui_labels").jsonObject
+        assertFalse("transaction_title" in paymentUiLabels, "Demo metadata must not add a generic transaction title")
+        assertFalse("security_hint" in paymentUiLabels, "Demo metadata must not add a generic security hint")
         val dockerMetadata = issuer2ConfigDir().parent.parent.parent
             .resolve("docker-compose/issuer-api2/config/credential-issuer-metadata.conf")
         loadIssuer2ConfigFiles(metadataConfigFile = dockerMetadata)
@@ -701,6 +705,19 @@ class Issuer2MetadataEndpointTest {
                     assertEquals(configured.copy(vct = publishedVct), vctTypeMetadata)
                     val document = vctTypeMetadata.toJSON()
                     assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
+                    val attributeLabels = document.getValue("claims").jsonArray.associate { claim ->
+                        val item = claim.jsonObject
+                        item.getValue("path").jsonArray.single().jsonPrimitive.content to
+                            item.getValue("display").jsonArray.associate { display ->
+                                display.jsonObject.getValue("locale").jsonPrimitive.content to
+                                    display.jsonObject.getValue("label").jsonPrimitive.content
+                            }
+                    }
+                    assertEquals(mapOf(
+                        "card_scheme" to mapOf("en" to "Card scheme", "de" to "Kartensystem"),
+                        "card_last4" to mapOf("en" to "Card ending", "de" to "Kartenende"),
+                        "card_holder_name" to mapOf("en" to "Cardholder", "de" to "Karteninhaber"),
+                    ), attributeLabels)
                     val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
                     assertPaymentClaimMetadata(payment.getValue("claims").jsonArray)
                     val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray

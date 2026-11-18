@@ -2,9 +2,8 @@
 
 `src/androidMain/assets/id/walt/wallet2/mobile/openid4vpmatcher.wasm` is the Credential Manager
 matcher this wallet registers for its OpenID4VP registry, in place of the one AndroidX embeds in
-`OpenId4VpRegistry`. Only the matcher binary is ours: `AndroidDigitalCredentialRegistry` still builds
-an `OpenId4VpRegistry` and re-registers its `credentials` bytes verbatim, so AndroidX remains the sole
-serializer of the registry format.
+`OpenId4VpRegistry`. AndroidX serializes the credential records and icon region. The adapter preserves that region and
+extends the JSON document with `walt_payment_instructions_v1`, consumed only by our patched matcher.
 
 This is separate from the Annex C matcher described in `ANNEX-C-MATCHER.md`. The two registries are
 registered independently and share no code beyond both being raw `DigitalCredentialRegistry`
@@ -31,7 +30,7 @@ substituting the Annex C matcher we already vendor, which implements no `transac
 
 ## Provenance
 
-The committed binary is **our build of unmodified upstream sources**, not an artifact Google publishes:
+The committed binary is **our build of upstream sources with the local payment patch**, not an artifact Google publishes:
 upstream ships the Rust sources only.
 
 | | |
@@ -40,10 +39,10 @@ upstream ships the Rust sources only.
 | Branch | `wasm` |
 | Commit | `5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e` |
 | Upstream path | `CredentialProvider/wasm/matcher-rs` |
-| Source modifications | none |
+| Source modifications | `matcher-patches/5d966fc4-local-ts12-payment-confirmation.patch` |
 | Built artifact | `target/wasm32-unknown-unknown/release/presentation.wasm`, built here |
-| Size | 117,546 bytes |
-| SHA-256 | `5f1738caf65854d8999701dd54a7caafbd8c2fccc355be340e553fe16f5cfd79` |
+| Size | 194,413 bytes |
+| SHA-256 | `beaf679bbb20f157f9fc68742a0f75d60527027e1ce84594983059b61a300462` |
 | Toolchain | `rustc 1.99.0-nightly (12c36e253 2026-08-10)`, target `wasm32-unknown-unknown` |
 | License | Apache-2.0 |
 
@@ -60,9 +59,11 @@ different hash.
 
 ```shell
 git clone https://github.com/android/identity-samples
-git -C identity-samples checkout <pinned-commit>
+git -C identity-samples checkout 5d966fc4913cac93f3b3b11e11bdd44d3e0b5c9e
+git -C identity-samples apply <this-module>/matcher-patches/5d966fc4-local-ts12-payment-confirmation.patch
 cd identity-samples/CredentialProvider/wasm/matcher-rs
 rustup toolchain install nightly --component rust-src --target wasm32-unknown-unknown
+cargo test --lib
 bash build.sh
 cp target/wasm32-unknown-unknown/release/presentation.wasm \
   <this-module>/src/androidMain/assets/id/walt/wallet2/mobile/openid4vpmatcher.wasm
@@ -111,3 +112,99 @@ custom registry and see whether it still passes.
 
 Because the matcher is vendored rather than declared as a dependency, ordinary dependency-update
 tooling will not detect upstream changes to it.
+
+## TS-12 system payment confirmation
+
+The local patch supports one unscheduled `urn:eudi:sca:payment:1` transaction, including ordinary
+credentials requested alongside it. It expands the original JSON number token without floating point
+and pads to the ISO 4217 minor-unit count used by the shared wallet validator. It never rounds, uses
+verifier-supplied `amount_display`, or changes the original transaction bytes retained for proof binding.
+The locked `serde_json` parser preserves arbitrary-precision number tokens. Android supplies decimal
+separators and digit symbols for the preferred language ranges, without parsing the amount as a
+platform floating-point number (for example `KWD 1.234` in English and `KWD 1,234` in German).
+
+For SD-JWT payment candidates, `PaymentConsentResolver` authenticates the stored attestation using
+independently configured issuer keys before retrieving its issuer-designated metadata. The shared
+metadata parser validates labels and exports language-indexed instructions. Registration includes
+transaction labels, UI labels and requested-attribute labels from that authenticated document; it never
+copies verifier text into issuer instructions. The matcher requires labels for every applicable
+parameter and requested attribute, including a common preferred language. It displays levels 1–3 in
+the multiline subtitle and omits level 4. Optional descriptions, title and security hint are shown only
+when the issuer supplied them. The ordinary picker caption is not repeated in the payment subtitle;
+card identity remains in the title and issuer-labelled requested attributes. The demo issuer omits
+generic optional titles and hints; issuers can still supply meaningful instructions. Request values are
+isolated for bidirectional text and control characters are escaped to prevent injected instruction lines.
+Unsigned warning text and Boolean translations are
+wallet-owned English/German text; unsupported languages fail closed when these are needed.
+
+The standard `require_cryptographic_holder_binding` transaction parameter is accepted when absent
+or `true`; `false` and malformed values are rejected. Missing instructions exclude the affected card,
+while another card with valid instructions remains selectable. Credential attributes retain their own
+values even when their names also occur in the transaction payload.
+
+Payment entry IDs bind the authenticated document, credential wire representation and locale preferences.
+The wallet verifies the Request Object first, then re-resolves metadata and rejects a stale system
+selection before disclosure. Ordinary disclosure does not fetch payment metadata. Unavailable or
+untrusted metadata leaves ordinary registration usable but supplies no SD-JWT payment candidate.
+Unsupported metadata paths, missing required labels, multiple transactions, scheduled/recurring
+payments and unknown payment extensions produce no payment candidate. This filtering happens before
+the provider opens, including when wallet preview is enabled; the direct wallet-owned presentation
+route is unchanged. On the tested Google Play services version, an empty match entered the cross-device
+hybrid activity and left the caller pending, including with `preferImmediatelyAvailableCredentials=true`.
+Google documents that Digital Credentials has no equivalent of the immediate-availability option:
+https://developer.android.com/identity/digital-credentials/email-verification-implementation.
+The physical Android 12 / Play services 26.42.31 run reproduced the hybrid activity. Back and caller
+cancellation alone did not close it. Its explicit **Cancel** action did return cancellation and pass
+cleanup, independently for multiple transactions and missing labels. The focused device helper now
+accepts either the empty state's Close action or the QR fallback's Cancel action. This is a
+user-dismissed fallback, not an immediate no-credential callback. The matcher returns normally with zero entries, and the wallet provider has not been invoked;
+it cannot explain or replace that system fallback. Keep fail-closed matching rather than fabricating
+a selectable credential to carry an error message. The existing mdoc payment-summary
+route retains its scope and gains exact amount formatting; it has no authenticated TS-12 label chain
+and must not be described as equivalent to the SD-JWT route.
+
+This remains a system-sheet improvement, **not full TS-12 display conformance**. Observed on Android 17
+(API 37), Play services 26.43.30, ABI 9: payment entries display multiline subtitles, but ignore the
+ordinary field, metadata-text and warning/disclaimer APIs. The platform controls the heading and action
+labels; it cannot express issuer-prescribed button labels, level-1 emphasis or a separate level-3 details
+hierarchy through the tested ABI. The subtitle warning plus system Continue is not established as a
+separate TS-12 unsigned-request consent step. Signed Request Objects are decoded for matching but
+are authenticated only by the wallet after selection; the sheet cannot certify their validity.
+These require a Google platform enhancement or an explicit product-policy decision. Wallet preview
+remains user-controlled; its existing issuer-led review and native signing authorization are preserved.
+
+CI runs `node matcher-tests/payment.mjs` against the actual vendored binary, including exact decimal
+vectors, multilingual labels, selected attributes, ordinary companion entries, signed/unsigned routing,
+missing instructions and unsupported boundaries. This ABI evidence complements real system-sheet
+captures; it does not substitute for them. New upstream matcher HEAD was inspected for WAL-1513;
+its transaction extraction still uses floating point and two decimal places, so an upgrade alone does
+not address this issue.
+
+### Demo rollout dependency
+
+Deploy the accompanying service and Docker issuer VCT catalogue updates before using the new SD-JWT
+payment route against those demo services. They add English/German labels for `card_scheme`,
+`card_last4` and `card_holder_name` to the authenticated attestation type document. Issuance metadata's
+separate `credential_metadata.claims[].display[].name` is not a substitute for the VCT's authenticated
+`claims[].display[].label`. A deployment still serving the previous VCT without these labels intentionally
+has no SD-JWT system-payment candidate. Other issuers, including separately configured Enterprise
+fixtures, must publish equivalent authenticated labels for their requested attributes.
+
+The unattended public-demo device check verifies rejection for both preview settings while the
+deployed VCT has no attribute `claims`. Once that property is deployed, it requires the complete
+system-sheet labels and native-policy rejection path; malformed or incomplete labels do not select
+the legacy-deployment expectation. Positive matcher coverage remains unconditional.
+
+A physical Android 12 signed-request check used a synthetic verifier whose public key was configured
+independently in the isolated wallet. The actual wallet accepted the valid signature, audience and
+origin, then displayed the exact amount and issuer labels with preview disabled. Confirmation reached
+the native SCA policy rejection on the deliberately unprotected test identity. Protected identity setup
+and signing require operator biometrics and remain an attended acceptance gate; this check is not a
+successful protected SCA payment.
+
+The attended physical `ScaPaymentE2ETest.sharesScaSdJwtWithNativeAuthorizationWithoutWalletReview`
+prepares the remaining signed/protected acceptance path. On a fresh isolated **preview** install,
+select it with `-e class id.walt.walletdemo.compose.android.ScaPaymentE2ETest#sharesScaSdJwtWithNativeAuthorizationWithoutWalletReview`
+and `-e wallet.sca approve`. It creates the protected identity through the app, checks issuer labels
+in the system sheet, then requires operator-approved signing and verifier acceptance with the exact
+original transaction hash. It also requires the issuer-label deployment. Do not run it unattended.

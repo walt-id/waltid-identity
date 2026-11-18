@@ -26,6 +26,7 @@ import androidx.credentials.registry.provider.digitalcredentials.DigitalCredenti
 import androidx.credentials.registry.provider.digitalcredentials.DigitalCredentialRegistry
 import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
 import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
+import id.walt.wallet2.consent.PaymentConsentMetadata
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -66,7 +67,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 public class AndroidDigitalCredentialRegistry(
     context: Context,
-) : MobileWalletCredentialRegistry {
+) : MobileWalletPaymentCredentialRegistry {
     private val applicationContext: Context = context.applicationContext
     private val registryManager: RegistryManager = RegistryManager.create(applicationContext)
     /** Host app icon shown in the Credential Manager wallet / credential picker. */
@@ -162,6 +163,13 @@ public class AndroidDigitalCredentialRegistry(
     override suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
+    ): MobileWalletCredentialRegistrationResult = replaceWithPaymentMetadata(registryId, records, emptyMap(), emptyList())
+
+    override suspend fun replaceWithPaymentMetadata(
+        registryId: String,
+        records: List<MobileWalletCredentialRegistryRecord>,
+        paymentMetadata: Map<String, PaymentConsentMetadata>,
+        preferredLocales: List<String>,
     ): MobileWalletCredentialRegistrationResult = replacementMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
@@ -170,7 +178,7 @@ public class AndroidDigitalCredentialRegistry(
             return@withLock MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
         }
         val immediate = records.map { it.withLocalThumbnail() }
-        val result = registerRecords(registryId, immediate)
+        val result = registerRecords(registryId, immediate, paymentMetadata, preferredLocales)
         if (!result.available || records.none { it.iconPng == null && it.cardArtImageUris.isNotEmpty() }) {
             return@withLock result
         }
@@ -183,7 +191,7 @@ public class AndroidDigitalCredentialRegistry(
             !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
         }
         if (changed) {
-            val refreshResult = registerRecords(registryId, refreshed)
+            val refreshResult = registerRecords(registryId, refreshed, paymentMetadata, preferredLocales)
             registrationAvailable = registrationAvailableAfterRefresh(
                 initialSucceeded = result.available,
                 refreshSucceeded = refreshResult.available,
@@ -195,6 +203,8 @@ public class AndroidDigitalCredentialRegistry(
     private suspend fun registerRecords(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
+        paymentMetadata: Map<String, PaymentConsentMetadata>,
+        preferredLocales: List<String>,
     ): MobileWalletCredentialRegistrationResult {
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
@@ -211,7 +221,7 @@ public class AndroidDigitalCredentialRegistry(
             registerCredentials(
                 AndroidOpenId4VpRegistry(
                     id = registryId,
-                    credentials = openId4Vp.credentials,
+                    credentials = withPaymentInstructions(openId4Vp.credentials, paymentMetadata, preferredLocales),
                     matcher = applicationContext.assets.open(OPENID4VP_MATCHER_ASSET).use { it.readBytes() },
                 )
             )
@@ -621,3 +631,38 @@ internal data class AndroidAnnexCMdoc(
     val docType: String,
     val namespaces: Map<String, Map<String, List<String>>>,
 )
+
+/** Preserve AndroidX's icon region and offsets; only extend its JSON document for our pinned matcher. */
+internal fun withPaymentInstructions(
+    credentials: ByteArray,
+    metadata: Map<String, PaymentConsentMetadata>,
+    preferredLocales: List<String>,
+): ByteArray {
+    require(credentials.size >= 4)
+    val offset = ByteBuffer.wrap(credentials, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
+    require(offset in 4..credentials.size)
+    val original = Json.parseToJsonElement(credentials.copyOfRange(offset, credentials.size).decodeToString()) as JsonObject
+    val extended = buildJsonObject {
+        original.forEach { (key, value) -> put(key, value) }
+        putJsonObject("walt_payment_number_formats_v1") {
+            preferredLocales.flatMap { tag ->
+                generateSequence(tag.lowercase()) { range -> range.substringBeforeLast('-', "").takeIf { it.isNotEmpty() } }.toList()
+            }.distinct().forEach { tag ->
+                val symbols = java.text.DecimalFormatSymbols.getInstance(java.util.Locale.forLanguageTag(tag))
+                putJsonObject(tag) {
+                    put("decimal_separator", symbols.decimalSeparator.toString())
+                    put("zero_digit", symbols.zeroDigit.toString())
+                }
+            }
+        }
+        putJsonObject("walt_payment_instructions_v1") {
+            metadata.forEach { (id, instructions) ->
+                putJsonObject(id) {
+                    put("document", instructions.document)
+                    putJsonArray("locales") { preferredLocales.forEach { add(JsonPrimitive(it)) } }
+                }
+            }
+        }
+    }
+    return credentials.copyOfRange(0, offset) + extended.toString().encodeToByteArray()
+}

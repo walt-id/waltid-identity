@@ -855,6 +855,10 @@ abstract interface id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id
     open suspend fun registerCreationOptions(): id.walt.wallet2.mobile/MobileWalletCredentialRegistrationResult // id.walt.wallet2.mobile/MobileWalletCredentialRegistry.registerCreationOptions|registerCreationOptions(){}[0]
 }
 
+abstract interface id.walt.wallet2.mobile/MobileWalletPaymentCredentialRegistry : id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/MobileWalletPaymentCredentialRegistry|null[0]
+    abstract suspend fun replaceWithPaymentMetadata(kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialRegistryRecord>, kotlin.collections/Map<kotlin/String, id.walt.wallet2.consent/PaymentConsentMetadata>, kotlin.collections/List<kotlin/String>): id.walt.wallet2.mobile/MobileWalletCredentialRegistrationResult // id.walt.wallet2.mobile/MobileWalletPaymentCredentialRegistry.replaceWithPaymentMetadata|replaceWithPaymentMetadata(kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord>;kotlin.collections.Map<kotlin.String,id.walt.wallet2.consent.PaymentConsentMetadata>;kotlin.collections.List<kotlin.String>){}[0]
+}
+
 abstract interface id.walt.wallet2.mobile/ProximityApplicationProfile { // id.walt.wallet2.mobile/ProximityApplicationProfile|null[0]
     abstract val id // id.walt.wallet2.mobile/ProximityApplicationProfile.id|{}id[0]
         abstract fun <get-id>(): kotlin/String // id.walt.wallet2.mobile/ProximityApplicationProfile.id.<get-id>|<get-id>(){}[0]

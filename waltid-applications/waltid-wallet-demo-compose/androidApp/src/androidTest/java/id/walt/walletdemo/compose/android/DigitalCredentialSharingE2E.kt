@@ -264,8 +264,8 @@ internal abstract class DigitalCredentialSharingE2E {
     }
 
     /**
-     * Drives an unsupported request until Credential Manager shows its empty state. A candidate is a
-     * failure, and the request is only allowed to complete after the GMS-scoped Close action.
+     * Rejects a local candidate and dismisses either the empty state or cross-device fallback.
+     * Completion must follow the GMS-scoped Close or hybrid Cancel action.
      */
     protected fun Fixture.awaitUnsupportedRequestEmptyState(
         request: DigitalCredentialRequestHandle,
@@ -286,10 +286,14 @@ internal abstract class DigitalCredentialSharingE2E {
                         request.completedResultDescription(),
                 )
             }
-            if (device.findCredentialManagerClose() != null) {
+            val hybrid = device.findCredentialManagerText("Scan this QR code") != null
+            val dismiss: (UiObject2) -> Boolean = if (hybrid) {
+                { node -> runCatching { node.isEnabled && node.text == "Cancel" }.getOrDefault(false) }
+            } else ::isCredentialManagerClose
+            if (device.credentialManagerNodes().any(dismiss)) {
                 assertTrue(
-                    "Could not dismiss Credential Manager's empty state for $protocol",
-                    device.clickCredentialManagerNode(::isCredentialManagerClose),
+                    "Could not dismiss Credential Manager's unsupported-request UI for $protocol",
+                    device.clickCredentialManagerNode(dismiss),
                 )
                 return
             }
@@ -297,7 +301,7 @@ internal abstract class DigitalCredentialSharingE2E {
         }
 
         fail(
-            "Credential Manager did not show its empty state for $protocol.\n" +
+            "Credential Manager did not show a dismissible unsupported-request UI for $protocol.\n" +
                 pickerDiagnostic(request, candidateText, candidateSelected = false),
         )
     }
