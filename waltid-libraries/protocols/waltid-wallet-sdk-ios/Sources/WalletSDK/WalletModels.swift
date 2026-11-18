@@ -1300,6 +1300,12 @@ public struct IssuanceFailure: Equatable, Sendable {
     }
 
     /// Creates a failure with the session's explicit offer retry decision.
+    ///
+    /// - Parameters:
+    ///   - code: The category of the failed issuance transition.
+    ///   - message: A public description that excludes protocol secrets.
+    ///   - targetFailure: The failed credential target and any unattempted targets, when available.
+    ///   - canRetryOffer: Whether the caller may submit the same reviewed offer again.
     public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil, canRetryOffer: Bool) {
         self.code = code
         self.message = message
