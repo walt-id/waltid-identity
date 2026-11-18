@@ -69,7 +69,14 @@ data class IssuanceSession(
     val authorizedCredentialIdentifiers: List<String>? = null,
     val deferredStatus: id.walt.openid4vci.deferred.DeferredStatus? = null,
     val deferredState: id.walt.openid4vci.deferred.DeferredIssuanceState? = null,
+    /** Private checkpoints for immediate issuance with preallocated credential status. */
+    val credentialStatusIssuance: CredentialStatusIssuanceState? = null,
 ) {
+    /** All items in a session must respect the same persistent processing fence. */
+    val requiresCredentialStatusLease: Boolean
+        get() = credentialStatusIssuance != null ||
+            issuanceRequests.any { CredentialStatusConfiguration.isPreallocated(it.credentialStatus) }
+
     init {
         require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }
         require(issuanceRequests.map { it.credentialIdentifier }.distinct().size == issuanceRequests.size) {
