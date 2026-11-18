@@ -19,8 +19,8 @@ internal fun presentationDisplayName(
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
     CredentialDisplayNormalizer.toDetails(this, platformPreferredLocales())
 
-fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales: List<String> = platformPreferredLocales()): CredentialDetails {
-    val summary = CredentialSummary(
+internal fun WalletDemoPresentationCredentialOption.toCredentialSummary(): CredentialSummary =
+    CredentialSummary(
         id = selection.id,
         format = format,
         issuer = issuer,
@@ -30,7 +30,8 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales:
         credentialDataJson = credentialDataJson,
         metadataJson = metadataJson,
     )
-    val parsed = CredentialDisplayNormalizer.toDetails(summary, preferredLocales)
+fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales: List<String> = platformPreferredLocales()): CredentialDetails {
+    val parsed = CredentialDisplayNormalizer.toDetails(toCredentialSummary(), preferredLocales)
     val requestedGroup = toRequestedDisclosureGroup(preferredLocales)
 
     return parsed.copy(groups = listOfNotNull(requestedGroup) + parsed.groups)
@@ -39,24 +40,27 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales:
 fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(preferredLocales: List<String> = platformPreferredLocales()): ClaimGroup? {
     val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales, format)
     val requestedItems = disclosures.mapIndexed { index, disclosure ->
-        val path = ClaimPath.disclosure(index = index, rawPath = disclosure.path, format = format)
-        ClaimItem(
-            path = path.itemPath,
-            pathComponents = path.components,
-            label = disclosure.label,
-            value = CredentialDisplayNormalizer.toDisclosureValue(
-                valueJson = disclosure.valueJson,
-                displayValue = disclosure.displayValue,
-                path = path,
-                format = format,
-            ),
-            rawValue = disclosure.valueJson,
-            roles = CredentialDisplayVocabulary.roles(path),
-            labelSource = ClaimLabelSource.Request,
-        ).withClaimMetadata(metadata, format, disclosurePathExpression(disclosure.path, format))
+        disclosure.toClaimItem(index, format, metadata)
     }
 
     return requestedItems
         .takeIf { it.isNotEmpty() }
         ?.let { ClaimGroup(id = "requested", title = CredentialDisplayVocabulary.RequestedDisclosuresTitle, items = it) }
+}
+
+internal fun WalletDemoPresentationDisclosure.toClaimItem(
+    index: Int,
+    format: String,
+    metadata: List<WalletDemoCredentialClaimMetadata>,
+): ClaimItem {
+    val claimPath = ClaimPath.disclosure(index = index, rawPath = path, format = format)
+    return ClaimItem(
+        path = claimPath.itemPath,
+        pathComponents = claimPath.components,
+        label = label,
+        value = CredentialDisplayNormalizer.toDisclosureValue(valueJson, displayValue, claimPath, format),
+        rawValue = valueJson,
+        roles = CredentialDisplayVocabulary.roles(claimPath),
+        labelSource = ClaimLabelSource.Request,
+    ).withClaimMetadata(metadata, format, disclosurePathExpression(path, format))
 }

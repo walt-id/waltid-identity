@@ -31,6 +31,27 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
+    static func sharingDetails(for options: [PresentationCredentialOption], includeDisclosures: Bool) async -> [CredentialDetails] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: options.map {
+                    sharingDetails(for: $0, includeDisclosures: includeDisclosures)
+                })
+            }
+        }
+    }
+
+    static func sharingDetails(
+        for option: PresentationCredentialOption, includeDisclosures: Bool, preferredLocales: [String] = Locale.preferredLanguages
+    ) -> CredentialDetails {
+        CredentialDetails(
+            id: option.selection.id, title: option.label ?? option.format, issuer: option.issuer,
+            subject: option.subject, format: option.format, addedAt: nil,
+            groups: includeDisclosures ? requestedDisclosureGroups(for: option, preferredLocales: preferredLocales) : [],
+            metadataJSON: option.metadataJSON, credentialDataJSON: option.credentialDataJSON, preferredLocales: preferredLocales
+        )
+    }
+
     public static func details(for credential: Credential) -> CredentialDetails {
         details(for: credential, preferredLocales: Locale.preferredLanguages)
     }
@@ -73,25 +94,6 @@ public enum CredentialDisplayNormalizer {
             addedAt: nil,
             credentialDataJSON: option.credentialDataJSON
         )
-        let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, preferredLocales: preferredLocales, format: option.format)
-        let requestedItems = option.disclosures.enumerated().map { index, disclosure in
-            let path = disclosurePath(index: index, disclosure: disclosure, format: option.format)
-            return ClaimItem(
-                path: path.itemPath,
-                pathComponents: path.components,
-                label: CredentialDisplayVocabulary.disclosureLabel(
-                    name: disclosure.name,
-                    path: disclosure.path
-                ),
-                value: disclosureValue(for: disclosure, path: path, format: option.format),
-                rawValue: disclosure.valueJSON,
-                roles: CredentialDisplayVocabulary.roles(for: path.components), labelSource: .request
-            ).applyingClaimMetadata(metadata, format: option.format, expression: disclosurePathExpression(disclosure.path, format: option.format))
-        }
-        let requestedGroups = requestedItems.isEmpty
-            ? []
-            : [ClaimGroup(id: "requested", title: CredentialDisplayVocabulary.requestedDisclosuresTitle, items: requestedItems)]
-
         return CredentialDetails(
             id: parsed.id,
             title: parsed.title,
@@ -99,10 +101,32 @@ public enum CredentialDisplayNormalizer {
             subject: parsed.subject,
             format: parsed.format,
             addedAt: parsed.addedAt,
-            groups: requestedGroups + parsed.groups,
+            groups: requestedDisclosureGroups(for: option, preferredLocales: preferredLocales) + parsed.groups,
             metadataJSON: option.metadataJSON,
             credentialDataJSON: option.credentialDataJSON,
             preferredLocales: preferredLocales
+        )
+    }
+
+    private static func requestedDisclosureGroups(for option: PresentationCredentialOption, preferredLocales: [String]) -> [ClaimGroup] {
+        guard !option.disclosures.isEmpty else { return [] }
+        let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, preferredLocales: preferredLocales, format: option.format)
+        let items = option.disclosures.enumerated().map { index, disclosure in
+            disclosureItem(disclosure, index: index, format: option.format)
+                .applyingClaimMetadata(metadata, format: option.format, expression: disclosurePathExpression(disclosure.path, format: option.format))
+        }
+        return [ClaimGroup(id: "requested", title: CredentialDisplayVocabulary.requestedDisclosuresTitle, items: items)]
+    }
+
+    static func disclosureItem(_ disclosure: PresentationDisclosure, index: Int, format: String) -> ClaimItem {
+        let path = disclosurePath(index: index, disclosure: disclosure, format: format)
+        return ClaimItem(
+            path: path.itemPath,
+            pathComponents: path.components,
+            label: CredentialDisplayVocabulary.disclosureLabel(name: disclosure.name, path: disclosure.path),
+            value: disclosureValue(for: disclosure, path: path, format: format),
+            rawValue: disclosure.valueJSON,
+            roles: CredentialDisplayVocabulary.roles(for: path.components), labelSource: .request
         )
     }
 

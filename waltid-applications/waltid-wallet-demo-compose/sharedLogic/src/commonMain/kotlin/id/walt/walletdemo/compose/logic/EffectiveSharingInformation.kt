@@ -65,7 +65,6 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
     preferredLocales: List<String> = platformPreferredLocales(),
 ): List<EffectiveSharingGroup> {
     val optionById = options.associateBy { it.selection }
-    val information = options.associate { it.selection to it.toSharingInformation(preferredLocales) }
     val metadataByOption = options.associate { option ->
         option.selection to StoredCredentialMetadataParser.claims(option.metadataJson, preferredLocales, option.format)
     }
@@ -83,12 +82,14 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
             val option = requireNotNull(optionById[optionId])
             return bestClaimMetadata(metadataByOption.getValue(option.selection),
                 reviewedDisclosurePathExpression(selection.path, option.format), option.format)?.value?.displayName
-                ?: information[optionId]?.fields?.firstOrNull { selection in it.selections }?.item?.label ?: "selected information"
+                ?: option.disclosures.firstOrNull { it.path == selection.path }?.label ?: "selected information"
         }
         val choices = selectedOptions.flatMap { option ->
-            information.getValue(option.selection).fields.filter { it.optionalSelections.isNotEmpty() }.map { field ->
-                val selection = field.optionalSelections.single()
+            option.disclosures.mapIndexedNotNull { index, disclosure ->
+                if (!disclosure.selectable) return@mapIndexedNotNull null
+                val selection = WalletDemoPresentationDisclosureSelection(option.queryId, credentialId, disclosure.path)
                 val pattern = reviewedDisclosurePathExpression(selection.path, option.format)
+                if (!disclosure.requested && isCredentialSummaryClaim(pattern.segments, option.format)) return@mapIndexedNotNull null
                 val matches = contributions.flatMap { contribution -> contribution.locations.filter { location ->
                     pattern.matches(concreteClaimPath(location.sourcePathJson))
                 }.map { contribution to it } }
@@ -108,7 +109,8 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
                             }
                         }
                     }
-                SharingClaimChoice(selection, field.item.copy(label = label(selection)), selection in selectedDisclosures, matches.isNotEmpty(), forced)
+                val item = disclosure.toClaimItem(index, option.format, metadataByOption.getValue(option.selection))
+                SharingClaimChoice(selection, item.copy(label = label(selection)), selection in selectedDisclosures, matches.isNotEmpty(), forced)
             }
         }
         val rendered = contributions.map { contribution ->
@@ -144,8 +146,11 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
                     causes.isNotEmpty() -> "Shared with " + causes.map(::label).distinct().joinToString()
                     else -> "Also shared with selected information"
                 }
-                val decoded = if (location.isBinary) CredentialDisplayNormalizer.toBinaryReviewValue(value, path)
-                else value.reviewDisplayValue(path, option.format)
+                val decoded = when {
+                    location.isBinary -> CredentialDisplayNormalizer.toBinaryReviewValue(value, path)
+                    option.format == "mso_mdoc" && value is JsonArray -> null
+                    else -> value.reviewDisplayValue(path, option.format)
+                }
                 val kind = value.reviewKind(decoded)
                 val children = when (kind) {
                     SharingClaimNode.Kind.Object -> (value as JsonObject).entries.map { (key, child) ->
@@ -202,7 +207,7 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
             }
             contribution.copy(nodes = nodes)
         }
-        EffectiveSharingGroup(credentialId, information.getValue(selectedOptions.first().selection).summary, decorated, choices)
+        EffectiveSharingGroup(credentialId, selectedOptions.first().toCredentialSummary().toCardDisplayData(preferredLocales), decorated, choices)
     }
 }
 

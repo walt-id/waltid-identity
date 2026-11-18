@@ -38,6 +38,7 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.IssuerSignedItem
@@ -47,6 +48,10 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.PresentationClaimsProjection
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborByteString
@@ -57,6 +62,55 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
+    @OptIn(ExperimentalUnsignedTypes::class)
+    @Test
+    fun mdocReviewUsesSignedPathsWhenDisplaySerializerChangesTheShape() {
+        val namespace = "example.mdoc.review"
+        val field = "evidence"
+        val byteString = CborByteString(byteArrayOf(1, 2, 3))
+        val signedValue = CborMap(mapOf(
+            CborString("raw") to byteString,
+            CborString("items") to CborArray(listOf(CborByteString(byteArrayOf(4, 5, 6)), CborString("caption"))),
+        ))
+        val document = Document("example.mdoc", IssuerSigned.fromIssuerSignedItems(
+            mapOf(namespace to listOf(IssuerSignedItem.create(0u, field, signedValue))),
+            CoseSign1(byteArrayOf(), CoseHeaders(), null, byteArrayOf()),
+        ))
+        val display = Json.parseToJsonElement("""{"attachment":[1,2,3],"items":["caption",[4,5,6]]}""")
+        val serializer = object : KSerializer<CborMap> {
+            override val descriptor = buildClassSerialDescriptor("DisplayEvidence")
+            override fun deserialize(decoder: Decoder): CborMap = error("Display only")
+            override fun serialize(encoder: Encoder, value: CborMap) {
+                assertEquals(signedValue, value)
+                (encoder as JsonEncoder).encodeJsonElement(display)
+            }
+        }
+        MdocsCborSerializer.register(mapOf(field to serializer), namespace)
+        val stored = document.issuerSigned.namespacesToJson()
+        assertEquals(display, stored.getValue(namespace).jsonObject[field])
+        val credential = MdocsCredential(
+            JsonObject(stored + ("docType" to JsonPrimitive(document.docType))),
+            coseCompliantCbor.encodeToByteArray(document).encodeToBase64Url(),
+            document.docType,
+        )
+        val raw = RawDcqlCredential("one", credential.format, credential.credentialData, originalCredential = credential)
+        val query = CredentialQuery("q", CredentialFormat.MSO_MDOC, meta = MsoMdocMeta(document.docType),
+            claims = listOf(ClaimsQuery(pathStrings = listOf(namespace, field))))
+        val review = PresentationClaimsProjection.prepare(credential, DcqlMatcher.matchCredential(query, raw).getOrThrow())
+        assertEquals(
+            Json.parseToJsonElement("""{"$namespace":{"evidence":{"raw":"AQID","items":["BAUG","caption"]}}}"""),
+            review.claims,
+        )
+        val path = listOf(JsonPrimitive(namespace), JsonPrimitive(field))
+        assertEquals(
+            setOf(path + JsonPrimitive("raw"), path + JsonPrimitive("items") + JsonPrimitive(0)),
+            review.locations.filter { it.isBinary }.map { it.receivedPath }.toSet(),
+        )
+        val caption = path + JsonPrimitive("items") + JsonPrimitive(1)
+        assertEquals(caption, review.locations.single { it.receivedPath == caption }.sourcePath)
+        assertEquals(7, review.locations.size)
+    }
+
     @OptIn(ExperimentalUnsignedTypes::class)
     @Test
     fun mdocReviewKeepsBinaryValuesCompactWithoutCollapsingNumericArrays() {

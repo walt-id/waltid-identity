@@ -22,7 +22,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
             format: option.format,
             claimsJSON: """
-                {"\(namespace)":{"portrait":"\(encoded)","attachment":"\(attachment)","text":"\(attachment)","blob":"\(encoded)"}}
+                {"\(namespace)":{"portrait":"\(encoded)","attachment":"\(attachment)","text":"\(attachment)","blob":"\(encoded)","image":[137,80,78,71,4]}}
                 """,
             wholeCredential: false, locations: [
                 location("[]"), location("[\"\(namespace)\"]"),
@@ -30,10 +30,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 location("[\"\(namespace)\",\"attachment\"]", isBinary: true),
                 location("[\"\(namespace)\",\"text\"]"),
                 location("[\"\(namespace)\",\"blob\"]", isBinary: true),
-            ])])
+                location("[\"\(namespace)\",\"image\"]"),
+            ] + (0...4).map { location("[\"\(namespace)\",\"image\",\($0)]") })])
         let review = try EffectivePresentationReview(prepared: prepared,
             model: .init(request: .init(requester: nil), credentialOptions: [option]),
-            details: [CredentialDisplayNormalizer.details(for: option)],
             selection: .init(credentials: [option.selection], disclosures: []))
         let nodes = try XCTUnwrap(review.contributions.first?.nodes.first?.children)
         let photo = try XCTUnwrap(nodes.first { $0.label == "Portrait" })
@@ -48,6 +48,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(nodes.first { $0.label == "Attachment" }?.value, .text("Binary data"))
         XCTAssertEqual(nodes.first { $0.label == "Text" }?.value, .decodedText("Hello, wallet"))
         XCTAssertEqual(nodes.first { $0.label == "Blob" }?.value, .text("Binary data"))
+        let numericImage = try XCTUnwrap(nodes.first { $0.label == "Image" })
+        XCTAssertEqual(numericImage.kind, .array)
+        XCTAssertEqual(numericImage.children.map(\.path), (0...4).map { [.key(namespace), .key("image"), .index($0)] })
+        XCTAssertEqual(numericImage.children.compactMap(\.value), ["137", "80", "78", "71", "4"].map(DisplayValue.number))
     }
 
     func testProjectedArraySelectorsRetainUniqueLabelsAndRestrictions() throws {
@@ -83,7 +87,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             ])])
         let review = try EffectivePresentationReview(prepared: prepared,
             model: .init(request: .init(requester: nil), credentialOptions: [option]),
-            details: [CredentialDisplayNormalizer.details(for: option, preferredLocales: ["en"])],
             selection: .init(credentials: [option.selection], disclosures: []), preferredLocales: ["en"])
         let account = try XCTUnwrap(review.contributions.first?.nodes.first?.children.first)
         XCTAssertEqual(account.path, [.key("accounts"), .index(1)])

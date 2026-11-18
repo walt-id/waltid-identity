@@ -22,14 +22,15 @@ class CredentialInformationContractTest {
         fun location(path: String, isBinary: Boolean = false, sharedBy: List<String> = emptyList()) =
             WalletDemoClaimLocation(path, path, sharedBy, alwaysCarried = false, isBinary = isBinary)
         val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("mdl", "one", "mso_mdoc",
-            """{"$namespace":{"portrait":"$portrait","attachment":"$attachment","text":"$attachment","blob":"$portrait"}}""",
+            """{"$namespace":{"portrait":"$portrait","attachment":"$attachment","text":"$attachment","blob":"$portrait","image":[137,80,78,71,4]}}""",
             wholeCredential = false, locations = listOf(
                 location("[]"), location("""["$namespace"]"""),
                 location("""["$namespace","portrait"]""", isBinary = true, sharedBy = listOf(selectionPath)),
                 location("""["$namespace","attachment"]""", isBinary = true),
                 location("""["$namespace","text"]"""),
                 location("""["$namespace","blob"]""", isBinary = true),
-            ))))
+                location("""["$namespace","image"]"""),
+            ) + (0..4).map { location("""["$namespace","image",$it]""") })))
         val nodes = review.toEffectiveSharingInformation(listOf(option), emptySet()).single()
             .contributions.single().nodes.single().children.associateBy { it.label }
         val photo = nodes.getValue("Portrait")
@@ -42,6 +43,10 @@ class CredentialInformationContractTest {
         assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Attachment").value)
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), nodes.getValue("Text").value)
         assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Blob").value)
+        val numericImage = nodes.getValue("Image")
+        assertEquals(SharingClaimNode.Kind.Array, numericImage.kind)
+        assertEquals((0..4).toList(), numericImage.children.map { it.sourceArrayIndex })
+        assertEquals(listOf("137", "80", "78", "71", "4").map(DisplayValue::NumberValue), numericImage.children.map { it.value })
     }
 
     @Test

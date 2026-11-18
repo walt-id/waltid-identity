@@ -61,7 +61,7 @@ public struct EffectivePresentationReview: Equatable {
     let contributions: [EffectiveClaimContribution]
 
     public init(prepared: PreparedPresentationReview, model: SharingReviewModel,
-                details: [CredentialDetails], selection: SharingSelection,
+                selection: SharingSelection,
                 preferredLocales: [String] = Locale.preferredLanguages) throws {
         guard prepared.credentials.count == selection.credentials.count,
               Set(prepared.credentials.map { PresentationCredentialSelection(queryID: $0.queryID, credentialID: $0.credentialID) }) == selection.credentials else {
@@ -91,8 +91,7 @@ public struct EffectivePresentationReview: Equatable {
         var rendered: [EffectiveClaimContribution] = []
         for contribution in prepared.credentials {
             let option = try optionFor(contribution)
-            guard let detail = details.first(where: { $0.id == option.selection.id }),
-                  case .object(let members) = CredentialDisplayJSONParser.parse(contribution.claimsJSON) else {
+            guard case .object(let members) = CredentialDisplayJSONParser.parse(contribution.claimsJSON) else {
                 throw invalidReview("Missing effective credential data")
             }
             let metadata = metadataByOption[option.selection, default: []]
@@ -121,7 +120,7 @@ public struct EffectivePresentationReview: Equatable {
                 else if !location.sharedBy.isEmpty { reason = "Shared with " + Array(Set(location.sharedBy.map { label($0, option: option) })).sorted().joined(separator: ", ") }
                 else { reason = "Also shared with selected information" }
                 var node = try reviewNode(value, path: source, fallback: fallback, metadata: metadata,
-                                          format: option.format, isBinary: location.isBinary)
+                                          format: option.format, isBinary: location.isBinary, preserveArrays: option.format == "mso_mdoc")
                 node.contextOnly = false
                 node.alwaysShared = location.alwaysCarried
                 node.reason = node.kind != .scalar && exact.isEmpty ? nil : reason
@@ -145,13 +144,11 @@ public struct EffectivePresentationReview: Equatable {
                 if isCredentialSummaryClaim(try concreteReviewPath(location.sourcePathJSON), format: option.format) { return nil }
                 return try makeNode(member.value, received: received, fallback: CredentialDisplayVocabulary.humanizedLabel(member.key))
             }
-            let fields = informationFields(option: option, details: detail, disclosures: selection.disclosures)
             var detached: [EffectiveClaimChoice] = []
-            for field in fields where !field.optionalSelections.isEmpty {
-                guard field.optionalSelections.count == 1, let key = field.optionalSelections.first else {
-                    throw invalidReview("Ambiguous optional disclosure control")
-                }
+            for (index, disclosure) in option.disclosures.enumerated() where disclosure.selectable {
+                let key = PresentationDisclosureSelection(queryID: option.queryID, credentialID: option.credentialID, path: disclosure.path)
                 let target = path(key.path, option.format)
+                if !disclosure.requested && isCredentialSummaryClaim(target, format: option.format) { continue }
                 let matches = try prepared.credentials.flatMap { other -> [(PresentationCredentialClaims, PresentationClaimLocation)] in
                     guard other.credentialID == contribution.credentialID else { return [] }
                     return try other.locations.filter { reviewPathMatches(target, try concreteReviewPath($0.sourcePathJSON)) }.map { (other, $0) }
@@ -172,16 +169,21 @@ public struct EffectivePresentationReview: Equatable {
                         }
                     }
                 }
-                let item = ClaimItem(path: field.item.path, pathComponents: field.item.pathComponents,
-                    label: label(key.path, option: option), value: field.item.value, rawValue: field.item.rawValue,
-                    roles: field.item.roles, labelSource: field.item.labelSource, displayOrder: field.item.displayOrder)
+                let candidate = CredentialDisplayNormalizer.disclosureItem(disclosure, index: index, format: option.format)
+                    .applyingClaimMetadata(metadata, format: option.format, expression: .init(segments: target))
+                let item = ClaimItem(path: candidate.path, pathComponents: candidate.pathComponents,
+                    label: label(key.path, option: option), value: candidate.value, rawValue: candidate.rawValue,
+                    roles: candidate.roles, labelSource: candidate.labelSource, displayOrder: candidate.displayOrder)
                 let choice = EffectiveClaimChoice(selection: key, item: item,
                     selected: selection.disclosures.contains(key), included: !matches.isEmpty, forcedReason: forced)
                 if !target.isEmpty && !wildcard && (forced == nil || nodes.containsReviewPath(target)) {
                     nodes = try nodes.addingReviewChoice(target, choice: choice, metadata: metadata, format: option.format)
                 } else { detached.append(choice) }
             }
-            rendered.append(EffectiveClaimContribution(id: option.selection.id, credentialID: option.credentialID, title: detail.cardSummary.title,
+            let title = CredentialDisplayNormalizer.sharingDetails(
+                for: option, includeDisclosures: false, preferredLocales: preferredLocales
+            ).cardTitle
+            rendered.append(EffectiveClaimContribution(id: option.selection.id, credentialID: option.credentialID, title: title,
                 wholeCredential: contribution.wholeCredential, separatesAlwaysShared: ["dc+sd-jwt", "vc+sd-jwt"].contains(option.format),
                 nodes: nodes, detachedChoices: detached))
         }
@@ -292,7 +294,8 @@ private func reviewMetadataOrder(_ path: [ClaimPathExpression.Segment], _ metada
     bestClaimMetadata(metadata, expression: .init(segments: path), format: format)?.offset ?? .max
 }
 private func reviewNode(_ value: CredentialDisplayJSONValue, path: [ClaimPathExpression.Segment], fallback: String,
-                        metadata: [CredentialClaimMetadata], format: String, isBinary: Bool = false) throws -> EffectiveClaimNode {
+                        metadata: [CredentialClaimMetadata], format: String, isBinary: Bool = false,
+                        preserveArrays: Bool = false) throws -> EffectiveClaimNode {
     let displayPath = effectiveDisplayPath(path)
     let roles = CredentialDisplayVocabulary.roles(for: displayPath.components)
     let decoded: DisplayValue?
@@ -306,7 +309,7 @@ private func reviewNode(_ value: CredentialDisplayJSONValue, path: [ClaimPathExp
         case .object:
             decoded = nil
             kind = .object
-        case .array where !roles.contains(.image):
+        case .array where preserveArrays || !roles.contains(.image):
             decoded = nil
             kind = .array
         default:

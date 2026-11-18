@@ -30,7 +30,7 @@ final class SharingReviewModelTests: XCTestCase {
             let details = CredentialDisplayNormalizer.details(for: option, preferredLocales: [locale])
             XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.map(\.label), Array(labels.dropFirst()))
             let review = try EffectivePresentationReview(prepared: prepared,
-                model: .init(request: .init(requester: nil), credentialOptions: [option]), details: [details],
+                model: .init(request: .init(requester: nil), credentialOptions: [option]),
                 selection: .init(credentials: [option.selection]), preferredLocales: [locale])
             let address = try XCTUnwrap(review.contributions.first?.nodes.first)
             XCTAssertEqual(address.label, labels[0])
@@ -107,7 +107,7 @@ final class SharingReviewModelTests: XCTestCase {
         }
         let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
         XCTAssertThrowsError(try EffectivePresentationReview(prepared: effectivePrepared("{}"), model: model,
-            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init()))
+            selection: .init()))
         XCTAssertFalse(ClaimReviewState.loading().canConfirm)
         XCTAssertFalse(ClaimReviewState.failed("Unavailable").canConfirm)
     }
@@ -157,7 +157,6 @@ final class SharingReviewModelTests: XCTestCase {
             let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: options)
             let review = try EffectivePresentationReview(prepared: .init(credentials: [
                 contribution("first", index: 1), contribution("second", index: index)]), model: model,
-                details: options.map(CredentialDisplayNormalizer.details(for:)),
                 selection: .init(credentials: Set(options.map(\.selection))))
             XCTAssertEqual(review.groups.count, 1)
             XCTAssertEqual(review.contributions.count, index == 1 ? 1 : 2)
@@ -184,7 +183,7 @@ final class SharingReviewModelTests: XCTestCase {
     private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
                                  disclosures: Set<PresentationDisclosureSelection> = []) throws -> EffectivePresentationReview {
         try .init(prepared: prepared, model: .init(request: .init(requester: nil), credentialOptions: [option]),
-            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init(credentials: [option.selection], disclosures: disclosures))
+            selection: .init(credentials: [option.selection], disclosures: disclosures))
     }
 
     private func effectivePrepared(_ claims: String) -> PreparedPresentationReview {

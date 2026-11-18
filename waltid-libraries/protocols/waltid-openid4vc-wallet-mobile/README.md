@@ -221,6 +221,8 @@ In the effective review returned by `reviewPresentation` or `reviewDigitalCreden
 a location with `isBinary` identifies an mdoc byte string. Its value in `claimsJson` is an
 unpadded base64url string and has one claim location. Use the flag to display it as binary data
 and use the source path for its label and selection information.
+Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
+format the stored credential view.
 
 ### TS-12 payment consent
 
