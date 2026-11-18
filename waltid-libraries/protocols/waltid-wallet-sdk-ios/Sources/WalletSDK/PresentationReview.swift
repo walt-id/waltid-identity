@@ -21,6 +21,7 @@ public struct PresentationCredentialClaims: Equatable, Sendable {
     /// Credential format identifier used by the presenter.
     public let format: String
     /// JSON object containing the effective claims, including unavoidable additional values.
+    /// Locations marked `isBinary` identify unpadded base64url strings.
     public let claimsJSON: String
     /// Whether the presenter sends the credential in full instead of selectively disclosing claims.
     public let wholeCredential: Bool
@@ -52,6 +53,8 @@ public struct PresentationClaimLocation: Equatable, Sendable {
     public let sharedBy: [String]
     /// Whether the value is outside selectively disclosed ancestors or belongs to a credential shared in full.
     public let alwaysCarried: Bool
+    /// Whether this value is an mdoc CBOR byte string, represented by one base64url string in the review.
+    public let isBinary: Bool
 
     /// Creates the provenance mapping for one effective claim value.
     /// - Parameters:
@@ -59,8 +62,10 @@ public struct PresentationClaimLocation: Equatable, Sendable {
     ///   - receivedPathJSON: JSON-array path locating the value in the effective claims.
     ///   - sharedBy: Original selection identifiers carrying the value, rather than received paths.
     ///   - alwaysCarried: Whether the value is carried independently of selective-disclosure choices.
-    public init(sourcePathJSON: String, receivedPathJSON: String, sharedBy: [String], alwaysCarried: Bool) {
+    ///   - isBinary: Whether the received path identifies one binary value.
+    public init(sourcePathJSON: String, receivedPathJSON: String, sharedBy: [String], alwaysCarried: Bool,
+                isBinary: Bool = false) {
         self.sourcePathJSON = sourcePathJSON; self.receivedPathJSON = receivedPathJSON
-        self.sharedBy = sharedBy; self.alwaysCarried = alwaysCarried
+        self.sharedBy = sharedBy; self.alwaysCarried = alwaysCarried; self.isBinary = isBinary
     }
 }

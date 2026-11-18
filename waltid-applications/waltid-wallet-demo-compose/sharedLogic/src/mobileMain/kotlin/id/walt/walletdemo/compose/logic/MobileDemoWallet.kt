@@ -575,6 +575,7 @@ fun id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview.toDemoClaimRev
     WalletDemoPreparedClaimReview(credentials.map { contribution ->
         WalletDemoCredentialClaims(contribution.queryId, contribution.credentialId, contribution.format,
             contribution.claimsJson, contribution.wholeCredential, contribution.locations.map { location ->
-                WalletDemoClaimLocation(location.sourcePathJson, location.receivedPathJson, location.sharedBy, location.alwaysCarried)
+                WalletDemoClaimLocation(location.sourcePathJson, location.receivedPathJson,
+                    location.sharedBy, location.alwaysCarried, location.isBinary)
             })
     })

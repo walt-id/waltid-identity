@@ -243,7 +243,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
                 claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
                     PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
-                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried)
+                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried, isBinary: $0.isBinary)
                 })
         })
     }

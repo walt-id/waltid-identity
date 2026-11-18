@@ -53,9 +53,12 @@ class WalletDateTimeTest {
                 )
                 val expected = if (source.length == 10) DisplayValue.Text(source)
                     else DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z"))
-                val items = option.toCredentialDetails().groups.flatMap { it.items }
-                assertEquals(listOf(expected, expected), items.map { it.value }, "$name $source")
-                assertTrue(items.all { it.rawValue == "\"$source\"" })
+                val requested = option.toSharingInformation().fields.single().item
+                val stored = option.toCredentialSummary().toCredentialDetails().groups.flatMap { it.items }.single()
+                for (item in listOf(requested, stored)) {
+                    assertEquals(expected, item.value, "$name $source")
+                    assertEquals("\"$source\"", item.rawValue)
+                }
             }
         }
     }

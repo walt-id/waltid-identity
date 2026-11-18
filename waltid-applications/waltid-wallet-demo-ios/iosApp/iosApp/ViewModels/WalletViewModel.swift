@@ -1428,9 +1428,7 @@ class WalletViewModel: ObservableObject {
                     let prepared = try await walletClient.reviewPresentation(previewHandle: preview.previewHandle,
                         selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
                     try Task.checkCancellation()
-                    let details = await CredentialDisplayNormalizer.details(for: model.credentialOptions)
-                    try Task.checkCancellation()
-                    information = .ready(try EffectivePresentationReview(prepared: prepared, model: model, details: details,
+                    information = .ready(try EffectivePresentationReview(prepared: prepared, model: model,
                         selection: SharingSelection(credentials: credentials, disclosures: disclosures)))
                 } else { information = .legacy }
             } catch is CancellationError { return

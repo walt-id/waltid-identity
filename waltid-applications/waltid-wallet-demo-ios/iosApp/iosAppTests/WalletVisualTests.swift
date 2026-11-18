@@ -419,7 +419,7 @@ final class WalletVisualTests: XCTestCase {
         if alternative { credentials = [review.credentialOptions[1].selection] }
         let selection = SharingSelection(credentials: credentials)
         XCTAssertTrue(review.hasCompleteCredentialSelection(credentials))
-        let details = review.credentialOptions.map { CredentialDisplayNormalizer.details(for: $0) }
+        let details = await CredentialDisplayNormalizer.sharingDetails(for: review.credentialOptions, includeDisclosures: true)
         let groups = review.informationToShare(selection: selection, details: details)
         XCTAssertEqual(groups.count, multiple ? 2 : 1)
         if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }

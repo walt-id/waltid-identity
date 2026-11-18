@@ -23,9 +23,16 @@ public struct SharingReviewView: View {
     private let claimReview: ClaimReviewState
     private let onRetryClaimReview: () -> Void
     @State private var normalizedDetails: [CredentialDetails] = []
-    @State private var normalizedOptions: [PresentationCredentialOption]?
+    private struct NormalizationInput: Equatable {
+        let options: [PresentationCredentialOption]
+        let includeDisclosures: Bool
+    }
+    @State private var normalizedInput: NormalizationInput?
     private var usesLegacyClaimReview: Bool { if case .legacy = claimReview { return true }; return false }
-    private var isNormalized: Bool { normalizedOptions == review.credentialOptions }
+    private var normalizationInput: NormalizationInput {
+        NormalizationInput(options: review.credentialOptions, includeDisclosures: usesLegacyClaimReview)
+    }
+    private var isNormalized: Bool { normalizedInput == normalizationInput }
     private var credentialDetails: [CredentialDetails] { isNormalized ? normalizedDetails : [] }
 
     /// Renders one sharing review.
@@ -146,13 +153,15 @@ public struct SharingReviewView: View {
             }
         }
         .preference(key: SharingReviewReadinessKey.self, value: isNormalized ? review.credentialOptions : [])
-        .task(id: review.credentialOptions) {
-            normalizedOptions = nil
+        .task(id: normalizationInput) { [input = normalizationInput] in
+            normalizedInput = nil
             normalizedDetails = []
-            let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
+            let snapshot = await CredentialDisplayNormalizer.sharingDetails(
+                for: input.options, includeDisclosures: input.includeDisclosures
+            )
             guard !Task.isCancelled else { return }
             normalizedDetails = snapshot
-            normalizedOptions = review.credentialOptions
+            normalizedInput = input
         }
     }
 

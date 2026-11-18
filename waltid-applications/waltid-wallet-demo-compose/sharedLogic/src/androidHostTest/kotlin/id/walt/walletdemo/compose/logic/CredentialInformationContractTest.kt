@@ -1,10 +1,54 @@
 package id.walt.walletdemo.compose.logic
 
 import java.io.File
+import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
+    @Test fun effectiveMdocReviewUsesTheBinaryMarkerForImagesAndOtherBytes() {
+        val bytes = File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "synthetic-signature.png").readBytes()
+        val portrait = Base64.UrlSafe.encode(bytes).trimEnd('=')
+        val attachment = "SGVsbG8sIHdhbGxldA"
+        val namespace = "org.iso.18013.5.1"
+        val rawPortrait = bytes.joinToString(prefix = "[", postfix = "]")
+        val selectionPath = "\"$namespace\".\"portrait\""
+        val option = WalletDemoPresentationCredentialOption(
+            "mdl", "one", format = "mso_mdoc", label = "Driving licence", issuer = null,
+            credentialDataJson = """{"$namespace":{"portrait":$rawPortrait}}""",
+            disclosures = listOf(WalletDemoPresentationDisclosure("Portrait", selectionPath, rawPortrait,
+                selectivelyDisclosable = true, required = true)),
+        )
+        fun location(path: String, isBinary: Boolean = false, sharedBy: List<String> = emptyList()) =
+            WalletDemoClaimLocation(path, path, sharedBy, alwaysCarried = false, isBinary = isBinary)
+        val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("mdl", "one", "mso_mdoc",
+            """{"$namespace":{"portrait":"$portrait","attachment":"$attachment","text":"$attachment","blob":"$portrait","image":[137,80,78,71,4]}}""",
+            wholeCredential = false, locations = listOf(
+                location("[]"), location("""["$namespace"]"""),
+                location("""["$namespace","portrait"]""", isBinary = true, sharedBy = listOf(selectionPath)),
+                location("""["$namespace","attachment"]""", isBinary = true),
+                location("""["$namespace","text"]"""),
+                location("""["$namespace","blob"]""", isBinary = true),
+                location("""["$namespace","image"]"""),
+            ) + (0..4).map { location("""["$namespace","image",$it]""") })))
+        val nodes = review.toEffectiveSharingInformation(listOf(option), emptySet()).single()
+            .contributions.single().nodes.single().children.associateBy { it.label }
+        val photo = nodes.getValue("Portrait")
+        assertEquals("[\"$namespace\"].portrait", photo.path.id)
+        assertEquals("Required", photo.reason)
+        assertTrue(photo.children.isEmpty())
+        val image = assertIs<DisplayValue.Image>(assertIs<DisplayValue.DeferredImage>(photo.value).resolve())
+        assertEquals("image/png", image.mimeType)
+        assertContentEquals(bytes, image.bytes)
+        assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Attachment").value)
+        assertEquals(DisplayValue.DecodedText("Hello, wallet"), nodes.getValue("Text").value)
+        assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Blob").value)
+        val numericImage = nodes.getValue("Image")
+        assertEquals(SharingClaimNode.Kind.Array, numericImage.kind)
+        assertEquals((0..4).toList(), numericImage.children.map { it.sourceArrayIndex })
+        assertEquals(listOf("137", "80", "78", "71", "4").map(DisplayValue::NumberValue), numericImage.children.map { it.value })
+    }
+
     @Test
     fun projectedArraySelectorsRetainUniqueLabelsAndRestrictions() {
         val fixture = credentialInformationFixture()
@@ -25,7 +69,7 @@ class CredentialInformationContractTest {
             format = summary.format, label = "Account", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = listOf(WalletDemoPresentationDisclosure(label = "Iban", path = "[\"accounts\",1,\"iban\"]",
                 valueJson = "\"DE456\"", selectivelyDisclosable = true)))
-        assertEquals("Second IBAN", option.toRequestedDisclosureGroup(listOf("en"))!!.items.single().label)
+        assertEquals("Second IBAN", option.toSharingInformation(listOf("en")).fields.single().item.label)
         val path = option.disclosures.single().path
         val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("account", summary.id, summary.format,
             """{"accounts":[{"iban":"DE456"}]}""", false, listOf(
@@ -88,7 +132,7 @@ class CredentialInformationContractTest {
         val option = WalletDemoPresentationCredentialOption(queryId = "identity", credentialId = summary.id,
             format = format, label = "Identity", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = strings("requestedPaths").map { WalletDemoPresentationDisclosure(label = "Unhelpful fallback", path = it, valueJson = "\"Ada\"", selectivelyDisclosable = false) })
-        val requested = option.toRequestedDisclosureGroup(locales)!!.items
+        val requested = option.toSharingInformation(locales).fields.map { it.item }
         assertEquals(strings("requestedLabels"), requested.map { it.label })
         assertTrue(requested.all { it.labelSource == ClaimLabelSource.IssuerMetadata })
         assertEquals(listOf(1, 2), requested.map { it.displayOrder })

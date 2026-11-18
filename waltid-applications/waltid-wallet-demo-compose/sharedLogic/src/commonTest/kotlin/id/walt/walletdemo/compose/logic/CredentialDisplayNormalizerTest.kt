@@ -24,13 +24,13 @@ class CredentialDisplayNormalizerTest {
                         displayValue = value, selectivelyDisclosable = false)
                 },
             )
-            val details = option.toCredentialDetails()
+            val requested = option.toSharingInformation().fields.map { it.item }
             val expected = listOf("2026-10-30T00:00:00Z", "2027-01-28T00:00:00Z", "2026-10-30T00:00:00.25Z")
-            assertEquals(expected.map { DisplayValue.InstantValue(Instant.parse(it)) }, details.groups.first().items.map { it.value }, format)
-            val stored = details.groups.drop(1).flatMap { it.items }.associateBy { it.path.id }
+            assertEquals(expected.map { DisplayValue.InstantValue(Instant.parse(it)) }, requested.map { it.value }, format)
+            val stored = option.toCredentialSummary().toCredentialDetails().groups.flatMap { it.items }.associateBy { it.path.id }
             option.disclosures.forEachIndexed { index, disclosure ->
                 assertEquals(DisplayValue.InstantValue(Instant.parse(expected[index])), stored.getValue(disclosure.path).value, format)
-                assertEquals(disclosure.valueJson, details.groups.first().items[index].rawValue)
+                assertEquals(disclosure.valueJson, requested[index].rawValue)
             }
         }
     }
@@ -967,7 +967,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun presentationCredentialOptionPrependsReadableRequestedDisclosures() {
+    fun sharingReviewShowsReadableRequestedDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
             credentialId = "credential-1",
@@ -1003,22 +1003,20 @@ class CredentialDisplayNormalizerTest {
             ),
         )
 
-        val details = option.toCredentialDetails()
+        val requested = option.toSharingInformation().fields.map { it.item }
+        assertEquals(listOf("Given name", "Portrait"), requested.map { it.label })
+        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.map { it.path.id })
+        assertEquals(DisplayValue.Text("Ada"), requested.first().value)
+        assertIs<DisplayValue.Image>(assertIs<DisplayValue.DeferredImage>(requested.last().value).resolve())
 
-        val requested = assertNotNull(details.groups.firstOrNull())
-        assertEquals("Requested disclosures", requested.title)
-        assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
-        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
-        assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
-        assertIs<DisplayValue.Image>((requested.items.last().value as DisplayValue.DeferredImage).resolve())
-
+        val details = option.toCredentialSummary().toCredentialDetails()
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
         assertEquals(option.selection.id, details.summary.id)
     }
 
     @Test
-    fun presentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+    fun sharingReviewShowsNoFieldsWhenThereAreNoPreviewDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
             credentialId = "credential-1",
@@ -1034,10 +1032,7 @@ class CredentialDisplayNormalizerTest {
             disclosures = emptyList(),
         )
 
-        val details = option.toCredentialDetails()
-
-        assertFalse(details.groups.any { it.title == "Requested disclosures" })
-        assertEquals("Personal details", details.groups.firstOrNull()?.title)
+        assertTrue(option.toSharingInformation().fields.isEmpty())
     }
 
     @Test
@@ -1063,7 +1058,7 @@ class CredentialDisplayNormalizerTest {
             """.trimIndent(),
         )
 
-        val card = option.toCredentialDetails().toCardDisplayData()
+        val card = option.toSharingInformation(includeDisclosures = false).summary
 
         assertEquals("https://issuer.example/pid-bg.png", card.backgroundImageUri)
         assertEquals("Personal ID", card.title)
