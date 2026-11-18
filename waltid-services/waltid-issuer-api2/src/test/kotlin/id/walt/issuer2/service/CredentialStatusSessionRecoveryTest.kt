@@ -59,6 +59,31 @@ class CredentialStatusSessionRecoveryTest {
     }
 
     @Test
+    fun storedCheckpointWithAnExplicitCountRecoversItsOrderedHolderKeys() = runTest {
+        val session = Json.encodeToJsonElement(create()).jsonObject
+        val state = buildJsonObject {
+            putJsonObject("operations") {
+                putJsonObject("credential") {
+                    put("id", "pending")
+                    putJsonArray("holderKeys") {
+                        add("key1")
+                        add("key2")
+                    }
+                    put("count", 2)
+                }
+            }
+        }
+        val restored = IssuanceSessionStorageCodec.decode(JsonObject(session + ("credentialStatusIssuance" to state)).toString())
+        assertEquals(CredentialStatusIssuanceOperation("pending", listOf("key1", "key2")),
+            restored.credentialStatusIssuance!!.operations["credential"])
+        val claim = assertNotNull(service().claimCredentialStatusSession("session"))
+        assertFailsWith<IllegalArgumentException> {
+            service().prepareCredentialStatusOperation(claim, "credential", emptyList())
+        }
+        assertTrue(service().getSession("session").credentialStatusIssuance!!.operations.isEmpty())
+    }
+
+    @Test
     fun staleWorkersCannotCheckpointOrReleaseANewerClaim() = runTest {
         create()
         val stale = assertNotNull(service().claimCredentialStatusSession("session"))

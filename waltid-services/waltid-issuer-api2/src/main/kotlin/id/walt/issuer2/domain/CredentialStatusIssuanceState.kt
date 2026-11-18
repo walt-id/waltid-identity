@@ -21,4 +21,8 @@ data class CredentialStatusIssuanceOperation(
     val id: String,
     val holderKeys: List<String>,
     val response: CredentialResponse? = null,
-)
+) {
+    init {
+        require(holderKeys.isNotEmpty()) { "At least one verified holder binding is required" }
+    }
+}
