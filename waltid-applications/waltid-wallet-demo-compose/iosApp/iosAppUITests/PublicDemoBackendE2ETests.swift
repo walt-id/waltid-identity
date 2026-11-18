@@ -85,10 +85,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             }
             ui.replaceText(in: input, value: offer.txCode)
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-            XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-            let saved = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
-            XCTAssertTrue(saved.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
+            // The untouched receipt can dismiss between separate accessibility queries.
+            let receipt = app.windows.containing(.button, identifier: "issuance-done")
+                .containing(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
+            XCTAssertTrue(receipt.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
             waitForIdleResultDismissal(app)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
