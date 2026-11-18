@@ -1788,7 +1788,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             IssuanceSession(
                 sessionId = UUID.randomUUID().toString(),
                 authenticationMethod = AuthenticationMethod.AUTHORIZED,
-                issuanceRequests = profiles.map { it.toIssuanceRequest() },
+                issuanceRequests = profiles.map(::createIssuanceRequest),
                 authorizationRequest = authorizationRequest.toDefaultAuthorizationRequest(),
                 expiresAt = Clock.System.now() + AUTHORIZATION_CODE_SESSION_LIFETIME,
                 notifications = notifications,
@@ -1796,7 +1796,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
     }
 
-    private fun CredentialProfile.toIssuanceRequest(): IssuanceRequest =
+    private fun createIssuanceRequest(profile: CredentialProfile): IssuanceRequest = with(profile) {
         IssuanceRequest(
             credentialIdentifier = UUID.randomUUID().toString(),
             profileId = profileId,
@@ -1811,8 +1811,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             msoData = msoData,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
-            credentialStatus = credentialStatus,
+            credentialStatus = profileService.prepareCredentialStatus(credentialConfigurationId, credentialStatus, mapping),
         )
+    }
 
     private fun resolveRequestedCredentialConfigurationIds(
         authorizationRequest: AuthorizationRequest,
