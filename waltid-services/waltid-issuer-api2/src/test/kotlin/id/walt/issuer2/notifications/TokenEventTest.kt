@@ -1,5 +1,6 @@
 package id.walt.issuer2.notifications
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -9,6 +10,7 @@ import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.ktornotifications.SseNotifier
@@ -35,6 +37,7 @@ import id.walt.openid4vci.responses.token.TokenResponseOptions
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertEquals
@@ -42,9 +45,16 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 class TokenEventTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
 
     @Test
     fun `provider PKCE rejection publishes one correlated authorization code failure`() = runTest {
@@ -355,16 +365,21 @@ class TokenEventTest {
             metadataConfig = metadataConfig,
         )
         val sessionService = IssuanceSessionService(InMemorySessionRepository(sessions.toList()))
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
         val module = OpenId4VciModule.create(
             config = serviceConfig,
             authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
+            typeMetadata = typeMetadata,
             profileService = profileService,
             sessionService = sessionService,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,

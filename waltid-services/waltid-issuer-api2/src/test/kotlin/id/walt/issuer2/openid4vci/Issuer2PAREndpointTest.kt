@@ -1,9 +1,12 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
+import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
@@ -17,13 +20,21 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration
 
 class Issuer2PAREndpointTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
 
     @Test
     fun `issuer module provider allows direct authorization when PAR is not enforced by default`() = runTest {
@@ -161,22 +172,28 @@ class Issuer2PAREndpointTest {
     private fun issuerProvider(
         enforcePushedAuthorizationRequests: Boolean = false,
         clientAttestation: ClientAttestationVerifierConfig? = null,
-    ): OAuth2Provider =
-        OpenId4VciModule.create(
-            config = Issuer2ServiceConfig(
-                baseUrl = "http://localhost",
-                enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
-                clientAuthenticationConfig = clientAttestation?.let {
-                    ClientAuthenticationConfig(
-                        supportedMethods = listOf(ClientAuthenticationMethodConfig.ClientAttestation(it)),
-                    )
-                },
-            ),
+    ): OAuth2Provider {
+        val config = Issuer2ServiceConfig(
+            baseUrl = "http://localhost",
+            enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+            clientAuthenticationConfig = clientAttestation?.let {
+                ClientAuthenticationConfig(
+                    supportedMethods = listOf(ClientAuthenticationMethodConfig.ClientAttestation(it)),
+                )
+            },
+        )
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            config, Issuer2MetadataConfig(), InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
+        return OpenId4VciModule.create(
+            config = config,
             authorizationCodeRepository = ConfiguredAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         ).oauth2Provider
+    }
 
     private suspend fun pushAuthorizationRequest(
         provider: OAuth2Provider,

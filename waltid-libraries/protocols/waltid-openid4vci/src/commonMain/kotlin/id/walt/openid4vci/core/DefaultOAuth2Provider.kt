@@ -927,7 +927,7 @@ class DefaultOAuth2Provider(
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
         CredentialResponseHttp(
-            status = 400,
+            status = if (error.error == OAuthErrorCodes.SERVER_ERROR) 500 else 400,
             headers = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
             retryable = error.retryAfterSeconds != null,
             payload = buildMap {
