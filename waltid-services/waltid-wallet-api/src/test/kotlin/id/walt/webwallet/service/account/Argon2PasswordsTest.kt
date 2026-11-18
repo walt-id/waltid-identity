@@ -1,10 +1,23 @@
 package id.walt.webwallet.service.account
 
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class Argon2PasswordsTest {
+    @Test
+    fun usesCanonicalPhcFormatUnderTurkishLocale() {
+        val originalLocale = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("tr-TR"))
+            verifiesHashesProducedByThePreviousLibrary()
+            hashUsesArgon2iParameters()
+        } finally {
+            Locale.setDefault(originalLocale)
+        }
+    }
+
     @Test
     fun hashUsesArgon2iParameters() {
         val password = "test-password".encodeToByteArray()

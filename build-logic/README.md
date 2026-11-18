@@ -59,6 +59,11 @@ These conventions enable their Android targets through `enableAndroidBuild`. And
   - `binary` — shipped Enterprise binaries. Apache set plus LGPL. Does not allow GPL.
   - `saas` — license server. Same set as `binary`. Plain GPL and AGPL are not allowed.
 
+The Android policy records exceptions for the exact Google Play Services, ML Kit and
+SQLCipher versions used by the existing Android dependency graphs. Review the relevant
+terms and update the allowlist when those dependencies change. Version-specific
+exceptions appear in the validation reports and keep the dependencies in the inventory.
+
 #### Misc
 
 - `waltid.base.gradle.kts` - Base for all types

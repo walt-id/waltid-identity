@@ -61,10 +61,6 @@ dependencies {
     implementation(identityLibs.bouncycastle.prov)
     implementation(identityLibs.bouncycastle.pkix)
 
-    // Argon2i password hashes. Apache-2.0; verifies hashes previously produced by argon2-jvm.
-    implementation(identityLibs.password4j)
-
-
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))

@@ -92,6 +92,7 @@ object LicenseePolicies {
         "https://github.com/redis/jedis/blob/master/LICENSE" to MIT_LICENSE_NAME,
         "https://github.com/googleapis/gax-java/blob/master/LICENSE" to BSD_3_CLAUSE,
         "https://github.com/googleapis/api-common-java/blob/main/LICENSE" to BSD_3_CLAUSE,
+        "https://github.com/googleapis/google-cloud-java/blob/main/LICENSE" to "Apache-2.0",
         "https://opensource.org/license/BSD-3-Clause" to BSD_3_CLAUSE,
         "https://asm.ow2.io/license.html" to BSD_3_CLAUSE,
         "http://www.sun.com/cddl/cddl.html" to "CDDL-1.0",
@@ -99,11 +100,35 @@ object LicenseePolicies {
         "https://github.com/adraffy/ENSNormalize.java/blob/main/LICENSE" to MIT_LICENSE_NAME,
         "https://github.com/TooTallNate/Java-WebSocket/blob/master/LICENSE" to MIT_LICENSE_NAME,
         "https://raw.githubusercontent.com/ThreeTen/threetenbp/main/LICENSE.txt" to BSD_3_CLAUSE,
+        "https://raw.githubusercontent.com/ThreeTen/threeten-extra/main/LICENSE.txt" to BSD_3_CLAUSE,
         "https://aws.amazon.com/apache2.0" to "Apache-2.0",
         "http://apache.org/licenses/LICENSE-2.0.html" to "Apache-2.0",
         "https://apache.org/licenses/LICENSE-2.0.html" to "Apache-2.0",
         "https://jdbc.postgresql.org/about/license.html" to "BSD-2-Clause",
         "http://www.oracle.com/technetwork/licenses/upl-license-2927578.html" to "UPL-1.0",
+    )
+
+    private val googleAndroidSdkVersions = mapOf(
+        "com.google.android.gms:play-services-auth" to "21.1.1",
+        "com.google.android.gms:play-services-auth-api-phone" to "18.0.2",
+        "com.google.android.gms:play-services-auth-base" to "18.0.10",
+        "com.google.android.gms:play-services-auth-blockstore" to "16.4.0",
+        "com.google.android.gms:play-services-base" to "18.11.1",
+        "com.google.android.gms:play-services-basement" to "18.12.0",
+        "com.google.android.gms:play-services-fido" to "21.0.0",
+        "com.google.android.gms:play-services-identity-credentials" to "16.0.0-alpha11",
+        "com.google.android.gms:play-services-tasks" to "18.4.1",
+        "com.google.android.libraries.identity.googleid:googleid" to "1.2.0",
+        "com.google.android.odml:image" to "1.0.0-beta1",
+    )
+
+    private val mlKitVersions = mapOf(
+        "com.google.android.gms:play-services-mlkit-barcode-scanning" to "18.3.1",
+        "com.google.mlkit:barcode-scanning" to "17.3.0",
+        "com.google.mlkit:barcode-scanning-common" to "17.0.0",
+        "com.google.mlkit:common" to "18.11.0",
+        "com.google.mlkit:vision-common" to "17.3.0",
+        "com.google.mlkit:vision-interfaces" to "16.3.0",
     )
 
     fun shouldCheck(project: Project): Boolean {
@@ -166,23 +191,38 @@ object LicenseePolicies {
                 because(reason)
             }
         }
-        ignoreNameOnlyMitCoordinates(licensee)
+        licensee.allowDependency("com.microsoft.azure", "msal4j", "1.26.0") {
+            because("MIT License in this release; the POM omits its URL.")
+        }
+        licensee.allowDependency("com.microsoft.azure", "msal4j-persistence-extension", "1.3.0") {
+            because("MIT License in this release; the POM omits its URL.")
+        }
+        listOf("com.android.application", "com.android.library", "com.android.kotlin.multiplatform.library").forEach { plugin ->
+            project.pluginManager.withPlugin(plugin) {
+                configureAndroidDependencies(licensee)
+            }
+        }
         licensee.unusedAction(UnusedAction.IGNORE)
         licensee.violationAction(ViolationAction.FAIL)
         project.logger.info("Configured Licensee policy {} for {}", policy, project.path)
     }
 
-    /**
-     * These POMs say "MIT License" and include no URL. Licensee 1.14 can only
-     * allow a coordinate at one exact version, so a pin fails on every Azure SDK
-     * bump. The published license is MIT; ignoring the coordinate keeps that
-     * version free to move.
-     */
-    private fun ignoreNameOnlyMitCoordinates(licensee: LicenseeExtension) {
-        listOf("msal4j", "msal4j-persistence-extension").forEach { artifact ->
-            licensee.ignoreDependencies("com.microsoft.azure", artifact) {
-                because("MIT License with no URL or SPDX identifier.")
+    private fun configureAndroidDependencies(licensee: LicenseeExtension) {
+        googleAndroidSdkVersions.forEach { (coordinate, version) ->
+            licensee.allowDependency(coordinate.substringBefore(':'), coordinate.substringAfter(':'), version) {
+                because("Existing Google Android SDK dependency. See https://developer.android.com/studio/terms.html.")
             }
+        }
+        licensee.allowDependency("com.google.android.gms", "play-services-identity-credentials", "16.0.0-alpha08") {
+            because("Existing Android release-variant SDK dependency. See https://developer.android.com/studio/terms.html.")
+        }
+        mlKitVersions.forEach { (coordinate, version) ->
+            licensee.allowDependency(coordinate.substringBefore(':'), coordinate.substringAfter(':'), version) {
+                because("Existing Android barcode scanning SDK under https://developers.google.com/ml-kit/terms.")
+            }
+        }
+        licensee.allowDependency("net.zetetic", "sqlcipher-android", "4.20.0") {
+            because("SQLCipher for Android community artifact with a BSD-style license.")
         }
     }
 }

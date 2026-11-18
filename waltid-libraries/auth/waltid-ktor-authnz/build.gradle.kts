@@ -40,6 +40,7 @@ dependencies {
 
     // Cryptography
     implementation(identityLibs.password4j)
+    implementation(identityLibs.bouncycastle.prov)
     implementation(identityLibs.kotlincrypto.hash.sha2)
     implementation(identityLibs.kotlincrypto.random)
 
