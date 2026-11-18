@@ -176,25 +176,19 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         captureHost("Nearby compact choices")
         ui.tapButton(identifier: "proximity-connection-options", fallbackLabel: "Connection options")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsProximityDefault"].waitForExistence(timeout: 10))
-        var expandedTops: [CGFloat] = []
         let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let top = sheet.frame.minY
-            expandedTops.append(top)
-            return top < compactTop - 40
+            sheet.frame.minY < compactTop - 40
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed,
-            "Nearby options did not expand: initial title y=\(compactTop), observed y=\(expandedTops)")
+            "Nearby options did not expand from the compact position y=\(compactTop)")
         captureHost("Nearby connection options")
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
-        var collapsedTops: [CGFloat] = []
         let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            let top = sheet.frame.minY
-            collapsedTops.append(top)
-            return abs(top - compactTop) <= 2
+            abs(sheet.frame.minY - compactTop) <= 2
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed,
-            "Nearby choices did not restore compact geometry: initial title y=\(compactTop), observed y=\(collapsedTops)")
+            "Nearby choices did not return to the compact position y=\(compactTop)")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Nearby options return")
         ui.tapButton(identifier: "wallet.proximityCancelButton", fallbackLabel: "Close nearby sharing")
@@ -412,8 +406,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
         XCTAssertTrue(changed)
         XCTAssertEqual(notice.label, "PIN changed")
-        XCTContext.runActivity(named: "Terminate after changing PIN") { _ in app.terminate() }
-        XCTContext.runActivity(named: "Relaunch with the saved PIN") { _ in app.launch() }
+        app.terminate()
+        app.launch()
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
         input.typeText("1234")

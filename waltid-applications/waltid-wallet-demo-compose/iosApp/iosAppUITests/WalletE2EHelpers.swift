@@ -24,11 +24,9 @@ final class WalletE2EUI {
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
-        XCTContext.runActivity(named: "Launch Compose wallet") { _ in app.launch() }
-        XCTContext.runActivity(named: "Unlock Compose wallet") { _ in unlockWallet() }
-        if initializeSigningIdentity {
-            XCTContext.runActivity(named: "Initialize signing identity") { _ in completeKeySetupIfNeeded() }
-        }
+        app.launch()
+        unlockWallet()
+        if initializeSigningIdentity { completeKeySetupIfNeeded() }
     }
 
     func launch(attestation: [String: String]) {
