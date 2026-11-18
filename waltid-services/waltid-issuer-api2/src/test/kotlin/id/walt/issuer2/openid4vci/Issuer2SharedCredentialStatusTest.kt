@@ -224,6 +224,76 @@ class Issuer2SharedCredentialStatusTest {
     }
 
     @Test
+    fun offerlessAndAuthorizedSdJwtOffersUseTheProfileStatusGroups() = verifyProfileAuthorization(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS,
+        Issuer2CredentialScenarios.identitySdJwt,
+    )
+
+    @Test
+    fun offerlessAndAuthorizedW3cOffersKeepStatusPurposesTogether() = verifyProfileAuthorization(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_W3C_STATUS,
+        Issuer2CredentialScenarios.openBadgeCredential,
+    )
+
+    @Test
+    fun offerlessAndAuthorizedMdocOffersUseTheProfileStatusGroups() = verifyProfileAuthorization(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS,
+        Issuer2CredentialScenarios.isoMdl,
+    )
+
+    private fun verifyProfileAuthorization(
+        example: CredentialOfferCreateRequest,
+        scenario: Issuer2CredentialScenario,
+    ) = testApplication {
+        val groups = example.runtimeOverrides!!.credentialStatus!!.jsonArray
+        val fixture = installStatusIssuer(profileDefault = example.profileId to groups)
+        val metadata = IssuerMetadataResolver(fixture.client)
+        val issuerMetadata = metadata.resolveCredentialIssuerMetadata("http://localhost/openid4vci").metadata
+        val authorizationMetadata = metadata.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
+        val format = issuerMetadata.getCredentialConfiguration(scenario.credentialConfigurationId)!!.format.value
+        val resolved = ResolvedCredentialOffer(
+            CredentialOffer.withAuthorizationCodeGrant("http://localhost/openid4vci",
+                listOf(scenario.credentialConfigurationId), null),
+            issuerMetadata, authorizationMetadata,
+        )
+        for ((index, stateMode) in listOf(null, IssuerStateMode.OMIT, IssuerStateMode.INCLUDE).withIndex()) {
+            val created = if (stateMode != null) {
+                fixture.client.createCredentialOffer(example.copy(
+                    authMethod = AuthenticationMethod.AUTHORIZED, issuerStateMode = stateMode, runtimeOverrides = null,
+                ))
+            } else null
+            val requestMode = if (index == 1) Issuer2AuthorizationRequestMode.AUTHORIZATION_DETAILS
+                else Issuer2AuthorizationRequestMode.SCOPE
+            val redirect = if (stateMode == IssuerStateMode.INCLUDE) {
+                fixture.wallet.startAuthorizationCodeFlowWithIssuerState(
+                    assertNotNull(created), fixture.wallet.resolve(created), scenario, requestMode,
+                )
+            } else fixture.wallet.startOfferlessAuthorizationCodeFlow(scenario, requestMode)
+            val parameters = redirect.substringAfter("/external_login/").decodeExternalLoginAuthorizationParameters()
+            val sessionId = parameters.getValue("_issuer2_session_id").single()
+            val saved = assertNotNull(fixture.repository.get(sessionId))
+            if (stateMode == IssuerStateMode.INCLUDE) assertEquals(created!!.offerId, sessionId)
+            else assertNull(saved.credentialOffer, "Session was derived from the profile")
+            val code = UUID.randomUUID().toString()
+            fixture.authorizationCodes.save(DefaultAuthorizationCodeRecord(
+                pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
+                code = code, clientId = "issuer2-wallet-test", redirectUri = "https://wallet.example/callback",
+                grantedScopes = setOf(scenario.credentialConfigurationId), grantedAudience = emptySet(),
+                session = DefaultSession(subject = sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to saved.expiresAt)),
+                expiresAt = saved.expiresAt,
+            ))
+            val token = fixture.wallet.exchangeAuthorizationCode(resolved, code)
+            val count = if (index == 2) 1 else 2
+            val proofs = fixture.twoProofs(resolved, scenario.credentialConfigurationId)
+                .let { it.copy(jwt = it.jwt!!.take(count)) }
+            val response = fixture.issue(resolved, token.access_token,
+                credentialRequest(scenario.credentialConfigurationId, proofs))
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertPreallocatedStatuses(response.body(), format, groups.drop(index * 2).take(count))
+        }
+    }
+
+    @Test
     fun fixedAndPreallocatedItemsRespectTheSameSessionLease() = testApplication {
         val fixture = installStatusIssuer()
         val fixed = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS
