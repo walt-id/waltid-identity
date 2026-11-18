@@ -55,26 +55,23 @@ data class CredentialStatusReservation(
 
 internal const val GLOBAL_STATUS_CONSUMPTION_ID = ".global-v2"
 
+internal fun configuredCredentialStatusStorage() = ConfiguredPersistence(
+    "issuer2_credential_status_consumption",
+    encoding = { state: CredentialStatusConsumption -> Json.encodeToString(state) },
+    decoding = { Json.decodeFromString<CredentialStatusConsumption>(it) },
+)
+
 /** Redis uses incremental global ownership records; injected stores retain an atomic CAS implementation. */
 class ConfiguredCredentialStatusConsumptionRepository(
-    private val storage: Persistence<CredentialStatusConsumption> = ConfiguredPersistence(
-        "issuer2_credential_status_consumption",
-        defaultExpiration = Duration.INFINITE,
-        encoding = { Json.encodeToString(CredentialStatusConsumption.serializer(), it) },
-        decoding = { Json.decodeFromString(CredentialStatusConsumption.serializer(), it) },
-    ),
-    override val durable: Boolean = storage is RedisPersistence<*> ||
-        (storage is ConfiguredPersistence<*> && storage.underlyingPersistence is RedisPersistence<*>),
+    private val storage: Persistence<CredentialStatusConsumption>,
+    durable: Boolean? = null,
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialStatusConsumptionRepository {
-    private val redis = when (storage) {
-        is RedisPersistence<*> -> storage
-        is ConfiguredPersistence<*> -> storage.underlyingPersistence as? RedisPersistence<*>
-        else -> null
+    private val backend = (storage as? ConfiguredPersistence<*>)?.underlyingPersistence ?: storage
+    private val redis = (backend as? RedisPersistence<*>)?.let {
+        RedisCredentialStatusConsumptionRepository(it.pool, it.discriminator, now)
     }
-    private val delegate = redis?.let {
-        RedisCredentialStatusConsumptionRepository(it.pool, it.discriminator, now, durable)
-    }
+    override val durable = durable ?: (redis != null)
 
     override suspend fun reserve(
         profileId: String,
@@ -84,7 +81,7 @@ class ConfiguredCredentialStatusConsumptionRepository(
         expiresAt: Instant,
     ): List<JsonArray> {
         require(holderKeys.isNotEmpty()) { "At least one verified holder binding is required" }
-        delegate?.let { return it.reserve(profileId, operationId, holderKeys, groups, expiresAt) }
+        redis?.let { return it.reserve(profileId, operationId, holderKeys, groups, expiresAt) }
         val binding = CredentialStatusReservation.bindingFor(operationId, holderKeys)
         while (true) {
             if (expiresAt <= now()) throw CredentialStatusOperationException("Credential status operation expired")

@@ -25,18 +25,16 @@ internal class RedisCredentialStatusConsumptionRepository(
     private val pool: UnifiedJedis,
     discriminator: String,
     private val now: () -> Instant,
-    override val durable: Boolean,
-) : CredentialStatusConsumptionRepository {
+) {
     private val keys = CredentialStatusRedisKeys(discriminator)
 
-    override suspend fun reserve(
+    suspend fun reserve(
         profileId: String,
         operationId: String,
         holderKeys: List<String>,
         groups: List<CredentialStatusConfiguration.Group>,
         expiresAt: Instant,
     ): List<JsonArray> = withContext(Dispatchers.IO) {
-        require(holderKeys.isNotEmpty()) { "At least one verified holder binding is required" }
         // Status JSON stays opaque to Lua: cjson's floating-point numbers cannot preserve every ULong idx.
         val candidates = groups.map { StatusCandidate(it.statuses.toString(), it.references) }
         val result = pool.eval(RESERVE, listOf(keys.records, keys.deadlines), listOf(

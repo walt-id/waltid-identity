@@ -7,6 +7,11 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.config.Issuer2MetadataConfig
+import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.issuer2.service.IssuanceSessionService
 import kotlinx.coroutines.*
 import kotlin.test.assertIs
@@ -15,6 +20,9 @@ import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonArray
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
@@ -233,6 +241,37 @@ class ConfiguredRedisRepositoryTest {
                 persistence.remove("key")
                 persistence.remove("list")
             }
+        }
+    }
+
+    @Test
+    fun closingIssuerReleasesItsStatusPoolAndLeavesInjectedStorageUsable() = runTest {
+        loadIssuer2ConfigFiles()
+        val service = ConfigManager.getConfig<Issuer2ServiceConfig>()
+        val metadata = ConfigManager.getConfig<Issuer2MetadataConfig>()
+        val profiles = ConfigManager.getConfig<Issuer2ProfilesConfig>()
+        configureRedisPersistence()
+        val id = java.util.UUID.randomUUID().toString()
+        val groups = (CredentialStatusConfiguration.parse(buildJsonArray {
+            addJsonObject { putJsonObject("status_list") { put("uri", "https://status.example.com/$id"); put("idx", 0) } }
+        }, CredentialFormat.SD_JWT_VC) as CredentialStatusConfiguration.Preallocated).groups
+        val deadline = Clock.System.now() + 1.days
+        val owned = Issuer2Module(service, metadata, profiles).use { module ->
+            module.statusConsumption.also { it.reserve("profile", id, listOf("holder"), groups, deadline) }
+        }
+        val error = kotlin.test.assertFails { owned.reserve("profile", id, listOf("holder"), groups, deadline) }
+        kotlin.test.assertTrue(generateSequence(error) { it.cause }.any {
+            it.message.orEmpty().contains("closed", ignoreCase = true) || it.message.orEmpty().contains("not open", ignoreCase = true)
+        }, error.toString())
+
+        configuredCredentialStatusStorage().use { storage ->
+            val injected = ConfiguredCredentialStatusConsumptionRepository(storage)
+            Issuer2Module(service, metadata, profiles, credentialStatusConsumptionRepository = injected).close()
+            assertEquals(groups.map { it.statuses }, injected.reserve("profile", id, listOf("holder"), groups, deadline))
+            val redis = (storage.underlyingPersistence as id.walt.commons.persistence.RedisPersistence<*>).pool
+            val keys = CredentialStatusRedisKeys(storage.discriminator)
+            redis.hdel(keys.records, "entry:" + groups.single().references.single(), "operation:$id")
+            redis.zrem(keys.deadlines, id)
         }
     }
 

@@ -22,7 +22,6 @@ import id.walt.issuer2.domain.IssuanceResult
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.issuer2.domain.CredentialStatusIssuanceOperation
 import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
-import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.CredentialStatusCapacityException
 import id.walt.issuer2.repository.CredentialStatusOperationException
 import id.walt.issuer2.notifications.IssuanceNotificationService
@@ -148,7 +147,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val keyAttestation: KeyAttestationVerificationOptions? = null,
     private val attestationChallengeService: AttestationChallengeService? = null,
     private val deferredConfig: DeferredIssuanceConfig = DeferredIssuanceConfig(),
-    private val credentialStatusConsumption: CredentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(),
+    private val credentialStatusConsumption: CredentialStatusConsumptionRepository? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -1297,7 +1296,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         createCredentialIssuanceInput(issuanceRequest, configuration.format, statusConfiguration.value)
                     }
                     is CredentialStatusConfiguration.Preallocated -> {
-                        val groups = credentialStatusConsumption.reserve(
+                        val repository = checkNotNull(credentialStatusConsumption) { "Per-copy credential status requires a status repository" }
+                        val groups = repository.reserve(
                             profileId = issuanceRequest.profileId,
                             operationId = deferredClaim?.id ?: requireNotNull(statusOperation).id,
                             holderKeys = statusHolderKeys,
@@ -1564,6 +1564,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             claimFinalized = true
             return rejectCredentialRequest(requestWithSession, session, configuration.format, requestId,
                 CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
+        } catch (e: CredentialProofServiceException) {
+            logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
+            return failClaimedCredentialRequest(requestWithSession, session, configuration.format, requestId,
+                OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential proof verification unavailable"))
         } catch (e: CredentialProtocolException) {
             throw e
         } catch (e: Exception) {
