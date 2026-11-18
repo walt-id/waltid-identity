@@ -23,6 +23,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.verifier2.data.SameDeviceFlowSetup
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.SessionEvent
@@ -37,8 +38,12 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.request.forms.submitForm
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.Json
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
@@ -154,7 +159,13 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
     @Test
     fun `single use sessions reject presentations and request fetches after success`() = verifyLifecycle(false)
 
-    private fun verifyLifecycle(reattemptable: Boolean?) {
+    @Test
+    fun `same device presentation returns to the browser`() = verifyLifecycle(null, sameDevice = true)
+
+    @Test
+    fun `same device single success session rejects another presentation`() = verifyLifecycle(false, sameDevice = true)
+
+    private fun verifyLifecycle(reattemptable: Boolean?, sameDevice: Boolean = false) {
         val host = "127.0.0.1"
 
         Verifier2WebhookRecorder().start().use { webhook ->
@@ -187,12 +198,16 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
 
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    val setup = verificationSessionSetup(webhook.notifications()) as CrossDeviceFlowSetup
+                    val base = verificationSessionSetup(webhook.notifications()) as CrossDeviceFlowSetup
+                    val configured = if (reattemptable == null) base else base.copy(core = base.core.copy(reattemptable = reattemptable))
+                    val setup: VerificationSessionSetup = if (sameDevice) SameDeviceFlowSetup(
+                        core = configured.core, urlConfig = configured.urlConfig, redirects = requireNotNull(configured.redirects),
+                    ) else configured
                     if (reattemptable == null) {
                         // The default JSON serializer omits default values, including reattemptable=true.
                         setBody(Json.encodeToString<VerificationSessionSetup>(setup))
                     } else {
-                        setBody<VerificationSessionSetup>(setup.copy(core = setup.core.copy(reattemptable = reattemptable)))
+                        setBody(setup)
                     }
                 }.body<VerificationSessionCreationResponse>()
             }
@@ -217,6 +232,15 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 }
             }
 
+            if (sameDevice) {
+                assertTrue(info1.setup is SameDeviceFlowSetup)
+                val missingRedirects = Json.encodeToJsonElement<VerificationSessionSetup>(info1.setup).jsonObject - "redirects"
+                val rejected = http.post("/verification-session/create") {
+                    contentType(ContentType.Application.Json)
+                    setBody(JsonObject(missingRedirects).toString())
+                }
+                assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            }
             assertEquals(reattemptable ?: true, info1.reattemptable)
             assertNull(info1.presentationId)
 
