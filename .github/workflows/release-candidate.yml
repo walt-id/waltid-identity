@@ -11,8 +11,9 @@ on:
         required: true
 
 concurrency:
-  group: release-candidate-${{ inputs.release_version }}
-  cancel-in-progress: false
+  # Promotion verifies and deploys the version tags written by this workflow.
+  group: release-pipeline
+  queue: max
 
 jobs:
   version:

@@ -8,8 +8,9 @@ on:
         required: true
 
 concurrency:
-  group: promote
-  cancel-in-progress: false
+  # Keep candidate runs from moving version tags during promotion.
+  group: release-pipeline
+  queue: max
 
 jobs:
   version:
@@ -86,20 +87,25 @@ jobs:
     name: Require the Enterprise release scan
     runs-on: ubuntu-latest
     needs: [ version, source ]
+    outputs:
+      run-id: ${{ steps.scan.outputs.run-id }}
     steps:
       - name: Verify a successful scan of this release
+        id: scan
         env:
           GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           ENTERPRISE_SHA: ${{ fromJSON(needs.source.outputs.checkout-refs).enterprise }}
           VERSION: ${{ needs.version.outputs.release_version }}
         run: |
           set -euo pipefail
-          if ! gh api --paginate "repos/walt-id/waltid-identity-enterprise/actions/workflows/release-sonar-snapshot.yml/runs?head_sha=${ENTERPRISE_SHA}&status=success&event=workflow_dispatch&per_page=100" \
-            | jq -se --arg title "Release Sonar scan $VERSION" \
-              'any(.[].workflow_runs[]; .display_title == $title)' > /dev/null; then
+          if ! run_id="$(gh api --paginate "repos/walt-id/waltid-identity-enterprise/actions/workflows/release-sonar-snapshot.yml/runs?head_sha=${ENTERPRISE_SHA}&status=success&event=workflow_dispatch&per_page=100" \
+            | jq -ser --arg title "Release Sonar scan $VERSION" --arg sha "$ENTERPRISE_SHA" '
+                [.[].workflow_runs[] | select(.display_title == $title and .head_sha == $sha and .conclusion == "success")]
+                | sort_by(.id) | last | .id')"; then
             echo "::error::No successful SonarQube Cloud scan found for $VERSION at $ENTERPRISE_SHA."
             exit 1
           fi
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
 
   retag:
     name: Promote image tags
@@ -110,7 +116,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.source.outputs.tag }}
+          ref: ${{ fromJSON(needs.source.outputs.checkout-refs).identity }}
+          persist-credentials: false
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
@@ -231,7 +238,7 @@ jobs:
     name: Enterprise release evidence
     runs-on: ubuntu-latest
     # Attaches to the enterprise GitHub release, so it has to exist first.
-    needs: [ version, source, enterprise-image-digests, enterprise-release ]
+    needs: [ version, source, verify-release-scan, enterprise-image-digests, enterprise-release ]
     if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Dispatch release-evidence.yml and wait
@@ -243,7 +250,12 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
-          inputs: '{"version": "${{ needs.version.outputs.release_version }}", "api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "attach-to-release": "true"}'
+          inputs: >-
+            {"version": "${{ needs.version.outputs.release_version }}",
+            "api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}",
+            "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}",
+            "sonar-run-id": "${{ needs.verify-release-scan.outputs.run-id }}",
+            "attach-to-release": "true"}
 
   deploy-license:
     name: Deploy license
