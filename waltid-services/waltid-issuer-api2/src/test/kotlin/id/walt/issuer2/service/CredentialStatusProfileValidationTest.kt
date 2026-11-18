@@ -34,6 +34,7 @@ class CredentialStatusProfileValidationTest {
             )) {
                 val expected = configured.profiles.getValue(example.profileId).copy(
                     credentialStatus = example.runtimeOverrides!!.credentialStatus,
+                    requireDistinctBatchHolderKeys = example.profileId == Issuer2CredentialScenarios.identitySdJwt.profileId,
                 )
                 Files.writeString(file, "profiles { " + example.profileId + " = " +
                     Json.encodeToString(CredentialProfileConfig.serializer(), expected) + " }")
@@ -42,9 +43,9 @@ class CredentialStatusProfileValidationTest {
                     ConfigManager.ConfigData("issuer2-profiles", Issuer2ProfilesConfig::class), emptyArray(),
                 ).getOrThrow() as Issuer2ProfilesConfig
                 assertEquals(expected.credentialStatus, loaded.profiles.getValue(example.profileId).credentialStatus)
-                assertEquals(expected.credentialStatus, CredentialProfileService(
-                    loaded, ConfigManager.getConfig(),
-                ).getProfile(example.profileId).credentialStatus)
+                val profile = CredentialProfileService(loaded, ConfigManager.getConfig()).getProfile(example.profileId)
+                assertEquals(expected.credentialStatus, profile.credentialStatus)
+                assertEquals(expected.requireDistinctBatchHolderKeys, profile.requireDistinctBatchHolderKeys)
             }
         } finally { Files.deleteIfExists(file) }
     }
