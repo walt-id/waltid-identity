@@ -30,23 +30,6 @@ internal fun WalletDemoPresentationCredentialOption.toCredentialSummary(): Crede
         credentialDataJson = credentialDataJson,
         metadataJson = metadataJson,
     )
-fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales: List<String> = platformPreferredLocales()): CredentialDetails {
-    val parsed = CredentialDisplayNormalizer.toDetails(toCredentialSummary(), preferredLocales)
-    val requestedGroup = toRequestedDisclosureGroup(preferredLocales)
-
-    return parsed.copy(groups = listOfNotNull(requestedGroup) + parsed.groups)
-}
-
-fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(preferredLocales: List<String> = platformPreferredLocales()): ClaimGroup? {
-    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales, format)
-    val requestedItems = disclosures.mapIndexed { index, disclosure ->
-        disclosure.toClaimItem(index, format, metadata)
-    }
-
-    return requestedItems
-        .takeIf { it.isNotEmpty() }
-        ?.let { ClaimGroup(id = "requested", title = CredentialDisplayVocabulary.RequestedDisclosuresTitle, items = it) }
-}
 
 internal fun WalletDemoPresentationDisclosure.toClaimItem(
     index: Int,

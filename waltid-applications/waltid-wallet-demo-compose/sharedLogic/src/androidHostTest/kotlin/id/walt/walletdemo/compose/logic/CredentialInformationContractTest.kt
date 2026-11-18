@@ -69,7 +69,7 @@ class CredentialInformationContractTest {
             format = summary.format, label = "Account", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = listOf(WalletDemoPresentationDisclosure(label = "Iban", path = "[\"accounts\",1,\"iban\"]",
                 valueJson = "\"DE456\"", selectivelyDisclosable = true)))
-        assertEquals("Second IBAN", option.toRequestedDisclosureGroup(listOf("en"))!!.items.single().label)
+        assertEquals("Second IBAN", option.toSharingInformation(listOf("en")).fields.single().item.label)
         val path = option.disclosures.single().path
         val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("account", summary.id, summary.format,
             """{"accounts":[{"iban":"DE456"}]}""", false, listOf(
@@ -132,7 +132,7 @@ class CredentialInformationContractTest {
         val option = WalletDemoPresentationCredentialOption(queryId = "identity", credentialId = summary.id,
             format = format, label = "Identity", issuer = null, credentialDataJson = summary.credentialDataJson.orEmpty(), metadataJson = metadata,
             disclosures = strings("requestedPaths").map { WalletDemoPresentationDisclosure(label = "Unhelpful fallback", path = it, valueJson = "\"Ada\"", selectivelyDisclosable = false) })
-        val requested = option.toRequestedDisclosureGroup(locales)!!.items
+        val requested = option.toSharingInformation(locales).fields.map { it.item }
         assertEquals(strings("requestedLabels"), requested.map { it.label })
         assertTrue(requested.all { it.labelSource == ClaimLabelSource.IssuerMetadata })
         assertEquals(listOf(1, 2), requested.map { it.displayOrder })

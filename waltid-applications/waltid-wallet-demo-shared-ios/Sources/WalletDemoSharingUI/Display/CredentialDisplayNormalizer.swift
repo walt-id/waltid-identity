@@ -23,14 +23,6 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
-    public static func details(for options: [PresentationCredentialOption]) async -> [CredentialDetails] {
-        await withCheckedContinuation { continuation in
-            queue.async {
-                continuation.resume(returning: options.map(details(for:)))
-            }
-        }
-    }
-
     static func sharingDetails(for options: [PresentationCredentialOption], includeDisclosures: Bool) async -> [CredentialDetails] {
         await withCheckedContinuation { continuation in
             queue.async {
@@ -76,34 +68,6 @@ public enum CredentialDisplayNormalizer {
             groups: result.groups,
             metadataJSON: credential.metadataJSON,
             credentialDataJSON: credential.credentialDataJSON,
-            preferredLocales: preferredLocales
-        )
-    }
-
-    public static func details(for option: PresentationCredentialOption) -> CredentialDetails {
-        details(for: option, preferredLocales: Locale.preferredLanguages)
-    }
-
-    public static func details(for option: PresentationCredentialOption, preferredLocales: [String]) -> CredentialDetails {
-        let parsed = details(
-            id: option.selection.id,
-            title: option.label ?? option.format,
-            issuer: option.issuer,
-            subject: option.subject,
-            format: option.format,
-            addedAt: nil,
-            credentialDataJSON: option.credentialDataJSON
-        )
-        return CredentialDetails(
-            id: parsed.id,
-            title: parsed.title,
-            issuer: parsed.issuer,
-            subject: parsed.subject,
-            format: parsed.format,
-            addedAt: parsed.addedAt,
-            groups: requestedDisclosureGroups(for: option, preferredLocales: preferredLocales) + parsed.groups,
-            metadataJSON: option.metadataJSON,
-            credentialDataJSON: option.credentialDataJSON,
             preferredLocales: preferredLocales
         )
     }

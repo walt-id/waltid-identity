@@ -104,7 +104,7 @@ class CredentialDisplayImageFallbackAndroidTest {
         )
 
         val image = assertIs<DisplayValue.Image>(
-            (option.toCredentialDetails().groups.first().items.single().value as DisplayValue.DeferredImage).resolve()
+            assertIs<DisplayValue.DeferredImage>(option.toSharingInformation().fields.single().item.value).resolve()
         )
         assertEquals("image/png", image.mimeType)
     }

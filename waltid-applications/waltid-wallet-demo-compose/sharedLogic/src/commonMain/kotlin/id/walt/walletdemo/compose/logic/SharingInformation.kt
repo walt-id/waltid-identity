@@ -52,11 +52,11 @@ fun WalletDemoPresentationCredentialOption.toSharingInformation(
     val summary = toCredentialSummary().toCardDisplayData(preferredLocales)
     if (!includeDisclosures) return SharingCredentialInformation(this, summary, emptyList())
 
-    val items = toRequestedDisclosureGroup(preferredLocales)?.items.orEmpty()
+    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales, format)
     val fields = disclosures.mapIndexedNotNull { index, disclosure ->
-        val item = items.getOrNull(index) ?: return@mapIndexedNotNull null
         val path = disclosurePathExpression(disclosure.path, format).segments
         if (!disclosure.requested && isCredentialSummaryClaim(path, format)) return@mapIndexedNotNull null
+        val item = disclosure.toClaimItem(index, format, metadata)
         val selection = WalletDemoPresentationDisclosureSelection(queryId, credentialId, disclosure.path)
         SharingInformationField(item, path,
             included = !disclosure.selectivelyDisclosable || disclosure.required,
