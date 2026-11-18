@@ -43,9 +43,14 @@ class CredentialStatusSessionRecoveryTest {
         val recovered = service().prepareCredentialStatusOperation(retried, "credential", listOf("key1", "key2"), 2)
         assertEquals(operation.id, recovered.id)
         assertEquals(response, recovered.response)
-        val completed = service().finishCredentialStatusSession(retried.copy(
-            issuanceResults = mapOf("credential" to IssuanceResult("dc+sd-jwt")),
-        ), "credential")
+        val claims = buildJsonObject { put("department", "finance") }
+        service().saveSession(retried.copy(authorizationClaims = claims, externalAuthorizationState = "renewed"))
+        val completed = service().finishCredentialStatusSession(retried, "credential") { current ->
+            current.copy(issuanceResults = current.issuanceResults + ("credential" to IssuanceResult("dc+sd-jwt")))
+        }
+        assertEquals(claims, completed.authorizationClaims)
+        assertEquals("renewed", completed.externalAuthorizationState)
+        assertEquals(IssuanceResult("dc+sd-jwt"), completed.issuanceResults["credential"])
         assertTrue(completed.credentialStatusIssuance!!.operations.isEmpty())
         assertNull(completed.credentialStatusIssuance.leaseId)
         val next = assertNotNull(service().claimCredentialStatusSession("session"))
@@ -75,12 +80,17 @@ class CredentialStatusSessionRecoveryTest {
         create()
         val claim = assertNotNull(service().claimCredentialStatusSession("session"))
         val operation = service().prepareCredentialStatusOperation(claim, "credential", listOf("key"), 1)
-        service().saveSession(claim.copy(statusReason = "updated separately"))
+        service().saveSession(claim.copy(statusReason = "updated separately", externalAuthorizationState = "renewed"))
         val saved = repository.get("session")!!
         assertEquals(claim.credentialStatusIssuance!!.leaseId, saved.credentialStatusIssuance!!.leaseId)
         assertEquals(operation, saved.credentialStatusIssuance.operations["credential"])
         assertFailsWith<CredentialStatusOperationException> {
             service().prepareCredentialStatusOperation(claim, "credential", listOf("other-key"), 1)
         }
+        val released = service().releaseCredentialStatusSession(claim)
+        assertNull(released.credentialStatusIssuance?.leaseId)
+        assertEquals(operation, released.credentialStatusIssuance?.operations?.get("credential"))
+        assertEquals("updated separately", released.statusReason)
+        assertEquals("renewed", released.externalAuthorizationState)
     }
 }

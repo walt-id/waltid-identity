@@ -149,21 +149,19 @@ class IssuanceSessionService(
         }
     }
 
-    suspend fun releaseCredentialStatusSession(claim: IssuanceSession): IssuanceSession =
-        finishCredentialStatusSession(claim, completedCredentialIdentifier = null)
+    suspend fun releaseCredentialStatusSession(
+        claim: IssuanceSession,
+        update: (IssuanceSession) -> IssuanceSession = { it },
+    ): IssuanceSession = updateCredentialStatusClaim(claim, release = true, transform = update)
 
     suspend fun finishCredentialStatusSession(
         claim: IssuanceSession,
-        completedCredentialIdentifier: String?,
+        credentialIdentifier: String,
+        recordIssuance: (IssuanceSession) -> IssuanceSession,
     ): IssuanceSession = updateCredentialStatusClaim(claim, release = true) { current ->
         val state = requireNotNull(current.credentialStatusIssuance)
-        claim.copy(
-            issuanceResults = current.issuanceResults + claim.issuanceResults,
-            authorizedCredentialIdentifiers = current.authorizedCredentialIdentifiers ?: claim.authorizedCredentialIdentifiers,
-            credentialStatusIssuance = state.copy(
-                operations = if (completedCredentialIdentifier == null) state.operations
-                    else state.operations - completedCredentialIdentifier,
-            ),
+        recordIssuance(current).copy(
+            credentialStatusIssuance = state.copy(operations = state.operations - credentialIdentifier),
         )
     }
 

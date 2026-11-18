@@ -1553,48 +1553,45 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 claimFinalized = true
                 return response
             }
-            val issuanceResults = session.issuanceResults + (
-                    issuanceRequest.credentialIdentifier to IssuanceResult(
-                        issuedCredentialFormat = configuration.format.value,
-                    )
-                    )
-            val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
-                .map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
-                    tokenClaims, null,
-                    metadataService.credentialConfigurationIdsForScopes(
-                        tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()
-                    ),
-                ).map { it.credentialIdentifier }
-            val issuanceComplete =
-                establishedSelection.isNotEmpty() && establishedSelection.all { it in issuanceResults }
+            val result = IssuanceResult(issuedCredentialFormat = configuration.format.value)
+            fun recordIssuance(current: IssuanceSession): IssuanceSession {
+                val results = current.issuanceResults + (issuanceRequest.credentialIdentifier to result)
+                val selected = current.authorizedCredentialIdentifiers ?: current.issuanceRequests
+                    .map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
+                        tokenClaims, null,
+                        metadataService.credentialConfigurationIdsForScopes(
+                            tokenClaims.stringClaim("scope").orEmpty().split(' ').filter(String::isNotBlank).toSet()
+                        ),
+                    ).map { it.credentialIdentifier }
+                val complete = selected.isNotEmpty() && selected.all { it in results }
+                return current.copy(
+                    issuanceResults = results,
+                    authorizedCredentialIdentifiers = selected,
+                    status = if (complete) IssuanceSessionStatus.SUCCESSFUL else IssuanceSessionStatus.ACTIVE,
+                    statusReason = when {
+                        current.statusReason != session.statusReason -> current.statusReason
+                        complete -> "Credentials issued successfully"
+                        else -> null
+                    },
+                )
+            }
             val updatedSession = try {
                 withContext(NonCancellable) {
-                    val save: suspend (IssuanceSession) -> IssuanceSession =
-                        if (deferredClaim != null) sessionService::saveDeferredProgress
-                        else if (session.credentialStatusIssuance?.leaseId != null) { updated ->
-                            sessionService.finishCredentialStatusSession(updated,
-                                issuanceRequest.credentialIdentifier.takeIf { statusOperation != null })
-                        } else sessionService::saveSession
-                    save(
-                        session.copy(
-                            issuanceResults = issuanceResults,
-                            authorizedCredentialIdentifiers = establishedSelection,
-                            status = if (issuanceComplete) {
-                                IssuanceSessionStatus.SUCCESSFUL
-                            } else {
-                                IssuanceSessionStatus.ACTIVE
-                            },
-                            statusReason = if (issuanceComplete) "Credentials issued successfully" else null,
-                            isClosed = false,
+                    when {
+                        deferredClaim != null -> sessionService.saveDeferredProgress(recordIssuance(session))
+                        session.credentialStatusIssuance?.leaseId != null -> sessionService.finishCredentialStatusSession(
+                            session, issuanceRequest.credentialIdentifier, ::recordIssuance,
                         )
-                    )
+                        else -> sessionService.saveSession(recordIssuance(session))
+                    }
                 }
             } catch (e: Exception) {
-                val retrySession = if (statusOperation != null) session else session.withExpectedCredentialProofKeys(
-                    issuanceRequest.credentialIdentifier, proofPublicKeyJwks,
-                )
-                try {
-                    restoreClaimedSession(retrySession)
+                val retrySession = try {
+                    restoreClaimedSession(session) { current ->
+                        if (statusOperation != null) current else current.withExpectedCredentialProofKeys(
+                            issuanceRequest.credentialIdentifier, proofPublicKeyJwks,
+                        )
+                    }
                 } catch (restoreException: Exception) {
                     e.addSuppressed(restoreException)
                     throw e
@@ -1629,12 +1626,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             return response
         } catch (e: CancellationException) {
             if (!claimFinalized) {
-                restoreClaimedSession(
-                    if (usesPreallocatedStatus) session else session.withExpectedCredentialProofKeys(
-                        issuanceRequest.credentialIdentifier,
-                        committedProofKeyJwks,
+                restoreClaimedSession(session) { current ->
+                    if (usesPreallocatedStatus) current else current.withExpectedCredentialProofKeys(
+                        issuanceRequest.credentialIdentifier, committedProofKeyJwks,
                     )
-                )
+                }
             }
             throw e
         } catch (e: CredentialStatusCapacityException) {
@@ -2111,11 +2107,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return rejectCredentialRequest(request, session, format, requestId, error)
     }
 
-    private suspend fun restoreClaimedSession(session: IssuanceSession) {
-        withContext(NonCancellable) {
-            if (session.deferredState != null) sessionService.saveDeferredProgress(session)
-            else if (session.credentialStatusIssuance?.leaseId != null) sessionService.releaseCredentialStatusSession(session)
-            else sessionService.saveSession(session)
+    private suspend fun restoreClaimedSession(
+        session: IssuanceSession,
+        update: (IssuanceSession) -> IssuanceSession = { it },
+    ): IssuanceSession = withContext(NonCancellable) {
+        when {
+            session.deferredState != null -> sessionService.saveDeferredProgress(update(session))
+            session.credentialStatusIssuance?.leaseId != null -> sessionService.releaseCredentialStatusSession(session, update)
+            else -> sessionService.saveSession(update(session))
         }
     }
 
