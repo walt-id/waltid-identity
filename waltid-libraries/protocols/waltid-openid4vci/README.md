@@ -397,6 +397,13 @@ status entries there when required. Custom format handlers receive the complete
 the first proof or allocate statuses before validation. There is no separate
 single/batch mode or bridge to the legacy OpenID4VC library.
 
+To require a different holder key for each copy, pass
+`proofValidationContext.copy(requireDistinctBatchHolderKeys = true)` to
+`acceptCredentialRequest` and `createCredentialResponse`, including when collecting a deferred
+request. The OpenID4VCI provider compares the verified keys selected for that request. If two
+copies would use the same public key, it returns `invalid_proof` before accepting a deferred
+transaction or calling `CredentialIssuanceInputProvider.prepare`. The default allows repeated keys.
+
 Custom token handlers now accept `TokenResponseOptions`. When a
 `credentialAuthorizationResolver` is configured, call it after grant validation and
 before signing, add its `tokenClaims()` to the signed access token, and return the

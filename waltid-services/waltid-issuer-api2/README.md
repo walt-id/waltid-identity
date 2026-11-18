@@ -273,8 +273,9 @@ each copy of the identity credential to bind to a different holder key.
 profiles.identityCredentialSdJwt.requireDistinctBatchHolderKeys = true
 ```
 
-The wallet supplies a fresh key for each copy. Issuer2 compares the verified public keys within
-that request. If two copies would use the same key, the whole batch returns HTTP 400
+The wallet supplies a fresh key for each copy. Issuer2 passes the selected profile's setting
+to the OpenID4VCI provider, which compares the verified public keys within that request.
+If two copies would use the same key, the whole batch returns HTTP 400
 `invalid_proof` before status reservation, signing, or deferred acceptance. The wallet can retry
 with distinct keys. The selected profile applies to both offered and offerless issuance.
 An offer pinned to one `expectedCredentialProofKeyJwk` can issue one copy per request under this
