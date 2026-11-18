@@ -35,12 +35,12 @@ class CredentialStatusSessionRecoveryTest {
         val first = assertNotNull(service().claimCredentialStatusSession("session"))
         assertNotNull(repository.get("session"), "A claim must not remove the session")
         assertNull(service().claimCredentialStatusSession("session"))
-        val operation = service().prepareCredentialStatusOperation(first, "credential", listOf("key1", "key2"), 2)
+        val operation = service().prepareCredentialStatusOperation(first, "credential", listOf("key1", "key2"))
         val response = CredentialResponse(listOf(IssuedCredential(JsonPrimitive("signed-once"))))
         service().checkpointCredentialStatusResponse(first, "credential", operation.id, response)
         service().releaseCredentialStatusSession(first)
         val retried = assertNotNull(service().claimCredentialStatusSession("session"))
-        val recovered = service().prepareCredentialStatusOperation(retried, "credential", listOf("key1", "key2"), 2)
+        val recovered = service().prepareCredentialStatusOperation(retried, "credential", listOf("key1", "key2"))
         assertEquals(operation.id, recovered.id)
         assertEquals(response, recovered.response)
         val claims = buildJsonObject { put("department", "finance") }
@@ -55,14 +55,14 @@ class CredentialStatusSessionRecoveryTest {
         assertNull(completed.credentialStatusIssuance.leaseId)
         val next = assertNotNull(service().claimCredentialStatusSession("session"))
         assertNotEquals(operation.id,
-            service().prepareCredentialStatusOperation(next, "credential", listOf("new-key"), 1).id)
+            service().prepareCredentialStatusOperation(next, "credential", listOf("new-key")).id)
     }
 
     @Test
     fun staleWorkersCannotCheckpointOrReleaseANewerClaim() = runTest {
         create()
         val stale = assertNotNull(service().claimCredentialStatusSession("session"))
-        val operation = service().prepareCredentialStatusOperation(stale, "credential", listOf("key"), 1)
+        val operation = service().prepareCredentialStatusOperation(stale, "credential", listOf("key"))
         now += 6.minutes
         val fresh = assertNotNull(service().claimCredentialStatusSession("session"))
         assertFailsWith<CredentialStatusOperationException> {
@@ -72,20 +72,20 @@ class CredentialStatusSessionRecoveryTest {
         assertEquals(fresh.credentialStatusIssuance!!.leaseId,
             repository.get("session")!!.credentialStatusIssuance!!.leaseId)
         assertEquals(operation.id,
-            service().prepareCredentialStatusOperation(fresh, "credential", listOf("key"), 1).id)
+            service().prepareCredentialStatusOperation(fresh, "credential", listOf("key")).id)
     }
 
     @Test
     fun ordinarySessionUpdatesPreservePrivateOperationsAndDoNotReleaseTheLease() = runTest {
         create()
         val claim = assertNotNull(service().claimCredentialStatusSession("session"))
-        val operation = service().prepareCredentialStatusOperation(claim, "credential", listOf("key"), 1)
+        val operation = service().prepareCredentialStatusOperation(claim, "credential", listOf("key"))
         service().saveSession(claim.copy(statusReason = "updated separately", externalAuthorizationState = "renewed"))
         val saved = repository.get("session")!!
         assertEquals(claim.credentialStatusIssuance!!.leaseId, saved.credentialStatusIssuance!!.leaseId)
         assertEquals(operation, saved.credentialStatusIssuance.operations["credential"])
         assertFailsWith<CredentialStatusOperationException> {
-            service().prepareCredentialStatusOperation(claim, "credential", listOf("other-key"), 1)
+            service().prepareCredentialStatusOperation(claim, "credential", listOf("other-key"))
         }
         val released = service().releaseCredentialStatusSession(claim)
         assertNull(released.credentialStatusIssuance?.leaseId)

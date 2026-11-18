@@ -1290,7 +1290,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             } else emptyList()
             val statusOperation = if (preallocatedStatus != null && deferredClaim == null) {
                 sessionService.prepareCredentialStatusOperation(
-                    session, issuanceRequest.credentialIdentifier, statusHolderKeys, statusHolderKeys.size,
+                    session, issuanceRequest.credentialIdentifier, statusHolderKeys,
                 )
             } else null
 
@@ -1385,7 +1385,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             operationId = deferredClaim?.id ?: requireNotNull(statusOperation).id,
                             holderKeys = statusHolderKeys,
                             groups = statusConfiguration.groups,
-                            count = issuanceCount,
                             expiresAt = session.deferredState?.deadline ?: session.expiresAt,
                         )
                         if (deferredClaim != null) deferredIssuance.checkpointProgress(sessionId, deferredClaim,

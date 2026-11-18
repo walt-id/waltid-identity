@@ -69,18 +69,18 @@ class ConfiguredRedisRepositoryTest {
         withStatusLedger { redis, storage, keys ->
             fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage)
             val deadline = Clock.System.now() + 1.days
-            val reserved = repository().reserve("profile", "first", listOf("A", "B"), statusGroups(1, 2, 3), 2, deadline)
-            assertEquals(reserved, repository().reserve("profile", "first", listOf("A", "B"), statusGroups(3, 2, 1), 2, deadline))
+            val reserved = repository().reserve("profile", "first", listOf("A", "B"), statusGroups(1, 2, 3), deadline)
+            assertEquals(reserved, repository().reserve("profile", "first", listOf("A", "B"), statusGroups(3, 2, 1), deadline))
             assertEquals(-1L, redis.pttl(keys.records))
             assertEquals(CredentialStatusOwner("profile", "first"), Json.decodeFromString<CredentialStatusOwner>(
                 redis.hget(keys.records, "entry:" + statusGroups(1).single().references.single()),
             ))
-            val next = repository().reserve("profile", "after-restart", listOf("C"), statusGroups(2, 1, 4, 3), 1, deadline)
+            val next = repository().reserve("profile", "after-restart", listOf("C"), statusGroups(2, 1, 4, 3), deadline)
             assertEquals(statusGroups(4).single().statuses, next.single())
             val results = coroutineScope {
                 (1..12).map { index -> async(Dispatchers.IO) {
-                    runCatching { repository().reserve("concurrent-" + index, "request-" + index, listOf("key"),
-                        statusGroups(10, 11, 12), 2, deadline) }
+                    runCatching { repository().reserve("concurrent-" + index, "request-" + index, listOf("key1", "key2"),
+                        statusGroups(10, 11, 12), deadline) }
                 } }.awaitAll()
             }
             assertEquals(1, results.count { it.isSuccess })
@@ -95,17 +95,17 @@ class ConfiguredRedisRepositoryTest {
             fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage)
             val groups = statusGroups(1, 2, 3)
             val deadline = Clock.System.now() + 1.days
-            repository().reserve("A", "first", listOf("A"), groups, 2, deadline)
+            repository().reserve("A", "first", listOf("A1", "A2"), groups, deadline)
             assertFailsWith<CredentialStatusCapacityException> {
-                repository().reserve("B", "second", listOf("B"), groups, 2, deadline)
+                repository().reserve("B", "second", listOf("B1", "B2"), groups, deadline)
             }
             assertNull(redis.hget(keys.records, "entry:" + groups.last().references.single()))
-            assertEquals(listOf(groups.last().statuses), repository().reserve("B", "second", listOf("B"), groups, 1, deadline))
+            assertEquals(listOf(groups.last().statuses), repository().reserve("B", "second", listOf("B"), groups, deadline))
             assertEquals(CredentialStatusOwner("B", "second"), Json.decodeFromString<CredentialStatusOwner>(
                 redis.hget(keys.records, "entry:" + groups.last().references.single()),
             ))
             assertFailsWith<CredentialStatusOperationException> {
-                repository().reserve("B", "first", listOf("A"), groups, 2, deadline)
+                repository().reserve("B", "first", listOf("A1", "A2"), groups, deadline)
             }
         }
     }
@@ -122,12 +122,12 @@ class ConfiguredRedisRepositoryTest {
                 as CredentialStatusConfiguration.Preallocated).groups
             val deadline = Clock.System.now() + 1.days
             val first = ConfiguredCredentialStatusConsumptionRepository(storage)
-                .reserve("A", "batch", listOf("one", "two"), groups, 2, deadline)
+                .reserve("A", "batch", listOf("one", "two"), groups, deadline)
             assertEquals(groups.map { it.statuses }, first)
             assertEquals(first, ConfiguredCredentialStatusConsumptionRepository(storage)
-                .reserve("A", "batch", listOf("one", "two"), groups.reversed(), 2, deadline))
+                .reserve("A", "batch", listOf("one", "two"), groups.reversed(), deadline))
             assertFailsWith<CredentialStatusCapacityException> {
-                ConfiguredCredentialStatusConsumptionRepository(storage).reserve("B", "next", listOf("key"), groups, 1, deadline)
+                ConfiguredCredentialStatusConsumptionRepository(storage).reserve("B", "next", listOf("key"), groups, deadline)
             }
             assertEquals(2, redis.hkeys(keys.records).count { it.startsWith("entry:") })
             val slots = listOf(keys.records, keys.deadlines)
@@ -142,13 +142,13 @@ class ConfiguredRedisRepositoryTest {
             var now = Clock.System.now()
             fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage, now = { now })
             val groups = statusGroups(1, 2)
-            repository().reserve("A", "pending", listOf("A1", "A2"), groups, 2, now + 1.days)
+            repository().reserve("A", "pending", listOf("A1", "A2"), groups, now + 1.days)
             now += 2.days
-            repository().reserve("B", "later", listOf("B"), statusGroups(3), 1, now + 1.days)
+            repository().reserve("B", "later", listOf("B"), statusGroups(3), now + 1.days)
             assertNull(redis.hget(keys.records, "operation:pending"))
             assertNull(redis.zscore(keys.deadlines, "pending"))
             assertFailsWith<CredentialStatusCapacityException> {
-                repository().reserve("C", "spent", listOf("C"), groups, 1, now + 1.days)
+                repository().reserve("C", "spent", listOf("C"), groups, now + 1.days)
             }
             for (group in groups) {
                 val owner = redis.hget(keys.records, "entry:" + group.references.single())
@@ -169,15 +169,15 @@ class ConfiguredRedisRepositoryTest {
             val deadline = Clock.System.now() + 1.days
             fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage)
             assertEquals(listOf(first.statuses), repository().reserve("first-W3C", "first", listOf("key"),
-                listOf(first, second), 1, deadline))
+                listOf(first, second), deadline))
             assertEquals(listOf(second.statuses), repository().reserve("other-W3C", "next", listOf("key"),
-                listOf(first, second), 1, deadline))
+                listOf(first, second), deadline))
             assertEquals(8, redis.hkeys(keys.records).count { it.startsWith("entry:") })
             for (reference in second.references) assertEquals(CredentialStatusOwner("other-W3C", "next"),
                 Json.decodeFromString<CredentialStatusOwner>(redis.hget(keys.records, "entry:" + reference)))
             val overlapping = groups(1, 99).single()
             assertFailsWith<CredentialStatusCapacityException> {
-                repository().reserve("third-W3C", "third", listOf("key"), listOf(overlapping), 1, deadline)
+                repository().reserve("third-W3C", "third", listOf("key"), listOf(overlapping), deadline)
             }
             for (unused in overlapping.references - first.references) assertNull(redis.hget(keys.records, "entry:" + unused))
         }
@@ -247,7 +247,7 @@ class ConfiguredRedisRepositoryTest {
             val first = IssuanceSessionService(repository, now = { now })
             val stale = assertNotNull(first.claimCredentialStatusSession(original.sessionId))
             val identifier = original.issuanceRequests.single().credentialIdentifier
-            val operation = first.prepareCredentialStatusOperation(stale, identifier, listOf("key1", "key2"), 2)
+            val operation = first.prepareCredentialStatusOperation(stale, identifier, listOf("key1", "key2"))
             val response = CredentialResponse(listOf(
                 IssuedCredential(JsonPrimitive("signed-copy-1")), IssuedCredential(JsonPrimitive("signed-copy-2")),
             ))
@@ -256,7 +256,7 @@ class ConfiguredRedisRepositoryTest {
             val restartedRepository = ConfiguredIssuanceSessionRepository()
             val restarted = IssuanceSessionService(restartedRepository, now = { now })
             val recovered = assertNotNull(restarted.claimCredentialStatusSession(original.sessionId))
-            val restored = restarted.prepareCredentialStatusOperation(recovered, identifier, listOf("key1", "key2"), 2)
+            val restored = restarted.prepareCredentialStatusOperation(recovered, identifier, listOf("key1", "key2"))
             assertEquals(operation.id, restored.id)
             assertEquals(response, restored.response)
             assertNotNull(restartedRepository.get(original.sessionId)!!.issuanceRequests.single().crypto2IssuerStoredKey)

@@ -110,13 +110,12 @@ class IssuanceSessionService(
         claim: IssuanceSession,
         credentialIdentifier: String,
         holderKeys: List<String>,
-        count: Int,
     ): CredentialStatusIssuanceOperation {
         val saved = updateCredentialStatusClaim(claim) { current ->
             val state = requireNotNull(current.credentialStatusIssuance)
             val operation = state.operations[credentialIdentifier]
-                ?: CredentialStatusIssuanceOperation(UUID.randomUUID().toString(), holderKeys, count)
-            if (operation.holderKeys != holderKeys || operation.count != count) {
+                ?: CredentialStatusIssuanceOperation(UUID.randomUUID().toString(), holderKeys)
+            if (operation.holderKeys != holderKeys) {
                 throw CredentialStatusOperationException("Credential request conflicts with its pending status operation")
             }
             current.copy(credentialStatusIssuance = state.copy(

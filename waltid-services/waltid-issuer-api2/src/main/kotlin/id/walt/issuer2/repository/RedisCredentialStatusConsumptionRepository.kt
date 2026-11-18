@@ -34,14 +34,13 @@ internal class RedisCredentialStatusConsumptionRepository(
         operationId: String,
         holderKeys: List<String>,
         groups: List<CredentialStatusConfiguration.Group>,
-        count: Int,
         expiresAt: Instant,
     ): List<JsonArray> = withContext(Dispatchers.IO) {
-        require(count > 0)
+        require(holderKeys.isNotEmpty()) { "At least one verified holder binding is required" }
         // Status JSON stays opaque to Lua: cjson's floating-point numbers cannot preserve every ULong idx.
         val candidates = groups.map { StatusCandidate(it.statuses.toString(), it.references) }
         val result = pool.eval(RESERVE, listOf(keys.records, keys.deadlines), listOf(
-            profileId, operationId, CredentialStatusReservation.bindingFor(operationId, holderKeys), count.toString(),
+            profileId, operationId, CredentialStatusReservation.bindingFor(operationId, holderKeys), holderKeys.size.toString(),
             expiresAt.toEpochMilliseconds().toString(), now().toEpochMilliseconds().toString(),
             Json.encodeToString(candidates), Json.encodeToString(CredentialStatusOwner(profileId, operationId)),
         )) as List<*>

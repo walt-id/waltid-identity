@@ -19,7 +19,7 @@ class PublicIssuanceSessionTest {
         val state = id.walt.issuer2.domain.CredentialStatusIssuanceState(
             leaseId = "private-lease",
             operations = mapOf("configuration" to id.walt.issuer2.domain.CredentialStatusIssuanceOperation(
-                "private-operation", listOf("private-holder"), 1,
+                "private-operation", listOf("private-holder"),
                 id.walt.openid4vci.responses.credential.CredentialResponse(listOf(
                     id.walt.openid4vci.responses.credential.IssuedCredential(JsonPrimitive("private-signed-response")),
                 )),

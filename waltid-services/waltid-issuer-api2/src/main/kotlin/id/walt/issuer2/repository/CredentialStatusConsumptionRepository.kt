@@ -24,7 +24,6 @@ interface CredentialStatusConsumptionRepository {
         operationId: String,
         holderKeys: List<String>,
         groups: List<CredentialStatusConfiguration.Group>,
-        count: Int,
         expiresAt: Instant,
     ): List<JsonArray>
 }
@@ -82,11 +81,10 @@ class ConfiguredCredentialStatusConsumptionRepository(
         operationId: String,
         holderKeys: List<String>,
         groups: List<CredentialStatusConfiguration.Group>,
-        count: Int,
         expiresAt: Instant,
     ): List<JsonArray> {
-        require(count > 0)
-        delegate?.let { return it.reserve(profileId, operationId, holderKeys, groups, count, expiresAt) }
+        require(holderKeys.isNotEmpty()) { "At least one verified holder binding is required" }
+        delegate?.let { return it.reserve(profileId, operationId, holderKeys, groups, expiresAt) }
         val binding = CredentialStatusReservation.bindingFor(operationId, holderKeys)
         while (true) {
             if (expiresAt <= now()) throw CredentialStatusOperationException("Credential status operation expired")
@@ -94,7 +92,7 @@ class ConfiguredCredentialStatusConsumptionRepository(
             val current = expected ?: CredentialStatusConsumption()
             current.reservations[operationId]?.let { existing ->
                 if (existing.expiresAt <= now()) throw CredentialStatusOperationException("Credential status operation expired")
-                if (existing.profileId != profileId || existing.binding != binding || existing.groups.size != count) {
+                if (existing.profileId != profileId || existing.binding != binding || existing.groups.size != holderKeys.size) {
                     throw CredentialStatusOperationException("Credential request conflicts with its reserved status groups")
                 }
                 return existing.groups
@@ -108,8 +106,8 @@ class ConfiguredCredentialStatusConsumptionRepository(
             val selected = groups.asSequence()
                 .filter { group -> group.references.none { it in current.referenceOwners || it in selectedReferences } }
                 .onEach { selectedReferences += it.references }
-                .take(count).toList()
-            if (selected.size != count) throw CredentialStatusCapacityException()
+                .take(holderKeys.size).toList()
+            if (selected.size != holderKeys.size) throw CredentialStatusCapacityException()
             val reservation = CredentialStatusReservation(binding, selected.map { it.statuses }, expiresAt, profileId)
             val replacement = CredentialStatusConsumption(
                 reservations = active + (operationId to reservation),
