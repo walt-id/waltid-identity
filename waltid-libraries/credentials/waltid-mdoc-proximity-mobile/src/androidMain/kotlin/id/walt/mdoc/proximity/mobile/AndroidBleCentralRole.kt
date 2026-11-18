@@ -362,7 +362,7 @@ internal class AndroidCentralGattSession(
     // The provider serializes native operations. A callback already delivered before a new
     // request belongs to an earlier operation and cannot acknowledge this request.
     private fun beginOperation() {
-        while (operations.tryReceive().isSuccess) Unit
+        while (operations.tryReceive().isSuccess) {}
         if (closed.get()) throw CancellationException("GATT session is closed")
     }
 

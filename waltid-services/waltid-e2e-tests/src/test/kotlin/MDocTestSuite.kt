@@ -158,20 +158,20 @@ class MDocTestSuite(
                 actual = mDLCredentialConfigurationDraft13.format.value,
             )
 
-            assertTrue {
+            assertTrue(
                 mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains(
                     CredSignAlgValues.Named("ES256")
                 )
-            }
+            )
 
             assertEquals(
                 expected = MDL_DOC_TYPE,
                 actual = mDLCredentialConfigurationDraft13.docType!!,
             )
 
-            assertTrue {
+            assertTrue(
                 credentialConfigurationsSupportedDraft13.values.filter { it.docType == MDL_DOC_TYPE }.size == 1
-            }
+            )
 
         }
 
@@ -197,25 +197,25 @@ class MDocTestSuite(
         serialNumber: BigInteger,
     ) {
 
-        assertTrue {
+        assertTrue(
             serialNumber.signum() > 0
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             serialNumber != BigInteger.ZERO
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             serialNumber.bitLength() <= 160
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             serialNumber.bitLength() >= 63
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             serialNumber.bitLength() >= 71
-        }
+        )
 
     }
 
@@ -250,13 +250,13 @@ class MDocTestSuite(
             }
         }
 
-        assertTrue {
+        assertTrue(
             basicConstraints.isCA
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.criticalExtensionOIDs.contains(Extension.basicConstraints.id)
-        }
+        )
 
         assertEquals(
             expected = 0,
@@ -269,9 +269,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.subjectKeyIdentifier.id)
-        }
+        )
 
         assertNotNull(
             iacaCertificate.getExtensionValue(
@@ -279,9 +279,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
-        }
+        )
 
         //key-usage
         val keyUsageBytes = iacaCertificate.getExtensionValue(
@@ -296,13 +296,13 @@ class MDocTestSuite(
             }
         }
 
-        assertTrue {
+        assertTrue(
             keyUsage.hasUsages(KeyUsage.keyCertSign or KeyUsage.cRLSign)
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.criticalExtensionOIDs.contains(Extension.keyUsage.id)
-        }
+        )
 
         //check crl distribution point if it exists
 
@@ -316,17 +316,17 @@ class MDocTestSuite(
                     }
                 }
             }.let { crlDistPoint ->
-                assertTrue {
+                assertTrue(
                     crlDistPoint.distributionPoints.size > 0
-                }
+                )
 
                 crlDistPoint.distributionPoints.forEach { distributionPoint ->
-                    assertTrue {
+                    assertTrue(
                         distributionPoint.reasons == null
-                    }
-                    assertTrue {
+                    )
+                    assertTrue(
                         distributionPoint.crlIssuer == null
-                    }
+                    )
 
                     (distributionPoint.distributionPoint.name as GeneralNames).let {
                         it.names.forEach { generalName ->
@@ -344,9 +344,9 @@ class MDocTestSuite(
                 }
             }
 
-            assertTrue {
+            assertTrue(
                 iacaCertificate.criticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
-            }
+            )
         }
 
     }
@@ -364,10 +364,10 @@ class MDocTestSuite(
             dsCertificate.checkValidity()
         }
 
-        assertTrue {
+        assertTrue(
             (dsCertificate.notAfter.time - dsCertificate.notBefore.time)
                 .toDuration(DurationUnit.MILLISECONDS) <= (457).toDuration(DurationUnit.DAYS)
-        }
+        )
 
         certificateSerialNoAssertions(dsCertificate.serialNumber)
 
@@ -383,9 +383,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.authorityKeyIdentifier.id)
-        }
+        )
 
         val iacaSKI = iacaCertificate.getExtensionValue(
             /* oid = */ Extension.subjectKeyIdentifier.id
@@ -422,9 +422,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.subjectKeyIdentifier.id)
-        }
+        )
 
         assertNotNull(
             dsCertificate.getExtensionValue(
@@ -432,9 +432,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
-        }
+        )
 
         //key-usage
         val keyUsage = dsCertificate.getExtensionValue(
@@ -445,13 +445,13 @@ class MDocTestSuite(
             }
         }
 
-        assertTrue {
+        assertTrue(
             keyUsage.hasUsages(KeyUsage.digitalSignature)
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             dsCertificate.criticalExtensionOIDs.contains(Extension.keyUsage.id)
-        }
+        )
 
         //extended key-usage
         //key-usage
@@ -463,13 +463,13 @@ class MDocTestSuite(
             }
         }
 
-        assertTrue {
+        assertTrue(
             dsCertificate.criticalExtensionOIDs.contains(Extension.extendedKeyUsage.id)
-        }
+        )
 
-        assertTrue {
+        assertTrue(
             extKeyUsage.hasKeyPurposeId(KeyPurposeId.getInstance(MDL_KEY_PURPOSE_DS_OID))
-        }
+        )
 
         val crlDistributionPointsBytes = assertNotNull(
             dsCertificate.getExtensionValue(
@@ -518,14 +518,14 @@ class MDocTestSuite(
             actual = dsX500Name.getRDNs(BCStyle.ST)
         )
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.notBefore <= dsCertificate.notBefore
-        }
+        )
 
 
-        assertTrue {
+        assertTrue(
             iacaCertificate.notAfter >= dsCertificate.notAfter
-        }
+        )
 
         assertContentEquals(
             expected = iacaCertificate.subjectX500Principal.encoded,
@@ -538,9 +538,9 @@ class MDocTestSuite(
             )
         )
 
-        assertTrue {
+        assertTrue(
             dsCertificate.nonCriticalExtensionOIDs.contains(Extension.issuerAlternativeName.id)
-        }
+        )
 
     }
 
@@ -552,14 +552,14 @@ class MDocTestSuite(
         validateIACACertificate(iacaCertificate)
         assertNull(mDLIssuanceRequest.trustedRootCAs)
         val x5Chain = assertNotNull(mDLIssuanceRequest.x5Chain)
-        assertTrue {
+        assertTrue(
             x5Chain.size == 1
-        }
+        )
         val dsCertificatePem = x5Chain.first()
         val mDocData = assertNotNull(mDLIssuanceRequest.mdocData)
-        assertTrue {
+        assertTrue(
             mDocData.size == 1
-        }
+        )
         assertEquals(
             expected = setOf(ISO_IEC_MDL_NAMESPACE_ID),
             actual = mDocData.keys,
@@ -570,13 +570,13 @@ class MDocTestSuite(
             "issuing_country", "issuing_authority", "document_number", "portrait",
             "driving_privileges", "un_distinguishing_sign"
         )
-        assertTrue {
+        assertTrue(
             mDLNamespaceDataJson.keys.containsAll(mDLRequiredFields)
-        }
+        )
         val issuanceRequestKey = KeyManager.resolveSerializedKey(mDLIssuanceRequest.issuerKey)
-        assertTrue {
+        assertTrue(
             issuanceRequestKey.hasPrivateKey
-        }
+        )
         assertEquals(
             expected = KeyType.secp256r1,
             actual = issuanceRequestKey.keyType,
@@ -622,13 +622,13 @@ class MDocTestSuite(
     ) {
         val issuerAuthCOSESign1 = assertNotNull(mDL.issuerSigned.issuerAuth)
         assertNotNull(issuerAuthCOSESign1.payload)
-        assertTrue {
+        assertTrue(
             mDLCOSECryptoProviderInfo.provider.verify1(
                 coseSign1 = issuerAuthCOSESign1,
                 keyID = mDLCOSECryptoProviderInfo.verificationKeyId,
             )
-        }
-        assertTrue {
+        )
+        assertTrue(
             mDL.verify(
                 verificationParams = MDocVerificationParams(
                     verificationTypes = VerificationType.forIssuance,
@@ -636,7 +636,7 @@ class MDocTestSuite(
                 ),
                 cryptoProvider = mDLCOSECryptoProviderInfo.provider,
             )
-        }
+        )
         val issuerAuth = assertNotNull(mDL.issuerSigned.issuerAuth)
         val x5c = assertNotNull(issuerAuth.x5Chain)
         assertEquals(
@@ -703,13 +703,13 @@ class MDocTestSuite(
         }
         optionalClaimsMap?.let { otherClaimsMap ->
 
-            assertTrue {
+            assertTrue(
                 otherClaimsMap.isNotEmpty()
-            }
+            )
 
             otherClaimsMap.forEach { (key, value) ->
 
-                assertTrue {
+                assertTrue(
                     mDLNamespaceDecodedElements.any {
                         it.elementIdentifier == StringElement(key) &&
                                 if (it.elementValue.type == DEType.number) {
@@ -718,7 +718,7 @@ class MDocTestSuite(
                                     it.elementValue.toJsonElement() == value
                                 }
                     }
-                }
+                )
 
             }
 
@@ -805,9 +805,9 @@ class MDocTestSuite(
         val issuedSignedItems = mDL.issuerSigned.nameSpaces!![ISO_IEC_MDL_NAMESPACE_ID]!!
         val presentedSignedItems = presentedMdoc.issuerSigned.nameSpaces!![ISO_IEC_MDL_NAMESPACE_ID]!!
 
-        assertTrue {
+        assertTrue(
             issuedSignedItems.containsAll(presentedSignedItems)
-        }
+        )
 
         assertNotNull(
             presentationRequest["request_credentials"]
@@ -897,14 +897,14 @@ class MDocTestSuite(
             deviceNameSpaces = EncodedCBORElement(MapElement(mapOf())),
         )
 
-        assertTrue {
+        assertTrue(
             deviceSignatureCoseVerifier.verify1(
                 coseSign1 = deviceSignature.attachPayload(
                     payload = EncodedCBORElement(deviceAuthentication.toDE()).toCBOR()
                 ),
                 keyID = walletVerificationKeyId,
             )
-        }
+        )
 
     }
 
@@ -970,12 +970,12 @@ class MDocTestSuite(
                 "age_over_18" to true.toJsonElement(),
             )
 
-            assertTrue {
+            assertTrue(
                 mDLIssuanceRequestParams
                     .mDLNamespaceDataJson
                     .entries
                     .containsAll(optionalClaimsMap.entries)
-            }
+            )
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
@@ -1031,12 +1031,12 @@ class MDocTestSuite(
                 "age_over_60" to false.toJsonElement(),
             )
 
-            assertTrue {
+            assertTrue(
                 mDLIssuanceRequestParams
                     .mDLNamespaceDataJson
                     .entries
                     .containsAll(optionalClaimsMap.entries)
-            }
+            )
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)
@@ -1151,12 +1151,12 @@ class MDocTestSuite(
                 ).toJsonElement(),
             )
 
-            assertTrue {
+            assertTrue(
                 mDLIssuanceRequestParams
                     .mDLNamespaceDataJson
                     .entries
                     .containsAll(optionalClaimsMap.entries)
-            }
+            )
 
             val offerUrl = client.post(MDOC_ISSUE_URL) {
                 setBody(mDLIssuanceRequest)

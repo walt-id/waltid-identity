@@ -20,7 +20,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implements
 import org.robolectric.annotation.Implementation
 import org.robolectric.shadow.api.Shadow
-import org.robolectric.shadows.ShadowBluetoothDevice
 import org.robolectric.shadows.ShadowBluetoothGattServer
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -94,8 +93,8 @@ class AndroidPeripheralGattCallbackTest {
     private class Fixture(scope: CoroutineScope) {
         private val context = RuntimeEnvironment.getApplication()
         private val manager = context.getSystemService(BluetoothManager::class.java)
-        val peer = ShadowBluetoothDevice.newInstance("00:11:22:33:44:55")
-        val other = ShadowBluetoothDevice.newInstance("00:11:22:33:44:66")
+        val peer = manager.adapter.getRemoteDevice("00:11:22:33:44:55")
+        val other = manager.adapter.getRemoteDevice("00:11:22:33:44:66")
         val role = AndroidBlePeripheralRole(context, manager, manager.adapter,
             BleServiceUuid.parse("00112233-4455-6677-8899-aabbccddeeff"), false, scope)
         val callback = role.javaClass.getDeclaredField("callback").let {

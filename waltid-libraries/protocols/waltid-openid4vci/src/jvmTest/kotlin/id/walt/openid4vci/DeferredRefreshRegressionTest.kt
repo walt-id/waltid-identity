@@ -23,10 +23,10 @@ class DeferredRefreshRegressionTest {
         val issuer = "https://issuer.example"
         val endpoint = "$issuer/token"
         val wallet = JWKKey.generate(KeyType.secp256r1)
-        var claims: Map<String, Any?> = emptyMap()
+        var issuedClaims: Map<String, Any?> = emptyMap()
         var sequence = 0
         val signer = object : AccessTokenIssuer {
-            override suspend fun issue(value: Map<String, Any?>): String { claims = value; return "access-${++sequence}" }
+            override suspend fun issue(claims: Map<String, Any?>): String { issuedClaims = claims; return "access-${++sequence}" }
         }
         val backing = InMemoryRefreshTokenRepository()
         val repository = object : RefreshTokenRepository by backing {
@@ -58,13 +58,13 @@ class DeferredRefreshRegressionTest {
         )).request.withIssuer(issuer)
         val initial = assertIs<AccessTokenResponseResult.Success>(provider.createAccessTokenResponse(initialRequest, options)).response
         assertEquals("DPoP", initial.tokenType)
-        assertNotNull(claims["cnf"])
+        assertNotNull(issuedClaims["cnf"])
         val refreshRequest = assertIs<AccessTokenRequestResult.Success>(provider.createAccessTokenRequest(
             mapOf("grant_type" to listOf(GrantType.RefreshToken.value), "refresh_token" to listOf(assertNotNull(initial.refreshToken))),
             headers = if (includeRefreshProof) mapOf("DPoP" to listOf(proof("refresh"))) else emptyMap(),
             tokenEndpointUri = endpoint,
         )).request.withIssuer(issuer)
-        return provider.createAccessTokenResponse(refreshRequest, options) to claims
+        return provider.createAccessTokenResponse(refreshRequest, options) to issuedClaims
     }
 
     @Test fun deferredRefreshRetainsDpopTokenAndBinding() = runTest {

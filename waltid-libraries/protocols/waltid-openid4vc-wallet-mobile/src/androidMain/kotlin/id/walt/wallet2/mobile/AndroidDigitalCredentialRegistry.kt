@@ -223,7 +223,7 @@ public class AndroidDigitalCredentialRegistry(
                 )
             )
             registrationAvailable = true
-            MobileWalletCredentialRegistrationResult(true, entries.size)
+            MobileWalletCredentialRegistrationResult(true, records.map { it.registryEntryId }.distinct().size)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             registrationAvailable = false

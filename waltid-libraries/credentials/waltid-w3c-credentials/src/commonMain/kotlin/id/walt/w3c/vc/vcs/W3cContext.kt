@@ -27,7 +27,6 @@ fun JsonElement.w3cContextUrls(): List<String>? = when (this) {
 private fun JsonElement.w3cContextEntries(): List<JsonElement> = when (this) {
     is JsonArray -> this
     is JsonPrimitive, is JsonObject -> listOf(this)
-    else -> emptyList()
 }
 
 /**

@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.handlers.resolvedSdJwtVcTypes
+
 import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.wallet2.consent.*
@@ -39,6 +41,7 @@ import id.walt.wallet2.handlers.PresentationCredentialRequirement
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PresentationPreviewHandle
+import id.walt.wallet2.handlers.PreparedPresentationReview
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.PreviewPresentationResult
 import id.walt.wallet2.handlers.RejectPresentationRequest
@@ -89,6 +92,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -1043,6 +1047,34 @@ public class MobileWallet internal constructor(
         }
     }
 
+    /** Recomputes exactly what the selected credentials disclose, without signing or sending. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewPresentation(wallet,
+            SubmitPresentationRequest(PresentationPreviewHandle(previewHandle.value),
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
+    /** Same selection review for a retained Digital Credentials API request. */
+    public suspend fun reviewDigitalCredentialPresentation(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): MobileWalletPreparedPresentationReview = lifecycle.use {
+        WalletPresentationHandler.reviewDcApiPresentation(wallet,
+            SubmitDcApiPresentationRequest(requestId,
+                selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+                selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did)
+        ).toMobileReview()
+    }
+
     /** Resolves authoritative payment instructions for the current credential/disclosure selection. */
     public suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -1200,23 +1232,25 @@ public class MobileWallet internal constructor(
             if (projection == MobileWalletRegistryProjection.MdocIdentity) {
                 // IdentityDocumentServices indexes only identity and type. Do not read metadata,
                 // serialize claims, or decode images that the native adapter would discard.
-                return@mapNotNull MobileWalletCredentialRegistryRecord(
+                return@mapNotNull listOf(MobileWalletCredentialRegistryRecord(
                     registryEntryId = registryEntryId,
                     credentialId = stored.id,
                     format = MobileWalletDigitalCredentialFormat.MDOC,
                     type = (credential as MdocsCredential).docType,
                     fields = emptyList(),
                     displayName = "",
-                )
+                ))
             }
             val metadata = stored.toMetadata()
-            when (credential) {
+            val record = when (credential) {
                 is MdocsCredential -> {
                     val display = MobileWalletRegistryDisplay.resolve(
                         format = MobileWalletDigitalCredentialFormat.MDOC,
                         type = credential.docType,
                         credentialData = credential.credentialData,
                         storedLabel = metadata.label,
+                        metadata = stored.metadata,
+                        preferredLocales = preferredLocales,
                     )
                     val cardArt = MobileWalletRegistryIcons.extractCardArt(
                         metadata = stored.metadata,
@@ -1258,6 +1292,8 @@ public class MobileWallet internal constructor(
                         type = type,
                         credentialData = data,
                         storedLabel = metadata.label,
+                        metadata = stored.metadata,
+                        preferredLocales = preferredLocales,
                     )
                     val cardArt = MobileWalletRegistryIcons.extractCardArt(
                         metadata = stored.metadata,
@@ -1284,7 +1320,19 @@ public class MobileWallet internal constructor(
                     )
                 } else null
             }
-        }.toList()
+            record?.let { entry ->
+                val types = if (entry.format == MobileWalletDigitalCredentialFormat.SD_JWT_VC) {
+                    try {
+                        stored.resolvedSdJwtVcTypes().ifEmpty { listOf(entry.type) }
+                    } catch (cause: CancellationException) {
+                        throw cause
+                    } catch (_: IllegalArgumentException) {
+                        return@mapNotNull null
+                    }
+                } else listOf(entry.type)
+                types.map { entry.copy(type = it) }
+            }
+        }.toList().flatten()
 
     /**
      * Maps an SD-JWT VC claim path onto the object-key path used by registry fields.
@@ -1331,7 +1379,7 @@ public class MobileWallet internal constructor(
          * declaration is not, so it has to be excluded here.
          */
         private val SD_JWT_INFRASTRUCTURE_CLAIMS = setOf(
-            "vct", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
+            "vct", "vct#integrity", "iss", "iat", "nbf", "exp", "cnf", "status", "_sd", "_sd_alg",
         )
     }
 }
@@ -1478,3 +1526,11 @@ internal fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): Mo
 private fun String.includesWalletInstanceAttestation(): Boolean = this == "wia" || this == "wia_ka"
 
 private fun String.includesKeyAttestation(): Boolean = this == "ka" || this == "wia_ka"
+
+private fun PreparedPresentationReview.toMobileReview() =
+    MobileWalletPreparedPresentationReview(credentials.map {
+        MobileWalletPresentationCredentialClaims(it.queryId, it.credentialId, it.format, it.claims.toString(), it.wholeCredential,
+            it.locations.map { location -> MobileWalletPresentationClaimLocation(
+                JsonArray(location.sourcePath).toString(),
+                JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
+    })

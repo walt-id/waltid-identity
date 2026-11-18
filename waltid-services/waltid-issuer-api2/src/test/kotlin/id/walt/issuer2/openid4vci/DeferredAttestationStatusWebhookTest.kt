@@ -304,7 +304,7 @@ class DeferredAttestationStatusWebhookTest {
             val stored = assertNotNull(repository.get(offer.offerId))
             assertTrue(stored.issuanceResults.isEmpty())
             assertTrue(stored.deferredState!!.transactions.getValue(transactionId).denied)
-            if (stage == "checkpoint") assertNotNull(stored.deferredState!!.transactions.getValue(transactionId).response)
+            if (stage == "checkpoint") assertNotNull(stored.deferredState.transactions.getValue(transactionId).response)
             assertDenialNotification(offer.offerId)
         } finally { publisher.close() }
     }

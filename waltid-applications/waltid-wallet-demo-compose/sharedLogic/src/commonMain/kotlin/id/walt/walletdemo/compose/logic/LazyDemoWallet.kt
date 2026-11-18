@@ -14,6 +14,13 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
             wallet ?: createWallet().also { wallet = it }
         }
 
+    override val supportsClaimReview: Boolean get() = wallet?.supportsClaimReview == true
+    override suspend fun reviewPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ) = wallet().reviewPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
     override suspend fun identityDetails(): WalletDemoIdentityDetails? = wallet().identityDetails()
     override suspend fun identitySetup(): WalletDemoIdentitySetup? = wallet().identitySetup()
     override suspend fun chooseIdentity(choiceId: String) = wallet().chooseIdentity(choiceId)

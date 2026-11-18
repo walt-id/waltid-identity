@@ -101,7 +101,10 @@ class WalletIsolatedProofKeyFormsTest {
             override val name = "Unexpected DID lookup detector"
             override suspend fun getSupportedMethods() = Result.success(setOf("web"))
             override suspend fun resolve(did: String): Result<JsonObject> { resolutions++; return Result.failure(IllegalStateException("Unexpected lookup")) }
+            // Keep the legacy callbacks as tripwires for unexpected resolver calls.
+            @Suppress("OVERRIDE_DEPRECATION")
             override suspend fun resolveToKey(did: String): Result<Key> { resolutions++; return Result.failure(IllegalStateException("Unexpected lookup")) }
+            @Suppress("OVERRIDE_DEPRECATION")
             override suspend fun resolveToKeys(did: String): Result<Set<Key>> { resolutions++; return Result.failure(IllegalStateException("Unexpected lookup")) }
         })
         try {

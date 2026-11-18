@@ -359,7 +359,7 @@ internal class AndroidBlePeripheralRole internal constructor(
 
     internal suspend fun notify(characteristic: BluetoothGattCharacteristic, value: ByteArray) {
         // Serial sends must not consume an already delivered completion from an earlier notification.
-        while (notifications.tryReceive().isSuccess) Unit
+        while (notifications.tryReceive().isSuccess) {}
         if (closed.get()) throw CancellationException("GATT session is closed")
         val device = activeDevice.get() ?: throw androidTransportFailure(
             "ble_disconnected",

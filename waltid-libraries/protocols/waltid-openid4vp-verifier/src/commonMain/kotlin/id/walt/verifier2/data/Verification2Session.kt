@@ -185,6 +185,7 @@ data class Verification2Session(
         }
 
     fun requireAvailable(now: Instant = Clock.System.now()) {
+        require(setup !is ExternalReaderFlowSetup) { "External-reader sessions do not accept wallet requests or responses." }
         require(expirationDate?.let { now < it } != false) { "This verification session is expired." }
         require(!isConsumed) {
             if (sessionUsage == VerificationSessionUsage.SINGLE_ATTEMPT) "This verification session has already received a presentation."
@@ -373,7 +374,10 @@ data class Verification2Session(
         /**
          * Data object passed to a platform API (optionally signed)
          */
-        DC_API
+        DC_API,
+
+        /** Completed ISO 18013-5 exchange owned by an external reader. */
+        EXTERNAL_READER
     }
 }
 

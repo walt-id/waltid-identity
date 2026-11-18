@@ -22,6 +22,12 @@ android {
     productFlavors {
         create("production") { dimension = "environment" }
     }
+    kotlin {
+        compilerOptions {
+            allWarningsAsErrors.set(true)
+        }
+    }
+
     compileOptions {
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.objects.document
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -22,6 +24,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
 import id.walt.crypto2.keys.Key as Crypto2Key
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Represents the `IssuerSigned` structure within a `Document`, containing data elements attested to
@@ -80,6 +83,7 @@ data class IssuerSigned private constructor(
                 issuerSignedList.entries.forEach { wrappedItem ->
                     val item = wrappedItem.value
 
+                    // The registry erases serializer types; toJsonElement handles mismatches with its fallback.
                     val serialized: JsonElement = MdocsCborSerializer.toJsonElement(
                         namespace, item.elementIdentifier, item.elementValue,
                     )

@@ -6,6 +6,12 @@ plugins {
 
 group = "id.walt"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))

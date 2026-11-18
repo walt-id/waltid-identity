@@ -54,7 +54,7 @@ class InitialAttestationStatusTest {
             val accepted = fixture.accept()
             assertEquals(3, accepted.bindings.size)
             assertEquals(3, accepted.proofs!!.size)
-            assertEquals((1..3).toList(), accepted.proofs!!.map { it.keyAttestation!!.status!!.reference!!.index })
+            assertEquals((1..3).toList(), accepted.proofs.map { it.keyAttestation!!.status!!.reference!!.index })
             assertEquals(0, accepted.clientAttestation!!.status!!.reference!!.index)
             assertNull(accepted.request.proofs)
             assertEquals(1, fixture.fetches, "The complete accepted batch shares one fresh list lookup")

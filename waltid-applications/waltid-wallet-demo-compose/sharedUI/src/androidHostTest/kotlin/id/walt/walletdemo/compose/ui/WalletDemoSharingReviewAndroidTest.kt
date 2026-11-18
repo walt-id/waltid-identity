@@ -12,6 +12,14 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun compactClaimChoicesKeepSelectionAndExpansionIndependent() =
+        scenarios.compactClaimChoicesKeepSelectionAndExpansionIndependent()
+
+    @Test
+    fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() =
+        scenarios.selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff()
+
+    @Test
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =
         scenarios.choosingFromTheWholeRowUpdatesInformationAndSubmission()
 
