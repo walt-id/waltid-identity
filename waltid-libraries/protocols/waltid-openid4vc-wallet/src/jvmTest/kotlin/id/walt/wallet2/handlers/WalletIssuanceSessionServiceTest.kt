@@ -2390,6 +2390,40 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun lostTokenResponseStillClosesTheOfferIfTheProcessingRecordCannotBeDeleted() = runTest {
+        val records = RecordingSessionStore()
+        val store = object : AtomicWalletIssuanceSessionStore by records {
+            override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+                if (expected.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION && replacement == null) {
+                    throw IOException("The store cannot delete the processing record")
+                }
+                return records.compareAndSet(expected, replacement)
+            }
+        }
+        var tokenCalls = 0
+        val service = service(sessionStore = store) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> {
+                    tokenCalls++
+                    throw IOException("Token response lost")
+                }
+                else -> error("Unexpected request to ${request.url}")
+            }
+        }
+        val session = service.start(preAuthorizedRequest())
+        val lost = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
+        assertEquals(WalletIssuanceErrorCode.NETWORK, lost.error.code)
+        assertFalse(lost.error.canRetryOffer)
+
+        val pending = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
+        assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, pending.error.code)
+        assertFalse(pending.error.canRetryOffer)
+        assertEquals(1, tokenCalls)
+    }
+
+    @Test
     fun storageFailurePermitsAnotherAcceptOnlyBeforeTheOfferIsClaimed() = runTest {
         val records = RecordingSessionStore()
         var failRead = false
