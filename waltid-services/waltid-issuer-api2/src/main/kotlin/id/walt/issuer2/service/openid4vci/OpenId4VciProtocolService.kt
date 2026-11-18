@@ -813,7 +813,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
             return session
         }
-        if (session.deferredState != null) return sessionService.saveDeferredProgress(
+        if (session.deferredState != null || session.requiresCredentialStatusLease) return sessionService.saveIssuanceProgress(
             session.copy(authorizedCredentialIdentifiers = identifiers)
         )
         val current =
@@ -1241,8 +1241,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
-        // Claiming removes the session, so every later exit has to either close or restore it.
-        val session = (if (deferredClaim != null) observedSession else sessionService.claimSession(sessionId))
+        // Preallocated status requires a durable lease so a crashed process cannot lose the session.
+        val session = (if (deferredClaim != null) observedSession
+            else if (observedSession.requiresCredentialStatusLease) sessionService.claimCredentialStatusSession(sessionId)
+            else sessionService.claimSession(sessionId))
             ?: return rejectCredentialRequest(
                 requestWithSession,
                 observedSession,
@@ -1469,6 +1471,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             if (deferredClaim != null && deferredClaim.response == null) {
                 deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
             }
+            if (statusOperation != null && statusOperation.response == null) {
+                sessionService.checkpointCredentialStatusResponse(
+                    session, issuanceRequest.credentialIdentifier, statusOperation.id, credentialResponse,
+                )
+            }
 
             val responseToWrite = if (deferredClaim == null) credentialResponse else {
                 when (val creation = oauth2Provider.createDeferredCredentialResponse(
@@ -1541,6 +1548,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 claimFinalized = true
                 return response
             }
+            if (session.credentialStatusIssuance?.leaseId != null && response.status != 200) {
+                restoreClaimedSession(session)
+                claimFinalized = true
+                return response
+            }
             val issuanceResults = session.issuanceResults + (
                     issuanceRequest.credentialIdentifier to IssuanceResult(
                         issuedCredentialFormat = configuration.format.value,
@@ -1558,7 +1570,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val updatedSession = try {
                 withContext(NonCancellable) {
                     val save: suspend (IssuanceSession) -> IssuanceSession =
-                        if (deferredClaim != null) sessionService::saveDeferredProgress else sessionService::saveSession
+                        if (deferredClaim != null) sessionService::saveDeferredProgress
+                        else if (session.credentialStatusIssuance?.leaseId != null) { updated ->
+                            sessionService.finishCredentialStatusSession(updated,
+                                issuanceRequest.credentialIdentifier.takeIf { statusOperation != null })
+                        } else sessionService::saveSession
                     save(
                         session.copy(
                             issuanceResults = issuanceResults,
@@ -1574,9 +1590,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             } catch (e: Exception) {
-                val retrySession = session.withExpectedCredentialProofKeys(
-                    issuanceRequest.credentialIdentifier,
-                    proofPublicKeyJwks,
+                val retrySession = if (statusOperation != null) session else session.withExpectedCredentialProofKeys(
+                    issuanceRequest.credentialIdentifier, proofPublicKeyJwks,
                 )
                 try {
                     restoreClaimedSession(retrySession)
@@ -1615,13 +1630,31 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: CancellationException) {
             if (!claimFinalized) {
                 restoreClaimedSession(
-                    session.withExpectedCredentialProofKeys(
+                    if (usesPreallocatedStatus) session else session.withExpectedCredentialProofKeys(
                         issuanceRequest.credentialIdentifier,
                         committedProofKeyJwks,
                     )
                 )
             }
             throw e
+        } catch (e: CredentialStatusCapacityException) {
+            if (session.credentialStatusIssuance?.leaseId != null) {
+                sessionService.discardUnreservedCredentialStatusOperation(session, issuanceRequest.credentialIdentifier)
+            }
+            val response = retryCredentialRequest(requestWithSession, session, configuration.format, requestId,
+                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
+            claimFinalized = true
+            return response
+        } catch (e: CredentialStatusOperationException) {
+            // A stale worker must never overwrite a newer claim while attempting cleanup.
+            try {
+                restoreClaimedSession(session)
+            } catch (_: CredentialStatusOperationException) {
+                // The newer owner (or session expiry) controls the persisted state.
+            }
+            claimFinalized = true
+            return rejectCredentialRequest(requestWithSession, session, configuration.format, requestId,
+                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
         } catch (e: CredentialProtocolException) {
             throw e
         } catch (e: Exception) {
