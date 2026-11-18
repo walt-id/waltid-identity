@@ -1,6 +1,7 @@
 package id.walt.issuer2.models
 
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.CredentialStatusConfiguration
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -20,7 +21,8 @@ val multiIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name != "deferredState") element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
+            if (name !in setOf("deferredState", "credentialStatusIssuance"))
+                element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
     }
 
@@ -30,7 +32,7 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
+            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "credentialStatusIssuance"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
         val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
@@ -60,14 +62,22 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
         add("deferredState")
+        add("credentialStatusIssuance")
         if (deferredStatus == null) add("deferredStatus")
     })
-    if (issuanceRequests.size != 1) return encoded
+    fun publicRequest(request: id.walt.issuer2.domain.IssuanceRequest): JsonObject {
+        val value = json.encodeToJsonElement(request).jsonObject
+        return if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
+            JsonObject(value - "credentialStatus") else value
+    }
+    if (issuanceRequests.size != 1) return JsonObject(encoded + (
+        "issuanceRequests" to JsonArray(issuanceRequests.map(::publicRequest))
+    ))
     val request = issuanceRequests.single()
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
     fields.putAll(
-        json.encodeToJsonElement(request).jsonObject - setOf(
+        publicRequest(request) - setOf(
             "credentialIdentifier",
             "expectedCredentialProofKeyJwks"
         )
