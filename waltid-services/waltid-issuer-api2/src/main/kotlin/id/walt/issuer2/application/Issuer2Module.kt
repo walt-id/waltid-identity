@@ -12,6 +12,8 @@ import id.walt.issuer2.controller.OpenId4VciController
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
@@ -39,6 +41,7 @@ class Issuer2Module @JvmOverloads constructor(
     keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
     metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
+    credentialStatusConsumptionRepository: CredentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(),
 ) : AutoCloseable {
     private val typeMetadata = IssuerTypeMetadataCatalogue(serviceConfig, metadataConfig)
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
@@ -61,7 +64,12 @@ class Issuer2Module @JvmOverloads constructor(
     private val credentialProfileService = CredentialProfileService(
         profilesConfig = profilesConfig,
         metadataConfig = metadataConfig,
-    )
+        preallocatedStatusEnabled = credentialStatusConsumptionRepository.durable,
+    ).also { service ->
+        profilesConfig.profiles.values.forEach { profile ->
+            service.prepareCredentialStatus(profile.credentialConfigurationId, profile.credentialStatus, profile.mapping)
+        }
+    }
 
     private val issuanceSessionService = IssuanceSessionService(
         repository = issuanceSessionRepository,
@@ -103,6 +111,7 @@ class Issuer2Module @JvmOverloads constructor(
         keyAttestation = openId4VciModule.keyAttestation,
         attestationChallengeService = openId4VciModule.attestationChallengeService,
         deferredConfig = serviceConfig.deferredIssuance,
+        credentialStatusConsumption = credentialStatusConsumptionRepository,
     )
 
     val managementController = Issuer2ManagementController(
