@@ -13,6 +13,8 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.domain.CredentialStatusConfiguration
+import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.tokenStatus
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
@@ -23,6 +25,7 @@ import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.CredentialStatusConsumption
+import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.testsupport.*
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -63,6 +66,7 @@ import kotlin.reflect.typeOf
 import kotlin.test.*
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /** Exercise the documented offers through real signing and JSON-persisted issuance sessions. */
 class Issuer2SharedCredentialStatusTest {
@@ -205,6 +209,74 @@ class Issuer2SharedCredentialStatusTest {
         }
         assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
         assertTrue(fixture.repository.list().isEmpty())
+    }
+
+    @Test
+    fun mdocOfferRejectsDuplicateEncodedReferencesAndUnencodableUrls() = testApplication {
+        val fixture = installStatusIssuer()
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS
+        val overrides = requireNotNull(example.runtimeOverrides)
+        val inventories = listOf(
+            listOf(tokenStatus(7, "https://status.example.com/list"), tokenStatus(7, "https://status.example.com:443/list")),
+            listOf(tokenStatus(7, "https://status.example.com:70000/list")),
+        )
+        for (inventory in inventories) {
+            val request = example.copy(runtimeOverrides = overrides.copy(credentialStatus = JsonArray(inventory)))
+            val response = fixture.client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(request))
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        }
+        assertTrue(fixture.repository.list().isEmpty())
+    }
+
+    @Test
+    fun signedMdocsAcrossProfilesUseDistinctCanonicalReferences() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS
+        val url = "https://status.example.com/list"
+        val aliasUrl = "HTTPS://STATUS.EXAMPLE.COM:443/list"
+        val secondProfile = "otherMdocProfile"
+        val fixture = installStatusIssuer(
+            profileDefault = example.profileId to JsonArray(listOf(tokenStatus(7, aliasUrl), tokenStatus(8, aliasUrl))),
+            additionalProfile = secondProfile to example.profileId,
+        )
+        val first = example.copy(runtimeOverrides = null)
+        val second = example.copy(profileId = secondProfile, runtimeOverrides = example.runtimeOverrides!!.copy(
+            credentialStatus = JsonArray(listOf(tokenStatus(7, url), tokenStatus(9, url), tokenStatus(10, url))),
+        ))
+        for ((request, indexes) in listOf(first to listOf(7, 8), second to listOf(9, 10))) {
+            val offer = fixture.wallet.resolve(fixture.client.createCredentialOffer(request))
+            val configurationId = offer.offer.credentialConfigurationIds.single()
+            val token = fixture.wallet.exchangePreAuthorizedCode(offer, null)
+            val response = fixture.issue(offer, token.access_token,
+                credentialRequest(configurationId, fixture.twoProofs(offer, configurationId)))
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertPreallocatedStatuses(response.body(), "mso_mdoc", indexes.map { tokenStatus(it, url) })
+        }
+    }
+
+    @Test
+    fun unencodableReservedMdocStatusFailsTheWholeCredentialRequest() = testApplication {
+        val fixture = installStatusIssuer(statusRepository = object : CredentialStatusConsumptionRepository {
+            override val durable = true
+            override suspend fun reserve(
+                profileId: String, operationId: String, holderKeys: List<String>,
+                groups: List<CredentialStatusConfiguration.Group>, expiresAt: Instant,
+            ) = listOf(groups.first().statuses, JsonArray(listOf(tokenStatus(8, "https://status.example.com:70000/list"))))
+        })
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS
+        val receipt = fixture.client.createCredentialOffer(example)
+        val offer = fixture.wallet.resolve(receipt)
+        val configurationId = offer.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(offer, null)
+        val response = fixture.issue(offer, token.access_token,
+            credentialRequest(configurationId, fixture.twoProofs(offer, configurationId)))
+        assertEquals(HttpStatusCode.InternalServerError, response.status)
+        val body = response.body<JsonObject>()
+        assertEquals("server_error", body["error"]?.jsonPrimitive?.content)
+        assertNull(body["credentials"])
+        assertTrue(fixture.repository.get(receipt.offerId)!!.issuanceResults.isEmpty())
     }
 
     private fun verifyPreallocatedStatus(
@@ -496,6 +568,10 @@ class Issuer2SharedCredentialStatusTest {
         batchSize: Int? = 2,
         profileDefault: Pair<String, JsonElement>? = null,
         additionalProfile: Pair<String, String>? = null,
+        statusRepository: CredentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
+            InMemoryPersistence<CredentialStatusConsumption>("preallocated-status-test", Duration.INFINITE),
+            durable = true,
+        ),
     ): Fixture {
         loadIssuer2ConfigFiles()
         // A test backend alias exercises the legacy provider branch without weakening JWK migration.
@@ -521,11 +597,7 @@ class Issuer2SharedCredentialStatusTest {
                 batchCredentialIssuance = batchSize?.let(::BatchCredentialIssuance),
             ),
             ConfigManager.getConfig(), profiles, issuanceSessionRepository = repository,
-            // A shared injected store exercises durable orchestration without a Redis requirement in unit tests.
-            credentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
-                InMemoryPersistence<CredentialStatusConsumption>("preallocated-status-test", Duration.INFINITE),
-                durable = true,
-            ),
+            credentialStatusConsumptionRepository = statusRepository,
         )
         val codes = Issuer2Module::class.java.getDeclaredField("authorizationCodeRepository").let {
             it.isAccessible = true
