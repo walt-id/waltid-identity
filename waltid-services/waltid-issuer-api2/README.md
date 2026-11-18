@@ -264,16 +264,98 @@ to disable multiple-proof requests. Single-credential issuance remains available
 
 Each Credential Request selects one configuration and dataset and issues one copy for each holder proof. A multi-selection offer is redeemed through separate Credential Requests. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required.
 
-Supply status through the existing `runtimeOverrides.credentialStatus` field, either on a
-single-profile offer or inside each `credentials[]` item. A runtime value takes precedence
-over the profile's configured status. Issuer2 embeds this supplied value in every copy of the
-selected item. The caller is responsible for allocating status entries, publishing their
-lists, and updating their values. Issuer2 does not allocate a new entry for each proof.
+Supply status through a profile's `credentialStatus` or the existing
+`runtimeOverrides.credentialStatus` field, either on a single-profile offer or inside each
+`credentials[]` item. A runtime value takes precedence over the profile's configured status.
+The caller allocates the entries, publishes the lists, and manages status updates.
+
+The shape of `credentialStatus` determines how issuer2 uses the supplied values:
+
+| Shape | Meaning |
+|---|---|
+| A JSON object | Fixed status, embedded unchanged in every copy |
+| A flat array of SD-JWT VC/mdoc status objects | Preallocated entries, consumed once per issued copy |
+| A flat array of W3C status objects | Fixed status group, embedded unchanged in every copy |
+| An array of arrays of W3C status objects | Preallocated groups, consumed once per issued copy |
 
 All credentials referencing the same status entry share its status: revoking it revokes
 every such credential, including copies issued by later requests. The shared reference
 also makes those copies linkable. Different offered items can supply different entries,
 so revoking one item's entry does not revoke items using another entry.
+
+### Preallocated status groups
+
+For SD-JWT VC and mdoc, supply a flat array of complete IETF Token Status List values,
+one entry per copy:
+
+```json
+{
+  "credentialStatus": [
+    {"status_list": {"uri": "https://status.example.com/list/1", "idx": 583}},
+    {"status_list": {"uri": "https://status.example.com/list/1", "idx": 9204}}
+  ]
+}
+```
+
+For W3C JWT VC, use nested arrays. Each inner array contains the complete status group
+for one copy. It may contain both revocation and suspension entries. Issuer2 embeds the selected inner array as
+that credential's standard `credentialStatus` value. SD-JWT VC and mdoc embed the selected
+object as their status value. The outer per-copy array is issuer configuration and is never
+embedded in an issued credential.
+
+Configure groups on the profile for both offered and offerless issuance. Existing
+runtime overrides accept the same format-specific shapes for a particular offer. Offers and
+profile-derived authorization sessions snapshot the selected configuration; later
+configuration changes apply to newly created sessions.
+
+**Enable the existing Redis persistence backend before using preallocated groups.**
+Normal service startup and offer validation reject preallocated configurations when
+the configured backend is not Redis. No status-allocation HTTP service or
+new management endpoint is required.
+
+After proof validation, issuer2 atomically reserves one unused group for each selected
+holder key. If too few groups remain, the entire request fails before signing with
+`invalid_credential_request`, without consuming a partial batch. Later successful
+requests and other sessions, including those using different profiles, consume additional
+unused groups from the same Redis consumption ledger.
+Invalid proofs consume no groups.
+
+Consumption is internal allocation bookkeeping: issuer2 does not modify the profile
+configuration or the published status list, and marking an entry used does not revoke it.
+
+Issuer2 tracks actual list URI/index references globally across per-copy inventories
+sharing the same Redis store. Each ownership record retains the profile ID and issuance
+operation. An entry consumed through one profile is unavailable through another profile;
+the same operation can recover its reservation, but another operation cannot claim it.
+Changing profile IDs, reordering, removing, reintroducing, or appending configured entries
+does not reset consumption. To replenish, add freshly allocated groups to the profile
+configuration and restart the service. Retain the Redis data and configure Redis durability
+for the deployment. Fixed shared-status configurations retain their existing behavior.
+
+Redis stores ownership and pending operations as individual hash fields, rather than
+rewriting a profile's complete history for every reservation. A whole batch and its retry
+record commit in one atomic write. The ledger and expiry keys share a Redis Cluster slot,
+so one batch can contain entries from different status-list URIs.
+
+When upgrading from an earlier per-profile consumption store, stop all older issuer
+replicas before starting the updated replicas. The first reservation imports the existing
+used entries and pending reservations behind a shared migration gate; an interrupted import
+can resume. Existing source records are retained. Conflicting historical pending operations
+are rejected, and previously used references remain unavailable. This migration cannot
+undo credentials already issued with duplicate references. Do not mix old and new writers.
+
+Pending retries reuse their reserved groups and prepared credential responses. Abandoned
+reservations are never automatically recycled. Unused groups and private processing
+checkpoints are omitted from session responses and notifications.
+
+Per-copy arrays and groups must be nonempty and contain only supported status objects.
+SD-JWT VC and mdoc entries contain one IETF status object; W3C supports
+`BitstringStatusListEntry` and `StatusList2021Entry` groups. Duplicate references, malformed indexes, mixed array
+nesting, and mappings that could overwrite managed status fields are rejected. Callers
+must avoid reusing allocations across independent Redis stores or outside this issuer's
+per-copy consumption path; those allocations require coordination by the caller.
+
+### Fixed status compatibility
 
 For example, this offer uses the same SD-JWT profile twice with two different status entries:
 
