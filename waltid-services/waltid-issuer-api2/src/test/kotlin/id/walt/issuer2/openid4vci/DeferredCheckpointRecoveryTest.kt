@@ -17,6 +17,9 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputP
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.sdjwt.SDJwt
 import id.walt.openid4vci.deferred.*
@@ -138,10 +141,10 @@ class DeferredCheckpointRecoveryTest {
             }
             catch (e: InvocationTargetException) { throw e.targetException }
         } as OAuth2Provider
-        fun protocol() = OpenId4VciProtocolService(
+        fun protocol(additionalVerifier: CredentialProofVerifier? = null) = OpenId4VciProtocolService(
             oauth2Provider = provider, sessionService = IssuanceSessionService(repository), profileService = profiles,
             metadataService = metadata, notificationService = notifications, credentialNonceService = module.credentialNonceService,
-            credentialStatusConsumption = statusRepository,
+            credentialStatusConsumption = statusRepository, credentialProofVerifier = additionalVerifier,
         )
         val offers = CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, serviceConfig, notifications, typeMetadata)
         val receipt = offers.createCredentialOffer(Issuer2RequestExamples.PROFILE_DEFERRED_OFFER.copy(
@@ -166,7 +169,8 @@ class DeferredCheckpointRecoveryTest {
                 putJsonObject("proofs") { put("jwt", JsonArray(proofs.map(::JsonPrimitive))) }
             }
         }
-        suspend fun submit(body: JsonObject) = protocol().processCredentialRequest(listOf("Bearer $token"), emptyList(), body, "credential")
+        suspend fun submit(body: JsonObject, verifier: CredentialProofVerifier? = null) =
+            protocol(verifier).processCredentialRequest(listOf("Bearer $token"), emptyList(), body, "credential")
         if (failure == "consume" && deferred) assertFailsWith<IllegalStateException> { submit(request()) }
         else assertEquals(500, submit(request()).status)
         assertEquals(1, proofVerifications, "The first request verifies its batch once")
@@ -186,6 +190,13 @@ class DeferredCheckpointRecoveryTest {
             putJsonObject("proofs") { putJsonArray("jwt") { add("invalid") } }
         })
         assertEquals(400, invalid.status, "Repeated Credential Requests must revalidate proofs")
+        if (!deferred && failure == "response") {
+            val rejected = submit(request(), CredentialProofVerifier { _, _, _ ->
+                throw CredentialProtocolException(CredentialError(CredentialErrorCodes.INVALID_PROOF, "Holder policy rejected"))
+            })
+            assertEquals("invalid_proof", rejected.payload.getValue("error").jsonPrimitive.content)
+            assertNull(sessions.getSession(receipt.offerId).credentialStatusIssuance!!.leaseId)
+        }
         val beforeRetry = proofVerifications
         val recovered = submit(request())
         assertEquals(200, recovered.status, recovered.payload.toString())

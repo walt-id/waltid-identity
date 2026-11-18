@@ -1139,7 +1139,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
 
         val nonceBinding = credentialNonceBinding()
-        val usesPreallocatedStatus = CredentialStatusConfiguration.isPreallocated(observedIssuanceRequest.credentialStatus)
 
         val proofValidationContext = CredentialProofValidationContext(
             keyAttestation = keyAttestation,
@@ -1235,6 +1234,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val statusConfiguration = CredentialStatusConfiguration.parse(
                 issuanceRequest.credentialStatus, configuration.format, issuanceRequest.mapping,
             )
+            val usesPreallocatedStatus = statusConfiguration is CredentialStatusConfiguration.Preallocated
             var statusOperation: CredentialStatusIssuanceOperation? = null
             var statusHolderKeys = emptyList<String>()
             var proofPublicKeyJwks: List<JsonObject>? = null
@@ -1260,19 +1260,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         )
                         val publicKeys = bindings.map { it.holderKey.exportPublicJwkObject() }
                         if (credentialProofVerifier != null && deferredClaim == null) {
-                            val inspected = try {
-                                credentialProofVerifier.verify(requestWithSession, configuration, proofValidationContext)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: CredentialProofServiceException) {
-                                throw e
-                            } catch (e: CredentialProofValidationException) {
-                                return CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
-                            }
-                            if (inspected.bindings.map { it.holderKey.exportPublicJwkObject().thumbprint() } !=
-                                publicKeys.map { it.thumbprint() }) return CredentialResponseResult.Failure(
-                                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof holder keys disagree"),
-                            )
+                            validateAdditionalProofKeys(credentialProofVerifier, requestWithSession, configuration,
+                                proofValidationContext, publicKeys)?.let { return CredentialResponseResult.Failure(it) }
                         }
                         proofPublicKeyJwks = publicKeys
                         validateExpectedCredentialProofKeys(publicKeys, issuanceRequest)?.let {
@@ -1452,7 +1441,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         ),
                     )
                 }
-                committedProofKeyJwks = proofPublicKeyJwks
+                if (!usesPreallocatedStatus) committedProofKeyJwks = proofPublicKeyJwks
             }
 
             val response = oauth2Provider.writeCredentialResponse(requestWithSession, responseToWrite)
@@ -1540,9 +1529,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: CancellationException) {
             if (!claimFinalized) {
                 restoreClaimedSession(session) { current ->
-                    if (usesPreallocatedStatus) current else current.withExpectedCredentialProofKeys(
-                        issuanceRequest.credentialIdentifier, committedProofKeyJwks,
-                    )
+                    current.withExpectedCredentialProofKeys(issuanceRequest.credentialIdentifier, committedProofKeyJwks)
                 }
             }
             throw e
@@ -1846,6 +1833,29 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private suspend fun JsonObject.thumbprint(): String =
         Jwk.sha256Thumbprint(EncodedKey.Jwk(BinaryData(toString().encodeToByteArray()), privateMaterial = false))
+
+    private suspend fun validateAdditionalProofKeys(
+        verifier: CredentialProofVerifier,
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        context: CredentialProofValidationContext,
+        signingKeys: List<JsonObject>,
+    ): CredentialError? = try {
+        val inspected = verifier.verify(request, configuration, context)
+        val keys = inspected.bindings.map { it.holderKey.exportPublicJwkObject().thumbprint() }
+        if (keys == signingKeys.map { it.thumbprint() }) null
+        else CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof holder keys disagree")
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: CredentialProofServiceException) {
+        throw e
+    } catch (e: CredentialProofValidationException) {
+        CredentialError(e.errorCode, e.message)
+    } catch (e: CredentialProtocolException) {
+        e.error
+    } catch (e: Exception) {
+        e.toCredentialProofError()
+    }
 
     private suspend fun checkCredentialProofKeyAcceptance(session: IssuanceSession, publicKeys: List<JsonObject>): CredentialError? {
         val acceptance = credentialProofKeyAcceptance ?: return null
