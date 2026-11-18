@@ -17,6 +17,7 @@ import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
+import id.walt.issuer2.testsupport.Issuer2CredentialScenario
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
@@ -41,6 +42,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.Parameters
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -452,7 +454,15 @@ class Issuer2NotificationEndpointTest {
     @Test
     fun deferredCollectionKeepsAnOverlappingWalletReportOnRejection() = verifyOverlappingWalletReport(rejectCollection = true)
 
-    private fun verifyOverlappingWalletReport(rejectCollection: Boolean) = testApplication {
+    @Test
+    fun immediateIssuanceKeepsAnOverlappingWalletReportOnSuccess() =
+        verifyOverlappingWalletReport(rejectCollection = false, deferred = false)
+
+    @Test
+    fun immediateIssuanceKeepsAnOverlappingWalletReportOnRejection() =
+        verifyOverlappingWalletReport(rejectCollection = true, deferred = false)
+
+    private fun verifyOverlappingWalletReport(rejectCollection: Boolean, deferred: Boolean = true) = testApplication {
         val collectionStarted = CompletableDeferred<Unit>()
         val resumeCollection = CompletableDeferred<Unit>()
         var overlap = false
@@ -469,36 +479,45 @@ class Issuer2NotificationEndpointTest {
         val offer = client.createCredentialOffer(MultiCredentialOfferCreateRequest(
             scenarios.map { CredentialOfferCredential(it.profileId) },
             AuthenticationMethod.PRE_AUTHORIZED,
-            deferred = true,
+            deferred = deferred,
         ))
         val resolved = wallet.resolve(offer)
         val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null)
-        val transactions = scenarios.map { scenario ->
+        suspend fun requestCredential(scenario: Issuer2CredentialScenario): HttpResponse {
             val proof = wallet.buildJwtProofs(resolved.issuerMetadata, scenario.credentialConfigurationId)
-            val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+            return client.post(resolved.issuerMetadata.credentialEndpoint) {
                 bearerAuth(token.access_token)
                 contentType(ContentType.Application.Json)
                 setBody(credentialRequest(scenario.credentialConfigurationId, proof))
             }
-            assertEquals(HttpStatusCode.Accepted, response.status, response.bodyAsText())
-            response.body<JsonObject>().getValue("transaction_id").jsonPrimitive.content
         }
-        assertEquals(
-            HttpStatusCode.NoContent,
-            client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status,
-        )
-        val endpoint = assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)
-        suspend fun collect(transactionId: String) = client.post(endpoint) {
-            bearerAuth(token.access_token)
-            contentType(ContentType.Application.Json)
-            setBody(buildJsonObject { put("transaction_id", transactionId) })
+        val transactions = if (deferred) {
+            scenarios.map { scenario ->
+                val response = requestCredential(scenario)
+                assertEquals(HttpStatusCode.Accepted, response.status, response.bodyAsText())
+                response.body<JsonObject>().getValue("transaction_id").jsonPrimitive.content
+            }.also {
+                assertEquals(
+                    HttpStatusCode.NoContent,
+                    client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete").status,
+                )
+            }
+        } else emptyList()
+        suspend fun issue(index: Int) = if (deferred) {
+            client.post(assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)) {
+                bearerAuth(token.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(buildJsonObject { put("transaction_id", transactions[index]) })
+            }
+        } else {
+            requestCredential(scenarios[index])
         }
-        val first = collect(transactions[0])
+        val first = issue(0)
         assertEquals(HttpStatusCode.OK, first.status, first.bodyAsText())
         val notificationId = first.body<JsonObject>().getValue("notification_id").jsonPrimitive.content
         overlap = true
         coroutineScope {
-            val collecting = async { collect(transactions[1]) }
+            val collecting = async { issue(1) }
             withTimeout(10_000) { collectionStarted.await() }
             try {
                 val reported = client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
@@ -507,6 +526,10 @@ class Issuer2NotificationEndpointTest {
                     setBody(notificationBody(notificationId, "credential_accepted", "stored"))
                 }
                 assertEquals(HttpStatusCode.NoContent, reported.status, reported.bodyAsText())
+                if (!deferred) {
+                    val publicSession = client.get("/issuer2/sessions/${offer.offerId}").body<JsonObject>()
+                    assertFalse("issuanceClaimId" in publicSession)
+                }
                 val reportedSession = client.getSession(offer.offerId)
                 val reportedIdentifier = reportedSession.issuanceResults.entries.single {
                     it.value.walletNotification?.notificationId == notificationId

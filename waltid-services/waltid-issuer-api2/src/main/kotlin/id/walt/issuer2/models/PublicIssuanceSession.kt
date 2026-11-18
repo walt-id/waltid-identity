@@ -35,7 +35,7 @@ val multiIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name != "deferredState") element(
+            if (name !in setOf("deferredState", "issuanceClaimId")) element(
                 name,
                 if (name == "issuanceResults") mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor) else session.getElementDescriptor(index),
                 isOptional = session.isElementOptional(index),
@@ -49,7 +49,7 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
+            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "issuanceClaimId"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
         val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
@@ -82,6 +82,7 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
         add("deferredState")
+        add("issuanceClaimId")
         if (deferredStatus == null) add("deferredStatus")
     })
     if (issuanceRequests.size != 1) {

@@ -67,7 +67,10 @@ class PublicIssuanceSessionTest {
         ))
         assertEquals(JsonObject(legacy + report), session.toPublicJson())
         assertEquals(session, IssuanceSessionStorageCodec.decode(Json.encodeToString(session)))
-        val batch = session.copy(issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B"))
+        val batch = session.copy(
+            issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B"),
+            issuanceClaimId = "claim",
+        )
         for (defaults in listOf(false, true)) for (nulls in listOf(false, true)) {
             val json = Json { encodeDefaults = defaults; explicitNulls = nulls }
             val internal = json.encodeToJsonElement(batch).jsonObject
@@ -75,6 +78,7 @@ class PublicIssuanceSessionTest {
             val publicResult = JsonObject(result - "walletNotification" + report)
             val publicBatch = JsonObject((internal - buildSet {
                 add("deferredState")
+                add("issuanceClaimId")
                 if (batch.deferredStatus == null) add("deferredStatus")
             }) + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))

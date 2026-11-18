@@ -763,8 +763,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
 
                 result.credentialAuthorization?.issuanceDeadline?.let { deferredIssuance.start(sessionId, it) }
-                val authorizedSession = establishIssuanceSelection(
-                    session,
+                val authorizedSession = sessionService.establishIssuanceSelection(
+                    session.sessionId,
                     requireNotNull(result.credentialAuthorization).credentialIdentifiers
                 )
                 val response = oauth2Provider.writeAccessTokenResponse(result.request, result.response)
@@ -817,30 +817,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         ).copy(issuanceDeadline = session.deferredState?.let {
             it.deadline ?: (Clock.System.now() + deferredConfig.lifetimeSeconds.seconds)
         })
-    }
-
-    private suspend fun establishIssuanceSelection(
-        session: IssuanceSession,
-        identifiers: List<String>,
-    ): IssuanceSession {
-        session.authorizedCredentialIdentifiers?.let { selected ->
-            require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
-            return session
-        }
-        if (session.deferredState != null) return sessionService.saveDeferredProgress(
-            session.copy(authorizedCredentialIdentifiers = identifiers)
-        )
-        val current =
-            requireNotNull(sessionService.claimSession(session.sessionId)) { "Issuance session is being processed" }
-        try {
-            val selected = current.authorizedCredentialIdentifiers ?: current.issuanceRequests
-                .map { it.credentialIdentifier }.filter { it in identifiers }
-            require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
-            return sessionService.saveSession(current.copy(authorizedCredentialIdentifiers = selected))
-        } catch (error: Throwable) {
-            restoreClaimedSession(current)
-            throw error
-        }
     }
 
     suspend fun processNonceRequest(
@@ -1122,6 +1098,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
             return response
         }
+        if (deferredClaim == null && observedSession.issuanceClaimId != null) {
+            return invalidCredentialAuthorization(requestId)
+        }
         val authorization = when (
             val resolution = credentialRequest.resolveCredentialAuthorization(
                 observedSession.issuanceRequests.map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
@@ -1287,7 +1266,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
-        // Claiming removes the session, so every later exit has to either close or restore it.
+        // Keep the persisted session visible to wallet reports while one request owns immediate issuance.
         val session = (if (deferredClaim != null) observedSession else sessionService.claimSession(sessionId))
             ?: return rejectCredentialRequest(
                 requestWithSession,
@@ -1512,6 +1491,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
 
             if (credentialResponse.isDeferred) {
+                if (deferredClaim == null) {
+                    restoreClaimedSession(session)
+                    claimFinalized = true
+                }
                 return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
             }
             if (deferredClaim != null && deferredClaim.response == null) {
@@ -1598,13 +1581,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuanceResults = session.issuanceResults + (
                 issuanceRequest.credentialIdentifier to issuedResult
             )
-            // A deferred collection may have started before another credential's wallet report was saved.
-            // Merge only this credential so that report is not replaced by the stale snapshot.
-            val persistedResults = if (deferredClaim != null) {
-                mapOf(issuanceRequest.credentialIdentifier to issuedResult)
-            } else {
-                issuanceResults
-            }
             val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
                 .map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
                     tokenClaims, null,
@@ -1617,10 +1593,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val updatedSession = try {
                 withContext(NonCancellable) {
                     val save: suspend (IssuanceSession) -> IssuanceSession =
-                        if (deferredClaim != null) sessionService::saveDeferredProgress else sessionService::saveSession
+                        if (deferredClaim != null) sessionService::saveDeferredProgress else sessionService::finishClaimedSession
                     save(
                         session.copy(
-                            issuanceResults = persistedResults,
+                            issuanceResults = mapOf(issuanceRequest.credentialIdentifier to issuedResult),
                             authorizedCredentialIdentifiers = establishedSelection,
                             status = if (issuanceComplete) {
                                 IssuanceSessionStatus.SUCCESSFUL
@@ -1682,6 +1658,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
             throw e
         } catch (e: CredentialProtocolException) {
+            if (!claimFinalized && deferredClaim == null) restoreClaimedSession(session)
             throw e
         } catch (e: Exception) {
             if (claimFinalized) {
@@ -2160,10 +2137,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private suspend fun restoreClaimedSession(session: IssuanceSession) {
         withContext(NonCancellable) {
+            val released = session.copy(issuanceResults = emptyMap())
             if (session.deferredState != null) {
-                // Recovery adds no issued results; retain the latest persisted wallet reports.
-                sessionService.saveDeferredProgress(session.copy(issuanceResults = emptyMap()))
-            } else sessionService.saveSession(session)
+                sessionService.saveDeferredProgress(released)
+            } else sessionService.finishClaimedSession(released)
         }
     }
 
