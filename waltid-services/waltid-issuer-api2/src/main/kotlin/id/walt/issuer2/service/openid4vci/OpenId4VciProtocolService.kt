@@ -1295,7 +1295,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         )
                         groups.map { group ->
                             val value = CredentialStatusConfiguration.credentialValue(group, configuration.format)
-                            createCredentialIssuanceInput(issuanceRequest, configuration.format, value)
+                            if (configuration.format == CredentialFormat.MSO_MDOC) {
+                                val status = MdocStatus(statusList = CredentialStatusConfiguration.tokenStatusList(value))
+                                CredentialIssuanceInput(issuanceRequest.credentialData, status)
+                            } else {
+                                createCredentialIssuanceInput(issuanceRequest, configuration.format, value)
+                            }
                         }
                     }
                 }
@@ -2020,7 +2025,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             else -> request.credentialData
         }
         return CredentialIssuanceInput(data,
-            if (format == CredentialFormat.MSO_MDOC && status != null) parseStatusFromJsonElement(status) else null)
+            if (format == CredentialFormat.MSO_MDOC && status != null) parseSharedMdocStatus(status) else null)
     }
 
     private fun CredentialError.isRetryableProofFailure(): Boolean =
@@ -2145,11 +2150,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             message ?: "Credential request processing failed",
         )
 
-    /**
-     * Parse JsonElement to Status object for mDoc credentials.
-     * Supports status_list format with idx and uri fields.
-     */
-    private fun parseStatusFromJsonElement(status: JsonElement): MdocStatus? {
+    private fun parseSharedMdocStatus(status: JsonElement): MdocStatus? {
         return try {
             val statusObj = status.jsonObject
             val statusList = statusObj["status_list"]?.jsonObject
