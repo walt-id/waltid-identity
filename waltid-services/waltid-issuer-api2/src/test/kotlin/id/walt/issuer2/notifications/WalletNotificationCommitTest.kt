@@ -1,5 +1,6 @@
 package id.walt.issuer2.notifications
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -11,6 +12,7 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.ktornotifications.SseNotifier
@@ -36,6 +38,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -44,10 +47,17 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
 class WalletNotificationCommitTest {
     private val singleCredentialGrant = Json.parseToJsonElement("""{"sub":"session","authorization_details":[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["credential"]}]}""").jsonObject
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
 
     @Test
     fun `cancellation as committed save returns never restores the old snapshot`() = runTest {
@@ -178,18 +188,23 @@ class WalletNotificationCommitTest {
             metadataConfig = metadataConfig,
         )
         val sessionService = IssuanceSessionService(repository)
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
         val module = OpenId4VciModule.create(
             config = serviceConfig,
             authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
             profileService = profileService,
             sessionService = sessionService,
+            typeMetadata = typeMetadata,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
         )
         return OpenId4VciProtocolService(
