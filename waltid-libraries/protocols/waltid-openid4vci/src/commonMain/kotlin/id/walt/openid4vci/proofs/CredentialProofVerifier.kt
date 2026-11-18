@@ -31,6 +31,7 @@ data class VerifiedCredentialBinding(
     val proofIndexes: Set<Int> = emptySet(),
 )
 
+@OptIn(ExperimentalVersionOverloading::class)
 data class CredentialProofValidationContext(
     val credentialIssuer: String,
     val clientId: String? = null,
@@ -40,6 +41,9 @@ data class CredentialProofValidationContext(
     val keyAttestation: KeyAttestationVerificationOptions? = null,
     /** The provider checks captured status once after verifying the complete acceptance batch. */
     internal val deferKeyAttestationStatusValidation: Boolean = false,
+    /** Require a distinct verified holder key for each credential copy in this request. */
+    @IntroducedAt("2")
+    val requireDistinctBatchHolderKeys: Boolean = false,
 ) {
     init {
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }

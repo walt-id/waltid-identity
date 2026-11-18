@@ -1,5 +1,7 @@
 package id.walt.openid4vci.core
 
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.attestation.*
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAttestation
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAuthentication
@@ -608,7 +610,7 @@ class DefaultOAuth2Provider(
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: throw CredentialProofValidationException(CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION, "Unsupported credential format")
         val bindings = verification.bindings
-        validateCredentialBindings(handler, configuration, bindings)?.let {
+        validateCredentialBindings(handler, configuration, bindings, proofValidationContext)?.let {
             throw CredentialProofValidationException(it.error, it.description.orEmpty())
         }
         val authentication = (request as? AuthenticatedCredentialRequest)?.authentication
@@ -835,7 +837,7 @@ class DefaultOAuth2Provider(
             }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return missingCredentialHandler(configuration)
-        return issueCredentialBatch(request, configuration, handler, bindings, issuanceInputData) { issuanceBatch ->
+        return issueCredentialBatch(request, configuration, handler, bindings, proofValidationContext, issuanceInputData) { issuanceBatch ->
             handler.sign(
                 request = request,
                 configuration = configuration,
@@ -888,7 +890,7 @@ class DefaultOAuth2Provider(
                     description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
                 ),
             )
-        return issueCredentialBatch(request, configuration, registeredHandler, bindings, issuanceInputData) { issuanceBatch ->
+        return issueCredentialBatch(request, configuration, registeredHandler, bindings, proofValidationContext, issuanceInputData) { issuanceBatch ->
             handler.sign(
                 request = request,
                 configuration = configuration,
@@ -1083,8 +1085,18 @@ class DefaultOAuth2Provider(
         handler: CredentialEndpointHandler,
         configuration: CredentialConfiguration,
         bindings: List<VerifiedCredentialBinding>,
+        context: CredentialProofValidationContext?,
     ): CredentialError? = try {
         handler.validateBindings(configuration, bindings)
+        if (context?.requireDistinctBatchHolderKeys == true && bindings.size > 1) {
+            val thumbprints = mutableSetOf<String>()
+            for (binding in bindings) {
+                val thumbprint = Jwk.sha256Thumbprint(binding.holderKey.exportPublicJwk())
+                if (!thumbprints.add(thumbprint)) {
+                    throw invalidCredentialProof("Each credential copy in this batch requires a distinct holder key")
+                }
+            }
+        }
         null
     } catch (e: CancellationException) {
         throw e
@@ -1101,10 +1113,13 @@ class DefaultOAuth2Provider(
         configuration: CredentialConfiguration,
         handler: CredentialEndpointHandler,
         bindings: List<VerifiedCredentialBinding>,
+        proofValidationContext: CredentialProofValidationContext?,
         inputs: CredentialIssuanceInputProvider,
         sign: suspend (CredentialIssuanceBatch) -> CredentialResponseResult,
     ): CredentialResponseResult {
-        validateCredentialBindings(handler, configuration, bindings)?.let { return CredentialResponseResult.Failure(it) }
+        validateCredentialBindings(handler, configuration, bindings, proofValidationContext)?.let {
+            return CredentialResponseResult.Failure(it)
+        }
         val count = bindings.size.coerceAtLeast(1)
         val prepared = inputs.prepare(bindings)
         if (prepared is CredentialResponseResult.Success) {
