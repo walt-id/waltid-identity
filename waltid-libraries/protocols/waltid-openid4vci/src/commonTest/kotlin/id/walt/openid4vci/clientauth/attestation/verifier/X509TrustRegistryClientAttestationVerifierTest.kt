@@ -28,6 +28,7 @@ import id.walt.trust.model.TrustedEntityType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -91,6 +92,29 @@ class X509TrustRegistryClientAttestationVerifierTest {
         )
 
         assertEquals("Client attestation signature is invalid", assertIs<ClientAttestationVerificationResult.Rejected>(result).reason)
+        assertTrue(evaluator.requests.isEmpty())
+    }
+
+    @Test
+    fun `an x5c that is not one leaf-first chain is rejected before the registry is asked`() = runTest {
+        val pki = TestAttesterPki.create()
+        val evaluator = RecordingTrustEvaluator { registryDecision() }
+        val leaf = pki.x5c.first()
+        val ca = pki.x5c.last()
+        val unrelatedRoot = TestAttesterPki.create().x5c.last()
+        // The leaf comes first in each, so the leaf signature alone would accept them.
+        val malformed = listOf(
+            JsonArray(listOf(leaf, ca, ca)),
+            JsonArray(listOf(leaf, ca, unrelatedRoot)),
+        )
+
+        for (x5c in malformed) {
+            val result = verify(X509TrustRegistryClientAttestationVerifier(evaluator, types), attestation(pki, x5c = x5c))
+            assertEquals(
+                "Client attestation x5c must contain one leaf-first certificate chain",
+                assertIs<ClientAttestationVerificationResult.Rejected>(result, "$x5c").reason,
+            )
+        }
         assertTrue(evaluator.requests.isEmpty())
     }
 
@@ -176,6 +200,7 @@ class X509TrustRegistryClientAttestationVerifierTest {
         pki: TestAttesterPki,
         signer: Key = pki.leafKey,
         holder: Key? = null,
+        x5c: JsonArray = pki.x5c,
     ): String {
         val now = Clock.System.now().epochSeconds
         val confirmationKey: JsonObject = (holder ?: generateTestP256Key("client-instance")).exportPublicJwkObject()
@@ -190,7 +215,7 @@ class X509TrustRegistryClientAttestationVerifierTest {
             algorithm = JwsAlgorithm.ES256,
             protectedHeader = buildJsonObject {
                 put("typ", ClientAttestationJwtTypes.CLIENT_ATTESTATION)
-                put("x5c", pki.x5c)
+                put("x5c", x5c)
             },
         )
     }

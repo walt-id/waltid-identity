@@ -1,5 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.validation.X509CertificateChain
 import id.walt.trust.decision.TrustCheck
 import id.walt.trust.decision.TrustDecisionEvaluator
 import id.walt.trust.decision.TrustDecisionRequest
@@ -17,8 +19,8 @@ import kotlin.io.encoding.Base64
  * Trusts a client attestation whose x5c chain, leaf first, a trust registry lists for one of
  * [expectedEntityTypes], from an accepted source that is fresh ([TrustRequirement.RegistryFresh]).
  *
- * The signature is verified with the leaf key before the registry is asked, so a forged attestation
- * never reaches it. A registry denial is [ClientAttestationVerificationResult.Rejected]. When the issuer
+ * The x5c must be one leaf-first chain, and the signature is verified with the leaf key, before the
+ * registry is asked, so a malformed or forged attestation never reaches it. A registry denial is [ClientAttestationVerificationResult.Rejected]. When the issuer
  * cannot decide, verification throws [IllegalStateException] instead, so the client is not blamed for a
  * server fault: no [evaluator] is configured, or the trust source is unavailable
  * ([TrustDecisionCode.UNKNOWN]). Evaluator exceptions propagate unchanged.
@@ -40,6 +42,9 @@ class X509TrustRegistryClientAttestationVerifier(
         payload: JsonObject,
     ): ClientAttestationVerificationResult {
         val certificateChain = clientAttestationX5c(header) { return it }
+        if (!certificateChain.isOneLeafFirstChain()) {
+            return ClientAttestationVerificationResult.Rejected("Client attestation x5c must contain one leaf-first certificate chain")
+        }
         val verified = verifyClientAttestationLeafSignature(jwt, header)
         if (verified is ClientAttestationVerificationResult.Rejected) return verified
 
@@ -69,3 +74,11 @@ class X509TrustRegistryClientAttestationVerifier(
         val log = KotlinLogging.logger { }
     }
 }
+
+/** Each certificate exactly once, leaf first, each followed by its issuer, as key attestations also require. */
+private fun List<X509Certificate>.isOneLeafFirstChain(): Boolean =
+    try {
+        X509CertificateChain.of(this).isProvidedLeafFirst
+    } catch (_: IllegalArgumentException) {
+        false
+    }
