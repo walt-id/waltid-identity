@@ -20,11 +20,9 @@
 
 ## What is Verifier API 2?
 
-A production-ready Verifier HTTP service for requesting and validating verifiable presentations from wallets using **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. It exposes REST endpoints to create verification sessions, provide authorization requests to wallets, receive `vp_token` responses, and stream session updates.
+A Community Stack reference service for requesting and validating verifiable presentations from wallets using **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. It exposes REST endpoints to create verification sessions, provide authorization requests to wallets, receive `vp_token` responses, and stream session updates.
 
-Refer to the
-[walt.id documentation](https://docs.walt.id/community-stack/verifier/getting-started)
-for a detailed view on using the verifier service, or learn more about OpenID4VP [here](http://localhost:3000/concepts/data-exchange-protocols/openid4vp)
+See the [Verifier API 2 documentation](https://docs.walt.id/community-stack/verifier2/getting-started) and the [OpenID4VP 1.0 specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0-final.html).
 
 ### How it differs from the original Verifier API
 
@@ -44,6 +42,20 @@ for a detailed view on using the verifier service, or learn more about OpenID4VP
   - Verifier API 2: `waltid-openid4vp`, `waltid-openid4vp-verifier`, `waltid-dcql`, `waltid-digital-credentials`, `waltid-verification-policies2`, `waltid-vical`, `waltid-ktor-notifications`.
   - Original Verifier API: Draft-era OpenID4VP libs and the legacy policies library.
 
+## Production deployment
+
+**Verifier API 2 does not authenticate or authorize management API callers.** OpenID4VP presentation validation protects the credential exchange. It does not restrict who can create sessions, read results, or delete session data.
+
+Apply the [shared deployment controls](../README.md#production-deployment) and complete these verifier-specific steps:
+
+- **Separate management from wallet traffic.** Keep session creation (`POST /verification-session/create`), session info and events, deletion and personal data purge, and VICAL tools on a private ingress behind an authenticated backend or gateway. Authorize operations and scope access to sessions there. On the wallet-facing ingress, allow only the needed methods on `/verification-session/{sessionId}/request` (GET and POST) and `/verification-session/{sessionId}/response` (POST). Do not allowlist the whole `/verification-session/*` prefix.
+- **Establish verifier identity.** Set `urlPrefix` in [`verifier-service.conf`](config/verifier-service.conf) to your wallet-reachable HTTPS URL, including `/verification-session`. If your trust framework requires signed request objects, configure the appropriate `clientId`, your own request signing key, and any required certificate chain. Replace demo keys and certificates.
+- **Define what you accept.** Have your backend choose the DCQL queries and verification policies. Request only the claims needed for the decision. Check issuer trust, holder binding, validity and credential status as applicable to each format and trust framework. Choose session expiry and [reuse behavior](#offer-lifecycle-and-callback-correlation) deliberately.
+- **Plan for retention and scaling.** The shipped service keeps sessions in a bounded, process-local store: sessions can be evicted under load and are lost on restart. Set `maxInMemorySessions` and `maxInMemoryBytes` to fit your workload and heap. If sessions must survive restarts or span replicas, integrate a shared `VerificationSessionRepository` that preserves atomic updates and replay protection. The standalone verifier has no Redis setting for this.
+- **Protect presentation data.** Set an explicit `sessionRetention`, constrain per-session overrides, and define when to purge presentations and results, including copies in webhook receivers. Limit presentation payload sizes at the gateway. Keep the [outbound fetch guard](config/network-fetch-guard.conf) restrictive, allow only approved webhook destinations, and set `vicalFetchEnabled = false` when the VICAL fetch route is unnecessary.
+
+Before launch, verify that unauthenticated callers cannot create sessions, read results or events, or delete session data, and that a wallet can fetch a request and submit a presentation through the public routes.
+
 ## Supported credential formats
 
 - `dc+sd-jwt` — IETF SD-JWT VCs (with selective disclosure)
@@ -61,6 +73,56 @@ Backed by `waltid-digital-credentials` for parsing and validation.
 - SSE-based live session updates + optional webhooks
 - OpenAPI helpers for documentation and example payloads
 - VICAL helper endpoints (fetch/validate) for mdoc trust lists
+
+## External-reader proximity verification
+
+Enable `proximity-verifier` in `config/_features.conf` to register
+`POST /verification-session/proximity/device-response`. It is off by default in OSS and Enterprise.
+The route uses the session-creation authentication surface; Enterprise requires the verifier-session create permission.
+
+The kiosk owns engagement, the reader private key, DeviceRequest/ReaderAuth, session encryption, and termination.
+After decrypting SessionData, submit:
+
+```json
+{
+  "flow_type": "iso_18013_5_external_reader",
+  "core_flow": {
+    "requestedElements": {
+      "org.iso.18013.5.1.mDL": { "org.iso.18013.5.1": ["family_name"] }
+    }
+  },
+  "deviceResponse": "<base64 decrypted DeviceResponse CBOR>",
+  "deviceEngagement": "<base64 exact DeviceEngagement CBOR>",
+  "eReaderKey": "<base64 exact reader public COSE_Key CBOR>",
+  "handover": "qr"
+}
+```
+
+For static NFC handover, use an object with `type: "nfc"` and `handoverSelect`; omit
+`handoverRequest` or set it to null. Negotiated handover also supplies `handoverRequest`.
+Each byte field contains standard base64 of the exact observed message.
+Preserve transcript and signed inner bytes; do not reconstruct them from decoded objects.
+Malformed CBOR and encrypted SessionData return 400 without creating a session. A valid outer CBOR
+re-encoding cannot in general be distinguished from the original; changing signed bytes fails verification.
+
+`core_flow` also supports `dcql_query`, `policies`, `notifications.webhook`, and ISO duration/date retention overrides.
+The service-level HOCON `sessionRetention` uses Hoplite duration syntax, for example `30d`.
+ISO-8601 strings such as `P30D` are not accepted in HOCON; request JSON retention durations use ISO-8601.
+The verifier evaluates returned claims; it does not receive or attest to the kiosk's DeviceRequest.
+
+Both verified and rejected presentations return 200 with a terminal public `Verification2Session`.
+Decide access from `status` and `policy_results`. Each submission receives a fresh session id, including
+an authenticated replay of an identical body. This endpoint requires session-creation authorization;
+`reattemptable` does not deduplicate separate create-and-verify calls, and the completed session cannot receive another attempt.
+The session is available through the usual info, events,
+deletion, and PII-purge endpoints. Enterprise also includes it in session lists and honors
+`persistSessionResult=false`, returning the result but discarding it before a later info lookup.
+
+The session emits one terminal update: `presentation_validation_failed` for mdoc check failures,
+or `credential_policy_results_available` after checks pass and policies decide the outcome.
+The events stream replays the stored outcome when the kiosk subscribes after the POST.
+The kiosk sends termination SessionData itself with status 20 (`SESSION_TERMINATION`).
+`DeviceResponse.status` 0 means the wallet returned documents; it is not a SessionData close status.
 
 ## Offer lifecycle and callback correlation
 
@@ -127,7 +189,7 @@ Base path: `/verification-session`
   - Form fields: `vp_token` (required), `state` (recommended)
   - Action: Validates presentations, updates session status, returns a JSON result
 
-- `GET /verification-session/{sessionId}/verification-session/events` (SSE)
+- `GET /verification-session/{sessionId}/events` (SSE)
   - Streams live session updates (`event`, `session`)
 
 Session webhooks are sent by the service to a caller-supplied URL. `config/network-fetch-guard.conf` refuses loopback and private destinations for webhooks and for the service's other outbound requests, such as DID resolution and policy fetches, unless that deployment opts in. Link-local and cloud-metadata addresses stay refused. The other API services read the same file. The Docker Compose configs allow private networks so the services can reach each other.
@@ -136,7 +198,7 @@ VICAL utilities:
 - `POST /vical/fetch` — Fetch an http(s) VICAL and return Base64. `vicalFetchEnabled` in `verifier-service.conf` defaults to true. `file` URLs and loopback, link-local, and private destinations are refused. Set it to false to remove the route. `allowPrivateNetworkVical` opts network fetches into RFC1918 and IPv6 unique-local addresses. `POST /vical/validate` accepts a Base64 VICAL and stays available when fetch is disabled.
 - `POST /vical/validate` — Validate VICAL with provided verification key
 
-Verifier API 2 does not authenticate callers. Deployments, including the public demo, are expected to put their own access control in front of the service.
+See [Production deployment](#production-deployment) for the separation between management and wallet-facing routes.
 
 ## Quick start
 
@@ -191,7 +253,7 @@ vp_token={...}&state=xyz
 Subscribe to updates:
 
 ```http
-GET /verification-session/{sessionId}/verification-session/events
+GET /verification-session/{sessionId}/events
 Accept: text/event-stream
 ```
 

@@ -58,12 +58,12 @@ class JsonArrayConversionTest {
             actual = tDateElement.value.toString(),
         )
         var byteStringElement = assertIs<ByteStringElement>(listElement.value[2])
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
         byteStringElement = assertIs<ByteStringElement>(listElement.value[3])
-        assertTrue {
+        assertTrue(
             byteArray.contentEquals(byteStringElement.value)
-        }
+        )
     }
 }

@@ -15,6 +15,7 @@ class AttestationAssemblerSelectionTest {
     private val attest = ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH
     private val assembler = ClientAttestationAssembler(object : WalletAttestationProvider {
         override suspend fun getAttestationJwt(instancePublicKeyJwk: EncodedKey.Jwk, clientId: String) = "jwt"
+        @Deprecated("Use the EncodedKey.Jwk overload")
         override suspend fun getAttestationJwt(instanceKey: Key, clientId: String) = "jwt"
     })
 

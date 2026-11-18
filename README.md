@@ -55,6 +55,10 @@ commercial **Enterprise Stack**.
 </tr>
 </table>
 
+**Before deploying the Community Stack:** The services are reference implementations, and the quickstart defaults are for development and testing. **Issuer API 2 and Verifier API 2 do not authenticate or authorize callers to their management APIs.** Keep those APIs private and enforce your own access controls before production use. Wallet API v2 includes opt-in account authentication and wallet ownership checks, but still needs production configuration.
+
+Start with the [production deployment guidance](waltid-services/README.md#production-deployment). The commercial Enterprise Stack provides [built-in API authentication and role-based permissions](https://docs.walt.id/enterprise-stack/administration/access-and-permissions/overview), as well as tenant and audit controls.
+
 ## Getting Started
 
 This repository contains a wealth of resources, applications and libraries — the sections below will
@@ -63,8 +67,8 @@ usage guides, see the [docs site](https://docs.walt.id).
 
 ### Test out the walt.id products
 
-Public demo instances of all APIs are available at demo.walt.id, for testing only. For production
-use, the services are self-managed, on-premises or in a private cloud. Depending on the service you are interested in, you can visit the following links:
+The public demo instances at demo.walt.id and the Docker Compose quickstart below are for development
+and testing. Use synthetic credentials and data in these environments.
 
 > The links below point to our current v2 APIs (`issuer-api2`, `verifier-api2`, `wallet-api2`). If
 > you come across an older `waltid-*-api` service elsewhere in this repo, that's the legacy v1

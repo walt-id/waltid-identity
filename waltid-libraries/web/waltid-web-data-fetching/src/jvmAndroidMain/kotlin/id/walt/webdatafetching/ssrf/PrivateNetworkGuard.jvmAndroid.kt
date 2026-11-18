@@ -31,12 +31,6 @@ private val DOWNGRADE_TO_GET_STATUSES = setOf(
     HttpStatusCode.MovedPermanently, HttpStatusCode.Found, HttpStatusCode.SeeOther,
 )
 
-/** True if [host] equals, or is a subdomain of, one of [PrivateNetworkGuardSettings.trustedHostSuffixes]. */
-private fun isTrustedHost(host: String): Boolean =
-    PrivateNetworkGuardSettings.trustedHostSuffixes.any { suffix ->
-        host.equals(suffix, ignoreCase = true) || host.endsWith(".$suffix", ignoreCase = true)
-    }
-
 private fun loopbackAllowed(): Boolean = when {
     PrivateNetworkGuardSettings.allowLoopbackExplicit -> PrivateNetworkGuardSettings.allowLoopback
     else -> System.getProperty("walt.ssrf.allowLoopback") == "true"
@@ -84,7 +78,7 @@ private suspend fun requireAllowedTarget(url: Url) {
     }
     val host = url.host
     val addresses = withContext(Dispatchers.IO) { InetAddress.getAllByName(host) }
-    val trustedHost = isTrustedHost(host)
+    val trustedHost = PrivateNetworkGuardSettings.isTrustedHost(host)
     val blocked = addresses.firstOrNull { isBlockedAddress(it, trustedHost) }
     if (blocked != null) {
         log.warn { "Refusing to fetch $url: '$host' resolves to ${blocked.hostAddress}, which is a blocked address" }
@@ -117,7 +111,7 @@ private fun resolveRedirectTarget(base: Url, location: String): Url {
 internal object ConnectTimeDns : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
         val addresses = Dns.SYSTEM.lookup(hostname)
-        val trustedHost = isTrustedHost(hostname)
+        val trustedHost = PrivateNetworkGuardSettings.isTrustedHost(hostname)
         if (addresses.any { isBlockedAddress(it, trustedHost) }) {
             throw UnknownHostException("Destination not allowed: $hostname")
         }

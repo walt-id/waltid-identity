@@ -111,6 +111,10 @@ val softHsmStateDirectory = layout.buildDirectory.dir("softhsm-example")
 val softHsmConfigPath = softHsmStateDirectory.map { it.file("softhsm2.conf").asFile.absolutePath }
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     jvm {
         binaries {
             executable {
