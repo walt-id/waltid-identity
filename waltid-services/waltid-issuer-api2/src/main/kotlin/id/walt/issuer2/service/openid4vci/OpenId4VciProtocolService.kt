@@ -96,7 +96,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
@@ -2184,8 +2183,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ?: statusObj["statusList"]?.jsonObject
                 ?: return null
 
-            val idx = statusList["idx"]?.jsonPrimitive?.longOrNull?.toULong()
-                ?: statusList["index"]?.jsonPrimitive?.longOrNull?.toULong()
+            val idx = statusList["idx"]?.jsonPrimitive?.content?.toULongOrNull()
+                ?: statusList["index"]?.jsonPrimitive?.content?.toULongOrNull()
                 ?: return null
             val uri = statusList["uri"]?.jsonPrimitive?.content
                 ?: return null
