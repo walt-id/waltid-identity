@@ -174,7 +174,7 @@ class DeferredCheckpointRecoveryTest {
                 SDJwt.parse(it.jsonObject.getValue("credential").jsonPrimitive.content).fullPayload.getValue("status")
             }
             assertEquals(groups.toList(), statuses)
-            assertEquals(2, statusStorage[GLOBAL_STATUS_CONSUMPTION_ID]!!.usedReferences.size)
+            assertEquals(2, statusStorage[GLOBAL_STATUS_CONSUMPTION_ID]!!.referenceOwners.size)
         }
         val final = sessions.getSession(receipt.offerId)
         assertEquals(1, final.issuanceResults.size)

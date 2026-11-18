@@ -337,13 +337,6 @@ rewriting a profile's complete history for every reservation. A whole batch and 
 record commit in one atomic write. The ledger and expiry keys share a Redis Cluster slot,
 so one batch can contain entries from different status-list URIs.
 
-When upgrading from an earlier per-profile consumption store, stop all older issuer
-replicas before starting the updated replicas. The first reservation imports the existing
-used entries and pending reservations behind a shared migration gate; an interrupted import
-can resume. Existing source records are retained. Conflicting historical pending operations
-are rejected, and previously used references remain unavailable. This migration cannot
-undo credentials already issued with duplicate references. Do not mix old and new writers.
-
 Pending retries reuse their reserved groups and prepared credential responses. Abandoned
 reservations are never automatically recycled. Unused groups and private processing
 checkpoints are omitted from session responses and notifications.

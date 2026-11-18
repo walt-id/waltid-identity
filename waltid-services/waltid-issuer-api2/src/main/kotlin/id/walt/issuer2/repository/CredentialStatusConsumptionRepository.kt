@@ -4,11 +4,9 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.Persistence
 import id.walt.commons.persistence.RedisPersistence
 import id.walt.issuer2.domain.CredentialStatusConfiguration
-import id.walt.openid4vci.CredentialFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -33,42 +31,12 @@ interface CredentialStatusConsumptionRepository {
 
 @Serializable
 data class CredentialStatusConsumption(
-    val usedReferences: Set<String> = emptySet(),
     val reservations: Map<String, CredentialStatusReservation> = emptyMap(),
     val referenceOwners: Map<String, CredentialStatusOwner> = emptyMap(),
-) {
-    companion object {
-        /** Import old profile-local history conservatively; conflicting pending operations fail closed. */
-        internal fun fromLegacyProfiles(profiles: Map<String, CredentialStatusConsumption>, now: Instant): CredentialStatusConsumption {
-            val owners = linkedMapOf<String, CredentialStatusOwner>()
-            profiles.toSortedMap().forEach { (profileId, state) ->
-                state.usedReferences.forEach { owners.putIfAbsent(it, CredentialStatusOwner(profileId)) }
-            }
-            val operations = linkedMapOf<String, CredentialStatusReservation>()
-            profiles.toSortedMap().forEach { (profileId, state) ->
-                state.reservations.filterValues { it.expiresAt > now }.forEach { (operationId, reservation) ->
-                    val references = reservation.referenceGroups().flatten()
-                    references.forEach { owners.putIfAbsent(it, CredentialStatusOwner(profileId)) }
-                    val collision = operations[operationId]
-                    if (collision != null) {
-                        operations[operationId] = collision.copy(conflicted = true)
-                    } else {
-                        val conflicted = reservation.conflicted || references.any {
-                            val owner = owners.getValue(it)
-                            owner.profileId != profileId || (owner.operationId != null && owner.operationId != operationId)
-                        }
-                        operations[operationId] = reservation.copy(profileId = profileId, conflicted = conflicted)
-                        if (!conflicted) references.forEach { owners[it] = CredentialStatusOwner(profileId, operationId) }
-                    }
-                }
-            }
-            return CredentialStatusConsumption(owners.keys.toSet(), operations, owners)
-        }
-    }
-}
+)
 
 @Serializable
-data class CredentialStatusOwner(val profileId: String, val operationId: String? = null)
+data class CredentialStatusOwner(val profileId: String, val operationId: String)
 
 @Serializable
 data class CredentialStatusReservation(
@@ -76,17 +44,8 @@ data class CredentialStatusReservation(
     val binding: String,
     val groups: List<JsonArray>,
     val expiresAt: Instant,
-    val profileId: String? = null,
-    val conflicted: Boolean = false,
+    val profileId: String,
 ) {
-    /** Old reservations did not persist their format or reference keys. */
-    internal fun referenceGroups(): List<Set<String>> = groups.map { group ->
-        val format = if (group.first().jsonObject.containsKey("status_list")) CredentialFormat.SD_JWT_VC
-            else CredentialFormat.JWT_VC_JSON
-        (CredentialStatusConfiguration.parse(JsonArray(listOf(group)), format)
-            as CredentialStatusConfiguration.Preallocated).groups.single().references
-    }
-
     companion object {
         internal fun bindingFor(operationId: String, holderKeys: List<String>): String =
             HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(
@@ -95,7 +54,6 @@ data class CredentialStatusReservation(
     }
 }
 
-/** Reserved ID cannot collide with a profile ID, which cannot contain a dot. */
 internal const val GLOBAL_STATUS_CONSUMPTION_ID = ".global-v2"
 
 /** Redis uses incremental global ownership records; injected stores retain an atomic CAS implementation. */
@@ -116,13 +74,8 @@ class ConfiguredCredentialStatusConsumptionRepository(
         else -> null
     }
     private val delegate = redis?.let {
-        RedisCredentialStatusConsumptionRepository(it.pool, it.discriminator, ::legacySnapshot, now, durable)
+        RedisCredentialStatusConsumptionRepository(it.pool, it.discriminator, now, durable)
     }
-
-    private fun legacySnapshot(): CredentialStatusConsumption = CredentialStatusConsumption.fromLegacyProfiles(
-        storage.listAllKeys().filter { it != GLOBAL_STATUS_CONSUMPTION_ID }
-            .mapNotNull { id -> storage[id]?.let { id to it } }.toMap(), now(),
-    )
 
     override suspend fun reserve(
         profileId: String,
@@ -138,14 +91,10 @@ class ConfiguredCredentialStatusConsumptionRepository(
         while (true) {
             if (expiresAt <= now()) throw CredentialStatusOperationException("Credential status operation expired")
             val expected = storage[GLOBAL_STATUS_CONSUMPTION_ID]
-            val current = expected ?: legacySnapshot()
-            if (expected == null && current.usedReferences.isNotEmpty()) {
-                storage.compareAndSet(GLOBAL_STATUS_CONSUMPTION_ID, null, current, Duration.INFINITE)
-                continue
-            }
+            val current = expected ?: CredentialStatusConsumption()
             current.reservations[operationId]?.let { existing ->
                 if (existing.expiresAt <= now()) throw CredentialStatusOperationException("Credential status operation expired")
-                if (existing.conflicted || existing.profileId != profileId || existing.binding != binding || existing.groups.size != count) {
+                if (existing.profileId != profileId || existing.binding != binding || existing.groups.size != count) {
                     throw CredentialStatusOperationException("Credential request conflicts with its reserved status groups")
                 }
                 return existing.groups
@@ -157,13 +106,12 @@ class ConfiguredCredentialStatusConsumptionRepository(
             }
             val selectedReferences = mutableSetOf<String>()
             val selected = groups.asSequence()
-                .filter { group -> group.references.none { it in current.usedReferences || it in selectedReferences } }
+                .filter { group -> group.references.none { it in current.referenceOwners || it in selectedReferences } }
                 .onEach { selectedReferences += it.references }
                 .take(count).toList()
             if (selected.size != count) throw CredentialStatusCapacityException()
             val reservation = CredentialStatusReservation(binding, selected.map { it.statuses }, expiresAt, profileId)
             val replacement = CredentialStatusConsumption(
-                usedReferences = current.usedReferences + selectedReferences,
                 reservations = active + (operationId to reservation),
                 referenceOwners = current.referenceOwners + selectedReferences.associateWith { CredentialStatusOwner(profileId, operationId) },
             )
