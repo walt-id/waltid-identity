@@ -835,33 +835,25 @@ class DefaultOAuth2Provider(
             }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return missingCredentialHandler(configuration)
-        validateCredentialBindings(
-            handler,
-            configuration,
-            bindings
-        )?.let { return CredentialResponseResult.Failure(it) }
-        val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
-        deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
-
-        val result = handler.sign(
-            request = request,
-            configuration = configuration,
-            issuerKey = issuerKey,
-            issuerId = issuerId,
-            issuanceBatch = issuanceBatch,
-            dataMapping = dataMapping,
-            selectiveDisclosure = selectiveDisclosure,
-            x5Chain = x5Chain,
-            display = display,
-            w3cVersion = w3cVersion,
-            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-            authorizedTransactionDataTypes = authorizedTransactionDataTypes,
-            validFrom = validFrom,
-            validUntil = validUntil,
-            expectedUpdate = expectedUpdate,
-        )
-        deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
-        return result
+        return issueCredentialBatch(request, configuration, handler, bindings, issuanceInputData) { issuanceBatch ->
+            handler.sign(
+                request = request,
+                configuration = configuration,
+                issuerKey = issuerKey,
+                issuerId = issuerId,
+                issuanceBatch = issuanceBatch,
+                dataMapping = dataMapping,
+                selectiveDisclosure = selectiveDisclosure,
+                x5Chain = x5Chain,
+                display = display,
+                w3cVersion = w3cVersion,
+                mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+                validFrom = validFrom,
+                validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
+            )
+        }
     }
 
     override suspend fun createCredentialResponse(
@@ -896,33 +888,25 @@ class DefaultOAuth2Provider(
                     description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
                 ),
             )
-        validateCredentialBindings(
-            registeredHandler,
-            configuration,
-            bindings
-        )?.let { return CredentialResponseResult.Failure(it) }
-        val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
-        deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
-
-        val result = handler.sign(
-            request = request,
-            configuration = configuration,
-            issuerKey = issuerKey,
-            issuerId = issuerId,
-            issuanceBatch = issuanceBatch,
-            dataMapping = dataMapping,
-            selectiveDisclosure = selectiveDisclosure,
-            x5Chain = x5Chain,
-            display = display,
-            w3cVersion = w3cVersion,
-            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-            authorizedTransactionDataTypes = authorizedTransactionDataTypes,
-            validFrom = validFrom,
-            validUntil = validUntil,
-            expectedUpdate = expectedUpdate,
-        )
-        deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
-        return result
+        return issueCredentialBatch(request, configuration, registeredHandler, bindings, issuanceInputData) { issuanceBatch ->
+            handler.sign(
+                request = request,
+                configuration = configuration,
+                issuerKey = issuerKey,
+                issuerId = issuerId,
+                issuanceBatch = issuanceBatch,
+                dataMapping = dataMapping,
+                selectiveDisclosure = selectiveDisclosure,
+                x5Chain = x5Chain,
+                display = display,
+                w3cVersion = w3cVersion,
+                mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+                authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+                validFrom = validFrom,
+                validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
+            )
+        }
     }
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
@@ -1112,16 +1096,24 @@ class DefaultOAuth2Provider(
         throw CredentialProofServiceException("Credential handler binding validation failed", e)
     }
 
-    private suspend fun createCredentialIssuanceBatch(
+    private suspend fun issueCredentialBatch(
+        request: CredentialRequest,
+        configuration: CredentialConfiguration,
+        handler: CredentialEndpointHandler,
         bindings: List<VerifiedCredentialBinding>,
-        issuanceInputData: CredentialIssuanceInputProvider,
-    ): CredentialIssuanceBatch {
-        val expectedCount = bindings.size.coerceAtLeast(1)
-        val inputs = issuanceInputData.provide(expectedCount)
-        check(inputs.size == expectedCount) {
-            "Credential issuance input data returned ${inputs.size} inputs; expected $expectedCount"
+        inputs: CredentialIssuanceInputProvider,
+        sign: suspend (CredentialIssuanceBatch) -> CredentialResponseResult,
+    ): CredentialResponseResult {
+        validateCredentialBindings(handler, configuration, bindings)?.let { return CredentialResponseResult.Failure(it) }
+        val result = inputs.prepare(bindings) ?: run {
+            val count = bindings.size.coerceAtLeast(1)
+            val values = inputs.provide(count)
+            check(values.size == count) { "Credential issuance input data returned ${values.size} inputs; expected $count" }
+            deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
+            sign(CredentialIssuanceBatch(values, bindings))
         }
-        return CredentialIssuanceBatch(inputs, bindings)
+        deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
+        return result
     }
 
     private fun missingCredentialHandler(configuration: CredentialConfiguration) =

@@ -13,6 +13,7 @@ import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -84,6 +85,32 @@ class ProviderCredentialProofVerificationTest {
         assertEquals(3, handledInputCount)
         assertEquals(3, handledProofCount)
         assertEquals(3, responseResult.response.credentials?.size)
+    }
+
+    @Test
+    fun `verified bindings can recover a response before allocation and signing`() = runTest {
+        val config = createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW }))
+        config.credentialEndpointHandlers.register(CredentialFormat.SD_JWT_VC,
+            CredentialEndpointHandler { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> error("Signed a saved response") })
+        val provider = buildOAuth2Provider(config)
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val request = createCredentialRequest(provider, holders.map { createProof(it) })
+        val saved = CredentialResponseResult.Success(CredentialResponse(listOf(
+            IssuedCredential(JsonPrimitive("saved-1")), IssuedCredential(JsonPrimitive("saved-2")),
+        )))
+        val result = provider.createCredentialResponse(
+            request = request, configuration = credentialConfiguration(),
+            issuerId = "did:example:issuer", issuerKey = JWKKey.generate(KeyType.secp256r1),
+            proofValidationContext = proofContext(batchSize = 2),
+            issuanceInputData = object : CredentialIssuanceInputProvider {
+                override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult {
+                    assertEquals(listOf(setOf(0), setOf(1)), bindings.map { it.proofIndexes })
+                    return saved
+                }
+                override suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput> = error("Allocated new inputs")
+            },
+        )
+        assertEquals(saved, result)
     }
 
     @Test
