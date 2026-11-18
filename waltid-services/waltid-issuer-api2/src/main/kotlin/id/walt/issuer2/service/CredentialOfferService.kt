@@ -27,6 +27,7 @@ import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
+import io.ktor.server.plugins.BadRequestException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -68,6 +69,15 @@ class CredentialOfferService(
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
             val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
+            val credentialStatus = try {
+                profileService.prepareCredentialStatus(
+                    profile.credentialConfigurationId,
+                    overrides?.credentialStatus ?: profile.credentialStatus,
+                    overrides?.mapping ?: profile.mapping,
+                )
+            } catch (e: IllegalArgumentException) {
+                throw BadRequestException(e.message ?: "Invalid credentialStatus configuration", e)
+            }
             idTokenClaimsMapping?.let { mapping ->
                 JsonObjectPathMapper.validateJsonObjectContainsPaths(
                     jsonObject = credentialData,
@@ -92,7 +102,7 @@ class CredentialOfferService(
                     .takeUnless { it.isEmpty() },
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
-                credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
+                credentialStatus = credentialStatus,
             )
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }
