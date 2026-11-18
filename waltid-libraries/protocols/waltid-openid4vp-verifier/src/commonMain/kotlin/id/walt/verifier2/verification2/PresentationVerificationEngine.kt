@@ -17,10 +17,14 @@ import id.walt.dcql.DcqlCredential
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.DcqlMatchingContext
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.TrustedAuthoritiesQuery
+import id.walt.policies2.vc.policies.CredentialTypeMetadataResolver
+import id.walt.policies2.vc.policies.PolicyServiceKey
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
@@ -335,12 +339,13 @@ object PresentationVerificationEngine {
         dcqlQuery: DcqlQuery,
         credentialsByQuery: Map<String, List<DigitalCredential>>,
         matchClaims: Boolean,
+        resolvedTypes: Map<DigitalCredential, Set<String>> = emptyMap(),
         transactionData: List<String> = emptyList(),
         enforceMdocDisclosure: Boolean = true,
     ): Result<Set<String>> {
         val mismatches = credentialsByQuery.mapNotNull { (queryId, credentials) ->
             val credentialQuery = dcqlQuery.credentials.single { it.id == queryId }
-            val mismatch = credentialMismatch(credentialQuery, credentials, matchClaims)
+            val mismatch = credentialMismatch(credentialQuery, credentials, matchClaims, resolvedTypes)
                 ?: if (matchClaims && enforceMdocDisclosure) credentials.filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
                     unrequestedMdocClaim(dcqlQuery, credentialsByQuery, it, transactionData)
                 } else null
@@ -406,6 +411,7 @@ object PresentationVerificationEngine {
         credentialQuery: CredentialQuery,
         credentials: List<DigitalCredential>,
         matchClaims: Boolean,
+        resolvedTypes: Map<DigitalCredential, Set<String>>,
     ): String? {
         if (credentials.isEmpty()) return "no credential was presented"
         if (!credentialQuery.multiple && credentials.size > 1) {
@@ -430,7 +436,8 @@ object PresentationVerificationEngine {
                     ?.map { DcqlDisclosure(it.name, it.value, it.location) },
                 originalCredential = credential,
             )
-            DcqlMatcher.matchCredential(query, dcqlCredential).onFailure { return "credential $index: ${it.message}" }
+            val matchingContext = DcqlMatchingContext(mapOf(dcqlCredential to resolvedTypes[credential].orEmpty()))
+            DcqlMatcher.matchCredential(query, dcqlCredential, matchingContext).onFailure { return "credential $index: ${it.message}" }
         }
         return null
     }
@@ -650,12 +657,27 @@ object PresentationVerificationEngine {
 
             // Each credential must satisfy the query it was returned for (OpenID4VP 1.0 §8.6 step 2), and only
             // the queries so satisfied count towards the request and its credential_sets (§8.6 step 3, §6.4.2).
+            val typeMetadataResolver = policyContext.getService<CredentialTypeMetadataResolver>(PolicyServiceKey.TYPE_METADATA_RESOLVER)
+                ?: CredentialTypeMetadataResolver()
+            val metadataPolicyContext = policyContext.copy(services = policyContext.services +
+                (PolicyServiceKey.TYPE_METADATA_RESOLVER to typeMetadataResolver))
             val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
+                val resolvedTypes = mutableMapOf<DigitalCredential, Set<String>>()
+                for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
+                    val meta = dcqlQuery.credentials.single { it.id == queryId }.meta as? SdJwtVcMeta ?: continue
+                    for (credential in credentials) {
+                        val vct = (credential.credentialData["vct"] as? JsonPrimitive)?.content
+                        if (credential.format == "dc+sd-jwt" && vct !in meta.vctValues) {
+                            typeMetadataResolver.resolve(credential).getOrNull()?.let { resolvedTypes[credential] = it.types }
+                        }
+                    }
+                }
                 matchCredentialsToQueries(
                     dcqlQuery = dcqlQuery,
                     credentialsByQuery = allSuccessfullyValidatedAndProcessedData,
                     matchClaims = session.setup !is DcApiAnnexCFlowSetup,
                     transactionData = session.authorizationRequest.transactionData.orEmpty(),
+                    resolvedTypes = resolvedTypes,
                 ).mapCatching { matchedQueryIds ->
                     DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matchedQueryIds).getOrThrow()
                 }
@@ -689,7 +711,7 @@ object PresentationVerificationEngine {
             val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
                 session.policies,
                 allSuccessfullyValidatedAndProcessedData,
-                policyContext
+                metadataPolicyContext
             )
             log.debug { "Verification phases: credentialPolicies=${credentialPolicyStart.elapsedNow()}" }
 

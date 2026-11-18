@@ -156,18 +156,18 @@ class MdocDisclosureContractTest {
         val query = DcqlQuery(listOf(query("q", "family_name")))
         val proof = credential("family_name", deviceFields = mapOf("transaction_data_hash" to "hash", "transaction_data_hash_alg" to "sha-256"))
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
-            query, mapOf("q" to listOf(proof)), true, transactionData).isSuccess)
+            query, mapOf("q" to listOf(proof)), true, transactionData = transactionData).isSuccess)
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
             query, mapOf("q" to listOf(proof)), true).isFailure)
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
-            query, mapOf("q" to listOf(credential("family_name", "transaction_data_hash"))), true, transactionData).isFailure)
+            query, mapOf("q" to listOf(credential("family_name", "transaction_data_hash"))), true, transactionData = transactionData).isFailure)
     }
 
     @Test
     fun `transaction metadata does not authorize other fields in its namespace`() {
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
             DcqlQuery(listOf(query("q", "family_name"))),
-            mapOf("q" to listOf(credential("family_name", deviceFields = mapOf("portrait" to "PII")))), true, transactionData).isFailure)
+            mapOf("q" to listOf(credential("family_name", deviceFields = mapOf("portrait" to "PII")))), true, transactionData = transactionData).isFailure)
     }
 
     @Test

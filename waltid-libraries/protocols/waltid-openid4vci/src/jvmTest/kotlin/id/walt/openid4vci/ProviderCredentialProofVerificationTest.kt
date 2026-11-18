@@ -20,6 +20,12 @@ import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.metadata.type.PublishedTypeMetadata
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
+import id.walt.sdjwt.metadata.type.TypeMetadataException
+import id.walt.sdjwt.metadata.type.TypeMetadataFailure
+import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -302,6 +308,50 @@ class ProviderCredentialProofVerificationTest {
 
         assertTrue(responseResult is CredentialResponseResult.Failure)
         assertEquals(CredentialErrorCodes.INVALID_PROOF, responseResult.error.error)
+    }
+
+    @Test
+    fun `provider enforces type rules without an offer and maps preparation outages to server errors`() = runTest {
+        val configuration = credentialConfiguration()
+        val publication = PublishedTypeMetadata.create(buildJsonObject {
+            put("vct", configuration.vct!!)
+            put("claims", JsonArray(listOf(buildJsonObject {
+                put("path", JsonArray(listOf(JsonPrimitive("family_name")))); put("mandatory", true)
+            })))
+        })
+        var metadataCalls = 0
+        var unavailable = false
+        val config = createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW }))
+        config.credentialEndpointHandlers.register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(metadataResolver = {
+            metadataCalls++
+            val resolved = TypeMetadataResolver({ publication.bytes() }).resolve(publication.vct)
+            if (unavailable) throw TypeMetadataException(
+                TypeMetadataFailure.UNAVAILABLE, "Controlled outage",
+            )
+            object : SdJwtVcMetadataContext {
+                override val publication = publication
+                override val resolved = resolved
+                override suspend fun readDocument(uri: String): ByteArray = error("No schema")
+                override fun close() = Unit
+            }
+        }))
+        val provider = buildOAuth2Provider(config)
+        val request = createCredentialRequest(provider, listOf(createProof(JWKKey.generate(KeyType.secp256r1))))
+        suspend fun issue() = provider.createCredentialResponse(
+            request = request, configuration = configuration, issuerKey = JWKKey.generate(KeyType.secp256r1),
+            issuerId = "did:example:issuer", issuanceInputData = issuanceInputs(buildJsonObject { put("given_name", "Ada") }),
+            proofValidationContext = proofContext(),
+        )
+        val rejected = issue()
+        assertTrue(rejected is CredentialResponseResult.Failure)
+        assertEquals("credential_request_denied", rejected.error.error)
+        assertEquals(400, provider.writeCredentialError(rejected.error).status)
+        unavailable = true
+        val failed = issue()
+        assertTrue(failed is CredentialResponseResult.Failure)
+        assertEquals("server_error", failed.error.error)
+        assertEquals(500, provider.writeDeferredCredentialError(failed.error).status)
+        assertEquals(2, metadataCalls)
     }
 
     private suspend fun createProof(key: JWKKey): String = key.signJws(
