@@ -15,15 +15,24 @@ import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.CredentialStatusConsumption
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.testsupport.*
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.offers.IssuerStateMode
+import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.sdjwt.SDJwt
@@ -31,6 +40,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
+import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -106,6 +116,158 @@ class Issuer2SharedCredentialStatusTest {
             }
         },
     )
+
+    @Test
+    fun sdJwtPreallocatedGroupsStayFreshAcrossRequestsAndOffers() = verifyPreallocatedStatus(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS,
+    )
+
+    @Test
+    fun w3cPreallocatedGroupsKeepRevocationAndSuspensionTogether() = verifyPreallocatedStatus(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_W3C_STATUS,
+    )
+
+    @Test
+    fun mdocPreallocatedGroupsStayFreshAcrossRequestsAndOffers() = verifyPreallocatedStatus(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS,
+    )
+
+    @Test
+    fun preallocatedProfileDefaultsApplyWithoutRuntimeOverrides() = verifyPreallocatedStatus(
+        Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS,
+        profileDefault = true,
+    )
+
+    @Test
+    fun overlappingProfilesConsumeDistinctStatusesAcrossOffers() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val statuses = example.runtimeOverrides!!.credentialStatus!!.jsonArray
+        val alias = "secondStatusProfile"
+        val fixture = installStatusIssuer(profileDefault = example.profileId to statuses,
+            additionalProfile = alias to example.profileId)
+        for ((index, profileId) in listOf(example.profileId, alias).withIndex()) {
+            val offer = fixture.client.createCredentialOffer(example.copy(profileId = profileId, runtimeOverrides = null))
+            val resolved = fixture.wallet.resolve(offer)
+            val configurationId = resolved.offer.credentialConfigurationIds.single()
+            val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+            val response = fixture.issue(resolved, token.access_token,
+                credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId)))
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertPreallocatedStatuses(response.body(), "dc+sd-jwt", statuses.drop(index * 2).take(2))
+            if (index == 1) {
+                val exhausted = fixture.issue(resolved, token.access_token,
+                    credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId)))
+                assertEquals(HttpStatusCode.BadRequest, exhausted.status)
+                val single = fixture.twoProofs(resolved, configurationId).let { it.copy(jwt = it.jwt!!.take(1)) }
+                val last = fixture.issue(resolved, token.access_token, credentialRequest(configurationId, single))
+                assertEquals(HttpStatusCode.OK, last.status, last.bodyAsText())
+                assertPreallocatedStatuses(last.body(), "dc+sd-jwt", statuses.takeLast(1))
+            }
+        }
+    }
+
+    @Test
+    fun malformedStatusGroupsAreRejectedBeforeCreatingAnOffer() = testApplication {
+        val fixture = installStatusIssuer()
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val invalid = example.copy(runtimeOverrides = example.runtimeOverrides!!.copy(
+            credentialStatus = JsonArray(listOf(JsonArray(emptyList()))),
+        ))
+        val response = fixture.client.post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody(Json.encodeToString(invalid))
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertTrue(fixture.repository.list().isEmpty())
+    }
+
+    private fun verifyPreallocatedStatus(
+        example: CredentialOfferCreateRequest,
+        profileDefault: Boolean = false,
+    ) = testApplication {
+        val groups = example.runtimeOverrides!!.credentialStatus!!.jsonArray
+        val fixture = installStatusIssuer(
+            profileDefault = if (profileDefault) example.profileId to groups else null,
+        )
+        val request = if (profileDefault) example.copy(runtimeOverrides = null) else example
+        val offer = fixture.client.createCredentialOffer(request)
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val format = resolved.issuerMetadata.getCredentialConfiguration(configurationId)!!.format.value
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        val bad = fixture.issue(resolved, token.access_token, credentialRequest(configurationId,
+            fixture.twoProofs(resolved, configurationId).copy(jwt = listOf("invalid-proof"))))
+        assertEquals(HttpStatusCode.BadRequest, bad.status)
+        repeat(2) { batch ->
+            val response = fixture.issue(resolved, token.access_token,
+                credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId)))
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertPreallocatedStatuses(response.body(), format, groups.drop(batch * 2).take(2))
+        }
+        val exhausted = fixture.issue(resolved, token.access_token,
+            credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId)))
+        assertEquals(HttpStatusCode.BadRequest, exhausted.status)
+        assertEquals("invalid_credential_request", exhausted.body<JsonObject>()["error"]!!.jsonPrimitive.content)
+
+        // Failed two-copy reservation leaves the final group available to a separate offer/session.
+        val nextOffer = fixture.client.createCredentialOffer(request)
+        val nextResolved = fixture.wallet.resolve(nextOffer)
+        val nextToken = fixture.wallet.exchangePreAuthorizedCode(nextResolved, null)
+        val singleProof = fixture.twoProofs(nextResolved, configurationId).let { it.copy(jwt = it.jwt!!.take(1)) }
+        val last = fixture.issue(nextResolved, nextToken.access_token, credentialRequest(configurationId, singleProof))
+        assertEquals(HttpStatusCode.OK, last.status, last.bodyAsText())
+        assertPreallocatedStatuses(last.body(), format, groups.takeLast(1))
+
+        val public = fixture.client.get("/issuer2/sessions/" + offer.offerId).body<JsonObject>()
+        assertFalse("credentialStatus" in public)
+        assertFalse("credentialStatusIssuance" in public)
+    }
+
+    @Test
+    fun fixedAndPreallocatedItemsRespectTheSameSessionLease() = testApplication {
+        val fixture = installStatusIssuer()
+        val fixed = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS
+        val preallocated = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val offer = fixture.client.createCredentialOffer(MultiCredentialOfferCreateRequest(
+            credentials = listOf(
+                CredentialOfferCredential(fixed.profileId, fixed.runtimeOverrides),
+                CredentialOfferCredential(preallocated.profileId, preallocated.runtimeOverrides),
+            ), authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+        ))
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        val requests = fixture.repository.get(offer.offerId)!!.issuanceRequests
+        val sessions = IssuanceSessionService(fixture.repository)
+        val held = assertNotNull(sessions.claimCredentialStatusSession(offer.offerId))
+        val blocked = fixture.issue(resolved, token.access_token, credentialRequestByIdentifier(
+            requests.first().credentialIdentifier, fixture.twoProofs(resolved, configurationId),
+        ))
+        assertEquals(HttpStatusCode.BadRequest, blocked.status)
+        assertEquals(held.credentialStatusIssuance!!.leaseId,
+            fixture.repository.get(offer.offerId)!!.credentialStatusIssuance!!.leaseId)
+        sessions.releaseCredentialStatusSession(held)
+        val fixedResponse = fixture.issue(resolved, token.access_token, credentialRequestByIdentifier(
+            requests.first().credentialIdentifier, fixture.twoProofs(resolved, configurationId),
+        ))
+        assertEquals(HttpStatusCode.OK, fixedResponse.status, fixedResponse.bodyAsText())
+        assertStatuses(fixedResponse.body(), "dc+sd-jwt", fixed.runtimeOverrides!!.credentialStatus!!)
+        assertNull(fixture.repository.get(offer.offerId)!!.credentialStatusIssuance!!.leaseId)
+        val allocatedResponse = fixture.issue(resolved, token.access_token, credentialRequestByIdentifier(
+            requests.last().credentialIdentifier, fixture.twoProofs(resolved, configurationId),
+        ))
+        assertEquals(HttpStatusCode.OK, allocatedResponse.status, allocatedResponse.bodyAsText())
+        assertPreallocatedStatuses(allocatedResponse.body(), "dc+sd-jwt",
+            preallocated.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
+    }
+
+    private fun assertPreallocatedStatuses(response: JsonObject, format: String, expected: List<JsonElement>) {
+        val credentials = response.getValue("credentials").jsonArray
+        assertEquals(expected.size, credentials.size)
+        credentials.forEachIndexed { index, credential ->
+            assertStatuses(buildJsonObject { put("credentials", JsonArray(listOf(credential))) }, format, expected[index], count = 1)
+        }
+    }
 
     private fun verifySharedStatus(
         example: CredentialOfferCreateRequest,
@@ -237,6 +399,7 @@ class Issuer2SharedCredentialStatusTest {
         legacy: Boolean = false,
         batchSize: Int? = 2,
         profileDefault: Pair<String, JsonElement>? = null,
+        additionalProfile: Pair<String, String>? = null,
     ): Fixture {
         loadIssuer2ConfigFiles()
         // A test backend alias exercises the legacy provider branch without weakening JWK migration.
@@ -247,7 +410,10 @@ class Issuer2SharedCredentialStatusTest {
                 issuerKey = if (legacy) JsonObject(profile.issuerKey + ("type" to JsonPrimitive(LEGACY_BACKEND))) else profile.issuerKey,
                 credentialStatus = profileDefault?.takeIf { it.first == id }?.second ?: profile.credentialStatus,
             )
-        })
+        }).let { configured ->
+            if (additionalProfile == null) configured else configured.copy(profiles = configured.profiles +
+                (additionalProfile.first to configured.profiles.getValue(additionalProfile.second)))
+        }
         val repository = ConfiguredIssuanceSessionRepository(
             sessions = JsonSessions(),
             crypto2Keys = InMemoryPersistence("status-test-keys", 5.minutes),
@@ -259,6 +425,11 @@ class Issuer2SharedCredentialStatusTest {
                 batchCredentialIssuance = batchSize?.let(::BatchCredentialIssuance),
             ),
             ConfigManager.getConfig(), profiles, issuanceSessionRepository = repository,
+            // A shared injected store exercises durable orchestration without a Redis requirement in unit tests.
+            credentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
+                InMemoryPersistence<CredentialStatusConsumption>("preallocated-status-test", Duration.INFINITE),
+                durable = true,
+            ),
         )
         val codes = Issuer2Module::class.java.getDeclaredField("authorizationCodeRepository").let {
             it.isAccessible = true
@@ -320,6 +491,8 @@ class Issuer2SharedCredentialStatusTest {
         private val raw = InMemoryPersistence<String>(discriminator, 5.minutes)
         override fun get(id: String) = raw[id]?.let(IssuanceSessionStorageCodec::decode)
         override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
+        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?) =
+            raw.compareAndSet(id, expected?.let { Json.encodeToString(it) }, Json.encodeToString(replacement), ttl)
         override fun set(id: String, value: IssuanceSession) = set(id, value, null)
         override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
         override fun remove(id: String) = raw.remove(id)
