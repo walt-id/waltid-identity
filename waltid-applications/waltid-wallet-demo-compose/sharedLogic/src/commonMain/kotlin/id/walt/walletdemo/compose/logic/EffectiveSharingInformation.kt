@@ -144,7 +144,8 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
                     causes.isNotEmpty() -> "Shared with " + causes.map(::label).distinct().joinToString()
                     else -> "Also shared with selected information"
                 }
-                val decoded = value.reviewDisplayValue(path, option.format)
+                val decoded = if (location.isBinary) CredentialDisplayNormalizer.toBinaryReviewValue(value, path)
+                else value.reviewDisplayValue(path, option.format)
                 val kind = value.reviewKind(decoded)
                 val children = when (kind) {
                     SharingClaimNode.Kind.Object -> (value as JsonObject).entries.map { (key, child) ->
@@ -176,9 +177,9 @@ fun WalletDemoPreparedClaimReview.toEffectiveSharingInformation(
             val option = optionById.getValue(WalletDemoPresentationCredentialSelection(choice.selection.queryId, credentialId))
             reviewedDisclosurePathExpression(choice.selection.path, option.format)
         }.values.any { it.size > 1 }
-        val merged = if (collidingChoices) rendered else rendered.zip(contributions).groupBy { (_, raw) ->
+        val merged = if (collidingChoices || rendered.size < 2) rendered else rendered.zip(contributions).groupBy { (_, raw) ->
             Json.parseToJsonElement(raw.claimsJson) to raw.locations.associate {
-                concreteClaimPath(it.receivedPathJson) to concreteClaimPath(it.sourcePathJson)
+                concreteClaimPath(it.receivedPathJson) to (concreteClaimPath(it.sourcePathJson) to it.isBinary)
             }
         }.values.map { matching ->
             val views = matching.map { it.first }

@@ -1532,5 +1532,5 @@ private fun PreparedPresentationReview.toMobileReview() =
         MobileWalletPresentationCredentialClaims(it.queryId, it.credentialId, it.format, it.claims.toString(), it.wholeCredential,
             it.locations.map { location -> MobileWalletPresentationClaimLocation(
                 JsonArray(location.sourcePath).toString(),
-                JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried) })
+                JsonArray(location.receivedPath).toString(), location.sharedBy, location.alwaysCarried, location.isBinary) })
     })

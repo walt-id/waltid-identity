@@ -4,6 +4,52 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
+    func testEffectiveMdocReviewUsesTheBinaryMarkerForImagesAndOtherBytes() throws {
+        let namespace = "org.iso.18013.5.1"
+        let path = "\"\(namespace)\".\"portrait\""
+        let rawPortrait = "[" + Self.validPNGData.map { String(Int8(bitPattern: $0)) }.joined(separator: ",") + "]"
+        let encoded = Self.validPNGBase64.replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let attachment = "SGVsbG8sIHdhbGxldA"
+        let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
+            issuer: nil, subject: nil, label: "Driving licence",
+            credentialDataJSON: "{\"\(namespace)\":{\"portrait\":\(rawPortrait)}}",
+            disclosures: [PresentationDisclosure(path: path, name: "Portrait", valueJSON: rawPortrait,
+                displayValue: nil, selectivelyDisclosable: true, required: true)])
+        func location(_ path: String, isBinary: Bool = false, sharedBy: [String] = []) -> PresentationClaimLocation {
+            .init(sourcePathJSON: path, receivedPathJSON: path, sharedBy: sharedBy, alwaysCarried: false, isBinary: isBinary)
+        }
+        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+            format: option.format,
+            claimsJSON: """
+                {"\(namespace)":{"portrait":"\(encoded)","attachment":"\(attachment)","text":"\(attachment)","blob":"\(encoded)"}}
+                """,
+            wholeCredential: false, locations: [
+                location("[]"), location("[\"\(namespace)\"]"),
+                location("[\"\(namespace)\",\"portrait\"]", isBinary: true, sharedBy: [path]),
+                location("[\"\(namespace)\",\"attachment\"]", isBinary: true),
+                location("[\"\(namespace)\",\"text\"]"),
+                location("[\"\(namespace)\",\"blob\"]", isBinary: true),
+            ])])
+        let review = try EffectivePresentationReview(prepared: prepared,
+            model: .init(request: .init(requester: nil), credentialOptions: [option]),
+            details: [CredentialDisplayNormalizer.details(for: option)],
+            selection: .init(credentials: [option.selection], disclosures: []))
+        let nodes = try XCTUnwrap(review.contributions.first?.nodes.first?.children)
+        let photo = try XCTUnwrap(nodes.first { $0.label == "Portrait" })
+        XCTAssertEqual(photo.path, [.key(namespace), .key("portrait")])
+        XCTAssertEqual(photo.reason, "Required")
+        XCTAssertTrue(photo.children.isEmpty)
+        guard case .image(_, let data, let mimeType, _) = photo.value?.resolvedImage else {
+            return XCTFail("Expected the binary portrait to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+        XCTAssertEqual(data, Self.validPNGData)
+        XCTAssertEqual(nodes.first { $0.label == "Attachment" }?.value, .text("Binary data"))
+        XCTAssertEqual(nodes.first { $0.label == "Text" }?.value, .decodedText("Hello, wallet"))
+        XCTAssertEqual(nodes.first { $0.label == "Blob" }?.value, .text("Binary data"))
+    }
+
     func testProjectedArraySelectorsRetainUniqueLabelsAndRestrictions() throws {
         let fixture = try credentialInformationFixture()
         let metadata = String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayClaims"])), as: UTF8.self)

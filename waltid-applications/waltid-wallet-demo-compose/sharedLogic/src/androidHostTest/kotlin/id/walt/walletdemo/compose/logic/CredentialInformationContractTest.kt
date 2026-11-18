@@ -1,10 +1,49 @@
 package id.walt.walletdemo.compose.logic
 
 import java.io.File
+import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class CredentialInformationContractTest {
+    @Test fun effectiveMdocReviewUsesTheBinaryMarkerForImagesAndOtherBytes() {
+        val bytes = File(requireNotNull(System.getProperty("walletDemoImageFixturesDir")), "synthetic-signature.png").readBytes()
+        val portrait = Base64.UrlSafe.encode(bytes).trimEnd('=')
+        val attachment = "SGVsbG8sIHdhbGxldA"
+        val namespace = "org.iso.18013.5.1"
+        val rawPortrait = bytes.joinToString(prefix = "[", postfix = "]")
+        val selectionPath = "\"$namespace\".\"portrait\""
+        val option = WalletDemoPresentationCredentialOption(
+            "mdl", "one", format = "mso_mdoc", label = "Driving licence", issuer = null,
+            credentialDataJson = """{"$namespace":{"portrait":$rawPortrait}}""",
+            disclosures = listOf(WalletDemoPresentationDisclosure("Portrait", selectionPath, rawPortrait,
+                selectivelyDisclosable = true, required = true)),
+        )
+        fun location(path: String, isBinary: Boolean = false, sharedBy: List<String> = emptyList()) =
+            WalletDemoClaimLocation(path, path, sharedBy, alwaysCarried = false, isBinary = isBinary)
+        val review = WalletDemoPreparedClaimReview(listOf(WalletDemoCredentialClaims("mdl", "one", "mso_mdoc",
+            """{"$namespace":{"portrait":"$portrait","attachment":"$attachment","text":"$attachment","blob":"$portrait"}}""",
+            wholeCredential = false, locations = listOf(
+                location("[]"), location("""["$namespace"]"""),
+                location("""["$namespace","portrait"]""", isBinary = true, sharedBy = listOf(selectionPath)),
+                location("""["$namespace","attachment"]""", isBinary = true),
+                location("""["$namespace","text"]"""),
+                location("""["$namespace","blob"]""", isBinary = true),
+            ))))
+        val nodes = review.toEffectiveSharingInformation(listOf(option), emptySet()).single()
+            .contributions.single().nodes.single().children.associateBy { it.label }
+        val photo = nodes.getValue("Portrait")
+        assertEquals("[\"$namespace\"].portrait", photo.path.id)
+        assertEquals("Required", photo.reason)
+        assertTrue(photo.children.isEmpty())
+        val image = assertIs<DisplayValue.Image>(assertIs<DisplayValue.DeferredImage>(photo.value).resolve())
+        assertEquals("image/png", image.mimeType)
+        assertContentEquals(bytes, image.bytes)
+        assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Attachment").value)
+        assertEquals(DisplayValue.DecodedText("Hello, wallet"), nodes.getValue("Text").value)
+        assertEquals(DisplayValue.Text("Binary data"), nodes.getValue("Blob").value)
+    }
+
     @Test
     fun projectedArraySelectorsRetainUniqueLabelsAndRestrictions() {
         val fixture = credentialInformationFixture()

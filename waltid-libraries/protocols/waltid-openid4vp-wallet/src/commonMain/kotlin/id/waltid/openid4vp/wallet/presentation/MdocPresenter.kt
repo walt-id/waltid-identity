@@ -424,6 +424,9 @@ object MdocPresenter {
     fun previewClaims(digitalCredential: DigitalCredential, matchResult: DcqlMatcher.DcqlMatchResult) =
         prepareIssuerSigned(digitalCredential as MdocsCredential, matchResult).namespacesToJson()
 
+    internal fun preview(digitalCredential: DigitalCredential, matchResult: DcqlMatcher.DcqlMatchResult) =
+        prepareIssuerSigned(digitalCredential as MdocsCredential, matchResult).toMdocReviewProjection()
+
     private fun prepareIssuerSigned(
         mdocsCredential: MdocsCredential,
         matchResult: DcqlMatcher.DcqlMatchResult,

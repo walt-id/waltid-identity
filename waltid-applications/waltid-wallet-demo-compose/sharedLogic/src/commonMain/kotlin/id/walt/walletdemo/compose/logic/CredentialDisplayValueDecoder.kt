@@ -11,6 +11,16 @@ internal class CredentialDisplayValueDecoder(
     private val json: Json,
     private val renderJson: (JsonElement, ClaimPath, String?) -> DisplayValue,
 ) {
+    fun binaryValue(encoded: String, roles: Set<ClaimRole>): DisplayValue {
+        val binary = DisplayValue.Text(CredentialDisplayText.BinaryData)
+        if (ClaimRole.Image !in roles || !isImageCandidate(encoded, ImageDecodingPolicy.SchemaImage)) return binary
+        return DisplayValue.DeferredImage {
+            val bytes = Base64Payload.parse(encoded)?.decode() ?: return@DeferredImage binary
+            val mimeType = ImageBytes.detectMime(bytes) ?: return@DeferredImage binary
+            bytes.toImageValue(mimeType, encoded)
+        }
+    }
+
     fun decodedString(
         value: String,
         path: ClaimPath,

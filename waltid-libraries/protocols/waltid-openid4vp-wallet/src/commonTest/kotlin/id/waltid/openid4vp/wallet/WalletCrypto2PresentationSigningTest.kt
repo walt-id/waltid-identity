@@ -5,6 +5,7 @@ package id.waltid.openid4vp.wallet
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.Ts12Payment
 import id.walt.verifier.openid.transactiondata.Ts12PaymentValidationException
@@ -34,8 +35,12 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
@@ -43,10 +48,89 @@ import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.PresentationClaimsProjection
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.cbor.CborInteger
+import kotlinx.serialization.cbor.CborMap
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletCrypto2PresentationSigningTest {
+    @OptIn(ExperimentalUnsignedTypes::class)
+    @Test
+    fun mdocReviewKeepsBinaryValuesCompactWithoutCollapsingNumericArrays() {
+        val namespace = "org.iso.18013.5.1"
+        for (size in listOf(0, 32, 256 * 1024)) {
+            val bytes = ByteArray(size) { (it * 73).toByte() }
+            val nested = CborMap(mapOf(
+                CborString("image") to CborByteString(bytes),
+                CborInteger(0) to CborByteString(byteArrayOf(1, 2, 3)),
+                CborString("text") to CborString("AQID"),
+                CborString("images") to CborArray(listOf(CborByteString(byteArrayOf(4, 5, 6)))),
+                CborString("numbers") to CborArray(listOf(CborInteger(1), CborInteger(0), CborInteger(-1))),
+            ))
+            val document = Document("org.iso.18013.5.1.mDL", IssuerSigned.fromIssuerSignedItems(
+                mapOf(namespace to listOf(
+                    IssuerSignedItem.create(0u, "portrait", CborByteString(bytes)),
+                    IssuerSignedItem.create(1u, "nested", nested),
+                    IssuerSignedItem.create(2u, "unrequested", CborString("not shared")),
+                )), CoseSign1(byteArrayOf(), CoseHeaders(), null, byteArrayOf()),
+            ))
+            val signed = coseCompliantCbor.encodeToByteArray(document)
+            val credential = MdocsCredential(document.issuerSigned.namespacesToJson(),
+                signed.encodeToBase64Url(), document.docType)
+            val requested = listOf("portrait", "nested").map { ClaimsQuery(pathStrings = listOf(namespace, it)) }
+            val query = CredentialQuery("mdl", CredentialFormat.MSO_MDOC, meta = MsoMdocMeta(document.docType), claims = requested)
+            val match = DcqlMatcher.DcqlMatchResult(
+                RawDcqlCredential("mdl", credential.format, credential.credentialData, originalCredential = credential),
+                requested.associate { claim -> claim.path.joinToString(".") to
+                    credential.credentialData.getValue(namespace).jsonObject.getValue(claim.path.last().jsonPrimitive.content) }, query,
+            )
+            val projection = PresentationClaimsProjection.prepare(credential, match)
+            val claims = projection.claims.getValue(namespace).jsonObject
+            assertContentEquals(bytes, claims.getValue("portrait").jsonPrimitive.content.decodeFromBase64Url())
+            val nestedClaims = claims.getValue("nested").jsonObject
+            assertContentEquals(bytes, nestedClaims.getValue("image").jsonPrimitive.content.decodeFromBase64Url())
+            assertContentEquals(byteArrayOf(1, 2, 3), nestedClaims.getValue("0").jsonPrimitive.content.decodeFromBase64Url())
+            assertEquals(JsonPrimitive("AQID"), nestedClaims["text"])
+            assertContentEquals(byteArrayOf(4, 5, 6), nestedClaims.getValue("images").jsonArray.single().jsonPrimitive.content.decodeFromBase64Url())
+            assertEquals(Json.parseToJsonElement("[1,0,-1]"), nestedClaims["numbers"])
+            assertEquals(setOf("portrait", "nested"), claims.keys)
+            val expected = listOf(
+                emptyList(), listOf(namespace), listOf(namespace, "portrait"), listOf(namespace, "nested"),
+                listOf(namespace, "nested", "image"), listOf(namespace, "nested", "0"),
+                listOf(namespace, "nested", "images"), listOf(namespace, "nested", "text"),
+                listOf(namespace, "nested", "numbers"),
+            ).map { path -> path.map(::JsonPrimitive) } + (0..2).map { index ->
+                listOf(JsonPrimitive(namespace), JsonPrimitive("nested"), JsonPrimitive("numbers"), JsonPrimitive(index))
+            } + listOf(listOf(JsonPrimitive(namespace), JsonPrimitive("nested"), JsonPrimitive("images"), JsonPrimitive(0)))
+            assertEquals(expected.toSet(), projection.locations.map { it.sourcePath }.toSet())
+            assertEquals(13, projection.locations.size)
+            assertEquals(
+                setOf(
+                    listOf(namespace, "portrait").map(::JsonPrimitive),
+                    listOf(namespace, "nested", "image").map(::JsonPrimitive),
+                    listOf(namespace, "nested", "0").map(::JsonPrimitive),
+                    listOf(JsonPrimitive(namespace), JsonPrimitive("nested"), JsonPrimitive("images"), JsonPrimitive(0)),
+                ),
+                projection.locations.filter { it.isBinary }.map { it.receivedPath }.toSet(),
+            )
+            projection.locations.forEach { location ->
+                assertEquals(location.sourcePath, location.receivedPath)
+                assertFalse(location.alwaysCarried)
+                val selected = when (location.sourcePath.getOrNull(1)) {
+                    JsonPrimitive("portrait") -> listOf("\"$namespace\".\"portrait\"")
+                    JsonPrimitive("nested") -> listOf("\"$namespace\".\"nested\"")
+                    else -> emptyList()
+                }
+                assertEquals(selected, location.sharedBy)
+            }
+            assertEquals(document, credential.document)
+            assertIs<JsonArray>(credential.document.issuerSigned.namespacesToJson().getValue(namespace).jsonObject.getValue("portrait"))
+        }
+    }
+
     @Test
     fun wholeCredentialProjectionUsesTheSignedJwtIncludingUnrequestedClaims() {
         val payload = Json.parseToJsonElement("""{"iss":"https://issuer.example","vc":{"credentialSubject":{

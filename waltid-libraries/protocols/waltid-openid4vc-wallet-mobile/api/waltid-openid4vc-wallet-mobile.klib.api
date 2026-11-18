@@ -3655,10 +3655,12 @@ final class id.walt.wallet2.mobile/MobileWalletPreparedPresentationReview { // i
 }
 
 final class id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation { // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin/Boolean) // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin/Boolean, kotlin/Boolean = ...) // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final val alwaysCarried // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.alwaysCarried|{}alwaysCarried[0]
         final fun <get-alwaysCarried>(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.alwaysCarried.<get-alwaysCarried>|<get-alwaysCarried>(){}[0]
+    final val isBinary // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.isBinary|{}isBinary[0]
+        final fun <get-isBinary>(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.isBinary.<get-isBinary>|<get-isBinary>(){}[0]
     final val receivedPathJson // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.receivedPathJson|{}receivedPathJson[0]
         final fun <get-receivedPathJson>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.receivedPathJson.<get-receivedPathJson>|<get-receivedPathJson>(){}[0]
     final val sharedBy // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.sharedBy|{}sharedBy[0]
@@ -3670,7 +3672,8 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation { // id
     final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.component4|component4(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ...): id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.Boolean){}[0]
+    final fun component5(): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.component5|component5(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.Boolean;kotlin.Boolean){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletPresentationClaimLocation.toString|toString(){}[0]

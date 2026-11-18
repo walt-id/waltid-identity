@@ -15,6 +15,7 @@ data class WalletDemoClaimLocation(
     val receivedPathJson: String,
     val sharedBy: List<String>,
     val alwaysCarried: Boolean,
+    val isBinary: Boolean = false,
 )
 
 sealed interface WalletDemoClaimReview {

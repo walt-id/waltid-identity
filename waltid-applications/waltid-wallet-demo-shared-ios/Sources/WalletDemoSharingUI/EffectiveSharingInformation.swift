@@ -120,7 +120,8 @@ public struct EffectivePresentationReview: Equatable {
                 else if let own, location.sharedBy.allSatisfy({ $0 == own.path }) { reason = "Included" }
                 else if !location.sharedBy.isEmpty { reason = "Shared with " + Array(Set(location.sharedBy.map { label($0, option: option) })).sorted().joined(separator: ", ") }
                 else { reason = "Also shared with selected information" }
-                var node = try offeredReviewNode(value, path: source, fallback: fallback, metadata: metadata, format: option.format)
+                var node = try reviewNode(value, path: source, fallback: fallback, metadata: metadata,
+                                          format: option.format, isBinary: location.isBinary)
                 node.contextOnly = false
                 node.alwaysShared = location.alwaysCarried
                 node.reason = node.kind != .scalar && exact.isEmpty ? nil : reason
@@ -190,14 +191,16 @@ public struct EffectivePresentationReview: Equatable {
             option.disclosures.filter(\.selectable).map { CredentialDisplayJSONValue.array([.string(option.credentialID), .string(canonicalReviewPath(path($0.path, option.format)))]).rawJSON }
         }
         let collisions = Set(optionalPaths).count != optionalPaths.count
-        if collisions { contributions = rendered }
+        if collisions || rendered.count < 2 { contributions = rendered }
         else {
             var keys: [String] = []; var equal: [String: [EffectiveClaimContribution]] = [:]
             for (raw, display) in zip(prepared.credentials, rendered) {
                 let identity = try raw.locations.map { location -> String in
                     let source = try concreteReviewPath(location.sourcePathJSON)
                     let received = try concreteReviewPath(location.receivedPathJSON)
-                    return CredentialDisplayJSONValue.array([.string(canonicalReviewPath(source)), .string(canonicalReviewPath(received))]).rawJSON
+                    return CredentialDisplayJSONValue.array([
+                        .string(canonicalReviewPath(source)), .string(canonicalReviewPath(received)), .bool(location.isBinary)
+                    ]).rawJSON
                 }.sorted()
                 let keyParts = [raw.credentialID, raw.format, raw.claimsJSON] + identity
                 let key = String(data: try JSONSerialization.data(withJSONObject: keyParts), encoding: .utf8)!
@@ -288,31 +291,54 @@ private func effectiveDisplayPath(_ segments: [ClaimPathExpression.Segment]) -> 
 private func reviewMetadataOrder(_ path: [ClaimPathExpression.Segment], _ metadata: [CredentialClaimMetadata], _ format: String) -> Int {
     bestClaimMetadata(metadata, expression: .init(segments: path), format: format)?.offset ?? .max
 }
-private func offeredReviewNode(_ value: CredentialDisplayJSONValue, path: [ClaimPathExpression.Segment], fallback: String,
-                               metadata: [CredentialClaimMetadata], format: String) throws -> EffectiveClaimNode {
+private func reviewNode(_ value: CredentialDisplayJSONValue, path: [ClaimPathExpression.Segment], fallback: String,
+                        metadata: [CredentialClaimMetadata], format: String, isBinary: Bool = false) throws -> EffectiveClaimNode {
     let displayPath = effectiveDisplayPath(path)
-    let decoded = CredentialDisplayNormalizer.effectiveReviewValue(value, path: displayPath, format: format)
+    let roles = CredentialDisplayVocabulary.roles(for: displayPath.components)
+    let decoded: DisplayValue?
     let kind: EffectiveClaimNode.Kind
-    switch value {
-    case .object: kind = .object
-    case .array:
-        switch decoded { case .list: kind = .array; default: kind = .scalar }
-    default: kind = .scalar
-    }
-    let children: [EffectiveClaimNode]
-    switch value {
-    case .object(let fields) where kind == .object:
-        children = try fields.map { try offeredReviewNode($0.value, path: path + [.key($0.key)],
-            fallback: CredentialDisplayVocabulary.humanizedLabel($0.key), metadata: metadata, format: format) }
-            .sorted { reviewMetadataOrder($0.path, metadata, format) < reviewMetadataOrder($1.path, metadata, format) }
-    case .array(let values) where kind == .array:
-        children = try values.enumerated().map { try offeredReviewNode($0.element, path: path + [.index($0.offset)], fallback: "", metadata: metadata, format: format) }
-    default: children = []
+    if isBinary {
+        guard case .string(let encoded) = value else { throw invalidReview("A binary review claim must be a base64url string") }
+        decoded = CredentialDisplayValueDecoder.binaryValue(encoded, roles: roles)
+        kind = .scalar
+    } else {
+        switch value {
+        case .object:
+            decoded = nil
+            kind = .object
+        case .array where !roles.contains(.image):
+            decoded = nil
+            kind = .array
+        default:
+            let display = CredentialDisplayNormalizer.effectiveReviewValue(value, path: displayPath, format: format)
+            if case .array = value, case .list = display {
+                decoded = nil
+                kind = .array
+            } else {
+                decoded = display
+                kind = .scalar
+            }
+        }
     }
     return EffectiveClaimNode(path: path,
         label: bestClaimMetadata(metadata, expression: .init(segments: path), format: format)?.element.name ?? fallback,
-        kind: kind, value: kind == .scalar ? decoded : nil, children: children, reason: nil, alwaysShared: false,
+        kind: kind, value: decoded, children: [], reason: nil, alwaysShared: false,
         contextOnly: true, technical: CredentialDisplayVocabulary.groupKind(for: displayPath.components, format: format) == .technical, initiallyExpanded: true)
+}
+
+private func offeredReviewNode(_ value: CredentialDisplayJSONValue, path: [ClaimPathExpression.Segment], fallback: String,
+                               metadata: [CredentialClaimMetadata], format: String) throws -> EffectiveClaimNode {
+    var node = try reviewNode(value, path: path, fallback: fallback, metadata: metadata, format: format)
+    switch value {
+    case .object(let fields):
+        node.children = try fields.map { try offeredReviewNode($0.value, path: path + [.key($0.key)],
+            fallback: CredentialDisplayVocabulary.humanizedLabel($0.key), metadata: metadata, format: format) }
+            .sorted { reviewMetadataOrder($0.path, metadata, format) < reviewMetadataOrder($1.path, metadata, format) }
+    case .array(let values) where node.kind == .array:
+        node.children = try values.enumerated().map { try offeredReviewNode($0.element, path: path + [.index($0.offset)], fallback: "", metadata: metadata, format: format) }
+    default: break
+    }
+    return node
 }
 
 extension Array where Element == EffectiveClaimNode {
