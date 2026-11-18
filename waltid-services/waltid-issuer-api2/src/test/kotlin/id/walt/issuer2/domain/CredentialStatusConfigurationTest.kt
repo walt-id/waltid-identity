@@ -49,6 +49,20 @@ class CredentialStatusConfigurationTest {
     }
 
     @Test
+    fun statusListComparisonPreservesNonDefaultPortsPathsAndQueries() {
+        val urls = listOf(
+            "https://status.example.com/List?a=1",
+            "https://status.example.com:8443/List?a=1",
+            "https://status.example.com/list?a=1",
+            "https://status.example.com/List?a=2",
+        )
+        val configuration = assertIs<CredentialStatusConfiguration.Preallocated>(
+            CredentialStatusConfiguration.parse(JsonArray(urls.map { tokenStatus(7, it) }), CredentialFormat.MSO_MDOC),
+        )
+        assertEquals(urls.size, configuration.groups.flatMap { it.references }.distinct().size)
+    }
+
+    @Test
     fun w3cGroupKeepsBothStatusPurposesTogether() {
         val group = JsonArray(listOf(w3cStatus(1), w3cStatus(7, "suspension")))
         val configuration = assertIs<CredentialStatusConfiguration.Preallocated>(
@@ -130,8 +144,8 @@ class CredentialStatusConfigurationTest {
     }
 
     companion object {
-        fun tokenStatus(index: Int): JsonObject = buildJsonObject {
-            putJsonObject("status_list") { put("idx", index); put("uri", "https://status.example.com/1") }
+        fun tokenStatus(index: Int, uri: String = "https://status.example.com/1"): JsonObject = buildJsonObject {
+            putJsonObject("status_list") { put("idx", index); put("uri", uri) }
         }
 
         fun tokenGroups(vararg indexes: Int) = JsonArray(indexes.map(::tokenStatus))

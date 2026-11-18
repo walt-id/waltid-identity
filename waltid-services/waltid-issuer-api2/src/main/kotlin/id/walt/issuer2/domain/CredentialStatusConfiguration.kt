@@ -1,8 +1,14 @@
 package id.walt.issuer2.domain
 
+import id.walt.mdoc.objects.mso.Status.StatusListInfo
+import id.walt.mdoc.objects.mso.UniformResourceIdentifier
 import id.walt.openid4vci.CredentialFormat
+import io.ktor.http.URLBuilder
+import io.ktor.http.URLParserException
+import io.ktor.http.encodedPath
 import kotlinx.serialization.json.*
 import java.net.URI
+import java.net.URISyntaxException
 
 /** Interprets issuer configuration, not the status value written into a credential. */
 sealed interface CredentialStatusConfiguration {
@@ -57,13 +63,8 @@ sealed interface CredentialStatusConfiguration {
 
         private fun references(status: JsonObject, format: CredentialFormat): List<String> {
             if (format == CredentialFormat.SD_JWT_VC || format == CredentialFormat.MSO_MDOC) {
-                val list = status["status_list"] as? JsonObject
-                    ?: throw IllegalArgumentException("Preallocated status requires status_list")
-                val index = list["idx"] as? JsonPrimitive
-                require(index != null && !index.isString && index.content.toULongOrNull() != null) {
-                    "status_list.idx must be an unsigned integer"
-                }
-                return listOf(reference(uri(list["uri"], "status_list.uri"), index.content.toULong().toString()))
+                val list = tokenStatusList(status)
+                return listOf(reference(list.uri, list.index.toString()))
             }
             require(status["type"]?.jsonPrimitive?.content in setOf("BitstringStatusListEntry", "StatusList2021Entry")) {
                 "Unsupported preallocated W3C status type"
@@ -87,19 +88,39 @@ sealed interface CredentialStatusConfiguration {
             }
         }
 
-        private fun uri(value: JsonElement?, field: String): String {
-            val text = (value as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content
-            val uri = text?.let { runCatching { URI(it) }.getOrNull() }
-            require(uri != null && uri.isAbsolute && uri.host != null && uri.scheme.lowercase() in setOf("http", "https")) {
-                field + " must be an absolute HTTP(S) URI"
-            }
-            return requireNotNull(text)
+        internal fun tokenStatusList(status: JsonElement): StatusListInfo {
+            val list = (status as? JsonObject)?.get("status_list") as? JsonObject
+                ?: throw IllegalArgumentException("Preallocated status requires status_list")
+            val index = (list["idx"] as? JsonPrimitive)?.takeUnless { it.isString }?.content?.toULongOrNull()
+            requireNotNull(index) { "status_list.idx must be an unsigned integer" }
+            return StatusListInfo(index, uri(list["uri"], "status_list.uri"))
         }
 
-        private fun reference(uri: String, index: String): String =
-            "list:" + JsonArray(listOf(JsonPrimitive(uri), JsonPrimitive(index))).toString()
+        private fun uri(value: JsonElement?, field: String): UniformResourceIdentifier {
+            val text = (value as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content
+            val uri = try {
+                text?.let(::URI)
+            } catch (_: URISyntaxException) {
+                null
+            }
+            require(uri?.host != null && (uri.scheme.equals("https", true) || uri.scheme.equals("http", true))) {
+                "$field must be an absolute HTTP(S) URI"
+            }
+            // Use the mdoc serializer's URL representation for ownership across all formats.
+            val url = try {
+                URLBuilder(uri.toString())
+            } catch (e: URLParserException) {
+                throw IllegalArgumentException("$field is not a valid HTTP(S) URL", e)
+            }
+            url.host = url.host.lowercase()
+            if (url.encodedPath.isEmpty()) url.encodedPath = "/"
+            return UniformResourceIdentifier(url.build())
+        }
 
-        private fun validateMapping(format: CredentialFormat, mapping: JsonObject?) {
+        private fun reference(uri: UniformResourceIdentifier, index: String): String =
+            "list:" + JsonArray(listOf(JsonPrimitive(uri.string), JsonPrimitive(index))).toString()
+
+        internal fun validateMapping(format: CredentialFormat, mapping: JsonObject?) {
             if (format == CredentialFormat.MSO_MDOC) return
             // Mapping keys are literal. A jwt: key writes to the signed payload; jwt:vc replaces the W3C wrapper.
             val protected = if (format == CredentialFormat.SD_JWT_VC) setOf("status", "jwt:status")
