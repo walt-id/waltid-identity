@@ -33,7 +33,7 @@ public extension CredentialStatusUIContext {
         var seen = Set<String>()
         return review.credentialOptions.filter { selection.credentials.contains($0.selection) && seen.insert($0.credentialID).inserted }
             .map {
-                let summary = CredentialDisplayNormalizer.details(for: $0).cardSummary
+                let summary = CredentialDisplayNormalizer.sharingDetails(for: $0, includeDisclosures: false).cardSummary
                 return ReviewCredentialStatus(credentialID: $0.credentialID, title: summary.title,
                     issuer: summary.issuer, context: self)
             }

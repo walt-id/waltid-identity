@@ -15,8 +15,7 @@ final class ReviewSubmissionGateTests: XCTestCase {
                 locations: ["[]", #"["name"]"#].map {
                     .init(sourcePathJSON: $0, receivedPathJSON: $0, sharedBy: [], alwaysCarried: true)
                 })])
-            let claims = try EffectivePresentationReview(prepared: prepared, model: review,
-                details: [CredentialDisplayNormalizer.details(for: option)], selection: selection)
+            let claims = try EffectivePresentationReview(prepared: prepared, model: review, selection: selection)
             return SharingSubmissionKey(requestIdentity: "request", review: review, selection: selection,
                 claimReview: .ready(claims))
         }
