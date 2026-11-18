@@ -35,6 +35,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -98,19 +99,21 @@ class ProviderCredentialProofVerificationTest {
         val saved = CredentialResponseResult.Success(CredentialResponse(listOf(
             IssuedCredential(JsonPrimitive("saved-1")), IssuedCredential(JsonPrimitive("saved-2")),
         )))
-        val result = provider.createCredentialResponse(
+        suspend fun recover(checkpoint: CredentialResponseResult.Success) = provider.createCredentialResponse(
             request = request, configuration = credentialConfiguration(),
             issuerId = "did:example:issuer", issuerKey = JWKKey.generate(KeyType.secp256r1),
             proofValidationContext = proofContext(batchSize = 2),
             issuanceInputData = object : CredentialIssuanceInputProvider {
                 override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult {
                     assertEquals(listOf(setOf(0), setOf(1)), bindings.map { it.proofIndexes })
-                    return saved
+                    return checkpoint
                 }
                 override suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput> = error("Allocated new inputs")
             },
         )
-        assertEquals(saved, result)
+        assertEquals(saved, recover(saved))
+        val partial = CredentialResponseResult.Success(CredentialResponse(listOf(IssuedCredential(JsonPrimitive("only-one")))))
+        assertFailsWith<IllegalStateException> { recover(partial) }
     }
 
     @Test

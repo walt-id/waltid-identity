@@ -1105,8 +1105,14 @@ class DefaultOAuth2Provider(
         sign: suspend (CredentialIssuanceBatch) -> CredentialResponseResult,
     ): CredentialResponseResult {
         validateCredentialBindings(handler, configuration, bindings)?.let { return CredentialResponseResult.Failure(it) }
-        val result = inputs.prepare(bindings) ?: run {
-            val count = bindings.size.coerceAtLeast(1)
+        val count = bindings.size.coerceAtLeast(1)
+        val prepared = inputs.prepare(bindings)
+        if (prepared is CredentialResponseResult.Success) {
+            check(prepared.response.transactionId == null && prepared.response.credentials?.size == count) {
+                "Saved credential response must contain $count issued credentials"
+            }
+        }
+        val result = prepared ?: run {
             val values = inputs.provide(count)
             check(values.size == count) { "Credential issuance input data returned ${values.size} inputs; expected $count" }
             deferredCredentialError(request)?.let { return credentialResponseFailure(request, it) }
