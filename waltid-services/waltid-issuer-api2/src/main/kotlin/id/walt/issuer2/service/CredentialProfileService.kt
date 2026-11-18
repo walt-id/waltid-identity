@@ -4,15 +4,20 @@ import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
+import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.mdoc.MsoData
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
 
 class CredentialProfileService(
     private val profilesConfig: Issuer2ProfilesConfig,
     private val metadataConfig: Issuer2MetadataConfig,
+    private val preallocatedStatusEnabled: Boolean = true,
 ) {
     fun listProfiles(): List<CredentialProfile> =
         profilesConfig.profiles.map { (profileId, config) -> config.toDomain(profileId) }
@@ -53,7 +58,26 @@ class CredentialProfileService(
                     profile.credentialConfigurationId
         }
         requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, profile.msoData)
+        prepareCredentialStatus(profile.credentialConfigurationId, profile.credentialStatus, profile.mapping)
         return profile
+    }
+
+    /** Validate format-specific configuration and normalize per-copy values for stored sessions. */
+    fun prepareCredentialStatus(configurationId: String, value: JsonElement?, mapping: JsonObject?): JsonElement? {
+        if (value !is JsonArray) return value
+        val format = metadataConfig.credentialConfigurations[configurationId]
+            ?.jsonObject?.get("format")?.jsonPrimitive?.content?.let(CredentialFormat::fromValue)
+        if (format == null) {
+            require(!CredentialStatusConfiguration.isPreallocated(value)) { "Unknown credential format for preallocated status" }
+            return value
+        }
+        return when (val configuration = CredentialStatusConfiguration.parse(value, format, mapping)) {
+            is CredentialStatusConfiguration.Fixed -> configuration.value
+            is CredentialStatusConfiguration.Preallocated -> {
+                require(preallocatedStatusEnabled) { "Preallocated credentialStatus requires Redis persistence" }
+                JsonArray(configuration.groups.map { it.statuses })
+            }
+        }
     }
 
     fun requireMsoDataOnlyForMdoc(credentialConfigurationId: String, msoData: MsoData?) {
