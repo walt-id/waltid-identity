@@ -19,6 +19,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.addJsonObject
@@ -34,6 +35,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.tokenGroups
+import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.tokenStatus
 import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.w3cStatus
 import id.walt.issuer2.domain.IssuanceResult
 import id.walt.issuer2.domain.IssuanceSession
@@ -115,6 +117,26 @@ class ConfiguredRedisRepositoryTest {
             assertFailsWith<CredentialStatusOperationException> {
                 repository().reserve("B", "first", listOf("A1", "A2"), groups, deadline)
             }
+        }
+    }
+
+    @Test
+    fun equivalentListUrisShareOwnershipAcrossProfilesAndFormats() = runTest {
+        withStatusLedger { _, storage, _ ->
+            val deadline = Clock.System.now() + 1.days
+            val mdoc = JsonArray(listOf(tokenStatus(7, "HTTPS://STATUS.EXAMPLE.COM:443")))
+            val sdJwt = JsonArray(listOf(tokenStatus(7, "https://status.example.com/")))
+            val w3c = JsonObject(w3cStatus(7) + ("statusListCredential" to JsonPrimitive("https://status.example.com")))
+            val w3cGroups = JsonArray(listOf(JsonArray(listOf(w3c))))
+            suspend fun reserve(profile: String, format: CredentialFormat, inventory: JsonArray) {
+                val groups = assertIs<CredentialStatusConfiguration.Preallocated>(
+                    CredentialStatusConfiguration.parse(inventory, format),
+                ).groups
+                ConfiguredCredentialStatusConsumptionRepository(storage).reserve(profile, profile, listOf("key"), groups, deadline)
+            }
+            reserve("mdoc", CredentialFormat.MSO_MDOC, mdoc)
+            assertFailsWith<CredentialStatusCapacityException> { reserve("sd-jwt", CredentialFormat.SD_JWT_VC, sdJwt) }
+            assertFailsWith<CredentialStatusCapacityException> { reserve("w3c", CredentialFormat.JWT_VC_JSON, w3cGroups) }
         }
     }
 
