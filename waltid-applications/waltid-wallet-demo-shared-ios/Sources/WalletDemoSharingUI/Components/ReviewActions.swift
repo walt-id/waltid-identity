@@ -13,6 +13,11 @@ public struct ReviewSubmissionBinding<Key: Equatable>: Equatable {
 
 /// Actions shared by online, provider and nearby hosts, with one final warning gate.
 public struct ReviewActions<Key: Equatable>: View {
+    private struct SubmissionState: Equatable {
+        let binding: ReviewSubmissionBinding<Key>
+        let enabled: Bool
+    }
+
     @Environment(\.credentialStatusUI) private var statusUI
     @ObservedObject private var gate: ReviewSubmissionGate<ReviewSubmissionBinding<Key>>
     private let reviewKey: Key
@@ -48,6 +53,7 @@ public struct ReviewActions<Key: Equatable>: View {
             credentials: credentialStatuses.map { ReviewSubmissionBinding<Key>.Revision(credentialID: $0.credentialID,
                 storeIndex: $0.storeIndex, revision: $0.presentation?.advisoryRevision) }.sorted { $0.credentialID < $1.credentialID },
             paymentRevision: paymentReview.consent?.revision)
+        let submission = SubmissionState(binding: binding, enabled: canSubmit)
         let ordinarySharing = presentation == .sharing && !isPayment && paymentReview.consent == nil
         let submitTitle = submitTitleOverride ?? paymentReview.consent?.affirmativeAction
             ?? (isPayment ? String(localized: "Confirm payment", bundle: .module) : presentation.submitTitle)
@@ -79,9 +85,8 @@ public struct ReviewActions<Key: Equatable>: View {
             Button(String(localized: "Back to review", bundle: .module), role: .cancel) { gate.dismiss() }
                 .accessibilityIdentifier(attempt.unsigned ? "payment-unsigned-back" : "credential-status-back")
         } message: { Text($0.message) }
-        .onAppear { gate.update(binding, enabled: canSubmit) }
-        .onChange(of: binding) { gate.update($0, enabled: canSubmit) }
-        .onChange(of: canSubmit) { gate.update(binding, enabled: $0) }
+        .onAppear { gate.update(submission.binding, enabled: submission.enabled) }
+        .onChange(of: submission) { gate.update($0.binding, enabled: $0.enabled) }
         .onDisappear { gate.close() }
     }
 
