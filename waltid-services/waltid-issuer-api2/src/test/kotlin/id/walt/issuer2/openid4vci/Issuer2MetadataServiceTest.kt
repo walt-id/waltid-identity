@@ -1,6 +1,8 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -9,6 +11,8 @@ import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
+import org.junit.jupiter.api.AfterEach
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
@@ -25,14 +29,21 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class Issuer2MetadataServiceTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() { catalogues.forEach { it.close() } }
+
 
     @Test
     fun `authorization metadata advertises credential authorization details`() {
@@ -43,7 +54,7 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
-    fun `configured type metadata preserves extensions and resolves its associated VCT`() {
+    fun `configured type metadata preserves extensions and resolves its associated VCT`() = runBlocking {
         val extension = buildJsonObject {
             put("urn:eudi:sca:payment:1", buildJsonObject {
                 put("schema", "urn:eudi:sca:payment:1")
@@ -58,9 +69,23 @@ class Issuer2MetadataServiceTest {
         val config = sdJwtMetadata("payment", "vctBaseUrl").copy(
             sdJwtVcTypeMetadataConfiguration = mapOf("payment" to configured),
         )
-        val metadata = metadataService(metadataConfig = config).getVctTypeMetadata("payment")
-        assertEquals(configured.copy(vct = "http://localhost/openid4vci/payment"), metadata)
-        assertEquals(extension, metadata.toJSON()["transaction_data_types"])
+        val metadata = metadataService(metadataConfig = config).getPublishedTypeMetadata("payment")
+        assertEquals(configured.copy(vct = "http://localhost/openid4vci/payment").toJSON(), metadata.metadata)
+        assertEquals(extension, metadata.metadata["transaction_data_types"])
+    }
+
+    @Test
+    fun `hosted publication uses the VCT slug independently of configuration id`() = runBlocking {
+        val vct = "https://issuer.example/openid4vci/identity_type"
+        val configured = sdJwtMetadata("identity_config", vct)
+        for (config in listOf(configured, configured.copy(sdJwtVcTypeMetadataConfiguration = mapOf(
+            "identity_config" to SdJwtVcTypeMetadataDraft04(name = "Identity"),
+        )))) {
+            val service = metadataService(metadataConfig = config, baseUrl = "https://issuer.example")
+            val publication = service.getPublishedTypeMetadata("identity_type")
+            assertEquals(vct, publication.vct)
+            assertEquals(MetadataIntegrity.sha256(publication.bytes()), publication.integrity)
+        }
     }
 
     @Test
@@ -88,6 +113,17 @@ class Issuer2MetadataServiceTest {
             ),
         )
         assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = config) }
+    }
+
+    @Test
+    fun `contradictory claim descriptions are rejected with the configuration id`() {
+        val config = Issuer2MetadataConfig(credentialConfigurations = mapOf("pid" to Json.parseToJsonElement(
+            """{"format": "dc+sd-jwt", "vct": "urn:example:pid", "credential_metadata": {"claims": [
+                {"path": ["nationalities", null]}, {"path": ["nationalities", 1]}
+            ]}}"""
+        )))
+        val error = assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = config) }
+        assertTrue(error.message.orEmpty().contains("Credential configuration 'pid'"), error.message)
     }
 
     @Test
@@ -144,7 +180,7 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
-    fun `external VCTs and unrelated configuration ids may use reserved names`() {
+    fun `external VCTs and unrelated configuration ids may use reserved names`() = runBlocking {
         listOf(
             "https://types.example/openid4vci/authorize",
             "http://localhost:8080/openid4vci/authorize",
@@ -157,11 +193,11 @@ class Issuer2MetadataServiceTest {
         val service = metadataService(
             metadataConfig = sdJwtMetadata("authorize", "http://localhost/openid4vci/EmployeeCredential"),
         )
-        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
+        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getPublishedTypeMetadata("EmployeeCredential").vct)
     }
 
     @Test
-    fun `identifier VCTs are published unchanged and served as type metadata`() {
+    fun `identifier VCTs are published unchanged and served as type metadata`() = runBlocking {
         val configured = SdJwtVcTypeMetadataDraft04(
             name = "EU Person Identification Data",
             description = "From configuration.",
@@ -172,22 +208,22 @@ class Issuer2MetadataServiceTest {
             ),
         )
         assertEquals("urn:eudi:pid:1", pid.getCredentialConfiguration("urn:eudi:pid:1")?.vct)
-        assertEquals(configured.copy(vct = "urn:eudi:pid:1"), pid.getVctTypeMetadata("urn:eudi:pid:1"))
+        assertEquals(configured.copy(vct = "urn:eudi:pid:1").toJSON(), pid.getPublishedTypeMetadata("urn:eudi:pid:1").metadata)
 
         val ehic = metadataService(metadataConfig = sdJwtMetadata("urn:eudi:ehic:1", "urn:eudi:ehic:1"))
-        val ehicMetadata = ehic.getVctTypeMetadata("urn:eudi:ehic:1")
+        val ehicMetadata = ehic.getPublishedTypeMetadata("urn:eudi:ehic:1")
         assertEquals("urn:eudi:ehic:1", ehicMetadata.vct)
-        assertEquals("urn:eudi:ehic:1", ehicMetadata.name)
-        assertEquals("urn:eudi:ehic:1 Verifiable Credential", ehicMetadata.description)
+        assertEquals("urn:eudi:ehic:1", ehicMetadata.metadata["name"]?.jsonPrimitive?.content)
+        assertEquals("urn:eudi:ehic:1 Verifiable Credential", ehicMetadata.metadata["description"]?.jsonPrimitive?.content)
 
         val external = metadataService(
             metadataConfig = sdJwtMetadata("identity", "https://example.com/credentials/identity"),
         )
-        assertFailsWith<NotFoundException> { external.getVctTypeMetadata("identity") }
+        assertFailsWith<NotFoundException> { external.getPublishedTypeMetadata("identity") }
     }
 
     @Test
-    fun `uppercase HTTPS vct values stay external URLs`() {
+    fun `uppercase HTTPS vct values stay external URLs`() = runBlocking {
         val service = metadataService(
             metadataConfig = sdJwtMetadata("identity", "HTTPS://example.com/credentials/identity"),
         )
@@ -195,9 +231,9 @@ class Issuer2MetadataServiceTest {
             "HTTPS://example.com/credentials/identity",
             service.getCredentialConfiguration("identity")?.vct,
         )
-        assertFailsWith<NotFoundException> { service.getVctTypeMetadata("identity") }
+        assertFailsWith<NotFoundException> { service.getPublishedTypeMetadata("identity") }
         assertFailsWith<NotFoundException> {
-            service.getVctTypeMetadata("HTTPS://example.com/credentials/identity")
+            service.getPublishedTypeMetadata("HTTPS://example.com/credentials/identity")
         }
     }
 
@@ -211,11 +247,11 @@ class Issuer2MetadataServiceTest {
     }
 
     @Test
-    fun `unknown and reserved metadata types are not found`() {
+    fun `unknown and reserved metadata types are not found`() = runBlocking {
         val service = metadataService(metadataConfig = sdJwtMetadata("EmployeeCredential", "vctBaseUrl"))
-        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
+        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getPublishedTypeMetadata("EmployeeCredential").vct)
         (RESERVED_VCT_NAMES + "missing-type").forEach { name ->
-            assertFailsWith<NotFoundException>(name) { service.getVctTypeMetadata(name) }
+            assertFailsWith<NotFoundException>(name) { service.getPublishedTypeMetadata(name) }
         }
     }
 
@@ -377,6 +413,9 @@ class Issuer2MetadataServiceTest {
         return MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
+            typeMetadata = IssuerTypeMetadataCatalogue(
+                serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+            ).also(catalogues::add),
             profileService = CredentialProfileService(
                 profilesConfig = Issuer2ProfilesConfig(),
                 metadataConfig = metadataConfig,

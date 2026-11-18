@@ -73,7 +73,7 @@ public enum CredentialDisplayNormalizer {
             addedAt: nil,
             credentialDataJSON: option.credentialDataJSON
         )
-        let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, preferredLocales: preferredLocales)
+        let metadata = StoredCredentialMetadataParser.claims(from: option.metadataJSON, preferredLocales: preferredLocales, format: option.format)
         let requestedItems = option.disclosures.enumerated().map { index, disclosure in
             let path = disclosurePath(index: index, disclosure: disclosure, format: option.format)
             return ClaimItem(
@@ -201,18 +201,26 @@ public enum CredentialDisplayNormalizer {
             )
         }
 
-        let displayMembers = format == mdocFormat ? members.compactMap(sanitizedMdocMember) : members
+        let displayMembers = members
+        let multipleNamespaces = format == mdocFormat && members.filter {
+            if case .object = $0.value { return true }; return false
+        }.count > 1
         let groupedItems = displayMembers.flatMap { member in
             let path = DisplayClaimPath.topLevel(member.key)
-            return claimRows(
+            return credentialRows(
                 path: path,
                 label: CredentialDisplayVocabulary.humanizedLabel(member.key),
                 value: member.value,
-                format: format
+                format: format,
+                preserveNamespaces: multipleNamespaces
             )
                 .map { row in
-                    let displayRow = row.withMdocDisplaySemantics(format: format)
-                    return (CredentialDisplayVocabulary.groupKind(for: displayRow.path.components, format: format), displayRow)
+                    var group = CredentialDisplayVocabulary.groupKind(for: row.path.components, format: format)
+                    if format == mdocFormat, row.path.components.count == 1, case .object(let entries) = row.item.value {
+                        group = entries.map { CredentialDisplayVocabulary.groupKind(for: $0.pathComponents, format: format) }
+                            .min { $0.order < $1.order } ?? group
+                    }
+                    return (group, row)
                 }
         }
         let groups = Dictionary(grouping: groupedItems, by: { $0.0 })
@@ -249,14 +257,55 @@ public enum CredentialDisplayNormalizer {
         value: CredentialDisplayJSONValue,
         format: String?
     ) -> ClaimItem {
-        ClaimItem(
+        if format == mdocFormat, path.components.count == 2,
+           case .object(let members) = value, members.count == 1,
+           members[0].key == imageWrapperClaimName {
+            return claimItem(path: path.child(imageWrapperClaimName), label: label, value: members[0].value, format: format)
+        }
+        var roles = CredentialDisplayVocabulary.roles(for: path.components)
+        if ["dc+sd-jwt", "vc+sd-jwt"].contains(format ?? ""), ["_sd", "_sd_alg"].contains(path.components.last ?? "") {
+            roles.insert(.technical)
+        }
+        let item = ClaimItem(
             path: path.itemPath,
             pathComponents: path.components,
-            label: label,
-            value: protocolDisplayValue(for: value, path: path) ?? displayValue(for: value, path: path, format: format),
+            label: label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Claim" : label,
+            value: protocolDisplayValue(for: value, path: path, format: format) ?? displayValue(for: value, path: path, format: format),
             rawValue: rawString(value),
-            roles: CredentialDisplayVocabulary.roles(for: path.components)
+            roles: roles
         )
+        guard let format else { return item }
+        return ClaimRow(path: path, item: item).withMdocDisplaySemantics(format: format).item
+    }
+
+    /// Only protocol envelopes are transparent; claim containers keep their source identity.
+    private static func credentialRows(
+        path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue,
+        format: String, preserveNamespaces: Bool
+    ) -> [ClaimRow] {
+        if case .object(let members) = value {
+            if format == mdocFormat, members.count == 1, members[0].key == imageWrapperClaimName {
+                return credentialRows(path: path.child(imageWrapperClaimName), label: label, value: members[0].value,
+                    format: format, preserveNamespaces: preserveNamespaces)
+            }
+            let w3cEnvelope = ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format) &&
+                [["vc"], ["credentialSubject"], ["credential_subject"],
+                 ["vc", "credentialSubject"], ["vc", "credential_subject"]].contains(path.components)
+            let namespace = format == mdocFormat && path.components.count == 1 && !preserveNamespaces
+            if (w3cEnvelope || namespace) && !members.isEmpty {
+                return members.flatMap { member in
+                    credentialRows(path: path.child(member.key), label: CredentialDisplayVocabulary.humanizedLabel(member.key),
+                        value: member.value, format: format, preserveNamespaces: preserveNamespaces)
+                }
+            }
+        }
+        let item = claimItem(path: path, label: label, value: value, format: format)
+        if case .object(let entries) = item.value, entries.count == 1, entries[0].value.isImage,
+           entries[0].label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
+            let child = entries[0].relabelled(label)
+            return [ClaimRow(path: DisplayClaimPath(itemPath: child.path, components: child.pathComponents), item: child)]
+        }
+        return [ClaimRow(path: DisplayClaimPath(itemPath: item.path, components: item.pathComponents), item: item)]
     }
 
     private static func claimItems(
@@ -299,8 +348,13 @@ public enum CredentialDisplayNormalizer {
 
     private static func protocolDisplayValue(
         for value: CredentialDisplayJSONValue,
-        path: DisplayClaimPath
+        path: DisplayClaimPath,
+        format: String?
     ) -> DisplayValue? {
+        guard let format, dataURLFallbackFormats.contains(format.lowercased()) else { return nil }
+        let components = ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format) && path.components.first == "vc"
+            ? Array(path.components.dropFirst()) : path.components
+        guard components.count == 1 || (components.last == "_sd" && ["dc+sd-jwt", "vc+sd-jwt"].contains(format)) else { return nil }
         switch path.components.last {
         case "_sd":
             guard case .array(let values) = value else { return nil }
@@ -351,6 +405,10 @@ public enum CredentialDisplayNormalizer {
             }
             return rows
         }
+    }
+
+    static func effectiveReviewValue(_ value: CredentialDisplayJSONValue, path: DisplayClaimPath, format: String) -> DisplayValue {
+        displayValue(for: value, path: path, format: format)
     }
 
     private static func displayValue(
@@ -413,24 +471,6 @@ public enum CredentialDisplayNormalizer {
         let components = path.components.first == "vc" ? Array(path.components.dropFirst()) : path.components
         guard [["validFrom"], ["validUntil"], ["proof", "created"], ["proof", "expires"]].contains(components) else { return nil }
         return WalletInstant.parseTimestamp(text.trimmingCharacters(in: .whitespacesAndNewlines) + "Z")
-    }
-
-    private static func sanitizedMdocMember(_ member: CredentialDisplayJSONMember) -> CredentialDisplayJSONMember? {
-        guard case .null = member.value else {
-            return CredentialDisplayJSONMember(key: member.key, value: sanitizeMdocValue(member.value))
-        }
-        return nil
-    }
-
-    private static func sanitizeMdocValue(_ value: CredentialDisplayJSONValue) -> CredentialDisplayJSONValue {
-        switch value {
-        case .object(let members):
-            return .object(members.compactMap(sanitizedMdocMember))
-        case .array(let values):
-            return .array(values.map(sanitizeMdocValue))
-        case .string, .number, .bool, .null:
-            return value
-        }
     }
 
     private static func disclosurePath(index: Int, disclosure: PresentationDisclosure, format: String) -> DisplayClaimPath {
@@ -508,7 +548,9 @@ private struct ClaimRow {
             return self
         }
         let displayValue: DisplayValue
-        switch semantics.valueKind {
+        if case .null = item.value {
+            displayValue = .null
+        } else { switch semantics.valueKind {
         case .bool:
             if case .bool = item.value {
                 displayValue = item.value
@@ -519,6 +561,7 @@ private struct ClaimRow {
             displayValue = item.value.binaryAvailability
         case .other:
             displayValue = item.value
+        }
         }
         return ClaimRow(
             path: path,
@@ -535,7 +578,7 @@ private extension DisplayValue {
             byteCount = count
         case .deferredImage(let source):
             byteCount = source.byteCount
-        case .list(let values) where !values.isEmpty && values.allSatisfy({ value in
+        case .list(let values, _) where !values.isEmpty && values.allSatisfy({ value in
             if case .number = value { return true }
             return false
         }):
@@ -550,9 +593,9 @@ private extension DisplayValue {
 
 private func hiddenClaimCommitmentsText(count: Int) -> String {
     switch count {
-    case 0: return "No undisclosed claim values"
-    case 1: return "1 undisclosed claim value"
-    default: return "\(count) undisclosed claim values"
+    case 0: return "No disclosure digests"
+    case 1: return "1 disclosure digest"
+    default: return "\(count) disclosure digests"
     }
 }
 

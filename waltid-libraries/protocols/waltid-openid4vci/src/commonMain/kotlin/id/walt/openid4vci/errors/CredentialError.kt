@@ -8,6 +8,8 @@ data class CredentialError(
     val error: String,
     @SerialName("error_description")
     val description: String? = null,
+    /** Internal retryability marker for deferred response creation; never encoded in error JSON. */
+    @kotlinx.serialization.Transient val retryAfterSeconds: Long? = null,
 )
 
 /**

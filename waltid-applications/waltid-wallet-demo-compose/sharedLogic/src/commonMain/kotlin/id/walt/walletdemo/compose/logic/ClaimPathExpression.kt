@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 
 internal data class ClaimPathExpression(
     val segments: List<Segment>,
@@ -28,12 +27,20 @@ internal data class ClaimPathExpression(
             return parseJsonArrayPath(path) ?: ClaimPathExpressionParser(path).parse()
         }
 
+        /** DCQL dot rendering quotes keys, while bare numbers and null retain their typed meaning. */
+        fun parseSdkDisclosure(rawValue: String): ClaimPathExpression =
+            parseJsonArrayPath(rawValue.trim()) ?: ClaimPathExpressionParser(rawValue.trim(), typedDotTokens = true).parse()
+
         private fun parseJsonArrayPath(rawValue: String): ClaimPathExpression? {
             if (!rawValue.startsWith("[")) return null
 
             val array = runCatching { json.parseToJsonElement(rawValue) as? JsonArray }.getOrNull()
                 ?: return null
-            return ClaimPathExpression(array.mapNotNull { element -> element.toSegment() })
+            val segments = array.map { element ->
+                // An unsupported segment must not turn a longer path into a different valid path.
+                element.toSegment() ?: return ClaimPathExpression(emptyList())
+            }
+            return ClaimPathExpression(segments)
         }
 
         private fun JsonElement.toSegment(): Segment? =
@@ -41,9 +48,8 @@ internal data class ClaimPathExpression(
                 JsonNull -> Segment.Wildcard
                 is JsonPrimitive -> when {
                     isString -> contentOrNull
-                        ?.takeIf { it.isNotBlank() }
                         ?.let(Segment::Key)
-                    intOrNull != null -> Segment.Index(intOrNull!!)
+                    content.toIntOrNull() != null -> Segment.Index(content.toInt())
                     else -> null
                 }
                 else -> null
@@ -51,7 +57,7 @@ internal data class ClaimPathExpression(
     }
 }
 
-private class ClaimPathExpressionParser(rawValue: String) {
+private class ClaimPathExpressionParser(rawValue: String, private val typedDotTokens: Boolean = false) {
     private val path = rawValue.trim()
     private var index = 0
     private val segments = mutableListOf<ClaimPathExpression.Segment>()
@@ -61,8 +67,11 @@ private class ClaimPathExpressionParser(rawValue: String) {
             when (path[index]) {
                 '$', '.', ',', ' ', '\n', '\r', '\t' -> index += 1
                 '[' -> addBracketSegment()
-                '\'', '"' -> addKey(readQuotedSegment(path[index]))
-                else -> addKey(readDotSegment())
+                '\'', '"' -> {
+                    val key = readQuotedSegment(path[index])
+                    if (typedDotTokens) segments += ClaimPathExpression.Segment.Key(key) else addKey(key)
+                }
+                else -> if (typedDotTokens) addToken(readDotSegment()) else addKey(readDotSegment())
             }
         }
         return ClaimPathExpression(segments)
@@ -83,7 +92,7 @@ private class ClaimPathExpressionParser(rawValue: String) {
         val segment = rawSegment.trim()
         when {
             segment.isBlank() -> Unit
-            segment == "*" -> segments += ClaimPathExpression.Segment.Wildcard
+            segment == "*" || typedDotTokens && segment == "null" -> segments += ClaimPathExpression.Segment.Wildcard
             segment.toIntOrNull() != null -> segments += ClaimPathExpression.Segment.Index(segment.toInt())
             else -> addKey(segment)
         }

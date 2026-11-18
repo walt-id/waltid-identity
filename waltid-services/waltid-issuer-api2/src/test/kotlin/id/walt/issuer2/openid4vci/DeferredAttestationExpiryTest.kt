@@ -168,6 +168,7 @@ class DeferredAttestationExpiryTest {
             authorizationCodes.save(DefaultAuthorizationCodeRecord(
                 code, "issuer2-wallet-test", "https://wallet.example/callback", setOf(configurationId), emptySet(),
                 DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt)), session.expiresAt,
+                pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
             ))
         }
         val initial = token(Parameters.build {
@@ -313,7 +314,7 @@ class DeferredAttestationExpiryTest {
             val completed = assertNotNull(repository.get(offer.offerId))
             assertEquals(1, completed.issuanceResults.size)
             assertEquals(checkpoint.response, completed.deferredState!!.transactions.getValue(transactionId).response)
-            assertTrue(completed.deferredState!!.transactions.getValue(transactionId).consumed)
+            assertTrue(completed.deferredState.transactions.getValue(transactionId).consumed)
             return@testApplication
         }
         var savedResults = emptyMap<String, IssuanceResult>()

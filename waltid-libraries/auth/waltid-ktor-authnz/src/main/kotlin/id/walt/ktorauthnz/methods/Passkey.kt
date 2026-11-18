@@ -84,7 +84,11 @@ object Passkey : AuthenticationMethod("passkey") {
     }
 
     private fun serverProperty(challenge: ByteArray, settings: PasskeySettings) =
-        ServerProperty(settings.origins.map(::Origin).toSet(), settings.rpId, DefaultChallenge(challenge))
+        ServerProperty.builder()
+            .origins(settings.origins.map(::Origin).toSet())
+            .rpId(settings.rpId)
+            .challenge(DefaultChallenge(challenge))
+            .build()
 
     internal suspend fun registrationOptions(challenge: String, accountId: String, userName: String, excludeCredentials: List<String>): JsonObject {
         val settings = settings()

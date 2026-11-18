@@ -1,6 +1,7 @@
 package id.walt.wallet2.mobile
 
 import id.walt.credentials.display.CredentialTitles
+import id.walt.credentials.display.DisplayLocales
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -27,10 +28,17 @@ internal object MobileWalletRegistryDisplay {
         type: String,
         credentialData: JsonObject,
         storedLabel: String?,
+        metadata: JsonObject? = null,
+        preferredLocales: List<String> = emptyList(),
     ): Resolved {
         val mapping = mappingFor(format, type, credentialData)
         val humanizedType = humanizedType(format, type)
+        val displays = (metadata?.get("credentialDisplay") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        val metadataTitle = DisplayLocales.select(displays, preferredLocales) {
+            (it["locale"] as? JsonPrimitive)?.contentOrNull
+        }?.get("name")?.let { (it as? JsonPrimitive)?.contentOrNull }
         val title = mapping?.title?.resolve(credentialData)
+            ?: metadataTitle
             ?: storedLabel?.trim()?.takeIf { it.isNotBlank() }
             ?: humanizedType
         val subtitle = mapping?.subtitle?.resolve(credentialData) ?: humanizedType

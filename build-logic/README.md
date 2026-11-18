@@ -46,9 +46,10 @@ these baselines; updates with iOS disabled are rejected to preserve the iOS decl
 
 #### Android
 
-- `waltid.android.app.gradle.kts` - You are building an Android app
-- `waltid.android.library.gradle.kts` - You are building an Android library
-- (`waltid.android.base.gradle.kts`) - Android Base
+- `waltid.mobile.library` - Android/iOS libraries
+- `waltid.full.library` - Libraries targeting JVM, Android, JavaScript and iOS
+
+These conventions enable their Android targets through `enableAndroidBuild`. Android apps configure `com.android.application` directly; see the [Compose demo host](../waltid-applications/waltid-wallet-demo-compose/androidApp/build.gradle.kts).
 
 #### Dependency analysis
 
@@ -58,3 +59,35 @@ these baselines; updates with iOS disabled are rejected to preserve the iOS decl
 
 - `waltid.base.gradle.kts` - Base for all types
 - `waltid.licensereport.gradle.kts` - Use mocking
+
+## Kotlin compiler warnings
+
+The Identity and Unified Build roots apply `waltid.kotlin-warnings` once for all projects.
+The convention makes missing experimental opt-ins errors in production and test
+compilations, including enabled JVM, JS, Android, and native targets. A module that
+applies Kotlin directly receives the same policy as a convention-based module,
+without declaring another plugin. Keep explicit plugin versions in the root's
+`plugins` block when those plugins are also dependencies of build logic.
+
+Use a local `@OptIn` when an implementation intentionally uses an experimental API.
+Applying the experimental marker itself makes the declaration experimental for its
+callers. Avoid module-wide opt-ins, which hide unintended experimental API use in
+both production and test code.
+
+Once a module's supported production and test compilations are warning-free,
+enable the stricter policy in its build script:
+
+```kotlin
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+```
+
+This also rejects new deprecated API usages. Migrate legacy APIs deliberately;
+compatibility tests and adapters may need to keep exercising deprecated entry
+points. Any necessary suppression should be local and explain the compatibility
+contract it preserves.
+
+Compiler options are described in the [Kotlin warning documentation](https://kotlinlang.org/docs/compiler-reference.html#warning-management).

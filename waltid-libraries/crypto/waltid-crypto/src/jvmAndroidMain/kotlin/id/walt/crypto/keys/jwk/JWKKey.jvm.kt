@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.crypto.keys.jwk
 
 import com.google.crypto.tink.subtle.Ed25519Verify
@@ -45,6 +47,7 @@ import java.security.interfaces.ECPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.serialization.ExperimentalSerializationApi
 
 
 private val bouncyCastleProvider = BouncyCastleProvider()

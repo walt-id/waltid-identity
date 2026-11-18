@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id Services</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Production-ready services for credential issuance, verification, and wallet management</p>
+ <p>Open-source reference services for credential issuance, verification, and wallet management</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -41,19 +41,19 @@
 
 ## Overview
 
-This directory contains production-ready services built on top of the walt.id libraries. These services provide complete, deployable solutions for credential issuance, verification, wallet management, and testing infrastructure.
+These Community Stack services demonstrate how to issue, verify, and manage credentials using the walt.id libraries. The shipped quickstart configurations are for development and testing.
 
-Please note that these services are treated as reference implementations of our libraries. They may not implement the best practices in terms of security, performance, or scalability. They are not intended to be used "as-is" in production environments.
+## Production deployment
 
-Common extensiones required for production use are:
-- Authentication and authorization
-- Rate limiting
-- Improved logging & monitoring
-- Performance optimization
-- Security best practices
-- Scalability
+**Do not expose Issuer API 2 or Verifier API 2 directly to the internet.** Neither service has built-in authentication or authorization for its management API. A self-managed deployment must protect those routes with its own authenticated backend or gateway. If you serve multiple tenants, enforce tenant isolation there or use separate deployments. Wallet API v2 ships with optional account authentication and wallet ownership checks. Docker Compose enables them; the standalone sample configuration leaves them disabled.
 
-If you are looking for a production-ready service, we recommend looking into our [enterprise stack](https://walt.id/enterprise-stack) offering, which includes all of these services and more with the best practices and production-ready features implemented.
+Review the checklist for [Issuer API 2](./waltid-issuer-api2/README.md#production-deployment), [Verifier API 2](./waltid-verifier-api2/README.md#production-deployment), or [Wallet API v2](./waltid-wallet-api2/README.md#production-deployment), along with these controls for all three services:
+
+- **Restrict ingress.** Put the service behind a TLS reverse proxy or gateway, block direct access to its port, and allowlist routes and HTTP methods. Leave development mode off and keep debug, health, and Swagger endpoints off public ingress. Restrict CORS to the browser origins you use, and let the gateway set trusted forwarding headers.
+- **Limit abuse.** Set route-specific rate limits, request size limits, and timeouts. If you use Server-Sent Events (SSE), limit concurrent streams and configure and test the proxy's streaming timeouts.
+- **Operate and monitor.** Deploy a pinned release and apply security updates. Monitor availability, latency, errors, resource use, and abuse signals. Audit privileged actions and redact credentials, tokens, session links, and personal data from logs and traces. Test load, restarts, and recovery before launch.
+
+The commercial [Enterprise Stack](https://docs.walt.id/enterprise-stack/home/the-enterprise-stack) includes built-in API authentication, role-based authorization, tenant controls, and audit logs.
 
 ## Services
 
@@ -62,17 +62,17 @@ If you are looking for a production-ready service, we recommend looking into our
 ### [🟢 waltid-issuer-api2](./waltid-issuer-api2)
 Issuer API 2 service (OpenID4VCI 1.0). Modern issuer service for profile-based credential offers, OpenID4VCI metadata, authorization and token flows, credential issuance, nonce handling, session inspection, and SSE session updates.
 
-**Use when:** You need a production-ready issuer service for OpenID4VCI 1.0 credential issuance workflows.
+**Use when:** You are building OpenID4VCI 1.0 issuance workflows and can provide the required deployment controls.
 
 ### [🟢 waltid-verifier-api2](./waltid-verifier-api2)
 Verifier API 2 service (OpenID4VP 1.0). Modern verifier service implementing OpenID4VP 1.0 with DCQL (Digital Credentials Query Language) support. Provides session management, SSE/webhook notifications, and comprehensive verification policy support.
 
-**Use when:** You need a production-ready verifier service that supports OpenID4VP 1.0, DCQL queries, and modern verification workflows.
+**Use when:** You are building OpenID4VP 1.0 verification workflows with DCQL and can provide the required deployment controls.
 
 ### [🟢 waltid-wallet-api2](./waltid-wallet-api2)
 Wallet API service. Complete wallet backend service providing credential storage, presentation management, OpenID4VCI/OpenID4VP flows, and wallet management APIs. Supports multiple credential formats and provides comprehensive wallet functionality.
 
-**Use when:** You need a production-ready wallet backend service for storing credentials, handling issuance/presentation flows, and managing wallet operations.
+**Use when:** You are building a custodial wallet backend for storing credentials and handling issuance and presentation flows.
 
 ### [🟠 waltid-issuer-api](./waltid-issuer-api)
 Credential Issuer API service (legacy, planned for deprecation). Provides a complete REST API for issuing verifiable credentials in multiple formats (W3C, SD-JWT, mdoc). Supports OpenID4VCI draft flows, credential templates, and issuer metadata management.
