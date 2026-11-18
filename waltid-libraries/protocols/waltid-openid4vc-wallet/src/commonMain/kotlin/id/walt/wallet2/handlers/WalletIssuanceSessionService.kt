@@ -345,7 +345,15 @@ enum class WalletIssuanceErrorCode {
 data class WalletIssuanceError(
     val code: WalletIssuanceErrorCode,
     val message: String,
-)
+    /** Whether the caller may submit the same reviewed offer again after this transition. */
+    val canRetryOffer: Boolean = false,
+) {
+    constructor(code: WalletIssuanceErrorCode, message: String) : this(code, message, false)
+
+    /** Preserves the released copy signature and the session's retry decision. */
+    fun copy(code: WalletIssuanceErrorCode = this.code, message: String = this.message): WalletIssuanceError =
+        WalletIssuanceError(code, message, canRetryOffer)
+}
 
 /** Terminal or pending result of an issuance-session transition. */
 @Serializable
@@ -620,14 +628,14 @@ class WalletIssuanceSessionService(
             return failed(sessionId, error.code)
         } catch (error: Exception) {
             log.error(error) { "Could not load issuance session '$sessionId' for pre-authorized issuance" }
-            return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
+            // The store failed before this attempt could claim the offer or submit its grant.
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, canRetryOffer = true)
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
             ?: return failAndRemove(sessionId, WalletIssuanceErrorCode.INVALID_SESSION)
         val requirement = grant.txCode
         if (requirement != null && transactionCode.isNullOrBlank()) {
-            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
-            return failed(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
+            return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         // OpenID4VCI 1.0 §6.3: a tx_code may only be sent when the offer's grant requested one.
         // Issuers now reject an unsolicited tx_code, so never forward one the offer did not ask for.
@@ -636,19 +644,17 @@ class WalletIssuanceSessionService(
             acceptSelections(active, prepareCredentials(active.toBatchSession(), active.selections?.map { it.selection }))
             onCredentialsAccepted()
         } catch (error: CancellationException) {
-            withContext(NonCancellable) { restoreSession(active, SessionState.AWAITING_ACCEPTANCE) }
+            withContext(NonCancellable) { restoreOffer(active) }
             throw error
         } catch (_: IllegalArgumentException) {
-            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
-            return failed(sessionId, WalletIssuanceErrorCode.INVALID_INPUT)
+            return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         } catch (_: Exception) {
-            restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
-            return failed(sessionId, WalletIssuanceErrorCode.CRYPTO)
+            return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.CRYPTO)
         }
         try {
             persistActive(active)
         } catch (error: CancellationException) {
-            withContext(NonCancellable) { restoreSession(active, SessionState.AWAITING_ACCEPTANCE) }
+            withContext(NonCancellable) { restoreOffer(active) }
             throw error
         } catch (error: Exception) {
             log.error(error) { "Could not persist accepted issuance session '$sessionId'" }
@@ -1145,20 +1151,13 @@ class WalletIssuanceSessionService(
                         "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
                         "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
             }
-            if (
-                retryTokenRejection &&
-                storedIds.isEmpty() &&
-                error.oauthError == "invalid_grant"
-            ) {
-                restoreSession(active, SessionState.AWAITING_ACCEPTANCE)
+            val code = if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE
+            if (retryTokenRejection && storedIds.isEmpty() && error.oauthError == "invalid_grant") {
+                restoreOfferAfterFailure(active, code)
             } else {
                 removeSession(active.public.id)
+                failed(active.public.id, code, storedIds)
             }
-            failed(
-                active.public.id,
-                if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE,
-                storedIds,
-            )
         } catch (error: IssuanceStageException) {
             removeSession(active.public.id)
             failed(active.public.id, error.code, storedIds, deferredResults, error.failure)
@@ -2301,20 +2300,25 @@ class WalletIssuanceSessionService(
         }
     }
 
-    private suspend fun restoreSession(active: ActiveSession, state: SessionState) {
-        mutex.withLock {
-            if (sessions[active.public.id] === active && active.state == SessionState.PROCESSING) {
-                active.state = state
-                if (state == SessionState.AWAITING_ACCEPTANCE) active.authorization = null
-                active.expiresAtEpochMilliseconds = nowEpochMilliseconds() +
-                        when (state) {
-                            SessionState.AWAITING_ACCEPTANCE -> sessionPolicy.reviewTtl.inWholeMilliseconds
-                            SessionState.AWAITING_CALLBACK -> sessionPolicy.authorizationCallbackTtl.inWholeMilliseconds
-                            SessionState.PROCESSING -> PROCESSING_EXPIRY
-                        }
-                persistActive(active)
-            }
+    private suspend fun restoreOffer(active: ActiveSession): Boolean = mutex.withLock {
+        if (sessions[active.public.id] !== active || active.state != SessionState.PROCESSING) return@withLock false
+        active.state = SessionState.AWAITING_ACCEPTANCE
+        active.authorization = null
+        active.expiresAtEpochMilliseconds = nowEpochMilliseconds() + sessionPolicy.reviewTtl.inWholeMilliseconds
+        persistActive(active)
+        true
+    }
+
+    private suspend fun restoreOfferAfterFailure(active: ActiveSession, code: WalletIssuanceErrorCode): WalletIssuanceOutcome.Failed {
+        val canRetry = try {
+            restoreOffer(active)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            invalidateActiveSessionBestEffort(active.public.id)
+            return failed(active.public.id, (error as? IssuanceStageException)?.code ?: WalletIssuanceErrorCode.STORAGE)
         }
+        return failed(active.public.id, code, canRetryOffer = canRetry)
     }
 
     private suspend fun rollbackAuthorizationStart(active: ActiveSession) {
@@ -2346,11 +2350,12 @@ class WalletIssuanceSessionService(
         storedIds: List<String> = emptyList(),
         deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         failure: CredentialIssuanceFailure? = null,
+        canRetryOffer: Boolean = false,
     ): WalletIssuanceOutcome.Failed {
         emitEvent(WalletSessionEvent.issuance_failed)
         return WalletIssuanceOutcome.Failed(
             sessionId = sessionId,
-            error = WalletIssuanceError(code, code.publicDescription()),
+            error = WalletIssuanceError(code, code.publicDescription(), canRetryOffer),
             storedCredentialIds = storedIds.toList(),
             deferredCredentials = deferredCredentials.toList(),
             failure = failure,

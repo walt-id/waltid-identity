@@ -403,6 +403,53 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(viewModel.txCode, "")
     }
 
+    func testLostTokenResponseClosesOfferAndPreventsAnotherAccept() async throws {
+        let failure = IssuanceFailure(code: .network, message: "The issuer could not be reached.")
+        let client = TransactionCodeWalletClient(firstAcceptanceFailure: failure)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.txCode = "1234"
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+
+        XCTAssertEqual(model.issuanceReceipt?.problem, failure)
+        XCTAssertNil(model.offerPreview)
+        XCTAssertFalse(model.acceptOfferEnabled)
+        XCTAssertEqual(model.txCode, "")
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        let calls = await client.issuanceContinuationCalls
+        XCTAssertEqual(calls, 1)
+    }
+
+    func testRejectedTransactionCodeCanBeCorrectedOnTheSameOffer() async throws {
+        let failure = IssuanceFailure(code: .issuerResponse, message: "Transaction code rejected", canRetryOffer: true)
+        let client = TransactionCodeWalletClient(firstAcceptanceFailure: failure)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.txCode = "wrong"
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+
+        XCTAssertEqual(model.statusMessage, failure.message)
+        XCTAssertTrue(model.acceptOfferEnabled)
+        model.txCode = "correct"
+        model.acceptOffer()
+        try await waitUntil { model.receiveCompleted && !model.isLoading }
+        let codes = await client.receivedTxCodes
+        let starts = await client.issuanceStartCalls
+        XCTAssertEqual(codes, ["wrong", "correct"])
+        XCTAssertEqual(starts, 1)
+    }
+
     func testNumericTransactionCodeIsFilteredCappedAndValidated() async throws {
         let client = TransactionCodeWalletClient(
             transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
@@ -916,6 +963,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     private var credentialIssued = false
     private let issuanceStartDelayNanoseconds: UInt64
     private let transactionCode: IssuanceTransactionCode?
+    private var firstAcceptanceFailure: IssuanceFailure?
     private let batchSize: Int?
     private let failWithProgress: Bool
     private let deferWithProgress: Bool
@@ -937,6 +985,7 @@ private actor TransactionCodeWalletClient: WalletClient {
             descriptionText: "Enter the code from the issuer"
         ),
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
+        firstAcceptanceFailure: IssuanceFailure? = nil,
         batchSize: Int? = nil,
         failWithProgress: Bool = false,
         deferWithProgress: Bool = false,
@@ -947,6 +996,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     ) {
         self.issuanceStartDelayNanoseconds = issuanceStartDelayNanoseconds
         self.transactionCode = transactionCode
+        self.firstAcceptanceFailure = firstAcceptanceFailure
         self.issuanceGrant = issuanceGrant
         self.batchSize = batchSize
         self.failWithProgress = failWithProgress
@@ -1051,6 +1101,10 @@ private actor TransactionCodeWalletClient: WalletClient {
         issuanceContinuationCalls += 1
         receivedIssuanceSelections.append(credentials)
         receivedTxCodes.append(transactionCode ?? "")
+        if let failure = firstAcceptanceFailure {
+            firstAcceptanceFailure = nil
+            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
+        }
         credentialIssued = true
         deletedCredentialIDs.remove(Self.credential.id)
         if deferWithProgress {
