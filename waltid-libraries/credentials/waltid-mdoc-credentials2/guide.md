@@ -119,7 +119,7 @@ This request will return an issuance offer URL. Enter this into the "offerUrl" i
 
 #### 0.1.2. Receive credential into wallet
 
-For authentication in Enterprise development mode, the seeded example account is `user@walt.id`. Before calling `/v1/dev/add-example-data`, configure its password using `exampleAccountPassword` in `dev-mode-access.conf`; the password must meet the server's new-password requirements. Use that configured password to sign in. Previously seeded accounts retain their existing password. Alternatively, create another account.
+For authentication in Enterprise development mode, the seeded example account is `user@walt.id`. Before calling `/v1/dev/add-example-data`, configure its password using `exampleAccountPassword` in `dev-mode-access.conf`; the password must meet the server's [new-password requirements](https://docs.walt.id/enterprise-stack/administration/access-and-permissions/accounts/create-account#password-requirements). Use that configured password to sign in. Previously seeded accounts retain their existing password. Alternatively, create another account.
 
 ```shell
 curl -X 'POST' \
