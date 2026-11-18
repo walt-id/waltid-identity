@@ -532,7 +532,7 @@ class DefaultOAuth2Provider(
             } catch (error: InvalidTokenCredentialAuthorization) {
                 return AccessTokenResponseResult.Failure(
                     error.request,
-                    OAuthError(OAuthErrorCodes.INVALID_REQUEST, error.message)
+                    OAuthError(error.errorCode, error.message)
                 )
             }
             return when (result) {

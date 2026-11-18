@@ -1,5 +1,6 @@
 package id.walt.openid4vci.responses.token
 
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.walt.openid4vci.requests.credential.CredentialAuthorization
@@ -27,8 +28,13 @@ data class TokenCredentialAuthorization(
         mapOf("authorization_details" to Json.encodeToJsonElement(authorizationDetails))
 }
 
-class InvalidTokenCredentialAuthorization(val request: AccessTokenRequest, message: String) :
-    IllegalArgumentException(message)
+class InvalidTokenCredentialAuthorization(
+    val request: AccessTokenRequest,
+    message: String,
+    val errorCode: String,
+) : IllegalArgumentException(message) {
+    constructor(request: AccessTokenRequest, message: String) : this(request, message, OAuthErrorCodes.INVALID_REQUEST)
+}
 
 /** Apply a credential grant without treating a missing grant as an unrestricted grant. */
 fun Collection<CredentialAuthorization>.withinAuthorizationDetails(
