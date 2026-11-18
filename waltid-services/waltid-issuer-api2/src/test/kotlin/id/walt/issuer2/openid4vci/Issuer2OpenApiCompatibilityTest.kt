@@ -1,6 +1,12 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.web.modules.OpenApiModule
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.persistence.InMemoryPersistence
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.configurePlugins
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.CredentialStatusConsumption
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRequestBody
@@ -18,11 +24,15 @@ import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.*
+import kotlin.time.Duration
 
 /**
  * Matches the content-negotiation JSON installed by the shipped service
@@ -79,7 +89,8 @@ class Issuer2OpenApiCompatibilityTest {
         val examples = offer.getValue("requestBody").jsonObject.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("examples").jsonObject
         val statusExamples = examples.filterKeys { "status" in it }
-        assertEquals(5, statusExamples.size)
+        assertEquals(8, statusExamples.size)
+        assertEquals(3, statusExamples.keys.count { "preallocated status groups" in it })
         statusExamples.values.forEach { example ->
             val value = example.jsonObject.getValue("value").jsonObject
             val statuses = if ("profileId" in value) {
@@ -100,6 +111,9 @@ class Issuer2OpenApiCompatibilityTest {
             .getValue("anyOf").jsonArray.map(::resolve)
         assertTrue(sessionShapes.any { "profileId" in it.getValue("properties").jsonObject })
         assertTrue(sessionShapes.any { "issuanceRequests" in it.getValue("properties").jsonObject })
+        sessionShapes.forEach {
+            assertFalse("credentialStatusIssuance" in it.getValue("properties").jsonObject)
+        }
         assertFalse(specification.toString().contains("CredentialOfferCredentialResponse"))
     }
 
@@ -137,7 +151,7 @@ class Issuer2OpenApiCompatibilityTest {
             }
             routing { route("api.json") { openApi() } }
         }
-        installIssuer2WithConfigFiles(json = shippedIssuer2Json)
+        installStatusExampleIssuer()
         val client = apiClient()
         val specification = Json.parseToJsonElement(client.get("/api.json").bodyAsText()).jsonObject
         val examples = specification.getValue("paths").jsonObject
@@ -158,6 +172,27 @@ class Issuer2OpenApiCompatibilityTest {
                 setBody(published.toString())
             }
             assertEquals(HttpStatusCode.Created, response.status, "$name\n${response.bodyAsText()}")
+        }
+    }
+}
+
+/** Exercise every published body with an injected durable-store stand-in, including Redis-only examples. */
+private fun ApplicationTestBuilder.installStatusExampleIssuer() {
+    loadIssuer2ConfigFiles()
+    val module = Issuer2Module(
+        ConfigManager.getConfig(), ConfigManager.getConfig(), ConfigManager.getConfig(),
+        credentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
+            InMemoryPersistence<CredentialStatusConsumption>("openapi-status-examples", Duration.INFINITE),
+            durable = true,
+        ),
+    )
+    application {
+        install(ContentNegotiation) { json(shippedIssuer2Json) }
+        installIssuer2AuthenticationForTests()
+        configurePlugins()
+        routing {
+            module.managementController.register(this)
+            module.openId4VciController.register(this)
         }
     }
 }
