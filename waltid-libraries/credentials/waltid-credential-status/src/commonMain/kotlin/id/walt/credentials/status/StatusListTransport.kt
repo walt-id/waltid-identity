@@ -15,6 +15,8 @@ import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.fromHttpToGmtDate
+import io.ktor.util.date.GMTDate
+import io.ktor.util.date.GMTDateParser
 import io.ktor.util.AttributeKey
 import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
@@ -194,8 +196,11 @@ internal class StatusListTransport(
             }.execute { response ->
                 val receivedAt = now()
                 if (response.status == HttpStatusCode.TooManyRequests) {
-                    val wait = response.headers[HttpHeaders.RetryAfter]?.toLongOrNull()?.coerceIn(1, 3600) ?: 30
-                    val retryAt = receivedAt + wait.seconds
+                    val retryAfter = response.headers[HttpHeaders.RetryAfter]
+                    val wait = retryAfter?.toLongOrNull()?.seconds
+                        ?: retryAfter?.toRetryAfterInstant(receivedAt)?.minus(receivedAt)
+                        ?: 30.seconds
+                    val retryAt = receivedAt + wait.coerceIn(1.seconds, 60.minutes)
                     mutex.withLock {
                         rateLimits.entries.removeAll { it.value <= receivedAt }
                         if (uri in rateLimits || rateLimits.size < limits.maxCachedLists) rateLimits[uri] = retryAt
@@ -276,6 +281,34 @@ internal class StatusListTransport(
 
     fun close() { client.close() }
 }
+
+private val Rfc850Date = Regex("""[A-Za-z]+, (\d{2}-[A-Za-z]{3}-)(\d{2})( \d{2}:\d{2}:\d{2} GMT)""")
+private val Rfc850DateParser = GMTDateParser("dd-MMM-YYYY hh:mm:ss zzz")
+private val AsctimeDateParser = GMTDateParser("*** MMM dd hh:mm:ss YYYY")
+
+private fun String.toRetryAfterInstant(receivedAt: Instant): Instant? = runCatching {
+    val value = trim()
+    val rfc850 = Rfc850Date.matchEntire(value)
+    val date = when {
+        rfc850 != null -> {
+            val (dayAndMonth, shortYear, timeAndZone) = rfc850.destructured
+            val received = GMTDate(receivedAt.toEpochMilliseconds())
+            // RFC 9110 limits the two-digit year to 50 years in the future.
+            val latestYear = received.year + 50
+            val year = latestYear - (latestYear - shortYear.toInt()).mod(100)
+            fun dateIn(year: Int) = Rfc850DateParser.parse("$dayAndMonth${year.toString().padStart(4, '0')}$timeAndZone")
+            val candidate = dateIn(year)
+            val beyondWindow = year == latestYear && compareValuesBy(
+                candidate, received, GMTDate::month, GMTDate::dayOfMonth,
+                GMTDate::hours, GMTDate::minutes, GMTDate::seconds,
+            ) > 0
+            if (beyondWindow) dateIn(year - 100) else candidate
+        }
+        ',' !in value -> AsctimeDateParser.parse(value.replace("  ", " 0"))
+        else -> value.fromHttpToGmtDate()
+    }
+    Instant.fromEpochMilliseconds(date.timestamp)
+}.getOrNull()
 
 private val StatusOriginalUrl = AttributeKey<Url>("credential-status-original-url")
 private val StatusRequestBoundary = createClientPlugin("CredentialStatusRequestBoundary") {

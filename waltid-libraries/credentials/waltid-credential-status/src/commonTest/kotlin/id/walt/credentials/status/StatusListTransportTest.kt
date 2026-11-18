@@ -33,6 +33,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
@@ -234,6 +235,53 @@ class StatusListTransportTest {
             CredentialStatusLimits(maxResponseBytes = 10))
         try {
             assertEquals(StatusListContent.Text("1234567890"), transport.fetch(StatusListRequest("https://status.example/exact", StatusListRepresentation.TOKEN_JWT), true).content)
+        } finally { transport.close(); client.close() }
+    }
+
+    @Test
+    fun datedRetryAfterBlocksForcedRefreshUntilTheReportedDeadline() = runTest {
+        val start = Instant.parse("2026-11-06T08:49:37.125Z")
+        val deadline = Instant.parse("2026-11-06T08:54:37Z")
+        val cases = listOf(
+            "Fri, 06 Nov 2026 08:54:37 GMT" to deadline,
+            "Friday, 06-Nov-26 08:54:37 GMT" to deadline,
+            "Fri Nov  6 08:54:37 2026" to deadline,
+            "Mon Nov 16 08:54:37 2026" to (start + 60.minutes),
+            "Sunday, 07-Nov-76 08:54:37 GMT" to (start + 1.seconds),
+            "invalid date" to (start + 30.seconds),
+        )
+        var at = start
+        var retryAfter = ""
+        var requests = 0
+        val client = HttpClient(MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler {
+                if (++requests == 1) {
+                    respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, retryAfter))
+                } else {
+                    respond("list")
+                }
+            }
+        }))
+        val transport = StatusListTransport(client, backgroundScope, { at }, CredentialStatusLimits())
+        try {
+            cases.forEachIndexed { index, (header, expected) ->
+                at = start
+                retryAfter = header
+                requests = 0
+                val request = StatusListRequest("https://status.example/list/$index", StatusListRepresentation.TOKEN_JWT)
+                suspend fun forcedRefresh() = assertFailsWith<CredentialStatusException> {
+                    transport.fetch(request, force = true)
+                }.reason
+
+                assertEquals(CheckFailure.RateLimited(expected), forcedRefresh(), header)
+                at = expected - 1.milliseconds
+                assertEquals(CheckFailure.RateLimited(expected), forcedRefresh(), header)
+                assertEquals(1, requests, "Forced refresh must honor Retry-After: $header")
+                at = expected
+                assertEquals(StatusListContent.Text("list"), transport.fetch(request, force = true).content)
+                assertEquals(2, requests)
+            }
         } finally { transport.close(); client.close() }
     }
 
