@@ -14,6 +14,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
 import kotlin.time.Duration.Companion.days
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
@@ -23,6 +24,10 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceRequest
+import id.walt.issuer2.domain.CredentialStatusConfiguration
+import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.tokenGroups
+import id.walt.issuer2.domain.CredentialStatusConfigurationTest.Companion.w3cStatus
+import id.walt.issuer2.domain.IssuanceResult
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
@@ -45,6 +50,8 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.time.Duration
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -52,10 +59,184 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import redis.clients.jedis.util.JedisClusterCRC16
 
 @Tag("redis")
 @EnabledIfEnvironmentVariable(named = "ISSUER2_REDIS_HOST", matches = ".+")
 class ConfiguredRedisRepositoryTest {
+    @Test
+    fun statusReservationsAreAtomicPermanentAndRecoverAcrossRepositoryInstances() = runTest {
+        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
+        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
+        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+            val namespace = "status-consumption-" + java.util.UUID.randomUUID()
+            fun storage() = id.walt.commons.persistence.RedisPersistence(
+                namespace, Duration.INFINITE,
+                { value: CredentialStatusConsumption -> Json.encodeToString(value) },
+                { value -> Json.decodeFromString<CredentialStatusConsumption>(value) }, redis,
+            )
+            fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage())
+            val keys = CredentialStatusRedisKeys(namespace)
+            fun groups(vararg indexes: Int) = (CredentialStatusConfiguration.parse(
+                tokenGroups(*indexes), CredentialFormat.SD_JWT_VC,
+            ) as CredentialStatusConfiguration.Preallocated).groups
+            val deadline = Clock.System.now() + 1.days
+            try {
+                val reserved = repository().reserve("profile", "first", listOf("A", "B"), groups(1, 2, 3), 2, deadline)
+                assertEquals(reserved, repository().reserve("profile", "first", listOf("A", "B"), groups(3, 2, 1), 2, deadline))
+                assertEquals(-1L, redis.pttl(keys.records))
+                assertEquals(CredentialStatusOwner("profile", "first"), Json.decodeFromString<CredentialStatusOwner>(
+                    redis.hget(keys.records, "entry:" + groups(1).single().references.single()),
+                ))
+                val next = repository().reserve("profile", "after-restart", listOf("C"), groups(2, 1, 4, 3), 1, deadline)
+                assertEquals(groups(4).single().statuses, next.single())
+                val results = coroutineScope {
+                    (1..12).map { index -> async(Dispatchers.IO) {
+                        runCatching { repository().reserve("concurrent-" + index, "request-" + index, listOf("key"),
+                            groups(10, 11, 12), 2, deadline) }
+                    } }.awaitAll()
+                }
+                assertEquals(1, results.count { it.isSuccess })
+                kotlin.test.assertTrue(results.filter { it.isFailure }.all { it.exceptionOrNull() is CredentialStatusCapacityException })
+                assertEquals(5, redis.hkeys(keys.records).count { it.startsWith("entry:") })
+            } finally {
+                redis.del(keys.records, keys.deadlines, keys.migrationComplete, keys.migrationLock)
+            }
+        }
+    }
+
+    @Test
+    fun statusProfilesCannotReuseEntriesOrPartiallyConsumeAnExhaustedBatch() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            fun repository() = ConfiguredCredentialStatusConsumptionRepository(storage)
+            val groups = statusGroups(1, 2, 3)
+            val deadline = Clock.System.now() + 1.days
+            repository().reserve("A", "first", listOf("A"), groups, 2, deadline)
+            assertFailsWith<CredentialStatusCapacityException> {
+                repository().reserve("B", "second", listOf("B"), groups, 2, deadline)
+            }
+            assertNull(redis.hget(keys.records, "entry:" + groups.last().references.single()))
+            assertEquals(listOf(groups.last().statuses), repository().reserve("B", "second", listOf("B"), groups, 1, deadline))
+            assertEquals(CredentialStatusOwner("B", "second"), Json.decodeFromString<CredentialStatusOwner>(
+                redis.hget(keys.records, "entry:" + groups.last().references.single()),
+            ))
+            assertFailsWith<CredentialStatusOperationException> {
+                repository().reserve("B", "first", listOf("A"), groups, 2, deadline)
+            }
+        }
+    }
+
+    @Test
+    fun statusBatchesPreserveUnsignedIndexesAcrossDifferentLists() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            val values = JsonArray(listOf("https://status.example.com/A", "https://status.example.com/B").map { uri ->
+                buildJsonObject { put("status_list", buildJsonObject {
+                    put("uri", uri); put("idx", Json.parseToJsonElement(ULong.MAX_VALUE.toString()))
+                }) }
+            })
+            val groups = (CredentialStatusConfiguration.parse(values, CredentialFormat.SD_JWT_VC)
+                as CredentialStatusConfiguration.Preallocated).groups
+            val deadline = Clock.System.now() + 1.days
+            val first = ConfiguredCredentialStatusConsumptionRepository(storage)
+                .reserve("A", "batch", listOf("one", "two"), groups, 2, deadline)
+            assertEquals(groups.map { it.statuses }, first)
+            assertEquals(first, ConfiguredCredentialStatusConsumptionRepository(storage)
+                .reserve("A", "batch", listOf("one", "two"), groups.reversed(), 2, deadline))
+            assertFailsWith<CredentialStatusCapacityException> {
+                ConfiguredCredentialStatusConsumptionRepository(storage).reserve("B", "next", listOf("key"), groups, 1, deadline)
+            }
+            assertEquals(2, redis.hkeys(keys.records).count { it.startsWith("entry:") })
+            val slots = listOf(keys.records, keys.deadlines, keys.migrationComplete, keys.migrationLock)
+                .map { JedisClusterCRC16.getSlot(it) }.toSet()
+            assertEquals(1, slots.size, "Batch and migration keys must share a Redis Cluster slot")
+        }
+    }
+
+    private fun statusGroups(vararg indexes: Int) = (CredentialStatusConfiguration.parse(
+        tokenGroups(*indexes), CredentialFormat.SD_JWT_VC,
+    ) as CredentialStatusConfiguration.Preallocated).groups
+
+    private suspend fun withStatusLedger(block: suspend (
+        redis.clients.jedis.JedisPooled,
+        id.walt.commons.persistence.RedisPersistence<CredentialStatusConsumption>,
+        CredentialStatusRedisKeys,
+    ) -> Unit) {
+        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
+        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
+        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+            val namespace = "global-status-" + java.util.UUID.randomUUID()
+            val keys = CredentialStatusRedisKeys(namespace)
+            val storage = id.walt.commons.persistence.RedisPersistence(namespace, Duration.INFINITE,
+                { value: CredentialStatusConsumption -> Json.encodeToString(value) },
+                { Json.decodeFromString<CredentialStatusConsumption>(it) }, redis)
+            try { block(redis, storage, keys) }
+            finally {
+                storage.listAllKeys().forEach(storage::remove)
+                redis.del(keys.records, keys.deadlines, keys.migrationComplete, keys.migrationLock)
+            }
+        }
+    }
+
+    @Test
+    fun infiniteRedisExpiryDoesNotResetToFiniteOrOverflow() {
+        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
+        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
+        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+            val namespace = "permanent-status-" + java.util.UUID.randomUUID()
+            val persistence = id.walt.commons.persistence.RedisPersistence<String>(
+                namespace, Duration.INFINITE, { it }, { it }, redis,
+            )
+            try {
+                persistence["key"] = "first"
+                assertEquals(-1L, redis.pttl(namespace + ":key"))
+                kotlin.test.assertTrue(persistence.compareAndSet("key", "first", "second", Duration.INFINITE))
+                assertEquals(-1L, redis.pttl(namespace + ":key"))
+                persistence.set("key", "third", 1.minutes)
+                kotlin.test.assertTrue(persistence.retainForAtLeast("key", Duration.INFINITE))
+                assertEquals(-1L, redis.pttl(namespace + ":key"))
+                kotlin.test.assertTrue(persistence.retainForAtLeast("key", 5.minutes))
+                assertEquals(-1L, redis.pttl(namespace + ":key"))
+                persistence.listAdd("list", "first", 1.minutes)
+                persistence.listAdd("list", "second", Duration.INFINITE)
+                assertEquals(-1L, redis.pttl(namespace + ":list"))
+            } finally {
+                persistence.remove("key")
+                persistence.remove("list")
+            }
+        }
+    }
+
+    @Test
+    fun immediateStatusCheckpointAndLeaseSurviveRedisSessionRecovery() = runTest {
+        configureRedisPersistence()
+        var now = Clock.System.now()
+        val repository = ConfiguredIssuanceSessionRepository()
+        val original = testSession("status-lease-" + java.util.UUID.randomUUID()).copy(expiresAt = now + 1.days)
+        repository.save(original)
+        try {
+            val first = IssuanceSessionService(repository, now = { now })
+            val stale = assertNotNull(first.claimCredentialStatusSession(original.sessionId))
+            val identifier = original.issuanceRequests.single().credentialIdentifier
+            val operation = first.prepareCredentialStatusOperation(stale, identifier, listOf("key1", "key2"), 2)
+            val response = CredentialResponse(listOf(
+                IssuedCredential(JsonPrimitive("signed-copy-1")), IssuedCredential(JsonPrimitive("signed-copy-2")),
+            ))
+            first.checkpointCredentialStatusResponse(stale, identifier, operation.id, response)
+            now += 6.minutes
+            val restartedRepository = ConfiguredIssuanceSessionRepository()
+            val restarted = IssuanceSessionService(restartedRepository, now = { now })
+            val recovered = assertNotNull(restarted.claimCredentialStatusSession(original.sessionId))
+            val restored = restarted.prepareCredentialStatusOperation(recovered, identifier, listOf("key1", "key2"), 2)
+            assertEquals(operation.id, restored.id)
+            assertEquals(response, restored.response)
+            assertNotNull(restartedRepository.get(original.sessionId)!!.issuanceRequests.single().crypto2IssuerStoredKey)
+            assertFailsWith<CredentialStatusOperationException> { first.releaseCredentialStatusSession(stale) }
+            val complete = restarted.finishCredentialStatusSession(recovered.copy(
+                issuanceResults = mapOf(identifier to IssuanceResult("dc+sd-jwt")),
+            ), identifier)
+            assertEquals(emptyMap(), complete.credentialStatusIssuance!!.operations)
+        } finally { repository.remove(original.sessionId) }
+    }
 
     @Test
     fun redisRetentionDoesNotShortenExistingDeadline() = runTest {
