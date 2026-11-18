@@ -5,10 +5,12 @@ import id.walt.openid4vci.deferred.*
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwkObject
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.domain.CredentialProfile
@@ -18,6 +20,7 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceResult
 import id.walt.issuer2.domain.CredentialStatusConfiguration
+import id.walt.issuer2.domain.CredentialStatusIssuanceOperation
 import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.CredentialStatusCapacityException
@@ -63,11 +66,11 @@ import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceService
 import id.walt.openid4vci.proofs.CredentialNonceValidationContext
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
-import id.walt.openid4vci.proofs.CredentialProofServiceException
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
-import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
+import id.walt.openid4vci.proofs.CredentialProofServiceException
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -140,7 +143,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private val credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
     /** Atomically commits proof-key side effects after the complete credential batch was constructed. */
     private val credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
-    private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
+    /** An optional, additional holder-key policy for hosts that previously supplied a separate verifier. */
+    private val credentialProofVerifier: CredentialProofVerifier? = null,
     private val keyAttestation: KeyAttestationVerificationOptions? = null,
     private val attestationChallengeService: AttestationChallengeService? = null,
     private val deferredConfig: DeferredIssuanceConfig = DeferredIssuanceConfig(),
@@ -1138,20 +1142,25 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val nonceBinding = credentialNonceBinding()
         val usesPreallocatedStatus = CredentialStatusConfiguration.isPreallocated(observedIssuanceRequest.credentialStatus)
 
+        val proofValidationContext = CredentialProofValidationContext(
+            keyAttestation = keyAttestation,
+            credentialIssuer = nonceBinding.credentialIssuer,
+            clientId = requestWithSession.accessTokenClientId,
+            anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
+            nonceValidation = CredentialNonceValidationContext(
+                service = credentialNonceService,
+                binding = nonceBinding,
+            ),
+            batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
+        )
+
         if (observedSession.deferredState != null && deferredClaim == null) {
             try {
                 val accepted = try {
                     oauth2Provider.acceptCredentialRequest(
                         requestWithSession, configuration, authorization.credentialIdentifier,
                         authorization.credentialConfigurationId,
-                        CredentialProofValidationContext(
-                            keyAttestation = keyAttestation,
-                            credentialIssuer = nonceBinding.credentialIssuer,
-                            clientId = requestWithSession.accessTokenClientId,
-                            anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
-                            nonceValidation = CredentialNonceValidationContext(credentialNonceService, nonceBinding),
-                            batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-                        ),
+                        proofValidationContext,
                     )
                 } catch (e: CredentialProtocolException) {
                     // Collection notifications apply only after a transaction has been accepted.
@@ -1182,63 +1191,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             } catch (e: CredentialProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
             }
-        }
-
-        // The provider validates proofs authoritatively while building the credential response. Sessions
-        // pinned to an expected holder key, and deployments hooking into proof-key acceptance, need that
-        // key before the session is claimed, so resolve it up front for those cases only. Nonces stay
-        // valid until they expire, so validating them here as well never consumes anything.
-        val verifiedProofKeys = if (deferredClaim != null) CredentialProofKeys(
-            deferredClaim.accepted.bindings.map { it.publicJwk },
-            if (usesPreallocatedStatus) deferredClaim.accepted.bindings.map {
-                credentialStatusBinding(it.publicJwk, it.holderKid, it.holderDid, it.proofIndexes)
-            } else emptyList(),
-        ) else if (usesPreallocatedStatus || requiresCredentialProofKeys(observedIssuanceRequest)) {
-            try {
-                resolveCredentialProofKeys(requestWithSession, configuration, nonceBinding, usesPreallocatedStatus)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: CredentialProofServiceException) {
-                logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
-                return oauth2Provider.writeCredentialError(
-                    OAuthError(
-                        OAuthErrorCodes.SERVER_ERROR,
-                        "Credential proof verification unavailable"
-                    )
-                )
-            } catch (e: CredentialProofValidationException) {
-                return rejectCredentialRequest(
-                    requestWithSession,
-                    observedSession,
-                    configuration.format,
-                    requestId,
-                    CredentialError(e.errorCode, e.message),
-                )
-            } catch (e: Exception) {
-                return rejectCredentialRequest(
-                    requestWithSession,
-                    observedSession,
-                    configuration.format,
-                    requestId,
-                    CredentialError(
-                        CredentialErrorCodes.INVALID_PROOF,
-                        e.message ?: "Credential proof is invalid",
-                    ),
-                )
-            }
-        } else {
-            null
-        }
-        val proofPublicKeyJwks = verifiedProofKeys?.publicJwks
-
-        validateExpectedCredentialProofKeys(proofPublicKeyJwks, observedIssuanceRequest)?.let { error ->
-            return rejectCredentialRequest(
-                requestWithSession,
-                observedSession,
-                configuration.format,
-                requestId,
-                error,
-            )
         }
 
         // Preallocated status requires a durable lease so a crashed process cannot lose the session.
@@ -1284,68 +1236,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val statusConfiguration = CredentialStatusConfiguration.parse(
                 issuanceRequest.credentialStatus, configuration.format, issuanceRequest.mapping,
             )
-            val preallocatedStatus = statusConfiguration as? CredentialStatusConfiguration.Preallocated
-            val statusHolderKeys = if (preallocatedStatus != null) {
-                requireNotNull(verifiedProofKeys).statusBindings
-            } else emptyList()
-            val statusOperation = if (preallocatedStatus != null && deferredClaim == null) {
-                sessionService.prepareCredentialStatusOperation(
-                    session, issuanceRequest.credentialIdentifier, statusHolderKeys,
-                )
-            } else null
-
-            credentialProofKeyAcceptance?.let { acceptance ->
-                val accepted = try {
-                    acceptance.accept(session, requireNotNull(proofPublicKeyJwks))
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: CredentialProofKeyAcceptanceException) {
-                    val response = if (e.retryable) {
-                        retryCredentialRequest(
-                            requestWithSession,
-                            session,
-                            configuration.format,
-                            requestId,
-                            e.toCredentialError(),
-                        )
-                    } else {
-                        failClaimedCredentialRequest(
-                            requestWithSession,
-                            session,
-                            configuration.format,
-                            requestId,
-                            e.toCredentialError(),
-                        )
-                    }
-                    claimFinalized = true
-                    return response
-                } catch (e: Exception) {
-                    val response = retryCredentialRequest(
-                        requestWithSession,
-                        session,
-                        configuration.format,
-                        requestId,
-                        e.toCredentialProofError(),
-                    )
-                    claimFinalized = true
-                    return response
-                }
-                if (!accepted) {
-                    val response = retryCredentialRequest(
-                        requestWithSession,
-                        session,
-                        configuration.format,
-                        requestId,
-                        CredentialError(
-                            CredentialErrorCodes.INVALID_PROOF,
-                            "Credential proof key was not accepted",
-                        ),
-                    )
-                    claimFinalized = true
-                    return response
-                }
-            }
-
+            var statusOperation: CredentialStatusIssuanceOperation? = null
+            var statusHolderKeys = emptyList<String>()
+            var proofPublicKeyJwks: List<JsonObject>? = null
             val issuedAt = Clock.System.now()
             val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
                 MsoValidityResolver.resolve(
@@ -1360,26 +1253,50 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 null
             }
 
-            val proofValidationContext = CredentialProofValidationContext(
-                keyAttestation = keyAttestation,
-                credentialIssuer = nonceBinding.credentialIssuer,
-                clientId = requestWithSession.accessTokenClientId,
-                anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
-                nonceValidation = CredentialNonceValidationContext(
-                    service = credentialNonceService,
-                    binding = nonceBinding,
-                ),
-                batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-            )
-            val issuanceInputData = CredentialIssuanceInputProvider { issuanceCount ->
-                when (statusConfiguration) {
-                    is CredentialStatusConfiguration.Fixed -> List(issuanceCount) {
+            val issuanceInputData = object : CredentialIssuanceInputProvider {
+                override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult? {
+                    if (usesPreallocatedStatus || requiresCredentialProofKeys(issuanceRequest)) {
+                        if (bindings.isEmpty()) return CredentialResponseResult.Failure(
+                            CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential request has no credential proof"),
+                        )
+                        val publicKeys = bindings.map { it.holderKey.exportPublicJwkObject() }
+                        if (credentialProofVerifier != null && deferredClaim == null) {
+                            val inspected = try {
+                                credentialProofVerifier.verify(requestWithSession, configuration, proofValidationContext)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: CredentialProofServiceException) {
+                                throw e
+                            } catch (e: CredentialProofValidationException) {
+                                return CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
+                            }
+                            if (inspected.bindings.map { it.holderKey.exportPublicJwkObject().thumbprint() } !=
+                                publicKeys.map { it.thumbprint() }) return CredentialResponseResult.Failure(
+                                CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof holder keys disagree"),
+                            )
+                        }
+                        proofPublicKeyJwks = publicKeys
+                        validateExpectedCredentialProofKeys(publicKeys, issuanceRequest)?.let {
+                            return CredentialResponseResult.Failure(it)
+                        }
+                        checkCredentialProofKeyAcceptance(session, publicKeys)?.let { return CredentialResponseResult.Failure(it) }
+                        if (usesPreallocatedStatus) {
+                            statusHolderKeys = bindings.mapIndexed { index, binding ->
+                                credentialStatusBinding(publicKeys[index], binding)
+                            }
+                            if (deferredClaim == null) statusOperation = sessionService.prepareCredentialStatusOperation(
+                                session, issuanceRequest.credentialIdentifier, statusHolderKeys,
+                            )
+                        }
+                    }
+                    return (deferredClaim?.response ?: statusOperation?.response)?.let { CredentialResponseResult.Success(it) }
+                }
+
+                override suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput> = when (statusConfiguration) {
+                    is CredentialStatusConfiguration.Fixed -> List(credentialCount) {
                         createCredentialIssuanceInput(issuanceRequest, configuration.format, statusConfiguration.value)
                     }
                     is CredentialStatusConfiguration.Preallocated -> {
-                        if (issuanceCount != statusHolderKeys.size) {
-                            throw CredentialStatusOperationException("Verified status issuance count changed")
-                        }
                         val groups = credentialStatusConsumption.reserve(
                             profileId = issuanceRequest.profileId,
                             operationId = deferredClaim?.id ?: requireNotNull(statusOperation).id,
@@ -1387,8 +1304,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             groups = statusConfiguration.groups,
                             expiresAt = session.deferredState?.deadline ?: session.expiresAt,
                         )
-                        if (deferredClaim != null) deferredIssuance.checkpointProgress(sessionId, deferredClaim,
-                            buildJsonObject { put("credentialStatusOperationId", deferredClaim.id) })
                         groups.map { group ->
                             val value = CredentialStatusConfiguration.credentialValue(group, configuration.format)
                             createCredentialIssuanceInput(issuanceRequest, configuration.format, value)
@@ -1396,8 +1311,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     }
                 }
             }
-            val credentialResponseResult = (deferredClaim?.response ?: statusOperation?.response)
-                ?.let { CredentialResponseResult.Success(it) } ?: withContext(IssuanceClock(issuedAt)) {
+            val credentialResponseResult = withContext(IssuanceClock(issuedAt)) {
                 if (crypto2IssuerKey != null) {
                     oauth2Provider.createCredentialResponse(
                         request = requestWithSession,
@@ -1470,9 +1384,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             if (deferredClaim != null && deferredClaim.response == null) {
                 deferredIssuance.checkpoint(sessionId, deferredClaim, credentialResponse)
             }
-            if (statusOperation != null && statusOperation.response == null) {
+            statusOperation?.takeIf { it.response == null }?.let { operation ->
                 sessionService.checkpointCredentialStatusResponse(
-                    session, issuanceRequest.credentialIdentifier, statusOperation.id, credentialResponse,
+                    session, issuanceRequest.credentialIdentifier, operation.id, credentialResponse,
                 )
             }
 
@@ -1918,64 +1832,27 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 credentialProofKeyCommitment != null ||
                 issuanceRequest.expectedCredentialProofKeyJwks != null
 
-    /**
-     * Resolves the ordered holder keys of all credential proofs in the request.
-     *
-     * The credential response creation validates proofs authoritatively as well. This only exposes the
-     * holder keys to session pinning and to the proof-key hooks before the session is claimed, so that
-     * neither runs for a request that cannot be issued.
-     */
-    private data class CredentialProofKeys(
-        val publicJwks: List<JsonObject>,
-        val statusBindings: List<String>,
-    )
+    private suspend fun credentialStatusBinding(publicJwk: JsonObject, binding: VerifiedCredentialBinding): String =
+        buildJsonObject {
+            put("key", publicJwk.thumbprint())
+            binding.holderKid?.let { put("kid", it) }
+            binding.holderDid?.let { put("did", it) }
+            put("proofIndexes", JsonArray(binding.proofIndexes.sorted().map(::JsonPrimitive)))
+        }.toString()
 
-    private suspend fun credentialStatusBinding(
-        publicJwk: JsonObject,
-        holderKid: String?,
-        holderDid: String?,
-        proofIndexes: Set<Int>,
-    ): String = buildJsonObject {
-        put("key", JWKKey.importJWK(publicJwk.toString()).getOrThrow().getThumbprint())
-        holderKid?.let { put("kid", it) }
-        holderDid?.let { put("did", it) }
-        put("proofIndexes", JsonArray(proofIndexes.sorted().map(::JsonPrimitive)))
-    }.toString()
+    private suspend fun JsonObject.thumbprint(): String =
+        Jwk.sha256Thumbprint(EncodedKey.Jwk(BinaryData(toString().encodeToByteArray()), privateMaterial = false))
 
-    private suspend fun resolveCredentialProofKeys(
-        request: CredentialRequest,
-        configuration: CredentialConfiguration,
-        nonceBinding: CredentialNonceBinding,
-        includeStatusBindings: Boolean,
-    ): CredentialProofKeys {
-        val verifiedProofs = credentialProofVerifier.verify(
-            credentialRequest = request,
-            credentialConfiguration = configuration,
-            context = CredentialProofValidationContext(
-                keyAttestation = keyAttestation,
-                batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-                credentialIssuer = nonceBinding.credentialIssuer,
-                clientId = request.accessTokenClientId,
-                anonymousPreAuthorizedAccess = request.anonymousPreAuthorizedAccess,
-                nonceValidation = CredentialNonceValidationContext(
-                    service = credentialNonceService,
-                    binding = nonceBinding,
-                ),
-            ),
-        )
-        require(verifiedProofs.bindings.isNotEmpty()) { "Credential request has no credential proof" }
-        // The verified holder key is a crypto2 key since the crypto updates, so the public JWK comes
-        // from its public key exporter rather than the legacy getPublicKey().exportJWKObject().
-        val publicJwks = verifiedProofs.bindings.map { verifiedProof ->
-            val holderKey = verifiedProof.holderKey
-            val holderPublicJwk = requireNotNull(holderKey.capabilities.publicKeyExporter) {
-                "Credential proof holder key does not export public material"
-            }.exportPublicKey().toPublicJwk(holderKey.spec)
-            Json.parseToJsonElement(holderPublicJwk.data.toByteArray().decodeToString()).jsonObject
+    private suspend fun checkCredentialProofKeyAcceptance(session: IssuanceSession, publicKeys: List<JsonObject>): CredentialError? {
+        val acceptance = credentialProofKeyAcceptance ?: return null
+        return try {
+            if (acceptance.accept(session, publicKeys)) null
+            else CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential proof key was not accepted")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.toCredentialProofError()
         }
-        return CredentialProofKeys(publicJwks, if (includeStatusBindings) verifiedProofs.bindings.mapIndexed { index, binding ->
-            credentialStatusBinding(publicJwks[index], binding.holderKid, binding.holderDid, binding.proofIndexes)
-        } else emptyList())
     }
 
     private suspend fun validateExpectedCredentialProofKeys(
@@ -1986,10 +1863,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return try {
             val presentedJwks = requireNotNull(proofPublicKeyJwks) { "Credential proof keys are missing" }
             val expectedThumbprints = expectedJwks.map { expectedJwk ->
-                JWKKey.importJWK(expectedJwk.toString()).getOrThrow().getThumbprint()
+                expectedJwk.thumbprint()
             }
             val presentedThumbprints = presentedJwks.map { presentedJwk ->
-                JWKKey.importJWK(presentedJwk.toString()).getOrThrow().getThumbprint()
+                presentedJwk.thumbprint()
             }
             val matches = if (expectedThumbprints.size == 1) {
                 presentedThumbprints.isNotEmpty() && presentedThumbprints.all { it == expectedThumbprints.single() }

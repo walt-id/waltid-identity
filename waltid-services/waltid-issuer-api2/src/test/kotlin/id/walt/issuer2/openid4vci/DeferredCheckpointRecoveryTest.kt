@@ -13,6 +13,9 @@ import id.walt.issuer2.repository.*
 import id.walt.issuer2.service.*
 import id.walt.issuer2.service.openid4vci.*
 import id.walt.issuer2.testsupport.*
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
+import id.walt.openid4vci.proofs.CredentialProofVerifier
+import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.sdjwt.SDJwt
@@ -90,21 +93,37 @@ class DeferredCheckpointRecoveryTest {
         val typeMetadata = IssuerTypeMetadataCatalogue(
             serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
         ).also(catalogues::add)
+        var proofVerifications = 0
+        val verifier = DefaultCredentialProofVerifier()
         val module = OpenId4VciModule.create(
             serviceConfig, InMemoryAuthorizationCodeRepository(), InMemoryPreAuthorizedCodeRepository(),
             InMemoryPARRepository(), InMemoryRefreshTokenRepository(), metadataResolver = typeMetadata,
+            keyAttestationKeyResolver = null,
+            credentialProofVerifier = CredentialProofVerifier { request, configuration, context ->
+                proofVerifications++
+                verifier.verify(request, configuration, context)
+            },
         )
         val metadata = MetadataService(
             serviceConfig, metadataConfig, profiles, sessions, typeMetadata,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
         )
         val notifications = IssuanceNotificationService()
-        var signingCalls = 0
+        var issuanceInputRequests = 0
         // Intercept only the failure boundary; all parsing, proof validation, signing and persistence use real implementations.
         val provider = Proxy.newProxyInstance(OAuth2Provider::class.java.classLoader, arrayOf(OAuth2Provider::class.java)) { _, method, args ->
             if (method.name == "createCredentialResponse") {
-                signingCalls++
-                if (failure == "signing" && fail && !preallocated) { fail = false; error("Temporary signing failure") }
+                val inputIndex = method.parameterTypes.indexOf(CredentialIssuanceInputProvider::class.java)
+                val inputs = args[inputIndex] as CredentialIssuanceInputProvider
+                args[inputIndex] = object : CredentialIssuanceInputProvider by inputs {
+                    override suspend fun provide(credentialCount: Int) = inputs.provide(credentialCount).also {
+                        issuanceInputRequests++
+                        if (failure == "signing" && fail && !preallocated) {
+                            fail = false
+                            error("Temporary signing failure")
+                        }
+                    }
+                }
             }
             if (method.name == "writeCredentialResponse" && failure == "response" && fail) {
                 fail = false
@@ -150,6 +169,7 @@ class DeferredCheckpointRecoveryTest {
         suspend fun submit(body: JsonObject) = protocol().processCredentialRequest(listOf("Bearer $token"), emptyList(), body, "credential")
         if (failure == "consume" && deferred) assertFailsWith<IllegalStateException> { submit(request()) }
         else assertEquals(500, submit(request()).status)
+        assertEquals(1, proofVerifications, "The first request verifies its batch once")
         val transaction = if (deferred) assertNotNull(sessions.getSession(receipt.offerId).deferredState).transactions.values.single() else null
         if (transaction != null) {
             assertFalse(transaction.consumed)
@@ -166,9 +186,11 @@ class DeferredCheckpointRecoveryTest {
             putJsonObject("proofs") { putJsonArray("jwt") { add("invalid") } }
         })
         assertEquals(400, invalid.status, "Repeated Credential Requests must revalidate proofs")
+        val beforeRetry = proofVerifications
         val recovered = submit(request())
         assertEquals(200, recovered.status, recovered.payload.toString())
-        assertEquals(if (failure == "signing") 2 else 1, signingCalls)
+        assertEquals(beforeRetry + 1, proofVerifications, "A retry verifies fresh proofs once, even for a saved response")
+        assertEquals(if (failure == "signing") 2 else 1, issuanceInputRequests)
         if (preallocated) {
             val statuses = recovered.payload.getValue("credentials").jsonArray.map {
                 SDJwt.parse(it.jsonObject.getValue("credential").jsonPrimitive.content).fullPayload.getValue("status")
