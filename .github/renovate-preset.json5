@@ -60,13 +60,6 @@
       allowedVersions: '1.0.0-rc-1',
     },
     {
-      description: 'Frontend nginx images stay on the 1.27 Alpine line. Newer Alpine hangs QEMU image builds.',
-      matchDatasources: ['docker'],
-      matchPackageNames: ['nginx', 'nginxinc/nginx-unprivileged'],
-      matchCurrentVersion: '/1\\.27.*alpine/',
-      allowedVersions: '/^1\\.27.*alpine/',
-    },
-    {
       description: 'Navigation 1.2.0 stays held until the iOS Compose baselines are updated with it.',
       matchPackageNames: ['/^org\\.jetbrains\\.androidx\\.navigation3:/'],
       allowedVersions: '1.1.2',
