@@ -3,6 +3,7 @@ package id.walt.policies2.vc
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseSigner
 import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
@@ -26,6 +27,8 @@ import id.walt.did.dids.resolver.DidResolver
 import id.walt.policies2.vc.policies.AllowedIssuerPolicy
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -124,6 +127,7 @@ class CredentialIssuerAuthorizationTest {
         }
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun statusLists(key: Key, kid: String): Pair<String, ByteArray> {
         val payload = Json.encodeToString(buildJsonObject {
             put("iss", did)
@@ -133,7 +137,9 @@ class CredentialIssuerAuthorizationTest {
             protectedHeader = buildJsonObject { put("kid", kid); put("typ", "statuslist+jwt") })
         val cwt = CoseSign1.createAndSign(
             protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256, kid = kid.encodeToByteArray()),
-            unprotectedHeaders = CoseHeaders(), payload = payload, signer = key.toCoseSigner(Cose.Algorithm.ES256),
+            unprotectedHeaders = CoseHeaders(),
+            payload = coseCompliantCbor.encodeToByteArray(mapOf(1 to did)),
+            signer = key.toCoseSigner(Cose.Algorithm.ES256),
         ).toTagged()
         return jwt to cwt
     }
