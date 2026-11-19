@@ -72,7 +72,9 @@ internal data class WebhookAttemptResult(
             (error != null || statusCode == 408 || statusCode == 429 || statusCode in 500..599)
 
     fun failureMessage(): String = when {
-        error != null -> "${error::class.simpleName}: ${error.message ?: "request failed"}"
+        error is WebhookDestinationNotAllowedException -> "Webhook destination is not allowed (network-fetch-guard.conf)"
+        // Transport exception messages can include the complete callback URL and its credentials.
+        error != null -> "Webhook request failed (${error::class.simpleName})"
         statusCode != null -> "Webhook endpoint returned HTTP $statusCode"
         else -> "Webhook delivery failed"
     }

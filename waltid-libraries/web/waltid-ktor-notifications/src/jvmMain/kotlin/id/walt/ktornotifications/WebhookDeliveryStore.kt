@@ -4,12 +4,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.nio.file.attribute.PosixFilePermission
-import java.util.EnumSet
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.UUID
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
@@ -57,10 +58,10 @@ internal class FileWebhookDeliveryStore(
         Files.createDirectories(pendingDirectory)
         Files.createDirectories(deadLetterDirectory)
         Files.createDirectories(corruptDirectory)
-        setOwnerOnlyDirectoryPermissions(root)
-        setOwnerOnlyDirectoryPermissions(pendingDirectory)
-        setOwnerOnlyDirectoryPermissions(deadLetterDirectory)
-        setOwnerOnlyDirectoryPermissions(corruptDirectory)
+        setOwnerOnlyPermissions(root, "rwx------")
+        setOwnerOnlyPermissions(pendingDirectory, "rwx------")
+        setOwnerOnlyPermissions(deadLetterDirectory, "rwx------")
+        setOwnerOnlyPermissions(corruptDirectory, "rwx------")
     }
 
     override suspend fun enqueue(delivery: WebhookDelivery) = mutex.withLock {
@@ -72,7 +73,7 @@ internal class FileWebhookDeliveryStore(
     }
 
     override suspend fun pending(deliveryId: String): WebhookDelivery? = mutex.withLock {
-        readOrQuarantine(pendingPath(deliveryId))
+        readPending(pendingPath(deliveryId))
     }
 
     override suspend fun claimDue(
@@ -81,7 +82,7 @@ internal class FileWebhookDeliveryStore(
         limit: Int,
     ): List<WebhookDeliveryClaim> = mutex.withLock {
         val due = listDeliveryFiles(pendingDirectory)
-            .mapNotNull(::readOrQuarantine)
+            .mapNotNull(::readPending)
             .filter {
                 it.nextAttemptAtEpochMilliseconds <= nowEpochMilliseconds &&
                     (it.leaseUntilEpochMilliseconds == null || it.leaseUntilEpochMilliseconds <= nowEpochMilliseconds)
@@ -100,7 +101,8 @@ internal class FileWebhookDeliveryStore(
     }
 
     override suspend fun reschedule(claim: WebhookDeliveryClaim, delivery: WebhookDelivery): Boolean = mutex.withLock {
-        val current = readOrQuarantine(pendingPath(claim.delivery.deliveryId))
+        require(delivery.deliveryId == claim.delivery.deliveryId)
+        val current = readPending(pendingPath(claim.delivery.deliveryId))
         if (current?.leaseId != claim.leaseId) return@withLock false
         writeAtomically(
             pendingPath(delivery.deliveryId),
@@ -111,7 +113,7 @@ internal class FileWebhookDeliveryStore(
 
     override suspend fun markDelivered(claim: WebhookDeliveryClaim): Boolean = mutex.withLock {
         val path = pendingPath(claim.delivery.deliveryId)
-        val current = readOrQuarantine(path)
+        val current = readPending(path)
         if (current?.leaseId != claim.leaseId) return@withLock false
         Files.deleteIfExists(path)
     }
@@ -120,8 +122,9 @@ internal class FileWebhookDeliveryStore(
         claim: WebhookDeliveryClaim,
         delivery: WebhookDelivery,
     ): Boolean = mutex.withLock {
+        require(delivery.deliveryId == claim.delivery.deliveryId)
         val pendingPath = pendingPath(claim.delivery.deliveryId)
-        val current = readOrQuarantine(pendingPath)
+        val current = readPending(pendingPath)
         if (current?.leaseId != claim.leaseId) return@withLock false
         writeAtomically(
             deadLetterPath(delivery.deliveryId),
@@ -153,81 +156,69 @@ internal class FileWebhookDeliveryStore(
         true
     }
 
-    private fun pendingPath(deliveryId: String) = pendingDirectory.resolve("$deliveryId.json")
-    private fun deadLetterPath(deliveryId: String) = deadLetterDirectory.resolve("$deliveryId.json")
+    private fun pendingPath(deliveryId: String) = pendingDirectory.resolve(recordName(deliveryId))
+    private fun deadLetterPath(deliveryId: String) = deadLetterDirectory.resolve(recordName(deliveryId))
+
+    private fun recordName(deliveryId: String): String {
+        require(deliveryId.isNotBlank() && '/' !in deliveryId && '\\' !in deliveryId) { "Invalid delivery ID" }
+        return "$deliveryId.json"
+    }
+
+    // Publishing a dead letter commits failure. Removing it commits redrive. A crash between
+    // the two file operations in either transition leaves the dead letter authoritative.
+    private fun readPending(path: Path): WebhookDelivery? {
+        if (Files.exists(deadLetterDirectory.resolve(path.fileName))) {
+            Files.deleteIfExists(path)
+            return null
+        }
+        return readOrQuarantine(path)
+    }
 
     private fun listDeliveryFiles(directory: Path): List<Path> =
         Files.list(directory).use { paths ->
             paths.filter { it.isRegularFile() && it.extension == "json" }.toList()
         }
 
-    private fun read(path: Path): WebhookDelivery? =
-        if (Files.exists(path)) json.decodeFromString(Files.readString(path)) else null
-
-    private fun readOrQuarantine(path: Path): WebhookDelivery? =
-        runCatching { read(path) }.getOrElse { cause ->
-            val quarantined = corruptDirectory.resolve("${path.name}.${UUID.randomUUID()}.corrupt")
-            val quarantineFailure = runCatching {
-                try {
-                    Files.move(path, quarantined, StandardCopyOption.ATOMIC_MOVE)
-                } catch (_: AtomicMoveNotSupportedException) {
-                    Files.move(path, quarantined)
-                }
-                setOwnerOnlyFilePermissions(quarantined)
-            }.exceptionOrNull()
-
-            if (quarantineFailure == null) {
-                storeLog.error(cause) {
-                    "Quarantined unreadable webhook delivery record (source=$path, quarantined=$quarantined)"
-                }
-            } else {
-                storeLog.error(cause) {
-                    "Could not read or quarantine webhook delivery record (path=$path, " +
-                        "quarantineError=${quarantineFailure.message})"
+    private fun readOrQuarantine(path: Path): WebhookDelivery? {
+        return try {
+            json.decodeFromString<WebhookDelivery>(Files.readString(path)).also { delivery ->
+                require(recordName(delivery.deliveryId) == path.name)
+                if (path.parent == deadLetterDirectory) {
+                    require(delivery.failedAtEpochMilliseconds != null && delivery.lastError != null)
                 }
             }
+        } catch (_: NoSuchFileException) {
+            null
+        } catch (_: CharacterCodingException) {
+            quarantine(path)
+            null
+        } catch (_: IllegalArgumentException) {
+            quarantine(path)
             null
         }
+    }
+
+    private fun quarantine(path: Path) {
+        if (path.parent == deadLetterDirectory) Files.deleteIfExists(pendingDirectory.resolve(path.fileName))
+        val quarantined = corruptDirectory.resolve("${path.name}.${UUID.randomUUID()}.corrupt")
+        Files.move(path, quarantined)
+        // Decoder errors can include excerpts of the credential-bearing record.
+        storeLog.error { "Quarantined invalid webhook delivery record (source=$path, quarantined=$quarantined)" }
+    }
 
     private fun writeAtomically(path: Path, delivery: WebhookDelivery) {
-        Files.createDirectories(path.parent)
-        val temporary = path.parent.resolve(".${path.name}.${UUID.randomUUID()}.tmp")
-        Files.writeString(temporary, json.encodeToString(delivery))
-        setOwnerOnlyFilePermissions(temporary)
+        val temporary = Files.createTempFile(path.parent, ".${path.name}.", ".tmp")
         try {
-            Files.move(
-                temporary,
-                path,
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING)
+            setOwnerOnlyPermissions(temporary, "rw-------")
+            Files.writeString(temporary, json.encodeToString(delivery))
+            Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporary)
         }
     }
 
-    private fun setOwnerOnlyDirectoryPermissions(path: Path) {
-        runCatching {
-            Files.setPosixFilePermissions(
-                path,
-                EnumSet.of(
-                    PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE,
-                    PosixFilePermission.OWNER_EXECUTE,
-                ),
-            )
-        }
-    }
-
-    private fun setOwnerOnlyFilePermissions(path: Path) {
-        runCatching {
-            Files.setPosixFilePermissions(
-                path,
-                EnumSet.of(
-                    PosixFilePermission.OWNER_READ,
-                    PosixFilePermission.OWNER_WRITE,
-                ),
-            )
-        }
+    private fun setOwnerOnlyPermissions(path: Path, mode: String) {
+        Files.getFileAttributeView(path, PosixFileAttributeView::class.java)
+            ?.setPermissions(PosixFilePermissions.fromString(mode))
     }
 }

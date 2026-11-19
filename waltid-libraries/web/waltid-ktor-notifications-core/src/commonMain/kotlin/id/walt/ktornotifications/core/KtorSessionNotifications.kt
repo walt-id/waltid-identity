@@ -38,7 +38,9 @@ data class KtorSessionNotifications(
             require(maxBackoffSeconds >= initialBackoffSeconds) {
                 "max_backoff_seconds must be greater than or equal to initial_backoff_seconds"
             }
-            require(backoffMultiplier >= 1.0) { "backoff_multiplier must be at least 1.0" }
+            require(backoffMultiplier.isFinite() && backoffMultiplier >= 1.0) {
+                "backoff_multiplier must be finite and at least 1.0"
+            }
         }
     }
 
@@ -62,6 +64,23 @@ data class KtorSessionNotifications(
         @SerialName("retry_policy")
         val retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy(),
     ) {
+        // Keep the constructor and copy default-argument bridges used by precompiled clients.
+        @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+        constructor(
+            url: Url,
+            basicAuthUser: String? = null,
+            basicAuthPass: String? = null,
+            bearerToken: String? = null,
+        ) : this(url, basicAuthUser, basicAuthPass, bearerToken, null, WebhookRetryPolicy())
+
+        @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+        fun copy(
+            url: Url = this.url,
+            basicAuthUser: String? = this.basicAuthUser,
+            basicAuthPass: String? = this.basicAuthPass,
+            bearerToken: String? = this.bearerToken,
+        ) = copy(url, basicAuthUser, basicAuthPass, bearerToken, signingSecret, retryPolicy)
+
         init {
             require(signingSecret == null || (signingSecret.isNotBlank() && signingSecret.encodeToByteArray().size >= 32)) {
                 "signing_secret must be non-blank and contain at least 32 UTF-8 bytes"

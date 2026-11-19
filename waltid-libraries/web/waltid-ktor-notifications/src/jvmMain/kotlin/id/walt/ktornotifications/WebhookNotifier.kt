@@ -11,9 +11,8 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.basicAuth
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.header
-import io.ktor.client.request.post
+import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -40,9 +39,13 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.pow
 import kotlin.random.Random
+
+private fun addDelay(time: Long, delay: Long): Long =
+    if (time > Long.MAX_VALUE - delay) Long.MAX_VALUE else time + delay
 
 private val log = KotlinLogging.logger { }
 
@@ -73,8 +76,8 @@ internal class KtorWebhookTransport(
         attempt: Int,
         timestampEpochSeconds: Long,
     ): WebhookAttemptResult {
-        val response = try {
-            client.post(delivery.url) {
+        return try {
+            client.preparePost(delivery.url) {
                 contentType(ContentType.Application.Json)
                 header(WEBHOOK_ID_HEADER, delivery.deliveryId)
                 header(IDEMPOTENCY_KEY_HEADER, delivery.deliveryId)
@@ -103,29 +106,24 @@ internal class KtorWebhookTransport(
                 if (delivery.bearerToken != null) {
                     bearerAuth(delivery.bearerToken)
                 }
+            }.execute { response ->
+                WebhookAttemptResult(
+                    statusCode = response.status.value,
+                    retryAfterMilliseconds = parseRetryAfter(response.headers[HttpHeaders.RetryAfter], nowEpochMilliseconds()),
+                )
             }
         } catch (ex: CancellationException) {
             throw ex
         } catch (ex: Exception) {
             if (generateSequence<Throwable>(ex) { it.cause }.any { it is BlockedAddressException }) {
-                return WebhookAttemptResult(error = WebhookDestinationNotAllowedException(ex))
-            }
-            throw ex
+                WebhookAttemptResult(error = WebhookDestinationNotAllowedException(ex))
+            } else throw ex
         }
-        val result = WebhookAttemptResult(
-            statusCode = response.status.value,
-            retryAfterMilliseconds = parseRetryAfter(
-                response.headers[HttpHeaders.RetryAfter],
-                nowEpochMilliseconds(),
-            ),
-        )
-        response.bodyAsChannel().cancel(null)
-        return result
     }
 
     private fun parseRetryAfter(value: String?, now: Long): Long? {
         if (value == null) return null
-        value.toLongOrNull()?.let { seconds -> return seconds.coerceAtLeast(0) * 1_000 }
+        value.toLongOrNull()?.let { seconds -> return TimeUnit.SECONDS.toMillis(seconds.coerceAtLeast(0)) }
         return runCatching {
             val retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()
             (retryAt - now).coerceAtLeast(0)
@@ -292,7 +290,7 @@ internal class WebhookDeliveryQueue(
         val rescheduled = store.reschedule(
             claim,
             attempted.copy(
-                nextAttemptAtEpochMilliseconds = clock() + retryDelay,
+                nextAttemptAtEpochMilliseconds = addDelay(clock(), retryDelay),
                 lastError = error,
             )
         )
@@ -311,9 +309,9 @@ internal class WebhookDeliveryQueue(
         val policy = delivery.retryPolicy
         val base = policy.initialBackoffSeconds * 1_000.0 *
             policy.backoffMultiplier.pow((delivery.attemptCount - 1).coerceAtLeast(0))
-        val capped = base.toLong().coerceAtMost(policy.maxBackoffSeconds * 1_000)
+        val capped = base.toLong().coerceAtMost(TimeUnit.SECONDS.toMillis(policy.maxBackoffSeconds))
         val jitterUpperBound = capped / 2 + 1
-        return capped + jitter(jitterUpperBound)
+        return addDelay(capped, jitter(jitterUpperBound))
     }
 
     private fun contentDigest(payload: String): String {
@@ -335,7 +333,7 @@ object WebhookNotifier {
 
     /** Starts the worker and resumes deliveries left pending by a previous process. */
     fun start(storageDirectory: Path = defaultStorageDirectory()) {
-        queue(storageDirectory).start()
+        queue { FileWebhookDeliveryStore(storageDirectory) }.start()
     }
 
     /** Starts a worker in a service-specific directory below the configured outbox root. */
@@ -346,14 +344,18 @@ object WebhookNotifier {
 
     /** Starts the worker with a service-provided distributed outbox implementation. */
     fun start(store: WebhookDeliveryStore) {
-        queue(store).start()
+        queue { store }.start()
+    }
+
+    suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
+        enqueue(update, config)
     }
 
     /**
      * Durably enqueues a webhook. Delivery happens asynchronously so protocol requests are not held open by
      * receiver backoff. The returned ID is stable for all attempts of this logical delivery.
      */
-    suspend fun notify(
+    suspend fun enqueue(
         update: KtorSessionUpdate,
         config: VerificationSessionWebhookNotification,
     ): String {
@@ -371,25 +373,27 @@ object WebhookNotifier {
         activeQueue?.stop()
     }
 
-    private fun queue(storageDirectory: Path = defaultStorageDirectory()): WebhookDeliveryQueue =
-        queue(FileWebhookDeliveryStore(storageDirectory))
-
-    private fun queue(store: WebhookDeliveryStore): WebhookDeliveryQueue =
+    private fun queue(
+        createStore: () -> WebhookDeliveryStore = { FileWebhookDeliveryStore(defaultStorageDirectory()) },
+    ): WebhookDeliveryQueue =
         queue ?: synchronized(lock) {
             queue ?: WebhookDeliveryQueue(
-                store = store,
+                store = createStore(),
                 transport = KtorWebhookTransport(),
             ).also { queue = it }
         }
 
     private fun defaultStorageDirectory(): Path =
-        configuredStorageRoot().resolve("embedded-${ProcessHandle.current().pid()}")
+        configuredRoot()?.resolve("embedded")
+            ?: temporaryRoot().resolve("embedded-${ProcessHandle.current().pid()}")
 
-    private fun configuredStorageRoot(): Path {
-        val configured = System.getProperty(STORAGE_DIRECTORY_PROPERTY)
-            ?: System.getenv(STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE)
-        if (configured != null) return Path.of(configured)
+    private fun configuredRoot(): Path? =
+        (System.getProperty(STORAGE_DIRECTORY_PROPERTY) ?: System.getenv(STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE))
+            ?.let { Path.of(it) }
 
+    private fun configuredStorageRoot(): Path = configuredRoot() ?: temporaryRoot()
+
+    private fun temporaryRoot(): Path {
         val temporary = Path.of(System.getProperty("java.io.tmpdir"), "waltid-webhook-deliveries")
         log.warn {
             "Webhook delivery outbox is using temporary storage at $temporary. Pending and dead-letter " +
