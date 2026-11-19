@@ -3,6 +3,7 @@ package id.walt.itb
 import com.microsoft.playwright.Browser
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Route
+import com.microsoft.playwright.TimeoutError
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -38,9 +39,7 @@ internal class ItbAndroidBrowser(
         val responseEndpoint = sameOrigin(Url(descriptor.text("responseEndpoint")))
         return withTab("get", JsonArray(listOf(request)), interaction.protocol) { page ->
             val result = useProvider(page, interaction, executeOnDevice)
-            page.waitForFunction("() => window.itbError || window.itbResponse", null,
-                Page.WaitForFunctionOptions().setTimeout(15_000.0))
-            requireBrowserSuccess(page)
+            awaitBrowserResult(page)
             val response = Json.parseToJsonElement(page.evaluate("() => window.itbResponse") as String).jsonObject
             jsonPost(responseEndpoint, response, verifierResponse = true)
             result
@@ -67,9 +66,7 @@ internal class ItbAndroidBrowser(
         }
         return withTab("create", requests, interaction.protocol) { page ->
             val result = useProvider(page, interaction, executeOnDevice)
-            requireBrowserSuccess(page)
-            // Some Android provider builds omit the create reply. The owned provider receipt,
-            // stored PID and this exact offer's issuer state are the completion evidence.
+            awaitBrowserResult(page)
             withTimeout(30_000) {
                 while (true) {
                     val response = client.get(statusEndpoint) {
@@ -88,6 +85,16 @@ internal class ItbAndroidBrowser(
             }
             result
         }
+    }
+
+    private fun awaitBrowserResult(page: Page) {
+        try {
+            page.waitForFunction("() => window.itbError || window.itbResponse", null,
+                Page.WaitForFunctionOptions().setTimeout(15_000.0))
+        } catch (_: TimeoutError) {
+            throw ItbWalletRejection("dc_browser_response_missing")
+        }
+        requireBrowserSuccess(page)
     }
 
     private suspend fun useProvider(

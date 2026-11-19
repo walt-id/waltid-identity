@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.ViewModelStore
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.credentials.exceptions.CreateCredentialUnknownException
@@ -95,7 +96,9 @@ class DigitalCredentialCreateModelTest {
         model.accept(null, mapOf("pid" to 0, "mdl" to 2)); runCurrent()
         assertIs<WalletDemoOfferCreateUiState.WaitingForAuthorization>(model.state)
         assertEquals(listOf(WalletDemoCredentialSelection("mdl", WalletDemoCredentialHolders.NewKeys(2))), client.selections)
-        assertEquals(Intent.ACTION_VIEW, assertNotNull(shadowOf(host.get()).nextStartedActivity).action)
+        val authorization = assertNotNull(shadowOf(host.get()).nextStartedActivity)
+        assertEquals(Intent.ACTION_VIEW, authorization.action)
+        assertTrue(authorization.hasExtra(CustomTabsIntent.EXTRA_SESSION))
         assertEquals(DigitalCredentialCreateAuthHandoff.Delivery.Unmatched,
             DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=wrong")))
         assertNull(shadowOf(host.get()).nextStartedActivity)
