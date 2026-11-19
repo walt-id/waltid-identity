@@ -120,6 +120,9 @@ sharing sheet for the configured ITB host. In attended mode the operator
 confirms those prompts.
 The unattended driver declines Chrome's separate notification onboarding if it
 appears during the credential flow.
+The hosted emulator enables Chrome's Digital Credentials issuance feature. This
+is required on the image's Chrome 145 and enabled by default from Chrome 155.
+[Chrome issuance documentation](https://developer.chrome.com/blog/digital-credentials-api-issuance)
 The full matrix starts with VCI-006 and `tc15`, so Android's system picker has
 only the prerequisite PID when it selects credentials for `tc15`.
 VP-007 runs after VCI-008 and before VCI-005 so the wallet's single-match query

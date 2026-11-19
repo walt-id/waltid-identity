@@ -10,8 +10,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
 import java.net.URI
@@ -101,7 +101,7 @@ internal class ItbAndroidBrowser(
         page: Page,
         interaction: ItbWalletInteraction,
         execute: suspend (ItbWalletInteraction) -> ItbWalletResult,
-    ): ItbWalletResult = coroutineScope {
+    ): ItbWalletResult = supervisorScope {
         page.bringToFront()
         check(page.evaluate("() => !document.hidden") == true) { "The test browser is in the background" }
         val device = async(start = CoroutineStart.UNDISPATCHED) { execute(interaction) }
