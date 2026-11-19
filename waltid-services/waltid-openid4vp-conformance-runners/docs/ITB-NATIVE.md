@@ -47,31 +47,22 @@ Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operato
 
 ## SCA-User audience compatibility
 
-The referenced [SCA-User rulebook §§4.1 and 5.1](https://github.com/webuild-consortium/webuild-attestation-rulebooks-catalog/blob/f9b1812b19277e68f56ae64351783fa05c433cd5/rulebooks/rb-sca-user/README.md#41-mandatory-metadata)
-requires the issuer-signed credential's `aud` to contain the issuing bank's RP
-URL(s). [CS-02 §5](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-02-credential-presentation.md#L111)
-uses `x509_hash` to identify the request signer's certificate. These values have
-different meanings: comparing the credential audience directly with `client_id`,
-or issuing a certificate-hash audience to make them equal, does not implement the
-rulebook's URL audience requirement.
+[Rulebook PR #307](https://github.com/webuild-consortium/webuild-attestation-rulebooks-catalog/pull/307)
+removed the requirement for an issuer-signed SCA-User `aud` containing the
+issuing bank's RP URL and the corresponding verifier check. The
+[merged SCA-User rulebook](https://github.com/webuild-consortium/webuild-attestation-rulebooks-catalog/blob/adae9cb41c603724f68462ef23a653190d65c08f/rulebooks/rb-sca-user/README.md)
+retains the issuing-bank restriction. Section 7.2 calls for Embedded Disclosure
+Policy (EDP), while Section 7.4 still defines no policy.
 
-This credential-level restriction conflicts with
-[ETSI TS 119 472-1 V1.2.1 §5.2.8.1](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947201/01.02.01_60/ts_11947201v010201p.pdf#page=31):
-an SD-JWT VC EAA must not implement the EAA audience semantics of §4.2.9.2.
-The accompanying note points to Embedded Disclosure Policy (EDP) and RP
-registration restrictions. However, the referenced
-[CS-12 §§7.2(1) and 7.3(2)](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#72-attestation-provider-requirements-issuance)
-exclude EDP issuance and verification. The bank-URL audience requirement above
-describes the WE BUILD profile under discussion, not a settled EUDI requirement.
-
+[CS-12 v1.2](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-12-sca-payments.md)
+still specifies credential audience checks and excludes EDP issuance and
+verification. Its audience restriction also covers SCA-IBAN for
+`login_risk_transaction` ([WAL-1627](https://linear.app/walt-new/issue/WAL-1627/add-ts12-transaction-type-urneudiscalogin-risk-transaction1)).
 [Architecture #381](https://github.com/webuild-consortium/wp4-architecture/issues/381)
-tracks the unresolved profile and RP-permission questions. A resolution needs to
-align issuer, wallet and verifier requirements, establish how an authenticated RP
-is authorized before disclosure, and define failure behavior and positive/negative
-tests. [CS-12 §6.1(3)](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#61-issuer-requested-flow)
-also applies the restriction to SCA-IBAN used for `login_risk_transaction`.
-Request authentication and a verifier's acceptance do not establish the wallet's
-RP-permission enforcement; this runner does not qualify that policy.
+tracks the unresolved RP-permission contract and the conflict with
+[ETSI TS 119 472-1 V1.2.1 §5.2.8.1](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947201/01.02.01_60/ts_11947201v010201p.pdf#page=31).
+Qualifying RP permission requires an agreed way to authenticate and authorize a
+requesting RP before disclosure, with acceptance and rejection cases.
 
 The separate reference issuer/verifier interoperability failure in
 [ITB #58](https://github.com/webuild-consortium/wp4-interop-test-bed/issues/58)
@@ -80,16 +71,16 @@ was resolved after an attended retest on 10 November 2026. Fresh `ts12_issue_02`
 terminal ITB `SUCCESS`, using the Android fixture at
 [`9b9df335`](https://github.com/walt-id/waltid-identity/commit/9b9df335ad15c1ccd537b441bb14958fd7b314a4)
 with per-use biometric signing and synthetic key attestation. An issuance
-diagnostic observed an HTTPS credential audience; the deployed backend revision
-was not independently confirmed. This dated result establishes interoperability
-for those inputs, not resolution of #381 or full SCA conformance. Recheck changed
-deployments with fresh issuance and both payment cases.
+diagnostic observed an HTTPS credential audience. To qualify the updated profile
+after backend deployment, inspect the freshly issued SCA-User credential and rerun
+both payment cases. Record the build, the wallet and ITB verdicts for each session,
+and cleanup.
 
-The credential audience is distinct from the KB-JWT audience, which binds the
-proof to the current verifier or DC API origin. Preserve KB-JWT audience
-validation and signed credential claims; this profile question is not a reason
-to strip claims or weaken request/proof bindings. Reports retain only allowlisted
-verifier error identifiers or a bounded HTTP status, never the response body.
+The KB-JWT `aud` binds the proof to the current verifier or DC API origin.
+The local SCA interop matrix exercises all four response modes with an issuer
+payload that omits `aud` and independently checks the KB-JWT audience, signatures
+and hashes. Preserve both the issued bytes and request/proof validation.
+Reports retain allowlisted verifier error identifiers or a bounded HTTP status.
 
 ## Local timed-key controls
 

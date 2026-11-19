@@ -4,6 +4,7 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
+import com.microsoft.playwright.options.ElementState
 import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.Url
 import java.nio.ByteBuffer
@@ -18,7 +19,7 @@ internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The
     enum class Step {
         LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
         NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
-        SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
+        SESSION, START, INTERACTION, DIALOG, CONFIRMATION, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
     }
 }
 
@@ -77,6 +78,7 @@ class ItbPortalBridge(
     )
 
     private fun sessionId(): String = page.locator(".session-table-title-value .value").innerText().trim()
+    private fun dialog(): Locator = page.locator("ngb-modal-window:not([aria-hidden=true])")
 
     private inline fun <T> step(name: ItbPortalStepTimeout.Step, action: () -> T): T = try {
         action()
@@ -85,15 +87,23 @@ class ItbPortalBridge(
     }
 
     override suspend fun read(session: ItbSession): ItbWalletInteraction {
-        check(step(ItbPortalStepTimeout.Step.SESSION, ::sessionId) == session.session) {
-            "The portal is not showing the owned ITB session"
-        }
+        verifySession(session)
         // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
         step(ItbPortalStepTimeout.Step.START) {
             page.waitForCondition { startButton().isEnabled }
             startButton().click()
         }
-        val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
+        return readNext(session)
+    }
+
+    private fun verifySession(session: ItbSession) {
+        check(step(ItbPortalStepTimeout.Step.SESSION, ::sessionId) == session.session) {
+            "The portal is not showing the owned ITB session"
+        }
+    }
+
+    override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
+        val dialog = dialog()
         val interaction = dialog.getByText(Pattern.compile(
             "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
         ))
@@ -107,11 +117,14 @@ class ItbPortalBridge(
             )
         }
         if (portalError.count() > 0 && interaction.count() == 0) throw ItbPortalExecutionError()
+        verifySession(session)
         val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
         return when {
             text.contains("VCI request") -> {
                 val pin = Regex("\\bPIN\\s+([0-9]+)\\b").find(text)?.groupValues?.get(1)
-                require(session.testCase != "tc_vci_007" || pin != null) { "The ITB interaction did not supply its transaction code" }
+                require(session.testSuite != "cs01v1" || session.testCase != "tc_vci_007" || pin != null) {
+                    "The ITB interaction did not supply its transaction code"
+                }
                 ItbWalletInteraction.Offer(Url(preview("VCI request")), pin)
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
@@ -129,8 +142,7 @@ class ItbPortalBridge(
     }
 
     private fun row(label: String): Locator {
-        val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
-        return dialog.locator("app-any-content-view").filter(
+        return dialog().locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
     }
@@ -171,9 +183,33 @@ class ItbPortalBridge(
         }
     }
 
-    override suspend fun complete() {
-        page.locator("ngb-modal-window:not([aria-hidden=true])")
-            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("Close"))).click()
+    override suspend fun complete() = step(ItbPortalStepTimeout.Step.DIALOG) { close(dialog()) }
+
+    override suspend fun confirmRevocation(session: ItbSession) {
+        val label = when ("${session.testSuite}/${session.testCase}") {
+            "cs10-test-suite/rv_iss_01" -> "Confirm both credentials are shown as valid."
+            "cs10-test-suite/rv_iss_02" -> "Confirm the wallet reports the credential as revoked."
+            else -> error("This ITB case has no revocation confirmation")
+        }
+        val confirmation = dialog().filter(Locator.FilterOptions().setHas(
+            page.getByText(label, Page.GetByTextOptions().setExact(true)),
+        ))
+        step(ItbPortalStepTimeout.Step.CONFIRMATION) {
+            confirmation.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
+            verifySession(session)
+            close(confirmation)
+        }
+    }
+
+    private fun close(dialog: Locator) {
+        val previous = dialog.elementHandle()
+        try {
+            dialog.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("Close"))).click()
+            // The following interaction may reuse the same labels.
+            previous.waitForElementState(ElementState.HIDDEN)
+        } finally {
+            previous.dispose()
+        }
     }
 
     companion object {

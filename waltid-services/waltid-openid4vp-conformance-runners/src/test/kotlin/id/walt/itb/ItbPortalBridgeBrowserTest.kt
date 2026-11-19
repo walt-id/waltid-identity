@@ -165,6 +165,32 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun acknowledgesOnlyTheMatchingRevocationConfirmation() = runBlocking<Unit> {
+        withPage { page ->
+            val session = ItbSession("cs10-test-suite", "rv_iss_02", "00000000-0000-0000-0000-000000000001")
+            page.setContent("""
+                <div class="session-table-title-value"><div class="value">${session.session}</div></div>
+                <ngb-modal-window id="other">
+                  <div>Confirm both credentials are shown as valid.</div>
+                  <button onclick="this.parentElement.remove()">Close</button>
+                </ngb-modal-window>
+                <ngb-modal-window id="expected">
+                  <div>Confirm the wallet reports the credential as revoked.</div>
+                  <button onclick="this.parentElement.remove()">Close</button>
+                </ngb-modal-window>
+            """.trimIndent())
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            assertFailsWith<IllegalStateException> {
+                bridge.confirmRevocation(session.copy(session = "00000000-0000-0000-0000-000000000002"))
+            }
+            assertEquals(1, page.locator("#expected").count())
+            bridge.confirmRevocation(session)
+            assertEquals(0, page.locator("#expected").count())
+            assertEquals(1, page.locator("#other").count())
+        }
+    }
+
+    @Test
     fun reportsPortalExecutionErrorWithoutRetryingTheStart() = runBlocking<Unit> {
         withPage(failStart = true) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)

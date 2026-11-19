@@ -1,8 +1,8 @@
 # WeBuild ITB wallet runs
 
-The runner selects 24 CS-01,
-CS-02, CS-07 and TS12 Wallet SUT cases. `itbWallet` drives their actual
-ITB interactions through the production wallet, using a fresh holder and
+The runner selects 26 Wallet SUT cases across CS-01, CS-02, CS-07, CS-10 and TS12.
+`itbWallet` drives their actual
+ITB interactions through the production wallet SDK, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
 
@@ -50,7 +50,7 @@ Portal UI IDs are not API keys. The manifest pins the deployment to
 `https://dev-i4mlab.aegean.gr/itb`, the system name to `walt.id`, and the exact
 statement, suite and case labels. A different selected system or missing/ambiguous
 label fails before wallet execution. System and actor API keys are not needed.
-The pinned inventory was checked on 2026-11-06 and retains the deployed
+The pinned inventory was checked on 2026-11-19 and retains the deployed
 `[Wallet SUT]` qualifiers. CS-07 explicitly selects its visible `User` actor
 within the configured statement. Newly deployed cases are not selected automatically.
 
@@ -59,16 +59,16 @@ within the configured statement. Newly deployed cases are not selected automatic
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet
 ```
 
-By default all 24 cases run in catalogue order. `ITB_CASES` can select comma-separated
-case IDs (for example `tc_vp_002`); required issuance cases are automatically
-included. A failed prerequisite does not skip its presentation cases. Unknown
-or empty selections are configuration errors.
+By default all 26 cases run in catalogue order. `ITB_CASES` accepts comma-separated
+`suite/case` selectors, such as `cs02v1/tc_vp_002`. A bare case ID still works when it
+is unique across suites. The runner adds the selected suite's issuance prerequisites
+before presentation. A failed prerequisite still leaves its presentation cases
+eligible to run. Unknown, ambiguous or empty selections are configuration errors.
 
-When `CI=true`, selection is restricted to the 18 cases that do not need a
-user-authentication prompt: seven CS-01, seven CS-02, one CS-07 and three TS12
-issuance cases. Explicitly requesting any of the six TS12 payment cases fails
-before a session starts. The local default remains all 24; for the six payment
-cases with their three issuance prerequisites, use the [operator-assisted native
+When `CI=true`, the runner selects 20 unattended cases across CS-01 (seven),
+CS-02 (seven), CS-07 (one), CS-10 (two) and TS12 issuance (three). The local
+default includes the six TS12 payment cases. For those cases and their three
+issuance prerequisites, use the [operator-assisted native
 setup](ITB-NATIVE.md) and select them explicitly:
 
 ```bash
@@ -125,9 +125,9 @@ file. Request `x5c` chains are never automatically trusted.
 
 The **WeBuild ITB live wallet cases** workflow is explicitly dispatched by an
 operator because it uses a shared external tenant. Runs share one concurrency
-group so their tenant sessions do not overlap. The six payment cases remain
-local, operator-assisted coverage; CI success means 18/18 selected cases, not
-24/24. The offline profile checks remain a separate PR check.
+group so their tenant sessions do not overlap. The six payment cases require
+local operator-assisted execution. The offline profile checks run separately on
+relevant PRs.
 
 The portal bridge gives a started, owned session up to 45 seconds to display its
 wallet interaction and reports the portal's generic execution error separately.
@@ -155,7 +155,7 @@ The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
 Dispatch is available from the default branch. Its
 `cases` input can select an unattended subset, such as `tc_vp_002` with its
-issuance prerequisite; an empty input runs all 18. An operator-required
+issuance prerequisite. An empty input runs all 20 unattended cases. An operator-required
 case is rejected before any tenant session starts. The checked-in workflow
 alone is not a successful hosted run.
 
@@ -197,9 +197,9 @@ The requirement references are WeBuild architecture commit
 [CS-07 v0.1 pre-flight](https://github.com/webuild-consortium/wp4-architecture/blob/da58a26a84ab3b5bd04c15cb63d5e9ab7479c292/conformance-specs/cs-07-credential-presentation-dc-api.md), and
 [CS-12 v1.0 (TS12 profile)](https://github.com/webuild-consortium/wp4-architecture/blob/da58a26a84ab3b5bd04c15cb63d5e9ab7479c292/conformance-specs/cs-12-sca-payments.md).
 The local check names identify requirement areas, not hosted ITB case IDs.
-These local requirements remain pinned independently of the live catalogue:
-the deployed CS-02 suite now advertises v1.2, and labels VP-007 as an mdoc
-interoperability extension outside its normative coverage. The
+These local requirements remain pinned independently of the live catalogue.
+The live CS-02 suite labels VP-007 as an mdoc interoperability extension outside
+the normative profile. The
 [CS-02 v1.2 assessment](ITB-CS02-COVERAGE.md) maps the full profile and newly
 deployed cases to supported coverage and explicit gaps, including missing registrar
 data, registration trust and physical invocation/consent. The selected cases do not
@@ -213,31 +213,43 @@ Do not equate the eleven local profile checks with the deployed cases.
 
 ### Deployed catalogue
 
-The authenticated Walt.id catalogue on ITB 1.29.5 was inspected on 2026-11-06.
+The authenticated Walt.id catalogue was inspected on 2026-11-19.
 The [case manifest](../src/main/resources/itb/wallet-catalogue.json) records the
 actual suite/case identifiers exposed by the portal's REST API configuration.
-It contains no API keys. Versions below are the suite's displayed descriptions;
-the execution report must still record the version actually run.
+The suite metadata versions below are independent of the per-case version in each
+execution report and of the normative specification version.
 
-| Target | Deployed suite ID | Cases | Displayed version |
+| Target | Deployed suite ID | Cases | Suite metadata version |
 | --- | --- | --- | --- |
-| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.0, October 2026 |
-| CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.2, October 2026 |
-| CS-07 | `cts07` | `tc15` (1) | Not exposed on the inspected configuration screen |
-| TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | Not exposed on the inspected configuration screen |
+| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.1 |
+| CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.3 |
+| CS-07 | `cts07` | `tc15` presentation (1) | 1.0 |
+| CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.0 |
+| CS-12 / TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | 1.0 |
 
-The selected matrix therefore contains **24 cases**. The separate Trust Framework
-Integration suite (1.3, October 2026, optional WUA), QES suite and relying-party
-tests are not additional selected wallet cases. Historical tenant results do not
-identify this branch's build and must not be reported as its results. Case titles
-and linked documentation are insufficient to infer interaction contracts: the
-VCI-006 documentation popup still describes an unrelated AcademicID flow.
+### Follow-up coverage
+
+| Target | Evidence and remaining work |
+| --- | --- |
+| CS-01 | Seven authorization-code and pre-authorized-code issuance cases cover SD-JWT and mdoc. The live adapter uses a single holder. |
+| CS-02 | Seven presentation cases cover signed requests and the deployed invocation variants. The base-suite VP-004 transaction-data case is disabled. See the [profile assessment](ITB-CS02-COVERAGE.md) for registration and consent gaps. |
+| CS-04 | The runner supplies synthetic key attestation for issuance. Provider-backed WIA and KA, verification, and the unit lifecycle belong to [WAL-1060](https://linear.app/walt-new/issue/WAL-1060). |
+| CS-06 | Access and registration certificate coverage needs the [draft CS-06 profile](https://github.com/webuild-consortium/wp4-architecture/pull/287), [WAL-1485](https://linear.app/walt-new/issue/WAL-1485), and ITB trust configuration. The 13 Trust Framework wallet cases share identifiers with the base cases and need their own qualification, including VP-004 transaction-data binding. |
+| CS-07 | `tc15` covers protocol-level presentation. In a 2026-11-19 control, closing `tc16`'s issuance instructions yielded ITB `SUCCESS` without a wallet invocation. Issuance needs a browser/provider run with a correlated issuer completion result and wallet storage evidence. |
+| CS-10 | RV-ISS-01 redeems both offers in one session and checks that the two stored SD-JWTs have one status-list URI, different indices and fresh clear status. RV-ISS-02 requires a fresh `INVALID` result, the SDK's projection of Token Status List value 1. The runner acknowledges the portal prompt based on that SDK result. App rendering and holder notification require app evidence. |
+| CS-12 | The local SCA matrix covers the updated SCA-User credential shape. The [native guide](ITB-NATIVE.md) records the earlier attended runs and the outstanding RP-permission and deployment checks. |
+| CS-13 | The inspected statements expose no dedicated [intermediary wallet suite](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-13-intermediary-services-preflight.md). Coverage needs an intermediary counterpart and the registration material for the wallet to authenticate the intermediary and identify the represented relying party. |
+
+Export the portal's **Conformance Statement Report** after the target suites have
+passing sessions. Check the statement's coverage and keep the source SHA and
+session IDs from the runner reports with it. The portal statement aggregates
+tenant history. See the [WE BUILD submission guide](https://github.com/webuild-consortium/wp4-interop-test-bed/blob/d7f5df119c3bf9860e28d892d3fb2eaf0be03c93/docs/conformance-overview.md).
 
 ### Verified portal and REST boundary
 
 Interactive portal startup is required by the deployed DC API cases: REST
 background startup completes their instruction steps before the wallet can act.
-The runner therefore uses one interactive execution path for all 24 cases and
+The runner therefore uses the interactive execution path for all selected cases and
 uses REST only for authenticated status, terminal XML reports and cleanup. The
 hyphenated `ITB-API-KEY` header is required by the deployment. XML report requests
 send only `Accept: application/xml`; a combined JSON/XML header is rejected.

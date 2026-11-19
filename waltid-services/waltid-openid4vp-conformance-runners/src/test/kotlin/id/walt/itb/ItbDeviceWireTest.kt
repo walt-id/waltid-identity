@@ -48,6 +48,10 @@ class ItbDeviceWireTest {
                 Url("https://verifier.example/descriptor"), "session", "profile", "openid4vp-v1-signed",
                 ItbWalletInteraction.Payment("sca-iban", "Merchant", "payee", "EUR", "12.95", "transaction"),
             ),
+            ItbWalletInteraction.RevocationOffer(
+                ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer_uri=https://issuer.example/second")),
+                "00000000-0000-0000-0000-000000000001", ItbRevocationStep.SECOND_SHARED,
+            ),
         )
         inputs.forEach { input ->
             val encoded = ItbDeviceWire.encode(input)

@@ -36,7 +36,11 @@ interface ItbInteractionBridge {
     suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession
     /** Start the prepared session and read its pending wallet interaction. */
     suspend fun read(session: ItbSession): ItbWalletInteraction
+    /** Read a later interaction in the same session, without starting it again. */
+    suspend fun readNext(session: ItbSession): ItbWalletInteraction
     suspend fun complete()
+    /** Acknowledge the case-specific prompt only after the wallet has verified the expected status. */
+    suspend fun confirmRevocation(session: ItbSession)
 }
 
 @Serializable
@@ -98,12 +102,42 @@ class ItbCaseRunner(
                         "The ITB interaction does not use the case's invocation scheme"
                     }
                 }
-                phase = ItbCaseResult.Phase.WALLET
-                adapterInvoked = true
-                executeWallet(interaction)
+                suspend fun execute(input: ItbWalletInteraction) {
+                    phase = ItbCaseResult.Phase.WALLET
+                    adapterInvoked = true
+                    executeWallet(input)
+                }
+                val caseKey = "${suite.id}/${case.id}"
+                val confirmStatus = when (caseKey) {
+                    "cs10-test-suite/rv_iss_01" -> {
+                        val firstOffer = interaction.requireOffer()
+                        execute(ItbWalletInteraction.RevocationOffer(
+                            firstOffer, createdSession.session, ItbRevocationStep.FIRST_SHARED,
+                        ))
+                        phase = ItbCaseResult.Phase.INTERACTION
+                        bridge.complete()
+                        val secondOffer = bridge.readNext(createdSession).requireOffer()
+                        check(firstOffer.url != secondOffer.url) { "ITB repeated the first revocation offer" }
+                        execute(ItbWalletInteraction.RevocationOffer(
+                            secondOffer, createdSession.session, ItbRevocationStep.SECOND_SHARED,
+                        ))
+                        true
+                    }
+                    "cs10-test-suite/rv_iss_02" -> {
+                        execute(ItbWalletInteraction.RevocationOffer(
+                            interaction.requireOffer(), createdSession.session, ItbRevocationStep.ALREADY_REVOKED,
+                        ))
+                        true
+                    }
+                    else -> {
+                        execute(interaction)
+                        false
+                    }
+                }
                 walletSucceeded = true
                 bridge.complete()
                 phase = ItbCaseResult.Phase.VERDICT
+                if (confirmStatus) bridge.confirmRevocation(createdSession)
                 while (true) {
                     val status = api.status(listOf(createdSession.session)).single()
                     if (status.isComplete) break
@@ -137,7 +171,7 @@ class ItbCaseRunner(
             outcome = when {
                 error is ItbPortalStepTimeout -> ItbCaseResult.Outcome.TIMED_OUT
                 error is ItbAuthenticationUnavailable && adapterInvoked -> ItbCaseResult.Outcome.AUTH_UNAVAILABLE
-                adapterInvoked && !walletSucceeded -> ItbCaseResult.Outcome.WALLET_FAILED
+                    phase == ItbCaseResult.Phase.WALLET && !walletSucceeded -> ItbCaseResult.Outcome.WALLET_FAILED
                 else -> ItbCaseResult.Outcome.ERROR
             }
         } finally {
@@ -159,4 +193,7 @@ class ItbCaseRunner(
             start, Instant.now().toString(), failure, cleanupFailed, errorCode,
         )
     }
+
+    private fun ItbWalletInteraction.requireOffer(): ItbWalletInteraction.Offer =
+        checkNotNull(this as? ItbWalletInteraction.Offer) { "ITB did not supply a revocation offer" }
 }

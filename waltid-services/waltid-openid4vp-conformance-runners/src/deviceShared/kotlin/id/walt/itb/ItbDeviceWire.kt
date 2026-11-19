@@ -63,10 +63,20 @@ internal object ItbDeviceWire {
     }
 
     fun encode(interaction: ItbWalletInteraction): JsonObject = buildJsonObject {
+        fun putOffer(offer: ItbWalletInteraction.Offer) {
+            put("url", offer.url.toString())
+            offer.transactionCode?.let { put("transactionCode", it) }
+        }
         when (interaction) {
             is ItbWalletInteraction.Offer -> {
-                put("kind", "offer"); put("url", interaction.url.toString())
-                interaction.transactionCode?.let { put("transactionCode", it) }
+                put("kind", "offer")
+                putOffer(interaction)
+            }
+            is ItbWalletInteraction.RevocationOffer -> {
+                put("kind", "revocation_offer")
+                putOffer(interaction.offer)
+                put("session", interaction.session)
+                put("step", interaction.step.name)
             }
             is ItbWalletInteraction.Presentation -> { put("kind", "presentation"); put("url", interaction.url.toString()) }
             is ItbWalletInteraction.DigitalCredentials -> {
@@ -84,8 +94,13 @@ internal object ItbDeviceWire {
 
     fun decode(value: JsonObject): ItbWalletInteraction {
         fun JsonObject.text(name: String) = getValue(name).jsonPrimitive.content
+        fun offer() = ItbWalletInteraction.Offer(Url(value.text("url")), value["transactionCode"]?.jsonPrimitive?.content)
         return when (value.text("kind")) {
-            "offer" -> ItbWalletInteraction.Offer(Url(value.text("url")), value["transactionCode"]?.jsonPrimitive?.content)
+            "offer" -> offer()
+            "revocation_offer" -> ItbWalletInteraction.RevocationOffer(
+                offer(),
+                value.text("session"), ItbRevocationStep.valueOf(value.text("step")),
+            )
             "presentation" -> ItbWalletInteraction.Presentation(Url(value.text("url")))
             "dc" -> ItbWalletInteraction.DigitalCredentials(
                 Url(value.text("endpoint")), value.text("validationSession"), value.text("profile"), value.text("protocol"),
