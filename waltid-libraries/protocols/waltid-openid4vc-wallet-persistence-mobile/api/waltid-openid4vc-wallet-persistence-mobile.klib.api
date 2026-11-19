@@ -106,6 +106,22 @@ sealed interface id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration 
     }
 }
 
+final class id.walt.wallet2.persistence.db/Credential_status_maintenance { // id.walt.wallet2.persistence.db/Credential_status_maintenance|null[0]
+    constructor <init>(kotlin/String, kotlin/String?) // id.walt.wallet2.persistence.db/Credential_status_maintenance.<init>|<init>(kotlin.String;kotlin.String?){}[0]
+
+    final val grant_id // id.walt.wallet2.persistence.db/Credential_status_maintenance.grant_id|{}grant_id[0]
+        final fun <get-grant_id>(): kotlin/String? // id.walt.wallet2.persistence.db/Credential_status_maintenance.grant_id.<get-grant_id>|<get-grant_id>(){}[0]
+    final val wallet_id // id.walt.wallet2.persistence.db/Credential_status_maintenance.wallet_id|{}wallet_id[0]
+        final fun <get-wallet_id>(): kotlin/String // id.walt.wallet2.persistence.db/Credential_status_maintenance.wallet_id.<get-wallet_id>|<get-wallet_id>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.persistence.db/Credential_status_maintenance.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // id.walt.wallet2.persistence.db/Credential_status_maintenance.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String? = ...): id.walt.wallet2.persistence.db/Credential_status_maintenance // id.walt.wallet2.persistence.db/Credential_status_maintenance.copy|copy(kotlin.String;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.db/Credential_status_maintenance.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.db/Credential_status_maintenance.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.db/Credential_status_maintenance.toString|toString(){}[0]
+}
+
 final class id.walt.wallet2.persistence.db/Credential_status_snapshots { // id.walt.wallet2.persistence.db/Credential_status_snapshots|null[0]
     constructor <init>(kotlin/String, kotlin/String) // id.walt.wallet2.persistence.db/Credential_status_snapshots.<init>|<init>(kotlin.String;kotlin.String){}[0]
 
@@ -223,6 +239,7 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     final fun <#A1: kotlin/Any> selectAllIssuanceSessionRecords(kotlin/Function5<kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllIssuanceSessionRecords|selectAllIssuanceSessionRecords(kotlin.Function5<kotlin.String,kotlin.String,kotlin.String,kotlin.String,kotlin.Long,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectByKeyId(kotlin/String, kotlin/Function3<kotlin/String, kotlin/Long, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectByKeyId|selectByKeyId(kotlin.String;kotlin.Function3<kotlin.String,kotlin.Long,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectCredentialById(kotlin/String, kotlin/Function7<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String;kotlin.Function7<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectCredentialStatusMaintenance(kotlin/String, kotlin/Function2<kotlin/String, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialStatusMaintenance|selectCredentialStatusMaintenance(kotlin.String;kotlin.Function2<kotlin.String,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectDidByDid(kotlin/String, kotlin/Function2<kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectDidByDid|selectDidByDid(kotlin.String;kotlin.Function2<kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectIdentityRecord(kotlin/String, kotlin/Function3<kotlin/String, kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecord|selectIdentityRecord(kotlin.String;kotlin.Function3<kotlin.String,kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectIdentityRecords(kotlin/Function3<kotlin/String, kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecords|selectIdentityRecords(kotlin.Function3<kotlin.String,kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
@@ -233,6 +250,7 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     final fun deleteByKeyId(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteByKeyId|deleteByKeyId(kotlin.String){}[0]
     final fun deleteCredentialById(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteCredentialById|deleteCredentialById(kotlin.String){}[0]
     final fun deleteCredentialStatus(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteCredentialStatus|deleteCredentialStatus(kotlin.String){}[0]
+    final fun deleteCredentialStatusMaintenance(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteCredentialStatusMaintenance|deleteCredentialStatusMaintenance(kotlin.String){}[0]
     final fun deleteDidByDid(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteDidByDid|deleteDidByDid(kotlin.String){}[0]
     final fun deleteIdentityRecord(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteIdentityRecord|deleteIdentityRecord(kotlin.String){}[0]
     final fun deleteIssuanceSessionRecordById(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteIssuanceSessionRecordById|deleteIssuanceSessionRecordById(kotlin.String){}[0]
@@ -252,11 +270,13 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     final fun selectByKeyId(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Key_references> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectByKeyId|selectByKeyId(kotlin.String){}[0]
     final fun selectCredentialById(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Credentials> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String){}[0]
     final fun selectCredentialStatus(kotlin/String): app.cash.sqldelight/Query<kotlin/String> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialStatus|selectCredentialStatus(kotlin.String){}[0]
+    final fun selectCredentialStatusMaintenance(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Credential_status_maintenance> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialStatusMaintenance|selectCredentialStatusMaintenance(kotlin.String){}[0]
     final fun selectDidByDid(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Dids> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectDidByDid|selectDidByDid(kotlin.String){}[0]
     final fun selectIdentityRecord(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_identity_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecord|selectIdentityRecord(kotlin.String){}[0]
     final fun selectIdentityRecords(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_identity_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecords|selectIdentityRecords(){}[0]
     final fun selectIssuanceSessionRecordById(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Issuance_session_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIssuanceSessionRecordById|selectIssuanceSessionRecordById(kotlin.String){}[0]
     final fun setActiveIdentity(kotlin/String, kotlin/String, kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.setActiveIdentity|setActiveIdentity(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun setCredentialStatusMaintenance(kotlin/String, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.setCredentialStatusMaintenance|setCredentialStatusMaintenance(kotlin.String;kotlin.String?){}[0]
 }
 
 final class id.walt.wallet2.persistence.db/Wallet_active_identity { // id.walt.wallet2.persistence.db/Wallet_active_identity|null[0]
@@ -319,6 +339,7 @@ final class id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey { // id
 final class id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider : id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider { // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider|null[0]
     constructor <init>(kotlin/String? = ...) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.<init>|<init>(kotlin.String?){}[0]
 
+    final fun readExistingKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey? // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.readExistingKey|readExistingKey(kotlin.String;kotlin.String){}[0]
     final suspend fun deleteKey(kotlin/String, kotlin/String) // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.deleteKey|deleteKey(kotlin.String;kotlin.String){}[0]
     final suspend fun getOrCreateKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey // id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvider.getOrCreateKey|getOrCreateKey(kotlin.String;kotlin.String){}[0]
 }
@@ -437,6 +458,8 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
 
     final fun createEncryptedDriver(kotlin/String, id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey, kotlin/Boolean = ..., kotlin/String = ...): app.cash.sqldelight.db/SqlDriver // id.walt.wallet2.persistence.stores/DriverFactory.createEncryptedDriver|createEncryptedDriver(kotlin.String;id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey;kotlin.Boolean;kotlin.String){}[0]
     final fun deleteDatabase(kotlin/String) // id.walt.wallet2.persistence.stores/DriverFactory.deleteDatabase|deleteDatabase(kotlin.String){}[0]
+    final fun existingLocation(): kotlin/String // id.walt.wallet2.persistence.stores/DriverFactory.existingLocation|existingLocation(){}[0]
+    final fun openExistingEncryptedDriver(kotlin/String, kotlin/String, id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey, kotlin/String): app.cash.sqldelight.db/SqlDriver? // id.walt.wallet2.persistence.stores/DriverFactory.openExistingEncryptedDriver|openExistingEncryptedDriver(kotlin.String;kotlin.String;id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey;kotlin.String){}[0]
     final fun useAppGroup(kotlin/String): id.walt.wallet2.persistence.stores/DriverFactory // id.walt.wallet2.persistence.stores/DriverFactory.useAppGroup|useAppGroup(kotlin.String){}[0]
 }
 
@@ -449,6 +472,10 @@ final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.wa
     final suspend fun listCredentials(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.data/StoredCredential> // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.listCredentials|listCredentials(){}[0]
     final suspend fun readCredentialStatusRecord(kotlin/String): id.walt.wallet2.status/CredentialStatusStoredRecord? // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.readCredentialStatusRecord|readCredentialStatusRecord(kotlin.String){}[0]
     final suspend fun removeCredential(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.removeCredential|removeCredential(kotlin.String){}[0]
+
+    final object Companion { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.Companion|null[0]
+        final fun forStatusMaintenance(id.walt.wallet2.persistence.db/WalletPersistenceQueries, kotlin/String, kotlin/String): id.walt.wallet2.persistence.stores/SqlDelightCredentialStore // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.Companion.forStatusMaintenance|forStatusMaintenance(id.walt.wallet2.persistence.db.WalletPersistenceQueries;kotlin.String;kotlin.String){}[0]
+    }
 }
 
 final class id.walt.wallet2.persistence.stores/SqlDelightDidStore : id.walt.wallet2.data/WalletDidStore { // id.walt.wallet2.persistence.stores/SqlDelightDidStore|null[0]
@@ -492,6 +519,8 @@ final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wall
     final suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.crypto2.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     final suspend fun removeKey(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.removeKey|removeKey(kotlin.String){}[0]
 }
+
+final class id.walt.wallet2.persistence.stores/StatusMaintenanceStorageException : kotlin/RuntimeException // id.walt.wallet2.persistence.stores/StatusMaintenanceStorageException|null[0]
 
 sealed class id.walt.wallet2.persistence.encryption/WalletPersistenceException : kotlin/RuntimeException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException|null[0]
     final class DatabaseKeyMissing : id.walt.wallet2.persistence.encryption/WalletPersistenceException { // id.walt.wallet2.persistence.encryption/WalletPersistenceException.DatabaseKeyMissing|null[0]

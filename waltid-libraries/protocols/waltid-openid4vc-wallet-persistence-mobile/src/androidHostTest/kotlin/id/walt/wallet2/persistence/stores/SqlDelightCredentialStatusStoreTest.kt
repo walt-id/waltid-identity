@@ -2,7 +2,6 @@ package id.walt.wallet2.persistence.stores
 
 import kotlinx.serialization.json.Json
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.status.CredentialStatus
 import id.walt.wallet2.data.StoredCredential
@@ -44,6 +43,8 @@ class SqlDelightCredentialStatusStoreTest {
             assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("aba", snapshot)))
             assertFalse(store.compareAndSetCredentialStatus(credential, original, CredentialStatusStoredRecord("old", snapshot)))
             assertTrue(store.compareAndSetCredentialStatus(credential, cleared, CredentialStatusStoredRecord("restored", snapshot)))
+            WalletPersistenceDatabase.Schema.migrate(driver, 2, WalletPersistenceDatabase.Schema.version)
+            assertNull(database.walletPersistenceQueries.selectCredentialStatusMaintenance("existing").executeAsOneOrNull())
             assertEquals(snapshot, SqlDelightCredentialStore(WalletPersistenceDatabase(driver).walletPersistenceQueries).readCredentialStatus("resident"))
             assertTrue(store.removeCredential("resident"))
             assertNull(store.readCredentialStatus("resident"))

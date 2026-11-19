@@ -97,6 +97,7 @@ dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
     implementation(identityLibs.androidx.activity.compose)
+    implementation(identityLibs.androidx.work.runtime)
     implementation(identityLibs.androidx.credentials.registry.provider)
     debugImplementation(identityLibs.androidx.credentials.play.services.auth)
     debugImplementation(identityLibs.androidx.lifecycle.runtime)

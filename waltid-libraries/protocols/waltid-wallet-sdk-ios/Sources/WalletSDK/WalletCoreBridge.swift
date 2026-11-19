@@ -5,6 +5,9 @@ protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
     var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { get }
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot
+    func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment?
+    func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
+    func invalidateCredentialStatusSnapshot() async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
     func close() async throws
     var signingIdentityCore: any SigningIdentityCore { get }
@@ -300,4 +303,11 @@ extension WalletCoreBridge {
         deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
         throw WalletError.internalFailure("Status-reviewed Annex C presentation is unavailable")
     }
+}
+
+
+extension WalletCoreBridge {
+    func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func invalidateCredentialStatusSnapshot() async throws {}
 }

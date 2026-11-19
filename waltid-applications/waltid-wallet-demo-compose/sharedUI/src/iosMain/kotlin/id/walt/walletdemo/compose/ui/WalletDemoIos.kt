@@ -7,6 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
+import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -88,6 +94,9 @@ fun walletDemoViewController(
     attestationHostHeader: String = "",
     transactionDataProfilesUrl: String = "",
     signingProtectionMode: String = "optional",
+    onBackgroundStatusEnrollmentChanged: (String?) -> Unit,
+    backgroundStatusSchedulingAvailable: () -> Boolean,
+
 ): UIViewController {
     installWalletImageLoader()
     val parsedSigningProtectionMode = WalletDemoSigningProtectionMode.parse(signingProtectionMode)
@@ -139,9 +148,15 @@ fun walletDemoViewController(
         signingProtectionMode = parsedSigningProtectionMode,
         signingProtectionStore = createIosDemoSigningProtectionStore(config.walletId),
         sharingSettings = sharingSettings,
+        reconcileBackgroundStatusSchedule = { binding ->
+            withContext(Dispatchers.Main.immediate) {
+                onBackgroundStatusEnrollmentChanged(binding)
+            }
+        },
         scope = controllerScope,
         canOpenExternalRequest = { !proximityController.state.value.active },
     )
+    controller.setBackgroundStatusSchedulingAvailable(backgroundStatusSchedulingAvailable())
     iosController = controller
     iosProximityController?.dismiss()
     iosProximityController = proximityController
@@ -177,3 +192,36 @@ fun handleWalletDemoApplicationForegrounded() {
 fun handleWalletDemoApplicationBackgrounded() {
     iosController?.handleApplicationBackgrounded()
 }
+
+
+fun handleWalletDemoBackgroundStatusCompleted() {
+    iosController?.invalidateBackgroundStatusSnapshot()
+}
+
+fun setWalletDemoBackgroundStatusSchedulingAvailable(available: Boolean) {
+    iosController?.setBackgroundStatusSchedulingAvailable(available)
+}
+
+/** Swift owns a single cancellable SDK operation. No Compose controller is constructed here. */
+class ComposeBackgroundStatusRun internal constructor(private val job: Job) {
+    fun cancel() { job.cancel() }
+}
+
+fun startWalletDemoBackgroundStatus(
+    binding: String,
+    appGroupIdentifier: String,
+    keychainAccessGroup: String,
+    onFinished: (Boolean) -> Unit,
+): ComposeBackgroundStatusRun = ComposeBackgroundStatusRun(CoroutineScope(Dispatchers.Main).launch {
+    var delivered = false
+    try {
+        delivered = refreshDueStatusesForExistingWallet(binding,
+            MobileWalletCrossProcessAccess(appGroupIdentifier, keychainAccessGroup)) != CredentialStatusMaintenanceResult.Deferred
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        // Scheduler success and issuer observations are distinct. Report a failed delivery without wallet data.
+    } finally {
+        onFinished(delivered)
+    }
+})

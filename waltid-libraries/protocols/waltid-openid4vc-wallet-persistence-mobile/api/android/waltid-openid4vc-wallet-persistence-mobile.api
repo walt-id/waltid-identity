@@ -1,3 +1,16 @@
+public final class id/walt/wallet2/persistence/db/Credential_status_maintenance {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/Credential_status_maintenance;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Credential_status_maintenance;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Credential_status_maintenance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getGrant_id ()Ljava/lang/String;
+	public final fun getWallet_id ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class id/walt/wallet2/persistence/db/Credential_status_snapshots {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -100,6 +113,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun deleteByKeyId (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteCredentialStatus (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteCredentialStatusMaintenance (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
@@ -126,6 +140,8 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun selectCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialById (Ljava/lang/String;Lkotlin/jvm/functions/Function7;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatus (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectCredentialStatusMaintenance (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectCredentialStatusMaintenance (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
 	public final fun selectDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectDidByDid (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
 	public final fun selectIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
@@ -135,6 +151,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;Lkotlin/jvm/functions/Function5;)Lapp/cash/sqldelight/Query;
 	public final fun setActiveIdentity (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun setCredentialStatusMaintenance (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 }
 
 public final class id/walt/wallet2/persistence/db/Wallet_active_identity {
@@ -173,6 +190,7 @@ public final class id/walt/wallet2/persistence/encryption/AndroidDatabaseEncrypt
 	public fun <init> (Landroid/content/Context;)V
 	public fun deleteKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun getOrCreateKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun readExistingKey (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;
 }
 
 public final class id/walt/wallet2/persistence/encryption/DatabaseEncryptionKey {
@@ -408,9 +426,12 @@ public final class id/walt/wallet2/persistence/stores/DriverFactory {
 	public final fun createEncryptedDriver (Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;ZLjava/lang/String;)Lapp/cash/sqldelight/db/SqlDriver;
 	public static synthetic fun createEncryptedDriver$default (Lid/walt/wallet2/persistence/stores/DriverFactory;Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;ZLjava/lang/String;ILjava/lang/Object;)Lapp/cash/sqldelight/db/SqlDriver;
 	public final fun deleteDatabase (Ljava/lang/String;)V
+	public final fun existingLocation (Ljava/lang/String;)Ljava/lang/String;
+	public final fun openExistingEncryptedDriver (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;Ljava/lang/String;)Lapp/cash/sqldelight/db/SqlDriver;
 }
 
 public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialStore, id/walt/wallet2/status/CredentialStatusSnapshotStore {
+	public static final field Companion Lid/walt/wallet2/persistence/stores/SqlDelightCredentialStore$Companion;
 	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
 	public fun addCredential (Lid/walt/wallet2/data/StoredCredential;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun compareAndSetCredentialStatus (Lid/walt/wallet2/data/StoredCredential;Lid/walt/wallet2/status/CredentialStatusStoredRecord;Lid/walt/wallet2/status/CredentialStatusStoredRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -420,6 +441,10 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore 
 	public fun readCredentialStatus (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readCredentialStatusRecord (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore$Companion {
+	public final fun forStatusMaintenance (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/stores/SqlDelightCredentialStore;
 }
 
 public final class id/walt/wallet2/persistence/stores/SqlDelightDidStore : id/walt/wallet2/data/WalletDidStore {
@@ -464,5 +489,8 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightKeyStore : id/wa
 	public final fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeKey (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun storedKey (Ljava/lang/String;)Lid/walt/crypto2/keys/StoredKey;
+}
+
+public final class id/walt/wallet2/persistence/stores/StatusMaintenanceStorageException : java/lang/RuntimeException {
 }
 

@@ -67,6 +67,21 @@ SELECT changes();
 deleteCredentialStatus:
 DELETE FROM credential_status_snapshots WHERE credential_id = ?;
 
+-- Foreground opt-in with a nullable generation while automatic checks are paused.
+CREATE TABLE credential_status_maintenance (
+    wallet_id TEXT NOT NULL PRIMARY KEY,
+    grant_id TEXT
+);
+
+selectCredentialStatusMaintenance:
+SELECT * FROM credential_status_maintenance WHERE wallet_id = ?;
+
+setCredentialStatusMaintenance:
+INSERT OR REPLACE INTO credential_status_maintenance(wallet_id, grant_id) VALUES (?, ?);
+
+deleteCredentialStatusMaintenance:
+DELETE FROM credential_status_maintenance WHERE wallet_id = ?;
+
 -- DIDs
 
 CREATE TABLE dids (

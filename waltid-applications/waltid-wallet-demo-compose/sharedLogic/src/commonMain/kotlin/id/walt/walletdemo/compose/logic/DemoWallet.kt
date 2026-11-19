@@ -3,7 +3,17 @@ package id.walt.walletdemo.compose.logic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
+enum class DemoBackgroundStatusPreference { OFF, PAUSED, ENABLED }
+
+class DemoBackgroundStatusEnrollment(
+    val preference: DemoBackgroundStatusPreference,
+    val binding: String?,
+)
+
 interface DemoWallet {
+    suspend fun backgroundStatusEnrollment(): DemoBackgroundStatusEnrollment? = null
+    suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference): DemoBackgroundStatusEnrollment? = null
+    suspend fun invalidateCredentialStatusSnapshot() {}
     /** Releases host-owned resources when this wallet instance leaves its session. */
     suspend fun close() {}
     fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = emptyFlow()

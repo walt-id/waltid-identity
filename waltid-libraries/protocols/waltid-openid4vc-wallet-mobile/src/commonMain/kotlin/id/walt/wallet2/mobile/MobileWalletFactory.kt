@@ -181,6 +181,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         walletId: String,
     ) -> SqlDriver,
     deleteDatabase: (databaseName: String) -> Unit,
+    maintenanceLocation: (databaseName: String) -> String? = { null },
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     // Resolver state belongs to this process, including when all wallet keys already exist.
@@ -202,6 +203,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         config = config,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
+        maintenanceLocation = { maintenanceLocation(databaseName) },
         keyProvider = platformKeyProvider,
         registrationProjection = registrationProjection,
         proximityTransportFactory = proximityTransportFactory,
@@ -226,6 +228,7 @@ internal fun createSqlDelightMobileWallet(
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    maintenanceLocation: () -> String? = { null },
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
     val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
@@ -249,6 +252,11 @@ internal fun createSqlDelightMobileWallet(
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
+        statusMaintenance = StatusMaintenanceEnrollmentStore(config.walletId, queries) {
+            if (config.persistence.databaseKey == MobileWalletDatabaseKey.Managed && config.persistence.credentialStore == null) {
+                maintenanceLocation()
+            } else null
+        },
         issuanceSessionStore = issuanceSessionStore,
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
