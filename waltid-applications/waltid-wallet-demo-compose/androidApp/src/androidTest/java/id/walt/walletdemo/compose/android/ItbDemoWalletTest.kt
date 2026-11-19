@@ -248,13 +248,21 @@ private class DemoInteractions(
                 return@waitUntil false
             }
             if (device.hasObject(By.res(reviewTag))) true else {
+                val shareSheet = device.hasObject(By.copy(picker).text("Share info"))
                 val candidate = device.findObject(By.copy(picker).textContains("walt.id Wallet"))
-                val confirm = device.findObject(By.copy(picker).text("Confirm"))
-                    ?: device.findObject(By.copy(picker).text("Continue"))
+                val confirm = if (shareSheet) {
+                    if (!attended && device.hasObject(By.copy(picker).text(itbHost))) {
+                        device.findObject(By.copy(picker).text("Agree and continue"))
+                    } else null
+                } else {
+                    device.findObject(By.copy(picker).text("Confirm"))
+                        ?: device.findObject(By.copy(picker).text("Continue"))
+                }
                 when {
-                    confirm?.isEnabled == true && (candidate != null || selected) ->
+                    confirm?.isEnabled == true && (shareSheet || candidate != null || selected) ->
                         (confirm.clickableAncestor() ?: confirm).click()
-                    !selected && candidate != null -> (candidate.clickableAncestor() ?: candidate).click().also { selected = true }
+                    !shareSheet && !selected && candidate != null ->
+                        (candidate.clickableAncestor() ?: candidate).click().also { selected = true }
                 }
                 false
             }
