@@ -9,6 +9,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.inferKeySpec
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import id.walt.wallet2.status.WalletCredentialRead
 
 /**
  * Represents a wallet instance composed of its storage backends.
@@ -86,6 +88,35 @@ data class Wallet(
      */
     val defaultDidId: String? = null,
 ) {
+    private val credentialStatusMutex = Mutex()
+    private var statusService: WalletCredentialStatusService? = null
+
+    /** Configures status ownership without changing the published wallet constructor. */
+    fun attachCredentialStatusService(service: WalletCredentialStatusService): Wallet = apply {
+        require(service.wallet === this) { "Status service belongs to a different wallet instance" }
+        check(statusService == null || statusService === service) { "Status service is already configured" }
+        statusService = service
+    }
+
+    /** Local metadata is initialized lazily; obtaining the service never checks an issuer endpoint. */
+    suspend fun credentialStatuses(): WalletCredentialStatusService = credentialStatusMutex.withLock {
+        statusService ?: WalletCredentialStatusService(this).also { statusService = it }
+    }
+
+    /** Cancels status work and observation without initializing an unused status service. */
+    fun closeCredentialStatusService() { statusService?.close() }
+
+    /** Notifies an existing observer after direct writes to a custom store; no network or lazy initialization. */
+    fun notifyCredentialStatusInventoryChanged() { statusService?.notifyCredentialInventoryChanged() }
+
+    /** Read parsed credentials together with local status observations. */
+    suspend fun readCredentialsWithStatus(): List<WalletCredentialRead> =
+        credentialStatuses().readCredentials()
+
+    /** Read one wallet-owned credential with the same status semantics as collection reads. */
+    suspend fun readCredentialWithStatus(id: String): WalletCredentialRead? =
+        credentialStatuses().readCredential(id)
+
     private var resolvedStaticCrypto2Key: Crypto2Key? = null
     private sealed interface KeyAttestationSource {
         data class Fixed(val provider: KeyAttestationProvider) : KeyAttestationSource
@@ -263,6 +294,7 @@ data class Wallet(
         val store = credentialStores.firstOrNull()
             ?: error("Wallet '$id' has no credential stores configured")
         store.addCredential(entry)
+        notifyCredentialStatusInventoryChanged()
     }
 
     /**

@@ -77,17 +77,17 @@ public struct OfferedCredentialRow: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(CredentialCardSummary.offered(from: credential).title)
                     .accessibilityIdentifier("issuance-large-art-\(credential.configurationID)")
-                Button { showDetails = true } label: {
-                    Image(systemName: "info.circle")
-                        .resizable().frame(width: 20, height: 20)
-                        .foregroundStyle(Color(css: CredentialCardSummary.offered(from: credential).textColor) ?? .white)
-                        .frame(width: 48, height: 48).contentShape(Rectangle())
+                CredentialCardAccessory {
+                    Button { showDetails = true } label: {
+                        Image(systemName: "info.circle")
+                            .resizable().frame(width: 20, height: 20)
+                            .foregroundStyle(Color(css: CredentialCardSummary.offered(from: credential).textColor) ?? .white)
+                            .frame(width: 48, height: 48).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "Credential information", bundle: .module))
+                    .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(String(localized: "Credential information", bundle: .module))
-                .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
-                // Align the 20pt icon with the card's 16pt inset: 2 + (48 - 20) / 2.
-                .padding(2)
             }
         } else if !allowsSelection {
             HStack(spacing: 12) { summary; selection(showsLabel: false) }
@@ -118,7 +118,7 @@ public struct OfferedCredentialRow: View {
             if showsLabel { toggle }
             else { toggle.labelsHidden().fixedSize() }
         } else {
-            Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint).accessibilityHidden(true)
         }
     }
 

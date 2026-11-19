@@ -101,7 +101,7 @@ internal fun IdentitySetupScreen(
                 val visibleWarning = latestWarning?.takeIf { summary && latestFailedConfiguration == latestSelectedConfiguration }
                 savedPages.SaveableStateProvider(key) {
                     ReviewScaffold(
-                        modifier = Modifier.fillMaxSize().walletNavigationBackground().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp),
+                        modifier = Modifier.fillMaxSize().walletNavigationBackground().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletContentMaxWidth),
                         header = { WalletScreenHeader(if (summary) stringResource(Res.string.setup_title) else displayedStep!!.title) },
                         feedback = if (summary && (refreshing || visibleWarning != null)) ({
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

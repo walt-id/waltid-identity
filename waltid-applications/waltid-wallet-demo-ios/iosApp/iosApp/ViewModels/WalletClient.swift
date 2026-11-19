@@ -9,6 +9,15 @@ protocol WalletClient {
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PreparedPresentationReview
+    func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot?
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
+        did: String?, paymentConsentRevision: String?
+    ) async throws -> PresentationResult
+
     func signingIdentityManager() async throws -> SigningIdentityManager?
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult
     func signingProtectionAvailability(
@@ -59,6 +68,21 @@ extension WalletClient {
     ) async throws -> PreparedPresentationReview {
         throw WalletError.invalidInput("Effective review is unavailable")
     }
+    func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { nil }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { [] }
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
+        did: String?, paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        if let snapshot = try await credentialStatusSnapshot(), !selectedCredentialOptions.allSatisfy({ selection in
+            snapshot.credentials.first { $0.credentialID == selection.credentialID }?.value.presentation.advisoryRevision == reviewedStatus[selection.credentialID]
+        }) { throw WalletError.credentialStatusReviewChanged }
+        return try await submitPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did, paymentConsentRevision: paymentConsentRevision)
+    }
+
     func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
     func rejectIssuedCredential(
         notificationID: String,
@@ -108,6 +132,19 @@ final class SDKWalletClient: WalletClient {
         case .unsupported(.biometricUnavailable): .biometricUnavailable
         case .unsupported(.unsupportedCombination): .unsupported
         }
+    }
+
+    func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { try await wallet().credentialStatuses }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { try await wallet().refreshCredentialStatuses(ids: ids, force: force) }
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
+        did: String?, paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        try await wallet().submitStatusReviewedPresentation(previewHandle: previewHandle,
+            selectedCredentialOptions: selectedCredentialOptions, selectedDisclosureOptions: selectedDisclosureOptions,
+            reviewedStatus: reviewedStatus, did: did, paymentConsentRevision: paymentConsentRevision)
     }
 
     func credentials() async throws -> [Credential] {

@@ -231,6 +231,52 @@ examples. Issuance does not implicitly generate keys or increase batch size.
 | `GET` | `/wallet/{walletId}/credentials/{credentialId}` | Get credential with data |
 | `DELETE` | `/wallet/{walletId}/credentials/{credentialId}` | Delete a credential |
 
+### Credential status
+
+List/detail responses retain their existing fields and add `reference`, `status`,
+`statusPresentation` and `statusEvaluatedAt`. `GET /wallet/{walletId}/credential-status` reads local
+snapshots; `POST /wallet/{walletId}/credential-status/refresh` explicitly checks wallet-owned
+references. Both use the containing wallet's authentication and ownership checks.
+
+Typed Kotlin HTTP clients decode list entries as `WalletCredentialMetadataResponse` and details as
+`WalletCredentialResponse` from `id.walt.wallet2.status`. Import responses and inline isolated
+presentation inputs continue to use `StoredCredential`; copy its fields from the detail response
+when constructing an inline request. Strict JSON decoders must use the response types for reads.
+
+Refresh accepts `{ "credentials": [{ "storeIndex": 0, "credentialId": "stored-id" }], "mode": "IF_DUE" }`.
+Omit `credentials` to select the wallet; an explicit selection contains 1–100 references. `FORCE`
+requires revalidation. A wallet-scoped 30-second admission limit can return `DEFERRED` per credential;
+other outcomes are `COMPLETED`, `UNCHANGED` and `REMOVED`. Each `WalletCredentialStatusRefreshResponse`
+also carries producer-derived `presentation`, `evaluatedAt` and `hasCheckErrors`; render the returned
+facts immediately instead of requiring another read. No endpoint accepts a caller's status URL.
+
+`POST /wallet/{walletId}/credential-status/context` opens an explicit active review without issuer
+I/O. Its snapshot includes `statusContext: { id, expiresAt }`. Pass that ID as `statusContext` in the
+snapshot query, refresh body and both reviewed submission bodies. The browser keeps it only in memory;
+polling uses the same context and cannot overwrite a newer explicit refresh. Contexts retain detached
+evidence unavailable from managed snapshots, including no-store results and their failed attempts,
+never list bodies or request-authorized services. Every call reauthorizes the wallet and creates a new
+service. The context ID grants no permission. Snapshot, context-open and refresh responses send
+`Cache-Control: no-store`.
+
+Contexts expire after five idle minutes. The process admits at most 128 contexts, reserving at most
+4096 credential records in total and 1000 per context, before issuer work. Capacity exhaustion returns
+429. `DELETE /wallet/{walletId}/credential-status/context/{contextId}` closes a review; wallet deletion
+forgets its contexts. Stateless reads create no context. An unknown, foreign, expired or invalidated
+context identifier returns the same 409 review-change code; discard its pending consent and recover with a local
+snapshot, without an automatic issuer check or submission retry. Multi-instance hosts need routing
+affinity for this process-local state; losing it safely invalidates the review.
+
+The browser uses `/credentials/present/build-vp-token/status-reviewed` and
+`/credentials/present/send-response/status-reviewed` with the displayed `reviewedStatus` map.
+These preserve the ordinary request inside `request`; send also requires `selectedCredentialIds`.
+A changed selected warning yields HTTP 409 with `code: credential_status_review_changed` before
+response delivery. Re-render the local review and obtain consent again. Existing presentation
+endpoints remain available. Each guard boundary reloads the active context and current managed
+evidence, so another request's status change during proof work cannot preserve an old acknowledgement.
+Managed observations survive requests; restricted evidence survives only in its bounded active review.
+See [shared status behavior](../../credentials/waltid-credential-status/README.md).
+
 ### Issuance (OpenID4VCI 1.0)
 
 | Method | Path | Description |
