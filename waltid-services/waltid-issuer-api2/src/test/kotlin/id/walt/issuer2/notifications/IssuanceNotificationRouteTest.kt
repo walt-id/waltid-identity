@@ -1,17 +1,7 @@
 package id.walt.issuer2.notifications
 
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.issuer2Module
@@ -41,9 +31,8 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.proofs.Proofs
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
-import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
-import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -743,40 +732,18 @@ class IssuanceNotificationRouteTest {
         val issuerMetadata = get("/.well-known/openid-credential-issuer/openid4vci").also {
             assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         }.body<CredentialIssuerMetadata>()
-        val nonceResponse = post("/openid4vci/nonce").also {
-            assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-        }.body<JsonObject>()
-        val nonce = assertNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull)
-        val proofKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
-            KeyId("holder-proof"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-        ))
-        val holderDid = Crypto2DidJwkRegistrar()
-            .createByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
-            .did
-        val validProofs = JwtProofBuilder().buildProof(
-            key = proofKey,
-            algorithm = JwsAlgorithm.ES256,
-            audience = issuerMetadata.credentialIssuer,
-            nonce = nonce,
-            binding = ProofKeyBinding.KeyId("$holderDid#0"),
-            clientId = null,
-        )
-        val proofs = if (tamperProof) {
-            validProofs.copy(jwt = validProofs.jwt?.map(::tamperSignature))
-        } else {
-            validProofs.copy(jwt = List(proofCount) { requireNotNull(validProofs.jwt).single() })
+        val configurationId = resolvedOffer.credentialConfigurationIds.single()
+        val wallet = Issuer2WalletFlowDriver(this)
+        val proofs = List(proofCount) {
+            val jwt = requireNotNull(wallet.buildJwtProofs(issuerMetadata, configurationId, includeDidInProof = true).jwt).single()
+            if (tamperProof) tamperSignature(jwt) else jwt
         }
 
         return post("/openid4vci/credential") {
             requestId?.let { header(HttpHeaders.XRequestId, it) }
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
-            setBody(
-                credentialRequest(
-                    credentialConfigurationId = resolvedOffer.credentialConfigurationIds.single(),
-                    proofs = proofs,
-                )
-            )
+            setBody(credentialRequest(configurationId, Proofs(jwt = proofs)))
         }
     }
 
