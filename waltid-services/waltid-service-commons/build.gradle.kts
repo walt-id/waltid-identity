@@ -58,6 +58,11 @@ dependencies {
     // Persistence
     api(identityLibs.cache4k)
     api(identityLibs.jedis)
+    constraints {
+        api(identityLibs.json.java) {
+            because("Jedis's transitive JSON-java dependency is affected by CVE-2026-59171")
+        }
+    }
 
     // Testing
     testImplementation(identityLibs.bundles.waltid.ktortesting)
