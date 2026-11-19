@@ -17,6 +17,8 @@ struct ContentView: UIViewControllerRepresentable {
     /// Apple's registration store. Only the app may call `IdentityDocumentServices`.
     let onDigitalCredentialRegistryChanged: () -> Void
     let signingProtectionMode: String
+    let onBackgroundStatusEnrollmentChanged: (String?) -> Void
+    let backgroundStatusSchedulingAvailable: () -> Bool
 
     func makeUIViewController(context: Context) -> UIViewController {
         let nfcHost = ComposeNfcHostPlatformAdapter()
@@ -33,7 +35,9 @@ struct ContentView: UIViewControllerRepresentable {
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
             transactionDataProfilesUrl: transactionDataProfilesUrl,
-            signingProtectionMode: signingProtectionMode
+            signingProtectionMode: signingProtectionMode,
+            onBackgroundStatusEnrollmentChanged: onBackgroundStatusEnrollmentChanged,
+            backgroundStatusSchedulingAvailable: { KotlinBoolean(bool: backgroundStatusSchedulingAvailable()) }
         )
     }
 

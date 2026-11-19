@@ -48,9 +48,18 @@ internal class WalletDemoActivityModel(
         signingProtectionMode = config.signingProtectionMode,
         signingProtectionStore = config.signingProtectionStore(context.applicationContext),
         sharingSettings = sharingSettings,
+        reconcileBackgroundStatusSchedule = { binding ->
+            AndroidBackgroundCredentialStatus.reconcile(applicationContext, binding)
+        },
         canOpenExternalRequest = { !proximityController.state.value.active },
         scope = viewModelScope,
     )
+
+    init {
+        viewModelScope.launch {
+            AndroidBackgroundCredentialStatus.completed.collect { controller.invalidateBackgroundStatusSnapshot() }
+        }
+    }
 
     /** A browser callback after process loss continues once, even if MainActivity then rotates. */
     fun drainOrphanCreateAuthorization() {

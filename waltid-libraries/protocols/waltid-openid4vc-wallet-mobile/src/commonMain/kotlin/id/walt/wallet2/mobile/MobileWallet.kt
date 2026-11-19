@@ -262,6 +262,7 @@ public class MobileWallet internal constructor(
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    private val statusMaintenance: StatusMaintenanceEnrollmentStore? = null,
     private val proximityTransportFactory: BleProximityTransportFactory? = null,
     private val proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
@@ -758,6 +759,20 @@ public class MobileWallet internal constructor(
     public suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot = lifecycle.use {
         wallet.credentialStatuses().snapshot()
     }
+
+    /** Makes the local status stream reread encrypted snapshots written by another handle. */
+    public suspend fun invalidateCredentialStatusSnapshot(): Unit = lifecycle.use {
+        wallet.notifyCredentialStatusInventoryChanged()
+    }
+
+    /** Reads the background opt-in for this managed wallet, or null for an unsupported store. */
+    public suspend fun credentialStatusMaintenanceEnrollment(): CredentialStatusMaintenanceEnrollment? =
+        lifecycle.use { statusMaintenance?.get() }
+
+    /** Updates the existing wallet's opt-in. The app calls this from its authorized foreground flow. */
+    public suspend fun setCredentialStatusMaintenance(
+        preference: CredentialStatusMaintenancePreference,
+    ): CredentialStatusMaintenanceEnrollment? = lifecycle.use { statusMaintenance?.set(preference) }
 
     /** Closes this instance to new operations and cancels status work without deleting stored data. */
     public suspend fun close(): Unit = lifecycle.close { wallet.closeCredentialStatusService() }
@@ -1286,6 +1301,7 @@ public class MobileWallet internal constructor(
      */
     public suspend fun deleteWallet(): Unit = lifecycle.delete {
         if (!localStoresCleared) {
+            statusMaintenance?.retire()
             wallet.closeCredentialStatusService()
             issuanceSessions.closeSessions()
             proximityCoordinator.shutdown()

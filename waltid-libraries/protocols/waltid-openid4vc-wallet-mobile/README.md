@@ -122,6 +122,25 @@ are not persisted. Custom stores need the optional shared snapshot-store capabil
 See [credential-status profiles, trust hooks, cache rules and lifecycle](../../credentials/waltid-credential-status/README.md)
 and the Swift [credential-status guide](../waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md).
 
+### App-owned background status checks
+
+Use an open, authorized managed wallet to call
+`setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.ENABLED)`. Keep its opaque
+binding only in app-private preferences. When the platform delivers eligible work, call
+`refreshDueStatusesForExistingWallet` with that binding and the original storage namespace.
+The bounded call updates due issuer evidence in existing SQLCipher storage and returns aggregate
+outcomes. Cancel it when the OS expires or stops the task.
+
+Use `PAUSED` when the host turns off automatic checks and `OFF` for explicit opt-out. Both retire
+the current binding before the host cancels its request. An enabled binding from before a pause
+must be replaced when resuming. Wallet deletion also retires it. Custom database key providers and
+credential stores use foreground refresh. The app owns the schedule and must get opt-in.
+
+On unlock or resume, read local status first. After a same-process wake,
+`invalidateCredentialStatusSnapshot()` prompts the existing observer to reread the managed
+snapshot. With the default mobile trust policy, a cold reopen preserves dated history and
+evaluates it as stale until another authenticated check.
+
 ## Receiving credentials
 
 When an issuer advertises `key_attestations_required`, attach an application-supplied

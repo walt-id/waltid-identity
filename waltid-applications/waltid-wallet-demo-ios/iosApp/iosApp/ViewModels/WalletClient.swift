@@ -11,6 +11,9 @@ protocol WalletClient {
     ) async throws -> PreparedPresentationReview
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot?
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment?
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
+    func invalidateCredentialStatusSnapshot() async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
@@ -59,6 +62,10 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func invalidateCredentialStatusSnapshot() async throws {}
+
     var supportsClaimReview: Bool { false }
     func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
@@ -135,6 +142,19 @@ final class SDKWalletClient: WalletClient {
     }
 
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { try await wallet().credentialStatuses }
+
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await cachedWallet?.credentialStatusMaintenanceEnrollment()
+    }
+
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await cachedWallet?.setCredentialStatusMaintenance(preference)
+    }
+
+    func invalidateCredentialStatusSnapshot() async throws {
+        try await cachedWallet?.invalidateCredentialStatusSnapshot()
+    }
+
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { try await wallet().refreshCredentialStatuses(ids: ids, force: force) }
     func submitStatusReviewedPresentation(

@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.CredentialStatusMaintenancePreference
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
 import id.walt.wallet2.mobile.identity.*
@@ -228,6 +230,15 @@ internal class MobileDemoWallet(
                 WalletDemoSigningProtectionAvailability.Unsupported
         }
     }
+
+    override suspend fun backgroundStatusEnrollment() = mobileWallet.credentialStatusMaintenanceEnrollment()?.toDemoEnrollment()
+    override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference) =
+        mobileWallet.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.valueOf(preference.name))?.toDemoEnrollment()
+
+    private fun CredentialStatusMaintenanceEnrollment.toDemoEnrollment() =
+        DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.valueOf(preference.name), binding)
+
+    override suspend fun invalidateCredentialStatusSnapshot() = mobileWallet.invalidateCredentialStatusSnapshot()
 
     override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
         flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses()) } }

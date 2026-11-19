@@ -24,12 +24,22 @@ private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * SQLDelight-backed implementation of [WalletCredentialStore] for mobile wallets.
- *
- * @param queries SQLDelight queries for wallet persistence tables.
+
  */
-public class SqlDelightCredentialStore(
+public class SqlDelightCredentialStore private constructor(
     private val queries: WalletPersistenceQueries,
+    private val maintenanceGrant: Pair<String, String>?,
 ) : WalletCredentialStore, CredentialStatusSnapshotStore {
+
+    /** Opens the ordinary foreground credential store. */
+    public constructor(queries: WalletPersistenceQueries) : this(queries, null)
+
+    public companion object {
+        /** Restricts mutations to status writes under the named wallet's current grant. */
+        public fun forStatusMaintenance(
+            queries: WalletPersistenceQueries, walletId: String, grantId: String,
+        ): SqlDelightCredentialStore = SqlDelightCredentialStore(queries, walletId to grantId)
+    }
 
     /** Loads the current evidence revision, including a cleared snapshot; unreadable metadata is unavailable. */
     override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? =
@@ -44,6 +54,9 @@ public class SqlDelightCredentialStore(
     ): Boolean = queries.transactionWithResult {
         require(updated.revision != expected?.revision)
         require(updated.snapshot?.credentialFingerprint?.let { it == credential.statusFingerprint() } != false)
+        // SQLite serializes this transaction with revocation, even across separate driver handles.
+        if (maintenanceGrant != null && queries.selectCredentialStatusMaintenance(maintenanceGrant.first)
+                .executeAsOneOrNull()?.grant_id != maintenanceGrant.second) return@transactionWithResult false
         val raw = queries.selectCredentialStatus(credential.id).executeAsOneOrNull()
         if (raw?.let(::decodeStatusRecord) != expected) return@transactionWithResult false
         queries.saveCredentialStatusIfCurrent(snapshot = json.encodeToString(CredentialStatusStoredRecord.serializer(), updated),
@@ -72,6 +85,7 @@ public class SqlDelightCredentialStore(
      * Stores a credential and its display metadata.
      */
     override suspend fun addCredential(entry: StoredCredential) {
+        check(maintenanceGrant == null) { "Status maintenance cannot add credentials" }
         val rawString = entry.credential.serializedForWalletPersistence()
         queries.transaction {
             if (queries.selectCredentialById(entry.id).executeAsOneOrNull()?.serialized_credential != rawString) queries.deleteCredentialStatus(entry.id)
@@ -93,6 +107,7 @@ public class SqlDelightCredentialStore(
      * Removes a credential by wallet-local identifier.
      */
     override suspend fun removeCredential(id: String): Boolean {
+        check(maintenanceGrant == null) { "Status maintenance cannot remove credentials" }
         val exists = queries.selectCredentialById(id).executeAsOneOrNull() != null
         if (exists) queries.transaction {
             queries.deleteCredentialStatus(id)

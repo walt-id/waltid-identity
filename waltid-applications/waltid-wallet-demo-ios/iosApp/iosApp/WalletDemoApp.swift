@@ -2,9 +2,37 @@ import Foundation
 import SwiftUI
 import WalletDemoSharingUI
 import WalletSDK
+import UIKit
+import WalletDemoBackgroundStatus
+import WalletDemoIdentityDocumentSupport
 
 @main
 struct WalletDemoApp: App {
+    var body: some Scene {
+        WindowGroup { WalletForegroundScene() }
+    }
+
+    @UIApplicationDelegateAdaptor(NativeBackgroundStatusDelegate.self) private var backgroundStatusDelegate
+}
+
+private struct WalletForegroundScene: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var activated = false
+    @State private var pendingURL: URL?
+
+    var body: some View {
+        Group {
+            if activated || scenePhase == .active {
+                WalletForegroundRoot(pendingURL: $pendingURL)
+            }
+        }
+        .onChange(of: scenePhase) { if $0 == .active { activated = true } }
+        .onOpenURL { pendingURL = $0 }
+    }
+}
+
+private struct WalletForegroundRoot: View {
+    @Binding var pendingURL: URL?
     #if DEBUG
     @MainActor private static let initialCredentialReadGate = MockInitialCredentialReadGate()
     #endif
@@ -71,52 +99,60 @@ struct WalletDemoApp: App {
                 attestationBearerToken: env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken,
                 attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader,
                 transactionDataProfilesUrl: transactionDataProfilesUrl,
-                signingProtectionMode: signingProtectionMode
+                signingProtectionMode: signingProtectionMode,
+                backgroundStatusScheduler: .shared
             )
         }
         return WalletViewModel(
             walletID: walletID,
             transactionDataProfilesUrl: transactionDataProfilesUrl,
-            signingProtectionMode: signingProtectionMode
+            signingProtectionMode: signingProtectionMode,
+            backgroundStatusScheduler: .shared
         )
     }()
 
     @Environment(\.scenePhase) private var scenePhase
 
-    var body: some Scene {
-        WindowGroup {
-            ContentView(viewModel: viewModel)
-            #if DEBUG
-            .overlay(alignment: .bottom) {
-                MockInitialCredentialReadControl(gate: Self.initialCredentialReadGate)
-                    .padding(.bottom, 80)
+    var body: some View {
+        ContentView(viewModel: viewModel)
+        #if DEBUG
+        .overlay(alignment: .bottom) {
+            MockInitialCredentialReadControl(gate: Self.initialCredentialReadGate)
+                .padding(.bottom, 80)
+        }
+        #endif
+        .environment(\.walletDemoBranding, .default)
+        .tint(WalletDemoBranding.default.primary)
+        .onChange(of: pendingURL) { _ in handlePendingURL() }
+        .onReceive(NotificationCenter.default.publisher(for: .backgroundCredentialStatusDidFinish)) { _ in
+            viewModel.invalidateBackgroundStatusSnapshot()
+        }
+        .task {
+            handlePendingURL()
+            guard scenePhase == .active else { return }
+            viewModel.handleApplicationBecameActive()
+        }
+        .onChange(of: scenePhase) { phase in
+            // Reconciling requests authorization on a first run, and afterwards picks up a status
+            // the user changed in Settings - Apple sends no notification either way. Becoming
+            // active is the first moment the app can act on it, so it reconciles here rather
+            // than polling. The same foreground signal also drives the one-shot biometric
+            // unlock prompt, because PinView's scenePhase can stay inactive on a cold launch.
+            guard phase == .active else {
+                if phase == .background { viewModel.handleApplicationEnteredBackground() }
+                return
             }
-            #endif
-            .environment(\.walletDemoBranding, .default)
-            .tint(WalletDemoBranding.default.primary)
-            .onOpenURL { url in
-                viewModel.handleDeepLink(url)
-            }
-            .task {
-                guard scenePhase == .active else { return }
-                viewModel.handleApplicationBecameActive()
-            }
-            .onChange(of: scenePhase) { phase in
-                // Reconciling requests authorization on a first run, and afterwards picks up a status
-                // the user changed in Settings - Apple sends no notification either way. Becoming
-                // active is the first moment the app can act on it, so it reconciles here rather
-                // than polling. The same foreground signal also drives the one-shot biometric
-                // unlock prompt, because PinView's scenePhase can stay inactive on a cold launch.
-                guard phase == .active else {
-                    if phase == .background { viewModel.handleApplicationEnteredBackground() }
-                    return
-                }
-                viewModel.handleApplicationBecameActive()
-                if #available(iOS 26.0, *) {
-                    Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
-                }
+            viewModel.handleApplicationBecameActive()
+            if #available(iOS 26.0, *) {
+                Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
             }
         }
+    }
+
+    private func handlePendingURL() {
+        guard let url = pendingURL else { return }
+        pendingURL = nil
+        viewModel.handleDeepLink(url)
     }
 
     private static func mockVerifierStyle(environment: [String: String]) -> MockWalletClient.VerifierStyle {
@@ -155,6 +191,39 @@ struct WalletDemoApp: App {
         return (dataJSON, portraitValueJSON)
     }
     #endif
+}
+
+private extension Notification.Name {
+    static let backgroundCredentialStatusDidFinish = Notification.Name("wallet.credential-status.maintenance.finished")
+}
+
+@MainActor
+private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
+            let task = Task { @MainActor in
+                let namespace = IdentityDocumentNamespace.nativeDemo
+                guard let keychain = namespace.keychainAccessGroup else {
+                    finish(false)
+                    return
+                }
+                do {
+                    let result = try await Wallet.refreshDueStatusesForExistingWallet(
+                        binding: binding, crossProcessAccess: WalletCrossProcessAccess(
+                            appGroupIdentifier: namespace.appGroupIdentifier, keychainAccessGroup: keychain
+                        )
+                    )
+                    finish(result != .deferred)
+                } catch {
+                    finish(false)
+                }
+            }
+            return { task.cancel() }
+        } onResult: {
+            NotificationCenter.default.post(name: .backgroundCredentialStatusDidFinish, object: nil)
+        }
+        return true
+    }
 }
 
 #if DEBUG

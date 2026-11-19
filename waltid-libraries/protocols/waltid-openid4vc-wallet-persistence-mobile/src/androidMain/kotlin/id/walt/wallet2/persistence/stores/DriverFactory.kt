@@ -1,12 +1,15 @@
 package id.walt.wallet2.persistence.stores
 
 import android.content.Context
+import android.database.sqlite.SQLiteException
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import net.zetetic.database.DatabaseErrorHandler
+import net.zetetic.database.sqlcipher.SQLiteDatabase
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.io.File
 
@@ -57,6 +60,44 @@ public actual class DriverFactory(private val context: Context) {
             driver.close()
             throw WalletPersistenceException.DatabaseUnlockFailed(walletId, cause)
         }
+    }
+
+    /** Storage location of the already opened managed wallet. Ambiguous installations cannot enroll. */
+    public fun existingLocation(databaseName: String): String? =
+        maintenanceLocations(databaseName).filterValues(File::isFile).keys.singleOrNull()
+
+    /** Opens only the recorded location at the current schema without creation, migration or repair. */
+    public fun openExistingEncryptedDriver(
+        databaseName: String, location: String, encryptionKey: DatabaseEncryptionKey, walletId: String,
+    ): SqlDriver? {
+        val file = maintenanceLocations(databaseName)[location]?.takeIf(File::isFile) ?: return null
+        System.loadLibrary("sqlcipher")
+        try {
+            val connection = SQLiteDatabase.openDatabase(
+                file.path, encryptionKey.material, null, SQLiteDatabase.OPEN_READWRITE,
+                DatabaseErrorHandler { _, cause -> throw cause }, null,
+            )
+            try {
+                if (connection.version.toLong() == WalletPersistenceDatabase.Schema.version) {
+                    return AndroidSqliteDriver(connection)
+                }
+            } catch (failure: Throwable) {
+                connection.close()
+                throw failure
+            }
+            connection.close()
+            return null
+        } catch (failure: SQLiteException) {
+            throw WalletPersistenceException.DatabaseUnlockFailed(walletId, failure)
+        }
+    }
+
+    private fun maintenanceLocations(databaseName: String): Map<String, File> {
+        require(databaseName.none { it == '/' || it == '\\' || it == '\u0000' })
+        return mapOf(
+            "database" to context.dataDir.resolve("databases/$databaseName.db"),
+            "no-backup" to context.dataDir.resolve("no_backup/$databaseName.db"),
+        )
     }
 
     /**
