@@ -57,14 +57,17 @@ check(result.isValid)
 
 ## Shared X.509 validation
 
-AdES uses `waltid-x509` for certificate-path signatures, authority-key identifiers, CA constraints,
+AdES uses `waltid-x509` for certificate parsing, certificate-path signatures, authority-key identifiers, CA constraints,
 path lengths and CA validity. Explicit anchors are passed through an `InMemoryTrustStore`; system roots
 are not implicitly added. Leaf validity, revocation and historical proof-of-existence decisions remain
 in the EN 319 102-1 process so expired and revoked signatures retain their precise sub-indications.
 
-The format-facing DER certificate and CRL views remain in AdES for now. The shared complete-CRL verifier
-requires current, direct v2 CRLs with AKI and does not directly replace historical AdES revocation evidence.
-Consolidating those views and extending shared CRL support remains follow-up work.
+The format-facing certificate view delegates serial numbers, validity, names, public keys and standard
+constraints to the shared parsed certificate, which is reused for path validation. Original DER remains available
+for signed structures and extension values; EKU multiplicity is preserved for strict RFC 3161 checks.
+The DER name view remains because the shared DN API only parses strings and cannot preserve issuerSerial/OCSP
+bindings. Historical CRL processing remains in AdES: the shared complete-CRL verifier requires current, direct
+v2 CRLs with nextUpdate, AKI and a CRL number, and cannot replace the EN 319 102-1 past/POE process.
 
 ## CB-AdES interpretation notes (ETSI CB-AdES Plugtests 2026)
 

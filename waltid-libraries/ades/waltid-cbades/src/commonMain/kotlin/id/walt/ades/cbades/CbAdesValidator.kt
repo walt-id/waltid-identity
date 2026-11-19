@@ -24,6 +24,7 @@ import id.walt.ades.validation.TimestampType
 import id.walt.ades.validation.ValidationCheck
 import id.walt.ades.validation.ValidationData
 import id.walt.ades.x509.X509Certificate
+import id.walt.ades.x509.AttributeCertificateHolder
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 
@@ -137,6 +138,7 @@ class CbAdesValidator(
         } else false
 
         val policyError = checkSignaturePolicy(headers, checks)
+        val attributeError = signingCert?.let { checkAttributeHolders(protected, it, checks) }
 
         val contentTs = CbAdesComponents.parseTstContainer(protected[CbAdesLabels.ADO_TST])?.map { tok ->
             TimestampEvidence(TimestampType.CONTENT, tok, payload.forTimestamps?.let(CbAdesImprints::adoTst), "adoTst")
@@ -176,6 +178,7 @@ class CbAdesValidator(
             signedDataFound = payload.found,
             hashFailure = payload.hashFailure,
             policyError = policyError,
+            signatureConstraintsError = attributeError,
             claimedSigningTime = CbAdesComponents.iat(protected)?.let { Instant.fromEpochSeconds(it) },
             certificates = embedded.certificates,
             crls = embedded.crls,
@@ -185,6 +188,28 @@ class CbAdesValidator(
             archiveTimestamps = arcTs,
             level = level,
         )
+    }
+
+    private suspend fun checkAttributeHolders(protected: CborItem.Map, signer: X509Certificate, checks: MutableList<ValidationCheck>): String? {
+        val certified = protected[CbAdesLabels.SR_ATS]?.asMap?.get(1) ?: return null
+        val attributes = certified.asArray ?: return "srAts.certified is not an array"
+        if (attributes.isEmpty()) return "srAts.certified is empty"
+        for ((index, item) in attributes.withIndex()) {
+            val bytes = item.asMap?.get(1)?.asMap?.get(1)?.asBytes
+                ?: return "Unsupported or missing X.509 attribute certificate at srAts.certified[$index]"
+            val matches = try {
+                AttributeCertificateHolder(bytes).matches(signer)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IllegalArgumentException) {
+                return "Cannot verify attribute-certificate holder: ${e.message}"
+            }
+            if (!matches) return "srAts.certified[$index] attribute-certificate holder does not match the signer"
+            checks += ValidationCheck("attribute:holder[$index]", CheckStatus.PASSED,
+                "attribute-certificate holder matches signer; this check does not establish attribute-authority trust",
+                "TS 119 152-1 5.2.5; RFC 5755 4.2.2")
+        }
+        return null
     }
 
     private suspend fun counterSignatureResults(
@@ -223,6 +248,7 @@ class CbAdesValidator(
                 out += engine.validate(
                     SignatureEvidence(
                         id, checks, cert, alg, valid,
+                        signatureConstraintsError = cert?.let { checkAttributeHolders(cs.headers.protectedMap, it, checks) },
                         claimedSigningTime = CbAdesComponents.iat(cs.headers.protectedMap)?.let { Instant.fromEpochSeconds(it) },
                         certificates = embedded.certificates, crls = embedded.crls, ocsps = embedded.ocsps,
                         signatureTimestamps = CbAdesExtraction.uHeaderTokens(cs.headers, CbAdesLabels.SIG_TST).flatMap { (i, t) ->

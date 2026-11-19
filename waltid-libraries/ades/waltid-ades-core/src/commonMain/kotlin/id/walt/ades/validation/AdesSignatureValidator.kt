@@ -33,6 +33,8 @@ class SignatureEvidence(
     val signatureTimestamps: List<TimestampEvidence> = emptyList(),
     val archiveTimestamps: List<TimestampEvidence> = emptyList(),
     val level: AdesLevel? = null,
+    /** A signed attribute violates a signature constraint, independently of the signature's cryptographic validity. */
+    val signatureConstraintsError: String? = null,
 ) {
     val formatFailures: List<ValidationCheck> get() = checks.filter { it.status == CheckStatus.FAILED && it.id.startsWith(FORMAT_PREFIX) }
 
@@ -79,6 +81,10 @@ class AdesSignatureValidator(private val policy: AdesValidationPolicy) {
         }
         checks += ValidationCheck("crypto:signature-value", CheckStatus.PASSED,
             "${evidence.signatureAlgorithm?.name ?: "signature"} verifies with ${signer.subject}", "EN 319 102-1 5.2.7")
+        evidence.signatureConstraintsError?.let {
+            checks += ValidationCheck("signature:constraints", CheckStatus.FAILED, it, "EN 319 102-1 5.2.8")
+            return result(Indication.INDETERMINATE, SubIndication.SIG_CONSTRAINTS_FAILURE)
+        }
         evidence.signatureAlgorithm?.digest?.let { d ->
             if (d.displayName in policy.forbiddenDigests) {
                 checks += ValidationCheck("crypto:constraints", CheckStatus.FAILED, "${d.displayName} is not acceptable", "EN 319 102-1 5.2.8")
@@ -120,7 +126,7 @@ class AdesSignatureValidator(private val policy: AdesValidationPolicy) {
             } else {
                 checks += ValidationCheck(label, if (policy.strictTimestamps) CheckStatus.FAILED else CheckStatus.WARNING,
                     "${ev.description} rejected: ${ts.indication}/${ts.subIndication}: ${ts.problems.joinToString("; ")}", "EN 319 102-1 5.4")
-                if (policy.strictTimestamps && ts.indication == Indication.FAILED) return result(Indication.TOTAL_FAILED, ts.subIndication, x509.chain)
+                if (policy.strictTimestamps) return result(ts.indication.toTotal(), ts.subIndication, x509.chain)
             }
         }
 

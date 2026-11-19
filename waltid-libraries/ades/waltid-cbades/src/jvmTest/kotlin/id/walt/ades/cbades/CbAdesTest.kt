@@ -25,6 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.test.runTest
 
@@ -254,6 +255,19 @@ class CbAdesTest {
         assertTrue(brokenResult.signatures.single().timestamps.none { it.passed }, brokenResult.describe())
         val strict = CbAdesValidator(AdesValidationPolicy(listOf(pki.root.certificate), transport = pki.transport, strictTimestamps = true)).validate(brokenTs.encode())
         assertEquals(SubIndication.HASH_FAILURE, strict.subIndication, strict.describe())
+    }
+
+    @Test
+    fun strictTimestampValidationRejectsRevokedTsa() = runTest {
+        val message = signer.signSign1(payload, pki.credentials(), CbAdesSignatureParameters(level = AdesLevel.B_T))
+        pki.revoke(pki.tsa, pki.now - 1.days)
+        val basic = validator.validate(message.encode())
+        assertEquals(Indication.TOTAL_PASSED, basic.indication, basic.describe())
+        assertTrue(basic.signatures.single().timestamps.none { it.passed })
+        val strict = CbAdesValidator(AdesValidationPolicy(listOf(pki.root.certificate), transport = pki.transport, strictTimestamps = true))
+            .validate(message.encode())
+        assertEquals(Indication.TOTAL_FAILED, strict.indication, strict.describe())
+        assertEquals(SubIndication.REVOKED, strict.subIndication, strict.describe())
     }
 
     @Test

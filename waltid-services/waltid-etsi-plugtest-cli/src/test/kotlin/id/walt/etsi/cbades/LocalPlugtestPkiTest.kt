@@ -5,6 +5,7 @@ import java.nio.file.attribute.PosixFilePermissions
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class LocalPlugtestPkiTest {
     @Test
@@ -12,6 +13,10 @@ class LocalPlugtestPkiTest {
         val dir = Files.createTempDirectory("cbades-pki-test").toFile()
         try {
             val first = LocalPlugtestPki(dir, "TEST")
+            val serials = listOf(first.root, first.ca, first.signer, first.signer2, first.counter1, first.counter2, first.tsa, first.aa)
+                .map { it.cert.serialNumber }
+            assertTrue(serials.all { it.signum() > 0 })
+            assertEquals(serials.size, serials.distinct().size)
             dir.listFiles()!!.filter { it.extension == "key" }.forEach {
                 assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(it.toPath()))
             }

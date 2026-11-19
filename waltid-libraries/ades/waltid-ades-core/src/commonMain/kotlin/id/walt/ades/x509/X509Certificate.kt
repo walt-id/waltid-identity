@@ -8,6 +8,12 @@ import id.walt.ades.crypto.AdesCrypto
 import id.walt.ades.crypto.AdesDigestAlgorithm
 import id.walt.ades.crypto.AdesSignatureAlgorithm
 import id.walt.ades.crypto.PublicKeyInfo
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import kotlinx.io.bytestring.ByteString
 import kotlin.time.Instant
 
 class X509Extension(val oid: String, val critical: Boolean, val value: ByteArray) {
@@ -16,24 +22,29 @@ class X509Extension(val oid: String, val critical: Boolean, val value: ByteArray
 
 enum class KeyUsageBit { DIGITAL_SIGNATURE, NON_REPUDIATION, KEY_ENCIPHERMENT, DATA_ENCIPHERMENT, KEY_AGREEMENT, KEY_CERT_SIGN, CRL_SIGN, ENCIPHER_ONLY, DECIPHER_ONLY }
 
-/** Multiplatform, read-only X.509 v3 certificate (RFC 5280). */
+/**
+ * Multiplatform, read-only X.509 v3 certificate (RFC 5280), backed by waltid-x509.
+ * The AdES view retains original DER for signed structures, ESS issuerSerial and arbitrary extension values;
+ * the shared certificate model does not expose those raw fields. Parsing and path validation use waltid-x509.
+ */
 class X509Certificate(encoded: ByteArray) {
     val encoded: ByteArray = encoded.copyOf()
+    internal val sharedCertificate = X509CertificateUtil.Default.parseCertificateDerEncoded(ByteString(this.encoded))
+    private val data = sharedCertificate.data
     private val root = Der.parse(this.encoded).expectSequence()
     private val tbs = root.child(0).expectSequence()
-    private val offset = if (tbs.child(0).isContext(0)) 1 else 0
 
     val tbsEncoded: ByteArray get() = tbs.encoded
-    val version: Int = if (offset == 1) tbs.child(0).explicitInner().asInt() + 1 else 1
-    val serialNumber: ByteArray = tbs.child(offset).asIntegerBytes()
+    val version: Int = data.version
+    val serialNumber: ByteArray = data.serialNumberRaw.toByteArray()
     val serialNumberHex: String get() = serialNumber.toHexString().trimStart('0').ifEmpty { "0" }
-    val issuer: DistinguishedName = DistinguishedName.of(tbs.child(offset + 2))
-    val notBefore: Instant = tbs.child(offset + 3).child(0).asTime()
-    val notAfter: Instant = tbs.child(offset + 3).child(1).asTime()
-    val subject: DistinguishedName = DistinguishedName.of(tbs.child(offset + 4))
-    val publicKey: PublicKeyInfo = PublicKeyInfo(tbs.child(offset + 5).encoded)
+    val issuer: DistinguishedName = DistinguishedName(data.issuerDnRaw.toByteArray())
+    val notBefore: Instant = data.validity.notBefore
+    val notAfter: Instant = data.validity.notAfter
+    val subject: DistinguishedName = DistinguishedName(data.subjectDnRaw.toByteArray())
+    val publicKey: PublicKeyInfo = PublicKeyInfo(data.subjectPublicKeyInfo.encodedDer.toByteArray())
     val signatureAlgorithmElement: DerElement = root.child(1)
-    val signatureValue: ByteArray = root.child(2).asBitStringBytes()
+    val signatureValue: ByteArray = sharedCertificate.signatureValueRaw.toByteArray()
 
     val extensions: List<X509Extension> = tbs.contextChild(3)?.explicitInner()?.children?.map { ext ->
         val critical = ext.children.size == 3 && ext.child(1).asBoolean()
@@ -44,26 +55,20 @@ class X509Certificate(encoded: ByteArray) {
 
     val isSelfIssued: Boolean get() = issuer.matches(subject)
 
-    val isCa: Boolean
-        get() = extension(Oids.EXT_BASIC_CONSTRAINTS)?.parsed?.children?.firstOrNull()
-            ?.takeIf { it.isUniversal(Der.BOOLEAN) }?.asBoolean() ?: false
+    val isCa: Boolean get() = data.extensionBasicConstraints?.cA ?: false
 
-    val pathLengthConstraint: Int?
-        get() = extension(Oids.EXT_BASIC_CONSTRAINTS)?.parsed?.children?.firstOrNull { it.isUniversal(Der.INTEGER) }?.asInt()
+    val pathLengthConstraint: Int? get() = data.extensionBasicConstraints?.pathLenConstraint
 
     val keyUsage: Set<KeyUsageBit>?
-        get() = extension(Oids.EXT_KEY_USAGE)?.parsed?.asBitList()?.let { bits ->
-            bits.mapIndexedNotNull { i, set -> if (set) KeyUsageBit.entries.getOrNull(i) else null }.toSet()
-        }
+        get() = data.extensionKeyUsage?.keyPurposeIdList?.map { KeyUsageBit.entries[it.ordinal] }?.toSet()
 
+    // Preserve multiplicity: the shared Set view would hide duplicate EKUs from the strict RFC 3161 check.
     val extendedKeyUsage: List<String>
         get() = extension(Oids.EXT_EXTENDED_KEY_USAGE)?.parsed?.children?.map { it.asOid() } ?: emptyList()
 
-    val subjectKeyIdentifier: ByteArray?
-        get() = extension(Oids.EXT_SUBJECT_KEY_ID)?.parsed?.asOctetString()
+    val subjectKeyIdentifier: ByteArray? get() = data.extensionSubjectKeyIdentifier?.keyIdentifier?.toByteArray()
 
-    val authorityKeyIdentifier: ByteArray?
-        get() = extension(Oids.EXT_AUTHORITY_KEY_ID)?.parsed?.contextChild(0)?.content
+    val authorityKeyIdentifier: ByteArray? get() = data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toByteArray()
 
     val crlDistributionPoints: List<String>
         get() = extension(Oids.EXT_CRL_DISTRIBUTION_POINTS)?.parsed?.children?.flatMap { dp ->

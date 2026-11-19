@@ -19,7 +19,11 @@ enum class RevocationReason(val code: Int) {
 
 class RevokedEntry(val serialNumber: ByteArray, val revocationDate: Instant, val reason: RevocationReason)
 
-/** X.509 CRL (RFC 5280 section 5). */
+/**
+ * X.509 CRL (RFC 5280 section 5).
+ * AdES retains this historical evidence view: waltid-x509's complete-CRL verifier requires nextUpdate,
+ * AKI and a CRL number and validates current freshness, which cannot replace EN 319 102-1 past/POE processing.
+ */
 class X509Crl(encoded: ByteArray) {
     val encoded: ByteArray = encoded.copyOf()
     private val root = Der.parse(this.encoded).expectSequence()

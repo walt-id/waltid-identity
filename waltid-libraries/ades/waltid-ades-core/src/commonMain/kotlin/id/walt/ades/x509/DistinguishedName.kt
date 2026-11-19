@@ -4,7 +4,11 @@ import id.walt.ades.asn1.Der
 import id.walt.ades.asn1.DerElement
 import id.walt.ades.asn1.Oids
 
-/** X.500 Name kept as raw DER (for exact matching) with an RFC 4514-style rendering. */
+/**
+ * X.500 Name kept as raw DER (for exact matching) with an RFC 4514-style rendering.
+ * The shared DN type only parses strings; AdES needs DER-preserving issuerSerial/OCSP bindings and
+ * normalized name comparison, so this view cannot be replaced by a string round trip.
+ */
 class DistinguishedName(val encoded: ByteArray) {
     private val rdns: List<List<Pair<String, String>>> = Der.parse(encoded).children.map { rdn ->
         rdn.children.map { atv -> atv.child(0).asOid() to runCatching { atv.child(1).asString() }.getOrElse { "#" + atv.child(1).encoded.toHexString() } }

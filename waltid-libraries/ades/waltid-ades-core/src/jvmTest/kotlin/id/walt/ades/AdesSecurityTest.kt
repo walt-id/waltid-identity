@@ -81,6 +81,7 @@ class AdesSecurityTest {
         for ((critical, purposes) in listOf(
             false to arrayOf(KeyPurposeId.id_kp_timeStamping),
             true to arrayOf(KeyPurposeId.id_kp_timeStamping, KeyPurposeId.id_kp_clientAuth),
+            true to arrayOf(KeyPurposeId.id_kp_timeStamping, KeyPurposeId.id_kp_timeStamping),
         )) {
             val holder = X509v3CertificateBuilder(pki.tsa.holder)
                 .replaceExtension(Extension.extendedKeyUsage, critical, ExtendedKeyUsage(purposes))

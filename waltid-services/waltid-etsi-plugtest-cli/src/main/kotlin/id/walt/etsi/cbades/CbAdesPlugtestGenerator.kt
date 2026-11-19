@@ -24,7 +24,7 @@ import kotlin.time.Instant
 class PlugtestData(
     val toBeSigned: ByteArray,
     val signaturePolicy: ByteArray,
-    val signaturePolicyId: String = "urn:oid:0.4.0.0.19102.1.1.1",
+    val signaturePolicyId: String = "urn:oid:0.4.0.19102.1.1.1",
     val signaturePolicyUri: String = "https://signature-plugtests.etsi.org/api/public/signature_creation_policy.der",
 )
 

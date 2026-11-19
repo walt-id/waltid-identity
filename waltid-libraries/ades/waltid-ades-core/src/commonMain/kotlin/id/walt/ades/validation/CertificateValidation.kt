@@ -15,7 +15,6 @@ import id.walt.certificate.x509.validation.validator.X509CertificateCaHasKeyCert
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
-import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -34,7 +33,7 @@ class AdesValidationPolicy(
     val revocationFreshness: Duration = 1.days,
     /**
      * EN 319 102-1 5.5.4 3b removes failing signature time-stamps and continues. When true, a present but
-     * cryptographically broken time-stamp (wrong imprint / signature) makes the whole signature TOTAL-FAILED.
+     * invalid signature/archive time-stamp propagates its validation indication/sub-indication to the signature.
      */
     val strictTimestamps: Boolean = false,
     /** Digests that are never acceptable (TS 119 152-1 6.2.1: MD5 shall not be used). */
@@ -62,9 +61,8 @@ class CertificateChainValidator(
 ) {
     /** RFC 5280 path constraints are shared with waltid-x509; AdES retains revocation and POE processing. */
     private suspend fun validatePath(chain: List<X509Certificate>, time: Instant): String? {
-        val util = X509CertificateUtil.Default
-        val sharedChain = chain.map { util.parseCertificateDerEncoded(ByteString(it.encoded)) }
-        val anchors = policy.trustAnchors.map { util.parseCertificateDerEncoded(ByteString(it.encoded)) }
+        val sharedChain = chain.map { it.sharedCertificate }
+        val anchors = policy.trustAnchors.map { it.sharedCertificate }
         val validity = X509CertificateValidityValidator(clock = object : Clock {
             override fun now() = time
         })
@@ -75,10 +73,10 @@ class CertificateChainValidator(
         }
         val validators = listOf(
             X509CertificateBasicConstraintsValidator(), X509CertificateCaHasKeyCertSignKeyUsageValidator(),
-            X509CertificateAuthorityKeyIdValidator(), X509CertificateSignatureValidator(util.services.signatureValidator), caValidity,
+            X509CertificateAuthorityKeyIdValidator(), X509CertificateSignatureValidator(X509CertificateUtil.Default.services.signatureValidator), caValidity,
         )
         val result = X509CertificateChainValidator(validators, InMemoryTrustStore(anchors))
-            .validate(util.services.cryptoRuntime, sharedChain)
+            .validate(X509CertificateUtil.Default.services.cryptoRuntime, sharedChain)
         return result.errorLog.takeIf { !result.valid }?.joinToString { it.message }
     }
 

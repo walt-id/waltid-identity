@@ -71,7 +71,7 @@ internal fun loadTrust(files: List<File>): Pair<List<X509Certificate>, Validatio
         when (f.extension.lowercase()) {
             "crl" -> runCatching { extra.add(X509Crl(f.readBytes())) }
             "cer", "crt", "pem", "der" -> runCatching { Pem.certificates(f.readBytes()) }.getOrNull()?.forEach { c ->
-                if (c.isSelfIssued) certs += c else extra.add(c)
+                if (c.isSelfIssued && c.isCa) certs += c else extra.add(c)
             }
         }
     }
@@ -140,6 +140,8 @@ class CbAdesVerifyCommand : CliktCommand(name = "verify") {
     private val only by option("--from", help = "Only verify signatures of these participants").multiple()
     private val zip by option("--zip", help = "Also write a flat upload zip").flag()
     private val offline by option("--offline", help = "Do not fetch revocation data / documents").flag()
+    private val strictTimestamps by option("--strict-timestamps", help = "Require present signature/archive timestamps to validate (default for plugtest reports)")
+        .flag("--no-strict-timestamps", default = true)
 
     override fun run() = runBlocking {
         val dir = extractIfZip(packageFile)
@@ -147,7 +149,7 @@ class CbAdesVerifyCommand : CliktCommand(name = "verify") {
         echo("Trust anchors: ${anchorsData.joinToString { it.subject.commonName ?: it.subject.toString() }}")
         plugtestHttpClient().use { http ->
             val transport = if (offline) null else KtorAdesTransport(http, ::checkPlugtestUrl)
-            val validator = CbAdesValidator(AdesValidationPolicy(trustAnchors = anchorsData, transport = transport, additionalValidationData = extraData), documentResolver = transport?.let(DocumentResolver::http))
+            val validator = CbAdesValidator(AdesValidationPolicy(trustAnchors = anchorsData, transport = transport, additionalValidationData = extraData, strictTimestamps = strictTimestamps), documentResolver = transport?.let(DocumentResolver::http))
             val outDir = File(output, participant).apply { mkdirs() }
             val written = mutableListOf<File>()
             val folders = dir.listFiles()!!.filter { it.isDirectory && it.name !in setOf("Data", "trust") }

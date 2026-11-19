@@ -93,6 +93,7 @@ object CbAdesCredentials {
 class LocalPlugtestPki(private val dir: File, private val participant: String) {
     private val cf = CertificateFactory.getInstance("X.509")
     private val now = Clock.System.now()
+    private var serial = System.currentTimeMillis()
 
     class Entity(val keyPair: KeyPair, val cert: JcaCertificate) {
         val certificate get() = X509Certificate(cert.encoded)
@@ -165,8 +166,6 @@ class LocalPlugtestPki(private val dir: File, private val participant: String) {
             certFile.writeBytes(it.cert.encoded)
         }
     }
-
-    private var serial = System.currentTimeMillis()
 
     private fun issue(dn: String, issuer: Entity?, ca: Boolean = false, eku: KeyPurposeId? = null, years: Int = 2): Entity {
         val kp = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
