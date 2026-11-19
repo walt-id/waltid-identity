@@ -11,6 +11,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
 import java.nio.file.Files
@@ -66,20 +67,22 @@ class MobileCredentialStatusMaintenanceTest {
     @Test
     fun callerCancellationDrainsTheIssuerRequestBeforeClosingItsHandle() = withWallet { wallet ->
         val entered = CompletableDeferred<Unit>()
-        val left = AtomicBoolean(false)
+        val databaseClosedAtRequestExit = CompletableDeferred<Boolean>()
         val work = async {
-            wallet.refresh {
-                entered.complete(Unit)
-                try { awaitCancellation() } finally {
-                    assertFalse(wallet.closed.get())
-                    left.set(true)
+            wallet.refresh(beforeSend = {
+                try {
+                    entered.complete(Unit)
+                    awaitCancellation()
+                } finally {
+                    databaseClosedAtRequestExit.complete(wallet.closed.get())
                 }
-            }
+            })
         }
         entered.await()
         work.cancelAndJoin()
 
-        assertTrue(left.get())
+        assertTrue(databaseClosedAtRequestExit.isCompleted, "The request must finish before maintenance returns")
+        assertFalse(databaseClosedAtRequestExit.await(), "The store must stay open until the request finishes")
         assertTrue(wallet.closed.get())
         assertNull(wallet.store.readCredentialStatusRecord("credential"))
     }
@@ -112,11 +115,19 @@ class MobileCredentialStatusMaintenanceTest {
     ) {
         val closed = AtomicBoolean(false)
 
-        suspend fun refresh(beforeResponse: suspend () -> Unit = {}): CredentialStatusMaintenanceResult =
+        suspend fun refresh(
+            beforeSend: suspend () -> Unit = {},
+            beforeResponse: suspend () -> Unit = {},
+        ): CredentialStatusMaintenanceResult =
             HttpClient(MockEngine {
                 beforeResponse()
                 respond(list, headers = headersOf(HttpHeaders.ContentType, "application/statuslist+jwt"))
-            }).use { client ->
+            }) {
+                // This hook runs in the SDK request coroutine. The mock engine owns its own call job.
+                install(createClientPlugin("MaintenanceRequestProbe") {
+                    onRequest { _, _ -> beforeSend() }
+                })
+            }.use { client ->
                 closed.set(false)
                 runCredentialStatusMaintenance(binding, 1, 8.seconds, open = {
                     val driver = open()
