@@ -87,7 +87,7 @@ class ItbDemoWalletTest {
             withContext(Dispatchers.IO) { server.accept() }.use { socket ->
                 val init = withTimeout(10_000) { ItbDeviceWire.read(socket) }
                 ItbDeviceWire.authenticate(init, token)
-                ItbDeviceWire.approvedOrigin(init.getValue("origin").jsonPrimitive.content)
+                val origin = ItbDeviceWire.approvedOrigin(init.getValue("origin").jsonPrimitive.content)
                 val wallet = createAndroidDemoMobileWallet(context, config).wallet
                 try {
                     check(wallet.credentials().isEmpty()) { "Use a fresh Preview installation for live ITB" }
@@ -101,7 +101,7 @@ class ItbDemoWalletTest {
                         put("ready", true)
                         put("provider", if (attended) "android-demo-attended" else "android-demo-unattended")
                     })
-                    val driver = DemoInteractions(context, device, wallet, attended)
+                    val driver = DemoInteractions(context, device, wallet, attended, origin.host)
                     try {
                         ItbDeviceWire.serve(socket, driver::execute)
                     } catch (ended: CancellationException) {
@@ -120,6 +120,7 @@ private class DemoInteractions(
     private val device: UiDevice,
     private val wallet: MobileWallet,
     private val attended: Boolean,
+    private val itbHost: String,
 ) {
     suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult = when (interaction) {
         is ItbWalletInteraction.Offer -> ui("offer") { receive(interaction) }
@@ -239,8 +240,13 @@ private class DemoInteractions(
     private suspend fun enterProviderReview(reviewTag: String) {
         val picker = By.pkg("com.google.android.gms")
         var selected = false
-        waitUntil(40_000, "demo_dc_picker_or_review_missing") {
+        var browserConfirmed = false
+        waitUntil(if (attended) 90_000 else 40_000, "demo_dc_picker_or_review_missing") {
             requireProviderScreen()
+            if (!attended && !browserConfirmed && device.currentPackageName == CHROME_PACKAGE && confirmBrowserOrigin()) {
+                browserConfirmed = true
+                return@waitUntil false
+            }
             if (device.hasObject(By.res(reviewTag))) true else {
                 val candidate = device.findObject(By.copy(picker).textContains("walt.id Wallet"))
                 val confirm = device.findObject(By.copy(picker).text("Confirm"))
@@ -253,6 +259,16 @@ private class DemoInteractions(
                 false
             }
         }
+    }
+
+    private fun confirmBrowserOrigin(): Boolean {
+        val chrome = By.pkg(CHROME_PACKAGE)
+        if (!device.hasObject(By.copy(chrome).text("Do you trust this site with your data?")) ||
+            !device.hasObject(By.copy(chrome).textStartsWith("$itbHost wants to use personal info"))
+        ) return false
+        val proceed = device.findObject(By.copy(chrome).text("Continue"))?.takeIf { it.isEnabled } ?: return false
+        (proceed.clickableAncestor() ?: proceed).click()
+        return true
     }
 
     private fun requireProviderScreen() {
@@ -274,7 +290,7 @@ private class DemoInteractions(
         val presentation = tag == "wallet.presentationDone"
         var returnedFromBrowser = false
         waitUntil(timeout, "demo_receipt_missing") {
-            if (presentation && !returnedFromBrowser && device.currentPackageName == "com.android.chrome") {
+            if (presentation && !returnedFromBrowser && device.currentPackageName == CHROME_PACKAGE) {
                 // Some verifier responses switch to Chrome. Resume the existing wallet task
                 // to observe its receipt before acknowledging ITB.
                 val launch = checkNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
@@ -353,3 +369,5 @@ private class DemoInteractions(
         throw ItbWalletRejection("demo_${operation}_ui_assertion_failed")
     }
 }
+
+private const val CHROME_PACKAGE = "com.android.chrome"

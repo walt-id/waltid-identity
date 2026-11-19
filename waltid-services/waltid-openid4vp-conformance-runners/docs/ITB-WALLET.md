@@ -115,6 +115,8 @@ row. The portal exposes Copy instead of Download for short inline values; the
 bridge never accesses the clipboard. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed immediately after reading. For DC API cases, the app
 driver uses Chrome at the counterpart's origin and the Android credential picker.
+The unattended emulator confirms Chrome's disclosure prompt for the configured
+ITB host. In attended mode the operator confirms any Chrome disclosure prompt.
 For CS-07 issuance, the wallet uses a Custom Tab for issuer authorization so the
 original provider request can finish in Chrome. The driver requires the app's new
 PID, the browser's create response and an `issued` result from the same offer's
