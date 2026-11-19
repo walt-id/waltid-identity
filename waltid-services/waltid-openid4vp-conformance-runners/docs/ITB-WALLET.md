@@ -117,6 +117,8 @@ DC API inputs without executing supplied JavaScript. Downloads are removed immed
 driver uses Chrome at the counterpart's origin and the Android credential picker.
 The unattended emulator confirms Chrome's disclosure prompt for the configured
 ITB host. In attended mode the operator confirms any Chrome disclosure prompt.
+The full matrix starts with VCI-006 and `tc15`, so Android's system picker has
+only the prerequisite PID when it selects credentials for `tc15`.
 For CS-07 issuance, the wallet uses a Custom Tab for issuer authorization so the
 original provider request can finish in Chrome. The driver requires the app's new
 PID, the browser's create response and an `issued` result from the same offer's

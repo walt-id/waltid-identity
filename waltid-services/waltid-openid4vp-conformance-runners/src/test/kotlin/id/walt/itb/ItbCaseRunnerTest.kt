@@ -15,7 +15,7 @@ import java.net.ServerSocket
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
-    private val suite = ItbCatalogue.walletCases().suites.first()
+    private val suite = ItbCatalogue.walletCases().suites.single { it.id == "cs01v1" }
     private val case = suite.cases.single { it.id == "tc_vci_006" }
     private val session = "00000000-0000-0000-0000-000000000001"
     private val report = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
