@@ -1,5 +1,12 @@
 package id.walt.policies2.vc
 
+import id.walt.cose.Cose
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.toCoseSigner
+import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
+import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizationRequest
+import id.walt.policies2.vc.policies.status.signature.authorizeStatusListSigner
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.Key as LegacyKey
@@ -73,6 +80,64 @@ class CredentialIssuerAuthorizationTest {
         }
     }
 
+    @Test
+    fun `JWT and CWT status lists require assertion authorization including dedicated status keys`() = runTest {
+        val assertion = key("assertion")
+        val authentication = key("authentication")
+        val status = key("status")
+        val verifier = StatusListSignatureVerifier()
+        val credential = credential(assertion)
+        for (embedded in listOf(false, true)) {
+            withDocument(document(assertion, authentication, embedded, status)) {
+                for ((signer, kid, authorized) in listOf(
+                    Triple(assertion, assertion.id.value, true),
+                    Triple(status, status.id.value, true),
+                    Triple(authentication, authentication.id.value, false),
+                    Triple(assertion, "$did#missing", false),
+                )) {
+                    val (jwt, cwt) = statusLists(signer, kid)
+                    val jwtResult = verifier.verifyJwtWithSigner(jwt)
+                    val cwtResult = verifier.verifyCwtWithSigner(cwt)
+                    assertEquals(authorized, jwtResult.isSuccess, "JWT signer $kid (embedded=$embedded)")
+                    assertEquals(authorized, cwtResult.isSuccess, "CWT signer $kid (embedded=$embedded)")
+                    if (authorized) {
+                        for (resolved in listOf(jwtResult.getOrThrow().signer, cwtResult.getOrThrow().signer)) {
+                            authorizeStatusListSigner(
+                                StatusListSignerAuthorizationRequest(credential, "https://status.example/list", resolved),
+                                authorizer = null,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `status lists fail when the issuer has no assertion relationship`() = runTest {
+        val signer = key("assertion")
+        val (jwt, cwt) = statusLists(signer, signer.id.value)
+        withDocument(JsonObject(document(signer).filterKeys { it != "assertionMethod" })) {
+            val verifier = StatusListSignatureVerifier()
+            assertTrue(verifier.verifyJwt(jwt).isFailure)
+            assertTrue(verifier.verifyCwt(cwt).isFailure)
+        }
+    }
+
+    private suspend fun statusLists(key: Key, kid: String): Pair<String, ByteArray> {
+        val payload = Json.encodeToString(buildJsonObject {
+            put("iss", did)
+            put("status_list", buildJsonObject { put("bits", 1); put("lst", "test") })
+        }).encodeToByteArray()
+        val jwt = CompactJws.sign(payload, key, JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject { put("kid", kid); put("typ", "statuslist+jwt") })
+        val cwt = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256, kid = kid.encodeToByteArray()),
+            unprotectedHeaders = CoseHeaders(), payload = payload, signer = key.toCoseSigner(Cose.Algorithm.ES256),
+        ).toTagged()
+        return jwt to cwt
+    }
+
     private suspend fun key(id: String): Key = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
         id = KeyId("$did#$id"), spec = KeySpec.Ec(EcCurve.P256), usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
     ))
@@ -85,17 +150,24 @@ class CredentialIssuerAuthorizationTest {
         put("publicKeyJwk", Json.parseToJsonElement(publicKey.data.toByteArray().decodeToString()))
     }
 
-    private suspend fun document(assertion: Key, authentication: Key? = null, embedded: Boolean = false): JsonObject {
+    private suspend fun document(
+        assertion: Key, authentication: Key? = null, embedded: Boolean = false, status: Key? = null,
+    ): JsonObject {
         val assertionMethod = method(assertion)
         val authenticationMethod = authentication?.let { method(it) }
+        val statusMethod = status?.let { method(it) }
         return buildJsonObject {
             put("id", did)
             put("verificationMethod", buildJsonArray {
-                if (!embedded) add(assertionMethod)
+                if (!embedded) {
+                    add(assertionMethod)
+                    statusMethod?.let { add(it) }
+                }
                 authenticationMethod?.let { add(it) }
             })
             put("assertionMethod", buildJsonArray {
                 add(if (embedded) assertionMethod else JsonPrimitive("#assertion"))
+                statusMethod?.let { add(if (embedded) it else JsonPrimitive("#status")) }
             })
             authentication?.let { put("authentication", buildJsonArray { add(JsonPrimitive(it.id.value)) }) }
         }
