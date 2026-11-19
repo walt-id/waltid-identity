@@ -1150,7 +1150,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 binding = nonceBinding,
             ),
             batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
-            requireDistinctBatchHolderKeys = observedIssuanceRequest.requireDistinctBatchHolderKeys,
         )
 
         if (observedSession.deferredState != null && deferredClaim == null) {
@@ -1258,9 +1257,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult? {
                     val retainProofKeys = usesPreallocatedStatus || requiresCredentialProofKeys(issuanceRequest)
                     val additionalVerifier = credentialProofVerifier.takeIf { deferredClaim == null }
-                    val verifyBatchWithHost = additionalVerifier != null &&
-                            proofValidationContext.requireDistinctBatchHolderKeys && bindings.size > 1
-                    if (retainProofKeys || verifyBatchWithHost) {
+                    if (retainProofKeys || (additionalVerifier != null && bindings.size > 1)) {
                         if (bindings.isEmpty()) return CredentialResponseResult.Failure(
                             CredentialError(CredentialErrorCodes.INVALID_PROOF, "Credential request has no credential proof"),
                         )
@@ -1769,7 +1766,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             credentialStatus = profileService.statusForIssuance(profile),
-            requireDistinctBatchHolderKeys = requireDistinctBatchHolderKeys,
         )
     }
 

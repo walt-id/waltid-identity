@@ -6,8 +6,6 @@ import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.sdjwt.SDMap
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
@@ -44,9 +42,6 @@ data class IssuanceRequest(
     val credentialStatus: JsonElement? = null,
     @Transient
     val crypto2IssuerStoredKey: String? = null,
-    @OptIn(ExperimentalSerializationApi::class)
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val requireDistinctBatchHolderKeys: Boolean = false,
 )
 
 @Serializable

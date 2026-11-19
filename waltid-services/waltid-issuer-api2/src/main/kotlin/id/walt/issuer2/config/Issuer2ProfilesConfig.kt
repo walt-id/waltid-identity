@@ -44,5 +44,4 @@ data class CredentialProfileConfig(
     val notifications: IssuanceNotifications? = null,
     /** Fixed object/flat W3C group, or per-copy flat SD-JWT/mdoc arrays/nested W3C groups requiring Redis. */
     val credentialStatus: JsonElement? = null,
-    val requireDistinctBatchHolderKeys: Boolean = false,
 )
