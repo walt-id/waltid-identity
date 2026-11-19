@@ -95,11 +95,11 @@ have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved
 Reports contain identities, timestamps and error types/codes, not credentials,
 raw protocol messages, browser state or ITB service logs.
 
-Each fresh document waits up to 60 seconds for its login form or selected-system
-control after committing, without waiting for unrelated resources to finish loading.
-Ordinary DOM steps retain
-their 15-second limit. Login failures expose only the safe preparation-step code and
-leave initialized case reports as `NOT_RUN`; they do not start or retry a session.
+The public login form gets 30 seconds to appear, then one reload and up to 60
+seconds more before credentials are entered. The runner waits up to 60 seconds
+for each selected-system control. Ordinary DOM steps retain their 15-second
+limit. Login is submitted once. Setup failures expose the preparation-step
+code and leave initialized case reports as `NOT_RUN`.
 
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal

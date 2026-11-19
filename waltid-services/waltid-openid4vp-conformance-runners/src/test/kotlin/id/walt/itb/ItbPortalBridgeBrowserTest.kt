@@ -226,29 +226,45 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
-    fun loginFailureReportsTheSafeStepWithoutRetryingOrLeakingInputs() {
+    fun loginReloadsAnUnrenderedFormBeforeSubmittingOnce() {
+        withLoginPage(formOnLoad = 2) { page ->
+            page.setDefaultTimeout(500.0)
+            ItbPortalLogin.login(page, "https://itb.example", "test-user", "test-password", 1_000.0)
+            assertEquals("https://itb.example/app#/home", page.url())
+            assertEquals(2, page.evaluate("window.appLoads"))
+            assertEquals(1, page.evaluate("window.submits"))
+        }
+    }
+
+    @Test
+    fun loginFailureReportsTheSafeStepWithoutResubmittingOrLeakingInputs() {
         for (showForm in listOf(false, true)) {
-            withLoginPage(showForm = showForm, acceptLogin = false) { page ->
+            withLoginPage(formOnLoad = if (showForm) 1 else Int.MAX_VALUE, acceptLogin = false) { page ->
                 page.setDefaultTimeout(500.0)
                 val failure = assertFailsWith<ItbPortalStepTimeout> {
-                    ItbPortalLogin.login(page, "https://itb.example", "private-user", "private-password", 500.0)
+                    ItbPortalLogin.login(page, "https://itb.example", "private-user", "private-password", 1_000.0)
                 }
                 assertEquals(if (showForm) ItbPortalStepTimeout.Step.LOGIN_HOME else ItbPortalStepTimeout.Step.LOGIN_FORM, failure.step)
+                assertEquals(if (showForm) 1 else 2, page.evaluate("window.appLoads"))
                 assertEquals(if (showForm) 1 else 0, page.evaluate("window.submits"))
                 assertFalse(failure.toString().contains("private"))
             }
         }
     }
 
-    private fun withLoginPage(showForm: Boolean = true, acceptLogin: Boolean = true, block: (Page) -> Unit) {
+    private fun withLoginPage(formOnLoad: Int = 1, acceptLogin: Boolean = true, block: (Page) -> Unit) {
         Playwright.create().use { playwright ->
             playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
                 browser.newContext().use { context ->
+                    var appLoads = 0
                     context.route("**/*") { route ->
                         if (route.request().url() == "https://itb.example/app") {
+                            appLoads++
+                            val showForm = appLoads >= formOnLoad
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody("""
                                 <img src="/slow-image">
                                 <script>
+                                window.appLoads = $appLoads;
                                 window.submits = 0; window.loaded = false;
                                 window.addEventListener('load', () => window.loaded = true);
                                 if ($showForm) setTimeout(() => {
