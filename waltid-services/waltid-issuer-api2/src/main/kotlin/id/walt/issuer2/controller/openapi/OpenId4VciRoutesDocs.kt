@@ -324,6 +324,8 @@ object OpenId4VciRoutesDocs {
             Status reference uniqueness is shared across profiles using the same Redis consumption ledger;
             profile and operation ownership are retained internally, and retries recover their assignments.
             Insufficient groups return `invalid_credential_request` before signing and consume nothing.
+            A deferred transaction rejected for insufficient groups is invalidated. The wallet can
+            send a new Credential Request for that item with fewer proofs.
             This requires Redis persistence and works with both offered and offerless profile-derived
             sessions. The caller remains responsible for allocating and managing the status entries.
             Different `credentials[]` items can supply different statuses, each used for its corresponding item.

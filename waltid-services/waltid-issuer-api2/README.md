@@ -329,6 +329,8 @@ holder key. If too few groups remain, the entire request fails before signing wi
 `invalid_credential_request`, without consuming a partial batch. Later successful
 requests and other sessions, including those using different profiles, consume additional
 unused groups from the same Redis consumption ledger.
+If a deferred collection fails for lack of groups, issuer2 invalidates that transaction ID.
+The wallet can submit a new Credential Request for the same item with fewer proofs.
 Invalid proofs consume no groups.
 
 Consumption is internal allocation bookkeeping: issuer2 does not modify the profile
@@ -338,6 +340,9 @@ Issuer2 identifies a used entry by its normalized HTTP(S) list URI and index acr
 per-copy inventories sharing the same Redis store. For example, `https://status.example.com:443/list`
 and `https://status.example.com/list` identify the same list. Invalid list URLs and
 duplicate references within an inventory are rejected at profile load or offer creation.
+For per-copy mdoc status, issuer2 also writes the normalized URI into the signed credential.
+Publish the Status List Token with that exact URI as its subject. For example, use
+`https://status.example.com/list` as the subject when the configured URL explicitly includes port 443.
 Each ownership record retains the profile ID and issuance
 operation. An entry consumed through one profile is unavailable through another profile;
 the same operation can recover its reservation, but another operation cannot claim it.
@@ -354,6 +359,14 @@ so one batch can contain entries from different status-list URIs.
 Pending retries reuse their reserved groups and prepared credential responses. Abandoned
 reservations are never automatically recycled. Unused groups and private processing
 checkpoints are omitted from session responses and notifications.
+
+Immediate issuance checkpoints temporarily contain complete signed credentials before wallet
+response encryption. Treat the session store and its backups as credential data. Restrict access
+to issuer2 and authorized operators, encrypt Redis storage and backups, and use an encrypted
+network or TLS tunnel for remote Redis traffic. The standard Redis connector uses a plain
+connection. Verify that backups and restores respect the retention policy for credential data.
+Immediate checkpoints are cleared on successful finalization or expire with the issuance session.
+The separate records of spent status entries must survive session expiry.
 
 Per-copy arrays and groups must be nonempty and contain only supported status objects.
 SD-JWT VC and mdoc entries contain one IETF status object; W3C supports
