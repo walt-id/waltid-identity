@@ -266,20 +266,12 @@ Each Credential Request selects one configuration and dataset. The issuer signs 
 verified holder binding. One key attestation can cover several holder keys. A wallet redeems a
 multi-selection offer through separate Credential Requests.
 
-Profiles accept repeated holder keys by default. This setting in `issuer2-profiles.conf` requires
-each copy of the identity credential to bind to a different holder key.
-
-```hocon
-profiles.identityCredentialSdJwt.requireDistinctBatchHolderKeys = true
-```
-
-The wallet supplies a fresh key for each copy. Issuer2 passes the selected profile's setting
-to the OpenID4VCI provider, which compares the verified public keys within that request.
-If two copies would use the same key, the whole batch returns HTTP 400
-`invalid_proof` before status reservation, signing, or deferred acceptance. The wallet can retry
-with distinct keys. The selected profile applies to both offered and offerless issuance.
-An offer pinned to one `expectedCredentialProofKeyJwk` can issue one copy per request under this
-policy. Configure per-copy status entries as well to avoid correlating copies by their status.
+For both offered and offerless issuance, the wallet must supply a distinct holder key for
+each copy in a batch. If two copies would bind to the same public key, issuer2 returns
+HTTP 400 `invalid_proof` before reserving status entries, signing, or accepting a deferred
+transaction. The wallet can retry with distinct keys. An offer pinned to a single
+`expectedCredentialProofKeyJwk` can issue one copy per request. Configure per-copy status
+entries as well to avoid correlating copies by their status.
 See [OpenID4VCI batch issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#section-3.3.2)
 and [SD-JWT unlinkability considerations](https://www.rfc-editor.org/rfc/rfc9901.html#section-10.1).
 
@@ -547,7 +539,7 @@ Public session reads and webhook/SSE snapshots depend on original selection coun
 - Several original selections use `issuanceRequests` and `issuanceResults`, even when
   the grant selects only one of them. Original identifiers and request order are retained.
 - A single proof key uses `expectedCredentialProofKeyJwk`. Multiple proof copies use
-  `expectedCredentialProofKeyJwks` in response order, preserving duplicate keys.
+  `expectedCredentialProofKeyJwks` in response order.
 
 `authorizedCredentialIdentifiers` records the established session selection in the
 current stored model. Absent/null means unrecorded; an empty list authorizes nothing.

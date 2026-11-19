@@ -313,8 +313,8 @@ object OpenId4VciRoutesDocs {
 
             Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
             return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
-            If the selected profile has `requireDistinctBatchHolderKeys = true`, two credential copies
-            bound to the same public key return `invalid_proof` before status reservation, signing, or
+            If two credential copies would bind to the same holder key, the whole request
+            returns `invalid_proof` before status reservation, signing, or
             deferred acceptance. The wallet can retry with distinct keys.
             A configured status object or flat W3C status array is shared by every copy, including
             repeated issuance. Shared references make those copies linkable and revoking one affects all.

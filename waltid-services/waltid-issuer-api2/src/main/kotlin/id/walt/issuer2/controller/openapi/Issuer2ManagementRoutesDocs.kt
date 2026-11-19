@@ -28,8 +28,6 @@ object Issuer2ManagementRoutesDocs {
             provide credential data, mappings, selective disclosure, mDoc namespace data
             mappings, authorized transaction data types, ID token claim mappings, x5 chains,
             and webhook URLs for a single issuance session.
-            A profile can set `requireDistinctBatchHolderKeys` to require a different verified
-            holder key for each credential copy in an offered or offerless batch. The default is false.
         """.trimIndent()
         response {
             HttpStatusCode.OK to {
