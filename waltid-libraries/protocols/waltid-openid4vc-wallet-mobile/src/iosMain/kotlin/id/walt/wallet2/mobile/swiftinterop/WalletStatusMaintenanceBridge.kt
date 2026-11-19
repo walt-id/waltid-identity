@@ -7,7 +7,12 @@ import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Swift bridge value. A null preference means this persistence configuration cannot enroll. */
+/**
+ * Enrollment information for the Swift facade.
+ *
+ * @property preference The saved preference, or null when the persistence configuration cannot enroll.
+ * @property binding The opaque grant for the current wallet when maintenance is enabled.
+ */
 public data class WalletBridgeStatusMaintenanceEnrollment(
     public val preference: String?,
     public val binding: String?,
@@ -16,7 +21,14 @@ public data class WalletBridgeStatusMaintenanceEnrollment(
 internal fun CredentialStatusMaintenanceEnrollment?.toMaintenanceBridgeEnrollment() =
     WalletBridgeStatusMaintenanceEnrollment(this?.preference?.name, this?.binding)
 
-/** Redacted result of a single maintenance pass. */
+/**
+ * Redacted result of a single maintenance pass.
+ *
+ * @property outcome Whether the pass finished, deferred, or found an ineligible wallet.
+ * @property checked Completed attempts, including attempts with per-credential errors.
+ * @property unchanged Entries that needed no new observation or lost a concurrent update.
+ * @property remaining Entries deferred by the per-pass limits.
+ */
 public data class WalletBridgeStatusMaintenanceResult(
     public val outcome: String,
     public val checked: Int = 0,
