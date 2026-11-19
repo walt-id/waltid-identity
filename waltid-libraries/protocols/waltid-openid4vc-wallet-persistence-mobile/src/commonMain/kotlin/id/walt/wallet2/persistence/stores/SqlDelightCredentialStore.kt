@@ -34,6 +34,7 @@ public class SqlDelightCredentialStore private constructor(
     /** Opens the ordinary foreground credential store. */
     public constructor(queries: WalletPersistenceQueries) : this(queries, null)
 
+    /** Factories for credential stores with restricted writes. */
     public companion object {
         /** Restricts mutations to status writes under the named wallet's current grant. */
         public fun forStatusMaintenance(
