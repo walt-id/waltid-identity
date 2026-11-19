@@ -25,13 +25,13 @@
       "name": "WE BUILD CTS - CS-02 Presentation",
       "publishedVersion": "1.3",
       "cases": [
-        { "id": "tc_vp_001", "name": "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]" },
-        { "id": "tc_vp_002", "name": "VP-002: CS-02 hash presentation with explicit encrypted response mode [Wallet SUT]" },
-        { "id": "tc_vp_003", "name": "VP-003: CS-02 hash presentation with GET request-URI retrieval [Wallet SUT]" },
-        { "id": "tc_vp_007", "name": "VP-007: Remote mdoc interoperability extension — outside CS-02 v1.2 normative coverage [Wallet SUT]" },
-        { "id": "tc_vp_011", "name": "VP-011: CS-02 hash presentation invoked with OpenID4VP [Wallet SUT]", "invocationScheme": "openid4vp" },
-        { "id": "tc_vp_012", "name": "VP-012: CS-02 hash presentation invoked with eu-eaap [Wallet SUT]", "invocationScheme": "eu-eaap" },
-        { "id": "tc_vp_013", "name": "VP-013: CS-02 hash presentation invoked with haip-vp [Wallet SUT]", "invocationScheme": "haip-vp" }
+        { "id": "tc_vp_001", "name": "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc_vp_002", "name": "VP-002: CS-02 hash presentation with explicit encrypted response mode [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc_vp_003", "name": "VP-003: CS-02 hash presentation with GET request-URI retrieval [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc_vp_007", "name": "VP-007: Remote mdoc interoperability extension — outside CS-02 v1.2 normative coverage [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_008" },
+        { "id": "tc_vp_011", "name": "VP-011: CS-02 hash presentation invoked with OpenID4VP [Wallet SUT]", "invocationScheme": "openid4vp", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc_vp_012", "name": "VP-012: CS-02 hash presentation invoked with eu-eaap [Wallet SUT]", "invocationScheme": "eu-eaap", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc_vp_013", "name": "VP-013: CS-02 hash presentation invoked with haip-vp [Wallet SUT]", "invocationScheme": "haip-vp", "prerequisite": "cs01v1/tc_vci_006" }
       ],
       "statement": "Base Protocols"
     },
@@ -41,7 +41,8 @@
       "name": "WE BUILD DC APIs Test Suite",
       "publishedVersion": "1.0",
       "cases": [
-        { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request" }
+        { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc16", "name": "DC API - [Wallet SUT] CS-07 PID Credential Issuance", "demoOnly": true }
       ],
       "statement": "Domain Specific and generic use cases",
       "actor": "User"
@@ -52,8 +53,8 @@
       "name": "WE BUILD CS-10 Attestation Revocation",
       "publishedVersion": "1.0",
       "cases": [
-        { "id": "rv_iss_01", "name": "RV-ISS-01: Shared status list and public status token [Wallet SUT]" },
-        { "id": "rv_iss_02", "name": "RV-ISS-02: Wallet receives an already-revoked credential [Wallet SUT]" }
+        { "id": "rv_iss_01", "name": "RV-ISS-01: Shared status list and public status token [Wallet SUT]", "demoOnly": true },
+        { "id": "rv_iss_02", "name": "RV-ISS-02: Wallet receives an already-revoked credential [Wallet SUT]", "demoOnly": true }
       ],
       "statement": "Base Protocols"
     },
@@ -66,12 +67,12 @@
         { "id": "ts12_issue_01", "name": "TS12 [Wallet SUT]: Receive SCA-IBAN Credential" },
         { "id": "ts12_issue_02", "name": "TS12 [Wallet SUT]: Receive SCA-User Credential" },
         { "id": "ts12_issue_03", "name": "TS12 [Wallet SUT]: Receive SCA-Card DPC Credential" },
-        { "id": "ts12_pay_01", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-IBAN" },
-        { "id": "ts12_pay_02", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-User" },
-        { "id": "ts12_pay_03", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-Card DPC" },
-        { "id": "ts12_pay_dc_api_01", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-IBAN" },
-        { "id": "ts12_pay_dc_api_02", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-User" },
-        { "id": "ts12_pay_dc_api_03", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-Card DPC" }
+        { "id": "ts12_pay_01", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-IBAN", "prerequisite": "ts12/ts12_issue_01", "attended": true },
+        { "id": "ts12_pay_02", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-User", "prerequisite": "ts12/ts12_issue_02", "attended": true },
+        { "id": "ts12_pay_03", "name": "TS12 [Wallet SUT]: Authorize Payment with SCA-Card DPC", "prerequisite": "ts12/ts12_issue_03", "attended": true },
+        { "id": "ts12_pay_dc_api_01", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-IBAN", "prerequisite": "ts12/ts12_issue_01", "attended": true },
+        { "id": "ts12_pay_dc_api_02", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-User", "prerequisite": "ts12/ts12_issue_02", "attended": true },
+        { "id": "ts12_pay_dc_api_03", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-Card DPC", "prerequisite": "ts12/ts12_issue_03", "attended": true }
       ],
       "statement": "Payment use cases"
     }

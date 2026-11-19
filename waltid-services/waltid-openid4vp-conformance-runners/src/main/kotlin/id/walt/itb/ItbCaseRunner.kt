@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import java.time.Instant
 
 // Issuer response text is untrusted; reports retain only known protocol error identifiers.
@@ -60,8 +61,10 @@ data class ItbCaseResult(
     val errorType: String? = null,
     val cleanupFailed: Boolean = false,
     val errorCode: String? = null,
+    val statusObservations: List<ItbStatusObservation> = emptyList(),
+    @Transient val issuedCredentialIds: List<String> = emptyList(),
 ) {
-    enum class Outcome { PASSED, WALLET_FAILED, AUTH_UNAVAILABLE, ITB_FAILED, ERROR, TIMED_OUT, INCOMPLETE, NOT_RUN }
+    enum class Outcome { PASSED, WALLET_FAILED, AUTH_UNAVAILABLE, ITB_FAILED, ERROR, TIMED_OUT, INCOMPLETE, PREREQUISITE_FAILED, NOT_RUN }
     enum class Phase { START, INTERACTION, WALLET, VERDICT }
 }
 
@@ -69,7 +72,7 @@ data class ItbCaseResult(
 class ItbCaseRunner(
     private val api: ItbRestClient,
     private val bridge: ItbInteractionBridge,
-    private val executeWallet: suspend (ItbWalletInteraction) -> Unit,
+    private val executeWallet: suspend (ItbWalletInteraction) -> ItbWalletResult,
     private val caseTimeoutMillis: Long = 120_000,
     private val pollMillis: Long = 1_000,
 ) {
@@ -77,8 +80,18 @@ class ItbCaseRunner(
         require(caseTimeoutMillis > 0 && pollMillis > 0) { "ITB timeouts must be positive" }
     }
 
-    suspend fun run(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbCaseResult {
+    suspend fun run(
+        suite: ItbCatalogue.Suite,
+        case: ItbCatalogue.Case,
+        prerequisiteCredentialId: String? = null,
+    ): ItbCaseResult {
         val start = Instant.now().toString()
+        if (case.prerequisite != null && prerequisiteCredentialId == null) {
+            return ItbCaseResult(
+                suite.id, case.id, null, ItbCaseResult.Outcome.PREREQUISITE_FAILED, ItbCaseResult.Phase.START,
+                false, false, null, false, null, start, start, errorCode = case.prerequisite,
+            )
+        }
         var session: ItbSession? = null
         var report: ItbSessionReport? = null
         var phase = ItbCaseResult.Phase.START
@@ -87,6 +100,7 @@ class ItbCaseRunner(
         var failure: String? = null
         var cleanupFailed = false
         var errorCode: String? = null
+        var observation = ItbWalletResult()
         var outcome = ItbCaseResult.Outcome.ERROR
         try {
             withTimeout(caseTimeoutMillis) {
@@ -102,42 +116,53 @@ class ItbCaseRunner(
                         "The ITB interaction does not use the case's invocation scheme"
                     }
                 }
-                suspend fun execute(input: ItbWalletInteraction) {
+                suspend fun execute(input: ItbWalletInteraction): ItbWalletResult {
                     phase = ItbCaseResult.Phase.WALLET
                     adapterInvoked = true
-                    executeWallet(input)
+                    return executeWallet(input)
                 }
                 val caseKey = "${suite.id}/${case.id}"
-                val confirmStatus = when (caseKey) {
-                    "cs10-test-suite/rv_iss_01" -> {
+                val expectedStatus = when (caseKey) {
+                    "cs10-test-suite/rv_iss_01" -> ItbExpectedStatus.CLEAR
+                    "cs10-test-suite/rv_iss_02" -> ItbExpectedStatus.INVALID
+                    else -> null
+                }
+                if (expectedStatus != null) interaction.requireOffer()
+                val input = when (interaction) {
+                    is ItbWalletInteraction.Presentation -> interaction.copy(
+                        credentialId = prerequisiteCredentialId,
+                        attended = case.attended,
+                    )
+                    is ItbWalletInteraction.DigitalCredentials -> interaction.copy(credentialId = prerequisiteCredentialId)
+                    else -> interaction
+                }
+                observation = execute(input)
+                if (expectedStatus != null) {
+                    val firstId = observation.singleIssuedCredential()
+                    val ids = if (expectedStatus == ItbExpectedStatus.CLEAR) {
                         val firstOffer = interaction.requireOffer()
-                        execute(ItbWalletInteraction.RevocationOffer(
-                            firstOffer, createdSession.session, ItbRevocationStep.FIRST_SHARED,
-                        ))
                         phase = ItbCaseResult.Phase.INTERACTION
                         bridge.complete()
                         val secondOffer = bridge.readNext(createdSession).requireOffer()
                         check(firstOffer.url != secondOffer.url) { "ITB repeated the first revocation offer" }
-                        execute(ItbWalletInteraction.RevocationOffer(
-                            secondOffer, createdSession.session, ItbRevocationStep.SECOND_SHARED,
-                        ))
-                        true
-                    }
-                    "cs10-test-suite/rv_iss_02" -> {
-                        execute(ItbWalletInteraction.RevocationOffer(
-                            interaction.requireOffer(), createdSession.session, ItbRevocationStep.ALREADY_REVOKED,
-                        ))
-                        true
-                    }
-                    else -> {
-                        execute(interaction)
-                        false
-                    }
+                        val secondId = execute(secondOffer).singleIssuedCredential()
+                        if (firstId == secondId) throw ItbWalletRejection("status_expected_distinct_credentials")
+                        listOf(firstId, secondId)
+                    } else listOf(firstId)
+                    phase = ItbCaseResult.Phase.INTERACTION
+                    bridge.complete()
+                    observation = execute(ItbWalletInteraction.CheckStatus(ids, expectedStatus))
+                    if (observation.statusObservations.size != ids.size ||
+                        observation.statusObservations.any { it.refreshed != expectedStatus.label }
+                    ) throw ItbWalletRejection("status_missing_expected_app_observation")
+                    walletSucceeded = true
+                } else {
+                    walletSucceeded = true
+                    phase = ItbCaseResult.Phase.INTERACTION
+                    bridge.complete()
                 }
-                walletSucceeded = true
-                bridge.complete()
                 phase = ItbCaseResult.Phase.VERDICT
-                if (confirmStatus) bridge.confirmRevocation(createdSession)
+                if (expectedStatus != null) bridge.confirmRevocation(createdSession)
                 while (true) {
                     val status = api.status(listOf(createdSession.session)).single()
                     if (status.isComplete) break
@@ -191,8 +216,12 @@ class ItbCaseRunner(
             suite.id, case.id, session?.session, outcome, phase, adapterInvoked, walletSucceeded,
             report?.verdict, report?.isComplete == true, report?.caseVersion,
             start, Instant.now().toString(), failure, cleanupFailed, errorCode,
+            observation.statusObservations, observation.issuedCredentialIds,
         )
     }
+
+    private fun ItbWalletResult.singleIssuedCredential(): String =
+        issuedCredentialIds.singleOrNull() ?: throw ItbWalletRejection("status_expected_one_credential_per_offer")
 
     private fun ItbWalletInteraction.requireOffer(): ItbWalletInteraction.Offer =
         checkNotNull(this as? ItbWalletInteraction.Offer) { "ITB did not supply a revocation offer" }

@@ -21,6 +21,7 @@ internal fun demoWalletConfig(): DemoWalletConfig = DemoWalletConfig(
     attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
     transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
     signingProtectionMode = WalletDemoSigningProtectionMode.parse(BuildConfig.WALLET_SIGNING_PROTECTION_MODE),
+    paymentCredentialIssuerKeys = if (BuildConfig.ITB_PAYMENT_TRUST) itbPaymentCredentialIssuerKeys else emptyMap(),
 )
 
 internal fun DemoWalletConfig.signingProtectionStore(context: Context): WalletDemoSigningProtectionStore =
@@ -36,3 +37,11 @@ internal fun DemoWalletConfig.selectedSigningProtection(context: Context): Walle
             WalletDemoSigningProtectionMode.Disabled,
             -> signingProtectionMode.defaultSelection
         }
+
+
+// Reference issuer public signature key published at /rfc-issuer/.well-known/jwks.json.
+// The attended test trusts the independently published key, never a proof header supplied by the counterpart.
+private val itbPaymentCredentialIssuerKeys = mapOf(
+    "https://dev-i4mlab.aegean.gr/rfc-issuer" to
+        """{"kty":"EC","crv":"P-256","x":"ijVgOGHvwHSeV1Z2iLF9pQLQAw7KcHF3VIjThhvVtBQ","y":"SfFShWAUGEnNx24V2b5G1jrhJNHmMwtgROBOi9OKJLc"}""",
+)
