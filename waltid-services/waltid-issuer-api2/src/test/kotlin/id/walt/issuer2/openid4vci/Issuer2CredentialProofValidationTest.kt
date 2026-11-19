@@ -12,7 +12,6 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JweUtils
 import id.walt.issuer2.domain.IssuanceSessionStatus
-import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
@@ -212,8 +211,8 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
-    fun `strict batch checks the public keys bound to the signed copies`() = testApplication {
-        installIssuer2WithConfigFiles(configureProfilesConfig = ::requireDistinctBatchHolderKeys)
+    fun `batch checks the public keys bound to the signed copies`() = testApplication {
+        installIssuer2WithConfigFiles()
         val flow = prepareFlow(apiClient())
         val first = JWKKey.generate(KeyType.secp256r1)
         val second = JWKKey.generate(KeyType.secp256r1)
@@ -234,8 +233,8 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
-    fun `a strict offer pinned to one key can issue a single copy`() = testApplication {
-        installIssuer2WithConfigFiles(configureProfilesConfig = ::requireDistinctBatchHolderKeys)
+    fun `an offer pinned to one key can issue a single copy`() = testApplication {
+        installIssuer2WithConfigFiles()
         val holder = JWKKey.generate(KeyType.secp256r1)
         val flow = prepareFlow(apiClient(), runtimeOverrides = CredentialOfferRuntimeOverrides(
             expectedCredentialProofKeyJwk = holder.getPublicKey().exportJWKObject(),
@@ -258,7 +257,6 @@ class Issuer2CredentialProofValidationTest {
         val attesterJwk = attester.getPublicKey().exportJWKObject()
         installIssuer2WithConfigFiles(
             credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, keys -> acceptedKeys = keys; acceptBindings },
-            configureProfilesConfig = ::requireDistinctBatchHolderKeys,
             configureServiceConfig = { it.copy(keyAttestationConfig = KeyAttestationConfig(
                 KeyAttestationVerificationMethod.StaticJwk(attesterJwk),
             )) },
@@ -417,9 +415,6 @@ class Issuer2CredentialProofValidationTest {
             }
         }
     }
-
-    private fun requireDistinctBatchHolderKeys(config: Issuer2ProfilesConfig) =
-        config.copy(profiles = config.profiles.mapValues { (_, profile) -> profile.copy(requireDistinctBatchHolderKeys = true) })
 
     private suspend fun HttpResponse.sdJwtHolderThumbprints() = body<JsonObject>().getValue("credentials").jsonArray.map {
         val jwt = it.jsonObject.getValue("credential").jsonPrimitive.content

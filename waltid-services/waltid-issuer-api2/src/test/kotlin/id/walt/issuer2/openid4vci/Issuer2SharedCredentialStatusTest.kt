@@ -344,7 +344,7 @@ class Issuer2SharedCredentialStatusTest {
         scenario: Issuer2CredentialScenario,
     ) = testApplication {
         val groups = example.runtimeOverrides!!.credentialStatus!!.jsonArray
-        val fixture = installStatusIssuer(profileDefault = example.profileId to groups, strictProfileId = example.profileId)
+        val fixture = installStatusIssuer(profileDefault = example.profileId to groups)
         val metadata = IssuerMetadataResolver(fixture.client)
         val issuerMetadata = metadata.resolveCredentialIssuerMetadata("http://localhost/openid4vci").metadata
         val authorizationMetadata = metadata.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
@@ -396,43 +396,9 @@ class Issuer2SharedCredentialStatusTest {
     }
 
     @Test
-    fun eachOfferedProfileAppliesItsOwnHolderKeyRule() = testApplication {
-        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
-        val strictProfileId = "distinctHolderKeys"
-        val fixture = installStatusIssuer(
-            additionalProfile = strictProfileId to example.profileId,
-            strictProfileId = strictProfileId,
-        )
-        val offer = fixture.client.createCredentialOffer(MultiCredentialOfferCreateRequest(
-            credentials = listOf(
-                CredentialOfferCredential(example.profileId),
-                CredentialOfferCredential(strictProfileId, example.runtimeOverrides),
-            ),
-            authMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        ))
-        val resolved = fixture.wallet.resolve(offer)
-        val configurationId = resolved.offer.credentialConfigurationIds.single()
-        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
-        val items = fixture.repository.get(offer.offerId)!!.issuanceRequests.associateBy { it.profileId }
-        suspend fun issue(profile: String, proofs: Proofs) = fixture.issue(
-            resolved, token.access_token, credentialRequestByIdentifier(items.getValue(profile).credentialIdentifier, proofs),
-        )
-
-        val proofs = fixture.twoProofs(resolved, configurationId)
-        val repeated = proofs.repeatingFirstKey()
-        assertInvalidProof(issue(strictProfileId, repeated))
-        val shared = issue(example.profileId, repeated)
-        assertEquals(HttpStatusCode.OK, shared.status, shared.bodyAsText())
-        assertEquals(2, shared.body<JsonObject>().getValue("credentials").jsonArray.size)
-        val distinct = issue(strictProfileId, proofs)
-        assertEquals(HttpStatusCode.OK, distinct.status, distinct.bodyAsText())
-        assertPreallocatedStatuses(distinct.body(), "dc+sd-jwt", example.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
-    }
-
-    @Test
     fun deferredBatchRejectsRepeatedKeysBeforeCreatingATransaction() = testApplication {
         val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
-        val fixture = installStatusIssuer(strictProfileId = example.profileId)
+        val fixture = installStatusIssuer()
         val offer = fixture.client.createCredentialOffer(example.copy(deferred = true))
         val resolved = fixture.wallet.resolve(offer)
         val configurationId = resolved.offer.credentialConfigurationIds.single()
@@ -524,6 +490,9 @@ class Issuer2SharedCredentialStatusTest {
         val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
         val saved = assertNotNull(fixture.repository.get(offer.offerId))
         assertEquals(legacy, saved.issuanceRequests.single().crypto2IssuerStoredKey == null)
+
+        val repeated = fixture.wallet.buildJwtProofs(resolved.issuerMetadata, configurationId).repeatingFirstKey()
+        assertInvalidProof(fixture.issue(resolved, token.access_token, credentialRequest(configurationId, repeated)))
 
         // Repeated successful requests keep the same configured status and the session stays open.
         repeat(2) {
@@ -640,7 +609,6 @@ class Issuer2SharedCredentialStatusTest {
         batchSize: Int? = 2,
         profileDefault: Pair<String, JsonElement>? = null,
         additionalProfile: Pair<String, String>? = null,
-        strictProfileId: String? = null,
         statusRepository: CredentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
             InMemoryPersistence<CredentialStatusConsumption>("preallocated-status-test", Duration.INFINITE),
             durable = true,
@@ -657,7 +625,6 @@ class Issuer2SharedCredentialStatusTest {
             )
         }.toMutableMap()
         additionalProfile?.let { (alias, source) -> profiles[alias] = profiles.getValue(source) }
-        strictProfileId?.let { profiles[it] = profiles.getValue(it).copy(requireDistinctBatchHolderKeys = true) }
         val repository = ConfiguredIssuanceSessionRepository(
             sessions = JsonSessions(),
             crypto2Keys = InMemoryPersistence("status-test-keys", 5.minutes),

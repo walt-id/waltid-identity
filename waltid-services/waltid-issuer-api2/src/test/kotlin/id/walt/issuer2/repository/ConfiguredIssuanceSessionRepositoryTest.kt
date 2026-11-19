@@ -64,7 +64,6 @@ class ConfiguredIssuanceSessionRepositoryTest {
                 val loaded = assertNotNull(repository.get(legacy.sessionId))
                 assertEquals("saved-configuration", loaded.issuanceRequests.single().credentialIdentifier)
                 assertEquals(legacy.credentialData, loaded.issuanceRequests.single().credentialData)
-                assertFalse(loaded.issuanceRequests.single().requireDistinctBatchHolderKeys)
                 assertEquals(legacy.issuerKey, loaded.issuanceRequests.single().issuerKey)
                 assertEquals(sidecar, loaded.issuanceRequests.single().crypto2IssuerStoredKey)
                 assertNull(loaded.authorizedCredentialIdentifiers)
