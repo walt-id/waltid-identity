@@ -33,7 +33,12 @@ public enum class CredentialStatusMaintenancePreference {
     ENABLED,
 }
 
-/** A foreground preference and the opaque binding an authorized host can persist privately. */
+/**
+ * A foreground preference and the opaque binding an authorized host can persist privately.
+ *
+ * @property preference The preference committed to the managed wallet.
+ * @property binding The opaque grant for the current wallet, present only when enabled.
+ */
 public class CredentialStatusMaintenanceEnrollment internal constructor(
     public val preference: CredentialStatusMaintenancePreference,
     public val binding: String?,
@@ -41,7 +46,13 @@ public class CredentialStatusMaintenanceEnrollment internal constructor(
 
 /** Result of one due-only pass. It contains no wallet, credential, endpoint, or key identifiers. */
 public sealed interface CredentialStatusMaintenanceResult {
-    /** Counts of completed attempts, unchanged entries, and work left for a later pass. */
+    /**
+     * Redacted totals from one pass.
+     *
+     * @property checked Completed attempts, including attempts with per-credential errors.
+     * @property unchanged Entries that required no new observation or lost a concurrent update.
+     * @property remaining Entries deferred by the per-pass limits.
+     */
     public data class Finished(public val checked: Int, public val unchanged: Int, public val remaining: Int) :
         CredentialStatusMaintenanceResult
 
